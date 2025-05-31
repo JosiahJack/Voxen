@@ -1,1 +1,1 @@
-gcc -o voxen voxen.c -lX11 -lGL -lm -lXi
+gcc -o voxen voxen.c -lSDL2 -lGL -lm
