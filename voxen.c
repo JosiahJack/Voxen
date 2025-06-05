@@ -17,12 +17,29 @@ SDL_GLContext gl_context;
 int screen_width = 800, screen_height = 600;
 TTF_Font *font = NULL;
 bool window_has_focus = false;
+SDL_Color textCol = {255, 255, 255, 255};
 
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
 float cam_yaw = 0.0f, cam_pitch = -90.0f;         // Camera orientation
+float camdir_x, camdir_y, camdir_z;
 float move_speed = 0.1f;
+float normPointX = 0.0f;
+float normPointY = -1.0f;
+float normPointZ = 0.0f;
 float mouse_sensitivity = 0.1f;                   // Mouse look sensitivity
+float CAMERA_NEAR;
+float CAMERA_FAR;
+float CAMERA_FOV_HORIZONTAL;
+float CAMERA_FOV_VERTICAL;
+float DEGREES_PER_PIXEL_X;
+float DEGREES_PER_PIXEL_Y;
+float CAMERA_FOV_HORIZONTAL_HALF;
+float CAMERA_FOV_VERTICAL_HALF;
+
+float testVertX = 32.0f;
+float testVertY = 128.0f;
+float testVertZ = 3.0f;
 
 // Input states
 bool keys[256] = {false};
@@ -35,12 +52,24 @@ double last_time = 0.0;
 uint32_t *framebuffer = NULL; // RGBA pixel buffer
 float *depth_buffer = NULL;   // Depth buffer
 
+#define RAD2DEG (180.0 / M_PI)
+#define DEG2RAD (M_PI / 180.0)
+
+double rad2deg(double radians) {
+    return radians * RAD2DEG;
+}
+
+double deg2rad(double degrees) {
+    return degrees * DEG2RAD;
+}
+
 // Cube definition: 8 vertices (x, y, z) and per-face colors (r, g, b)
 float cube_vertices[8][3] = {
     {-1, -1,  1}, { 1, -1,  1}, { 1,  1,  1}, {-1,  1,  1}, // Front face
     {-1, -1, -1}, {-1,  1, -1}, { 1,  1, -1}, { 1, -1, -1}  // Back face
 };
 float face_colors[12][3] = {
+    {1, 0, 0}, // Front: red
     {1, 0, 0}, // Front: red
     {0, 1, 0}, // Back: green
     {0, 0, 1}, // Top: blue
@@ -52,7 +81,6 @@ float face_colors[12][3] = {
     {0, 0, 0.5}, // Left: cyan
     {0.5, 0.5, 0}, // Left: cyan
     {0.5, 0, 0.5}, // Left: cyan
-    {0, 0.5, 0.5}  // Left: cyan
 };
 int cube_triangles[12][3] = {
     // Front: 0,1,2 and 0,2,3
@@ -76,100 +104,82 @@ double get_time(void) {
     return ts.tv_sec + ts.tv_nsec * 1e-9;
 }
 
-// Vector math helpers
-typedef struct { float x, y, z; } Vec3;
-typedef struct { float x, y, w; } Vec2;
-
-Vec3 vec3_sub(Vec3 a, Vec3 b) {
-    return (Vec3){a.x - b.x, a.y - b.y, a.z - b.z};
-}
-
-float vec3_dot(Vec3 a, Vec3 b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-Vec3 vec3_cross(Vec3 a, Vec3 b) {
-    return (Vec3){
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
-    };
-}
-
-float vec3_length(Vec3 v) {
-    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
-}
-
-Vec3 vec3_normalize(Vec3 v) {
-    float len = vec3_length(v);
-    if (len > 0) return (Vec3){v.x / len, v.y / len, v.z / len};
-    return v;
-}
-
-void matrix_multiply(float *m, float *v, float *result) {
-    result[0] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3];
-    result[1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3];
-    result[2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14] * v[3];
-    result[3] = m[3] * v[0] + m[7] * v[1] + m[11] * v[2] + m[15] * v[3];
-}
-
-// Setup projection and view matrices
-void setup_matrices(float *proj, float *view) {
-    // Projection matrix (same as original)
-    float aspect = (float)screen_width / screen_height;
-    float fov = 90.0f, near = 0.1f, far = 100.0f;
-    float f = 1.0f / tan(fov * M_PI / 360.0f);
-    proj[0] = f / aspect; proj[5] = f; proj[10] = (far + near) / (near - far);
-    proj[11] = -1; proj[14] = (2 * far * near) / (near - far);
-    proj[1] = proj[2] = proj[3] = proj[4] = proj[6] = proj[7] = proj[8] = proj[9] = proj[12] = proj[13] = proj[15] = 0;
-
-    // View matrix (camera transformation)
-    float yaw_rad = -cam_yaw * M_PI / 180.0f;
-    float pitch_rad = cam_pitch * M_PI / 180.0f;
-    Vec3 forward = {sin(yaw_rad), -cos(yaw_rad), sin(pitch_rad)};
-    Vec3 up = {0, 0, 1};
-    Vec3 right = vec3_cross(forward, up);
-    up = vec3_cross(right, forward);
-    forward = vec3_normalize(forward);
-    right = vec3_normalize(right);
-    up = vec3_normalize(up);
-    view[0] = right.x; view[4] = right.y; view[8] = right.z; view[12] = -vec3_dot(right, (Vec3){cam_x, cam_y, cam_z});
-    view[1] = up.x; view[5] = up.y; view[9] = up.z; view[13] = -vec3_dot(up, (Vec3){cam_x, cam_y, cam_z});
-    view[2] = -forward.x; view[6] = -forward.y; view[10] = -forward.z; view[14] = vec3_dot(forward, (Vec3){cam_x, cam_y, cam_z});
-    view[3] = view[7] = view[11] = 0; view[15] = 1;
-}
-
 // Barycentric coordinate check for triangle rasterization
-bool is_inside_triangle(float x, float y, Vec2 v0, Vec2 v1, Vec2 v2, float *u, float *v, float *w) {
-    float area = 0.5f * (-v1.y * v2.x + v0.y * (-v1.x + v2.x) + v0.x * (v1.y - v2.y) + v1.x * v2.y);
-    float s = (v0.y * v2.x - v0.x * v2.y + (v2.y - v0.y) * x + (v0.x - v2.x) * y) / (2 * area);
-    float t = (v0.x * v1.y - v0.y * v1.x + (v0.y - v1.y) * x + (v1.x - v0.x) * y) / (2 * area);
+bool is_inside_triangle(float x, float y, float v0x, float v0y, float v1x, float v1y, float v2x, float v2y, float *u, float *v, float *w) {
+    float area = 0.5f * (-v1y * v2x + v0y * (-v1x + v2x) + v0x * (v1y - v2y) + v1x * v2y);
+    float s = (v0y * v2x - v0x * v2y + (v2y - v0y) * x + (v0x - v2x) * y) / (2 * area);
+    float t = (v0x * v1y - v0y * v1x + (v0y - v1y) * x + (v1x - v0x) * y) / (2 * area);
     *u = s; *v = t; *w = 1.0f - s - t;
     return *u >= 0 && *v >= 0 && *w >= 0;
 }
 
-// Rasterize a triangle
-void rasterize_triangle(Vec2 v0, Vec2 v1, Vec2 v2, float z0, float z1, float z2, float r, float g, float b) {
-    // Bounding box
-    int min_x = (int)fmax(0, fmin(v0.x, fmin(v1.x, v2.x)));
-    int max_x = (int)fmin(screen_width - 1, fmax(v0.x, fmax(v1.x, v2.x)));
-    int min_y = (int)fmax(0, fmin(v0.y, fmin(v1.y, v2.y)));
-    int max_y = (int)fmin(screen_height - 1, fmax(v0.y, fmax(v1.y, v2.y)));
+void get_cam_dir(float cam_yaw, float cam_pitch, float *dir_x, float *dir_y, float *dir_z) {
+    // Convert to radians
+    float yaw_rad = deg2rad(cam_yaw);
+    float pitch_rad = deg2rad(cam_pitch);
 
+    // Compute direction vector (Z-up coordinate system)
+    float cosfrad = cosf(pitch_rad);
+    *dir_x = sinf(yaw_rad) * cosfrad;
+    *dir_y = -cosf(yaw_rad) * cosfrad;
+    *dir_z = sinf(pitch_rad);
+
+    // Normalize the result
+    float magnitude = sqrtf((*dir_x) * (*dir_x) + (*dir_y) * (*dir_y) + (*dir_z) * (*dir_z));
+    if (magnitude > 0.0f) {
+        *dir_x /= magnitude;
+        *dir_y /= magnitude;
+        *dir_z /= magnitude;
+    }
+}
+
+void normalize(float *x, float *y, float *z) {
+    float magnitude = sqrtf((*x) * (*x) + (*y) * (*y) + (*z) * (*z));
+    if (magnitude > 0.0f) {
+        *x /= magnitude;
+        *y /= magnitude;
+        *z /= magnitude;
+    }
+}
+
+float dot(float x0, float y0, float z0, float x1, float y1, float z1) {
+    return (x0 * x1) + (y0 * y1) + (z0 * z1);
+}
+
+// Rasterize a triangle
+void rasterize_triangle(float x0, float pitch0, float dist0,
+                        float x1, float pitch1, float dist1,
+                        float x2, float pitch2, float dist2,
+                        float r, float g, float b) {
+    float y0, y1, y2;
+    y0 = screen_height - pitch0;
+    y1 = screen_height - pitch1;
+    y2 = screen_height - pitch2;
+
+    // Bounding box
+    int min_x = (int)fmax(0, fmin(x0, fmin(x1,x2)));
+    int max_x = (int)fmin(screen_width - 1, fmax(x0, fmax(x1,x2)));
+    int min_y = (int)fmax(0, fmin(y0, fmin(y1,y2)));
+    int max_y = (int)fmin(screen_height - 1, fmax(y0, fmax(y1,y2)));
     for (int y = min_y; y <= max_y; y++) {
         for (int x = min_x; x <= max_x; x++) {
             float u, v, w;
-            if (is_inside_triangle(x + 0.5f, y + 0.5f, v0, v1, v2, &u, &v, &w)) {
+            if (is_inside_triangle(x + 0.5f, y + 0.5f,
+                                   x0, y0,
+                                   x1, y1,
+                                   x2, y2,
+                                   &u, &v, &w)) {
+
                 // Interpolate depth
-                float depth = u * z0 + v * z1 + w * z2;
+                float depth = u * dist0 + v * dist1 + w * dist2;
                 int idx = (screen_height - 1 - y) * screen_width + x;
                 if (depth > 0 && depth < depth_buffer[idx]) {
                     depth_buffer[idx] = depth;
                     // Convert color to 8-bit and pack into RGBA
-                    uint8_t r8 = (uint8_t)(r * 255);
-                    uint8_t g8 = (uint8_t)(g * 255);
-                    uint8_t b8 = (uint8_t)(b * 255);
-                    framebuffer[idx] = (r8 << 24) | (g8 << 16) | (b8 << 8) | 0xFF;
+                    uint32_t r8 = (uint32_t)(r * 255);
+                    uint32_t g8 = (uint32_t)(g * 255);
+                    uint32_t b8 = (uint32_t)(b * 255);
+                    framebuffer[idx] = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8;
                 }
             }
         }
@@ -182,60 +192,71 @@ void software_render(void) {
     memset(framebuffer, 0, screen_width * screen_height * sizeof(uint32_t));
     for (int i = 0; i < screen_width * screen_height; i++) depth_buffer[i] = 1e10;
 
-    // Setup matrices
-    float proj[16] = {0}, view[16] = {0};
-    setup_matrices(proj, view);
+    float normX = normPointX;
+    float normY = normPointY;
+    float normZ = normPointZ;
+    normalize(&normX, &normY, &normZ);
+    get_cam_dir(cam_yaw, cam_pitch, &camdir_x, &camdir_y, &camdir_z);
+    if (dot(camdir_x, camdir_y, camdir_z, normX, normY, normZ) < 0) rasterize_triangle(testVertX, testVertY, testVertZ  , 128, 128, 3  , 128, 160, 3  , 0.7, 0.0, 0.0);
+    rasterize_triangle(62, 128, 3.1, 158, 128, 3.1, 158, 160, 3.1, 0.0, 0.0, 0.7);
+    return;
+
+    float cam_yaw_min = cam_yaw - CAMERA_FOV_HORIZONTAL_HALF;
+    float cam_yaw_max= cam_yaw + CAMERA_FOV_HORIZONTAL_HALF;
+    float cam_pitch_min = cam_pitch - CAMERA_FOV_VERTICAL_HALF;
+    float cam_pitch_max = cam_pitch + CAMERA_FOV_VERTICAL_HALF;
 
     // Process each triangle
     for (int i = 0; i < 12; i++) {
-        // Get vertices
-        int idx0 = cube_triangles[i][0], idx1 = cube_triangles[i][1], idx2 = cube_triangles[i][2];
-        float v0[4] = {cube_vertices[idx0][0], cube_vertices[idx0][1], cube_vertices[idx0][2], 1};
-        float v1[4] = {cube_vertices[idx1][0], cube_vertices[idx1][1], cube_vertices[idx1][2], 1};
-        float v2[4] = {cube_vertices[idx2][0], cube_vertices[idx2][1], cube_vertices[idx2][2], 1};
+        int idx0 = cube_triangles[i][0];
+        int idx1 = cube_triangles[i][1];
+        int idx2 = cube_triangles[i][2];
+        float v0[3] = {cube_vertices[idx0][0], cube_vertices[idx0][1], cube_vertices[idx0][2]};
+        float v1[3] = {cube_vertices[idx1][0], cube_vertices[idx1][1], cube_vertices[idx1][2]};
+        float v2[3] = {cube_vertices[idx2][0], cube_vertices[idx2][1], cube_vertices[idx2][2]};
 
-        // Transform to view space
-        float v0_view[4], v1_view[4], v2_view[4];
-        matrix_multiply(view, v0, v0_view);
-        matrix_multiply(view, v1, v1_view);
-        matrix_multiply(view, v2, v2_view);
+        // Transform to view space in polar coordinates where x maps to yaw, y maps to pitch, and z is the distance to camera.
+        float dx = v0[0] - cam_x;
+        float dy = v0[1] - cam_y;
+        float dz = v0[2] - cam_z;
+        float dist_v0 = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        float yaw_v0 = rad2deg(atan2f(dy, dx)) - cam_yaw;
+        while (yaw_v0 > 180.0f) yaw_v0 -= 360.0f;
+        while (yaw_v0 < -180.0f) yaw_v0 += 360.0f;
+        yaw_v0 = (yaw_v0 / DEGREES_PER_PIXEL_X) + (screen_width / 2.0f);
+        float dist_xy_v0 = sqrt(dx * dx + dy * dy);
+        float pitch_v0 = dist_xy_v0 < FLT_EPSILON ? 0 : rad2deg(atan2f(dz, dist_xy_v0));
+        pitch_v0 = (pitch_v0 - cam_pitch) / DEGREES_PER_PIXEL_Y + (screen_height / 2.0f);
 
-        // Project to screen space
-        float v0_proj[4], v1_proj[4], v2_proj[4];
-        matrix_multiply(proj, v0_view, v0_proj);
-        matrix_multiply(proj, v1_view, v1_proj);
-        matrix_multiply(proj, v2_view, v2_proj);
+        dx = v1[0] - cam_x;
+        dy = v1[1] - cam_y;
+        dz = v1[2] - cam_z;
+        float dist_v1 = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        float yaw_v1 = rad2deg(atan2f(dy, dx)) - cam_yaw;
+        while (yaw_v1 > 180.0f) yaw_v1 -= 360.0f;
+        while (yaw_v1 < -180.0f) yaw_v1 += 360.0f;
+        yaw_v1 = (yaw_v1 / DEGREES_PER_PIXEL_X) + (screen_width / 2.0f);
+        float dist_xy_v1 = sqrt(dx * dx + dy * dy);
+        float pitch_v1 = dist_xy_v1 < FLT_EPSILON ? 0 : rad2deg(atan2f(dz, dist_xy_v1));
+        pitch_v1 = (pitch_v1 - cam_pitch) / DEGREES_PER_PIXEL_Y + (screen_height / 2.0f);
 
-        // Perspective divide and viewport transform
-        Vec2 s0, s1, s2;
-        float z0, z1, z2;
-        if (v0_proj[3] != 0) {
-            s0.x = (v0_proj[0] / v0_proj[3] + 1) * screen_width / 2;
-            s0.y = (v0_proj[1] / v0_proj[3] + 1) * screen_height / 2;
-            z0 = v0_proj[2] / v0_proj[3];
-        } else continue;
-        if (v1_proj[3] != 0) {
-            s1.x = (v1_proj[0] / v1_proj[3] + 1) * screen_width / 2;
-            s1.y = (v1_proj[1] / v1_proj[3] + 1) * screen_height / 2;
-            z1 = v1_proj[2] / v1_proj[3];
-        } else continue;
-        if (v2_proj[3] != 0) {
-            s2.x = (v2_proj[0] / v2_proj[3] + 1) * screen_width / 2;
-            s2.y = (v2_proj[1] / v2_proj[3] + 1) * screen_height / 2;
-            z2 = v2_proj[2] / v2_proj[3];
-        } else continue;
-
-        // Backface culling
-        Vec2 e1 = {s1.x - s0.x, s1.y - s0.y};
-        Vec2 e2 = {s2.x - s0.x, s2.y - s0.y};
-        float cross = e1.x * e2.y - e1.y * e2.x;
-        if (cross > 0) continue; // Skip back-facing triangles
+        dx = v2[0] - cam_x;
+        dy = v2[1] - cam_y;
+        dz = v2[2] - cam_z;
+        float dist_v2 = sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        float yaw_v2 = rad2deg(atan2f(dy, dx)) - cam_yaw;
+        while (yaw_v2 > 180.0f) yaw_v2 -= 360.0f;
+        while (yaw_v2 < -180.0f) yaw_v2 += 360.0f;
+        yaw_v2 = (yaw_v2 / DEGREES_PER_PIXEL_X) + (screen_width / 2.0f);
+        float dist_xy_v2 = sqrt(dx * dx + dy * dy);
+        float pitch_v2 = dist_xy_v2 < FLT_EPSILON ? 0 : rad2deg(atan2f(dz, dist_xy_v2));
+        pitch_v2 = (pitch_v2 - cam_pitch) / DEGREES_PER_PIXEL_Y + (screen_height / 2.0f);
 
         // Rasterize
         float r = face_colors[i][0];
         float g = face_colors[i][1];
         float b = face_colors[i][2];
-        rasterize_triangle(s0, s1, s2, z0, z1, z2, r, g, b);
+        rasterize_triangle(yaw_v0, pitch_v0, dist_v0, yaw_v1, pitch_v1, dist_v1, yaw_v2, pitch_v2, dist_v2, r, g, b);
     }
 }
 
@@ -318,8 +339,19 @@ void render(void) {
     // Draw debug text
     char text[64];
     snprintf(text, sizeof(text), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
-    SDL_Color textCol = {255, 255, 255, 255};
     render_debug_text(10, 10, text, textCol);
+
+    char text2[64];
+    snprintf(text2, sizeof(text2), "x deg: %.2f y deg: %.2f", cam_yaw, cam_pitch);
+    render_debug_text(10, 25, text2, textCol);
+
+    char text3[64];
+    snprintf(text3, sizeof(text3), "testVertX: %.2f testVertY: %.2f", testVertX, testVertY);
+    render_debug_text(10, 40, text3, textCol);
+
+    char text4[64];
+    snprintf(text4, sizeof(text4), "testVertZ: %.2f", testVertZ);
+    render_debug_text(10, 55, text4, textCol);
 
     SDL_GL_SwapWindow(window);
 }
@@ -340,23 +372,31 @@ void process_input(void) {
     float strafe_y = facing_x;
 
     if (keys['f']) {
-        cam_x -= move_speed * facing_x; // Move forward (inverted)
-        cam_y -= move_speed * facing_y;
+//         cam_x -= move_speed * facing_x; // Move forward (inverted)
+//         cam_y -= move_speed * facing_y;
+        testVertY += move_speed * 2.0f;
     } else if (keys['s']) {
-        cam_x += move_speed * facing_x; // Move backward
-        cam_y += move_speed * facing_y;
+//         cam_x += move_speed * facing_x; // Move backward
+//         cam_y += move_speed * facing_y;
+        testVertY -= move_speed * 2.0f;
     }
     if (keys['a']) {
-        cam_x -= move_speed * strafe_x; // Strafe left
-        cam_y -= move_speed * strafe_y;
+//         cam_x -= move_speed * strafe_x; // Strafe left
+//         cam_y -= move_speed * strafe_y;
+        testVertX -= move_speed * 2.0f;
     } else if (keys['d']) {
-        cam_x += move_speed * strafe_x; // Strafe right
-        cam_y += move_speed * strafe_y;
+//         cam_x += move_speed * strafe_x; // Strafe right
+//         cam_y += move_speed * strafe_y;
+        testVertX += move_speed * 2.0f;
     }
     if (keys['v']) {
-        cam_z += move_speed;
+//         cam_z += move_speed;
+//         normPointY += move_speed * 2.0f;
+        testVertZ += move_speed * 2.0f;
     } else if (keys['c']) {
-        cam_z -= move_speed;
+//         cam_z -= move_speed;
+//         normPointY -= move_speed * 2.0f;
+        testVertZ -= move_speed * 2.0f;
     }
 }
 
@@ -413,6 +453,15 @@ int main(void) {
     double accumulator = 0.0;
     last_time = get_time();
     bool quit = false;
+
+    CAMERA_NEAR = 0.02f;
+    CAMERA_FAR = 20.0f;
+    CAMERA_FOV_HORIZONTAL = 90.0f;
+    CAMERA_FOV_VERTICAL = 60.0f;
+    DEGREES_PER_PIXEL_X = CAMERA_FOV_HORIZONTAL / screen_width; // 90 / 800 = 0.1125 degrees
+    DEGREES_PER_PIXEL_Y = CAMERA_FOV_VERTICAL / screen_height;  // 90 / 600 = 0.1000 degrees
+    CAMERA_FOV_HORIZONTAL_HALF = CAMERA_FOV_HORIZONTAL / 2.0f;
+    CAMERA_FOV_VERTICAL_HALF = CAMERA_FOV_VERTICAL / 2.0f;
     while (!quit) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
