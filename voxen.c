@@ -97,6 +97,11 @@ int cube_triangles[12][3] = {
     {4, 0, 3}, {4, 3, 5}
 };
 
+// x, y, z, radius
+float splats[5][4] = {
+    {0, 0, 0, 20}, {1, 0, 0, 10}, {1, 1, 0, 10}, {0, 1, 0, 20}, {0.5, 0.5, 0.5, 30}
+};
+
 // Function to get current time in seconds
 double get_time(void) {
     struct timespec ts;
@@ -155,14 +160,23 @@ void rasterize_triangle(float x0, float pitch0, float dist0,
     y0 = screen_height - pitch0;
     y1 = screen_height - pitch1;
     y2 = screen_height - pitch2;
+    uint32_t r8 = (uint32_t)(r * 255);
+    uint32_t g8 = (uint32_t)(g * 255);
+    uint32_t b8 = (uint32_t)(b * 255);
+    uint32_t r8_c = (uint32_t)(r * 0.7 * 255);
+    uint32_t g8_c = (uint32_t)(g * 0.7 * 255);
+    uint32_t b8_c = (uint32_t)(b * 0.7 * 255);
+    uint32_t r8_f = (uint32_t)(r * 0.4 * 255);
+    uint32_t g8_f = (uint32_t)(g * 0.4 * 255);
+    uint32_t b8_f = (uint32_t)(b * 0.4 * 255);
 
     // Bounding box
     int min_x = (int)fmax(0, fmin(x0, fmin(x1,x2)));
     int max_x = (int)fmin(screen_width - 1, fmax(x0, fmax(x1,x2)));
     int min_y = (int)fmax(0, fmin(y0, fmin(y1,y2)));
     int max_y = (int)fmin(screen_height - 1, fmax(y0, fmax(y1,y2)));
-    for (int y = min_y; y <= max_y; y++) {
-        for (int x = min_x; x <= max_x; x++) {
+    for (int y = min_y; y <= max_y; y+=4) {
+        for (int x = min_x; x <= max_x; x+=4) {
             float u, v, w;
             if (is_inside_triangle(x + 0.5f, y + 0.5f,
                                    x0, y0,
@@ -176,10 +190,24 @@ void rasterize_triangle(float x0, float pitch0, float dist0,
                 if (depth > 0 && depth < depth_buffer[idx]) {
                     depth_buffer[idx] = depth;
                     // Convert color to 8-bit and pack into RGBA
-                    uint32_t r8 = (uint32_t)(r * 255);
-                    uint32_t g8 = (uint32_t)(g * 255);
-                    uint32_t b8 = (uint32_t)(b * 255);
+
+                    int idx_up = idx - screen_width;
+                    int idx_dn = idx + screen_width;
+                    int idx_rt = idx + 1;
+                    int idx_lf = idx - 1;
+                    int idx_nw = idx - screen_width - 1;
+                    int idx_ne = idx - screen_width + 1;
+                    int idx_sw = idx + screen_width - 1;
+                    int idx_se = idx + screen_width + 1;
                     framebuffer[idx] = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8;
+                    framebuffer[idx_up] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
+                    framebuffer[idx_dn] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
+                    framebuffer[idx_lf] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
+                    framebuffer[idx_rt] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
+                    framebuffer[idx_nw] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
+                    framebuffer[idx_ne] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
+                    framebuffer[idx_sw] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
+                    framebuffer[idx_se] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
                 }
             }
         }
@@ -192,6 +220,52 @@ void software_render(void) {
     memset(framebuffer, 0, screen_width * screen_height * sizeof(uint32_t));
     for (int i = 0; i < screen_width * screen_height; i++) depth_buffer[i] = 1e10;
 
+    // Generate list of "spots" which are splats projected into 2d screen x,y
+    float spots[5][2] = {{0, 0}, {0, 0}};
+    spots[0][0] = 400;
+    spots[0][1] = 400;
+    spots[1][0] = 800;
+    spots[1][1] = 400;
+    spots[2][0] = 420;
+    spots[2][1] = 406;
+    spots[3][0] = 780;
+    spots[3][1] = 406;
+    spots[4][0] = 480;
+    spots[4][1] = 480;
+    for (int s = 0; s<5;s++) {
+//         spots[s][0] = 400;
+//         spots[s][1] = 400;
+    }
+
+    float dist = 0;
+    float dx = 0;
+    float dy = 0;
+    float rad = 0;
+    float r = 0.7f;
+    float g = 0.0f;
+    float b = 0.2f;
+    uint32_t packedCol;
+    for (int y = 0; y<screen_height - 1; y++) {
+        for (int x = 0; x< screen_width - 1; x++) {
+            int idx = (screen_height - 1 - y) * screen_width + x;
+            for (int s = 0; s < 5; s++) {
+                rad = splats[s][3];
+                rad *= rad;
+                dx = (spots[s][0] - x);
+                dy = (spots[s][1] - y);
+                dist = (dx * dx) + (dy * dy);
+                uint32_t r8 = (uint32_t)(r * ((rad - dist) / rad) * 255);
+                uint32_t g8 = (uint32_t)(g * ((rad - dist) / rad) * 255);
+                uint32_t b8 = (uint32_t)(b * ((rad - dist) / rad) * 255);
+                if (dist < rad) {
+                    packedCol = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8;
+                    packedCol += framebuffer[idx];
+                    framebuffer[idx] = packedCol;
+                }
+            }
+        }
+    }
+    /*
     float normX = normPointX;
     float normY = normPointY;
     float normZ = normPointZ;
@@ -258,6 +332,7 @@ void software_render(void) {
         float b = face_colors[i][2];
         rasterize_triangle(yaw_v0, pitch_v0, dist_v0, yaw_v1, pitch_v1, dist_v1, yaw_v2, pitch_v2, dist_v2, r, g, b);
     }
+    */
 }
 
 // Render debug text (unchanged from original)
@@ -307,6 +382,11 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
 
 // Main rendering function
 void render(void) {
+    uint64_t freq = SDL_GetPerformanceFrequency();
+    uint64_t start, end;
+    double render_time = 0;
+    start = SDL_GetPerformanceCounter();
+
     // Perform software rendering
     software_render();
 
@@ -339,19 +419,26 @@ void render(void) {
     // Draw debug text
     char text[64];
     snprintf(text, sizeof(text), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
-    render_debug_text(10, 10, text, textCol);
+    render_debug_text(10, 25, text, textCol);
 
     char text2[64];
     snprintf(text2, sizeof(text2), "x deg: %.2f y deg: %.2f", cam_yaw, cam_pitch);
-    render_debug_text(10, 25, text2, textCol);
+    render_debug_text(10, 40, text2, textCol);
 
     char text3[64];
     snprintf(text3, sizeof(text3), "testVertX: %.2f testVertY: %.2f", testVertX, testVertY);
-    render_debug_text(10, 40, text3, textCol);
+    render_debug_text(10, 55, text3, textCol);
 
     char text4[64];
     snprintf(text4, sizeof(text4), "testVertZ: %.2f", testVertZ);
-    render_debug_text(10, 55, text4, textCol);
+    render_debug_text(10, 70, text4, textCol);
+
+    end = SDL_GetPerformanceCounter();
+    render_time = (end - start) * 1000.0 / (double)freq;
+
+    char text5[64];
+    snprintf(text5, sizeof(text5), "frame time: %.4f", render_time);
+    render_debug_text(10, 10, text5, textCol);
 
     SDL_GL_SwapWindow(window);
 }
