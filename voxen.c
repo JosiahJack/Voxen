@@ -63,39 +63,10 @@ double deg2rad(double degrees) {
     return degrees * DEG2RAD;
 }
 
-// Cube definition: 8 vertices (x, y, z) and per-face colors (r, g, b)
-float cube_vertices[8][3] = {
-    {-1, -1,  1}, { 1, -1,  1}, { 1,  1,  1}, {-1,  1,  1}, // Front face
-    {-1, -1, -1}, {-1,  1, -1}, { 1,  1, -1}, { 1, -1, -1}  // Back face
-};
-float face_colors[12][3] = {
-    {1, 0, 0}, // Front: red
-    {1, 0, 0}, // Front: red
-    {0, 1, 0}, // Back: green
-    {0, 0, 1}, // Top: blue
-    {1, 1, 0}, // Bottom: yellow
-    {1, 0, 1}, // Right: magenta
-    {0, 1, 1}, // Left: cyan
-    {0.5, 0, 0}, // Left: cyan
-    {0, 0.5, 0}, // Left: cyan
-    {0, 0, 0.5}, // Left: cyan
-    {0.5, 0.5, 0}, // Left: cyan
-    {0.5, 0, 0.5}, // Left: cyan
-};
-int cube_triangles[12][3] = {
-    // Front: 0,1,2 and 0,2,3
-    {0, 1, 2}, {0, 2, 3},
-    // Back: 4,5,6 and 4,6,7
-    {4, 5, 6}, {4, 6, 7},
-    // Top: 3,2,6 and 3,6,5
-    {3, 2, 6}, {3, 6, 5},
-    // Bottom: 4,7,1 and 4,1,0
-    {4, 7, 1}, {4, 1, 0},
-    // Right: 7,6,2 and 7,2,1
-    {7, 6, 2}, {7, 2, 1},
-    // Left: 4,0,3 and 4,3,5
-    {4, 0, 3}, {4, 3, 5}
-};
+// TODO: Define the colors for splats
+// TODO: Use individual arrays (Structure of Arrays pattern) for each element that comprises a splat: x, y, z, radius, color_r, color_g, color_b, norm_x, norm_y, norm_z
+
+// TODO: Define a splat definition file .splat and put the splat data in there as readable ASCII 8bit text and load that at runtime in main() prior to the main loop.
 
 // x, y, z, radius
 float splats[5][4] = {
@@ -107,15 +78,6 @@ double get_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return ts.tv_sec + ts.tv_nsec * 1e-9;
-}
-
-// Barycentric coordinate check for triangle rasterization
-bool is_inside_triangle(float x, float y, float v0x, float v0y, float v1x, float v1y, float v2x, float v2y, float *u, float *v, float *w) {
-    float area = 0.5f * (-v1y * v2x + v0y * (-v1x + v2x) + v0x * (v1y - v2y) + v1x * v2y);
-    float s = (v0y * v2x - v0x * v2y + (v2y - v0y) * x + (v0x - v2x) * y) / (2 * area);
-    float t = (v0x * v1y - v0y * v1x + (v0y - v1y) * x + (v1x - v0x) * y) / (2 * area);
-    *u = s; *v = t; *w = 1.0f - s - t;
-    return *u >= 0 && *v >= 0 && *w >= 0;
 }
 
 void get_cam_dir(float cam_yaw, float cam_pitch, float *dir_x, float *dir_y, float *dir_z) {
@@ -151,69 +113,6 @@ float dot(float x0, float y0, float z0, float x1, float y1, float z1) {
     return (x0 * x1) + (y0 * y1) + (z0 * z1);
 }
 
-// Rasterize a triangle
-void rasterize_triangle(float x0, float pitch0, float dist0,
-                        float x1, float pitch1, float dist1,
-                        float x2, float pitch2, float dist2,
-                        float r, float g, float b) {
-    float y0, y1, y2;
-    y0 = screen_height - pitch0;
-    y1 = screen_height - pitch1;
-    y2 = screen_height - pitch2;
-    uint32_t r8 = (uint32_t)(r * 255);
-    uint32_t g8 = (uint32_t)(g * 255);
-    uint32_t b8 = (uint32_t)(b * 255);
-    uint32_t r8_c = (uint32_t)(r * 0.7 * 255);
-    uint32_t g8_c = (uint32_t)(g * 0.7 * 255);
-    uint32_t b8_c = (uint32_t)(b * 0.7 * 255);
-    uint32_t r8_f = (uint32_t)(r * 0.4 * 255);
-    uint32_t g8_f = (uint32_t)(g * 0.4 * 255);
-    uint32_t b8_f = (uint32_t)(b * 0.4 * 255);
-
-    // Bounding box
-    int min_x = (int)fmax(0, fmin(x0, fmin(x1,x2)));
-    int max_x = (int)fmin(screen_width - 1, fmax(x0, fmax(x1,x2)));
-    int min_y = (int)fmax(0, fmin(y0, fmin(y1,y2)));
-    int max_y = (int)fmin(screen_height - 1, fmax(y0, fmax(y1,y2)));
-    for (int y = min_y; y <= max_y; y+=4) {
-        for (int x = min_x; x <= max_x; x+=4) {
-            float u, v, w;
-            if (is_inside_triangle(x + 0.5f, y + 0.5f,
-                                   x0, y0,
-                                   x1, y1,
-                                   x2, y2,
-                                   &u, &v, &w)) {
-
-                // Interpolate depth
-                float depth = u * dist0 + v * dist1 + w * dist2;
-                int idx = (screen_height - 1 - y) * screen_width + x;
-                if (depth > 0 && depth < depth_buffer[idx]) {
-                    depth_buffer[idx] = depth;
-                    // Convert color to 8-bit and pack into RGBA
-
-                    int idx_up = idx - screen_width;
-                    int idx_dn = idx + screen_width;
-                    int idx_rt = idx + 1;
-                    int idx_lf = idx - 1;
-                    int idx_nw = idx - screen_width - 1;
-                    int idx_ne = idx - screen_width + 1;
-                    int idx_sw = idx + screen_width - 1;
-                    int idx_se = idx + screen_width + 1;
-                    framebuffer[idx] = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8;
-                    framebuffer[idx_up] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
-                    framebuffer[idx_dn] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
-                    framebuffer[idx_lf] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
-                    framebuffer[idx_rt] = (0xFF << 24) | (b8_c << 16) | (g8_c << 8) | r8_c;
-                    framebuffer[idx_nw] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
-                    framebuffer[idx_ne] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
-                    framebuffer[idx_sw] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
-                    framebuffer[idx_se] = (0xFF << 24) | (b8_f << 16) | (g8_f << 8) | r8_f;
-                }
-            }
-        }
-    }
-}
-
 // Software render function
 void software_render(void) {
     // Clear buffers
@@ -222,6 +121,8 @@ void software_render(void) {
 
     // Generate list of "spots" which are splats projected into 2d screen x,y
     float spots[5][2] = {{0, 0}, {0, 0}};
+
+    // Temporarily force some sort of projection to test splat rendering
     spots[0][0] = 400;
     spots[0][1] = 400;
     spots[1][0] = 800;
@@ -232,7 +133,10 @@ void software_render(void) {
     spots[3][1] = 406;
     spots[4][0] = 480;
     spots[4][1] = 480;
+
+    // Apply spherical coordinate projection (not standard perspective projection via matrix4x4's, treats x,y as yaw,pitch respectively with equiangular spacing between pixels).
     for (int s = 0; s<5;s++) {
+        // TODO: Actually do the spherical projection (e.g. atan2() for the yaw relative to cam_x,cam_y then subtract out the camera's min yaw)
 //         spots[s][0] = 400;
 //         spots[s][1] = 400;
     }
@@ -245,94 +149,34 @@ void software_render(void) {
     float g = 0.0f;
     float b = 0.2f;
     uint32_t packedCol;
+
+    // TODO: Implement tiled rendering with each tile on a separate pthread.
+    // Iterate over all pixels in the screen
     for (int y = 0; y<screen_height - 1; y++) {
         for (int x = 0; x< screen_width - 1; x++) {
-            int idx = (screen_height - 1 - y) * screen_width + x;
+            int idx = (screen_height - 1 - y) * screen_width + x; // Index into 1D framebuffer array. (or for depth buffer later.)
+            // Iterate over every splat (TODO: Cull based on bounds in a preprocessing loop prior to the "Iterate over all pixels in the screen" loops.
             for (int s = 0; s < 5; s++) {
-                rad = splats[s][3];
+                // Very basic spherical splat rendering
+                rad = splats[s][3]; // Get radius for the current splat.
                 rad *= rad;
+                // TODO: Early bounds check using manhattan distance.
                 dx = (spots[s][0] - x);
                 dy = (spots[s][1] - y);
-                dist = (dx * dx) + (dy * dy);
-                uint32_t r8 = (uint32_t)(r * ((rad - dist) / rad) * 255);
+                dist = (dx * dx) + (dy * dy); // Just squared distance for the check for performance.
+                // TODO: Adjust the brightness based on lambertion cos() angle between splat normal and the camdir_x, camdir_y, camdir_z facing vector.  This is the "backface" culling.
+                // TODO: Early return if splat normal facing away via dot()?
+                uint32_t r8 = (uint32_t)(r * ((rad - dist) / rad) * 255); // Linear falloff for color based on distance from splat's center
                 uint32_t g8 = (uint32_t)(g * ((rad - dist) / rad) * 255);
                 uint32_t b8 = (uint32_t)(b * ((rad - dist) / rad) * 255);
                 if (dist < rad) {
-                    packedCol = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8;
+                    packedCol = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8; // Stupid blending for now, just to not have hard edges. TODO: Use alpha channel with luminance to not overbrighten existing colors
                     packedCol += framebuffer[idx];
                     framebuffer[idx] = packedCol;
                 }
             }
         }
     }
-    /*
-    float normX = normPointX;
-    float normY = normPointY;
-    float normZ = normPointZ;
-    normalize(&normX, &normY, &normZ);
-    get_cam_dir(cam_yaw, cam_pitch, &camdir_x, &camdir_y, &camdir_z);
-    if (dot(camdir_x, camdir_y, camdir_z, normX, normY, normZ) < 0) rasterize_triangle(testVertX, testVertY, testVertZ  , 128, 128, 3  , 128, 160, 3  , 0.7, 0.0, 0.0);
-    rasterize_triangle(62, 128, 3.1, 158, 128, 3.1, 158, 160, 3.1, 0.0, 0.0, 0.7);
-    return;
-
-    float cam_yaw_min = cam_yaw - CAMERA_FOV_HORIZONTAL_HALF;
-    float cam_yaw_max= cam_yaw + CAMERA_FOV_HORIZONTAL_HALF;
-    float cam_pitch_min = cam_pitch - CAMERA_FOV_VERTICAL_HALF;
-    float cam_pitch_max = cam_pitch + CAMERA_FOV_VERTICAL_HALF;
-
-    // Process each triangle
-    for (int i = 0; i < 12; i++) {
-        int idx0 = cube_triangles[i][0];
-        int idx1 = cube_triangles[i][1];
-        int idx2 = cube_triangles[i][2];
-        float v0[3] = {cube_vertices[idx0][0], cube_vertices[idx0][1], cube_vertices[idx0][2]};
-        float v1[3] = {cube_vertices[idx1][0], cube_vertices[idx1][1], cube_vertices[idx1][2]};
-        float v2[3] = {cube_vertices[idx2][0], cube_vertices[idx2][1], cube_vertices[idx2][2]};
-
-        // Transform to view space in polar coordinates where x maps to yaw, y maps to pitch, and z is the distance to camera.
-        float dx = v0[0] - cam_x;
-        float dy = v0[1] - cam_y;
-        float dz = v0[2] - cam_z;
-        float dist_v0 = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-        float yaw_v0 = rad2deg(atan2f(dy, dx)) - cam_yaw;
-        while (yaw_v0 > 180.0f) yaw_v0 -= 360.0f;
-        while (yaw_v0 < -180.0f) yaw_v0 += 360.0f;
-        yaw_v0 = (yaw_v0 / DEGREES_PER_PIXEL_X) + (screen_width / 2.0f);
-        float dist_xy_v0 = sqrt(dx * dx + dy * dy);
-        float pitch_v0 = dist_xy_v0 < FLT_EPSILON ? 0 : rad2deg(atan2f(dz, dist_xy_v0));
-        pitch_v0 = (pitch_v0 - cam_pitch) / DEGREES_PER_PIXEL_Y + (screen_height / 2.0f);
-
-        dx = v1[0] - cam_x;
-        dy = v1[1] - cam_y;
-        dz = v1[2] - cam_z;
-        float dist_v1 = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-        float yaw_v1 = rad2deg(atan2f(dy, dx)) - cam_yaw;
-        while (yaw_v1 > 180.0f) yaw_v1 -= 360.0f;
-        while (yaw_v1 < -180.0f) yaw_v1 += 360.0f;
-        yaw_v1 = (yaw_v1 / DEGREES_PER_PIXEL_X) + (screen_width / 2.0f);
-        float dist_xy_v1 = sqrt(dx * dx + dy * dy);
-        float pitch_v1 = dist_xy_v1 < FLT_EPSILON ? 0 : rad2deg(atan2f(dz, dist_xy_v1));
-        pitch_v1 = (pitch_v1 - cam_pitch) / DEGREES_PER_PIXEL_Y + (screen_height / 2.0f);
-
-        dx = v2[0] - cam_x;
-        dy = v2[1] - cam_y;
-        dz = v2[2] - cam_z;
-        float dist_v2 = sqrt((dx * dx) + (dy * dy) + (dz * dz));
-        float yaw_v2 = rad2deg(atan2f(dy, dx)) - cam_yaw;
-        while (yaw_v2 > 180.0f) yaw_v2 -= 360.0f;
-        while (yaw_v2 < -180.0f) yaw_v2 += 360.0f;
-        yaw_v2 = (yaw_v2 / DEGREES_PER_PIXEL_X) + (screen_width / 2.0f);
-        float dist_xy_v2 = sqrt(dx * dx + dy * dy);
-        float pitch_v2 = dist_xy_v2 < FLT_EPSILON ? 0 : rad2deg(atan2f(dz, dist_xy_v2));
-        pitch_v2 = (pitch_v2 - cam_pitch) / DEGREES_PER_PIXEL_Y + (screen_height / 2.0f);
-
-        // Rasterize
-        float r = face_colors[i][0];
-        float g = face_colors[i][1];
-        float b = face_colors[i][2];
-        rasterize_triangle(yaw_v0, pitch_v0, dist_v0, yaw_v1, pitch_v1, dist_v1, yaw_v2, pitch_v2, dist_v2, r, g, b);
-    }
-    */
 }
 
 // Render debug text (unchanged from original)
@@ -386,6 +230,7 @@ void render(void) {
     uint64_t start, end;
     double render_time = 0;
     start = SDL_GetPerformanceCounter();
+    // TODO: Calculate the globals for min yaw, max yaw, min pitch, max pitch of the camera using cam_yaw and cam_pitch prior to software_render so it can perform projection correctly with the mouselook.
 
     // Perform software rendering
     software_render();
