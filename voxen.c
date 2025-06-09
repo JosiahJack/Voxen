@@ -72,14 +72,7 @@ void clear_ev_queue(void) {
     eventQueueEnd = 0;
 }
 
-// Function to get current time in nanoseconds
 double get_time(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_nsec;
-}
-
-double get_time_secs(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
         fprintf(stderr, "Error: clock_gettime failed\n");
@@ -92,15 +85,8 @@ double get_time_secs(void) {
 // Initializes unified event system variables
 int EventInit(void) {
     // Initialize the eventQueue as empty
-    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
-        eventQueue[i].type = EV_NULL;
-        eventQueue[i].timestamp = 0.0;
-        eventQueue[i].deltaTime_ns = 0.0;
-    }
-
+    clear_ev_queue();
     clear_ev_journal(); // Initialize the event journal as empty.
-
-    eventIndex = 0;
     eventQueue[eventIndex].type = EV_INIT;
     eventQueue[eventIndex].timestamp = get_time();
     eventQueue[eventIndex].deltaTime_ns = 0.0;
@@ -108,16 +94,16 @@ int EventInit(void) {
 }
 
 int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
-    eventQueueEnd++;
-    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) eventQueueEnd--;
+    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { printf("Queue buffer filled!\n"); return 1; }
 
-    printf("Enqueued event type %d",type);
+    //printf("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
     eventQueue[eventQueueEnd].type = type;
     eventQueue[eventQueueEnd].timestamp = 0;
     eventQueue[eventQueueEnd].payload1u = payload1u;
     eventQueue[eventQueueEnd].payload2u = payload2u;
     eventQueue[eventQueueEnd].payload1f = payload1f;
     eventQueue[eventQueueEnd].payload2f = payload2f;
+    eventQueueEnd++;
     return 0;
 }
 
@@ -170,18 +156,35 @@ int ClearFrameBuffers(void) {
 int EventQueueProcess(void) {
     int status = 0;
     double timestamp = 0.0;
+    int eventCount = 0;
+    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+        if (eventQueue[i].type != EV_NULL) {
+            //printf("Queue contains:  ");
+            //printf("%d, ", eventQueue[i].type);
+            eventCount++;
+        }
+    }
+
+//     printf("\n");
+
+    //printf("EventQueueProcess start with %d events in queue\n",eventCount);
+    eventIndex = 0;
     while (eventIndex < MAX_EVENTS_PER_FRAME) {
-        if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
+        //printf("Iterating over event queue, eventIndex this loop: %d\n",eventIndex);
+        if (eventQueue[eventIndex].type == EV_NULL) {
+            break; // End of queue
+        }
 
         timestamp = get_time();
         eventQueue[eventIndex].timestamp = timestamp;
         eventQueue[eventIndex].deltaTime_ns = timestamp - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
-
+        //printf("Current event deltaTime: %f\n",eventQueue[eventIndex].deltaTime_ns);
         // Journal buffer entry of this event
         eventJournalIndex++; // Increment now to then write event into the journal.
         if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE) {
             // TODO: Write to journal log file ./voxen.dem WriteJournalBuffer();
             clear_ev_journal(); // Also sets eventJournalIndex to 0.
+            //printf("Event queue cleared after journal filled\n");
         }
 
         eventJournal[eventJournalIndex].type = eventQueue[eventIndex].type;
@@ -191,19 +194,19 @@ int EventQueueProcess(void) {
         eventJournal[eventJournalIndex].payload2u = eventQueue[eventIndex].payload2u;
         eventJournal[eventJournalIndex].payload1f = eventQueue[eventIndex].payload1f;
         eventJournal[eventJournalIndex].payload2f = eventQueue[eventIndex].payload2f;
-        printf("t:%d,ts:%f,dt:%f,p1u:%d,p2u:%d,p1f:%f,p2f:%f",
-               eventQueue[eventIndex].type,
-               eventQueue[eventIndex].timestamp,
-               eventQueue[eventIndex].deltaTime_ns,
-               eventQueue[eventIndex].payload1u,
-               eventQueue[eventIndex].payload2u,
-               eventQueue[eventIndex].payload1f,
-               eventQueue[eventIndex].payload2f);
+//         printf("t:%d,ts:%f,dt:%f,p1u:%d,p2u:%d,p1f:%f,p2f:%f\n",
+//                eventQueue[eventIndex].type,
+//                eventQueue[eventIndex].timestamp,
+//                eventQueue[eventIndex].deltaTime_ns,
+//                eventQueue[eventIndex].payload1u,
+//                eventQueue[eventIndex].payload2u,
+//                eventQueue[eventIndex].payload1f,
+//                eventQueue[eventIndex].payload2f);
 
         // Execute event after journal buffer entry such that we can dump the
         // journal buffer on error and last entry will be the problematic event.
         status = EventExecute(&eventQueue[eventIndex]);
-        if (status) return status;
+        if (status) { printf("EventExecute returned nonzero status: %d !", status); return status; }
 
         eventIndex++;
     }
@@ -362,14 +365,18 @@ int RenderStaticMeshes(void) {
     return 0;
 }
 
-int RenderUI(void) {
+int RenderUI(double deltaTime) {
     glDisable(GL_LIGHTING); // Disable lighting for text
+    SDL_Color textCol = {255, 255, 255, 255}; // White
 
     // Draw debug text
-    char text[64];
-    snprintf(text, sizeof(text), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
-    SDL_Color textCol = {255, 255, 255, 255}; // White
-    render_debug_text(10, 10, text, textCol); // Top-left corner (10, 10)
+    char text0[64];
+    snprintf(text0, sizeof(text0), "Frame time: %f", deltaTime * 1000.0);
+    render_debug_text(10, 10, text0, textCol); // Top-left corner (10, 10)
+
+    char text1[64];
+    snprintf(text1, sizeof(text1), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
+    render_debug_text(10, 25, text1, textCol); // Top-left corner (10, 10)
     return 0;
 }
 
@@ -470,7 +477,7 @@ int EventExecute(Event* event) {
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
         case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers();
         case EV_RENDER_STATICS: return RenderStaticMeshes();
-        case EV_RENDER_UI: return RenderUI();
+        case EV_RENDER_UI: return RenderUI(get_time() - last_time);
         case EV_QUIT: return 1; break;
     }
 
@@ -484,7 +491,7 @@ int main(void) {
 
     EnqueuEvent_Simple(EV_INIT);
     double accumulator = 0.0;
-    last_time = get_time_secs();
+    last_time = get_time();
     while(1) {
         // Enqueue input events
         SDL_Event event;
@@ -510,7 +517,7 @@ int main(void) {
             }
         }
 
-        double current_time = get_time_secs();
+        double current_time = get_time();
         double frame_time = current_time - last_time;
         last_time = current_time;
         accumulator += frame_time;
