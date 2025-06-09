@@ -33,7 +33,7 @@
 #define EVENT_JOURNAL_BUFFER_SIZE 30000
 
 // Event Queue
-#define MAX_EVENTS_PER_FRAME 100
+#define MAX_EVENTS_PER_FRAME 1000
 
 // Event System variables
 typedef struct {

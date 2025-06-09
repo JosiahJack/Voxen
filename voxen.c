@@ -111,6 +111,7 @@ int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float pay
     eventQueueEnd++;
     if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) eventQueueEnd--;
 
+    printf("Enqueued event type %d",type);
     eventQueue[eventQueueEnd].type = type;
     eventQueue[eventQueueEnd].timestamp = 0;
     eventQueue[eventQueueEnd].payload1u = payload1u;
@@ -190,6 +191,14 @@ int EventQueueProcess(void) {
         eventJournal[eventJournalIndex].payload2u = eventQueue[eventIndex].payload2u;
         eventJournal[eventJournalIndex].payload1f = eventQueue[eventIndex].payload1f;
         eventJournal[eventJournalIndex].payload2f = eventQueue[eventIndex].payload2f;
+        printf("t:%d,ts:%f,dt:%f,p1u:%d,p2u:%d,p1f:%f,p2f:%f",
+               eventQueue[eventIndex].type,
+               eventQueue[eventIndex].timestamp,
+               eventQueue[eventIndex].deltaTime_ns,
+               eventQueue[eventIndex].payload1u,
+               eventQueue[eventIndex].payload2u,
+               eventQueue[eventIndex].payload1f,
+               eventQueue[eventIndex].payload2f);
 
         // Execute event after journal buffer entry such that we can dump the
         // journal buffer on error and last entry will be the problematic event.
@@ -379,23 +388,23 @@ void ProcessInput(void) {
     float strafe_x = -facing_y;
     float strafe_y = facing_x;
 
-    if (keys['f']) {
+    if (keys[SDL_SCANCODE_F]) {
         cam_x -= move_speed * facing_x; // Move forward (inverted)
         cam_y -= move_speed * facing_y;
-    } else if (keys['s']) {
+    } else if (keys[SDL_SCANCODE_S]) {
         cam_x += move_speed * facing_x; // Move backward
         cam_y += move_speed * facing_y;
     }
-    if (keys['a']) {
+    if (keys[SDL_SCANCODE_A]) {
         cam_x -= move_speed * strafe_x; // Strafe left
         cam_y -= move_speed * strafe_y;
-    } else if (keys['d']) {
+    } else if (keys[SDL_SCANCODE_D]) {
         cam_x += move_speed * strafe_x; // Strafe right
         cam_y += move_speed * strafe_y;
     }
-    if (keys['v']) {
+    if (keys[SDL_SCANCODE_V]) {
         cam_z += move_speed;
-    } else if (keys['c']) {
+    } else if (keys[SDL_SCANCODE_C]) {
         cam_z -= move_speed;
     }
 }
@@ -493,10 +502,10 @@ int main(void) {
             } else if (event.type == SDL_WINDOWEVENT) {
                 if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
                     window_has_focus = true;
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    //SDL_SetRelativeMouseMode(SDL_TRUE);
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                     window_has_focus = false;
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                    //SDL_SetRelativeMouseMode(SDL_FALSE);
                 }
             }
         }
