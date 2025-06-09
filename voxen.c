@@ -1,15 +1,17 @@
 // File: voxen.c
-// Description: A simple unlit software rasterizer for a cube, using SDL2 for window/input and OpenGL for texture display.
+// Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <GL/gl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
-#include <string.h>
 #include <time.h>
+#include <string.h>
+#include "event.h"
 
 // Window and OpenGL context
 SDL_Window *window;
@@ -17,185 +19,228 @@ SDL_GLContext gl_context;
 int screen_width = 800, screen_height = 600;
 TTF_Font *font = NULL;
 bool window_has_focus = false;
-SDL_Color textCol = {255, 255, 255, 255};
 
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
 float cam_yaw = 0.0f, cam_pitch = -90.0f;         // Camera orientation
-float camdir_x, camdir_y, camdir_z;
 float move_speed = 0.1f;
-float normPointX = 0.0f;
-float normPointY = -1.0f;
-float normPointZ = 0.0f;
-float mouse_sensitivity = 0.1f;                   // Mouse look sensitivity
-float CAMERA_NEAR;
-float CAMERA_FAR;
-float CAMERA_FOV_HORIZONTAL;
-float CAMERA_FOV_VERTICAL;
-float DEGREES_PER_PIXEL_X;
-float DEGREES_PER_PIXEL_Y;
-float CAMERA_FOV_HORIZONTAL_HALF;
-float CAMERA_FOV_VERTICAL_HALF;
-
-float testVertX = 32.0f;
-float testVertY = 128.0f;
-float testVertZ = 3.0f;
+float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
+float M_PI = 3.141592653f;
 
 // Input states
-bool keys[256] = {false};
-int mouse_x = 0, mouse_y = 0;                   // Mouse position
+bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
+int mouse_x = 0, mouse_y = 0; // Mouse position
 
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 
-// Software rasterizer buffers
-uint32_t *framebuffer = NULL; // RGBA pixel buffer
-float *depth_buffer = NULL;   // Depth buffer
+// Queue for events to process this frame
+Event eventQueue[MAX_EVENTS_PER_FRAME];
+int eventJournalIndex;
 
-#define RAD2DEG (180.0 / M_PI)
-#define DEG2RAD (M_PI / 180.0)
+// Journal buffer for event history to write into the log/demo file
+Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE];
 
-double rad2deg(double radians) {
-    return radians * RAD2DEG;
+int eventIndex; // Event that made it to the counter.  Indices below this were
+                // already executed and walked away from the counter.
+
+int eventQueueEnd; // End of the waiting line
+
+// Intended to be called after each buffered write to the logfile in .dem
+// format which is custom but similar concept to Quake 1 demos.
+void clear_ev_journal(void) {
+    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
+    for (int i=0;i<EVENT_JOURNAL_BUFFER_SIZE;i++) {
+        eventJournal[i].type = EV_NULL;
+        eventJournal[i].timestamp = 0.0;
+        eventJournal[i].deltaTime_ns = 0.0;
+    }
+
+    eventJournalIndex = 0; // Restart at the beginning.
 }
 
-double deg2rad(double degrees) {
-    return degrees * DEG2RAD;
+// Queue was processed for the frame, clear it so next frame starts fresh.
+void clear_ev_queue(void) {
+    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
+    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+        eventQueue[i].type = EV_NULL;
+        eventQueue[i].timestamp = 0.0;
+        eventQueue[i].deltaTime_ns = 0.0;
+    }
+
+    eventIndex = 0;
+    eventQueueEnd = 0;
 }
 
-// TODO: Define the colors for splats
-// TODO: Use individual arrays (Structure of Arrays pattern) for each element that comprises a splat: x, y, z, radius, color_r, color_g, color_b, norm_x, norm_y, norm_z
-
-// TODO: Define a splat definition file .splat and put the splat data in there as readable ASCII 8bit text and load that at runtime in main() prior to the main loop.
-
-// x, y, z, radius
-float splats[5][4] = {
-    {0, 0, 0, 20}, {1, 0, 0, 10}, {1, 1, 0, 10}, {0, 1, 0, 20}, {0.5, 0.5, 0.5, 30}
-};
-
-// Function to get current time in seconds
+// Function to get current time in nanoseconds
 double get_time(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec * 1e-9;
+    return ts.tv_nsec;
 }
 
-void get_cam_dir(float cam_yaw, float cam_pitch, float *dir_x, float *dir_y, float *dir_z) {
-    // Convert to radians
-    float yaw_rad = deg2rad(cam_yaw);
-    float pitch_rad = deg2rad(cam_pitch);
-
-    // Compute direction vector (Z-up coordinate system)
-    float cosfrad = cosf(pitch_rad);
-    *dir_x = sinf(yaw_rad) * cosfrad;
-    *dir_y = -cosf(yaw_rad) * cosfrad;
-    *dir_z = sinf(pitch_rad);
-
-    // Normalize the result
-    float magnitude = sqrtf((*dir_x) * (*dir_x) + (*dir_y) * (*dir_y) + (*dir_z) * (*dir_z));
-    if (magnitude > 0.0f) {
-        *dir_x /= magnitude;
-        *dir_y /= magnitude;
-        *dir_z /= magnitude;
-    }
-}
-
-void normalize(float *x, float *y, float *z) {
-    float magnitude = sqrtf((*x) * (*x) + (*y) * (*y) + (*z) * (*z));
-    if (magnitude > 0.0f) {
-        *x /= magnitude;
-        *y /= magnitude;
-        *z /= magnitude;
-    }
-}
-
-float dot(float x0, float y0, float z0, float x1, float y1, float z1) {
-    return (x0 * x1) + (y0 * y1) + (z0 * z1);
-}
-
-// Software render function
-void software_render(void) {
-    // Clear buffers
-    memset(framebuffer, 0, screen_width * screen_height * sizeof(uint32_t));
-    for (int i = 0; i < screen_width * screen_height; i++) depth_buffer[i] = 1e10;
-
-    // Generate list of "spots" which are splats projected into 2d screen x,y
-    float spots[5][2] = {{0, 0}, {0, 0}};
-
-    // Temporarily force some sort of projection to test splat rendering
-    spots[0][0] = 400;
-    spots[0][1] = 400;
-    spots[1][0] = 800;
-    spots[1][1] = 400;
-    spots[2][0] = 420;
-    spots[2][1] = 406;
-    spots[3][0] = 780;
-    spots[3][1] = 406;
-    spots[4][0] = 480;
-    spots[4][1] = 480;
-
-    // Apply spherical coordinate projection (not standard perspective projection via matrix4x4's, treats x,y as yaw,pitch respectively with equiangular spacing between pixels).
-    for (int s = 0; s<5;s++) {
-        // TODO: Actually do the spherical projection (e.g. atan2() for the yaw relative to cam_x,cam_y then subtract out the camera's min yaw)
-//         spots[s][0] = 400;
-//         spots[s][1] = 400;
+double get_time_secs(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+        fprintf(stderr, "Error: clock_gettime failed\n");
+        return 0.0;
     }
 
-    float dist = 0;
-    float dx = 0;
-    float dy = 0;
-    float rad = 0;
-    float r = 0.7f;
-    float g = 0.0f;
-    float b = 0.2f;
-    uint32_t packedCol;
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
+}
 
-    // TODO: Implement tiled rendering with each tile on a separate pthread.
-    // Iterate over all pixels in the screen
-    for (int y = 0; y<screen_height - 1; y++) {
-        for (int x = 0; x< screen_width - 1; x++) {
-            int idx = (screen_height - 1 - y) * screen_width + x; // Index into 1D framebuffer array. (or for depth buffer later.)
-            // Iterate over every splat (TODO: Cull based on bounds in a preprocessing loop prior to the "Iterate over all pixels in the screen" loops.
-            for (int s = 0; s < 5; s++) {
-                // Very basic spherical splat rendering
-                rad = splats[s][3]; // Get radius for the current splat.
-                rad *= rad;
-                // TODO: Early bounds check using manhattan distance.
-                dx = (spots[s][0] - x);
-                dy = (spots[s][1] - y);
-                dist = (dx * dx) + (dy * dy); // Just squared distance for the check for performance.
-                // TODO: Adjust the brightness based on lambertion cos() angle between splat normal and the camdir_x, camdir_y, camdir_z facing vector.  This is the "backface" culling.
-                // TODO: Early return if splat normal facing away via dot()?
-                uint32_t r8 = (uint32_t)(r * ((rad - dist) / rad) * 255); // Linear falloff for color based on distance from splat's center
-                uint32_t g8 = (uint32_t)(g * ((rad - dist) / rad) * 255);
-                uint32_t b8 = (uint32_t)(b * ((rad - dist) / rad) * 255);
-                if (dist < rad) {
-                    packedCol = (0xFF << 24) | (b8 << 16) | (g8 << 8) | r8; // Stupid blending for now, just to not have hard edges. TODO: Use alpha channel with luminance to not overbrighten existing colors
-                    packedCol += framebuffer[idx];
-                    framebuffer[idx] = packedCol;
-                }
-            }
+// Initializes unified event system variables
+int EventInit(void) {
+    // Initialize the eventQueue as empty
+    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+        eventQueue[i].type = EV_NULL;
+        eventQueue[i].timestamp = 0.0;
+        eventQueue[i].deltaTime_ns = 0.0;
+    }
+
+    clear_ev_journal(); // Initialize the event journal as empty.
+
+    eventIndex = 0;
+    eventQueue[eventIndex].type = EV_INIT;
+    eventQueue[eventIndex].timestamp = get_time();
+    eventQueue[eventIndex].deltaTime_ns = 0.0;
+    return 0;
+}
+
+int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
+    eventQueueEnd++;
+    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) eventQueueEnd--;
+
+    eventQueue[eventQueueEnd].type = type;
+    eventQueue[eventQueueEnd].timestamp = 0;
+    eventQueue[eventQueueEnd].payload1u = payload1u;
+    eventQueue[eventQueueEnd].payload2u = payload2u;
+    eventQueue[eventQueueEnd].payload1f = payload1f;
+    eventQueue[eventQueueEnd].payload2f = payload2f;
+    return 0;
+}
+
+int EnqueuEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
+    return EnqueueEvent(type,payload1u,payload2u,0.0f,0.0f);
+}
+
+int EnqueuEvent_Uint(uint8_t type, uint32_t payload1u) {
+    return EnqueueEvent(type,payload1u,0u,0.0f,0.0f);
+}
+
+int EnqueuEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
+    return EnqueueEvent(type,0u,0u,payload1f,payload2f);
+}
+
+int EnqueuEvent_Float(uint8_t type, float payload1f) {
+    return EnqueueEvent(type,0u,0u,payload1f,0.0f);
+}
+
+// Enqueues an event with type only and no payload values.
+int EnqueuEvent_Simple(uint8_t type) {
+    return EnqueueEvent(type,0u,0u,0.0f,0.0f);
+}
+
+int Input_KeyDown(uint32_t scancode) {
+    keys[scancode] = true;
+    return 0;
+}
+
+int Input_KeyUp(uint32_t scancode) {
+    keys[scancode] = false;
+    return 0;
+}
+
+int Input_MouseMove(float xrel, float yrel) {
+    cam_yaw += xrel * mouse_sensitivity;
+    cam_pitch += yrel * mouse_sensitivity;
+    if (cam_pitch < -179.0f) cam_pitch = -179.0f;
+    if (cam_pitch > -1.0f) cam_pitch = -1.0f;
+    return 0;
+}
+
+int ClearFrameBuffers(void) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    return 0;
+}
+
+// Process the entire event queue. Events might add more new events to the queue.
+// Intended to be called once per loop iteration by the main loop.
+int EventQueueProcess(void) {
+    int status = 0;
+    double timestamp = 0.0;
+    while (eventIndex < MAX_EVENTS_PER_FRAME) {
+        if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
+
+        timestamp = get_time();
+        eventQueue[eventIndex].timestamp = timestamp;
+        eventQueue[eventIndex].deltaTime_ns = timestamp - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
+
+        // Journal buffer entry of this event
+        eventJournalIndex++; // Increment now to then write event into the journal.
+        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE) {
+            // TODO: Write to journal log file ./voxen.dem WriteJournalBuffer();
+            clear_ev_journal(); // Also sets eventJournalIndex to 0.
         }
+
+        eventJournal[eventJournalIndex].type = eventQueue[eventIndex].type;
+        eventJournal[eventJournalIndex].timestamp = eventQueue[eventIndex].timestamp;
+        eventJournal[eventJournalIndex].deltaTime_ns = eventQueue[eventIndex].deltaTime_ns;
+        eventJournal[eventJournalIndex].payload1u = eventQueue[eventIndex].payload1u;
+        eventJournal[eventJournalIndex].payload2u = eventQueue[eventIndex].payload2u;
+        eventJournal[eventJournalIndex].payload1f = eventQueue[eventIndex].payload1f;
+        eventJournal[eventJournalIndex].payload2f = eventQueue[eventIndex].payload2f;
+
+        // Execute event after journal buffer entry such that we can dump the
+        // journal buffer on error and last entry will be the problematic event.
+        status = EventExecute(&eventQueue[eventIndex]);
+        if (status) return status;
+
+        eventIndex++;
     }
+
+    clear_ev_queue();
+    return 0;
 }
 
-// Render debug text (unchanged from original)
+// Function to set up OpenGL projection
+void setup_projection(void) {
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    float aspect = (float)screen_width / screen_height;
+    float fov = 90.0f, near = 0.1f, far = 100.0f;
+    float f = 1.0f / tan(fov * M_PI / 360.0f);
+    float proj[16] = {
+        f / aspect, 0, 0, 0,
+        0, f, 0, 0,
+        0, 0, (far + near) / (near - far), -1,
+        0, 0, (2 * far * near) / (near - far), 0
+    };
+    glMultMatrixf(proj);
+    glMatrixMode(GL_MODELVIEW);
+}
+
+// Renders text at x,y coordinates specified using pointer to the string array.
 void render_debug_text(float x, float y, const char *text, SDL_Color color) {
-    if (!font || !text) { fprintf(stderr, "Font or text is NULL\n"); return; }
+    if (!font || !text) { fprintf(stderr, "Font or text is NULL\n"); return; } // Skip if font not loaded
+
     SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
     if (!surface) { fprintf(stderr, "TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
+
     SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface(surface);
     if (!rgba_surface) { fprintf(stderr, "SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
+
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba_surface->w, rgba_surface->h, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
+    GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -203,96 +248,127 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
     glLoadIdentity();
+
     glEnable(GL_TEXTURE_2D);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glColor3f(1, 1, 1);
+    glColor3f(1, 1, 1); // White multiplier (color from texture)
     glBegin(GL_QUADS);
     glTexCoord2f(0, 1); glVertex2f(x, screen_height - y - rgba_surface->h);
     glTexCoord2f(1, 1); glVertex2f(x + rgba_surface->w, screen_height - y - rgba_surface->h);
     glTexCoord2f(1, 0); glVertex2f(x + rgba_surface->w, screen_height - y);
     glTexCoord2f(0, 0); glVertex2f(x, screen_height - y);
-    glEnd();
+    glEnd ();
+
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_BLEND);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
+
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
+
     glDeleteTextures(1, &texture);
     SDL_FreeSurface(rgba_surface);
 }
 
-// Main rendering function
-void render(void) {
-    uint64_t freq = SDL_GetPerformanceFrequency();
-    uint64_t start, end;
-    double render_time = 0;
-    start = SDL_GetPerformanceCounter();
-    // TODO: Calculate the globals for min yaw, max yaw, min pitch, max pitch of the camera using cam_yaw and cam_pitch prior to software_render so it can perform projection correctly with the mouselook.
+// Function to draw a cube
+void draw_cube(void) {
+    glBegin(GL_QUADS);
 
-    // Perform software rendering
-    software_render();
+    // Front face
+    glColor3f(1, 0, 0);
+    glNormal3f(0, 0, 1); // Normal for lighting
+    glVertex3f(-1, -1, 1); glVertex3f(1, -1, 1);
+    glVertex3f(1, 1, 1); glVertex3f(-1, 1, 1);
 
-    // Upload framebuffer to OpenGL texture
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, screen_width, screen_height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, framebuffer);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // Back face
+    glColor3f(0, 1, 0);
+    glNormal3f(0, 0, -1);
+    glVertex3f(-1, -1, -1); glVertex3f(-1, 1, -1);
+    glVertex3f(1, 1, -1); glVertex3f(1, -1, -1);
 
-    // Render texture to screen
+    // Top face
+    glColor3f(0, 0, 1);
+    glVertex3f(-1, 1, -1); glVertex3f(-1, 1, 1);
+    glVertex3f(1, 1, 1); glVertex3f(1, 1, -1);
+
+    // Bottom face
+    glColor3f(1, 1, 0);
+    glNormal3f(0, -1, 0);
+    glVertex3f(-1, -1, -1); glVertex3f(1, -1, -1);
+    glVertex3f(1, -1, 1); glVertex3f(-1, -1, 1);
+
+    // Right face
+    glColor3f(1, 0, 1);
+    glNormal3f(1, 0, 0);
+    glVertex3f(1, -1, -1); glVertex3f(1, 1, -1);
+    glVertex3f(1, 1, 1); glVertex3f(1, -1, 1);
+
+    // Left face
+    glColor3f(0, 1, 1);
+    glNormal3f(-1, 0, 0);
+    glVertex3f(-1, -1, -1); glVertex3f(-1, -1, 1);
+    glVertex3f(-1, 1, 1); glVertex3f(-1, 1, -1);
+    glEnd();
+}
+
+void PositionCamera(void) {
+    glRotatef(cam_pitch, 1, 0, 0);
+    glRotatef(cam_yaw, 0, 0, 1);
+    glTranslatef(-cam_x, -cam_y, -cam_z);
+}
+
+int RenderStaticMeshes(void) {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0, screen_width, 0, screen_height, -1, 1);
+    setup_projection(); // Reset projection for 3D
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-    glEnable(GL_TEXTURE_2D);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0, 0); glVertex2f(0, 0);
-    glTexCoord2f(1, 0); glVertex2f(screen_width, 0);
-    glTexCoord2f(1, 1); glVertex2f(screen_width, screen_height);
-    glTexCoord2f(0, 1); glVertex2f(0, screen_height);
-    glEnd();
-    glDisable(GL_TEXTURE_2D);
-    glDeleteTextures(1, &texture);
+    PositionCamera();
+
+    // Set up lighting
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_LIGHT1);
+    float ambient[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    float light_pos0[] = {2.0f, 3.0f, 2.0f, 1.0f};
+    float light_pos1[] = {2.0f, -3.0f, 2.0f, 1.0f};
+    float diffuse[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_pos0);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+
+    glLightfv(GL_LIGHT1, GL_AMBIENT, ambient);
+    glLightfv(GL_LIGHT1, GL_POSITION, light_pos1);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, diffuse);
+    glEnable(GL_COLOR_MATERIAL); // Use glColor for material
+    glColorMaterial(GL_FRONT, GL_DIFFUSE);
+    glShadeModel(GL_SMOOTH);
+
+    draw_cube();
+
+    return 0;
+}
+
+int RenderUI(void) {
+    glDisable(GL_LIGHTING); // Disable lighting for text
 
     // Draw debug text
     char text[64];
     snprintf(text, sizeof(text), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
-    render_debug_text(10, 25, text, textCol);
-
-    char text2[64];
-    snprintf(text2, sizeof(text2), "x deg: %.2f y deg: %.2f", cam_yaw, cam_pitch);
-    render_debug_text(10, 40, text2, textCol);
-
-    char text3[64];
-    snprintf(text3, sizeof(text3), "testVertX: %.2f testVertY: %.2f", testVertX, testVertY);
-    render_debug_text(10, 55, text3, textCol);
-
-    char text4[64];
-    snprintf(text4, sizeof(text4), "testVertZ: %.2f", testVertZ);
-    render_debug_text(10, 70, text4, textCol);
-
-    end = SDL_GetPerformanceCounter();
-    render_time = (end - start) * 1000.0 / (double)freq;
-
-    char text5[64];
-    snprintf(text5, sizeof(text5), "frame time: %.4f", render_time);
-    render_debug_text(10, 10, text5, textCol);
-
-    SDL_GL_SwapWindow(window);
+    SDL_Color textCol = {255, 255, 255, 255}; // White
+    render_debug_text(10, 10, text, textCol); // Top-left corner (10, 10)
+    return 0;
 }
 
 // Update camera based on input
-void process_input(void) {
+void ProcessInput(void) {
     // WASD movement (fixed to match inverted mouselook)
     float yaw_rad = -cam_yaw * M_PI / 180.0f;
-    float pitch_rad = cam_pitch * M_PI / 180.0f;
+//     float pitch_rad = cam_pitch * M_PI / 180.0f;
     // Forward direction (Z-up, adjusted for yaw and pitch)
     float facing_x = sin(yaw_rad);
     float facing_y = -cos(yaw_rad);
@@ -304,111 +380,116 @@ void process_input(void) {
     float strafe_y = facing_x;
 
     if (keys['f']) {
-//         cam_x -= move_speed * facing_x; // Move forward (inverted)
-//         cam_y -= move_speed * facing_y;
-        testVertY += move_speed * 2.0f;
+        cam_x -= move_speed * facing_x; // Move forward (inverted)
+        cam_y -= move_speed * facing_y;
     } else if (keys['s']) {
-//         cam_x += move_speed * facing_x; // Move backward
-//         cam_y += move_speed * facing_y;
-        testVertY -= move_speed * 2.0f;
+        cam_x += move_speed * facing_x; // Move backward
+        cam_y += move_speed * facing_y;
     }
     if (keys['a']) {
-//         cam_x -= move_speed * strafe_x; // Strafe left
-//         cam_y -= move_speed * strafe_y;
-        testVertX -= move_speed * 2.0f;
+        cam_x -= move_speed * strafe_x; // Strafe left
+        cam_y -= move_speed * strafe_y;
     } else if (keys['d']) {
-//         cam_x += move_speed * strafe_x; // Strafe right
-//         cam_y += move_speed * strafe_y;
-        testVertX += move_speed * 2.0f;
+        cam_x += move_speed * strafe_x; // Strafe right
+        cam_y += move_speed * strafe_y;
     }
     if (keys['v']) {
-//         cam_z += move_speed;
-//         normPointY += move_speed * 2.0f;
-        testVertZ += move_speed * 2.0f;
+        cam_z += move_speed;
     } else if (keys['c']) {
-//         cam_z -= move_speed;
-//         normPointY -= move_speed * 2.0f;
-        testVertZ -= move_speed * 2.0f;
+        cam_z -= move_speed;
     }
 }
 
-int main(void) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
-        return 1;
-    }
-    if (TTF_Init() < 0) {
-        fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError());
-        SDL_Quit();
-        return 1;
-    }
+int InitializeEnvironment(void) {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return 1; }
+    if (TTF_Init() < 0) { fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError()); return 2; }
+
+    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10);
+    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return 3; }
+
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    window = SDL_CreateWindow("Voxen Software Rasterizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
+    window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
-        TTF_Quit();
-        SDL_Quit();
-        return 1;
+        return 4;
     }
+
     gl_context = SDL_GL_CreateContext(window);
     if (!gl_context) {
         fprintf(stderr, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
-        SDL_DestroyWindow(window);
-        TTF_Quit();
-        SDL_Quit();
-        return 1;
+        return 5;
     }
+
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_SetRelativeMouseMode(SDL_TRUE);
+    glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glEnable(GL_CULL_FACE); // Enable backface culling
+    glCullFace(GL_BACK);
+    glEnable(GL_NORMALIZE); // Normalize normals for lighting
+    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); // One-sided lighting
     glViewport(0, 0, screen_width, screen_height);
+    setup_projection();
+    return 0;
+}
 
-    // Allocate buffers
-    framebuffer = (uint32_t *)malloc(screen_width * screen_height * sizeof(uint32_t));
-    depth_buffer = (float *)malloc(screen_width * screen_height * sizeof(float));
-    if (!framebuffer || !depth_buffer) {
-        fprintf(stderr, "Failed to allocate buffers\n");
-        SDL_GL_DeleteContext(gl_context);
-        SDL_DestroyWindow(window);
-        TTF_Quit();
-        SDL_Quit();
-        return 1;
+int ExitCleanup(int status) {
+    switch(status) {
+        case 2: SDL_Quit(); break; // SDL was init'ed, so SDL_Quit
+        case 3: TTF_Quit(); SDL_Quit(); break; // TTF was init'ed, so also TTF Quit
+        case 4: if (font) TTF_CloseFont(font); // Font was loaded, so clean it up
+                TTF_Quit(); SDL_Quit(); break;
+        case 5: SDL_DestroyWindow(window); // SDL window was created so destroy the window
+                if (font) TTF_CloseFont(font);
+                TTF_Quit(); SDL_Quit(); break;
+        default:SDL_DestroyWindow(window); SDL_GL_DeleteContext(gl_context); // GL context was created so delete the context
+                if (font) TTF_CloseFont(font);
+                TTF_Quit(); SDL_Quit(); break;
     }
 
-    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10);
-    if (!font) {
-        fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError());
+    return status;
+}
+
+int EventExecute(Event* event) {
+    switch(event->type) {
+        case EV_INIT: return InitializeEnvironment();
+        case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
+        case EV_KEYUP: return Input_KeyUp(event->payload1u);
+        case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
+        case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers();
+        case EV_RENDER_STATICS: return RenderStaticMeshes();
+        case EV_RENDER_UI: return RenderUI();
+        case EV_QUIT: return 1; break;
     }
 
+    return 99; // Something went wrong
+}
+
+int main(void) {
+    int exitCode = 0;
+    exitCode = EventInit();
+    if (exitCode) return ExitCleanup(exitCode);
+
+    EnqueuEvent_Simple(EV_INIT);
     double accumulator = 0.0;
-    last_time = get_time();
-    bool quit = false;
-
-    CAMERA_NEAR = 0.02f;
-    CAMERA_FAR = 20.0f;
-    CAMERA_FOV_HORIZONTAL = 90.0f;
-    CAMERA_FOV_VERTICAL = 60.0f;
-    DEGREES_PER_PIXEL_X = CAMERA_FOV_HORIZONTAL / screen_width; // 90 / 800 = 0.1125 degrees
-    DEGREES_PER_PIXEL_Y = CAMERA_FOV_VERTICAL / screen_height;  // 90 / 600 = 0.1000 degrees
-    CAMERA_FOV_HORIZONTAL_HALF = CAMERA_FOV_HORIZONTAL / 2.0f;
-    CAMERA_FOV_VERTICAL_HALF = CAMERA_FOV_VERTICAL / 2.0f;
-    while (!quit) {
+    last_time = get_time_secs();
+    while(1) {
+        // Enqueue input events
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                quit = true;
-            } else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) quit = true;
-                if (event.key.keysym.sym < 256) keys[event.key.keysym.sym] = true;
+            if (event.type == SDL_QUIT) EnqueuEvent_Simple(EV_QUIT);
+            else if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) EnqueuEvent_Simple(EV_QUIT);
+                else EnqueuEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
             } else if (event.type == SDL_KEYUP) {
-                if (event.key.keysym.sym < 256) keys[event.key.keysym.sym] = false;
+                EnqueuEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
             } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
-                cam_yaw += event.motion.xrel * mouse_sensitivity;
-                cam_pitch += event.motion.yrel * mouse_sensitivity;
-                if (cam_pitch < -179.0f) cam_pitch = -179.0f;
-                if (cam_pitch > -1.0f) cam_pitch = -1.0f;
+                EnqueuEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
+
+            // These aren't really events so just handle them here.
             } else if (event.type == SDL_WINDOWEVENT) {
                 if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
                     window_has_focus = true;
@@ -419,24 +500,26 @@ int main(void) {
                 }
             }
         }
-        double current_time = get_time();
+
+        double current_time = get_time_secs();
         double frame_time = current_time - last_time;
         last_time = current_time;
         accumulator += frame_time;
         while (accumulator >= time_step) {
-            if (window_has_focus) process_input();
+            if (window_has_focus) ProcessInput();
             accumulator -= time_step;
         }
-        render();
+
+        // Enqueue render events in pipeline order
+        EnqueuEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
+        EnqueuEvent_Simple(EV_RENDER_STATICS);
+        EnqueuEvent_Simple(EV_RENDER_UI);
+        exitCode = EventQueueProcess(); // Do everything
+        if (exitCode) break;
+
+        SDL_GL_SwapWindow(window); // Present frame
     }
 
     // Cleanup
-    free(framebuffer);
-    free(depth_buffer);
-    if (font) TTF_CloseFont(font);
-    TTF_Quit();
-    SDL_GL_DeleteContext(gl_context);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return 0;
+    return ExitCleanup(exitCode);
 }
