@@ -268,6 +268,8 @@ void SetupTextQuad(void) {
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
 // float cam_yaw = 0.0f, cam_pitch = 0.0f;         // Camera orientation
 Quaternion cam_rotation;
+float cam_yaw = 0.0f;
+float cam_pitch = -90.0f;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 
@@ -396,19 +398,19 @@ int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float pay
     return 0;
 }
 
-int EnqueuEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
+int EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
     return EnqueueEvent(type,payload1u,payload2u,0.0f,0.0f);
 }
 
-int EnqueuEvent_Uint(uint8_t type, uint32_t payload1u) {
+int EnqueueEvent_Uint(uint8_t type, uint32_t payload1u) {
     return EnqueueEvent(type,payload1u,0u,0.0f,0.0f);
 }
 
-int EnqueuEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
+int EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
     return EnqueueEvent(type,0u,0u,payload1f,payload2f);
 }
 
-int EnqueuEvent_Float(uint8_t type, float payload1f) {
+int EnqueueEvent_Float(uint8_t type, float payload1f) {
     return EnqueueEvent(type,0u,0u,payload1f,0.0f);
 }
 
@@ -428,18 +430,16 @@ int Input_KeyUp(uint32_t scancode) {
 }
 
 bool in_cyberspace = false;
-int Input_MouseMove(float xrel, float yrel) {
-    // Convert mouse movement to radians
-    float yaw_angle = xrel * mouse_sensitivity * M_PI / 180.0f;
-    float pitch_angle = yrel * mouse_sensitivity * M_PI / 180.0f;
-
+int Input_Mouselook(float yaw_angle, float pitch_angle) {
     // Create quaternions for yaw (around Z) and pitch (around X)
     Quaternion yaw_quat, pitch_quat, temp, new_orientation;
     quat_from_axis_angle(&yaw_quat, 0.0f, 0.0f, 1.0f, -yaw_angle); // Yaw around Z, negative for intuitive right turn
     quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -pitch_angle); // Pitch around X, negative for intuitive up tilt
 
     // Combine: new = pitch * yaw * current
-    quat_multiply(&temp, &pitch_quat, &yaw_quat);
+    quat_multiply(&temp, &yaw_quat, &cam_rotation);
+//     quat_multiply(&temp, &pitch_quat, &yaw_quat);
+//     quat_multiply(&new_orientation, &temp, &cam_rotation);
     quat_multiply(&new_orientation, &temp, &cam_rotation);
     cam_rotation = new_orientation;
 
@@ -448,6 +448,17 @@ int Input_MouseMove(float xrel, float yrel) {
     }
     return 0;
 }
+
+int Input_MouseMove(float xrel, float yrel) {
+    cam_yaw += xrel * mouse_sensitivity;
+    cam_pitch += yrel * mouse_sensitivity;
+    if (cam_pitch < -179.0f) cam_pitch = -179.0f;
+    if (cam_pitch > -1.0f) cam_pitch = -1.0f;
+
+    Input_Mouselook(cam_yaw * M_PI / 180.0f,cam_pitch * M_PI / 180.0f);
+    return 0;
+}
+
 
 int ClearFrameBuffers(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -558,7 +569,7 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
 
     // Set up orthographic projection
     float projection[16];
-    mat4_ortho(projection, 0.0f, (float)screen_width, 0.0f, (float)screen_height, -1.0f, 1.0f);
+    mat4_ortho(projection, 0.0f, (float)screen_width, (float)screen_height, 0.0f, -1.0f, 1.0f);
     GLint projLoc = glGetUniformLocation(textShaderProgram, "projection");
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
 
@@ -585,17 +596,11 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
     glBindVertexArray(textVAO);
     float scaleX = (float)rgba_surface->w;
     float scaleY = (float)rgba_surface->h;
-//     float vertices[] = {
-//         x,          y,          0.0f, 0.0f, // Bottom-left
-//         x + scaleX, y,          1.0f, 0.0f, // Bottom-right
-//         x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
-//         x,          y + scaleY, 0.0f, 1.0f  // Top-left
-//     };
     float vertices[] = {
-        x,          y,          0.0f, 1.0f, // Bottom-left: map texture top (1) to bottom
-        x + scaleX, y,          1.0f, 1.0f, // Bottom-right: map texture top (1) to bottom
-        x + scaleX, y + scaleY, 1.0f, 0.0f, // Top-right: map texture bottom (0) to top
-        x,          y + scaleY, 0.0f, 0.0f  // Top-left: map texture bottom (0) to top
+        x,          y,          0.0f, 0.0f, // Bottom-left
+        x + scaleX, y,          1.0f, 0.0f, // Bottom-right
+        x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
+        x,          y + scaleY, 0.0f, 1.0f  // Top-left
     };
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
@@ -656,16 +661,20 @@ int RenderUI(double deltaTime) {
     render_debug_text(10, 10, text0, textCol); // Top-left corner (10, 10)
 
     char text1[64];
-    snprintf(text1, sizeof(text1), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
+    snprintf(text1, sizeof(text1), "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
     render_debug_text(10, 25, text1, textCol); // Top-left corner (10, 10)
 
-    float cam_yaw = 0.0f;
-    float cam_pitch = 0.0f;
-    float cam_roll = 0.0f;
-    quat_to_euler(&cam_rotation,&cam_yaw,&cam_pitch,&cam_roll);
+    float cam_quat_yaw = 0.0f;
+    float cam_quat_pitch = 0.0f;
+    float cam_quat_roll = 0.0f;
+    quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
     char text2[64];
-    snprintf(text2, sizeof(text2), "cam yaw: %.2f cam pitch: %.2f", cam_yaw, cam_pitch);
+    snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f", cam_yaw, cam_pitch);
     render_debug_text(10, 40, text2, textCol);
+
+    char text3[64];
+    snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
+    render_debug_text(10, 55, text2, textCol);
     return 0;
 }
 
@@ -786,6 +795,9 @@ int InitializeEnvironment(void) {
     SetupCube();
     SetupTextQuad();
     quat_identity(&cam_rotation);
+    Quaternion pitch_quat;
+    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -90.0f * M_PI / 180.0f); // Pitch -90° to look toward Y+
+    quat_multiply(&cam_rotation, &pitch_quat, &cam_rotation);
     return 0;
 }
 
@@ -853,11 +865,11 @@ int main(void) {
             if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
             else if (event.type == SDL_KEYDOWN) {
                 if (event.key.keysym.sym == SDLK_ESCAPE) EnqueueEvent_Simple(EV_QUIT);
-                else EnqueuEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
+                else EnqueueEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
             } else if (event.type == SDL_KEYUP) {
-                EnqueuEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
+                EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
             } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
-                EnqueuEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
+                EnqueueEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
 
             // These aren't really events so just handle them here.
             } else if (event.type == SDL_WINDOWEVENT) {
