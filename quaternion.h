@@ -23,4 +23,7 @@ void quat_to_matrix(Quaternion* q, float* m);
 
 void quat_to_euler(Quaternion* q, float* yaw, float* pitch, float* roll);
 
+void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg);
+void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg);
+
 #endif // QUATERNION_H

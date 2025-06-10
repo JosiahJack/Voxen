@@ -268,8 +268,9 @@ void SetupTextQuad(void) {
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
 // float cam_yaw = 0.0f, cam_pitch = 0.0f;         // Camera orientation
 Quaternion cam_rotation;
-float cam_yaw = 0.0f;
-float cam_pitch = -90.0f;
+float cam_yaw = 180.0f;
+float cam_pitch = 90.0f;
+float cam_roll = 0.0f;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 
@@ -419,8 +420,20 @@ int EnqueueEvent_Simple(uint8_t type) {
     return EnqueueEvent(type,0u,0u,0.0f,0.0f);
 }
 
+bool in_cyberspace = true;
+
+void Input_MouselookApply() {
+    if (in_cyberspace) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
+    else quat_from_yaw_pitch(&cam_rotation,cam_yaw,cam_pitch);
+}
+
 int Input_KeyDown(uint32_t scancode) {
     keys[scancode] = true;
+    if (scancode == SDL_SCANCODE_TAB) {
+        in_cyberspace = !in_cyberspace;
+        cam_roll = 0.0f; // Reset roll for sanity
+        Input_MouselookApply();
+    }
     return 0;
 }
 
@@ -429,33 +442,14 @@ int Input_KeyUp(uint32_t scancode) {
     return 0;
 }
 
-bool in_cyberspace = false;
-int Input_Mouselook(float yaw_angle, float pitch_angle) {
-    // Create quaternions for yaw (around Z) and pitch (around X)
-    Quaternion yaw_quat, pitch_quat, temp, new_orientation;
-    quat_from_axis_angle(&yaw_quat, 0.0f, 0.0f, 1.0f, -yaw_angle); // Yaw around Z, negative for intuitive right turn
-    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -pitch_angle); // Pitch around X, negative for intuitive up tilt
 
-    // Combine: new = pitch * yaw * current
-    quat_multiply(&temp, &yaw_quat, &cam_rotation);
-//     quat_multiply(&temp, &pitch_quat, &yaw_quat);
-//     quat_multiply(&new_orientation, &temp, &cam_rotation);
-    quat_multiply(&new_orientation, &temp, &cam_rotation);
-    cam_rotation = new_orientation;
-
-    if (!in_cyberspace) {
-        // Clamp pitch to up down +/- 90deg from horizon x,y plane.
-    }
-    return 0;
-}
 
 int Input_MouseMove(float xrel, float yrel) {
     cam_yaw += xrel * mouse_sensitivity;
     cam_pitch += yrel * mouse_sensitivity;
-    if (cam_pitch < -179.0f) cam_pitch = -179.0f;
-    if (cam_pitch > -1.0f) cam_pitch = -1.0f;
-
-    Input_Mouselook(cam_yaw * M_PI / 180.0f,cam_pitch * M_PI / 180.0f);
+    if (cam_pitch > 179.0f) cam_pitch = 179.0f;
+    if (cam_pitch < 1.0f) cam_pitch = 1.0f;
+    Input_MouselookApply();
     return 0;
 }
 
@@ -669,12 +663,12 @@ int RenderUI(double deltaTime) {
     float cam_quat_roll = 0.0f;
     quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
     char text2[64];
-    snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f", cam_yaw, cam_pitch);
+    snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
     render_debug_text(10, 40, text2, textCol);
 
     char text3[64];
     snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
-    render_debug_text(10, 55, text2, textCol);
+    render_debug_text(10, 55, text3, textCol);
     return 0;
 }
 
@@ -714,6 +708,7 @@ void ProcessInput(void) {
         cam_y -= move_speed * facing_y;
         cam_z -= move_speed * facing_z;
     }
+
     if (keys[SDL_SCANCODE_A]) {
         cam_x -= move_speed * strafe_x; // Strafe left
         cam_y -= move_speed * strafe_y;
@@ -723,10 +718,19 @@ void ProcessInput(void) {
         cam_y += move_speed * strafe_y;
         cam_z += move_speed * strafe_z;
     }
+
     if (keys[SDL_SCANCODE_V]) {
         cam_z += move_speed; // Move up
     } else if (keys[SDL_SCANCODE_C]) {
         cam_z -= move_speed; // Move down
+    }
+
+    if (keys[SDL_SCANCODE_T]) {
+        cam_roll += move_speed * 5.0f; // Move up
+        Input_MouselookApply();
+    } else if (keys[SDL_SCANCODE_Q]) {
+        cam_roll -= move_speed * 5.0f; // Move down
+        Input_MouselookApply();
     }
 }
 

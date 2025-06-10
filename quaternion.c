@@ -86,3 +86,75 @@ void quat_to_euler(Quaternion* q, float* yaw, float* pitch, float* roll) {
     float sinr = 2.0f * (q->w * q->y - q->z * q->x);
     *roll = asin(sinr) * 180.0f / M_PI;
 }
+
+// Create a quaternion from yaw (around Z) and pitch (around X) in degrees
+void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg) {
+    // Convert yaw and pitch from degrees to radians
+    float yaw = yaw_deg * M_PI / 180.0f;
+    float pitch = pitch_deg * M_PI / 180.0f;
+
+    // Compute half angles
+    float half_yaw = yaw * 0.5f;
+    float half_pitch = pitch * 0.5f;
+
+    // Precompute sines and cosines
+    float cy = cos(half_yaw);
+    float sy = sin(half_yaw);
+    float cp = cos(half_pitch);
+    float sp = sin(half_pitch);
+
+    // Compute quaternion components directly
+    q->w = cy * cp;
+    q->x = cy * sp;  // X-axis (pitch)
+    q->y = sy * sp;  // Y-axis (affected by both, but roll is 0)
+    q->z = sy * cp;  // Z-axis (yaw)
+
+    // Normalize to ensure a valid rotation quaternion
+    float len = sqrt(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
+    if (len > 1e-6f) { // Avoid division by zero
+        q->w /= len;
+        q->x /= len;
+        q->y /= len;
+        q->z /= len;
+    } else {
+        quat_identity(q); // Fallback for degenerate case
+    }
+}
+
+// Create a quaternion from yaw (around Z), pitch (around X), and roll (around Y) in degrees
+void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
+    // Convert yaw, pitch, and roll from degrees to radians
+    float yaw = yaw_deg * M_PI / 180.0f;
+    float pitch = pitch_deg * M_PI / 180.0f;
+    float roll = roll_deg * M_PI / 180.0f;
+
+    // Compute half angles
+    float half_yaw = yaw * 0.5f;
+    float half_pitch = pitch * 0.5f;
+    float half_roll = roll * 0.5f;
+
+    // Precompute sines and cosines
+    float cy = cos(half_yaw);
+    float sy = sin(half_yaw);
+    float cp = cos(half_pitch);
+    float sp = sin(half_pitch);
+    float cr = cos(half_roll);
+    float sr = sin(half_roll);
+
+    // Compute quaternion components directly (Z-X-Y order: yaw, pitch, roll)
+    q->w = cy * cp * cr + sy * sp * sr;
+    q->x = cy * sp * cr - sy * cp * sr; // X-axis (pitch)
+    q->y = sy * sp * cr + cy * cp * sr; // Y-axis (roll)
+    q->z = sy * cp * cr - cy * sp * sr; // Z-axis (yaw)
+
+    // Normalize to ensure a valid rotation quaternion
+    float len = sqrt(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
+    if (len > 1e-6f) { // Avoid division by zero
+        q->w /= len;
+        q->x /= len;
+        q->y /= len;
+        q->z /= len;
+    } else {
+        quat_identity(q); // Fallback for degenerate case
+    }
+}
