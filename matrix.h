@@ -1,0 +1,13 @@
+#ifndef MATRIX_H
+#define MATRIX_H
+
+#include "quaternion.h"
+
+// Matrix helper functions
+void mat4_identity(float* m);
+
+void mat4_perspective(float* m, float fov, float aspect, float near, float far);
+
+void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orientation);
+
+#endif // MATRIX_H

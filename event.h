@@ -1,3 +1,6 @@
+#ifndef EVENT_H
+#define EVENT_H
+
 // Event types for debugging and playback callbacks
 #define EV_NULL 0u
 #define EV_INIT 1u
@@ -14,9 +17,9 @@
 #define EV_MOUSEUP 14u
 #define EV_MOUSEWARP 15u
 
-#define EV_LOAD_TEXTURE 20u
+#define EV_LOAD_TEXTURES 20u
 #define EV_LOAD_AUDIO 21u
-#define EV_LOAD_MODEL 22u
+#define EV_LOAD_MODELS 22u
 
 #define EV_NETWORK_PACKET_RX 30u
 #define EV_NETWORK_PACKET_TX 31u
@@ -47,3 +50,5 @@ typedef struct {
 } Event;
 
 int EventExecute(Event* event);
+
+#endif // EVENT_H

@@ -3,7 +3,8 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-#include <GL/gl.h>
+#include <SDL2/SDL_image.h>
+#include <GL/glew.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -12,6 +13,14 @@
 #include <time.h>
 #include <string.h>
 #include "event.h"
+#include "quaternion.h"
+#include "matrix.h"
+#include "constants.h"
+
+// Bindless texture function prototypes
+// GLuint64 glGetTextureHandleARB(GLuint texture);
+// void glMakeTextureHandleResidentARB(GLuint64 handle);
+// void glMakeTextureHandleNonResidentARB(GLuint64 handle);
 
 // Window and OpenGL context
 SDL_Window *window;
@@ -20,12 +29,247 @@ int screen_width = 800, screen_height = 600;
 TTF_Font *font = NULL;
 bool window_has_focus = false;
 
+// GL Shaders
+GLuint shaderProgram;
+GLuint textShaderProgram; // For text
+GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
+GLuint textVAO, textVBO; // For text
+bool use_bindless_textures = false;
+const char *vertexShaderSource =
+    "#version 450 core\n"
+    "\n"
+    "layout(location = 0) in vec3 aPos;\n"
+    "layout(location = 1) in vec3 aNormal;\n"
+    "layout(location = 2) in vec2 aTexCoord;\n"
+    "layout(location = 3) in float aTexIndex;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
+    "out vec2 TexCoord;\n"
+    "out float TexIndex;\n"
+    "\n"
+    "void main() {\n"
+    "    gl_Position = projection * view * vec4(aPos, 1.0);\n"
+    "    TexCoord = aTexCoord;\n"
+    "    TexIndex = aTexIndex;\n"
+    "}\n";
+
+const char *fragmentShaderBindless = "#version 450 core\n"
+    "#extension GL_ARB_bindless_texture : require\n"
+    "in vec2 TexCoord;\n"
+    "in float TexIndex;\n"
+    "out vec4 FragColor;\n"
+    "layout(bindless_sampler) uniform sampler2D uTextures[3];\n"
+    "void main() {\n"
+    "    int index = int(TexIndex);\n"
+    "    FragColor = texture(uTextures[index], TexCoord);\n"
+    "}\n";
+
+const char *fragmentShaderTraditional = "#version 450 core\n"
+    "in vec2 TexCoord;\n"
+    "in float TexIndex;\n"
+    "out vec4 FragColor;\n"
+    "uniform sampler2D uTextures[3];\n"
+    "void main() {\n"
+    "    int index = int(TexIndex);\n"
+    "    FragColor = texture(uTextures[index], TexCoord);\n"
+    "}\n";
+
+
+// Vertex Shader for Text
+const char *textVertexShaderSource =
+    "#version 450 core\n"
+    "layout(location = 0) in vec2 aPos;\n"
+    "layout(location = 1) in vec2 aTexCoord;\n"
+    "uniform mat4 projection;\n"
+    "out vec2 TexCoord;\n"
+    "void main() {\n"
+    "    gl_Position = projection * vec4(aPos, 0.0, 1.0);\n"
+    "    TexCoord = aTexCoord;\n"
+    "}\n";
+
+// Fragment Shader for Text
+const char *textFragmentShaderSource =
+    "#version 450 core\n"
+    "in vec2 TexCoord;\n"
+    "out vec4 FragColor;\n"
+    "uniform sampler2D textTexture;\n"
+    "uniform vec4 textColor;\n"
+    "void main() {\n"
+    "    vec4 sampled = texture(textTexture, TexCoord);\n"
+    "    FragColor = vec4(textColor.rgb, sampled.a * textColor.a);\n"
+    "}\n";
+
+int CompileShaders(void) {
+    // Vertex Shader
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+    GLint success;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        fprintf(stderr, "Vertex Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Fragment Shader
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char *fragSource = use_bindless_textures ? fragmentShaderBindless : fragmentShaderTraditional;
+    glShaderSource(fragmentShader, 1, &fragSource, NULL);
+    glCompileShader(fragmentShader);
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        fprintf(stderr, "Fragment Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Shader Program
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    // Text Vertex Shader
+    GLuint textVertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(textVertexShader, 1, &textVertexShaderSource, NULL);
+    glCompileShader(textVertexShader);
+    glGetShaderiv(textVertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(textVertexShader, 512, NULL, infoLog);
+        fprintf(stderr, "Text Vertex Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Text Fragment Shader
+    GLuint textFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(textFragmentShader, 1, &textFragmentShaderSource, NULL);
+    glCompileShader(textFragmentShader);
+    glGetShaderiv(textFragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(textFragmentShader, 512, NULL, infoLog);
+        fprintf(stderr, "Text Fragment Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Text Shader Program
+    textShaderProgram = glCreateProgram();
+    glAttachShader(textShaderProgram, textVertexShader);
+    glAttachShader(textShaderProgram, textFragmentShader);
+    glLinkProgram(textShaderProgram);
+    glGetProgramiv(textShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(textShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Text Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    glDeleteShader(textVertexShader);
+    glDeleteShader(textFragmentShader);
+    return 0;
+}
+
+// Cube Geometry (positions, normals, tex coords, texture index)
+float cubeVertices[] = {
+    // Positions          // Normals           // Tex Coords  // Tex Index
+    -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,  2.0f, // Top (med1_9.png)
+     1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,  2.0f,
+     1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,  2.0f,
+    -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,  2.0f,
+
+    -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,  1.0f, // Bottom (med1_7.png)
+    -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,  1.0f,
+     1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,  1.0f,
+     1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,  1.0f,
+
+    -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
+    -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,  0.0f,
+     1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,  0.0f,
+     1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,  0.0f,
+
+    -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
+     1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,  0.0f,
+     1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,  0.0f,
+    -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,  0.0f,
+
+     1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
+     1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,  0.0f,
+     1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,  0.0f,
+     1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,  0.0f,
+
+    -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
+    -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,  0.0f,
+    -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,  0.0f,
+    -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,  0.0f
+};
+
+void SetupCube(void) {
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    // Position
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // Normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    // Tex Coord
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    // Tex Index
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(8 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+    glBindVertexArray(0);
+}
+
+// Quad for text (2 triangles, positions and tex coords)
+float textQuadVertices[] = {
+    // Positions   // Tex Coords
+    0.0f, 0.0f,    0.0f, 0.0f, // Bottom-left
+    1.0f, 0.0f,    1.0f, 0.0f, // Bottom-right
+    1.0f, 1.0f,    1.0f, 1.0f, // Top-right
+    0.0f, 1.0f,    0.0f, 1.0f  // Top-left
+};
+
+void SetupTextQuad(void) {
+    glGenVertexArrays(1, &textVAO);
+    glGenBuffers(1, &textVBO);
+    glBindVertexArray(textVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(textQuadVertices), textQuadVertices, GL_STATIC_DRAW);
+    // Position
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    // Tex Coord
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
-float cam_yaw = 0.0f, cam_pitch = -90.0f;         // Camera orientation
+// float cam_yaw = 0.0f, cam_pitch = 0.0f;         // Camera orientation
+Quaternion cam_rotation;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
-float M_PI = 3.141592653f;
 
 // Input states
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
@@ -33,6 +277,51 @@ int mouse_x = 0, mouse_y = 0; // Mouse position
 
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
+
+// Data
+// ============================================================================
+
+// Textures
+SDL_Surface *textureSurfaces[TEXTURE_COUNT];
+GLuint textureIDs[TEXTURE_COUNT];
+GLuint64 textureHandles[TEXTURE_COUNT];
+const char *texturePaths[TEXTURE_COUNT] = {
+    "./Textures/med1_1.png",
+    "./Textures/med1_7.png",
+    "./Textures/med1_9.png"
+};
+
+int LoadTextures(void) {
+    for (int i = 0; i < TEXTURE_COUNT; i++) {
+        SDL_Surface *surface = IMG_Load(texturePaths[i]);
+        if (!surface) {
+            fprintf(stderr, "IMG_Load failed for %s: %s\n", texturePaths[i], IMG_GetError());
+            return 1;
+        }
+        textureSurfaces[i] = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
+        SDL_FreeSurface(surface);
+        if (!textureSurfaces[i]) {
+            fprintf(stderr, "SDL_ConvertSurfaceFormat failed for %s: %s\n", texturePaths[i], SDL_GetError());
+            return 1;
+        }
+        glGenTextures(1, &textureIDs[i]);
+        glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSurfaces[i]->w, textureSurfaces[i]->h, 0,
+                     GL_RGBA, GL_UNSIGNED_BYTE, textureSurfaces[i]->pixels);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        if (use_bindless_textures) {
+            textureHandles[i] = glGetTextureHandleARB(textureIDs[i]); // Bindless handle
+            glMakeTextureHandleResidentARB(textureHandles[i]); // Make resident
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    return 0;
+}
+
+// ============================================================================
 
 // Queue for events to process this frame
 Event eventQueue[MAX_EVENTS_PER_FRAME];
@@ -124,7 +413,7 @@ int EnqueuEvent_Float(uint8_t type, float payload1f) {
 }
 
 // Enqueues an event with type only and no payload values.
-int EnqueuEvent_Simple(uint8_t type) {
+int EnqueueEvent_Simple(uint8_t type) {
     return EnqueueEvent(type,0u,0u,0.0f,0.0f);
 }
 
@@ -138,11 +427,25 @@ int Input_KeyUp(uint32_t scancode) {
     return 0;
 }
 
+bool in_cyberspace = false;
 int Input_MouseMove(float xrel, float yrel) {
-    cam_yaw += xrel * mouse_sensitivity;
-    cam_pitch += yrel * mouse_sensitivity;
-    if (cam_pitch < -179.0f) cam_pitch = -179.0f;
-    if (cam_pitch > -1.0f) cam_pitch = -1.0f;
+    // Convert mouse movement to radians
+    float yaw_angle = xrel * mouse_sensitivity * M_PI / 180.0f;
+    float pitch_angle = yrel * mouse_sensitivity * M_PI / 180.0f;
+
+    // Create quaternions for yaw (around Z) and pitch (around X)
+    Quaternion yaw_quat, pitch_quat, temp, new_orientation;
+    quat_from_axis_angle(&yaw_quat, 0.0f, 0.0f, 1.0f, -yaw_angle); // Yaw around Z, negative for intuitive right turn
+    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -pitch_angle); // Pitch around X, negative for intuitive up tilt
+
+    // Combine: new = pitch * yaw * current
+    quat_multiply(&temp, &pitch_quat, &yaw_quat);
+    quat_multiply(&new_orientation, &temp, &cam_rotation);
+    cam_rotation = new_orientation;
+
+    if (!in_cyberspace) {
+        // Clamp pitch to up down +/- 90deg from horizon x,y plane.
+    }
     return 0;
 }
 
@@ -206,7 +509,10 @@ int EventQueueProcess(void) {
         // Execute event after journal buffer entry such that we can dump the
         // journal buffer on error and last entry will be the problematic event.
         status = EventExecute(&eventQueue[eventIndex]);
-        if (status) { printf("EventExecute returned nonzero status: %d !", status); return status; }
+        if (status) {
+            if (status != 1) printf("EventExecute returned nonzero status: %d !", status);
+            return status;
+        }
 
         eventIndex++;
     }
@@ -215,153 +521,128 @@ int EventQueueProcess(void) {
     return 0;
 }
 
-// Function to set up OpenGL projection
-void setup_projection(void) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    float aspect = (float)screen_width / screen_height;
-    float fov = 90.0f, near = 0.1f, far = 100.0f;
-    float f = 1.0f / tan(fov * M_PI / 360.0f);
-    float proj[16] = {
-        f / aspect, 0, 0, 0,
-        0, f, 0, 0,
-        0, 0, (far + near) / (near - far), -1,
-        0, 0, (2 * far * near) / (near - far), 0
-    };
-    glMultMatrixf(proj);
-    glMatrixMode(GL_MODELVIEW);
+// Matrix helper for 2D orthographic projection
+void mat4_ortho(float* m, float left, float right, float bottom, float top, float near, float far) {
+    mat4_identity(m);
+    m[0] = 2.0f / (right - left);
+    m[5] = 2.0f / (top - bottom);
+    m[10] = -2.0f / (far - near);
+    m[12] = -(right + left) / (right - left);
+    m[13] = -(top + bottom) / (top - bottom);
+    m[14] = -(far + near) / (far - near);
+    m[15] = 1.0f;
 }
 
 // Renders text at x,y coordinates specified using pointer to the string array.
 void render_debug_text(float x, float y, const char *text, SDL_Color color) {
-    if (!font || !text) { fprintf(stderr, "Font or text is NULL\n"); return; } // Skip if font not loaded
-
+    if (!font || !text) { fprintf(stderr, "Font or text is NULL\n"); return; }
     SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
     if (!surface) { fprintf(stderr, "TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
-
     SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface(surface);
     if (!rgba_surface) { fprintf(stderr, "SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
 
+    // Create and bind texture
     GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba_surface->w, rgba_surface->h, 0,
-    GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
+                 GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0, screen_width, 0, screen_height, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
+    // Use text shader
+    glUseProgram(textShaderProgram);
 
-    glEnable(GL_TEXTURE_2D);
+    // Set up orthographic projection
+    float projection[16];
+    mat4_ortho(projection, 0.0f, (float)screen_width, 0.0f, (float)screen_height, -1.0f, 1.0f);
+    GLint projLoc = glGetUniformLocation(textShaderProgram, "projection");
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
+
+    // Set text color (convert SDL_Color to 0-1 range)
+    float r = color.r / 255.0f;
+    float g = color.g / 255.0f;
+    float b = color.b / 255.0f;
+    float a = color.a / 255.0f;
+    GLint colorLoc = glGetUniformLocation(textShaderProgram, "textColor");
+    glUniform4f(colorLoc, r, g, b, a);
+
+    // Bind texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    GLint texLoc = glGetUniformLocation(textShaderProgram, "textTexture");
+    glUniform1i(texLoc, 0);
+
+    // Enable blending for text transparency
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glColor3f(1, 1, 1); // White multiplier (color from texture)
-    glBegin(GL_QUADS);
-    glTexCoord2f(0, 1); glVertex2f(x, screen_height - y - rgba_surface->h);
-    glTexCoord2f(1, 1); glVertex2f(x + rgba_surface->w, screen_height - y - rgba_surface->h);
-    glTexCoord2f(1, 0); glVertex2f(x + rgba_surface->w, screen_height - y);
-    glTexCoord2f(0, 0); glVertex2f(x, screen_height - y);
-    glEnd ();
+    glDisable(GL_DEPTH_TEST); // Disable depth test for 2D overlay
 
-    glDisable(GL_TEXTURE_2D);
+    // Bind VAO and adjust quad position/size
+    glBindVertexArray(textVAO);
+    float scaleX = (float)rgba_surface->w;
+    float scaleY = (float)rgba_surface->h;
+//     float vertices[] = {
+//         x,          y,          0.0f, 0.0f, // Bottom-left
+//         x + scaleX, y,          1.0f, 0.0f, // Bottom-right
+//         x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
+//         x,          y + scaleY, 0.0f, 1.0f  // Top-left
+//     };
+    float vertices[] = {
+        x,          y,          0.0f, 1.0f, // Bottom-left: map texture top (1) to bottom
+        x + scaleX, y,          1.0f, 1.0f, // Bottom-right: map texture top (1) to bottom
+        x + scaleX, y + scaleY, 1.0f, 0.0f, // Top-right: map texture bottom (0) to top
+        x,          y + scaleY, 0.0f, 0.0f  // Top-left: map texture bottom (0) to top
+    };
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+
+    // Render quad (two triangles)
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+
+    // Cleanup
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
     glDisable(GL_BLEND);
-    glBindTexture(GL_TEXTURE_2D, 0); // Unbind texture
-
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-
+    glEnable(GL_DEPTH_TEST); // Re-enable depth test for 3D rendering
+    glUseProgram(0);
     glDeleteTextures(1, &texture);
     SDL_FreeSurface(rgba_surface);
 }
 
-// Function to draw a cube
-void draw_cube(void) {
-    glBegin(GL_QUADS);
-
-    // Front face
-    glColor3f(1, 0, 0);
-    glNormal3f(0, 0, 1); // Normal for lighting
-    glVertex3f(-1, -1, 1); glVertex3f(1, -1, 1);
-    glVertex3f(1, 1, 1); glVertex3f(-1, 1, 1);
-
-    // Back face
-    glColor3f(0, 1, 0);
-    glNormal3f(0, 0, -1);
-    glVertex3f(-1, -1, -1); glVertex3f(-1, 1, -1);
-    glVertex3f(1, 1, -1); glVertex3f(1, -1, -1);
-
-    // Top face
-    glColor3f(0, 0, 1);
-    glVertex3f(-1, 1, -1); glVertex3f(-1, 1, 1);
-    glVertex3f(1, 1, 1); glVertex3f(1, 1, -1);
-
-    // Bottom face
-    glColor3f(1, 1, 0);
-    glNormal3f(0, -1, 0);
-    glVertex3f(-1, -1, -1); glVertex3f(1, -1, -1);
-    glVertex3f(1, -1, 1); glVertex3f(-1, -1, 1);
-
-    // Right face
-    glColor3f(1, 0, 1);
-    glNormal3f(1, 0, 0);
-    glVertex3f(1, -1, -1); glVertex3f(1, 1, -1);
-    glVertex3f(1, 1, 1); glVertex3f(1, -1, 1);
-
-    // Left face
-    glColor3f(0, 1, 1);
-    glNormal3f(-1, 0, 0);
-    glVertex3f(-1, -1, -1); glVertex3f(-1, -1, 1);
-    glVertex3f(-1, 1, 1); glVertex3f(-1, 1, -1);
-    glEnd();
-}
-
-void PositionCamera(void) {
-    glRotatef(cam_pitch, 1, 0, 0);
-    glRotatef(cam_yaw, 0, 0, 1);
-    glTranslatef(-cam_x, -cam_y, -cam_z);
-}
-
 int RenderStaticMeshes(void) {
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    setup_projection(); // Reset projection for 3D
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-    PositionCamera();
+    glUseProgram(shaderProgram);
+    // Set up matrices
+    float view[16], projection[16];
+    float fov = 65.0f;
+    mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.1f, 100.0f);
+    mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
+    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
+    if (use_bindless_textures) {
+        GLint texLoc = glGetUniformLocation(shaderProgram, "uTextures");
+        glUniformHandleui64vARB(texLoc, TEXTURE_COUNT, textureHandles);
+    } else {
+        for (int i = 0; i < TEXTURE_COUNT; i++) {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
+            char uniformName[32];
+            snprintf(uniformName, sizeof(uniformName), "uTextures[%d]", i);
+            GLint texLoc = glGetUniformLocation(shaderProgram, uniformName);
+            glUniform1i(texLoc, i);
+        }
+    }
 
-    // Set up lighting
-    glEnable(GL_LIGHTING);
-    glEnable(GL_LIGHT0);
-    glEnable(GL_LIGHT1);
-    float ambient[] = {0.0f, 0.0f, 0.0f, 1.0f};
-    float light_pos0[] = {2.0f, 3.0f, 2.0f, 1.0f};
-    float light_pos1[] = {2.0f, -3.0f, 2.0f, 1.0f};
-    float diffuse[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
-    glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_pos0);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
-
-    glLightfv(GL_LIGHT1, GL_AMBIENT, ambient);
-    glLightfv(GL_LIGHT1, GL_POSITION, light_pos1);
-    glLightfv(GL_LIGHT1, GL_DIFFUSE, diffuse);
-    glEnable(GL_COLOR_MATERIAL); // Use glColor for material
-    glColorMaterial(GL_FRONT, GL_DIFFUSE);
-    glShadeModel(GL_SMOOTH);
-
-    draw_cube();
-
+    // Render cube
+    glBindVertexArray(vao);
+    glDrawArrays(GL_QUADS, 0, 24); // 24 vertices for 6 quads
+    glBindVertexArray(0);
+    glUseProgram(0);
     return 0;
 }
 
@@ -377,78 +658,134 @@ int RenderUI(double deltaTime) {
     char text1[64];
     snprintf(text1, sizeof(text1), "x: %.2f y: %.2f z: %.2f", cam_x, cam_y, cam_z);
     render_debug_text(10, 25, text1, textCol); // Top-left corner (10, 10)
+
+    float cam_yaw = 0.0f;
+    float cam_pitch = 0.0f;
+    float cam_roll = 0.0f;
+    quat_to_euler(&cam_rotation,&cam_yaw,&cam_pitch,&cam_roll);
+    char text2[64];
+    snprintf(text2, sizeof(text2), "cam yaw: %.2f cam pitch: %.2f", cam_yaw, cam_pitch);
+    render_debug_text(10, 40, text2, textCol);
     return 0;
 }
 
-// Update camera based on input
+// Update camera position based on input
 void ProcessInput(void) {
-    // WASD movement (fixed to match inverted mouselook)
-    float yaw_rad = -cam_yaw * M_PI / 180.0f;
-//     float pitch_rad = cam_pitch * M_PI / 180.0f;
-    // Forward direction (Z-up, adjusted for yaw and pitch)
-    float facing_x = sin(yaw_rad);
-    float facing_y = -cos(yaw_rad);
-    // Normalize
-    float len = sqrt(facing_x * facing_x + facing_y * facing_y);
-    if (len > 0) { facing_x /= len; facing_y /= len; }
-    // Strafe direction (perpendicular)
-    float strafe_x = -facing_y;
-    float strafe_y = facing_x;
+    // Extract forward and right vectors from quaternion
+    float rotation[16];
+    quat_to_matrix(&cam_rotation, rotation);
+    float facing_x = rotation[8];  // Forward X
+    float facing_y = rotation[9];  // Forward Y
+    float facing_z = rotation[10]; // Forward Z
+    float strafe_x = rotation[0];  // Right X
+    float strafe_y = rotation[1];  // Right Y
+    float strafe_z = rotation[2];  // Right Z
+
+    // Normalize forward
+    float len = sqrt(facing_x * facing_x + facing_y * facing_y + facing_z * facing_z);
+    if (len > 0) {
+        facing_x /= len;
+        facing_y /= len;
+        facing_z /= len;
+    }
+    // Normalize strafe
+    len = sqrt(strafe_x * strafe_x + strafe_y * strafe_y + strafe_z * strafe_z);
+    if (len > 0) {
+        strafe_x /= len;
+        strafe_y /= len;
+        strafe_z /= len;
+    }
 
     if (keys[SDL_SCANCODE_F]) {
-        cam_x -= move_speed * facing_x; // Move forward (inverted)
-        cam_y -= move_speed * facing_y;
-    } else if (keys[SDL_SCANCODE_S]) {
-        cam_x += move_speed * facing_x; // Move backward
+        cam_x += move_speed * facing_x; // Move forward
         cam_y += move_speed * facing_y;
+        cam_z += move_speed * facing_z;
+    } else if (keys[SDL_SCANCODE_S]) {
+        cam_x -= move_speed * facing_x; // Move backward
+        cam_y -= move_speed * facing_y;
+        cam_z -= move_speed * facing_z;
     }
     if (keys[SDL_SCANCODE_A]) {
         cam_x -= move_speed * strafe_x; // Strafe left
         cam_y -= move_speed * strafe_y;
+        cam_z -= move_speed * strafe_z;
     } else if (keys[SDL_SCANCODE_D]) {
         cam_x += move_speed * strafe_x; // Strafe right
         cam_y += move_speed * strafe_y;
+        cam_z += move_speed * strafe_z;
     }
     if (keys[SDL_SCANCODE_V]) {
-        cam_z += move_speed;
+        cam_z += move_speed; // Move up
     } else if (keys[SDL_SCANCODE_C]) {
-        cam_z -= move_speed;
+        cam_z -= move_speed; // Move down
     }
 }
 
 int InitializeEnvironment(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return 1; }
     if (TTF_Init() < 0) { fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError()); return 2; }
+    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) { fprintf(stderr, "IMG_Init failed: %s\n", IMG_GetError()); return 3; }
 
     font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10);
-    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return 3; }
+    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return 4; }
 
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
-        return 4;
+        return 5;
     }
 
     gl_context = SDL_GL_CreateContext(window);
     if (!gl_context) {
         fprintf(stderr, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
-        return 5;
+        return 6;
     }
 
     SDL_GL_MakeCurrent(window, gl_context);
+    glewExperimental = GL_TRUE; // Enable modern OpenGL support
+    if (glewInit() != GLEW_OK) {
+        fprintf(stderr, "GLEW initialization failed\n");
+        return 7;
+    }
+
+     // Check bindless texture support
+    use_bindless_textures = GLEW_ARB_bindless_texture;
+    if (!use_bindless_textures) {
+        fprintf(stderr, "GL_ARB_bindless_texture not supported, falling back to traditional binding\n");
+    } else {
+        printf("use_bindless_textures was true\n");
+        fprintf(stderr, "Forcing traditional binding due to potential Intel/Mesa incompatibility\n");
+        use_bindless_textures = false;
+    }
+    // Diagnostic: Print OpenGL version and renderer
+    const GLubyte* version = glGetString(GL_VERSION);
+    const GLubyte* renderer = glGetString(GL_RENDERER);
+    fprintf(stderr, "OpenGL Version: %s\n", version ? (const char*)version : "unknown");
+    fprintf(stderr, "Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
+
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
+    glFrontFace(GL_CW); // Flip triangle sorting order
     glEnable(GL_NORMALIZE); // Normalize normals for lighting
     glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); // One-sided lighting
     glViewport(0, 0, screen_width, screen_height);
-    setup_projection();
+    if (!GLEW_ARB_bindless_texture) {
+        fprintf(stderr, "GL_ARB_bindless_texture not supported\n");
+        return 8;
+    }
+
+    if (CompileShaders()) return 9;
+    SetupCube();
+    SetupTextQuad();
+    quat_identity(&cam_rotation);
     return 0;
 }
 
@@ -456,12 +793,27 @@ int ExitCleanup(int status) {
     switch(status) {
         case 2: SDL_Quit(); break; // SDL was init'ed, so SDL_Quit
         case 3: TTF_Quit(); SDL_Quit(); break; // TTF was init'ed, so also TTF Quit
-        case 4: if (font) TTF_CloseFont(font); // Font was loaded, so clean it up
+        case 4: IMG_Quit(); TTF_Quit(); SDL_Quit(); break;
+        case 5: if (font) TTF_CloseFont(font); // Font was loaded, so clean it up
                 TTF_Quit(); SDL_Quit(); break;
-        case 5: SDL_DestroyWindow(window); // SDL window was created so destroy the window
+        case 6: SDL_DestroyWindow(window); // SDL window was created so destroy the window
                 if (font) TTF_CloseFont(font);
                 TTF_Quit(); SDL_Quit(); break;
-        default:SDL_DestroyWindow(window); SDL_GL_DeleteContext(gl_context); // GL context was created so delete the context
+        default:
+                for (int i = 0; i < TEXTURE_COUNT; i++) {
+                    if (textureHandles[i]) glMakeTextureHandleNonResidentARB(textureHandles[i]);
+                    if (textureIDs[i]) glDeleteTextures(1, &textureIDs[i]);
+                    if (textureSurfaces[i]) SDL_FreeSurface(textureSurfaces[i]);
+                }
+                glDeleteProgram(shaderProgram);
+                glDeleteVertexArrays(1, &vao);
+                glDeleteBuffers(1, &vbo);
+
+                glDeleteProgram(textShaderProgram);
+                glDeleteVertexArrays(1, &textVAO);
+                glDeleteBuffers(1, &textVBO);
+
+                SDL_DestroyWindow(window); SDL_GL_DeleteContext(gl_context); // GL context was created so delete the context
                 if (font) TTF_CloseFont(font);
                 TTF_Quit(); SDL_Quit(); break;
     }
@@ -478,6 +830,7 @@ int EventExecute(Event* event) {
         case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers();
         case EV_RENDER_STATICS: return RenderStaticMeshes();
         case EV_RENDER_UI: return RenderUI(get_time() - last_time);
+        case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_QUIT: return 1; break;
     }
 
@@ -489,16 +842,17 @@ int main(void) {
     exitCode = EventInit();
     if (exitCode) return ExitCleanup(exitCode);
 
-    EnqueuEvent_Simple(EV_INIT);
+    EnqueueEvent_Simple(EV_INIT);
+    EnqueueEvent_Simple(EV_LOAD_TEXTURES);
     double accumulator = 0.0;
     last_time = get_time();
     while(1) {
         // Enqueue input events
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) EnqueuEvent_Simple(EV_QUIT);
+            if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
             else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) EnqueuEvent_Simple(EV_QUIT);
+                if (event.key.keysym.sym == SDLK_ESCAPE) EnqueueEvent_Simple(EV_QUIT);
                 else EnqueuEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
             } else if (event.type == SDL_KEYUP) {
                 EnqueuEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
@@ -527,9 +881,9 @@ int main(void) {
         }
 
         // Enqueue render events in pipeline order
-        EnqueuEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
-        EnqueuEvent_Simple(EV_RENDER_STATICS);
-        EnqueuEvent_Simple(EV_RENDER_UI);
+        EnqueueEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
+        EnqueueEvent_Simple(EV_RENDER_STATICS);
+        EnqueueEvent_Simple(EV_RENDER_UI);
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
 
