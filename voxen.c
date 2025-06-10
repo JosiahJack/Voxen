@@ -277,6 +277,7 @@ float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 // Input states
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
+bool log_playback = false;
 
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
@@ -349,6 +350,58 @@ void clear_ev_journal(void) {
     }
 
     eventJournalIndex = 0; // Restart at the beginning.
+}
+
+void JournalLog(void) {
+    FILE* fp = fopen("./voxen.dem", "ab");
+    if (!fp) {
+        printf("Failed to open voxen.dem\n");
+        return;
+    }
+
+    // Write all valid events in eventJournal
+    for (int i = 0; i < eventJournalIndex; i++) {
+        if (eventJournal[i].type != EV_NULL) {
+            fwrite(&eventJournal[i], sizeof(Event), 1, fp);
+        }
+    }
+    fflush(fp);
+    fclose(fp);
+}
+
+int ReadJournalLog(const char* dem_file) {
+    FILE* fp = fopen(dem_file, "rb");
+    if (!fp) {
+        printf("Failed to open .dem file\n");
+        return -1;
+    }
+
+    Event event;
+    int events_processed = 0;
+    log_playback = true;
+    while (fread(&event, sizeof(Event), 1, fp) == 1 && events_processed < MAX_EVENTS_PER_FRAME) {
+        if (event.type == EV_NULL) continue; // Skip null events
+        // Enqueue event
+        if (eventIndex >= MAX_EVENTS_PER_FRAME) {
+            printf("Event queue full during playback!\n");
+            break;
+        }
+
+        eventQueue[eventIndex] = event;
+        eventIndex++;
+        events_processed++;
+        // Execute immediately (or defer to main loop)
+        int status = EventExecute(&event);
+        if (status && status != 1) {
+            printf("EventExecute failed during playback: %d\n", status);
+            fclose(fp);
+            return status;
+        }
+    }
+
+    log_playback = false;
+    fclose(fp);
+    return events_processed > 0 ? 0 : 1; // 1 if EOF
 }
 
 // Queue was processed for the frame, clear it so next frame starts fresh.
@@ -490,9 +543,9 @@ int EventQueueProcess(void) {
         // Journal buffer entry of this event
         eventJournalIndex++; // Increment now to then write event into the journal.
         if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE) {
-            // TODO: Write to journal log file ./voxen.dem WriteJournalBuffer();
+            JournalLog();
             clear_ev_journal(); // Also sets eventJournalIndex to 0.
-            //printf("Event queue cleared after journal filled\n");
+            printf("Event queue cleared after journal filled, log updated\n");
         }
 
         eventJournal[eventJournalIndex].type = eventQueue[eventIndex].type;
