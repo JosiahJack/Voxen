@@ -703,7 +703,14 @@ int main(int argc, char* argv[]) {
 
         // Enqueue all logged events for the current frame.
         if (log_playback) {
-            ReadActiveLog(); // Read the log file for current frame and enqueue events from log.
+            // Read the log file for current frame and enqueue events from log.
+            int read_status = ReadActiveLog();
+            if (read_status == 2) { // EOF reached, no more events
+                printf("Log playback completed.  Control returned.\n");
+            } else if (read_status == -1) { // Read error
+                printf("Error reading log file, exiting playback\n");
+                EnqueueEvent_Simple(EV_QUIT);
+            }
         }
 
         exitCode = EventQueueProcess(); // Do everything
