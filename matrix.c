@@ -18,6 +18,18 @@ void mat4_perspective(float* m, float fov, float aspect, float near, float far) 
     m[15] = 0.0f;
 }
 
+// Matrix helper for 2D orthographic projection for text/UI
+void mat4_ortho(float* m, float left, float right, float bottom, float top, float near, float far) {
+    mat4_identity(m);
+    m[0] = 2.0f / (right - left);
+    m[5] = 2.0f / (top - bottom);
+    m[10] = -2.0f / (far - near);
+    m[12] = -(right + left) / (right - left);
+    m[13] = -(top + bottom) / (top - bottom);
+    m[14] = -(far + near) / (far - near);
+    m[15] = 1.0f;
+}
+
 void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orientation) {
     // Convert quaternion to rotation matrix
     float rotation[16];

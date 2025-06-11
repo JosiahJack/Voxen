@@ -10,94 +10,34 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
-#include <time.h>
 #include <string.h>
 #include "event.h"
 #include "quaternion.h"
 #include "matrix.h"
 #include "constants.h"
+#include "shaders.glsl.h"
 
-// Bindless texture function prototypes
-// GLuint64 glGetTextureHandleARB(GLuint texture);
-// void glMakeTextureHandleResidentARB(GLuint64 handle);
-// void glMakeTextureHandleNonResidentARB(GLuint64 handle);
-
-// Window and OpenGL context
+// Window
 SDL_Window *window;
-SDL_GLContext gl_context;
 int screen_width = 800, screen_height = 600;
-TTF_Font *font = NULL;
 bool window_has_focus = false;
 
-// GL Shaders
+// Event System states
+int maxEventCount_debug = 0;
+double lastJournalWriteTime = 0;
+uint32_t globalFrameNum = 0;
+FILE* activeLogFile;
+
+// OpenGL
+SDL_GLContext gl_context;
 GLuint shaderProgram;
 GLuint textShaderProgram; // For text
 GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
+
+TTF_Font *font = NULL;
 GLuint textVAO, textVBO; // For text
+
 bool use_bindless_textures = false;
-const char *vertexShaderSource =
-    "#version 450 core\n"
-    "\n"
-    "layout(location = 0) in vec3 aPos;\n"
-    "layout(location = 1) in vec3 aNormal;\n"
-    "layout(location = 2) in vec2 aTexCoord;\n"
-    "layout(location = 3) in float aTexIndex;\n"
-    "uniform mat4 view;\n"
-    "uniform mat4 projection;\n"
-    "out vec2 TexCoord;\n"
-    "out float TexIndex;\n"
-    "\n"
-    "void main() {\n"
-    "    gl_Position = projection * view * vec4(aPos, 1.0);\n"
-    "    TexCoord = aTexCoord;\n"
-    "    TexIndex = aTexIndex;\n"
-    "}\n";
-
-const char *fragmentShaderBindless = "#version 450 core\n"
-    "#extension GL_ARB_bindless_texture : require\n"
-    "in vec2 TexCoord;\n"
-    "in float TexIndex;\n"
-    "out vec4 FragColor;\n"
-    "layout(bindless_sampler) uniform sampler2D uTextures[3];\n"
-    "void main() {\n"
-    "    int index = int(TexIndex);\n"
-    "    FragColor = texture(uTextures[index], TexCoord);\n"
-    "}\n";
-
-const char *fragmentShaderTraditional = "#version 450 core\n"
-    "in vec2 TexCoord;\n"
-    "in float TexIndex;\n"
-    "out vec4 FragColor;\n"
-    "uniform sampler2D uTextures[3];\n"
-    "void main() {\n"
-    "    int index = int(TexIndex);\n"
-    "    FragColor = texture(uTextures[index], TexCoord);\n"
-    "}\n";
-
-
-// Vertex Shader for Text
-const char *textVertexShaderSource =
-    "#version 450 core\n"
-    "layout(location = 0) in vec2 aPos;\n"
-    "layout(location = 1) in vec2 aTexCoord;\n"
-    "uniform mat4 projection;\n"
-    "out vec2 TexCoord;\n"
-    "void main() {\n"
-    "    gl_Position = projection * vec4(aPos, 0.0, 1.0);\n"
-    "    TexCoord = aTexCoord;\n"
-    "}\n";
-
-// Fragment Shader for Text
-const char *textFragmentShaderSource =
-    "#version 450 core\n"
-    "in vec2 TexCoord;\n"
-    "out vec4 FragColor;\n"
-    "uniform sampler2D textTexture;\n"
-    "uniform vec4 textColor;\n"
-    "void main() {\n"
-    "    vec4 sampled = texture(textTexture, TexCoord);\n"
-    "    FragColor = vec4(textColor.rgb, sampled.a * textColor.a);\n"
-    "}\n";
 
 int CompileShaders(void) {
     // Vertex Shader
@@ -339,140 +279,6 @@ int eventIndex; // Event that made it to the counter.  Indices below this were
 
 int eventQueueEnd; // End of the waiting line
 
-// Intended to be called after each buffered write to the logfile in .dem
-// format which is custom but similar concept to Quake 1 demos.
-void clear_ev_journal(void) {
-    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
-    for (int i=0;i<EVENT_JOURNAL_BUFFER_SIZE;i++) {
-        eventJournal[i].type = EV_NULL;
-        eventJournal[i].timestamp = 0.0;
-        eventJournal[i].deltaTime_ns = 0.0;
-    }
-
-    eventJournalIndex = 0; // Restart at the beginning.
-}
-
-void JournalLog(void) {
-    FILE* fp = fopen("./voxen.dem", "ab");
-    if (!fp) {
-        printf("Failed to open voxen.dem\n");
-        return;
-    }
-
-    // Write all valid events in eventJournal
-    for (int i = 0; i < eventJournalIndex; i++) {
-        if (eventJournal[i].type != EV_NULL) {
-            fwrite(&eventJournal[i], sizeof(Event), 1, fp);
-        }
-    }
-    fflush(fp);
-    fclose(fp);
-}
-
-int ReadJournalLog(const char* dem_file) {
-    FILE* fp = fopen(dem_file, "rb");
-    if (!fp) {
-        printf("Failed to open .dem file\n");
-        return -1;
-    }
-
-    Event event;
-    int events_processed = 0;
-    log_playback = true;
-    while (fread(&event, sizeof(Event), 1, fp) == 1 && events_processed < MAX_EVENTS_PER_FRAME) {
-        if (event.type == EV_NULL) continue; // Skip null events
-        // Enqueue event
-        if (eventIndex >= MAX_EVENTS_PER_FRAME) {
-            printf("Event queue full during playback!\n");
-            break;
-        }
-
-        eventQueue[eventIndex] = event;
-        eventIndex++;
-        events_processed++;
-        // Execute immediately (or defer to main loop)
-        int status = EventExecute(&event);
-        if (status && status != 1) {
-            printf("EventExecute failed during playback: %d\n", status);
-            fclose(fp);
-            return status;
-        }
-    }
-
-    log_playback = false;
-    fclose(fp);
-    return events_processed > 0 ? 0 : 1; // 1 if EOF
-}
-
-// Queue was processed for the frame, clear it so next frame starts fresh.
-void clear_ev_queue(void) {
-    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
-    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
-        eventQueue[i].type = EV_NULL;
-        eventQueue[i].timestamp = 0.0;
-        eventQueue[i].deltaTime_ns = 0.0;
-    }
-
-    eventIndex = 0;
-    eventQueueEnd = 0;
-}
-
-double get_time(void) {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-        fprintf(stderr, "Error: clock_gettime failed\n");
-        return 0.0;
-    }
-
-    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
-}
-
-// Initializes unified event system variables
-int EventInit(void) {
-    // Initialize the eventQueue as empty
-    clear_ev_queue();
-    clear_ev_journal(); // Initialize the event journal as empty.
-    eventQueue[eventIndex].type = EV_INIT;
-    eventQueue[eventIndex].timestamp = get_time();
-    eventQueue[eventIndex].deltaTime_ns = 0.0;
-    return 0;
-}
-
-int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
-    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { printf("Queue buffer filled!\n"); return 1; }
-
-    //printf("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
-    eventQueue[eventQueueEnd].type = type;
-    eventQueue[eventQueueEnd].timestamp = 0;
-    eventQueue[eventQueueEnd].payload1u = payload1u;
-    eventQueue[eventQueueEnd].payload2u = payload2u;
-    eventQueue[eventQueueEnd].payload1f = payload1f;
-    eventQueue[eventQueueEnd].payload2f = payload2f;
-    eventQueueEnd++;
-    return 0;
-}
-
-int EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
-    return EnqueueEvent(type,payload1u,payload2u,0.0f,0.0f);
-}
-
-int EnqueueEvent_Uint(uint8_t type, uint32_t payload1u) {
-    return EnqueueEvent(type,payload1u,0u,0.0f,0.0f);
-}
-
-int EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
-    return EnqueueEvent(type,0u,0u,payload1f,payload2f);
-}
-
-int EnqueueEvent_Float(uint8_t type, float payload1f) {
-    return EnqueueEvent(type,0u,0u,payload1f,0.0f);
-}
-
-// Enqueues an event with type only and no payload values.
-int EnqueueEvent_Simple(uint8_t type) {
-    return EnqueueEvent(type,0u,0u,0.0f,0.0f);
-}
-
 bool in_cyberspace = true;
 
 void Input_MouselookApply() {
@@ -510,85 +316,6 @@ int Input_MouseMove(float xrel, float yrel) {
 int ClearFrameBuffers(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     return 0;
-}
-
-// Process the entire event queue. Events might add more new events to the queue.
-// Intended to be called once per loop iteration by the main loop.
-int EventQueueProcess(void) {
-    int status = 0;
-    double timestamp = 0.0;
-    int eventCount = 0;
-    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
-        if (eventQueue[i].type != EV_NULL) {
-            //printf("Queue contains:  ");
-            //printf("%d, ", eventQueue[i].type);
-            eventCount++;
-        }
-    }
-
-//     printf("\n");
-
-    //printf("EventQueueProcess start with %d events in queue\n",eventCount);
-    eventIndex = 0;
-    while (eventIndex < MAX_EVENTS_PER_FRAME) {
-        //printf("Iterating over event queue, eventIndex this loop: %d\n",eventIndex);
-        if (eventQueue[eventIndex].type == EV_NULL) {
-            break; // End of queue
-        }
-
-        timestamp = get_time();
-        eventQueue[eventIndex].timestamp = timestamp;
-        eventQueue[eventIndex].deltaTime_ns = timestamp - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
-        //printf("Current event deltaTime: %f\n",eventQueue[eventIndex].deltaTime_ns);
-        // Journal buffer entry of this event
-        eventJournalIndex++; // Increment now to then write event into the journal.
-        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE) {
-            JournalLog();
-            clear_ev_journal(); // Also sets eventJournalIndex to 0.
-            printf("Event queue cleared after journal filled, log updated\n");
-        }
-
-        eventJournal[eventJournalIndex].type = eventQueue[eventIndex].type;
-        eventJournal[eventJournalIndex].timestamp = eventQueue[eventIndex].timestamp;
-        eventJournal[eventJournalIndex].deltaTime_ns = eventQueue[eventIndex].deltaTime_ns;
-        eventJournal[eventJournalIndex].payload1u = eventQueue[eventIndex].payload1u;
-        eventJournal[eventJournalIndex].payload2u = eventQueue[eventIndex].payload2u;
-        eventJournal[eventJournalIndex].payload1f = eventQueue[eventIndex].payload1f;
-        eventJournal[eventJournalIndex].payload2f = eventQueue[eventIndex].payload2f;
-//         printf("t:%d,ts:%f,dt:%f,p1u:%d,p2u:%d,p1f:%f,p2f:%f\n",
-//                eventQueue[eventIndex].type,
-//                eventQueue[eventIndex].timestamp,
-//                eventQueue[eventIndex].deltaTime_ns,
-//                eventQueue[eventIndex].payload1u,
-//                eventQueue[eventIndex].payload2u,
-//                eventQueue[eventIndex].payload1f,
-//                eventQueue[eventIndex].payload2f);
-
-        // Execute event after journal buffer entry such that we can dump the
-        // journal buffer on error and last entry will be the problematic event.
-        status = EventExecute(&eventQueue[eventIndex]);
-        if (status) {
-            if (status != 1) printf("EventExecute returned nonzero status: %d !", status);
-            return status;
-        }
-
-        eventIndex++;
-    }
-
-    clear_ev_queue();
-    return 0;
-}
-
-// Matrix helper for 2D orthographic projection
-void mat4_ortho(float* m, float left, float right, float bottom, float top, float near, float far) {
-    mat4_identity(m);
-    m[0] = 2.0f / (right - left);
-    m[5] = 2.0f / (top - bottom);
-    m[10] = -2.0f / (far - near);
-    m[12] = -(right + left) / (right - left);
-    m[13] = -(top + bottom) / (top - bottom);
-    m[14] = -(far + near) / (far - near);
-    m[15] = 1.0f;
 }
 
 // Renders text at x,y coordinates specified using pointer to the string array.
@@ -722,6 +449,10 @@ int RenderUI(double deltaTime) {
     char text3[64];
     snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
     render_debug_text(10, 55, text3, textCol);
+
+    char text4[64];
+    snprintf(text4, sizeof(text4), "Peak frame queue count: %.2d", maxEventCount_debug);
+    render_debug_text(10, 70, text4, textCol);
     return 0;
 }
 
@@ -859,6 +590,7 @@ int InitializeEnvironment(void) {
 }
 
 int ExitCleanup(int status) {
+    if (activeLogFile) fclose(activeLogFile); // Close log playback file.
     switch(status) {
         case 2: SDL_Quit(); break; // SDL was init'ed, so SDL_Quit
         case 3: TTF_Quit(); SDL_Quit(); break; // TTF was init'ed, so also TTF Quit
@@ -906,57 +638,79 @@ int EventExecute(Event* event) {
     return 99; // Something went wrong
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
     int exitCode = 0;
+    globalFrameNum = 0;
     exitCode = EventInit();
     if (exitCode) return ExitCleanup(exitCode);
+
+    if (argc == 3 && strcmp(argv[1], "play") == 0) {
+        printf("Playing log: %s\n", argv[2]);
+        activeLogFile = fopen(argv[2], "rb");
+        if (!activeLogFile) {
+            printf("Failed to read log: %s\n", argv[2]);
+        } else log_playback = true; // Perform log playback.
+    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) {
+        printf("Converting log: %s\n", argv[2]);
+        JournalDump(argv[2]);
+    }
 
     EnqueueEvent_Simple(EV_INIT);
     EnqueueEvent_Simple(EV_LOAD_TEXTURES);
     double accumulator = 0.0;
     last_time = get_time();
+    lastJournalWriteTime = get_time();
     while(1) {
-        // Enqueue input events
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
-            else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) EnqueueEvent_Simple(EV_QUIT);
-                else EnqueueEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
-            } else if (event.type == SDL_KEYUP) {
-                EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
-            } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
-                EnqueueEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
+        if (!log_playback) {
+            // Enqueue input events
+            SDL_Event event;
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
+                else if (event.type == SDL_KEYDOWN) {
+                    if (event.key.keysym.sym == SDLK_ESCAPE) EnqueueEvent_Simple(EV_QUIT);
+                    else EnqueueEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
+                } else if (event.type == SDL_KEYUP) {
+                    EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
+                } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
+                    EnqueueEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
 
-            // These aren't really events so just handle them here.
-            } else if (event.type == SDL_WINDOWEVENT) {
-                if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    window_has_focus = true;
-                    //SDL_SetRelativeMouseMode(SDL_TRUE);
-                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                    window_has_focus = false;
-                    //SDL_SetRelativeMouseMode(SDL_FALSE);
+                // These aren't really events so just handle them here.
+                } else if (event.type == SDL_WINDOWEVENT) {
+                    if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                        window_has_focus = true;
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                    } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                        window_has_focus = false;
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                    }
                 }
             }
+
+            double current_time = get_time();
+            double frame_time = current_time - last_time;
+            last_time = current_time;
+            accumulator += frame_time;
+            while (accumulator >= time_step) {
+                if (window_has_focus) ProcessInput();
+                accumulator -= time_step;
+            }
+
+            // Enqueue render events in pipeline order
+            EnqueueEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
+            EnqueueEvent_Simple(EV_RENDER_STATICS);
+            EnqueueEvent_Simple(EV_RENDER_UI);
         }
 
-        double current_time = get_time();
-        double frame_time = current_time - last_time;
-        last_time = current_time;
-        accumulator += frame_time;
-        while (accumulator >= time_step) {
-            if (window_has_focus) ProcessInput();
-            accumulator -= time_step;
+        // Enqueue all logged events for the current frame.
+        if (log_playback) {
+            ReadActiveLog(); // Read the log file for current frame and enqueue events from log.
         }
 
-        // Enqueue render events in pipeline order
-        EnqueueEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
-        EnqueueEvent_Simple(EV_RENDER_STATICS);
-        EnqueueEvent_Simple(EV_RENDER_UI);
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
 
         SDL_GL_SwapWindow(window); // Present frame
+        globalFrameNum++;
     }
 
     // Cleanup
