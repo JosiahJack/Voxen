@@ -325,6 +325,7 @@ int InitializeEnvironment(void) {
     fprintf(stderr, "OpenGL Version: %s\n", version ? (const char*)version : "unknown");
     fprintf(stderr, "Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
+    SDL_GL_SetSwapInterval(0.0);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
