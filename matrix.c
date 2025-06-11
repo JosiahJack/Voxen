@@ -47,3 +47,10 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
     m[2] = -forward[0]; m[6] = -forward[1]; m[10] = -forward[2]; m[14] = -(-forward[0] * eyeX + -forward[1] * eyeY + -forward[2] * eyeZ);
     m[3] = 0.0f;      m[7] = 0.0f;      m[11] = 0.0f;      m[15] = 1.0f;
 }
+
+void mat4_translate(float *m, float x, float y, float z) {
+    mat4_identity(m);
+    m[12] = x;
+    m[13] = y;
+    m[14] = z;
+}

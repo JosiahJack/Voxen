@@ -16,6 +16,9 @@
 #include "matrix.h"
 #include "constants.h"
 #include "shaders.glsl.h"
+#include "input.h"
+#include "data_textures.h"
+#include "data_models.h"
 
 // Window
 SDL_Window *window;
@@ -32,153 +35,13 @@ const char* manualLogName;
 // OpenGL
 SDL_GLContext gl_context;
 GLuint shaderProgram;
-GLuint textShaderProgram; // For text
+GLuint textShaderProgram;
 GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
 
 TTF_Font *font = NULL;
-GLuint textVAO, textVBO; // For text
+GLuint textVAO, textVBO;
 
 bool use_bindless_textures = false;
-
-int CompileShaders(void) {
-    // Vertex Shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    GLint success;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        fprintf(stderr, "Vertex Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Fragment Shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *fragSource = use_bindless_textures ? fragmentShaderBindless : fragmentShaderTraditional;
-    glShaderSource(fragmentShader, 1, &fragSource, NULL);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        fprintf(stderr, "Fragment Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Shader Program
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    // Text Vertex Shader
-    GLuint textVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(textVertexShader, 1, &textVertexShaderSource, NULL);
-    glCompileShader(textVertexShader);
-    glGetShaderiv(textVertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(textVertexShader, 512, NULL, infoLog);
-        fprintf(stderr, "Text Vertex Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Text Fragment Shader
-    GLuint textFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(textFragmentShader, 1, &textFragmentShaderSource, NULL);
-    glCompileShader(textFragmentShader);
-    glGetShaderiv(textFragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(textFragmentShader, 512, NULL, infoLog);
-        fprintf(stderr, "Text Fragment Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Text Shader Program
-    textShaderProgram = glCreateProgram();
-    glAttachShader(textShaderProgram, textVertexShader);
-    glAttachShader(textShaderProgram, textFragmentShader);
-    glLinkProgram(textShaderProgram);
-    glGetProgramiv(textShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(textShaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Text Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    glDeleteShader(textVertexShader);
-    glDeleteShader(textFragmentShader);
-    return 0;
-}
-
-// Cube Geometry (positions, normals, tex coords, texture index)
-float cubeVertices[] = {
-    // Positions          // Normals           // Tex Coords  // Tex Index
-    -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 0.0f,  2.0f, // Top (med1_9.png)
-     1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 0.0f,  2.0f,
-     1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  1.0f, 1.0f,  2.0f,
-    -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f,  0.0f, 1.0f,  2.0f,
-
-    -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  0.0f, 0.0f,  1.0f, // Bottom (med1_7.png)
-    -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  0.0f, 1.0f,  1.0f,
-     1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  1.0f, 1.0f,  1.0f,
-     1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f,  1.0f, 0.0f,  1.0f,
-
-    -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
-    -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  0.0f, 1.0f,  0.0f,
-     1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 1.0f,  0.0f,
-     1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f,  1.0f, 0.0f,  0.0f,
-
-    -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
-     1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 0.0f,  0.0f,
-     1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f,  1.0f, 1.0f,  0.0f,
-    -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f,  0.0f, 1.0f,  0.0f,
-
-     1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
-     1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  0.0f, 1.0f,  0.0f,
-     1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f,  0.0f,
-     1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f,  0.0f,
-
-    -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 0.0f,  0.0f, // Side (med1_1.png)
-    -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 0.0f,  0.0f,
-    -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f,  1.0f, 1.0f,  0.0f,
-    -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f,  0.0f, 1.0f,  0.0f
-};
-
-void SetupCube(void) {
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-    // Position
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    // Normal
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    // Tex Coord
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    // Tex Index
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(8 * sizeof(float)));
-    glEnableVertexAttribArray(3);
-    glBindVertexArray(0);
-}
 
 // Quad for text (2 triangles, positions and tex coords)
 float textQuadVertices[] = {
@@ -205,16 +68,6 @@ void SetupTextQuad(void) {
     glBindVertexArray(0);
 }
 
-// Camera variables
-float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
-// float cam_yaw = 0.0f, cam_pitch = 0.0f;         // Camera orientation
-Quaternion cam_rotation;
-float cam_yaw = 180.0f;
-float cam_pitch = 90.0f;
-float cam_roll = 0.0f;
-float move_speed = 0.1f;
-float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
-
 // Input states
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
@@ -222,51 +75,6 @@ bool log_playback = false;
 
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
-
-// Data
-// ============================================================================
-
-// Textures
-SDL_Surface *textureSurfaces[TEXTURE_COUNT];
-GLuint textureIDs[TEXTURE_COUNT];
-GLuint64 textureHandles[TEXTURE_COUNT];
-const char *texturePaths[TEXTURE_COUNT] = {
-    "./Textures/med1_1.png",
-    "./Textures/med1_7.png",
-    "./Textures/med1_9.png"
-};
-
-int LoadTextures(void) {
-    for (int i = 0; i < TEXTURE_COUNT; i++) {
-        SDL_Surface *surface = IMG_Load(texturePaths[i]);
-        if (!surface) {
-            fprintf(stderr, "IMG_Load failed for %s: %s\n", texturePaths[i], IMG_GetError());
-            return 1;
-        }
-        textureSurfaces[i] = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
-        SDL_FreeSurface(surface);
-        if (!textureSurfaces[i]) {
-            fprintf(stderr, "SDL_ConvertSurfaceFormat failed for %s: %s\n", texturePaths[i], SDL_GetError());
-            return 1;
-        }
-        glGenTextures(1, &textureIDs[i]);
-        glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, textureSurfaces[i]->w, textureSurfaces[i]->h, 0,
-                     GL_RGBA, GL_UNSIGNED_BYTE, textureSurfaces[i]->pixels);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        if (use_bindless_textures) {
-            textureHandles[i] = glGetTextureHandleARB(textureIDs[i]); // Bindless handle
-            glMakeTextureHandleResidentARB(textureHandles[i]); // Make resident
-        }
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-    return 0;
-}
-
-// ============================================================================
 
 // Queue for events to process this frame
 Event eventQueue[MAX_EVENTS_PER_FRAME];
@@ -279,40 +87,6 @@ int eventIndex; // Event that made it to the counter.  Indices below this were
                 // already executed and walked away from the counter.
 
 int eventQueueEnd; // End of the waiting line
-
-bool in_cyberspace = true;
-
-void Input_MouselookApply() {
-    if (in_cyberspace) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
-    else quat_from_yaw_pitch(&cam_rotation,cam_yaw,cam_pitch);
-}
-
-int Input_KeyDown(uint32_t scancode) {
-    keys[scancode] = true;
-    if (scancode == SDL_SCANCODE_TAB) {
-        in_cyberspace = !in_cyberspace;
-        cam_roll = 0.0f; // Reset roll for sanity
-        Input_MouselookApply();
-    }
-    return 0;
-}
-
-int Input_KeyUp(uint32_t scancode) {
-    keys[scancode] = false;
-    return 0;
-}
-
-
-
-int Input_MouseMove(float xrel, float yrel) {
-    cam_yaw += xrel * mouse_sensitivity;
-    cam_pitch += yrel * mouse_sensitivity;
-    if (cam_pitch > 179.0f) cam_pitch = 179.0f;
-    if (cam_pitch < 1.0f) cam_pitch = 1.0f;
-    Input_MouselookApply();
-    return 0;
-}
-
 
 int ClearFrameBuffers(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -393,9 +167,43 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
     SDL_FreeSurface(rgba_surface);
 }
 
+// int RenderStaticMeshes(void) {
+//     glUseProgram(shaderProgram);
+//     // Set up matrices
+//     float view[16], projection[16];
+//     float fov = 65.0f;
+//     mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.1f, 100.0f);
+//     mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
+//     GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
+//     GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
+//     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
+//     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
+//     if (use_bindless_textures) {
+//         GLint texLoc = glGetUniformLocation(shaderProgram, "uTextures");
+//         glUniformHandleui64vARB(texLoc, TEXTURE_COUNT, textureHandles);
+//     } else {
+//         for (int i = 0; i < TEXTURE_COUNT; i++) {
+//             glActiveTexture(GL_TEXTURE0 + i);
+//             glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
+//             char uniformName[32];
+//             snprintf(uniformName, sizeof(uniformName), "uTextures[%d]", i);
+//             GLint texLoc = glGetUniformLocation(shaderProgram, uniformName);
+//             glUniform1i(texLoc, i);
+//         }
+//     }
+/*
+    // Render cube
+    glBindVertexArray(vao);
+    glDrawArrays(GL_QUADS, 0, 24); // 24 vertices for 6 quads
+    glBindVertexArray(0);
+    glUseProgram(0);
+    return 0;
+}*/
+
 int RenderStaticMeshes(void) {
     glUseProgram(shaderProgram);
-    // Set up matrices
+
+    // Set up view and projection matrices
     float view[16], projection[16];
     float fov = 65.0f;
     mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.1f, 100.0f);
@@ -404,6 +212,8 @@ int RenderStaticMeshes(void) {
     GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
+
+    // Set textures
     if (use_bindless_textures) {
         GLint texLoc = glGetUniformLocation(shaderProgram, "uTextures");
         glUniformHandleui64vARB(texLoc, TEXTURE_COUNT, textureHandles);
@@ -418,9 +228,20 @@ int RenderStaticMeshes(void) {
         }
     }
 
-    // Render cube
     glBindVertexArray(vao);
-    glDrawArrays(GL_QUADS, 0, 24); // 24 vertices for 6 quads
+
+    // Render cube (first 24 vertices)
+    float model[16];
+    mat4_identity(model);
+    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glDrawArrays(GL_QUADS, 0, 24);
+
+    // Render med1_1.fbx instance at (0, 1.28f, 0)
+    mat4_translate(model, 0.0f, 1.28f, 0.0f);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glDrawArrays(GL_TRIANGLES, vbo_offsets[1], modelVertexCounts[0]);
+
     glBindVertexArray(0);
     glUseProgram(0);
     return 0;
@@ -431,11 +252,11 @@ int RenderUI(double deltaTime) {
     SDL_Color textCol = {255, 255, 255, 255}; // White
 
     // Draw debug text
-    char text0[64];
-    snprintf(text0, sizeof(text0), "Frame time: %f", deltaTime * 1000.0);
+    char text0[128];
+    snprintf(text0, sizeof(text0), "Frame time: %.6f", deltaTime * 1000.0);
     render_debug_text(10, 10, text0, textCol); // Top-left corner (10, 10)
 
-    char text1[64];
+    char text1[128];
     snprintf(text1, sizeof(text1), "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
     render_debug_text(10, 25, text1, textCol); // Top-left corner (10, 10)
 
@@ -443,80 +264,18 @@ int RenderUI(double deltaTime) {
     float cam_quat_pitch = 0.0f;
     float cam_quat_roll = 0.0f;
     quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
-    char text2[64];
+    char text2[128];
     snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
     render_debug_text(10, 40, text2, textCol);
 
-    char text3[64];
+    char text3[128];
     snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
     render_debug_text(10, 55, text3, textCol);
 
-    char text4[64];
+    char text4[128];
     snprintf(text4, sizeof(text4), "Peak frame queue count: %.2d", maxEventCount_debug);
     render_debug_text(10, 70, text4, textCol);
     return 0;
-}
-
-// Update camera position based on input
-void ProcessInput(void) {
-    // Extract forward and right vectors from quaternion
-    float rotation[16];
-    quat_to_matrix(&cam_rotation, rotation);
-    float facing_x = rotation[8];  // Forward X
-    float facing_y = rotation[9];  // Forward Y
-    float facing_z = rotation[10]; // Forward Z
-    float strafe_x = rotation[0];  // Right X
-    float strafe_y = rotation[1];  // Right Y
-    float strafe_z = rotation[2];  // Right Z
-
-    // Normalize forward
-    float len = sqrt(facing_x * facing_x + facing_y * facing_y + facing_z * facing_z);
-    if (len > 0) {
-        facing_x /= len;
-        facing_y /= len;
-        facing_z /= len;
-    }
-    // Normalize strafe
-    len = sqrt(strafe_x * strafe_x + strafe_y * strafe_y + strafe_z * strafe_z);
-    if (len > 0) {
-        strafe_x /= len;
-        strafe_y /= len;
-        strafe_z /= len;
-    }
-
-    if (keys[SDL_SCANCODE_F]) {
-        cam_x += move_speed * facing_x; // Move forward
-        cam_y += move_speed * facing_y;
-        cam_z += move_speed * facing_z;
-    } else if (keys[SDL_SCANCODE_S]) {
-        cam_x -= move_speed * facing_x; // Move backward
-        cam_y -= move_speed * facing_y;
-        cam_z -= move_speed * facing_z;
-    }
-
-    if (keys[SDL_SCANCODE_A]) {
-        cam_x -= move_speed * strafe_x; // Strafe left
-        cam_y -= move_speed * strafe_y;
-        cam_z -= move_speed * strafe_z;
-    } else if (keys[SDL_SCANCODE_D]) {
-        cam_x += move_speed * strafe_x; // Strafe right
-        cam_y += move_speed * strafe_y;
-        cam_z += move_speed * strafe_z;
-    }
-
-    if (keys[SDL_SCANCODE_V]) {
-        cam_z += move_speed; // Move up
-    } else if (keys[SDL_SCANCODE_C]) {
-        cam_z -= move_speed; // Move down
-    }
-
-    if (keys[SDL_SCANCODE_T]) {
-        cam_roll += move_speed * 5.0f; // Move up
-        Input_MouselookApply();
-    } else if (keys[SDL_SCANCODE_Q]) {
-        cam_roll -= move_speed * 5.0f; // Move down
-        Input_MouselookApply();
-    }
 }
 
 int InitializeEnvironment(void) {
@@ -633,6 +392,7 @@ int EventExecute(Event* event) {
         case EV_RENDER_STATICS: return RenderStaticMeshes();
         case EV_RENDER_UI: return RenderUI(get_time() - last_time);
         case EV_LOAD_TEXTURES: return LoadTextures();
+        case EV_LOAD_MODELS: return SetupGeometry();
         case EV_QUIT: return 1; break;
     }
 
@@ -667,6 +427,11 @@ int main(int argc, char* argv[]) {
         printf("-h, --help\n    Provides this help text.  Neat!\n\n");
         printf("-----------------------------------------------------------\n");
         return 0;
+    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
+        printf("Converting log: %s ...", argv[2]);
+        JournalDump(argv[2]);
+        printf("DONE!\n");
+        return 0;
     }
 
     int exitCode = 0;
@@ -681,15 +446,13 @@ int main(int argc, char* argv[]) {
         if (!activeLogFile) {
             printf("Failed to read log: %s\n", argv[2]);
         } else log_playback = true; // Perform log playback.
-    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
-        printf("Converting log: %s\n", argv[2]);
-        JournalDump(argv[2]);
     } else if (argc == 3 && strcmp(argv[1], "record") == 0) { // Log record
         manualLogName = argv[2];
     }
 
     EnqueueEvent_Simple(EV_INIT);
     EnqueueEvent_Simple(EV_LOAD_TEXTURES);
+    EnqueueEvent_Simple(EV_LOAD_MODELS);
     double accumulator = 0.0;
     last_time = get_time();
     lastJournalWriteTime = get_time();
