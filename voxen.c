@@ -27,6 +27,7 @@ int maxEventCount_debug = 0;
 double lastJournalWriteTime = 0;
 uint32_t globalFrameNum = 0;
 FILE* activeLogFile;
+const char* manualLogName;
 
 // OpenGL
 SDL_GLContext gl_context;
@@ -639,20 +640,52 @@ int EventExecute(Event* event) {
 }
 
 int main(int argc, char* argv[]) {
+    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
+        printf("-----------------------------------------------------------\n");
+        printf("Voxen v0.01.00 6/10/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT licensed\n\n\n");
+        return 0;
+    }
+
+    if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
+        printf("Voxen the OpenGL Voxel Lit Rendering Engine\n");
+        printf("-----------------------------------------------------------\n");
+        printf("        This is a rendering engine designed for optimized focused\n");
+        printf("        usage of OpenGL making maximal use of GPU Driven rendering\n");
+        printf("        techniques, a unified event system for debugging and log\n");
+        printf("        playback, full mod support loading all data from external\n");
+        printf("        files and using definition files for what to do with the\n");
+        printf("        data.\n\n");
+        printf("        This project aims to have minimal overhead, profiling,\n");
+        printf("        traceability, robustness, and low level control.\n\n");
+        printf("\n");
+        printf("Valid arguments:\n");
+        printf(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
+        printf("-v, --version\n    Prints version information\n\n");
+        printf("play <file>\n    Plays back recorded log from current directory\n\n");
+        printf("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
+        printf("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
+        printf("-h, --help\n    Provides this help text.  Neat!\n\n");
+        printf("-----------------------------------------------------------\n");
+        return 0;
+    }
+
     int exitCode = 0;
     globalFrameNum = 0;
+    activeLogFile = 0;
     exitCode = EventInit();
     if (exitCode) return ExitCleanup(exitCode);
 
-    if (argc == 3 && strcmp(argv[1], "play") == 0) {
+    if (argc == 3 && strcmp(argv[1], "play") == 0) { // Log playback
         printf("Playing log: %s\n", argv[2]);
         activeLogFile = fopen(argv[2], "rb");
         if (!activeLogFile) {
             printf("Failed to read log: %s\n", argv[2]);
         } else log_playback = true; // Perform log playback.
-    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) {
+    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
         printf("Converting log: %s\n", argv[2]);
         JournalDump(argv[2]);
+    } else if (argc == 3 && strcmp(argv[1], "record") == 0) { // Log record
+        manualLogName = argv[2];
     }
 
     EnqueueEvent_Simple(EV_INIT);
