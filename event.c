@@ -5,7 +5,10 @@
 #include "event.h"
 
 // Initializes unified event system variables
+bool journalFirstWrite = true;
 int EventInit(void) {
+    journalFirstWrite = true;
+
     // Initialize the eventQueue as empty
     clear_ev_queue();
     clear_ev_journal(); // Initialize the event journal as empty.
@@ -66,7 +69,14 @@ void clear_ev_journal(void) {
 }
 
 void JournalLog(void) {
-    FILE* fp = fopen("./voxen.dem", "ab");
+    FILE* fp;
+    if (journalFirstWrite) {
+        fp = fopen("./voxen.dem", "wb"); // Overwrite for first write.
+        journalFirstWrite = false;
+        
+        // TODO: Write player positions on first and 2nd line
+    } else fp = fopen("./voxen.dem", "ab"); // Append
+    
     if (!fp) {
         printf("Failed to open voxen.dem\n");
         return;
@@ -84,6 +94,7 @@ void JournalLog(void) {
 }
 
 bool IsPlayableEventType(uint8_t type) {
+    if (type == EV_KEYDOWN || type == EV_KEYUP) return true;
     return type != EV_INIT
            && type != EV_LOAD_TEXTURES
            && type != EV_LOAD_AUDIO
@@ -91,7 +102,6 @@ bool IsPlayableEventType(uint8_t type) {
            && type != EV_NULL;
 }
 
-// Makes use of global activeLogFile handle to read through log and enqueue events with matching frameNum to globalFrameNum
 // Makes use of global activeLogFile handle to read through log and enqueue events with matching frameNum to globalFrameNum
 int ReadActiveLog() {
     static bool eof_reached = false; // Track EOF across calls
@@ -102,6 +112,7 @@ int ReadActiveLog() {
         return 2; // Indicate EOF was previously reached
     }
 
+    printf("------ ReadActiveLog start for frame %d ------\n",globalFrameNum);
     while (events_processed < MAX_EVENTS_PER_FRAME) {
         size_t read_count = fread(&event, sizeof(Event), 1, activeLogFile);
         if (read_count != 1) {
@@ -110,28 +121,30 @@ int ReadActiveLog() {
                 log_playback = false; // Finished enqueuing last frame, main will finish processing the queue and return input to user.
                 return events_processed > 0 ? 0 : 2; // 0 if events were processed, 2 if EOF and no events
             }
+
             if (ferror(activeLogFile)) {
                 printf("Error reading log file\n");
                 return -1; // Read error
             }
         }
 
-        if (!IsPlayableEventType(event.type)) {
-            continue; // Skip unplayable events
-        }
+        if (!IsPlayableEventType(event.type)) continue; // Skip unplayable events
 
         if (event.frameNum == globalFrameNum) {
             // Enqueue events matching the current frame
             EnqueueEvent(event.type, event.payload1u, event.payload2u, event.payload1f, event.payload2f);
             events_processed++;
+            printf("Enqueued event %d from log for frame %d\n",event.type,event.frameNum);
         } else if (event.frameNum > globalFrameNum) {
             // Event is for a future frame; seek back and stop processing
             fseek(activeLogFile, -(long)sizeof(Event), SEEK_CUR);
+            printf("Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
             return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if no matching events
         }
         // If event.frameNum < globalFrameNum, skip it (past event)
     }
 
+    printf("End of log. Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
     return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if limit reached with no matching events
 }
 
@@ -143,7 +156,7 @@ int JournalDump(const char* dem_file) {
         return -1;
     }
 
-    FILE* fpW = fopen("./log_dump.txt", "ab");
+    FILE* fpW = fopen("./log_dump.txt", "wb");
     if (!fpW) {
         fclose(fpR); // Close .dem file that we were reading.
         printf("Failed to open voxen.dem\n");
@@ -215,13 +228,16 @@ int EventQueueProcess(void) {
 
         // Journal buffer entry of this event.  Still written to during playback for time deltas but never logged to .dem
         eventJournalIndex++; // Increment now to then write event into the journal.
-        if (!log_playback) {
-            if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (timestamp - lastJournalWriteTime) > 5.0) {
+        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (timestamp - lastJournalWriteTime) > 5.0) {
+            if (!log_playback) {
                 JournalLog();
                 lastJournalWriteTime = get_time();
-                clear_ev_journal(); // Also sets eventJournalIndex to 0.
                 printf("Event queue cleared after journal filled, log updated\n");
+            } else {
+                printf("Event queue cleared after journal filled, not writing to log during playback.\n");
             }
+            
+            clear_ev_journal(); // Also sets eventJournalIndex to 0.
         }
 
         eventJournal[eventJournalIndex].frameNum = eventQueue[eventIndex].frameNum;

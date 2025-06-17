@@ -2,8 +2,10 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "constants.h"
 #include "input.h"
 #include "quaternion.h"
+#include "player.h"
 
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
@@ -16,6 +18,17 @@ float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
 
+bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
+int mouse_x = 0, mouse_y = 0; // Mouse position
+
+void Input_Init(void) {
+    quat_identity(&cam_rotation);
+    Quaternion pitch_quat;
+    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -90.0f * M_PI / 180.0f); // Pitch -90° to look toward Y+
+    quat_multiply(&cam_rotation, &pitch_quat, &cam_rotation);
+    Input_MouselookApply();
+}
+    
 void Input_MouselookApply() {
     if (in_cyberspace) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
     else quat_from_yaw_pitch(&cam_rotation,cam_yaw,cam_pitch);
