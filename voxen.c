@@ -115,11 +115,12 @@ int ExitCleanup(int status) {
                 if (font) TTF_CloseFont(font);
                 TTF_Quit(); SDL_Quit(); break;
         default:
-                for (int i = 0; i < TEXTURE_COUNT; i++) {
-                    if (textureHandles[i]) glMakeTextureHandleNonResidentARB(textureHandles[i]);
-                    if (textureIDs[i]) glDeleteTextures(1, &textureIDs[i]);
-                    if (textureSurfaces[i]) SDL_FreeSurface(textureSurfaces[i]);
-                }
+                glDeleteBuffers(1, &colorBufferID);
+//                 for (int i = 0; i < TEXTURE_COUNT; i++) {
+//                     if (textureHandles[i]) glMakeTextureHandleNonResidentARB(textureHandles[i]);
+//                     if (textureIDs[i]) glDeleteTextures(1, &textureIDs[i]);
+//                     if (textureSurfaces[i]) SDL_FreeSurface(textureSurfaces[i]);
+//                 }
                 glDeleteProgram(shaderProgram);
                 glDeleteVertexArrays(1, &vao);
                 glDeleteBuffers(1, &vbo);

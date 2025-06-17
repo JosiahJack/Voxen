@@ -21,17 +21,16 @@ uint32_t totalVertexCount = 0;
 
 int LoadModels(float **vertexData, uint32_t *vertexCount) {
     totalVertexCount = 0;
-    uint32_t currentVertexOffset = 0;
     vbo_offsets[0] = 0; // First model starts at 0
-    float *tempVertices; // Temporary storage for all vertex data
+    float *tempVertices = NULL;
     bool tempVerticesAlloced = false;
     for (int i = 0; i < MODEL_COUNT; i++) {
-        const struct aiScene *scene = aiImportFile(modelPaths[i], // Load FBX file with Assimp
-                                                   aiProcess_FindInvalidData        // Removes invalid data such as micro polys, invalid normals (recalc'ed later)
-                                                   | aiProcess_Triangulate          // Triangulates any quads or ngons if tweren't already.
-                                                   | aiProcess_GenNormals           // Generates normals for verts that don't already have it.
-                                                   | aiProcess_ImproveCacheLocality // Fine tunes cache optimization for huge models.  Can help with single draw call
-                                                   | aiProcess_FindDegenerates);    // Removes degenerate triangles such as ones with only verts or edges
+        const struct aiScene *scene = aiImportFile(modelPaths[i],
+                                                   aiProcess_FindInvalidData
+                                                   | aiProcess_Triangulate
+                                                   | aiProcess_GenNormals
+                                                   | aiProcess_ImproveCacheLocality
+                                                   | aiProcess_FindDegenerates);
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
             fprintf(stderr, "Assimp failed to load %s: %s\n", modelPaths[i], aiGetErrorString());
             if (tempVerticesAlloced) free(tempVertices);
@@ -42,9 +41,11 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
         uint32_t vertexCount = 0;
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) vertexCount += scene->mMeshes[m]->mNumVertices;
         modelVertexCounts[i] = vertexCount;
+        printf("Model %s loaded with %d vertices\n", modelPaths[i], vertexCount);
 
+        
         // Allocate space for new vertices
-        if (!tempVerticesAlloced) tempVertices = (float *)malloc((totalVertexCount + vertexCount) * 9 * sizeof(float));
+        if (!tempVerticesAlloced) tempVertices = (float *)malloc(vertexCount * 9 * sizeof(float));
         else tempVertices = (float *)realloc(tempVertices, (totalVertexCount + vertexCount) * 9 * sizeof(float));
         
         if (!tempVertices) {
@@ -52,13 +53,10 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
             aiReleaseImport(scene);
             return 1;
         }
-        
         tempVerticesAlloced = true;
 
         // Extract vertex data
         uint32_t vertexIndex = totalVertexCount * 9;
-        float tempU = 0.0f;
-        float tempV = 0.0f;
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
@@ -68,23 +66,28 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
                 tempVertices[vertexIndex++] = mesh->mNormals[v].x; // Normal
                 tempVertices[vertexIndex++] = mesh->mNormals[v].y;
                 tempVertices[vertexIndex++] = mesh->mNormals[v].z;
-                tempU = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].x : 0.0f; // Tex Coord
-                tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
+                float tempU = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].x : 0.0f;
+                float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
                 tempVertices[vertexIndex++] = tempU;
                 tempVertices[vertexIndex++] = tempV;
-                tempVertices[vertexIndex++] = (float)(i); // Texture index matches model index TODO: Use separate texture index from constIndex
+                tempVertices[vertexIndex++] = (float)i; // TexIndex
             }
-            
         }
 
+//         vbo_offsets[i] = (totalVertexCount * 9);
+        vbo_offsets[i] = totalVertexCount;
         totalVertexCount += vertexCount;
-        if (i < MODEL_COUNT - 1) vbo_offsets[i] = currentVertexOffset;
-        currentVertexOffset += vertexCount;
+        printf("Cumulative totalVertexCount %d\n",totalVertexCount);
         aiReleaseImport(scene);
     }
 
+    
     *vertexData = tempVertices;
     *vertexCount = totalVertexCount;
+
+    // Log offsets and counts
+    printf("modelVertexCounts 0 %d 1 %d 2 %d\n",modelVertexCounts[0],modelVertexCounts[1],modelVertexCounts[2]);
+    printf("vbo_offsets 0 %d 1 %d 2 %d\n",vbo_offsets[0],vbo_offsets[1],vbo_offsets[2]);
     return 0;
 }
 

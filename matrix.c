@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 #include "constants.h"
 #include "matrix.h"
 
@@ -46,6 +47,20 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
     m[1] = up[0];     m[5] = up[1];     m[9]  = up[2];     m[13] = -(up[0] * eyeX + up[1] * eyeY + up[2] * eyeZ);
     m[2] = -forward[0]; m[6] = -forward[1]; m[10] = -forward[2]; m[14] = -(-forward[0] * eyeX + -forward[1] * eyeY + -forward[2] * eyeZ);
     m[3] = 0.0f;      m[7] = 0.0f;      m[11] = 0.0f;      m[15] = 1.0f;
+}
+
+void mat4_rotate_x(float *m, float angle) {
+    float c = cosf(angle), s = sinf(angle);
+    float t[16];
+    memcpy(t, m, 16 * sizeof(float));
+    m[4] = t[4] * c + t[8] * s;
+    m[5] = t[5] * c + t[9] * s;
+    m[6] = t[6] * c + t[10] * s;
+    m[7] = t[7] * c + t[11] * s;
+    m[8] = t[8] * c - t[4] * s;
+    m[9] = t[9] * c - t[5] * s;
+    m[10] = t[10] * c - t[6] * s;
+    m[11] = t[11] * c - t[7] * s;
 }
 
 void mat4_translate(float *m, float x, float y, float z) {

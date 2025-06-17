@@ -45,6 +45,7 @@ int ClearFrameBuffers(void) {
 }
 
 int RenderStaticMeshes(void) {
+    uint32_t modelIndex = 0;
     glUseProgram(shaderProgram);
 
     // Set up view and projection matrices
@@ -57,25 +58,38 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
 
-    // Set textures
-    for (int i = 0; i < TEXTURE_COUNT; i++) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
-        char uniformName[32];
-        snprintf(uniformName, sizeof(uniformName), "uTextures[%d]", i);
-        GLint texLoc = glGetUniformLocation(shaderProgram, uniformName);
-        glUniform1i(texLoc, i);
-    }
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, colorBufferID);
+    GLint offsetLoc = glGetUniformLocation(shaderProgram, "textureOffsets");
+    glUniform1uiv(offsetLoc, TEXTURE_COUNT, textureOffsets);
+    GLint sizeLoc = glGetUniformLocation(shaderProgram, "textureSizes");
+    glUniform2iv(sizeLoc, TEXTURE_COUNT, textureSizes);
 
     glBindVertexArray(vao);
 
     // Render med1_1.fbx instance at (0, 1.28f, 0)
     float model[16];
+    modelIndex = 0;
     mat4_identity(model);
     mat4_translate(model, 0.0f, 1.28f, 0.0f);
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
     glDrawArrays(GL_TRIANGLES, vbo_offsets[0], modelVertexCounts[0]);
+    
+    // Render model index 2 at (0, 1.28f, 0), rotated -90° on X-axis
+    modelIndex = 1;
+    mat4_identity(model);
+    mat4_translate(model, 2.56f, 1.28f, 0.0f);
+//     mat4_rotate_x(model, -M_PI_2); // -90° in radians
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glDrawArrays(GL_TRIANGLES, vbo_offsets[1], modelVertexCounts[1]);
+
+    // Render model index 2 at (0, 1.28f, 0), rotated +90° on X-axis
+    modelIndex = 2;
+    mat4_identity(model);
+    mat4_translate(model, -2.56f, 1.28f, 0.0f);
+//     mat4_rotate_x(model, M_PI_2); // +90° in radians
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glDrawArrays(GL_TRIANGLES, vbo_offsets[modelIndex], modelVertexCounts[modelIndex]);
 
     glBindVertexArray(0);
     glUseProgram(0);

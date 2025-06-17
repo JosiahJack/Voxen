@@ -232,9 +232,9 @@ int EventQueueProcess(void) {
             if (!log_playback) {
                 JournalLog();
                 lastJournalWriteTime = get_time();
-                printf("Event queue cleared after journal filled, log updated\n");
+//                 printf("Event queue cleared after journal filled, log updated\n");
             } else {
-                printf("Event queue cleared after journal filled, not writing to log during playback.\n");
+//                 printf("Event queue cleared after journal filled, not writing to log during playback.\n");
             }
             
             clear_ev_journal(); // Also sets eventJournalIndex to 0.

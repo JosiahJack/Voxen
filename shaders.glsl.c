@@ -30,15 +30,22 @@ const char *vertexShaderSource =
 
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
-    "\n"
     "in vec2 TexCoord;\n"
     "in float TexIndex;\n"
     "out vec4 FragColor;\n"
-    "uniform sampler2D uTextures[3];\n"
-    "\n"
+    "layout(std430, binding = 0) buffer ColorBuffer {\n"
+    "    float colors[];\n" // 1D color array (RGBA)
+    "};\n"
+    "uniform uint textureOffsets[3];\n" // Offsets for each texture
+    "uniform ivec2 textureSizes[3];\n" // Width, height for each texture
     "void main() {\n"
     "    int index = int(TexIndex);\n"
-    "    FragColor = texture(uTextures[index], TexCoord);\n"
+    "    ivec2 texSize = textureSizes[index];\n"
+    "    vec2 uv = clamp(vec2(1.0 - TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V
+    "    int x = int(uv.x * float(texSize.x));\n"
+    "    int y = int(uv.y * float(texSize.y));\n"
+    "    int pixelIndex = int(textureOffsets[index]) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
+    "    FragColor = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
     "}\n";
     
 // ----------------------------------------------------------------------------
