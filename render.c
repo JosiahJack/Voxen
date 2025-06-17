@@ -12,11 +12,6 @@
 #include "player.h"
 #include "render.h"
 
-void Render_Init(void) {
-    SetupCube();
-    SetupTextQuad();
-}
-
 // Quad for text (2 triangles, positions and tex coords)
 float textQuadVertices[] = {
     // Positions   // Tex Coords
@@ -32,9 +27,11 @@ void SetupTextQuad(void) {
     glBindVertexArray(textVAO);
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(textQuadVertices), textQuadVertices, GL_STATIC_DRAW);
+
     // Position
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    
     // Tex Coord
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
@@ -61,33 +58,24 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
 
     // Set textures
-    if (use_bindless_textures) {
-        GLint texLoc = glGetUniformLocation(shaderProgram, "uTextures");
-        glUniformHandleui64vARB(texLoc, TEXTURE_COUNT, textureHandles);
-    } else {
-        for (int i = 0; i < TEXTURE_COUNT; i++) {
-            glActiveTexture(GL_TEXTURE0 + i);
-            glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
-            char uniformName[32];
-            snprintf(uniformName, sizeof(uniformName), "uTextures[%d]", i);
-            GLint texLoc = glGetUniformLocation(shaderProgram, uniformName);
-            glUniform1i(texLoc, i);
-        }
+    for (int i = 0; i < TEXTURE_COUNT; i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, textureIDs[i]);
+        char uniformName[32];
+        snprintf(uniformName, sizeof(uniformName), "uTextures[%d]", i);
+        GLint texLoc = glGetUniformLocation(shaderProgram, uniformName);
+        glUniform1i(texLoc, i);
     }
 
     glBindVertexArray(vao);
 
-    // Render cube (first 24 vertices)
+    // Render med1_1.fbx instance at (0, 1.28f, 0)
     float model[16];
     mat4_identity(model);
+    mat4_translate(model, 0.0f, 1.28f, 0.0f);
     GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-    glDrawArrays(GL_QUADS, 0, 24);
-
-    // Render med1_1.fbx instance at (0, 1.28f, 0)
-    mat4_translate(model, 0.0f, 1.28f, 0.0f);
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-    glDrawArrays(GL_TRIANGLES, vbo_offsets[1], modelVertexCounts[0]);
+    glDrawArrays(GL_TRIANGLES, vbo_offsets[0], modelVertexCounts[0]);
 
     glBindVertexArray(0);
     glUseProgram(0);

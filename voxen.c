@@ -30,36 +30,23 @@ double lastJournalWriteTime = 0;
 uint32_t globalFrameNum = 0;
 FILE* activeLogFile;
 const char* manualLogName;
-
+bool log_playback = false;
+Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
+Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
+int eventJournalIndex;
+int eventIndex; // Event that made it to the counter.  Indices below this were
+                // already executed and walked away from the counter.
+int eventQueueEnd; // End of the waiting line
+const double time_step = 1.0 / 60.0; // 60fps
+double last_time = 0.0;
+                
 // OpenGL
 SDL_GLContext gl_context;
 GLuint shaderProgram;
 GLuint textShaderProgram;
 GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
-
 TTF_Font* font = NULL;
 GLuint textVAO, textVBO;
-
-bool use_bindless_textures = false;
-
-// Input states
-
-bool log_playback = false;
-
-const double time_step = 1.0 / 60.0; // 60fps
-double last_time = 0.0;
-
-// Queue for events to process this frame
-Event eventQueue[MAX_EVENTS_PER_FRAME];
-int eventJournalIndex;
-
-// Journal buffer for event history to write into the log/demo file
-Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE];
-
-int eventIndex; // Event that made it to the counter.  Indices below this were
-                // already executed and walked away from the counter.
-
-int eventQueueEnd; // End of the waiting line
 
 int InitializeEnvironment(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return 1; }
@@ -93,15 +80,6 @@ int InitializeEnvironment(void) {
         return 7;
     }
 
-    // Check bindless texture support
-    use_bindless_textures = GLEW_ARB_bindless_texture;
-    if (!use_bindless_textures) {
-        fprintf(stderr, "GL_ARB_bindless_texture not supported, falling back to traditional binding\n");
-    } else {
-        printf("use_bindless_textures was true\n");
-        fprintf(stderr, "Forcing traditional binding due to potential Intel/Mesa incompatibility\n");
-        use_bindless_textures = false;
-    }
     // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
@@ -118,13 +96,9 @@ int InitializeEnvironment(void) {
     glEnable(GL_NORMALIZE); // Normalize normals for lighting
     glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); // One-sided lighting
     glViewport(0, 0, screen_width, screen_height);
-    if (!GLEW_ARB_bindless_texture) {
-        fprintf(stderr, "GL_ARB_bindless_texture not supported\n");
-        return 8;
-    }
 
-    if (CompileShaders()) return 9;
-    Render_Init();
+    if (CompileShaders()) return 8;
+    SetupTextQuad();
     Input_Init();
     return 0;
 }

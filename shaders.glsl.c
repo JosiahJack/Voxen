@@ -2,24 +2,9 @@
 #include <stdio.h>
 #include "shaders.glsl.h"
 
-// const char *vertexShaderSource =
-//     "#version 450 core\n"
-//     "\n"
-//     "layout(location = 0) in vec3 aPos;\n"
-//     "layout(location = 1) in vec3 aNormal;\n"
-//     "layout(location = 2) in vec2 aTexCoord;\n"
-//     "layout(location = 3) in float aTexIndex;\n"
-//     "uniform mat4 view;\n"
-//     "uniform mat4 projection;\n"
-//     "out vec2 TexCoord;\n"
-//     "out float TexIndex;\n"
-//     "\n"
-//     "void main() {\n"
-//     "    gl_Position = projection * view * vec4(aPos, 1.0);\n"
-//     "    TexCoord = aTexCoord;\n"
-//     "    TexIndex = aTexIndex;\n"
-//     "}\n";
-
+// ----------------------------------------------------------------------------
+// Generic shader for unlit textured surfaces (all world geometry, items,
+// enemies, doors, etc., without transparency for first pass prior to lighting.
 const char *vertexShaderSource =
     "#version 450 core\n"
     "\n"
@@ -43,20 +28,6 @@ const char *vertexShaderSource =
     "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
     "}\n";
 
-const char *fragmentShaderBindless =
-    "#version 450 core\n"
-    "#extension GL_ARB_bindless_texture : require\n"
-    "\n"
-    "in vec2 TexCoord;\n"
-    "in float TexIndex;\n"
-    "out vec4 FragColor;\n"
-    "layout(bindless_sampler) uniform sampler2D uTextures[3];\n"
-    "\n"
-    "void main() {\n"
-    "    int index = int(TexIndex);\n"
-    "    FragColor = texture(uTextures[index], TexCoord);\n"
-    "}\n";
-
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
     "\n"
@@ -69,9 +40,10 @@ const char *fragmentShaderTraditional =
     "    int index = int(TexIndex);\n"
     "    FragColor = texture(uTextures[index], TexCoord);\n"
     "}\n";
+    
+// ----------------------------------------------------------------------------
 
-
-// Vertex Shader for Text
+// Text shader
 const char *textVertexShaderSource =
     "#version 450 core\n"
     "\n"
@@ -85,7 +57,6 @@ const char *textVertexShaderSource =
     "    TexCoord = aTexCoord;\n"
     "}\n";
 
-// Fragment Shader for Text
 const char *textFragmentShaderSource =
     "#version 450 core\n"
     "\n"
@@ -98,6 +69,8 @@ const char *textFragmentShaderSource =
     "    vec4 sampled = texture(textTexture, TexCoord);\n"
     "    FragColor = vec4(textColor.rgb, sampled.a * textColor.a);\n"
     "}\n";
+    
+// ----------------------------------------------------------------------------
 
 int CompileShaders(void) {
     // Vertex Shader
@@ -115,7 +88,7 @@ int CompileShaders(void) {
 
     // Fragment Shader
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *fragSource = use_bindless_textures ? fragmentShaderBindless : fragmentShaderTraditional;
+    const char *fragSource = fragmentShaderTraditional;
     glShaderSource(fragmentShader, 1, &fragSource, NULL);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);

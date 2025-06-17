@@ -7,7 +7,6 @@ extern int screen_height;
 extern TTF_Font* font;
 extern GLuint textVAO, textVBO;
 
-void Render_Init(void);
 void SetupTextQuad(void);
 int ClearFrameBuffers(void);
 int RenderStaticMeshes(void);

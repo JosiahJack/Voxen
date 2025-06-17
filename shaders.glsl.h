@@ -5,7 +5,6 @@
 
 extern GLuint shaderProgram;
 extern GLuint textShaderProgram;
-extern bool use_bindless_textures;
 
 int CompileShaders(void);
 
