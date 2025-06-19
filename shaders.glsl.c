@@ -34,6 +34,8 @@ int CompileShaders(void) {
     
     glDeleteShader(computeShader);
     
+    // ------------------------------------------------------------------------
+    
     // Rasterize Compute Shader
     GLuint rasterizeShader = glCreateShader(GL_COMPUTE_SHADER);
     glShaderSource(rasterizeShader, 1, &rasterize_computeShader, NULL);
@@ -59,6 +61,36 @@ int CompileShaders(void) {
     
     glDeleteShader(rasterizeShader);
     
+    // ------------------------------------------------------------------------
+    
+    // Transform Compute Shader - Transforms from cartesian world coordinates into screen space (polar coordinates)
+    GLuint transformShader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(transformShader, 1, &rasterize_computeShader, NULL);
+    glCompileShader(transformShader);
+    glGetShaderiv(transformShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(transformShader, 512, NULL, infoLog);
+        fprintf(stderr, "Transform Compute Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+    
+    transformShaderProgram = glCreateProgram();
+    glAttachShader(transformShaderProgram, transformShader);
+    glLinkProgram(transformShaderProgram);
+    glGetProgramiv(transformShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(transformShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Transform Compute Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+    
+    glDeleteShader(transformShader);
+    
+    // ------------------------------------------------------------------------
+   
+   
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     GLuint quadVertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(quadVertexShader, 1, &quadVertexShaderSource, NULL);

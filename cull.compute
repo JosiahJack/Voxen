@@ -45,7 +45,7 @@ const char *cull_computeShader =
     "\n"
     "void main() {\n"
     "    uint idx = gl_GlobalInvocationID.x;\n"
-    "    if (idx >= 3) return; // INSTANCE_COUNT = 3\n"
+    "    if (idx >= 1) return; // INSTANCE_COUNT = 1\n"
     "    \n"
     "    InstanceData inst = instances[idx];\n"
     "    int modelIdx = inst.modelIndex;\n"

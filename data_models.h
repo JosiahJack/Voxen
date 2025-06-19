@@ -11,7 +11,6 @@ extern GLuint vbo_offsets[];
 extern uint32_t totalVertexCount;
 extern GLuint vao;
 extern GLuint vbo;
-extern GLuint testVBO;
 extern GLuint quadVAO;
 extern GLuint quadVBO;
 

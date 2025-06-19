@@ -35,46 +35,12 @@ void SetupQuad(void) {
     glBindVertexArray(0);
 }
 
-Transform transformsBuffer[INSTANCE_COUNT] = {
+InstanceData instancesBuffer[INSTANCE_COUNT] = {
     // Model 0: med1_1.fbx at (0, 1.28, 0), no rotation, scale 1
-    {{ 0.00f, 1.28f, 0.00f}, {0.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
-    
-    // Model 1: med1_7.fbx at (2.56, 1.28, 0), no rotation, scale 1
-    {{ 2.56f, 1.28f, 0.00f}, {0.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
-    
-    // Model 2: med1_9.fbx at (-2.56, 1.28, 0), no rotation, scale 1
-    {{-2.56f, 1.28f, 0.00f}, {0.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}}
+    {{ 0.00f, 1.28f, 0.00f}, {0.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, 0},
 };
 
-GLuint testVBO, outputTexture;
-
-// Setup test vertex buffer for 4 triangles
-void SetupTestVertexBuffer(void) {
-    float vertices[12 * 6] = {
-        // Position x,y,z,    uv,         texture index
-        // Triangle 1 (top-left) - Reversed to CCW
-        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // (200, 400)
-        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 1.0f,  // (300, 500)
-        200.0f, 500.0f, 1.0f, 0.0f, 0.0f, 1.0f,  // (200, 500)
-        // Triangle 2 (top-right) - Reversed to CCW
-        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // (200, 400)
-        300.0f, 400.0f, 1.0f, 1.0f, 1.0f, 1.0f,  // (300, 400)
-        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 1.0f,  // (300, 500)
-        // Triangle 3 (bottom-left, different texture) - Reversed to CCW
-        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 2.0f,  // (400, 200)
-        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 2.0f,  // (500, 300)
-        400.0f, 300.0f, 2.0f, 0.0f, 0.0f, 2.0f,  // (400, 300)
-        // Triangle 4 (bottom-right) - Reversed to CCW
-        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 2.0f,  // (400, 200)
-        500.0f, 200.0f, 2.0f, 1.0f, 1.0f, 2.0f,  // (500, 200)
-        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 2.0f   // (500, 300)
-    };
-
-    glGenBuffers(1, &testVBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, testVBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 12 * 6 * sizeof(float), vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
+GLuint transformedVBO, outputTexture;
 
 // Setup output texture for compute shader
 void SetupOutputTexture(void) {
@@ -113,14 +79,22 @@ void SetupTextQuad(void) {
     glBindVertexArray(0);
 }
 
-int SetupGeometry(void) {
-    SetupTestVertexBuffer();
-    SetupOutputTexture();
-    SetupQuad();
-
+int SetupGeometry(void) {    
+    // Load models first to know how to size other buffers.
     float *vertexData = NULL;
     uint32_t vertexCount = 0;
     if (LoadModels(&vertexData, &vertexCount)) { fprintf(stderr, "Failed to load models!\n"); return 1; }
+    
+    glGenBuffers(1, &transformedVBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);
+    int numModel0 = 1;
+    int numModel1 = 0;
+    int numModel2 = 0;
+    glBufferData(GL_SHADER_STORAGE_BUFFER, ((modelVertexCounts[0] * numModel0) + (modelVertexCounts[1] * numModel1) + (modelVertexCounts[2] * numModel2)) * 6 * sizeof(float), vertexData, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    SetupOutputTexture();
+    SetupQuad();
 
     // VBO and VAO setup
     glGenVertexArrays(1, &vao);
@@ -140,7 +114,7 @@ int SetupGeometry(void) {
     // Instance SSBO
     glGenBuffers(1, &instanceSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instanceSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Transform), transformsBuffer, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(InstanceData), instancesBuffer, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, instanceSSBO);
 
     // Model bounds SSBO
@@ -179,43 +153,45 @@ int ClearFrameBuffers(void) {
 }
 
 int RenderStaticMeshes(void) {
-    // Compute shader: culling
-    glUseProgram(cullShaderProgram);
+    // Transform compute shader
+    glUseProgram(transformShaderProgram);
 
-    // Reset draw count
-    uint32_t zero = 0;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, drawCountBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &zero);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    // Bind buffers
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbo);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, transformedVBO);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, instanceSSBO);
 
     // Set uniforms
-    glUniform3f(glGetUniformLocation(cullShaderProgram, "cameraPos"), cam_x, cam_y, cam_z);
-    float fov = 65.0f * M_PI / 180.0f; // Convert to radians
-    float aspect = (float)screen_width / screen_height;
-    float yawFov = fov * aspect;
-    float pitchFov = fov;
-    glUniform1f(glGetUniformLocation(cullShaderProgram, "yawMin"), -yawFov / 2.0f);
-    glUniform1f(glGetUniformLocation(cullShaderProgram, "yawMax"), yawFov / 2.0f);
-    glUniform1f(glGetUniformLocation(cullShaderProgram, "pitchMin"), -pitchFov / 2.0f);
-    glUniform1f(glGetUniformLocation(cullShaderProgram, "pitchMax"), pitchFov / 2.0f);
-    glUniform1uiv(glGetUniformLocation(cullShaderProgram, "vbo_offsets"), MODEL_COUNT, vbo_offsets);
-    glUniform1uiv(glGetUniformLocation(cullShaderProgram, "modelVertexCounts"), MODEL_COUNT, modelVertexCounts);
+    glUniform1ui(glGetUniformLocation(transformShaderProgram, "vertexCount"), totalVertexCount);
+    glUniform1ui(glGetUniformLocation(transformShaderProgram, "instanceCount"), INSTANCE_COUNT);
+    glUniform1uiv(glGetUniformLocation(transformShaderProgram, "modelVertexCounts"), MODEL_COUNT, modelVertexCounts);
+    glUniform1uiv(glGetUniformLocation(transformShaderProgram, "vbo_offsets"), MODEL_COUNT, vbo_offsets);
+    glUniform3f(glGetUniformLocation(transformShaderProgram, "cameraPos"), 0.0f, 0.0f, 0.0f);
+    glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraYaw"), 180.0f);
+    glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraPitch"), 90.0f);
+    glUniform1f(glGetUniformLocation(transformShaderProgram, "fov"), 65.0f);
+    glUniform1f(glGetUniformLocation(transformShaderProgram, "aspect"), (float)screen_width / (float)screen_height);
+    glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenWidth"), screen_width);
+    glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenHeight"), screen_height);
 
     // Dispatch compute shader
-    glDispatchCompute((INSTANCE_COUNT + 63) / 64, 1, 1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
-    
-    // Rasterization compute shader (test with 4 triangles)
+    uint32_t workGroups = (totalVertexCount + 63) / 64;
+    glDispatchCompute(workGroups, 1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+    // Rasterization compute shader
     glUseProgram(rasterizeShaderProgram);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, testVBO);                        // BINDING 0
-    glBindImageTexture(1, outputTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // BINDING 1
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, colorBufferID);                  // BINDING 2
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, transformedVBO);
+    glBindImageTexture(1, outputTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, colorBufferID);
     glUniform1uiv(glGetUniformLocation(rasterizeShaderProgram, "textureOffsets"), TEXTURE_COUNT, textureOffsets);
     glUniform2uiv(glGetUniformLocation(rasterizeShaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
     glUniform1ui(glGetUniformLocation(rasterizeShaderProgram, "screenWidth"), screen_width);
     glUniform1ui(glGetUniformLocation(rasterizeShaderProgram, "screenHeight"), screen_height);
     glDispatchCompute((GLuint)ceil(screen_width / 8.0), (GLuint)ceil(screen_height / 8.0), 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+    // Rest of the rendering code (imageBlit, etc.) remains the same
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, outputTexture);
@@ -229,24 +205,6 @@ int RenderStaticMeshes(void) {
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
 
-    // Graphics pipeline
-//     glUseProgram(shaderProgram);
-//     glUniform3f(glGetUniformLocation(shaderProgram, "cameraPos"), cam_x, cam_y, cam_z); // Set vertex shader uniforms
-//     glUniform1f(glGetUniformLocation(shaderProgram, "yawMin"), -yawFov / 2.0f);
-//     glUniform1f(glGetUniformLocation(shaderProgram, "yawMax"), yawFov / 2.0f);
-//     glUniform1f(glGetUniformLocation(shaderProgram, "pitchMin"), -pitchFov / 2.0f);
-//     glUniform1f(glGetUniformLocation(shaderProgram, "pitchMax"), pitchFov / 2.0f);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, colorBufferID);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, instanceSSBO);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, instanceIDBuffer);
-//     glUniform1uiv(glGetUniformLocation(shaderProgram, "textureOffsets"), TEXTURE_COUNT, textureOffsets);
-//     glUniform2iv(glGetUniformLocation(shaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
-//     glBindVertexArray(vao);
-//     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirectBuffer);
-//     glMultiDrawArraysIndirect(GL_TRIANGLES, 0, INSTANCE_COUNT, 0); // Draw visible instances
-//     glBindVertexArray(0);
-//     glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-//     glUseProgram(0);
     return 0;
 }
 

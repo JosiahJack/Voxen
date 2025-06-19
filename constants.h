@@ -6,6 +6,6 @@
 #define M_PI_4 0.7853981633974483f     // pi / 4
 #define TEXTURE_COUNT 3
 #define MODEL_COUNT 3
-#define INSTANCE_COUNT 3
+#define INSTANCE_COUNT 1
 
 #endif // VOXEN_CONSTANTS_H

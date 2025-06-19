@@ -7,6 +7,13 @@ typedef struct {
     float scale[3];    // vec3
 } Transform;
 
-extern Transform transformsBuffer[];
+typedef struct {
+    float position[3];
+    float rotation[4]; // x, y, z, w
+    float scale[3];
+    uint32_t modelIndex;
+} InstanceData;
+
+extern InstanceData instancesBuffer[];
 
 #endif // VOXEN_TRANSFORM_H

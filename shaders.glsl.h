@@ -8,6 +8,7 @@ extern GLuint textShaderProgram;
 extern GLuint cullShaderProgram;
 extern GLuint rasterizeShaderProgram;
 extern GLuint imageBlitShaderProgram;
+extern GLuint transformShaderProgram;
 
 int CompileShaders(void);
 

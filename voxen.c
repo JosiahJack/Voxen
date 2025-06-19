@@ -48,6 +48,7 @@ SDL_GLContext gl_context;
 GLuint shaderProgram;
 GLuint textShaderProgram;
 GLuint cullShaderProgram;
+GLuint transformShaderProgram;
 GLuint rasterizeShaderProgram;
 GLuint imageBlitShaderProgram;
 GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
@@ -150,11 +151,11 @@ int ExitCleanup(int status) {
     if (shaderProgram) glDeleteProgram(shaderProgram);
     if (vao) glDeleteVertexArrays(1, &vao);
     if (vbo) glDeleteBuffers(1, &vbo);
-    if (testVBO) glDeleteBuffers(1, &testVBO);
     if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (textShaderProgram) glDeleteProgram(textShaderProgram);
     if (cullShaderProgram) glDeleteProgram(cullShaderProgram);
+    if (transformShaderProgram) glDeleteProgram(transformShaderProgram);
     if (rasterizeShaderProgram) glDeleteProgram(rasterizeShaderProgram);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
     if (textVAO) glDeleteVertexArrays(1, &textVAO);

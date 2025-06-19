@@ -94,10 +94,10 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
         extentMaxMost = extentMaxMost > maxz ? extentMaxMost : maxz;
         modelRadius[i] = extentMaxMost > extentMinMost ? extentMaxMost : extentMinMost;
         modelVertexCounts[i] = vertexCount;
-        printf("Model %d radius=%f\n",i,modelRadius[i]);
+//         printf("Model %d radius=%f\n",i,modelRadius[i]);
         vbo_offsets[i] = totalVertexCount;
         totalVertexCount += vertexCount;
-        printf("Cumulative totalVertexCount %d\n",totalVertexCount);
+//         printf("Cumulative totalVertexCount %d\n",totalVertexCount);
         aiReleaseImport(scene);
     }
 
@@ -106,7 +106,7 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
     *vertexCount = totalVertexCount;
 
     // Log offsets and counts
-    printf("modelVertexCounts 0 %d 1 %d 2 %d\n",modelVertexCounts[0],modelVertexCounts[1],modelVertexCounts[2]);
-    printf("vbo_offsets 0 %d 1 %d 2 %d\n",vbo_offsets[0],vbo_offsets[1],vbo_offsets[2]);
+//     printf("modelVertexCounts 0 %d 1 %d 2 %d\n",modelVertexCounts[0],modelVertexCounts[1],modelVertexCounts[2]);
+//     printf("vbo_offsets 0 %d 1 %d 2 %d\n",vbo_offsets[0],vbo_offsets[1],vbo_offsets[2]);
     return 0;
 }
