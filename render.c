@@ -9,6 +9,7 @@
 #include "event.h"
 #include "transform.h"
 #include "quaternion.h"
+#include "transform.h"
 #include "matrix.h"
 #include "player.h"
 #include "render.h"
@@ -79,6 +80,15 @@ void SetupTextQuad(void) {
     glBindVertexArray(0);
 }
 
+// Create just a plain old ground plane
+    float vertexDataTest[] = {
+        // x,    y,    z, |   nx,   ny,   nz, |   u,    v | texIndex
+        0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
+        5.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
+        5.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
+        0.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f        
+    };
+
 int SetupGeometry(void) {    
     // Load models first to know how to size other buffers.
     float *vertexData = NULL;
@@ -87,21 +97,35 @@ int SetupGeometry(void) {
     
     glGenBuffers(1, &transformedVBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);
-    int numModel0 = 1;
+    int numModel0 = INSTANCE_COUNT;
     int numModel1 = 0;
     int numModel2 = 0;
-    glBufferData(GL_SHADER_STORAGE_BUFFER, ((modelVertexCounts[0] * numModel0) + (modelVertexCounts[1] * numModel1) + (modelVertexCounts[2] * numModel2)) * 6 * sizeof(float), vertexData, GL_STATIC_DRAW);
+    
+    // VBO and VAO setup
+    
+    // TEST OVERRIDES!! DELETE LATER!
+    
+    
+    
+    
+    
+    totalVertexCount = 4;
+    vertexCount = 4;
+    modelVertexCounts[0] = 4;
+    modelVertexCounts[1] = 0;
+    modelVertexCounts[2] = 0;
+    
+    glBufferData(GL_SHADER_STORAGE_BUFFER, ((modelVertexCounts[0] * numModel0) + (modelVertexCounts[1] * numModel1) + (modelVertexCounts[2] * numModel2)) * 6 * sizeof(float), vertexDataTest, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     SetupOutputTexture();
     SetupQuad();
-
-    // VBO and VAO setup
+    
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * 9 * sizeof(float), vertexData, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertexCount * 9 * sizeof(float), vertexDataTest, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
@@ -153,31 +177,55 @@ int ClearFrameBuffers(void) {
 }
 
 int RenderStaticMeshes(void) {
-    // Transform compute shader
-    glUseProgram(transformShaderProgram);
+    float *vertexDataOut = (float *)malloc(totalVertexCount * INSTANCE_COUNT * 6 * sizeof(float));
+    if (!vertexDataOut) {
+        fprintf(stderr, "Memory allocation failed for vertexDataOut\n");
+        return 1;
+    }
 
-    // Bind buffers
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, transformedVBO);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, instanceSSBO);
-
-    // Set uniforms
-    glUniform1ui(glGetUniformLocation(transformShaderProgram, "vertexCount"), totalVertexCount);
-    glUniform1ui(glGetUniformLocation(transformShaderProgram, "instanceCount"), INSTANCE_COUNT);
-    glUniform1uiv(glGetUniformLocation(transformShaderProgram, "modelVertexCounts"), MODEL_COUNT, modelVertexCounts);
-    glUniform1uiv(glGetUniformLocation(transformShaderProgram, "vbo_offsets"), MODEL_COUNT, vbo_offsets);
-    glUniform3f(glGetUniformLocation(transformShaderProgram, "cameraPos"), 0.0f, 0.0f, 0.0f);
-    glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraYaw"), 180.0f);
-    glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraPitch"), 90.0f);
-    glUniform1f(glGetUniformLocation(transformShaderProgram, "fov"), 65.0f);
-    glUniform1f(glGetUniformLocation(transformShaderProgram, "aspect"), (float)screen_width / (float)screen_height);
-    glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenWidth"), screen_width);
-    glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenHeight"), screen_height);
-
-    // Dispatch compute shader
-    uint32_t workGroups = (totalVertexCount + 63) / 64;
-    glDispatchCompute(workGroups, 1, 1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    // Transform vertices on CPU
+    transform_vertices(vertexDataTest, vertexDataOut, totalVertexCount, instancesBuffer, INSTANCE_COUNT,
+                      modelVertexCounts, vbo_offsets, (float[3]){cam_x, cam_y, cam_z}, cam_yaw, cam_pitch,
+                      90.0f, 65.0f, screen_width, screen_height);
+    
+    // Update transformedVBO with CPU-transformed data
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertexCount * INSTANCE_COUNT * 6 * sizeof(float),
+                 vertexDataOut, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    for (uint32_t i=0; i < (totalVertexCount * INSTANCE_COUNT * 6);i+=6) {
+        printf("Vertex: %d, x: %f, y: %f, depth: %f, u: %f, v: %f, texIndex: %f  at cam_x: %f, cam_y: %f, cam_z: %f with cam_yaw: %f, cam_pitch %f\n",
+               i,vertexDataOut[i],vertexDataOut[i + 1],vertexDataOut[i + 2],vertexDataOut[i + 3],vertexDataOut[i + 4],vertexDataOut[i + 5],cam_x,cam_y,cam_z,cam_yaw,cam_pitch);
+    }
+    
+    free(vertexDataOut);
+//     // Transform compute shader
+//     glUseProgram(transformShaderProgram);
+// 
+//     // Bind buffers
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbo);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, transformedVBO);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, instanceSSBO);
+// 
+//     // Set uniforms
+//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "vertexCount"), totalVertexCount);
+//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "instanceCount"), INSTANCE_COUNT);
+//     glUniform1uiv(glGetUniformLocation(transformShaderProgram, "modelVertexCounts"), MODEL_COUNT, modelVertexCounts);
+//     glUniform1uiv(glGetUniformLocation(transformShaderProgram, "vbo_offsets"), MODEL_COUNT, vbo_offsets);
+//     glUniform3f(glGetUniformLocation(transformShaderProgram, "cameraPos"), 0.0f, 0.0f, 0.0f);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraYaw"), -180.0f);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraPitch"), -90.0f);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovH"),360.0f);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovV"),360.0f);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "aspect"), (float)screen_width / (float)screen_height);
+//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenWidth"), screen_width);
+//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenHeight"), screen_height);
+// 
+//     // Dispatch compute shader
+//     uint32_t workGroups = (totalVertexCount + 63) / 64;
+//     glDispatchCompute(workGroups, 1, 1);
+//     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     // Rasterization compute shader
     glUseProgram(rasterizeShaderProgram);

@@ -16,4 +16,11 @@ typedef struct {
 
 extern InstanceData instancesBuffer[];
 
+void transform_vertices(float *verticesIn, float *verticesOut, unsigned int vertexCount,
+                       InstanceData *instances, unsigned int instanceCount,
+                       unsigned int *modelVertexCounts, unsigned int *vbo_offsets,
+                       float cameraPos[3], float cameraYaw, float cameraPitch,
+                       float fovV, float fovH,
+                       unsigned int screenWidth, unsigned int screenHeight);
+
 #endif // VOXEN_TRANSFORM_H

@@ -1,6 +1,8 @@
 #ifndef VOXEN_PLAYER_H
 #define VOXEN_PLAYER_H
 
+#include <GL/glew.h>
+#include <stdbool.h>
 #include "quaternion.h"
 
 // Camera variables
