@@ -34,7 +34,7 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
                                                    | aiProcess_Triangulate
                                                    | aiProcess_GenNormals
                                                    | aiProcess_ImproveCacheLocality
-                                                   | aiProcess_FindDegenerates);
+                                                   | aiProcess_FindDegenerates); // aiProcess_FlipWindingOrder if computer rasterizer renders nothing.
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
             fprintf(stderr, "Assimp failed to load %s: %s\n", modelPaths[i], aiGetErrorString());
             if (tempVerticesAlloced) free(tempVertices);

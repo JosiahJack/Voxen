@@ -50,31 +50,25 @@ GLuint testVBO, outputTexture;
 
 // Setup test vertex buffer for 4 triangles
 void SetupTestVertexBuffer(void) {
-float vertices[12 * 6] = {
-    // Triangle 1 (top-left) - Reversed to CCW
-    200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // (200, 400)
-    300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 0.0f,  // (300, 500)
-    200.0f, 500.0f, 1.0f, 0.0f, 0.0f, 0.0f,  // (200, 500)
-    // Triangle 2 (top-right) - Reversed to CCW
-    200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // (200, 400)
-    300.0f, 400.0f, 1.0f, 1.0f, 1.0f, 0.0f,  // (300, 400)
-    300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 0.0f,  // (300, 500)
-    // Triangle 3 (bottom-left, different texture) - Reversed to CCW
-    400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 1.0f,  // (400, 200)
-    500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 1.0f,  // (500, 300)
-    400.0f, 300.0f, 2.0f, 0.0f, 0.0f, 1.0f,  // (400, 300)
-    // Triangle 4 (bottom-right) - Reversed to CCW
-    400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 1.0f,  // (400, 200)
-    500.0f, 200.0f, 2.0f, 1.0f, 1.0f, 1.0f,  // (500, 200)
-    500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 1.0f   // (500, 300)
-};
-    
-    for (int i=0;i<4;i++) {
-        int baseIdx = i * 18;
-        printf("v0: %f\n",vertices[baseIdx]);
-        printf("v0: %f\n",vertices[baseIdx + 6]);
-        printf("v0: %f\n",vertices[baseIdx + 12]);
-    }
+    float vertices[12 * 6] = {
+        // Position x,y,z,    uv,         texture index
+        // Triangle 1 (top-left) - Reversed to CCW
+        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // (200, 400)
+        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 0.0f,  // (300, 500)
+        200.0f, 500.0f, 1.0f, 0.0f, 0.0f, 0.0f,  // (200, 500)
+        // Triangle 2 (top-right) - Reversed to CCW
+        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // (200, 400)
+        300.0f, 400.0f, 1.0f, 1.0f, 1.0f, 0.0f,  // (300, 400)
+        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 0.0f,  // (300, 500)
+        // Triangle 3 (bottom-left, different texture) - Reversed to CCW
+        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 1.0f,  // (400, 200)
+        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 1.0f,  // (500, 300)
+        400.0f, 300.0f, 2.0f, 0.0f, 0.0f, 1.0f,  // (400, 300)
+        // Triangle 4 (bottom-right) - Reversed to CCW
+        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 1.0f,  // (400, 200)
+        500.0f, 200.0f, 2.0f, 1.0f, 1.0f, 1.0f,  // (500, 200)
+        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 1.0f   // (500, 300)
+    };
 
     glGenBuffers(1, &testVBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, testVBO);

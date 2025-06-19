@@ -4,7 +4,6 @@
 #include "cull.compute"
 // #include "transformation.compute TODO
 #include "rasterize.compute"
-#include "chunk.glsl"
 #include "text.glsl"
 #include "imageblit.glsl"
 
@@ -94,48 +93,6 @@ int CompileShaders(void) {
     }
     glDeleteShader(quadVertexShader);
     glDeleteShader(quadFragmentShader);
-    
-    // Chunk Shader
-    // Vertex Shader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        fprintf(stderr, "Vertex Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Fragment Shader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *fragSource = fragmentShaderTraditional;
-    glShaderSource(fragmentShader, 1, &fragSource, NULL);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        fprintf(stderr, "Fragment Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Shader Program
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
     
     // ------------------------------------------------------------------------
     
