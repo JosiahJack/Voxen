@@ -7,9 +7,9 @@ SDL_Surface *textureSurfaces[TEXTURE_COUNT];
 GLuint textureIDs[TEXTURE_COUNT];
 GLuint64 textureHandles[TEXTURE_COUNT];
 GLuint colorBufferID; // Single color buffer
-uint32_t textureOffsets[TEXTURE_COUNT]; // Pixel offsets
+uint32_t textureOffsets[TEXTURE_COUNT]; // Pixel offsets, not Pixels * 4 !!
 uint32_t totalPixels; // Total pixels
-int textureSizes[TEXTURE_COUNT * 2];
+uint32_t textureSizes[TEXTURE_COUNT * 2];
 
 const char *texturePaths[TEXTURE_COUNT] = {
     "./Textures/med1_1.png",
@@ -25,8 +25,8 @@ int LoadTextures(void) {
         SDL_Surface *surface = IMG_Load(texturePaths[i]);
         if (!surface) { fprintf(stderr, "IMG_Load failed for %s: %s\n", texturePaths[i], IMG_GetError()); return 1; }
         totalPixels += surface->w * surface->h;
-        textureSizes[i * 2] = surface->w;
-        textureSizes[(i * 2) + 1] = surface->h;
+        textureSizes[i * 2] = (uint32_t)surface->w;
+        textureSizes[(i * 2) + 1] = (uint32_t)surface->h;
         SDL_FreeSurface(surface);
     }
 
@@ -45,7 +45,7 @@ int LoadTextures(void) {
 
         uint8_t *pixels = (uint8_t *)textureSurfaces[i]->pixels;
         for (int j = 0; j < textureSurfaces[i]->w * textureSurfaces[i]->h; j++) {
-            colorData[pixelIndex++] = pixels[j * 4 + 0] / 255.0f; // R
+            colorData[pixelIndex++] = pixels[j * 4    ] / 255.0f; // R
             colorData[pixelIndex++] = pixels[j * 4 + 1] / 255.0f; // G
             colorData[pixelIndex++] = pixels[j * 4 + 2] / 255.0f; // B
             colorData[pixelIndex++] = pixels[j * 4 + 3] / 255.0f; // A

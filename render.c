@@ -53,21 +53,21 @@ void SetupTestVertexBuffer(void) {
     float vertices[12 * 6] = {
         // Position x,y,z,    uv,         texture index
         // Triangle 1 (top-left) - Reversed to CCW
-        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // (200, 400)
-        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 0.0f,  // (300, 500)
-        200.0f, 500.0f, 1.0f, 0.0f, 0.0f, 0.0f,  // (200, 500)
+        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // (200, 400)
+        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 1.0f,  // (300, 500)
+        200.0f, 500.0f, 1.0f, 0.0f, 0.0f, 1.0f,  // (200, 500)
         // Triangle 2 (top-right) - Reversed to CCW
-        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 0.0f,  // (200, 400)
-        300.0f, 400.0f, 1.0f, 1.0f, 1.0f, 0.0f,  // (300, 400)
-        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 0.0f,  // (300, 500)
+        200.0f, 400.0f, 1.0f, 0.0f, 1.0f, 1.0f,  // (200, 400)
+        300.0f, 400.0f, 1.0f, 1.0f, 1.0f, 1.0f,  // (300, 400)
+        300.0f, 500.0f, 1.0f, 1.0f, 0.0f, 1.0f,  // (300, 500)
         // Triangle 3 (bottom-left, different texture) - Reversed to CCW
-        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 1.0f,  // (400, 200)
-        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 1.0f,  // (500, 300)
-        400.0f, 300.0f, 2.0f, 0.0f, 0.0f, 1.0f,  // (400, 300)
+        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 2.0f,  // (400, 200)
+        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 2.0f,  // (500, 300)
+        400.0f, 300.0f, 2.0f, 0.0f, 0.0f, 2.0f,  // (400, 300)
         // Triangle 4 (bottom-right) - Reversed to CCW
-        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 1.0f,  // (400, 200)
-        500.0f, 200.0f, 2.0f, 1.0f, 1.0f, 1.0f,  // (500, 200)
-        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 1.0f   // (500, 300)
+        400.0f, 200.0f, 2.0f, 0.0f, 1.0f, 2.0f,  // (400, 200)
+        500.0f, 200.0f, 2.0f, 1.0f, 1.0f, 2.0f,  // (500, 200)
+        500.0f, 300.0f, 2.0f, 1.0f, 0.0f, 2.0f   // (500, 300)
     };
 
     glGenBuffers(1, &testVBO);
@@ -211,7 +211,7 @@ int RenderStaticMeshes(void) {
     glBindImageTexture(1, outputTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // BINDING 1
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, colorBufferID);                  // BINDING 2
     glUniform1uiv(glGetUniformLocation(rasterizeShaderProgram, "textureOffsets"), TEXTURE_COUNT, textureOffsets);
-    glUniform2iv(glGetUniformLocation(rasterizeShaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
+    glUniform2uiv(glGetUniformLocation(rasterizeShaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
     glUniform1ui(glGetUniformLocation(rasterizeShaderProgram, "screenWidth"), screen_width);
     glUniform1ui(glGetUniformLocation(rasterizeShaderProgram, "screenHeight"), screen_height);
     glDispatchCompute((GLuint)ceil(screen_width / 8.0), (GLuint)ceil(screen_height / 8.0), 1);
