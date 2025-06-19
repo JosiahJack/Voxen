@@ -1,5 +1,5 @@
-#ifndef PLAYER_H
-#define PLAYER_H
+#ifndef VOXEN_PLAYER_H
+#define VOXEN_PLAYER_H
 
 #include "quaternion.h"
 
@@ -11,4 +11,4 @@ extern float cam_pitch;
 extern float cam_roll;
 extern bool in_cyberspace;
 
-#endif // PLAYER_H
+#endif // VOXEN_PLAYER_H

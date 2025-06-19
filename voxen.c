@@ -1,5 +1,7 @@
 // File: voxen.c
-// Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
+// Description: A realtime OpenGL based application for experimenting with 
+//              voxel lighting techniques to derive new methods of high speed
+//              accurate lighting in resource constrained environements.
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -11,12 +13,13 @@
 #include <stdbool.h>
 #include <math.h>
 #include <string.h>
+#include "cli_args.h"
 #include "event.h"
 #include "constants.h"
+#include "data_models.h"
 #include "shaders.glsl.h"
 #include "input.h"
 #include "data_textures.h"
-#include "data_models.h"
 #include "render.h"
 
 // Window
@@ -44,17 +47,42 @@ double last_time = 0.0;
 SDL_GLContext gl_context;
 GLuint shaderProgram;
 GLuint textShaderProgram;
+GLuint cullShaderProgram;
+GLuint rasterizeShaderProgram;
+GLuint imageBlitShaderProgram;
 GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
 TTF_Font* font = NULL;
 GLuint textVAO, textVBO;
+GLuint instanceSSBO;
+GLuint modelBoundsBuffer;
+GLuint indirectBuffer;
+GLuint instanceIDBuffer;
+GLuint drawCountBuffer;
+
+typedef enum {
+    SYS_SDL = 0,
+    SYS_TTF,
+    SYS_IMG,
+    SYS_WIN,
+    SYS_CTX,
+    SYS_OGL,
+    SYS_COUNT // Number of subsystems
+} SystemType;
+
+bool systemInitialized[SYS_COUNT] = {false,false,false,false,false,false};
 
 int InitializeEnvironment(void) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return 1; }
-    if (TTF_Init() < 0) { fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError()); return 2; }
-    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) { fprintf(stderr, "IMG_Init failed: %s\n", IMG_GetError()); return 3; }
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
+    systemInitialized[SYS_SDL] = true;
+    
+    if (TTF_Init() < 0) { fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    systemInitialized[SYS_TTF] = true;
+
+    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) { fprintf(stderr, "IMG_Init failed: %s\n", IMG_GetError()); return SYS_IMG + 1; }
+    systemInitialized[SYS_IMG] = true;
 
     font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10);
-    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return 4; }
+    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
@@ -64,21 +92,27 @@ int InitializeEnvironment(void) {
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
-        return 5;
+        return SYS_WIN + 1;
     }
+    
+    systemInitialized[SYS_WIN] = true;
 
     gl_context = SDL_GL_CreateContext(window);
     if (!gl_context) {
         fprintf(stderr, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
-        return 6;
+        return SYS_CTX + 1;
     }
+    
+    systemInitialized[SYS_CTX] = true;
 
     SDL_GL_MakeCurrent(window, gl_context);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) {
         fprintf(stderr, "GLEW initialization failed\n");
-        return 7;
+        return SYS_OGL + 1;
     }
+    
+    systemInitialized[SYS_OGL] = true;
 
     // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
@@ -97,7 +131,7 @@ int InitializeEnvironment(void) {
     glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); // One-sided lighting
     glViewport(0, 0, screen_width, screen_height);
 
-    if (CompileShaders()) return 8;
+    if (CompileShaders()) return SYS_COUNT + 1;
     SetupTextQuad();
     Input_Init();
     return 0;
@@ -105,49 +139,59 @@ int InitializeEnvironment(void) {
 
 int ExitCleanup(int status) {
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
-    switch(status) {
-        case 2: SDL_Quit(); break; // SDL was init'ed, so SDL_Quit
-        case 3: TTF_Quit(); SDL_Quit(); break; // TTF was init'ed, so also TTF Quit
-        case 4: IMG_Quit(); TTF_Quit(); SDL_Quit(); break;
-        case 5: if (font) TTF_CloseFont(font); // Font was loaded, so clean it up
-                TTF_Quit(); SDL_Quit(); break;
-        case 6: SDL_DestroyWindow(window); // SDL window was created so destroy the window
-                if (font) TTF_CloseFont(font);
-                TTF_Quit(); SDL_Quit(); break;
-        default:
-                glDeleteBuffers(1, &colorBufferID);
-//                 for (int i = 0; i < TEXTURE_COUNT; i++) {
-//                     if (textureHandles[i]) glMakeTextureHandleNonResidentARB(textureHandles[i]);
-//                     if (textureIDs[i]) glDeleteTextures(1, &textureIDs[i]);
-//                     if (textureSurfaces[i]) SDL_FreeSurface(textureSurfaces[i]);
-//                 }
-                glDeleteProgram(shaderProgram);
-                glDeleteVertexArrays(1, &vao);
-                glDeleteBuffers(1, &vbo);
 
-                glDeleteProgram(textShaderProgram);
-                glDeleteVertexArrays(1, &textVAO);
-                glDeleteBuffers(1, &textVBO);
+    // OpenGL Cleanup
+    if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
+    if (instanceSSBO) glDeleteBuffers(1, &instanceSSBO);
+    if (modelBoundsBuffer) glDeleteBuffers(1, &modelBoundsBuffer);
+    if (indirectBuffer) glDeleteBuffers(1, &indirectBuffer);
+    if (instanceIDBuffer) glDeleteBuffers(1, &instanceIDBuffer);
+    if (drawCountBuffer) glDeleteBuffers(1, &drawCountBuffer);
+    if (shaderProgram) glDeleteProgram(shaderProgram);
+    if (vao) glDeleteVertexArrays(1, &vao);
+    if (vbo) glDeleteBuffers(1, &vbo);
+    if (testVBO) glDeleteBuffers(1, &testVBO);
+    if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
+    if (quadVBO) glDeleteBuffers(1, &quadVBO);
+    if (textShaderProgram) glDeleteProgram(textShaderProgram);
+    if (cullShaderProgram) glDeleteProgram(cullShaderProgram);
+    if (rasterizeShaderProgram) glDeleteProgram(rasterizeShaderProgram);
+    if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
+    if (textVAO) glDeleteVertexArrays(1, &textVAO);
+    if (textVBO) glDeleteBuffers(1, &textVBO);
 
-                SDL_DestroyWindow(window); SDL_GL_DeleteContext(gl_context); // GL context was created so delete the context
-                if (font) TTF_CloseFont(font);
-                TTF_Quit(); SDL_Quit(); break;
-    }
-
+    // Cleanup initialized systems in reverse order.
+    // Independent ifs so that we can exit from anywhere and de-init only as needed.
+    
+    // if (systemInitialized[SYS_OGL]) Nothing to be done for GLEW de-init.
+    
+    // Delete context after deleting buffers relevant to that context.
+    if (systemInitialized[SYS_CTX]) SDL_GL_DeleteContext(gl_context); // GL context was created so delete the context
+    
+    if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window); // SDL window was created so destroy the window
+    if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font); // Font was loaded, so clean it up
+    if (systemInitialized[SYS_IMG]) IMG_Quit();
+    if (systemInitialized[SYS_TTF]) TTF_Quit(); // TTF was init'ed, so also TTF Quit
+    if (systemInitialized[SYS_SDL]) SDL_Quit(); // SDL was init'ed, so SDL_Quit
     return status;
 }
 
+// All core engine operations run through the EventExecute as an Event processed
+// by the unified event system in the order it was enqueued.
 int EventExecute(Event* event) {
     switch(event->type) {
-        case EV_INIT: return InitializeEnvironment();
-        case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
-        case EV_KEYUP: return Input_KeyUp(event->payload1u);
-        case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
-        case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers();
-        case EV_RENDER_STATICS: return RenderStaticMeshes();
-        case EV_RENDER_UI: return RenderUI(get_time() - last_time);
+        case EV_INIT: return InitializeEnvironment(); // Initialization and Loading
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return SetupGeometry();
+        
+        case EV_KEYDOWN: return Input_KeyDown(event->payload1u); // Input
+        case EV_KEYUP: return Input_KeyUp(event->payload1u);
+        case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
+        
+        case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers(); // Rendering
+        case EV_RENDER_STATICS: return RenderStaticMeshes();
+        case EV_RENDER_UI: return RenderUI(get_time() - last_time);
+
         case EV_QUIT: return 1; break;
     }
 
@@ -155,32 +199,10 @@ int EventExecute(Event* event) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
-        printf("-----------------------------------------------------------\n");
-        printf("Voxen v0.01.00 6/10/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT licensed\n\n\n");
-        return 0;
-    }
+    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { cli_args_print_version(); return 0; }
 
     if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
-        printf("Voxen the OpenGL Voxel Lit Rendering Engine\n");
-        printf("-----------------------------------------------------------\n");
-        printf("        This is a rendering engine designed for optimized focused\n");
-        printf("        usage of OpenGL making maximal use of GPU Driven rendering\n");
-        printf("        techniques, a unified event system for debugging and log\n");
-        printf("        playback, full mod support loading all data from external\n");
-        printf("        files and using definition files for what to do with the\n");
-        printf("        data.\n\n");
-        printf("        This project aims to have minimal overhead, profiling,\n");
-        printf("        traceability, robustness, and low level control.\n\n");
-        printf("\n");
-        printf("Valid arguments:\n");
-        printf(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
-        printf("-v, --version\n    Prints version information\n\n");
-        printf("play <file>\n    Plays back recorded log from current directory\n\n");
-        printf("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
-        printf("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
-        printf("-h, --help\n    Provides this help text.  Neat!\n\n");
-        printf("-----------------------------------------------------------\n");
+        cli_args_print_help();
         return 0;
     } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
         printf("Converting log: %s ...", argv[2]);

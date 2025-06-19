@@ -1,5 +1,5 @@
-#ifndef EVENT_H
-#define EVENT_H
+#ifndef VOXEN_EVENT_H
+#define VOXEN_EVENT_H
 
 #include <stdio.h>
 #include <time.h>
@@ -88,4 +88,4 @@ void clear_ev_queue(void);
 double get_time(void);
 int EventQueueProcess(void);
 
-#endif // EVENT_H
+#endif // VOXEN_EVENT_H

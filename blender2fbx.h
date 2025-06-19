@@ -1,5 +1,5 @@
-#ifndef BLENDER2FBX_H
-#define BLENDER2FBX_H
+#ifndef VOXEN_BLENDER2FBX_H
+#define VOXEN_BLENDER2FBX_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,4 +7,4 @@
 
 int BlenderConvert(void);
 
-#endif // BLENDER2FBX_H
+#endif // VOXEN_BLENDER2FBX_H

@@ -1,5 +1,5 @@
-#ifndef MATRIX_H
-#define MATRIX_H
+#ifndef VOXEN_MATRIX_H
+#define VOXEN_MATRIX_H
 
 #include "quaternion.h"
 
@@ -11,4 +11,4 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
 void mat4_rotate_x(float *m, float angle);
 void mat4_translate(float *m, float x, float y, float z);
 
-#endif // MATRIX_H
+#endif // VOXEN_MATRIX_H

@@ -1,5 +1,5 @@
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef VOXEN_INPUT_H
+#define VOXEN_INPUT_H
 
 extern float move_speed;
 extern float mouse_sensitivity;
@@ -13,4 +13,4 @@ int Input_KeyUp(uint32_t scancode);
 int Input_MouseMove(float xrel, float yrel);
 void ProcessInput(void);
 
-#endif // INPUT_H
+#endif // VOXEN_INPUT_H

@@ -1,90 +1,105 @@
 #include <GL/glew.h>
 #include <stdio.h>
 #include "shaders.glsl.h"
-
-// ----------------------------------------------------------------------------
-// Generic shader for unlit textured surfaces (all world geometry, items,
-// enemies, doors, etc., without transparency for first pass prior to lighting.
-const char *vertexShaderSource =
-    "#version 450 core\n"
-    "\n"
-    "layout(location = 0) in vec3 aPos;\n"
-    "layout(location = 1) in vec3 aNormal;\n"
-    "layout(location = 2) in vec2 aTexCoord;\n"
-    "layout(location = 3) in float aTexIndex;\n"
-    "uniform mat4 model;\n"
-    "uniform mat4 view;\n"
-    "uniform mat4 projection;\n"
-    "out vec3 FragPos;\n"
-    "out vec3 Normal;\n"
-    "out vec2 TexCoord;\n"
-    "out float TexIndex;\n"
-    "\n"
-    "void main() {\n"
-    "    FragPos = vec3(model * vec4(aPos, 1.0));\n"
-    "    Normal = mat3(transpose(inverse(model))) * aNormal;\n"
-    "    TexCoord = aTexCoord;\n"
-    "    TexIndex = aTexIndex;\n"
-    "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
-    "}\n";
-
-const char *fragmentShaderTraditional =
-    "#version 450 core\n"
-    "in vec2 TexCoord;\n"
-    "in float TexIndex;\n"
-    "out vec4 FragColor;\n"
-    "layout(std430, binding = 0) buffer ColorBuffer {\n"
-    "    float colors[];\n" // 1D color array (RGBA)
-    "};\n"
-    "uniform uint textureOffsets[3];\n" // Offsets for each texture
-    "uniform ivec2 textureSizes[3];\n" // Width, height for each texture
-    "void main() {\n"
-    "    int index = int(TexIndex);\n"
-    "    ivec2 texSize = textureSizes[index];\n"
-    "    vec2 uv = clamp(vec2(1.0 - TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V
-    "    int x = int(uv.x * float(texSize.x));\n"
-    "    int y = int(uv.y * float(texSize.y));\n"
-    "    int pixelIndex = int(textureOffsets[index]) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
-    "    FragColor = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
-    "}\n";
-    
-// ----------------------------------------------------------------------------
-
-// Text shader
-const char *textVertexShaderSource =
-    "#version 450 core\n"
-    "\n"
-    "layout(location = 0) in vec2 aPos;\n"
-    "layout(location = 1) in vec2 aTexCoord;\n"
-    "uniform mat4 projection;\n"
-    "out vec2 TexCoord;\n"
-    "\n"
-    "void main() {\n"
-    "    gl_Position = projection * vec4(aPos, 0.0, 1.0);\n"
-    "    TexCoord = aTexCoord;\n"
-    "}\n";
-
-const char *textFragmentShaderSource =
-    "#version 450 core\n"
-    "\n"
-    "in vec2 TexCoord;\n"
-    "out vec4 FragColor;\n"
-    "uniform sampler2D textTexture;\n"
-    "uniform vec4 textColor;\n"
-    "\n"
-    "void main() {\n"
-    "    vec4 sampled = texture(textTexture, TexCoord);\n"
-    "    FragColor = vec4(textColor.rgb, sampled.a * textColor.a);\n"
-    "}\n";
-    
-// ----------------------------------------------------------------------------
+#include "cull.compute"
+// #include "transformation.compute TODO
+#include "rasterize.compute"
+#include "chunk.glsl"
+#include "text.glsl"
+#include "imageblit.glsl"
 
 int CompileShaders(void) {
+    // Cull Compute Shader
+    GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(computeShader, 1, &cull_computeShader, NULL);
+    glCompileShader(computeShader);
+    GLint success;
+    glGetShaderiv(computeShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(computeShader, 512, NULL, infoLog);
+        fprintf(stderr, "Compute Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    cullShaderProgram = glCreateProgram();
+    glAttachShader(cullShaderProgram, computeShader);
+    glLinkProgram(cullShaderProgram);
+    glGetProgramiv(cullShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(cullShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Compute Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+    
+    glDeleteShader(computeShader);
+    
+    // Rasterize Compute Shader
+    GLuint rasterizeShader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(rasterizeShader, 1, &rasterize_computeShader, NULL);
+    glCompileShader(rasterizeShader);
+    glGetShaderiv(rasterizeShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(rasterizeShader, 512, NULL, infoLog);
+        fprintf(stderr, "Rasterize Compute Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+    
+    rasterizeShaderProgram = glCreateProgram();
+    glAttachShader(rasterizeShaderProgram, rasterizeShader);
+    glLinkProgram(rasterizeShaderProgram);
+    glGetProgramiv(rasterizeShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(rasterizeShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Rasterize Compute Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+    
+    glDeleteShader(rasterizeShader);
+    
+    // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
+    GLuint quadVertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(quadVertexShader, 1, &quadVertexShaderSource, NULL);
+    glCompileShader(quadVertexShader);
+    glGetShaderiv(quadVertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(quadVertexShader, 512, NULL, infoLog);
+        fprintf(stderr, "Image Blit Vertex Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+    GLuint quadFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(quadFragmentShader, 1, &quadFragmentShaderSource, NULL);
+    glCompileShader(quadFragmentShader);
+    glGetShaderiv(quadFragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(quadFragmentShader, 512, NULL, infoLog);
+        fprintf(stderr, "Image Blit Fragment Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+    imageBlitShaderProgram = glCreateProgram();
+    glAttachShader(imageBlitShaderProgram, quadVertexShader);
+    glAttachShader(imageBlitShaderProgram, quadFragmentShader);
+    glLinkProgram(imageBlitShaderProgram);
+    glGetProgramiv(imageBlitShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(imageBlitShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Image Blit Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+    glDeleteShader(quadVertexShader);
+    glDeleteShader(quadFragmentShader);
+    
+    // Chunk Shader
     // Vertex Shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
-    GLint success;
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success) {
         char infoLog[512];
@@ -121,7 +136,10 @@ int CompileShaders(void) {
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
-
+    
+    // ------------------------------------------------------------------------
+    
+    // Text Shader
     // Text Vertex Shader
     GLuint textVertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(textVertexShader, 1, &textVertexShaderSource, NULL);

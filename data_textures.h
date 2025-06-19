@@ -1,5 +1,5 @@
-#ifndef DATA_TEXTURES_H
-#define DATA_TEXTURES_H
+#ifndef VOXEN_DATA_TEXTURES_H
+#define VOXEN_DATA_TEXTURES_H
 
 #include <stdbool.h>
 #include <SDL2/SDL.h>
@@ -15,4 +15,4 @@ extern int textureSizes[];
 
 int LoadTextures(void);
 
-#endif // DATA_TEXTURES_H
+#endif // VOXEN_DATA_TEXTURES_H

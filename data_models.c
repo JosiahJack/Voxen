@@ -5,9 +5,13 @@
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include "transform.h"
+#include "render.h"
 #include "constants.h"
 #include "data_models.h"
 #include "blender2fbx.h"
+
+float modelRadius[MODEL_COUNT];
 
 const char *modelPaths[MODEL_COUNT] = {
     "./Models/med1_1.fbx",
@@ -16,7 +20,7 @@ const char *modelPaths[MODEL_COUNT] = {
 };
 
 uint32_t modelVertexCounts[MODEL_COUNT];
-int32_t vbo_offsets[MODEL_COUNT];
+GLuint vbo_offsets[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
 
 int LoadModels(float **vertexData, uint32_t *vertexCount) {
@@ -57,12 +61,22 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
 
         // Extract vertex data
         uint32_t vertexIndex = totalVertexCount * 9;
+        float minx, miny, minz;
+        float maxx, maxy, maxz;
+        minx = miny = minz = 1e9;
+        maxx = maxy = maxz = -1e9;
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
                 tempVertices[vertexIndex++] = mesh->mVertices[v].x; // Position
+                if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
+                if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
                 tempVertices[vertexIndex++] = mesh->mVertices[v].y;
+                if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
+                if (mesh->mVertices[v].y > maxy) maxy = mesh->mVertices[v].y;
                 tempVertices[vertexIndex++] = mesh->mVertices[v].z;
+                if (mesh->mVertices[v].x < minz) minz = mesh->mVertices[v].z;
+                if (mesh->mVertices[v].x > maxz) maxz = mesh->mVertices[v].z;
                 tempVertices[vertexIndex++] = mesh->mNormals[v].x; // Normal
                 tempVertices[vertexIndex++] = mesh->mNormals[v].y;
                 tempVertices[vertexIndex++] = mesh->mNormals[v].z;
@@ -73,8 +87,14 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
                 tempVertices[vertexIndex++] = (float)i; // TexIndex
             }
         }
-
-//         vbo_offsets[i] = (totalVertexCount * 9);
+        
+        float extentMinMost = fabs(minx) > fabs(miny) ? fabs(minx) : fabs(miny);
+        extentMinMost = extentMinMost > fabs(minz) ? extentMinMost : fabs(minz);
+        float extentMaxMost = maxx > maxy ? maxx : maxy;
+        extentMaxMost = extentMaxMost > maxz ? extentMaxMost : maxz;
+        modelRadius[i] = extentMaxMost > extentMinMost ? extentMaxMost : extentMinMost;
+        modelVertexCounts[i] = vertexCount;
+        printf("Model %d radius=%f\n",i,modelRadius[i]);
         vbo_offsets[i] = totalVertexCount;
         totalVertexCount += vertexCount;
         printf("Cumulative totalVertexCount %d\n",totalVertexCount);
@@ -88,28 +108,5 @@ int LoadModels(float **vertexData, uint32_t *vertexCount) {
     // Log offsets and counts
     printf("modelVertexCounts 0 %d 1 %d 2 %d\n",modelVertexCounts[0],modelVertexCounts[1],modelVertexCounts[2]);
     printf("vbo_offsets 0 %d 1 %d 2 %d\n",vbo_offsets[0],vbo_offsets[1],vbo_offsets[2]);
-    return 0;
-}
-
-int SetupGeometry(void) {
-    float *vertexData = NULL;
-    uint32_t vertexCount = 0;
-    if (LoadModels(&vertexData, &vertexCount)) { fprintf(stderr, "Failed to load models!\n"); return 1; }
-
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * 9 * sizeof(float), vertexData, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0); // Position
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float))); // Normal
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float))); // Tex Coord
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(8 * sizeof(float))); // Tex Index
-    glEnableVertexAttribArray(3);
-    glBindVertexArray(0);
-    free(vertexData);
     return 0;
 }

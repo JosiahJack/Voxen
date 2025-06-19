@@ -1,11 +1,14 @@
-#ifndef SHADERS_GLSL_H
-#define SHADERS_GLSL_H
+#ifndef VOXEN_SHADERS_GLSL_H
+#define VOXEN_SHADERS_GLSL_H
 
-#include <stdbool.h>
+#include <GL/glew.h>
 
 extern GLuint shaderProgram;
 extern GLuint textShaderProgram;
+extern GLuint cullShaderProgram;
+extern GLuint rasterizeShaderProgram;
+extern GLuint imageBlitShaderProgram;
 
 int CompileShaders(void);
 
-#endif // SHADERS_GLSL_H
+#endif // VOXEN_SHADERS_GLSL_H
