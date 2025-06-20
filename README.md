@@ -70,6 +70,7 @@ Single command:
 
 ```bash
 sudo apt install libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev libglew-dev libgl1-mesa-dev libassimp-dev
+```
 
 ### License
 
