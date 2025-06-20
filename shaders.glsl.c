@@ -44,7 +44,7 @@ const char *fragmentShaderTraditional =
     "    vec2 uv = clamp(vec2(1.0 - TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
-    "    int pixelIndex = int(textureOffsets[index]) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
+    "    int pixelIndex = int(textureOffsets[index] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
     "    FragColor = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
     "}\n";
     
