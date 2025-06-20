@@ -6,6 +6,8 @@ extern int screen_height;
 
 extern TTF_Font* font;
 extern GLuint textVAO, textVBO;
+extern uint32_t drawCallCount;
+extern uint32_t vertexCount;
 
 void SetupTextQuad(void);
 int ClearFrameBuffers(void);

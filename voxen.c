@@ -40,6 +40,8 @@ int eventIndex; // Event that made it to the counter.  Indices below this were
 int eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
+double current_time = 0.0;
+double start_frame_time = 0.0;
                 
 // OpenGL
 SDL_GLContext gl_context;
@@ -110,7 +112,8 @@ int InitializeEnvironment(void) {
     fprintf(stderr, "OpenGL Version: %s\n", version ? (const char*)version : "unknown");
     fprintf(stderr, "Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
-    SDL_GL_SetSwapInterval(0.0);
+    int vsync_enable = 0;//1; // Set to 0 for false.
+    SDL_GL_SetSwapInterval(vsync_enable);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -244,6 +247,7 @@ int main(int argc, char* argv[]) {
     last_time = get_time();
     lastJournalWriteTime = get_time();
     while(1) {
+        start_frame_time = get_time();
         if (!log_playback) {
             // Enqueue input events
             SDL_Event event;
@@ -297,9 +301,8 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        double current_time = get_time();
+        current_time = get_time();
         double frame_time = current_time - last_time;
-        last_time = current_time;
         accumulator += frame_time;
         while (accumulator >= time_step) {
             if (window_has_focus) ProcessInput();
@@ -322,6 +325,7 @@ int main(int argc, char* argv[]) {
         if (exitCode) break;
 
         SDL_GL_SwapWindow(window); // Present frame
+        last_time = current_time;
         globalFrameNum++;
     }
 

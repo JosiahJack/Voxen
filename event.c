@@ -222,7 +222,7 @@ int EventQueueProcess(void) {
         if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
 
         eventQueue[eventIndex].frameNum = globalFrameNum;
-        timestamp = get_time();
+        timestamp = current_time;
         eventQueue[eventIndex].timestamp = timestamp;
         eventQueue[eventIndex].deltaTime_ns = timestamp - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
 
