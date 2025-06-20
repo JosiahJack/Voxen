@@ -25,35 +25,6 @@ void quat_to_mat3(float q[4], float mat[9]) {
 
 // Transform vertex function (mimics the shader)
 void transform_vertices(float *verticesIn, float *verticesOut, uint32_t vertexCount, InstanceData *instances, unsigned int *modelVertexCounts, unsigned int *vbo_offsets) {
-//     verticesOut[0] = 200.0f; // x
-//     verticesOut[1] = 200.0f; // y
-//     verticesOut[2] = 1.0f;   // z
-//     verticesOut[3] = 0.0f;   // u
-//     verticesOut[4] = 0.0f;   // v
-//     verticesOut[5] = 0.0f;   // texIndex
-// 
-//     verticesOut[6] = 280.0f; // x
-//     verticesOut[7] = 200.0f; // y
-//     verticesOut[8] = 1.0f;   // z
-//     verticesOut[9] = 1.0f;   // u
-//     verticesOut[10] = 0.0f;   // v
-//     verticesOut[11] = 0.0f;   // texIndex
-//     
-//     verticesOut[12] = 300.0f; // x
-//     verticesOut[13] = 238.0f; // y
-//     verticesOut[14] = 1.0f;   // z
-//     verticesOut[15] = 1.0f;   // u
-//     verticesOut[16] = 1.0f;   // v
-//     verticesOut[17] = 0.0f;   // texIndex
-//     
-//     verticesOut[18] = 200.0f; // x // Changes to this don't affect anything.  Still only draws one tri.  Of course you doof, a tri needs 3 verts not only just 1.
-//     verticesOut[19] = 300.0f; // y
-//     verticesOut[20] = 1.0f;   // z
-//     verticesOut[21] = 0.0f;   // u
-//     verticesOut[22] = 1.0f;   // v
-//     verticesOut[23] = 0.0f;   // texIndex
-//     return;
-
     float halfFovH = cam_fovH / 2.0f; // e.g. 90 / 2 = 45.0deg
     float minYaw = cam_yaw - halfFovH;
     float maxYaw = cam_yaw + halfFovH;
@@ -89,11 +60,11 @@ void transform_vertices(float *verticesIn, float *verticesOut, uint32_t vertexCo
             // Rotate
             float rotMat[9];
             quat_to_mat3(instance.rotation, rotMat);
-            float worldPos[3] = { scaledPos[0], scaledPos[1], scaledPos[2] };
-//                 rotMat[0] * scaledPos[0] + rotMat[3] * scaledPos[1] + rotMat[6] * scaledPos[2] + instance.position[0],
-//                 rotMat[1] * scaledPos[0] + rotMat[4] * scaledPos[1] + rotMat[7] * scaledPos[2] + instance.position[1],
-//                 rotMat[2] * scaledPos[0] + rotMat[5] * scaledPos[1] + rotMat[8] * scaledPos[2] + instance.position[2]
-//             };
+            float worldPos[3] = {// scaledPos[0], scaledPos[1], scaledPos[2] };
+                rotMat[0] * scaledPos[0] + rotMat[3] * scaledPos[1] + rotMat[6] * scaledPos[2] + instance.position[0],
+                rotMat[1] * scaledPos[0] + rotMat[4] * scaledPos[1] + rotMat[7] * scaledPos[2] + instance.position[1],
+                rotMat[2] * scaledPos[0] + rotMat[5] * scaledPos[1] + rotMat[8] * scaledPos[2] + instance.position[2]
+            };
             printf("World space for vert %d: x %f, y %f, z %f\n",localIdx,worldPos[0],worldPos[1],worldPos[2]);
 
             // Translate (treating camera position as 0, 0, 0)
@@ -104,23 +75,15 @@ void transform_vertices(float *verticesIn, float *verticesOut, uint32_t vertexCo
             };
             
             printf("vertexInCamSpace for vert %d: x %f, y %f, z %f\n",localIdx,vertexInCamSpace[0],vertexInCamSpace[1],vertexInCamSpace[2]);
-            
-            // Rotate to view space
-            float viewPos[3];
-            viewPos[0] = vertexInCamSpace[0];//vertexInCamSpace[0] * sinThetaC - vertexInCamSpace[1] * cosThetaC;
-            viewPos[1] = vertexInCamSpace[1];//vertexInCamSpace[0] * (-sinPhiC * cosThetaC) - vertexInCamSpace[1] * (-sinPhiC * sinThetaC) + vertexInCamSpace[2] * cosPhiC;
-            viewPos[2] = vertexInCamSpace[2];//vertexInCamSpace[0] * (-cosPhiC * cosThetaC) - vertexInCamSpace[1] * (-cosPhiC * sinThetaC) - vertexInCamSpace[2] * sinPhiC;
-            printf("viewPos for vert %d: x %f, y %f, z %f\n",localIdx,viewPos[0],viewPos[1],viewPos[2]);
-
-            float distance = sqrtf(  viewPos[0] * viewPos[0]
-                                   + viewPos[1] * viewPos[1]
-                                   + viewPos[2] * viewPos[2]);
+            float distance = sqrtf(  vertexInCamSpace[0] * vertexInCamSpace[0]
+                                   + vertexInCamSpace[1] * vertexInCamSpace[1]
+                                   + vertexInCamSpace[2] * vertexInCamSpace[2]);
 
             if (fabs(distance) < 0.001f) distance = 0.001f; // Avoid division by zero for pitch
 
             // Compute yaw and pitch relative to camera (Z-up, adjust for camera orientation)
-            float yaw = fabs(viewPos[0]) < 0.000001f ? 0.0f : rad2deg(atan2f(viewPos[1], viewPos[0])); // Yaw around Z  atan2(y,x)
-            float pitch = 90.0f + rad2deg(atan2f(viewPos[2],fabs(viewPos[1]) > 0.00001f ? viewPos[1] : viewPos[0]));
+            float yaw = fabs(vertexInCamSpace[0]) < 0.000001f ? 0.0f : rad2deg(atan2f(vertexInCamSpace[1], vertexInCamSpace[0])); // Yaw around Z  atan2(y,x)
+            float pitch = 90.0f + rad2deg(atan2f(vertexInCamSpace[2],fabs(vertexInCamSpace[1]) > 0.00001f ? vertexInCamSpace[1] : vertexInCamSpace[0]));
             printf("YawPitch raw vert %d: yaw %f, pitch %f\n",localIdx,yaw,pitch);
             
             // At this point yaw is the distance from screen center and pitch
