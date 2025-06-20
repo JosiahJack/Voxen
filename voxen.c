@@ -18,6 +18,7 @@
 #include "data_textures.h"
 #include "data_models.h"
 #include "render.h"
+#include "cli_args.h"
 
 // Window
 SDL_Window *window;
@@ -155,9 +156,15 @@ int EventExecute(Event* event) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
-        printf("-----------------------------------------------------------\n");
-        printf("Voxen v0.01.00 6/10/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT licensed\n\n\n");
+    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { cli_args_print_version(); return 0; }
+
+    if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
+        cli_args_print_help();
+        return 0;
+    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
+        printf("Converting log: %s ...", argv[2]);
+        JournalDump(argv[2]);
+        printf("DONE!\n");
         return 0;
     }
 

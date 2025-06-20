@@ -3,6 +3,14 @@
 #include "matrix.h"
 #include "quaternion.h"
 
+float deg2rad(float degrees) {
+    return degrees * (M_PI / 180.0f);
+}
+
+float rad2deg(float radians) {
+    return radians * (180.0f / M_PI);
+}
+
 // Initialize a quaternion (identity: no rotation)
 void quat_identity(Quaternion* q) {
     q->w = 1.0f;
