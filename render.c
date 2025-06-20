@@ -46,6 +46,11 @@ int ClearFrameBuffers(void) {
 }
 
 int RenderStaticMeshes(void) {
+    static uint32_t drawCallCount = 0;
+    static uint32_t vertexCount = 0;
+    drawCallCount = 0; // Reset per frame
+    vertexCount = 0;
+
     glUseProgram(shaderProgram);
 
     // Set up view and projection matrices
@@ -74,6 +79,8 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
     glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[0]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[0];
 
     // Model 1: med1_7.fbx at (2.56f, 1.28f, 0)
     mat4_identity(model);
@@ -82,6 +89,8 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
     glBindVertexBuffer(0, vbos[1], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[1]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[1];
 
     // Model 2: med1_9.fbx at (-2.56f, 1.28f, 0)
     mat4_identity(model);
@@ -90,6 +99,52 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
     glBindVertexBuffer(0, vbos[2], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[2]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[2];
+    
+    
+    // Model 0: med1_1.fbx at (0, 1.28f, 0)
+    mat4_identity(model);
+    mat4_translate(model, 0.0f, 10.24f, 0.0f);
+    glUniform1i(texIndexLoc, 0);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[0]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[0];
+    
+    // Model 0: med1_1.fbx at (0, 1.28f, 0)
+    mat4_identity(model);
+    mat4_translate(model, 2.56f, 10.24f, 0.0f);
+    glUniform1i(texIndexLoc, 0);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[0]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[0];
+    
+    // Model 0: med1_1.fbx at (0, 1.28f, 0)
+    mat4_identity(model);
+    mat4_translate(model, 7.68f, 10.24f, 0.0f);
+    glUniform1i(texIndexLoc, 0);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[0]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[0];
+    
+    // Model 0: med1_1.fbx at (0, 1.28f, 0)
+    mat4_identity(model);
+    mat4_translate(model, 10.24f, 10.24f, 0.0f);
+    glUniform1i(texIndexLoc, 0);
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+    glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[0]);
+    drawCallCount++;
+    vertexCount += modelVertexCounts[0];
+
+    // Log statistics
+    printf("Frame: Draw Calls = %u, Vertices = %u\n", drawCallCount, vertexCount);
     return 0;
 }
 
