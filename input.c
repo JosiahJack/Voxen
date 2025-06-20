@@ -8,12 +8,14 @@
 #include "player.h"
 
 // Camera variables
-float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
+float cam_x = 0.0f, cam_y = -4.0f, cam_z = 3.0f; // Camera position
 // float cam_yaw = 0.0f, cam_pitch = 0.0f;         // Camera orientation
 Quaternion cam_rotation;
-float cam_yaw = 180.0f;
+float cam_yaw = 0.0f;
 float cam_pitch = 90.0f;
 float cam_roll = 0.0f;
+float cam_fovH = 110.0f;
+float cam_fovV = 65.0f;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
@@ -24,7 +26,7 @@ int mouse_x = 0, mouse_y = 0; // Mouse position
 void Input_Init(void) {
     quat_identity(&cam_rotation);
     Quaternion pitch_quat;
-    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -90.0f * M_PI / 180.0f); // Pitch -90° to look toward Y+
+    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f,deg2rad(-90.0f)); // Pitch -90° to look toward Y+
     quat_multiply(&cam_rotation, &pitch_quat, &cam_rotation);
     Input_MouselookApply();
 }
@@ -51,7 +53,7 @@ int Input_KeyUp(uint32_t scancode) {
 
 int Input_MouseMove(float xrel, float yrel) {
     cam_yaw += xrel * mouse_sensitivity;
-    cam_pitch += yrel * mouse_sensitivity;
+    cam_pitch -= yrel * mouse_sensitivity;
     if (cam_pitch > 179.0f) cam_pitch = 179.0f;
     if (cam_pitch < 1.0f) cam_pitch = 1.0f;
     Input_MouselookApply();
@@ -86,13 +88,13 @@ void ProcessInput(void) {
     }
 
     if (keys[SDL_SCANCODE_F]) {
-        cam_x += move_speed * facing_x; // Move forward
-        cam_y += move_speed * facing_y;
-        cam_z += move_speed * facing_z;
-    } else if (keys[SDL_SCANCODE_S]) {
-        cam_x -= move_speed * facing_x; // Move backward
+        cam_x -= move_speed * facing_x; // Move forward
         cam_y -= move_speed * facing_y;
         cam_z -= move_speed * facing_z;
+    } else if (keys[SDL_SCANCODE_S]) {
+        cam_x += move_speed * facing_x; // Move backward
+        cam_y += move_speed * facing_y;
+        cam_z += move_speed * facing_z;
     }
 
     if (keys[SDL_SCANCODE_A]) {

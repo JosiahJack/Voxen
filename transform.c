@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
+#include "render.h"
 #include "constants.h"
 #include "transform.h"
 #include "player.h"
@@ -23,125 +24,126 @@ void quat_to_mat3(float q[4], float mat[9]) {
 }
 
 // Transform vertex function (mimics the shader)
-void transform_vertices(float *verticesIn, float *verticesOut, unsigned int vertexCount,
-                       InstanceData *instances, unsigned int instanceCount,
-                       unsigned int *modelVertexCounts, unsigned int *vbo_offsets,
-                       float cameraPos[3], float cameraYaw, float cameraPitch,
-                       float fovV, float fovH,
-                       unsigned int screenWidth, unsigned int screenHeight) {
-    
-    verticesOut[0] = 200.0f; // x
-    verticesOut[1] = 200.0f; // y
-    verticesOut[2] = 1.0f;   // z
-    verticesOut[3] = 0.0f;   // u
-    verticesOut[4] = 0.0f;   // v
-    verticesOut[5] = 0.0f;   // texIndex
+void transform_vertices(float *verticesIn, float *verticesOut, uint32_t vertexCount, InstanceData *instances, unsigned int *modelVertexCounts, unsigned int *vbo_offsets) {
+//     verticesOut[0] = 200.0f; // x
+//     verticesOut[1] = 200.0f; // y
+//     verticesOut[2] = 1.0f;   // z
+//     verticesOut[3] = 0.0f;   // u
+//     verticesOut[4] = 0.0f;   // v
+//     verticesOut[5] = 0.0f;   // texIndex
+// 
+//     verticesOut[6] = 280.0f; // x
+//     verticesOut[7] = 200.0f; // y
+//     verticesOut[8] = 1.0f;   // z
+//     verticesOut[9] = 1.0f;   // u
+//     verticesOut[10] = 0.0f;   // v
+//     verticesOut[11] = 0.0f;   // texIndex
+//     
+//     verticesOut[12] = 300.0f; // x
+//     verticesOut[13] = 238.0f; // y
+//     verticesOut[14] = 1.0f;   // z
+//     verticesOut[15] = 1.0f;   // u
+//     verticesOut[16] = 1.0f;   // v
+//     verticesOut[17] = 0.0f;   // texIndex
+//     
+//     verticesOut[18] = 200.0f; // x // Changes to this don't affect anything.  Still only draws one tri.  Of course you doof, a tri needs 3 verts not only just 1.
+//     verticesOut[19] = 300.0f; // y
+//     verticesOut[20] = 1.0f;   // z
+//     verticesOut[21] = 0.0f;   // u
+//     verticesOut[22] = 1.0f;   // v
+//     verticesOut[23] = 0.0f;   // texIndex
+//     return;
 
-    verticesOut[6] = 280.0f; // x
-    verticesOut[7] = 200.0f; // y
-    verticesOut[8] = 1.0f;   // z
-    verticesOut[9] = 1.0f;   // u
-    verticesOut[10] = 0.0f;   // v
-    verticesOut[11] = 0.0f;   // texIndex
+    float halfFovH = cam_fovH / 2.0f; // e.g. 90 / 2 = 45.0deg
+    float minYaw = cam_yaw - halfFovH;
+    float maxYaw = cam_yaw + halfFovH;
+
+    float halfFovV = cam_fovV / 2.0f; // e.g. 65 / 2 = 32.5deg
+    float minPitch = cam_pitch - halfFovV;
+    float maxPitch = cam_pitch + halfFovV;
+    printf("Transforming all verts with camera values of minYaw: %f, maxYaw: %f, minPitch: %f, maxPitch: %f\n",minYaw,maxYaw,minPitch,maxPitch);
     
-    verticesOut[12] = 300.0f; // x
-    verticesOut[13] = 238.0f; // y
-    verticesOut[14] = 1.0f;   // z
-    verticesOut[15] = 1.0f;   // u
-    verticesOut[16] = 1.0f;   // v
-    verticesOut[17] = 0.0f;   // texIndex
-    
-    verticesOut[18] = 200.0f; // x // Changes to this don't affect anything.  Still only draws one tri.
-    verticesOut[19] = 300.0f; // y
-    verticesOut[20] = 1.0f;   // z
-    verticesOut[21] = 0.0f;   // u
-    verticesOut[22] = 1.0f;   // v
-    verticesOut[23] = 0.0f;   // texIndex
-    return;
-    
-    for (unsigned int instanceID = 0; instanceID < instanceCount; instanceID++) {
+    for (unsigned int instanceID = 0; instanceID < INSTANCE_COUNT; instanceID++) {
         InstanceData instance = instances[instanceID];
-        unsigned int modelIdx = instance.modelIndex;
-        unsigned int vertCount = modelVertexCounts[modelIdx];
-        unsigned int baseOffset = vbo_offsets[modelIdx];
-
-        for (unsigned int localIdx = 0; localIdx < vertCount; localIdx++) {
-            unsigned int globalOutIdx = (instanceID * vertexCount) + localIdx;
-            unsigned int inIdx = (baseOffset + localIdx) * 9;
+        uint32_t modelIdx = instance.modelIndex;
+        uint32_t vertCount = modelVertexCounts[modelIdx];
+        GLuint baseOffset = vbo_offsets[modelIdx];
+        for (uint32_t localIdx = 0; localIdx < vertCount; localIdx++) {
+            uint32_t globalOutIdx = (instanceID * vertexCount) + localIdx;
+            uint32_t inIdx = (baseOffset + localIdx) * 9;
 
             // Load input vertex data
             float position[3] = {verticesIn[inIdx + 0], verticesIn[inIdx + 1], verticesIn[inIdx + 2]};
+            // TODO pass in the normal too.  = {verticesIn[inIdx + 3], verticesIn[inIdx + 4], verticesIn[inIdx + 5]};
             float uv[2] = {verticesIn[inIdx + 6], verticesIn[inIdx + 7]};
             float texIndex = verticesIn[inIdx + 8];
+            printf("\n----------------------------------------\nRaw vert %d: x %f, y %f, z %f\n",localIdx,position[0],position[1],position[2]);
 
-            // Instance transformation (model to world space)
+            // Scale
             float scaledPos[3] = {
                 position[0] * instance.scale[0],
                 position[1] * instance.scale[1],
                 position[2] * instance.scale[2]
             };
+            
+            // Rotate
             float rotMat[9];
             quat_to_mat3(instance.rotation, rotMat);
-            float worldPos[3] = {
-                rotMat[0] * scaledPos[0] + rotMat[3] * scaledPos[1] + rotMat[6] * scaledPos[2] + instance.position[0],
-                rotMat[1] * scaledPos[0] + rotMat[4] * scaledPos[1] + rotMat[7] * scaledPos[2] + instance.position[1],
-                rotMat[2] * scaledPos[0] + rotMat[5] * scaledPos[1] + rotMat[8] * scaledPos[2] + instance.position[2]
-            };
+            float worldPos[3] = { scaledPos[0], scaledPos[1], scaledPos[2] };
+//                 rotMat[0] * scaledPos[0] + rotMat[3] * scaledPos[1] + rotMat[6] * scaledPos[2] + instance.position[0],
+//                 rotMat[1] * scaledPos[0] + rotMat[4] * scaledPos[1] + rotMat[7] * scaledPos[2] + instance.position[1],
+//                 rotMat[2] * scaledPos[0] + rotMat[5] * scaledPos[1] + rotMat[8] * scaledPos[2] + instance.position[2]
+//             };
+            printf("World space for vert %d: x %f, y %f, z %f\n",localIdx,worldPos[0],worldPos[1],worldPos[2]);
 
-            // Compute vector from camera to vertex
-            float toVertex[3] = {
-                worldPos[0] - cameraPos[0],
-                worldPos[1] - cameraPos[1],
-                worldPos[2] - cameraPos[2]
+            // Translate (treating camera position as 0, 0, 0)
+            float vertexInCamSpace[3] = {
+                worldPos[0] - cam_x,
+                worldPos[1] - cam_y,
+                worldPos[2] - cam_z
             };
-            float distance = sqrtf(toVertex[0] * toVertex[0] + toVertex[1] * toVertex[1] + toVertex[2] * toVertex[2]);
-            if (distance < 0.001f) distance = 0.001f; // Avoid division by zero
+            
+            printf("vertexInCamSpace for vert %d: x %f, y %f, z %f\n",localIdx,vertexInCamSpace[0],vertexInCamSpace[1],vertexInCamSpace[2]);
+            
+            // Rotate to view space
+            float viewPos[3];
+            viewPos[0] = vertexInCamSpace[0];//vertexInCamSpace[0] * sinThetaC - vertexInCamSpace[1] * cosThetaC;
+            viewPos[1] = vertexInCamSpace[1];//vertexInCamSpace[0] * (-sinPhiC * cosThetaC) - vertexInCamSpace[1] * (-sinPhiC * sinThetaC) + vertexInCamSpace[2] * cosPhiC;
+            viewPos[2] = vertexInCamSpace[2];//vertexInCamSpace[0] * (-cosPhiC * cosThetaC) - vertexInCamSpace[1] * (-cosPhiC * sinThetaC) - vertexInCamSpace[2] * sinPhiC;
+            printf("viewPos for vert %d: x %f, y %f, z %f\n",localIdx,viewPos[0],viewPos[1],viewPos[2]);
+
+            float distance = sqrtf(  viewPos[0] * viewPos[0]
+                                   + viewPos[1] * viewPos[1]
+                                   + viewPos[2] * viewPos[2]);
+
+            if (fabs(distance) < 0.001f) distance = 0.001f; // Avoid division by zero for pitch
 
             // Compute yaw and pitch relative to camera (Z-up, adjust for camera orientation)
-            float yaw = atan2f(toVertex[0], toVertex[2]) * 180.0f / M_PI; // Yaw around Z
-            float pitch = asin(toVertex[1] / distance) * 180.0f / M_PI; // Pitch from vertical (Z-up)
+            float yaw = fabs(viewPos[0]) < 0.000001f ? 0.0f : rad2deg(atan2f(viewPos[1], viewPos[0])); // Yaw around Z  atan2(y,x)
+            float pitch = 90.0f + rad2deg(atan2f(viewPos[2],fabs(viewPos[1]) > 0.00001f ? viewPos[1] : viewPos[0]));
+            printf("YawPitch raw vert %d: yaw %f, pitch %f\n",localIdx,yaw,pitch);
+            
+            // At this point yaw is the distance from screen center and pitch
+            // is also distance from screen center.  Now we need to shift them
+            // to be relative to lower left corner as 0,0.
+            
+            // Lower Left (LL) corner of screen is 0,0 for x,y
+            yaw = yaw - minYaw; // Shift where yaw 0 maps to left screen edge
+            pitch = pitch - minPitch; // Shift where pitch 0 maps to bottom screen edge
+            printf("YawPitch shifted vert %d: yaw %f, pitch %f\n",localIdx,yaw,pitch);
 
-            // Apply camera rotation (in degrees)
-            yaw += cameraYaw;
-            pitch += cameraPitch; // Positive pitch should look up
-
-            // Normalize yaw to [-180, 180]
-            while (yaw > 180.0f) yaw -= 360.0f;
-            while (yaw < -180.0f) yaw += 360.0f;
-
-            // Map to screen coordinates
-            float halfFovV = fovV / 2.0f;
-            float halfFovH = fovH / 2.0f;
-            float minYaw = cameraYaw - halfFovH;
-            float maxYaw = cameraYaw + halfFovH;
-            float minPitch = cameraPitch - halfFovV;
-            float maxPitch = cameraPitch + halfFovV;
-            float screenX, screenY;
-
-            // Handle 360° FOV wrapping
-            if (maxYaw - minYaw == 0.0f) {
-                screenX = screenWidth / 2.0f;
-            } else {
-                screenX = (yaw - minYaw) / (maxYaw - minYaw) * screenWidth;
-            }
-            if (maxPitch - minPitch == 0.0f) {
-                screenY = screenHeight / 2.0f;
-            } else {
-                screenY = (maxPitch - pitch) / (maxPitch - minPitch) * screenHeight; // Invert pitch for top-down view
-            }
-
-            // Clamp to screen bounds
-            screenX = (screenX < 0.0f) ? 0.0f : (screenX > screenWidth - 1) ? screenWidth - 1 : screenX;
-            screenY = (screenY < 0.0f) ? 0.0f : (screenY > screenHeight - 1) ? screenHeight - 1 : screenY;
+            float screenX = ((yaw)   / cam_fovH) * screen_width ;
+            float screenY = (pitch / cam_fovV) * screen_height;
+            printf("screen final vert %d: screenX %f, screenY %f\n",localIdx,screenX,screenY);
 
             // Write transformed vertex data to output buffer
             unsigned int outIdx = globalOutIdx * 6;
-            verticesOut[outIdx + 0] = screenX;
-            verticesOut[outIdx + 1] = screenY;
-            verticesOut[outIdx + 2] = distance;
-            verticesOut[outIdx + 3] = uv[0];
-            verticesOut[outIdx + 4] = uv[1];
-            verticesOut[outIdx + 5] = texIndex;
+            verticesOut[outIdx + 0] = screenX;  // x     Screen Coordinates in pixels
+            verticesOut[outIdx + 1] = screenY;  // y
+            verticesOut[outIdx + 2] = distance; // depth
+            verticesOut[outIdx + 3] = uv[0];    // u
+            verticesOut[outIdx + 4] = uv[1];    // v
+            verticesOut[outIdx + 5] = texIndex; // texIndex
         }
     }
 }

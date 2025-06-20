@@ -84,9 +84,9 @@ void SetupTextQuad(void) {
     float vertexDataTest[] = {
         // x,    y,    z, |   nx,   ny,   nz, |   u,    v | texIndex
         0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
-        5.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
-        5.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
-        0.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f        
+        5.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  1.0f, 0.0f,      0.0f,
+        5.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  1.0f, 1.0f,      0.0f,
+        0.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 1.0f,      0.0f       
     };
 
 int SetupGeometry(void) {    
@@ -104,11 +104,6 @@ int SetupGeometry(void) {
     // VBO and VAO setup
     
     // TEST OVERRIDES!! DELETE LATER!
-    
-    
-    
-    
-    
     totalVertexCount = 4;
     vertexCount = 4;
     modelVertexCounts[0] = 4;
@@ -182,24 +177,21 @@ int RenderStaticMeshes(void) {
         fprintf(stderr, "Memory allocation failed for vertexDataOut\n");
         return 1;
     }
-
+    
     // Transform vertices on CPU
-    transform_vertices(vertexDataTest, vertexDataOut, totalVertexCount, instancesBuffer, INSTANCE_COUNT,
-                      modelVertexCounts, vbo_offsets, (float[3]){cam_x, cam_y, cam_z}, cam_yaw, cam_pitch,
-                      90.0f, 65.0f, screen_width, screen_height);
+    transform_vertices(vertexDataTest, vertexDataOut, totalVertexCount, instancesBuffer, modelVertexCounts, vbo_offsets);
     
     // Update transformedVBO with CPU-transformed data
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertexCount * INSTANCE_COUNT * 6 * sizeof(float),
-                 vertexDataOut, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertexCount * INSTANCE_COUNT * 6 * sizeof(float), vertexDataOut, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
     for (uint32_t i=0; i < (totalVertexCount * INSTANCE_COUNT * 6);i+=6) {
         printf("Vertex: %d, x: %f, y: %f, depth: %f, u: %f, v: %f, texIndex: %f  at cam_x: %f, cam_y: %f, cam_z: %f with cam_yaw: %f, cam_pitch %f\n",
                i,vertexDataOut[i],vertexDataOut[i + 1],vertexDataOut[i + 2],vertexDataOut[i + 3],vertexDataOut[i + 4],vertexDataOut[i + 5],cam_x,cam_y,cam_z,cam_yaw,cam_pitch);
     }
     
     free(vertexDataOut);
+
 //     // Transform compute shader
 //     glUseProgram(transformShaderProgram);
 // 
@@ -213,12 +205,11 @@ int RenderStaticMeshes(void) {
 //     glUniform1ui(glGetUniformLocation(transformShaderProgram, "instanceCount"), INSTANCE_COUNT);
 //     glUniform1uiv(glGetUniformLocation(transformShaderProgram, "modelVertexCounts"), MODEL_COUNT, modelVertexCounts);
 //     glUniform1uiv(glGetUniformLocation(transformShaderProgram, "vbo_offsets"), MODEL_COUNT, vbo_offsets);
-//     glUniform3f(glGetUniformLocation(transformShaderProgram, "cameraPos"), 0.0f, 0.0f, 0.0f);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraYaw"), -180.0f);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraPitch"), -90.0f);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovH"),360.0f);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovV"),360.0f);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "aspect"), (float)screen_width / (float)screen_height);
+//     glUniform3f(glGetUniformLocation(transformShaderProgram, "cameraPos"), cam_x, cam_y, cam_z);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraYaw"), cam_yaw);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraPitch"), cam_pitch);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovH"), cam_fovH);
+//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovV"), cam_fovY);
 //     glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenWidth"), screen_width);
 //     glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenHeight"), screen_height);
 // 

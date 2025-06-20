@@ -30,7 +30,6 @@ const char *transform_computeShader =
     "uniform float cameraPitch;\n"       // Camera pitch in degrees\n"
     "uniform float fovV;\n"              // Vertical FOV in degrees\n"
     "uniform float fovH;\n"              // Horizontal FOV in degrees\n"
-    "uniform float aspect;\n"            // Aspect ratio (width/height)\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
     "\n"

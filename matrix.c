@@ -8,17 +8,6 @@ void mat4_identity(float* m) {
     for (int i = 0; i < 16; i++) m[i] = (i % 5 == 0) ? 1.0f : 0.0f;
 }
 
-void mat4_perspective(float* m, float fov, float aspect, float near, float far) {
-    float f = 1.0f / tan(fov * M_PI / 360.0f);
-    mat4_identity(m);
-    m[0] = f / aspect;
-    m[5] = f;
-    m[10] = -(far + near) / (far - near); // Fixed: Negative for correct depth
-    m[11] = -1.0f;
-    m[14] = -2.0f * far * near / (far - near);
-    m[15] = 0.0f;
-}
-
 // Matrix helper for 2D orthographic projection for text/UI
 void mat4_ortho(float* m, float left, float right, float bottom, float top, float near, float far) {
     mat4_identity(m);

@@ -11,6 +11,8 @@ extern Quaternion cam_rotation;
 extern float cam_yaw;
 extern float cam_pitch;
 extern float cam_roll;
+extern float cam_fovH;
+extern float cam_fovV;
 extern bool in_cyberspace;
 
 #endif // VOXEN_PLAYER_H

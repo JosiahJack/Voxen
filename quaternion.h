@@ -6,6 +6,9 @@ typedef struct {
     float w, x, y, z;
 } Quaternion;
 
+float deg2rad(float degrees); // Not in math.h, who knew!
+float rad2deg(float radians);
+
 // Initialize a quaternion (identity: no rotation)
 void quat_identity(Quaternion* q);
 
