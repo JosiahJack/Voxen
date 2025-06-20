@@ -3,13 +3,15 @@
 
 #include <GL/glew.h>
 
+#define VERTEX_ATTRIBUTES_COUNT 8
+
 extern uint32_t modelVertexCounts[];
 extern int32_t vbo_offsets[];
 extern uint32_t totalVertexCount;
 extern GLuint vao;
-extern GLuint vbo;
+extern GLuint vbos[];
 
-int LoadModels(float **vertexData, uint32_t *vertexCount);
+int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]);
 int SetupGeometry(void);
 
 #endif // DATA_MODELS_H

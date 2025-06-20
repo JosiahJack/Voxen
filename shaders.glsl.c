@@ -11,27 +11,27 @@ const char *vertexShaderSource =
     "layout(location = 0) in vec3 aPos;\n"
     "layout(location = 1) in vec3 aNormal;\n"
     "layout(location = 2) in vec2 aTexCoord;\n"
-    "layout(location = 3) in float aTexIndex;\n"
+    "uniform int texIndex;\n"
     "uniform mat4 model;\n"
     "uniform mat4 view;\n"
     "uniform mat4 projection;\n"
     "out vec3 FragPos;\n"
     "out vec3 Normal;\n"
     "out vec2 TexCoord;\n"
-    "out float TexIndex;\n"
+    "flat out int TexIndex;\n"
     "\n"
     "void main() {\n"
     "    FragPos = vec3(model * vec4(aPos, 1.0));\n"
     "    Normal = mat3(transpose(inverse(model))) * aNormal;\n"
     "    TexCoord = aTexCoord;\n"
-    "    TexIndex = aTexIndex;\n"
+    "    TexIndex = texIndex;\n"
     "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
     "}\n";
 
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
     "in vec2 TexCoord;\n"
-    "in float TexIndex;\n"
+    "flat in int TexIndex;\n"
     "out vec4 FragColor;\n"
     "layout(std430, binding = 0) buffer ColorBuffer {\n"
     "    float colors[];\n" // 1D color array (RGBA)
@@ -39,12 +39,11 @@ const char *fragmentShaderTraditional =
     "uniform uint textureOffsets[3];\n" // Offsets for each texture
     "uniform ivec2 textureSizes[3];\n" // Width, height for each texture
     "void main() {\n"
-    "    int index = int(TexIndex);\n"
-    "    ivec2 texSize = textureSizes[index];\n"
+    "    ivec2 texSize = textureSizes[TexIndex];\n"
     "    vec2 uv = clamp(vec2(1.0 - TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
-    "    int pixelIndex = int(textureOffsets[index] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
+    "    int pixelIndex = int(textureOffsets[TexIndex] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
     "    FragColor = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
     "}\n";
     

@@ -11,6 +11,7 @@
 #include "matrix.h"
 #include "player.h"
 #include "render.h"
+#include "input.h"
 
 // Quad for text (2 triangles, positions and tex coords)
 float textQuadVertices[] = {
@@ -45,7 +46,6 @@ int ClearFrameBuffers(void) {
 }
 
 int RenderStaticMeshes(void) {
-    uint32_t modelIndex = 0;
     glUseProgram(shaderProgram);
 
     // Set up view and projection matrices
@@ -53,46 +53,43 @@ int RenderStaticMeshes(void) {
     float fov = 65.0f;
     mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.1f, 100.0f);
     mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
-    GLint viewLoc = glGetUniformLocation(shaderProgram, "view");
-    GLint projLoc = glGetUniformLocation(shaderProgram, "projection");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, view);
+    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, projection);
 
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, colorBufferID);
-    GLint offsetLoc = glGetUniformLocation(shaderProgram, "textureOffsets");
-    glUniform1uiv(offsetLoc, TEXTURE_COUNT, textureOffsets);
-    GLint sizeLoc = glGetUniformLocation(shaderProgram, "textureSizes");
-    glUniform2iv(sizeLoc, TEXTURE_COUNT, textureSizes);
+    glUniform1uiv(glGetUniformLocation(shaderProgram, "textureOffsets"), TEXTURE_COUNT, textureOffsets);
+    glUniform2iv(glGetUniformLocation(shaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
 
+    GLint texIndexLoc = glGetUniformLocation(shaderProgram, "texIndex");
     glBindVertexArray(vao);
 
-    // Render med1_1.fbx instance at (0, 1.28f, 0)
+    // Render each model
     float model[16];
-    modelIndex = 0;
+    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+
+    // Model 0: med1_1.fbx at (0, 1.28f, 0)
     mat4_identity(model);
     mat4_translate(model, 0.0f, 1.28f, 0.0f);
-    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
+    glUniform1i(texIndexLoc, 0);
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-    glDrawArrays(GL_TRIANGLES, vbo_offsets[0], modelVertexCounts[0]);
-    
-    // Render model index 2 at (0, 1.28f, 0), rotated -90° on X-axis
-    modelIndex = 1;
+    glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[0]);
+
+    // Model 1: med1_7.fbx at (2.56f, 1.28f, 0)
     mat4_identity(model);
     mat4_translate(model, 2.56f, 1.28f, 0.0f);
-//     mat4_rotate_x(model, -M_PI_2); // -90° in radians
+    glUniform1i(texIndexLoc, 1);
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-    glDrawArrays(GL_TRIANGLES, vbo_offsets[1], modelVertexCounts[1]);
+    glBindVertexBuffer(0, vbos[1], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[1]);
 
-    // Render model index 2 at (0, 1.28f, 0), rotated +90° on X-axis
-    modelIndex = 2;
+    // Model 2: med1_9.fbx at (-2.56f, 1.28f, 0)
     mat4_identity(model);
     mat4_translate(model, -2.56f, 1.28f, 0.0f);
-//     mat4_rotate_x(model, M_PI_2); // +90° in radians
+    glUniform1i(texIndexLoc, 2);
     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-    glDrawArrays(GL_TRIANGLES, vbo_offsets[modelIndex], modelVertexCounts[modelIndex]);
-
-    glBindVertexArray(0);
-    glUseProgram(0);
+    glBindVertexBuffer(0, vbos[2], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[2]);
     return 0;
 }
 

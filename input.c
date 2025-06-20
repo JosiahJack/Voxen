@@ -41,6 +41,12 @@ int Input_KeyDown(uint32_t scancode) {
         cam_roll = 0.0f; // Reset roll for sanity
         Input_MouselookApply();
     }
+    
+    if (keys[SDL_SCANCODE_U]) {
+        offsetAmount_TEST += 1;
+    } else if (keys[SDL_SCANCODE_I]) {
+        offsetAmount_TEST -= 1;
+    }
     return 0;
 }
 
@@ -57,6 +63,8 @@ int Input_MouseMove(float xrel, float yrel) {
     Input_MouselookApply();
     return 0;
 }
+
+int offsetAmount_TEST = 0;
 
 // Update camera position based on input
 void ProcessInput(void) {
