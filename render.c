@@ -89,9 +89,9 @@ void SetupTextQuad(void) {
         0.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 1.0f,      0.0f       
     };
 
+float *vertexData = NULL;
 int SetupGeometry(void) {    
     // Load models first to know how to size other buffers.
-    float *vertexData = NULL;
     uint32_t vertexCount = 0;
     if (LoadModels(&vertexData, &vertexCount)) { fprintf(stderr, "Failed to load models!\n"); return 1; }
     
@@ -104,11 +104,11 @@ int SetupGeometry(void) {
     // VBO and VAO setup
     
     // TEST OVERRIDES!! DELETE LATER!
-    totalVertexCount = 4;
-    vertexCount = 4;
-    modelVertexCounts[0] = 4;
-    modelVertexCounts[1] = 0;
-    modelVertexCounts[2] = 0;
+//     totalVertexCount = 4;
+//     vertexCount = 4;
+//     modelVertexCounts[0] = 4;
+//     modelVertexCounts[1] = 0;
+//     modelVertexCounts[2] = 0;
     
     glBufferData(GL_SHADER_STORAGE_BUFFER, ((modelVertexCounts[0] * numModel0) + (modelVertexCounts[1] * numModel1) + (modelVertexCounts[2] * numModel2)) * 6 * sizeof(float), vertexDataTest, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -179,7 +179,7 @@ int RenderStaticMeshes(void) {
     }
     
     // Transform vertices on CPU
-    transform_vertices(vertexDataTest, vertexDataOut, totalVertexCount, instancesBuffer, modelVertexCounts, vbo_offsets);
+    transform_vertices(vertexData, vertexDataOut, totalVertexCount, instancesBuffer, modelVertexCounts, vbo_offsets);
     
     // Update transformedVBO with CPU-transformed data
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);

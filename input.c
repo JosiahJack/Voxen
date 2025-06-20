@@ -14,7 +14,7 @@ Quaternion cam_rotation;
 float cam_yaw = 0.0f;
 float cam_pitch = 90.0f;
 float cam_roll = 0.0f;
-float cam_fovH = 110.0f;
+float cam_fovH = 90.0f;
 float cam_fovV = 65.0f;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
