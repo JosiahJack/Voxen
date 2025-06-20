@@ -125,6 +125,7 @@ int InitializeEnvironment(void) {
     glViewport(0, 0, screen_width, screen_height);
 
     if (CompileShaders()) return SYS_COUNT + 1;
+    CacheUniformLocationsForChunkShader();
     SetupTextQuad();
     Input_Init();
     return 0;
@@ -275,7 +276,7 @@ int main(int argc, char* argv[]) {
 
             // Enqueue render events in pipeline order
             EnqueueEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
-            EnqueueEvent_Simple(EV_RENDER_STATICS);
+            EnqueueEvent_Simple(EV_RENDER_STATICS); // FIRST FOR RESETTING DRAW CALL COUNTER!
             EnqueueEvent_Simple(EV_RENDER_UI);
         } else {
             // Log playback controls (pause, fast forward, rewind, quit playback)

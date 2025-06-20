@@ -11,6 +11,7 @@ extern uint32_t vertexCount;
 
 void SetupTextQuad(void);
 int ClearFrameBuffers(void);
+void CacheUniformLocationsForChunkShader(void);
 int RenderStaticMeshes(void);
 void render_debug_text(float x, float y, const char *text, SDL_Color color);
 int RenderUI(double deltaTime);

@@ -7,7 +7,6 @@
 #include <assimp/postprocess.h>
 #include "constants.h"
 #include "data_models.h"
-#include "blender2fbx.h"
 
 const char *modelPaths[MODEL_COUNT] = {
     "./Models/med1_1.fbx",

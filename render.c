@@ -48,11 +48,23 @@ int ClearFrameBuffers(void) {
     return 0;
 }
 
-int RenderStaticMeshes(void) {
+// Global uniform locations (cached during init)
+GLint viewLoc = -1, projectionLoc = -1, modelLoc = -1, texIndexLoc = -1;
+GLint textureOffsetsLoc = -1, textureSizesLoc = -1;
 
+void CacheUniformLocationsForChunkShader(void) {
+    // Called after shader compilation in InitializeEnvironment
+    viewLoc = glGetUniformLocation(shaderProgram, "view");
+    projectionLoc = glGetUniformLocation(shaderProgram, "projection");
+    modelLoc = glGetUniformLocation(shaderProgram, "model");
+    texIndexLoc = glGetUniformLocation(shaderProgram, "texIndex");
+    textureOffsetsLoc = glGetUniformLocation(shaderProgram, "textureOffsets");
+    textureSizesLoc = glGetUniformLocation(shaderProgram, "textureSizes");
+}
+
+int RenderStaticMeshes(void) {
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
-
     glUseProgram(shaderProgram);
 
     // Set up view and projection matrices
@@ -60,20 +72,15 @@ int RenderStaticMeshes(void) {
     float fov = 65.0f;
     mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 1300.0f);
     mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, view);
-    glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, projection);
-
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
+    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, projection);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, colorBufferID);
-    glUniform1uiv(glGetUniformLocation(shaderProgram, "textureOffsets"), TEXTURE_COUNT, textureOffsets);
-    glUniform2iv(glGetUniformLocation(shaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
-
-    GLint texIndexLoc = glGetUniformLocation(shaderProgram, "texIndex");
+    glUniform1uiv(textureOffsetsLoc, TEXTURE_COUNT, textureOffsets);
+    glUniform2iv(textureSizesLoc, TEXTURE_COUNT, textureSizes);
     glBindVertexArray(vao);
 
     // Render each model
     float model[16];
-    GLint modelLoc = glGetUniformLocation(shaderProgram, "model");
-
     int drawCallLimit = 100;
     int currentModelType = 0;
     int loopIter = 0;
@@ -219,6 +226,7 @@ int RenderUI(double deltaTime) {
     render_debug_text(10, 70, text4, textCol);
     
     // Frame stats
+    drawCallCount++; // Add one more for this text render ;)
     char text0[256];
     snprintf(text0, sizeof(text0), "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d", deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
     render_debug_text(10, 10, text0, textCol); // Top-left corner (10, 10)
