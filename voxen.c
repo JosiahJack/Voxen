@@ -13,12 +13,12 @@
 #include <string.h>
 #include "event.h"
 #include "constants.h"
-#include "shaders.glsl.h"
 #include "input.h"
 #include "data_textures.h"
 #include "data_models.h"
 #include "render.h"
 #include "cli_args.h"
+#include "lights.h"
 
 // Window
 SDL_Window *window;
@@ -47,6 +47,8 @@ double start_frame_time = 0.0;
 SDL_GLContext gl_context;
 GLuint shaderProgram;
 GLuint textShaderProgram;
+GLuint deferredLightingShaderProgram;
+GLuint imageBlitShaderProgram;
 GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
 TTF_Font* font = NULL;
 GLuint textVAO, textVBO;
@@ -126,7 +128,10 @@ int InitializeEnvironment(void) {
 
     if (CompileShaders()) return SYS_COUNT + 1;
     CacheUniformLocationsForChunkShader();
+    SetupQuad(); // For image blit for post processing effects like lighting.
     SetupTextQuad();
+    InitializeLights();
+    SetupGBuffer();
     Input_Init();
     return 0;
 }
@@ -145,6 +150,11 @@ int ExitCleanup(int status) {
     if (textShaderProgram) glDeleteProgram(textShaderProgram);
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
     if (textVBO) glDeleteBuffers(1, &textVBO);
+    if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
+    
+    if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
+    if (quadVBO) glDeleteBuffers(1, &quadVBO);
+    if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
 
     // Cleanup initialized systems in reverse order.
     // Independent ifs so that we can exit from anywhere and de-init only as needed.

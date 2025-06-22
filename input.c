@@ -17,6 +17,7 @@ float cam_roll = 0.0f;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
+float sprinting = 0.0f;
 
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
@@ -68,6 +69,9 @@ int offsetAmount_TEST = 0;
 
 // Update camera position based on input
 void ProcessInput(void) {
+    if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 1.0f;
+    else sprinting = 0.0f;
+    
     // Extract forward and right vectors from quaternion
     float rotation[16];
     quat_to_matrix(&cam_rotation, rotation);
@@ -93,30 +97,31 @@ void ProcessInput(void) {
         strafe_z /= len;
     }
 
+    float finalMoveSpeed = (move_speed + (sprinting * move_speed));
     if (keys[SDL_SCANCODE_F]) {
-        cam_x += move_speed * facing_x; // Move forward
-        cam_y += move_speed * facing_y;
-        cam_z += move_speed * facing_z;
+        cam_x += finalMoveSpeed * facing_x; // Move forward
+        cam_y += finalMoveSpeed * facing_y;
+        cam_z += finalMoveSpeed * facing_z;
     } else if (keys[SDL_SCANCODE_S]) {
-        cam_x -= move_speed * facing_x; // Move backward
-        cam_y -= move_speed * facing_y;
-        cam_z -= move_speed * facing_z;
+        cam_x -= finalMoveSpeed * facing_x; // Move backward
+        cam_y -= finalMoveSpeed * facing_y;
+        cam_z -= finalMoveSpeed * facing_z;
     }
 
     if (keys[SDL_SCANCODE_A]) {
-        cam_x -= move_speed * strafe_x; // Strafe left
-        cam_y -= move_speed * strafe_y;
-        cam_z -= move_speed * strafe_z;
+        cam_x -= finalMoveSpeed * strafe_x; // Strafe left
+        cam_y -= finalMoveSpeed * strafe_y;
+        cam_z -= finalMoveSpeed * strafe_z;
     } else if (keys[SDL_SCANCODE_D]) {
-        cam_x += move_speed * strafe_x; // Strafe right
-        cam_y += move_speed * strafe_y;
-        cam_z += move_speed * strafe_z;
+        cam_x += finalMoveSpeed * strafe_x; // Strafe right
+        cam_y += finalMoveSpeed * strafe_y;
+        cam_z += finalMoveSpeed * strafe_z;
     }
 
     if (keys[SDL_SCANCODE_V]) {
-        cam_z += move_speed; // Move up
+        cam_z += finalMoveSpeed; // Move up
     } else if (keys[SDL_SCANCODE_C]) {
-        cam_z -= move_speed; // Move down
+        cam_z -= finalMoveSpeed; // Move down
     }
 
     if (keys[SDL_SCANCODE_T]) {

@@ -1,9 +1,19 @@
+// render.c
+// Handles setup of OpenGL rendering related objects, buffers.  Defines calls
+// for all rendering tasks.
+// Render order should be:
+// 1. Clear
+// 2. Render static geometry 
+// 3. Render UI images (TODO)
+// 4. Render UI text (debug only at the moment, e.g. frame stats)
+
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <GL/glew.h>
+#include <stdio.h>
 #include "constants.h"
-#include "shaders.glsl.h"
+#include "text.glsl"
 #include "data_textures.h"
 #include "data_models.h"
 #include "event.h"
@@ -12,9 +22,428 @@
 #include "player.h"
 #include "render.h"
 #include "input.h"
+#include "lights.h"
+
+// ----------------------------------------------------------------------------
+// Generic shader for unlit textured surfaces (all world geometry, items,
+// enemies, doors, etc., without transparency for first pass prior to lighting.
+const char *vertexShaderSource =
+    "#version 450 core\n"
+    "\n"
+    "layout(location = 0) in vec3 aPos;\n"
+    "layout(location = 1) in vec3 aNormal;\n"
+    "layout(location = 2) in vec2 aTexCoord;\n"
+    "uniform int texIndex;\n"
+    "uniform mat4 model;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
+    "out vec3 FragPos;\n"
+    "out vec3 Normal;\n"
+    "out vec2 TexCoord;\n"
+    "flat out int TexIndex;\n"
+    "\n"
+    "void main() {\n"
+    "    FragPos = vec3(model * vec4(aPos, 1.0));\n"
+    "    Normal = mat3(transpose(inverse(model))) * aNormal;\n"
+    "    TexCoord = aTexCoord;\n"
+    "    TexIndex = texIndex;\n"
+    "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
+    "}\n";
+
+const char *fragmentShaderTraditional =
+    "#version 450 core\n"
+    "\n"
+    "in vec2 TexCoord;\n"
+    "flat in int TexIndex;\n"
+    "in vec3 Normal;\n"
+    "\n"
+    "layout(std430, binding = 0) buffer ColorBuffer {\n"
+    "    float colors[];\n" // 1D color array (RGBA)
+    "};\n"
+    "uniform uint textureOffsets[3];\n" // Offsets for each texture
+    "uniform ivec2 textureSizes[3];\n" // Width, height for each texture
+    "\n"
+    "layout(location = 0) out vec4 outAlbedo;\n"
+    "layout(location = 1) out vec4 outNormal;\n"
+    "\n"
+    "void main() {\n"
+    "    ivec2 texSize = textureSizes[TexIndex];\n"
+    "    vec2 uv = clamp(vec2(1.0 - TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V
+    "    int x = int(uv.x * float(texSize.x));\n"
+    "    int y = int(uv.y * float(texSize.y));\n"
+    "    int pixelIndex = int(textureOffsets[TexIndex] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
+    "    outAlbedo = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
+    "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
+    "}\n";
+    
+// ----------------------------------------------------------------------------
+    
+// image blit
+const char *quadVertexShaderSource =
+    "#version 450 core\n"
+    "layout(location = 0) in vec2 aPos;\n"
+    "layout(location = 1) in vec2 aTexCoord;\n"
+    "out vec2 TexCoord;\n"
+    "void main() {\n"
+    "    gl_Position = vec4(aPos, 0.0, 1.0);\n"
+    "    TexCoord = aTexCoord;\n"
+    "}\n";
+
+const char *quadFragmentShaderSource =
+    "#version 450 core\n"
+    "in vec2 TexCoord;\n"
+    "out vec4 FragColor;\n"
+    "uniform sampler2D tex;\n"
+    "void main() {\n"
+    "    FragColor = texture(tex, TexCoord);\n"
+    "}\n";
+    
+// ----------------------------------------------------------------------------
+    
+const char *deferredLighting_computeShader =
+    "#version 450 core\n"
+    "\n"
+    "layout(local_size_x = 8, local_size_y = 8) in;\n"
+    "\n"
+    "layout(rgba8, binding = 0) uniform image2D inputImage;\n"
+    "layout(rgba8, binding = 1) uniform image2D inputNormals;\n"
+    "layout(rgba8, binding = 2) uniform image2D inputDepth;\n"
+    "layout(rgba8, binding = 3) uniform image2D outputImage;\n"
+    "\n"
+    "uniform uint screenWidth;\n"
+    "uniform uint screenHeight;\n"
+    "uniform mat4 invViewProj;\n" // Inverse view-projection matrix to reconstruct world position
+    "\n"
+    "struct LightData {\n"
+    "    vec3 position;\n"
+    "    float intensity;\n"
+    "    float radius;\n"
+    "    float spotAng;\n" // In degrees, 0 for point lights
+    "    vec3 spotDir;\n"
+    "};\n"
+    "layout(std430, binding = 1) buffer LightBuffer {\n"
+    "    LightData lights[];\n"
+    "};\n"
+    "\n"
+    "void main() {\n"
+    "    uvec2 pixel = gl_GlobalInvocationID.xy;\n"
+    "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
+    "\n"
+    "    // Read G-buffer data\n"
+    "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
+    "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
+    "    float depth = imageLoad(inputDepth, ivec2(pixel)).r;\n"
+    "\n"
+    "    // Reconstruct world position from depth\n"
+    "    vec2 uv = vec2(float(pixel.x) / float(screenWidth), float(pixel.y) / float(screenHeight));\n"
+    "    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);\n"
+    "    vec4 worldPos = invViewProj * clipPos;\n"
+    "    worldPos /= worldPos.w;\n"
+    "\n"
+    "    vec3 lighting = vec3(0.0);\n"
+    "    for (int i = 0; i < lights.length(); i++) {\n"
+    "        LightData light = lights[i];\n"
+    "        vec3 toLight = light.position - worldPos.xyz;\n"
+    "        float dist = length(toLight);\n"
+    "\n"
+    "        // Distance attenuation\n"
+    "        if (dist > light.radius) continue;\n"
+    "        float attenuation = 1.0 / (1.0 + 0.1 * dist + 0.01 * dist * dist);\n"
+    "        vec3 lightDir = normalize(toLight);\n"
+    "\n"
+    "        // Spot light check\n"
+    "        float intensity = light.intensity * attenuation;\n"
+    "        if (light.spotAng > 0.0) {\n"
+    "            float cosAngle = dot(lightDir, normalize(-light.spotDir));\n"
+    "            float spotAngleRad = radians(light.spotAng);\n"
+    "            float cosSpotAngle = cos(spotAngleRad);\n"
+    "            if (cosAngle < cosSpotAngle) continue;\n"
+    "            float spotAttenuation = clamp((cosAngle - cosSpotAngle) / (1.0 - cosSpotAngle), 0.0, 1.0);\n"
+    "            intensity *= spotAttenuation;\n"
+    "        }\n"
+    "\n"
+    "        // Diffuse lighting\n"
+    "        float diffuse = max(dot(normal, lightDir), 0.0);\n"
+    "        lighting += color.rgb * diffuse * intensity;\n"
+    "    }\n"
+    "\n"
+    "    // Write to output image\n"
+    "    imageStore(outputImage, ivec2(pixel), vec4(worldPos.xyz / 1300.0, color.a));\n"
+    "}\n";
+    
+// ----------------------------------------------------------------------------
+
+int CompileShaders(void) {
+    // Vertex Shader
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+    GLint success;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        fprintf(stderr, "Vertex Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Fragment Shader
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    const char *fragSource = fragmentShaderTraditional;
+    glShaderSource(fragmentShader, 1, &fragSource, NULL);
+    glCompileShader(fragmentShader);
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        fprintf(stderr, "Fragment Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Shader Program
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glLinkProgram(shaderProgram);
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+    // Text Vertex Shader
+    GLuint textVertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(textVertexShader, 1, &textVertexShaderSource, NULL);
+    glCompileShader(textVertexShader);
+    glGetShaderiv(textVertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(textVertexShader, 512, NULL, infoLog);
+        fprintf(stderr, "Text Vertex Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Text Fragment Shader
+    GLuint textFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(textFragmentShader, 1, &textFragmentShaderSource, NULL);
+    glCompileShader(textFragmentShader);
+    glGetShaderiv(textFragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(textFragmentShader, 512, NULL, infoLog);
+        fprintf(stderr, "Text Fragment Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    // Text Shader Program
+    textShaderProgram = glCreateProgram();
+    glAttachShader(textShaderProgram, textVertexShader);
+    glAttachShader(textShaderProgram, textFragmentShader);
+    glLinkProgram(textShaderProgram);
+    glGetProgramiv(textShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(textShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Text Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    glDeleteShader(textVertexShader);
+    glDeleteShader(textFragmentShader);
+    
+    // Deferred Lighting Compute Shader Program
+    GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(computeShader, 1, &deferredLighting_computeShader, NULL);
+    glCompileShader(computeShader);
+    glGetShaderiv(computeShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(computeShader, 512, NULL, infoLog);
+        fprintf(stderr, "Compute Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    deferredLightingShaderProgram = glCreateProgram();
+    glAttachShader(deferredLightingShaderProgram, computeShader);
+    glLinkProgram(deferredLightingShaderProgram);
+    glGetProgramiv(deferredLightingShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(deferredLightingShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Compute Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+
+    glDeleteShader(computeShader);
+    
+    // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
+    GLuint quadVertexShader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(quadVertexShader, 1, &quadVertexShaderSource, NULL);
+    glCompileShader(quadVertexShader);
+    glGetShaderiv(quadVertexShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(quadVertexShader, 512, NULL, infoLog);
+        fprintf(stderr, "Image Blit Vertex Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+    GLuint quadFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(quadFragmentShader, 1, &quadFragmentShaderSource, NULL);
+    glCompileShader(quadFragmentShader);
+    glGetShaderiv(quadFragmentShader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetShaderInfoLog(quadFragmentShader, 512, NULL, infoLog);
+        fprintf(stderr, "Image Blit Fragment Shader Compilation Failed: %s\n", infoLog);
+        return 1;
+    }
+    imageBlitShaderProgram = glCreateProgram();
+    glAttachShader(imageBlitShaderProgram, quadVertexShader);
+    glAttachShader(imageBlitShaderProgram, quadFragmentShader);
+    glLinkProgram(imageBlitShaderProgram);
+    glGetProgramiv(imageBlitShaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(imageBlitShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Image Blit Shader Program Linking Failed: %s\n", infoLog);
+        return 1;
+    }
+    glDeleteShader(quadVertexShader);
+    glDeleteShader(quadFragmentShader);
+    return 0;
+}
+
+// Image Effect Blit quad
+GLuint quadVAO, quadVBO;
+void SetupQuad(void) {
+    float vertices[] = {
+        -1.0f, -1.0f, 0.0f, 0.0f, // Bottom-left
+        -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
+         1.0f,  1.0f, 1.0f, 1.0f, // Top-right
+         1.0f, -1.0f, 1.0f, 0.0f  // Bottom-right
+    };
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
 
 uint32_t drawCallCount = 0;
 uint32_t vertexCount = 0;
+LightData lights[LIGHT_COUNT];
+GLuint lightBufferID;
+
+// Initialize lights with random positions
+void InitializeLights(void) {
+    srand(time(NULL)); // Seed random number generator
+    for (int i = 0; i < LIGHT_COUNT; i++) {
+        lights[i].position[0] = (float)(rand() % 1024); // [0, 1024]
+        lights[i].position[1] = (float)(rand() % 1024); // [0, 1024]
+        lights[i].position[2] = 1.28f; // Fixed Z height
+        lights[i].intensity = 1.0f; // Default intensity
+        lights[i].radius = 10.0f; // Default radius
+        lights[i].spotAng = 0.0f;//(i % 2 == 0) ? 0.0f : 30.0f; // Half point lights, half spot lights with 30-degree cone
+        lights[i].spotDir[0] = 0.0f;
+        lights[i].spotDir[1] = 0.0f;
+        lights[i].spotDir[2] = -1.0f; // Downward direction for spot lights
+    }
+    
+    lights[0].position[0] = 0.0f;
+    lights[0].position[1] = 0.0f;
+    lights[0].position[2] = 0.0f; // Fixed Z height
+    lights[0].intensity = 5.0f; // Default intensity
+    lights[0].radius = 10.0f; // Default radius
+    lights[0].spotAng = 0;
+    lights[0].spotDir[0] = 0.0f;
+    lights[0].spotDir[1] = 0.0f;
+    lights[0].spotDir[2] = -1.0f; // Downward direction for spot lights
+
+    // Create and bind SSBO
+    glGenBuffers(1, &lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(LightData), lights, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+GLuint inputImageID, inputNormalsID, inputDepthID, outputImageID;
+
+GLuint gBufferFBO;
+
+void SetupGBuffer(void) {
+    printf("SetupGBuffer \n");
+    // Create G-buffer textures
+    glGenTextures(1, &inputImageID);
+    glBindTexture(GL_TEXTURE_2D, inputImageID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glGenTextures(1, &inputNormalsID);
+    glBindTexture(GL_TEXTURE_2D, inputNormalsID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glGenTextures(1, &inputDepthID);
+    glBindTexture(GL_TEXTURE_2D, inputDepthID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, screen_width, screen_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glGenTextures(1, &outputImageID);
+    glBindTexture(GL_TEXTURE_2D, outputImageID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Create framebuffer
+    glGenFramebuffers(1, &gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
+
+    // Specify draw buffers
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
+
+    // Check framebuffer status
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        switch (status) {
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                fprintf(stderr, "Framebuffer incomplete: Attachment issue\n");
+                break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                fprintf(stderr, "Framebuffer incomplete: Missing attachment\n");
+                break;
+            case GL_FRAMEBUFFER_UNSUPPORTED:
+                fprintf(stderr, "Framebuffer incomplete: Unsupported configuration\n");
+                break;
+            default:
+                fprintf(stderr, "Framebuffer incomplete: Error code %d\n", status);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
 
 // Quad for text (2 triangles, positions and tex coords)
 float textQuadVertices[] = {
@@ -44,7 +473,16 @@ void SetupTextQuad(void) {
 }
 
 int ClearFrameBuffers(void) {
+    // Clear the G-buffer FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Set clear color (black, fully opaque)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Clear the default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Ensure consistent clear color
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     return 0;
 }
 
@@ -65,6 +503,14 @@ void CacheUniformLocationsForChunkShader(void) {
 int RenderStaticMeshes(void) {
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
+    
+//     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+//     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+//     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO); // COMMENT OUT 1 Commenting out along with "COMMENT OUT 2 and 3" works to render unlit meshes
+//     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+//     glDrawBuffers(2, drawBuffers);
+    
     glUseProgram(shaderProgram);
 
     // Set up view and projection matrices
@@ -79,7 +525,7 @@ int RenderStaticMeshes(void) {
     glUniform2iv(textureSizesLoc, TEXTURE_COUNT, textureSizes);
     glBindVertexArray(vao);
 
-    // Render each model
+    // Render each model, simple draw calls, no instancing yet
     float model[16];
     int drawCallLimit = 100;
     int currentModelType = 0;
@@ -98,25 +544,46 @@ int RenderStaticMeshes(void) {
         }
     }
 
-//     // Model 1: med1_7.fbx at (2.56f, 1.28f, 0)
-//     mat4_identity(model);
-//     mat4_translate(model, 2.56f, 3.84f, 0.0f);
-//     glUniform1i(texIndexLoc, 1);
-//     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-//     glBindVertexBuffer(0, vbos[1], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-//     glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[1]);
-//     drawCallCount++;
-//     vertexCount += modelVertexCounts[1];
-// 
-//     // Model 2: med1_9.fbx at (-2.56f, 1.28f, 0)
-//     mat4_identity(model);
-//     mat4_translate(model, -2.56f, 3.84f, 0.0f);
-//     glUniform1i(texIndexLoc, 2);
-//     glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
-//     glBindVertexBuffer(0, vbos[2], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-//     glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[2]);
-//     drawCallCount++;
-//     vertexCount += modelVertexCounts[2];
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); // COMMENT OUT 2 Commenting out along with "COMMENT OUT 1 and 3" works to render unlit meshes
+
+    // Apply deferred lighting with compute shader
+    glUseProgram(deferredLightingShaderProgram);
+    GLint screenWidthLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
+    GLint screenHeightLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
+    GLint invViewProjLoc = glGetUniformLocation(deferredLightingShaderProgram, "invViewProj");
+    glUniform1ui(screenWidthLoc, screen_width);
+    glUniform1ui(screenHeightLoc, screen_height);
+
+    // Compute inverse view-projection matrix
+    float viewProj[16], invViewProj[16];
+    mat4_multiply(viewProj, view, projection);
+    mat4_inverse(invViewProj, viewProj);
+    glUniformMatrix4fv(invViewProjLoc, 1, GL_FALSE, invViewProj);
+
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(3, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+
+    // Dispatch compute shader
+    GLuint groupX = (screen_width + 7) / 8;
+    GLuint groupY = (screen_height + 7) / 8;
+    glDispatchCompute(groupX, groupY, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    
+    // Render final gather lighting  // COMMENT OUT 3 Commenting out all lines below except the return 0 along with "COMMENT OUT 1 and 3" works to render unlit meshes
+    glUseProgram(imageBlitShaderProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, inputImageID); // if set to inputImageID is also pure black.
+    glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
+    glBindVertexArray(quadVAO);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glEnable(GL_DEPTH_TEST);
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glUseProgram(0);
     return 0;
 }
 
