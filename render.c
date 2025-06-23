@@ -783,3 +783,16 @@ int RenderUI(double deltaTime) {
     }
     return 0;
 }
+
+// Main render call for entire graphics pipeline.
+int ClientRender() {
+    int exitCode = 0;
+    exitCode = ClearFrameBuffers();
+    if (exitCode) return exitCode;
+    
+    exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
+    if (exitCode) return exitCode;
+
+    exitCode = RenderUI(get_time() - last_time);
+    return exitCode;
+}

@@ -19,6 +19,7 @@
 #include "render.h"
 #include "cli_args.h"
 #include "lights.h"
+#include "network.h"
 
 // Window
 SDL_Window *window;
@@ -126,10 +127,12 @@ int InitializeEnvironment(void) {
     InitializeLights();
     SetupGBuffer();
     Input_Init();
+    InitializeNetworking();
     return 0;
 }
 
 int ExitCleanup(int status) {
+    CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
 
     // OpenGL Cleanup
@@ -332,9 +335,7 @@ int main(int argc, char* argv[]) {
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
         
-        exitCode = ClearFrameBuffers();
-        exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
-        exitCode = RenderUI(get_time() - last_time);
+        exitCode = ClientRender();
         SDL_GL_SwapWindow(window); // Present frame
         last_time = current_time;
         globalFrameNum++;
