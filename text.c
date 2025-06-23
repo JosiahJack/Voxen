@@ -21,6 +21,8 @@ SDL_Color textColors[6] = {
     {255, 127,   0, 255}  // 5 Orange 1f, 0.498f, 0f
 };
 
+char uiTextBuffer[TEXT_BUFFER_SIZE];
+
 // Quad for text (2 triangles, positions and tex coords)
 float textQuadVertices[] = {
     // Positions   // Tex Coords
@@ -135,4 +137,12 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     glUseProgram(0);
     glDeleteTextures(1, &texture);
     SDL_FreeSurface(rgba_surface);
+}
+
+void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
+    va_end(args);
+    RenderText(x, y, uiTextBuffer, color);
 }

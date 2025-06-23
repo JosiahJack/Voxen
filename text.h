@@ -15,8 +15,11 @@ extern GLuint textVAO, textVBO;
 #define TEXT_RED 4
 #define TEXT_ORANGE 5
 
+#define TEXT_BUFFER_SIZE 128
+
 int InitializeTextAndFonts(void);
 void SetupTextQuad(void);
 void RenderText(float x, float y, const char *text, int colorIdx);
+void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...);
 
 #endif // VOXEN_TEXT_H

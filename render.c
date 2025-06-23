@@ -324,8 +324,8 @@ int RenderStaticMeshes(void) {
     int drawCallLimit = 50;
     int currentModelType = 0;
     int loopIter = 0;
-    for (int yarray=0;yarray<drawCallLimit;yarray++) {
-        for (int xarray=0;xarray<drawCallLimit;xarray++) {
+    for (int yarray=0;yarray<drawCallLimit;yarray+=2) {
+        for (int xarray=0;xarray<drawCallLimit;xarray+=2) {
             mat4_identity(model);
             mat4_translate(model,(float)xarray * 2.56f, (float)yarray * 2.56f, 0.0f);
             glUniform1i(texIndexLoc, currentModelType);
@@ -336,8 +336,10 @@ int RenderStaticMeshes(void) {
             vertexCount += modelVertexCounts[0];
             loopIter++;
             
-            if (yarray > 25 || xarray % 4 == 0) currentModelType = 1;
-            else currentModelType = 0;
+            if (xarray % 4 == 0) {
+                currentModelType++;
+                if (currentModelType >= MODEL_COUNT) currentModelType = 0;
+            }
         }
     }
 
@@ -395,41 +397,23 @@ int RenderUI(double deltaTime) {
     glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil each frame TODO: Ok to do in ClearFrameBuffers()??
     glDisable(GL_LIGHTING); // Disable lighting for text
 
-    // Draw debug text
-    char text1[128];
-    snprintf(text1, sizeof(text1), "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
-    RenderText(10, 25, text1, TEXT_YELLOW); // Top-left corner (10, 10)
-
     float cam_quat_yaw = 0.0f;
     float cam_quat_pitch = 0.0f;
     float cam_quat_roll = 0.0f;
     quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
-    char text2[128];
-    snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-    RenderText(10, 40, text2, TEXT_WHITE);
-
-    char text3[128];
-    snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
-    RenderText(10, 55, text3, TEXT_WHITE);
-
-    char text4[128];
-    snprintf(text4, sizeof(text4), "Peak frame queue count: %.2d", maxEventCount_debug);
-    RenderText(10, 70, text4, TEXT_RED);
     
-    char text5[128];
-    snprintf(text5, sizeof(text5), "testLight_spotAng: %.4f", testLight_spotAng);
-    RenderText(10, 95, text5, TEXT_ORANGE);
-    
-    char text6[128];
-    snprintf(text6, sizeof(text6), "testLight_intensity: %.4f", testLight_intensity);
-    RenderText(10, 110, text6, TEXT_DARK_YELLOW);
+    RenderFormattedText(10, 25, TEXT_YELLOW, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+    RenderFormattedText(10, 40, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+    RenderFormattedText(10, 55, TEXT_WHITE, "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
+    RenderFormattedText(10, 70, TEXT_RED, "Peak frame queue count: %d", maxEventCount_debug);
+    RenderFormattedText(10, 95, TEXT_ORANGE, "testLight_spotAng: %.4f", testLight_spotAng);
+    RenderFormattedText(10, 110, TEXT_DARK_YELLOW, "testLight_intensity: %.4f", testLight_intensity);
     
     // Frame stats
     drawCallCount++; // Add one more for this text render ;)
-    char text0[256];
-    snprintf(text0, sizeof(text0), "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d", deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
-    RenderText(10, 10, text0, TEXT_GREEN); // Top-left corner (10, 10)
-
+    RenderFormattedText(10, 10, TEXT_GREEN, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d",
+                        deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
+    
     double time_now = get_time();
     if ((time_now - lastFrameSecCountTime) >= 1.00) {
         lastFrameSecCountTime = time_now;
