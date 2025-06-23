@@ -322,7 +322,7 @@ int RenderStaticMeshes(void) {
     // Render each model, simple draw calls, no instancing yet
     float model[16];
     int drawCallLimit = 50;
-    int currentModelType = 1;
+    int currentModelType = 0;
     int loopIter = 0;
     for (int yarray=0;yarray<drawCallLimit;yarray++) {
         for (int xarray=0;xarray<drawCallLimit;xarray++) {
@@ -335,6 +335,9 @@ int RenderStaticMeshes(void) {
             drawCallCount++;
             vertexCount += modelVertexCounts[0];
             loopIter++;
+            
+            if (yarray > 25 || xarray % 4 == 0) currentModelType = 1;
+            else currentModelType = 0;
         }
     }
 
@@ -380,88 +383,6 @@ int RenderStaticMeshes(void) {
     return 0;
 }
 
-// Renders text at x,y coordinates specified using pointer to the string array.
-void render_debug_text(float x, float y, const char *text, SDL_Color color) {
-    if (!font) { fprintf(stderr, "Font is NULL\n"); return; }
-    if (!text) { fprintf(stderr, "Text is NULL\n"); return; }
-    
-    SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
-    if (!surface) { fprintf(stderr, "TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
-    
-    SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface(surface);
-    if (!rgba_surface) { fprintf(stderr, "SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
-
-    // Create and bind texture
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba_surface->w, rgba_surface->h, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    // Use text shader
-    glUseProgram(textShaderProgram);
-
-    // Set up orthographic projection
-    float projection[16];
-    mat4_ortho(projection, 0.0f, (float)screen_width, (float)screen_height, 0.0f, -1.0f, 1.0f);
-    GLint projLoc = glGetUniformLocation(textShaderProgram, "projection");
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
-
-    // Set text color (convert SDL_Color to 0-1 range)
-    float r = color.r / 255.0f;
-    float g = color.g / 255.0f;
-    float b = color.b / 255.0f;
-    float a = color.a / 255.0f;
-    GLint colorLoc = glGetUniformLocation(textShaderProgram, "textColor");
-    glUniform4f(colorLoc, r, g, b, a);
-
-    // Bind texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    GLint texLoc = glGetUniformLocation(textShaderProgram, "textTexture");
-    glUniform1i(texLoc, 0);
-    
-    float scaleX = (float)rgba_surface->w;
-    float scaleY = (float)rgba_surface->h;
-    GLint texelSizeLoc = glGetUniformLocation(textShaderProgram, "texelSize");
-    glUniform2f(texelSizeLoc, 1.0f / scaleX, 1.0f / scaleY);
-
-    // Enable blending for text transparency
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST); // Disable depth test for 2D overlay
-
-    // Bind VAO and adjust quad position/size
-    glBindVertexArray(textVAO);
-    float vertices[] = {
-        x,          y,          0.0f, 0.0f, // Bottom-left
-        x + scaleX, y,          1.0f, 0.0f, // Bottom-right
-        x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
-        x,          y + scaleY, 0.0f, 1.0f  // Top-left
-    };
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-    // Render quad (two triangles)
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    drawCallCount++;
-    vertexCount+=4*128;
-
-    // Cleanup
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST); // Re-enable depth test for 3D rendering
-    glUseProgram(0);
-    glDeleteTextures(1, &texture);
-    SDL_FreeSurface(rgba_surface);
-}
-
 double lastFrameSecCountTime = 0.00;
 uint32_t lastFrameSecCount = 0;
 uint32_t framesPerLastSecond = 0;
@@ -473,14 +394,11 @@ int RenderUI(double deltaTime) {
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); // Replace stencil value
     glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil each frame TODO: Ok to do in ClearFrameBuffers()??
     glDisable(GL_LIGHTING); // Disable lighting for text
-    SDL_Color textCol = {255, 255, 255, 255}; // White
-    SDL_Color textColRed = {255, 0, 0, 255};
-    SDL_Color textColGreen = {20, 255, 30, 255};
 
     // Draw debug text
     char text1[128];
     snprintf(text1, sizeof(text1), "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
-    render_debug_text(10, 25, text1, textCol); // Top-left corner (10, 10)
+    RenderText(10, 25, text1, TEXT_YELLOW); // Top-left corner (10, 10)
 
     float cam_quat_yaw = 0.0f;
     float cam_quat_pitch = 0.0f;
@@ -488,29 +406,30 @@ int RenderUI(double deltaTime) {
     quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
     char text2[128];
     snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-    render_debug_text(10, 40, text2, textCol);
+    RenderText(10, 40, text2, TEXT_WHITE);
 
     char text3[128];
     snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
-    render_debug_text(10, 55, text3, textCol);
+    RenderText(10, 55, text3, TEXT_WHITE);
 
     char text4[128];
     snprintf(text4, sizeof(text4), "Peak frame queue count: %.2d", maxEventCount_debug);
-    render_debug_text(10, 70, text4, textColRed);
+    RenderText(10, 70, text4, TEXT_RED);
     
     char text5[128];
     snprintf(text5, sizeof(text5), "testLight_spotAng: %.4f", testLight_spotAng);
-    render_debug_text(10, 95, text5, textCol);
+    RenderText(10, 95, text5, TEXT_ORANGE);
     
     char text6[128];
     snprintf(text6, sizeof(text6), "testLight_intensity: %.4f", testLight_intensity);
-    render_debug_text(10, 110, text6, textCol);
+    RenderText(10, 110, text6, TEXT_DARK_YELLOW);
     
     // Frame stats
     drawCallCount++; // Add one more for this text render ;)
     char text0[256];
     snprintf(text0, sizeof(text0), "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d", deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
-    render_debug_text(10, 10, text0, textColGreen); // Top-left corner (10, 10)
+    RenderText(10, 10, text0, TEXT_GREEN); // Top-left corner (10, 10)
+
     double time_now = get_time();
     if ((time_now - lastFrameSecCountTime) >= 1.00) {
         lastFrameSecCountTime = time_now;
