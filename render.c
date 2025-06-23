@@ -425,6 +425,11 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
     glBindTexture(GL_TEXTURE_2D, texture);
     GLint texLoc = glGetUniformLocation(textShaderProgram, "textTexture");
     glUniform1i(texLoc, 0);
+    
+    float scaleX = (float)rgba_surface->w;
+    float scaleY = (float)rgba_surface->h;
+    GLint texelSizeLoc = glGetUniformLocation(textShaderProgram, "texelSize");
+    glUniform2f(texelSizeLoc, 1.0f / scaleX, 1.0f / scaleY);
 
     // Enable blending for text transparency
     glEnable(GL_BLEND);
@@ -433,8 +438,6 @@ void render_debug_text(float x, float y, const char *text, SDL_Color color) {
 
     // Bind VAO and adjust quad position/size
     glBindVertexArray(textVAO);
-    float scaleX = (float)rgba_surface->w;
-    float scaleY = (float)rgba_surface->h;
     float vertices[] = {
         x,          y,          0.0f, 0.0f, // Bottom-left
         x + scaleX, y,          1.0f, 0.0f, // Bottom-right
