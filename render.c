@@ -119,6 +119,7 @@ const char *deferredLighting_computeShader =
     "\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
+    "uniform int lightDataSize;\n"
     "\n"
     "layout(std430, binding = 5) buffer LightBuffer {\n"
     "    float lights[];\n"
@@ -135,7 +136,12 @@ const char *deferredLighting_computeShader =
     "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
     "\n"
     "    vec3 lighting = vec3(0.0);\n"
-    "    for (int i = 0; i < 16; i+=12) {\n"
+    "    int lightStride = lightDataSize > 0 && lightDataSize < 13 ? lightDataSize : 12;\n"
+//     "    int lightStride = lightDataSize;\n" // This on its own locks up program
+    "    for (int i = 0; i < lights.length(); i+=lightStride) {\n"
+    "        float intensity =    lights[i + 3];\n"
+    "        if (intensity < 0.015f) continue;\n" // LightAnimation has minIntensity of 0.01f
+    "\n"
     "        float range =        lights[i + 4];\n"
     "        vec3 lightPos = vec3(lights[i + 0],\n"  // posx
     "                             lights[i + 1],\n"  // posy
@@ -146,7 +152,6 @@ const char *deferredLighting_computeShader =
     "\n"
     "        vec3 lightDir = normalize(toLight);\n"
     "\n"
-    "        float intensity =    lights[i + 3];\n"
     "        float spotAng =      lights[i + 5];\n"
     "        vec3 spotDir =  vec3(lights[i + 6],\n"  // spotDirx
     "                             lights[i + 7],\n"  // spotDiry
@@ -157,7 +162,7 @@ const char *deferredLighting_computeShader =
     "\n"
     "        float spotFalloff = 1.0;\n"
     "        if (spotAng > 0.0) {\n"
-    "            float spotdot = dot(spotDir,lightDir);\n"
+    "            float spotdot = dot(spotDir,-lightDir);\n"
     "            float cosAngle = cos(radians(spotAng / 2.0));  // Convert half-angle to radians and get cosine\n"
     "            if (spotdot < cosAngle) continue;\n"
     "\n"
@@ -463,31 +468,44 @@ GLuint lightBufferID;
 void InitializeLights(void) {
     srand(time(NULL)); // Seed random number generator
     for (int i = 0; i < LIGHT_COUNT; i++) {
-        lights[i + 0] = (float)(rand() % 1024); // posx
-        lights[i + 1] = (float)(rand() % 1024); // posy
-        lights[i + 2] = 1.28f; // posz
-        lights[i + 3] = 1.0f; // intensity
-        lights[i + 4] = 10.24f; // radius
-        lights[i + 5] = 0.0f; // spotAng
-        lights[i + 6] = 0.0f; // spotDirx
-        lights[i + 7] = 0.0f; // spotDiry
-        lights[i + 8] = -1.0f; // spotDirz.  Downward direction for spot lights
-        lights[i + 9] = 1.0f; // r
-        lights[i +10] = 1.0f; // g
-        lights[i +11] = 1.0f; // b
+        int base = i * LIGHT_DATA_SIZE; // Step by 12
+        lights[base + 0] = base * 0.08f; // posx
+        lights[base + 1] = base * 0.08f; // posy
+        lights[base + 2] = 0.0f; // posz
+        lights[base + 3] = base > 12 * 256 ? 0.0f : 2.0f; // intensity
+        lights[base + 4] = 5.24f; // radius
+        lights[base + 5] = 0.0f; // spotAng
+        lights[base + 6] = 0.0f; // spotDirx
+        lights[base + 7] = 0.0f; // spotDiry
+        lights[base + 8] = -1.0f; // spotDirz
+        lights[base + 9] = 1.0f; // r
+        lights[base + 10] = 1.0f; // g
+        lights[base + 11] = 1.0f; // b
     }
     
     lights[0] = 10.24f;
     lights[1] = 0.0f;
     lights[2] = 0.0f; // Fixed Z height
-    lights[3] = 4.0f; // Default intensity
-    lights[4] = 2.56f; // Default radius
+    lights[3] = 2.0f; // Default intensity
+    lights[4] = 10.0f; // Default radius
     lights[6] = 0.0f;
     lights[7] = 0.0f;
     lights[8] = -1.0f;
     lights[9] = 1.0f;
     lights[10] = 1.0f;
     lights[11] = 1.0f;
+    
+    lights[0 + 12] = 10.24f;
+    lights[1 + 12] = 0.0f;
+    lights[2 + 12] = 0.0f; // Fixed Z height
+    lights[3 + 12] = 2.0f; // Default intensity
+    lights[4 + 12] = 10.0f; // Default radius
+    lights[6 + 12] = 0.0f;
+    lights[7 + 12] = 0.0f;
+    lights[8 + 12] = -1.0f;
+    lights[9 + 12] = 1.0f;
+    lights[10 + 12] = 0.0f;
+    lights[11 + 12] = 0.0f;
 
     // Create and bind SSBO
     glGenBuffers(1, &lightBufferID);
@@ -584,8 +602,8 @@ int RenderStaticMeshes(void) {
 
     // Render each model, simple draw calls, no instancing yet
     float model[16];
-    int drawCallLimit = 100;
-    int currentModelType = 0;
+    int drawCallLimit = 50;
+    int currentModelType = 1;
     int loopIter = 0;
     for (int yarray=0;yarray<drawCallLimit;yarray++) {
         for (int xarray=0;xarray<drawCallLimit;xarray++) {
@@ -607,8 +625,10 @@ int RenderStaticMeshes(void) {
     glUseProgram(deferredLightingShaderProgram);
     GLint screenWidthLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     GLint screenHeightLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
+    GLint lightDataSizeLoc = glGetUniformLocation(deferredLightingShaderProgram, "lightDataSize");
     glUniform1ui(screenWidthLoc, screen_width);
     glUniform1ui(screenHeightLoc, screen_height);
+    glUniform1ui(lightDataSizeLoc, LIGHT_DATA_SIZE);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);

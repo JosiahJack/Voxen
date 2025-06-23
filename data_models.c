@@ -22,7 +22,8 @@ uint32_t totalVertexCount = 0;
 
 int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]) {
     for (int i = 0; i < MODEL_COUNT; i++) {
-        const struct aiScene *scene = aiImportFile(modelPaths[i],aiProcess_FindInvalidData
+        const struct aiScene *scene = aiImportFile(modelPaths[i],
+                                                    aiProcess_FindInvalidData
                                                     | aiProcess_Triangulate
                                                     | aiProcess_GenNormals
                                                     | aiProcess_ImproveCacheLocality

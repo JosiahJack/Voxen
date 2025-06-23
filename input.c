@@ -20,13 +20,10 @@ bool in_cyberspace = true;
 float sprinting = 0.0f;
 
 float testLight_x = 10.24f;
-float testLight_y = 0.0f;
+float testLight_y = 10.24f;
 float testLight_z = 0.0f;
 float testLight_intensity = 2.0f;
 float testLight_range = 10.0f;
-float testLight_r = 1.0f;
-float testLight_g = 1.0f;
-float testLight_b = 1.0f;
 float testLight_spotAng = 0.0f;
 
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
