@@ -186,9 +186,6 @@ int EventExecute(Event* event) {
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
-        case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers();
-        case EV_RENDER_STATICS: return RenderStaticMeshes();
-        case EV_RENDER_UI: return RenderUI(get_time() - last_time);
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return SetupGeometry();
         case EV_QUIT: return 1; break;
@@ -288,11 +285,6 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-
-            // Enqueue render events in pipeline order
-            EnqueueEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
-            EnqueueEvent_Simple(EV_RENDER_STATICS); // FIRST FOR RESETTING DRAW CALL COUNTER!
-            EnqueueEvent_Simple(EV_RENDER_UI);
         } else {
             // Log playback controls (pause, fast forward, rewind, quit playback)
             SDL_Event event;
@@ -339,7 +331,10 @@ int main(int argc, char* argv[]) {
 
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
-
+        
+        exitCode = ClearFrameBuffers();
+        exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
+        exitCode = RenderUI(get_time() - last_time);
         SDL_GL_SwapWindow(window); // Present frame
         last_time = current_time;
         globalFrameNum++;

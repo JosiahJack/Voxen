@@ -7,11 +7,6 @@
 // Event types for debugging and playback callbacks
 #define EV_NULL 0u
 #define EV_INIT 1u
-#define EV_CLEAR_FRAME_BUFFERS 2u
-#define EV_RENDER_UI 3u
-#define EV_RENDER_STATICS 4u
-#define EV_RENDER_DYNAMICS 5u
-#define EV_RENDER_TRANSPARENTS 6u
 
 #define EV_KEYDOWN 10u
 #define EV_KEYUP 11u
