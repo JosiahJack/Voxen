@@ -24,6 +24,9 @@
 #include "input.h"
 #include "lights.h"
 
+uint32_t drawCallCount = 0;
+uint32_t vertexCount = 0;
+
 // ----------------------------------------------------------------------------
 // Generic shader for unlit textured surfaces (all world geometry, items,
 // enemies, doors, etc., without transparency for first pass prior to lighting.
@@ -56,6 +59,7 @@ const char *fragmentShaderTraditional =
     "in vec2 TexCoord;\n"
     "flat in int TexIndex;\n"
     "in vec3 Normal;\n"
+    "in vec3 FragPos;\n"
     "\n"
     "layout(std430, binding = 0) buffer ColorBuffer {\n"
     "    float colors[];\n" // 1D color array (RGBA)
@@ -65,6 +69,7 @@ const char *fragmentShaderTraditional =
     "\n"
     "layout(location = 0) out vec4 outAlbedo;\n"
     "layout(location = 1) out vec4 outNormal;\n"
+    "layout(location = 2) out vec4 outWorldPos;\n"
     "\n"
     "void main() {\n"
     "    ivec2 texSize = textureSizes[TexIndex];\n"
@@ -74,6 +79,7 @@ const char *fragmentShaderTraditional =
     "    int pixelIndex = int(textureOffsets[TexIndex] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
     "    outAlbedo = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
     "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
+    "    outWorldPos = vec4(FragPos, 1.0);\n"
     "}\n";
     
 // ----------------------------------------------------------------------------
@@ -97,7 +103,7 @@ const char *quadFragmentShaderSource =
     "void main() {\n"
     "    FragColor = texture(tex, TexCoord);\n"
     "}\n";
-    
+
 // ----------------------------------------------------------------------------
     
 const char *deferredLighting_computeShader =
@@ -106,23 +112,16 @@ const char *deferredLighting_computeShader =
     "layout(local_size_x = 8, local_size_y = 8) in;\n"
     "\n"
     "layout(rgba8, binding = 0) uniform image2D inputImage;\n"
-    "layout(rgba8, binding = 1) uniform image2D inputNormals;\n"
-    "layout(rgba8, binding = 2) uniform image2D inputDepth;\n"
-    "layout(rgba8, binding = 3) uniform image2D outputImage;\n"
+    "layout(rgba16f, binding = 1) uniform image2D inputNormals;\n"
+    "layout(r32f, binding = 2) uniform image2D inputDepth;\n"
+    "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
+    "layout(rgba8, binding = 4) uniform image2D outputImage;\n"
     "\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-    "uniform mat4 invViewProj;\n" // Inverse view-projection matrix to reconstruct world position
     "\n"
-    "struct LightData {\n"
-    "    vec3 position;\n"
-    "    float intensity;\n"
-    "    float radius;\n"
-    "    float spotAng;\n" // In degrees, 0 for point lights
-    "    vec3 spotDir;\n"
-    "};\n"
-    "layout(std430, binding = 1) buffer LightBuffer {\n"
-    "    LightData lights[];\n"
+    "layout(std430, binding = 5) buffer LightBuffer {\n"
+    "    float lights[];\n"
     "};\n"
     "\n"
     "void main() {\n"
@@ -133,48 +132,72 @@ const char *deferredLighting_computeShader =
     "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
     "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
     "    float depth = imageLoad(inputDepth, ivec2(pixel)).r;\n"
-    "\n"
-    "    // Reconstruct world position from depth\n"
-    "    vec2 uv = vec2(float(pixel.x) / float(screenWidth), float(pixel.y) / float(screenHeight));\n"
-    "    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);\n"
-    "    vec4 worldPos = invViewProj * clipPos;\n"
-    "    worldPos /= worldPos.w;\n"
+    "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
     "\n"
     "    vec3 lighting = vec3(0.0);\n"
-    "    for (int i = 0; i < lights.length(); i++) {\n"
-    "        LightData light = lights[i];\n"
-    "        vec3 toLight = light.position - worldPos.xyz;\n"
-    "        float dist = length(toLight);\n"
+    "    for (int i = 0; i < 16; i+=12) {\n"
+    "        float range =        lights[i + 4];\n"
+    "        vec3 lightPos = vec3(lights[i + 0],\n"  // posx
+    "                             lights[i + 1],\n"  // posy
+    "                             lights[i + 2]);\n" // posz
+    "        vec3 toLight = lightPos - worldPos;\n"
+    "        float dist = length(toLight);\n"    
+    "        if (dist > range) continue;\n"
     "\n"
-    "        // Distance attenuation\n"
-    "        if (dist > light.radius) continue;\n"
-    "        float attenuation = 1.0 / (1.0 + 0.1 * dist + 0.01 * dist * dist);\n"
     "        vec3 lightDir = normalize(toLight);\n"
     "\n"
-    "        // Spot light check\n"
-    "        float intensity = light.intensity * attenuation;\n"
-    "        if (light.spotAng > 0.0) {\n"
-    "            float cosAngle = dot(lightDir, normalize(-light.spotDir));\n"
-    "            float spotAngleRad = radians(light.spotAng);\n"
-    "            float cosSpotAngle = cos(spotAngleRad);\n"
-    "            if (cosAngle < cosSpotAngle) continue;\n"
-    "            float spotAttenuation = clamp((cosAngle - cosSpotAngle) / (1.0 - cosSpotAngle), 0.0, 1.0);\n"
-    "            intensity *= spotAttenuation;\n"
+    "        float intensity =    lights[i + 3];\n"
+    "        float spotAng =      lights[i + 5];\n"
+    "        vec3 spotDir =  vec3(lights[i + 6],\n"  // spotDirx
+    "                             lights[i + 7],\n"  // spotDiry
+    "                             lights[i + 8]);\n" // spotDirz
+    "        vec3 lightColor = vec3(lights[i + 9],\n"  // r
+    "                               lights[i +10],\n"  // g
+    "                               lights[i +11]);\n" // b
+    "\n"
+    "        float spotFalloff = 1.0;\n"
+    "        if (spotAng > 0.0) {\n"
+    "            float spotdot = dot(spotDir,lightDir);\n"
+    "            float cosAngle = cos(radians(spotAng / 2.0));  // Convert half-angle to radians and get cosine\n"
+    "            if (spotdot < cosAngle) continue;\n"
+    "\n"
+    "            float cosOuterAngle = cos(radians(spotAng / 2.0));  // Outer angle in radians\n"
+    "            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));  // Inner angle for full brightness (80% of outer angle)\n"
+    "            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);\n"
+    "            if (spotFalloff <= 0.0) continue;  // Outside the cone completely\n"
     "        }\n"
     "\n"
-    "        // Diffuse lighting\n"
-    "        float diffuse = max(dot(normal, lightDir), 0.0);\n"
-    "        lighting += color.rgb * diffuse * intensity;\n"
+            // Shadows here (taken from RayTracer.shader from separate project
+//             Ray ray;
+//             ray.origin = pos;
+//             ray.dir = normalize(lit.position - pos);
+//             if (shadowsEnabled > 0 && lit.range > 1.5 && lit.intensity > 0.5) {
+//                 ModelHitInfo hitInfo = CalculateRayCollision(ray); // Light to point check (aka SHADOWS!)
+//                 float shaddist = length(hitInfo.hitPoint - ray.origin);
+//                 if (hitInfo.didHit && shaddist < distance && shaddist > 0.001) continue;
+//             }
+    "\n"
+    "        float attenuation = (1.0 - (dist / range)) * max(dot(normal,lightDir),0.0);\n"
+    "\n"
+    "        float redFinal = color.r * intensity * attenuation * lightColor.r * spotFalloff;\n"
+    "        float greenFinal = color.g * intensity * attenuation * lightColor.g * spotFalloff;\n"
+    "        float blueFinal = color.b * intensity * attenuation * lightColor.b * spotFalloff;\n"
+    "        lighting.r += redFinal;\n"
+    "        lighting.g += greenFinal;\n"
+    "        lighting.b += blueFinal;\n"
     "    }\n"
     "\n"
     "    // Write to output image\n"
-    "    imageStore(outputImage, ivec2(pixel), vec4(worldPos.xyz / 1300.0, color.a));\n"
+    "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n" // Output world pos directly to debug.
     "}\n";
     
 // ----------------------------------------------------------------------------
 
 int CompileShaders(void) {
-    // Vertex Shader
+    // ------------------------------
+    // Chunk Shader
+    
+    // Vertex Subshader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
@@ -187,7 +210,7 @@ int CompileShaders(void) {
         return 1;
     }
 
-    // Fragment Shader
+    // Fragment Subshader
     GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     const char *fragSource = fragmentShaderTraditional;
     glShaderSource(fragmentShader, 1, &fragSource, NULL);
@@ -201,22 +224,25 @@ int CompileShaders(void) {
     }
 
     // Shader Program
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    chunkShaderProgram = glCreateProgram();
+    glAttachShader(chunkShaderProgram, vertexShader);
+    glAttachShader(chunkShaderProgram, fragmentShader);
+    glLinkProgram(chunkShaderProgram);
+    glGetProgramiv(chunkShaderProgram, GL_LINK_STATUS, &success);
     if (!success) {
         char infoLog[512];
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Shader Program Linking Failed: %s\n", infoLog);
+        glGetProgramInfoLog(chunkShaderProgram, 512, NULL, infoLog);
+        fprintf(stderr, "Chunk Shader Program Linking Failed: %s\n", infoLog);
         return 1;
     }
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
 
-    // Text Vertex Shader
+    // ------------------------------
+    // Text Shader
+    
+    // Text Vertex Subshader
     GLuint textVertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(textVertexShader, 1, &textVertexShaderSource, NULL);
     glCompileShader(textVertexShader);
@@ -228,7 +254,7 @@ int CompileShaders(void) {
         return 1;
     }
 
-    // Text Fragment Shader
+    // Text Fragment Subshader
     GLuint textFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(textFragmentShader, 1, &textFragmentShaderSource, NULL);
     glCompileShader(textFragmentShader);
@@ -255,7 +281,8 @@ int CompileShaders(void) {
 
     glDeleteShader(textVertexShader);
     glDeleteShader(textFragmentShader);
-    
+
+    // ------------------------------  
     // Deferred Lighting Compute Shader Program
     GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
     glShaderSource(computeShader, 1, &deferredLighting_computeShader, NULL);
@@ -281,7 +308,10 @@ int CompileShaders(void) {
 
     glDeleteShader(computeShader);
     
+    // ------------------------------  
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
+    
+    // Full Screen Quad Vertex Subshader
     GLuint quadVertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(quadVertexShader, 1, &quadVertexShaderSource, NULL);
     glCompileShader(quadVertexShader);
@@ -292,6 +322,8 @@ int CompileShaders(void) {
         fprintf(stderr, "Image Blit Vertex Shader Compilation Failed: %s\n", infoLog);
         return 1;
     }
+
+    // Full Screen Quad Fragment Subshader
     GLuint quadFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(quadFragmentShader, 1, &quadFragmentShaderSource, NULL);
     glCompileShader(quadFragmentShader);
@@ -302,6 +334,7 @@ int CompileShaders(void) {
         fprintf(stderr, "Image Blit Fragment Shader Compilation Failed: %s\n", infoLog);
         return 1;
     }
+    
     imageBlitShaderProgram = glCreateProgram();
     glAttachShader(imageBlitShaderProgram, quadVertexShader);
     glAttachShader(imageBlitShaderProgram, quadFragmentShader);
@@ -313,74 +346,17 @@ int CompileShaders(void) {
         fprintf(stderr, "Image Blit Shader Program Linking Failed: %s\n", infoLog);
         return 1;
     }
+    
     glDeleteShader(quadVertexShader);
     glDeleteShader(quadFragmentShader);
+
+    // ------------------------------  
+
     return 0;
 }
 
-// Image Effect Blit quad
-GLuint quadVAO, quadVBO;
-void SetupQuad(void) {
-    float vertices[] = {
-        -1.0f, -1.0f, 0.0f, 0.0f, // Bottom-left
-        -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
-         1.0f,  1.0f, 1.0f, 1.0f, // Top-right
-         1.0f, -1.0f, 1.0f, 0.0f  // Bottom-right
-    };
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-uint32_t drawCallCount = 0;
-uint32_t vertexCount = 0;
-LightData lights[LIGHT_COUNT];
-GLuint lightBufferID;
-
-// Initialize lights with random positions
-void InitializeLights(void) {
-    srand(time(NULL)); // Seed random number generator
-    for (int i = 0; i < LIGHT_COUNT; i++) {
-        lights[i].position[0] = (float)(rand() % 1024); // [0, 1024]
-        lights[i].position[1] = (float)(rand() % 1024); // [0, 1024]
-        lights[i].position[2] = 1.28f; // Fixed Z height
-        lights[i].intensity = 1.0f; // Default intensity
-        lights[i].radius = 10.0f; // Default radius
-        lights[i].spotAng = 0.0f;//(i % 2 == 0) ? 0.0f : 30.0f; // Half point lights, half spot lights with 30-degree cone
-        lights[i].spotDir[0] = 0.0f;
-        lights[i].spotDir[1] = 0.0f;
-        lights[i].spotDir[2] = -1.0f; // Downward direction for spot lights
-    }
-    
-    lights[0].position[0] = 0.0f;
-    lights[0].position[1] = 0.0f;
-    lights[0].position[2] = 0.0f; // Fixed Z height
-    lights[0].intensity = 5.0f; // Default intensity
-    lights[0].radius = 10.0f; // Default radius
-    lights[0].spotAng = 0;
-    lights[0].spotDir[0] = 0.0f;
-    lights[0].spotDir[1] = 0.0f;
-    lights[0].spotDir[2] = -1.0f; // Downward direction for spot lights
-
-    // Create and bind SSBO
-    glGenBuffers(1, &lightBufferID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(LightData), lights, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, lightBufferID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-}
-
-GLuint inputImageID, inputNormalsID, inputDepthID, outputImageID;
-
-GLuint gBufferFBO;
+GLuint chunkShaderProgram;
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, outputImageID, gBufferFBO;
 
 void SetupGBuffer(void) {
     printf("SetupGBuffer \n");
@@ -393,13 +369,20 @@ void SetupGBuffer(void) {
 
     glGenTextures(1, &inputNormalsID);
     glBindTexture(GL_TEXTURE_2D, inputNormalsID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     glGenTextures(1, &inputDepthID);
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, screen_width, screen_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    
+    // GL_RGBA32F for higher precision worldPos for lighting.
+    glGenTextures(1, &inputWorldPosID);
+    glBindTexture(GL_TEXTURE_2D, inputWorldPosID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -416,11 +399,15 @@ void SetupGBuffer(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
 
     // Specify draw buffers
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0,
+                             GL_COLOR_ATTACHMENT1,
+                             GL_COLOR_ATTACHMENT2 };
+                             
+    glDrawBuffers(3, drawBuffers);
 
     // Check framebuffer status
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -444,6 +431,75 @@ void SetupGBuffer(void) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+
+// Image Effect Blit quad
+GLuint imageBlitShaderProgram;
+GLuint quadVAO, quadVBO;
+void SetupQuad(void) {
+    float vertices[] = {
+        -1.0f, -1.0f, 0.0f, 0.0f, // Bottom-left
+        -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
+         1.0f,  1.0f, 1.0f, 1.0f, // Top-right
+         1.0f, -1.0f, 1.0f, 0.0f  // Bottom-right
+    };
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+GLuint deferredLightingShaderProgram;
+float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+GLuint lightBufferID;
+
+// Initialize lights with random positions
+void InitializeLights(void) {
+    srand(time(NULL)); // Seed random number generator
+    for (int i = 0; i < LIGHT_COUNT; i++) {
+        lights[i + 0] = (float)(rand() % 1024); // posx
+        lights[i + 1] = (float)(rand() % 1024); // posy
+        lights[i + 2] = 1.28f; // posz
+        lights[i + 3] = 1.0f; // intensity
+        lights[i + 4] = 10.24f; // radius
+        lights[i + 5] = 0.0f; // spotAng
+        lights[i + 6] = 0.0f; // spotDirx
+        lights[i + 7] = 0.0f; // spotDiry
+        lights[i + 8] = -1.0f; // spotDirz.  Downward direction for spot lights
+        lights[i + 9] = 1.0f; // r
+        lights[i +10] = 1.0f; // g
+        lights[i +11] = 1.0f; // b
+    }
+    
+    lights[0] = 10.24f;
+    lights[1] = 0.0f;
+    lights[2] = 0.0f; // Fixed Z height
+    lights[3] = 4.0f; // Default intensity
+    lights[4] = 2.56f; // Default radius
+    lights[6] = 0.0f;
+    lights[7] = 0.0f;
+    lights[8] = -1.0f;
+    lights[9] = 1.0f;
+    lights[10] = 1.0f;
+    lights[11] = 1.0f;
+
+    // Create and bind SSBO
+    glGenBuffers(1, &lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+}
+
+GLuint textShaderProgram;
+TTF_Font* font = NULL;
+GLuint textVAO, textVBO;
 
 // Quad for text (2 triangles, positions and tex coords)
 float textQuadVertices[] = {
@@ -492,26 +548,27 @@ GLint textureOffsetsLoc = -1, textureSizesLoc = -1;
 
 void CacheUniformLocationsForChunkShader(void) {
     // Called after shader compilation in InitializeEnvironment
-    viewLoc = glGetUniformLocation(shaderProgram, "view");
-    projectionLoc = glGetUniformLocation(shaderProgram, "projection");
-    modelLoc = glGetUniformLocation(shaderProgram, "model");
-    texIndexLoc = glGetUniformLocation(shaderProgram, "texIndex");
-    textureOffsetsLoc = glGetUniformLocation(shaderProgram, "textureOffsets");
-    textureSizesLoc = glGetUniformLocation(shaderProgram, "textureSizes");
+    viewLoc = glGetUniformLocation(chunkShaderProgram, "view");
+    projectionLoc = glGetUniformLocation(chunkShaderProgram, "projection");
+    modelLoc = glGetUniformLocation(chunkShaderProgram, "model");
+    texIndexLoc = glGetUniformLocation(chunkShaderProgram, "texIndex");
+    textureOffsetsLoc = glGetUniformLocation(chunkShaderProgram, "textureOffsets");
+    textureSizesLoc = glGetUniformLocation(chunkShaderProgram, "textureSizes");
 }
 
 int RenderStaticMeshes(void) {
+    // Attempt to update the test light to be "attached" to the player
+    lights[0] = testLight_x;
+    lights[1] = testLight_y;
+    lights[2] = testLight_z;
+    lights[3] = testLight_intensity;
+    lights[4] = testLight_range;
+    lights[5] = testLight_spotAng;
+    
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
-    
-//     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-//     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-//     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO); // COMMENT OUT 1 Commenting out along with "COMMENT OUT 2 and 3" works to render unlit meshes
-//     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-//     glDrawBuffers(2, drawBuffers);
-    
-    glUseProgram(shaderProgram);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glUseProgram(chunkShaderProgram);
 
     // Set up view and projection matrices
     float view[16], projection[16];
@@ -544,26 +601,23 @@ int RenderStaticMeshes(void) {
         }
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // COMMENT OUT 2 Commenting out along with "COMMENT OUT 1 and 3" works to render unlit meshes
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Apply deferred lighting with compute shader
     glUseProgram(deferredLightingShaderProgram);
     GLint screenWidthLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     GLint screenHeightLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    GLint invViewProjLoc = glGetUniformLocation(deferredLightingShaderProgram, "invViewProj");
     glUniform1ui(screenWidthLoc, screen_width);
     glUniform1ui(screenHeightLoc, screen_height);
-
-    // Compute inverse view-projection matrix
-    float viewProj[16], invViewProj[16];
-    mat4_multiply(viewProj, view, projection);
-    mat4_inverse(invViewProj, viewProj);
-    glUniformMatrix4fv(invViewProjLoc, 1, GL_FALSE, invViewProj);
-
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    glBindImageTexture(3, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
+    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
 
     // Dispatch compute shader
     GLuint groupX = (screen_width + 7) / 8;
@@ -571,10 +625,10 @@ int RenderStaticMeshes(void) {
     glDispatchCompute(groupX, groupY, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     
-    // Render final gather lighting  // COMMENT OUT 3 Commenting out all lines below except the return 0 along with "COMMENT OUT 1 and 3" works to render unlit meshes
+    // Render final gather lighting
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, inputImageID); // if set to inputImageID is also pure black.
+    glBindTexture(GL_TEXTURE_2D, outputImageID);
     glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
     glBindVertexArray(quadVAO);
     glDisable(GL_BLEND);
@@ -692,12 +746,15 @@ int RenderUI(double deltaTime) {
     snprintf(text4, sizeof(text4), "Peak frame queue count: %.2d", maxEventCount_debug);
     render_debug_text(10, 70, text4, textCol);
     
+    char text5[128];
+    snprintf(text5, sizeof(text5), "testLight_spotAng: %.4f", testLight_spotAng);
+    render_debug_text(10, 95, text5, textCol);
+    
     // Frame stats
     drawCallCount++; // Add one more for this text render ;)
     char text0[256];
     snprintf(text0, sizeof(text0), "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d", deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
     render_debug_text(10, 10, text0, textCol); // Top-left corner (10, 10)
-    
     double time_now = get_time();
     if ((time_now - lastFrameSecCountTime) >= 1.00) {
         lastFrameSecCountTime = time_now;

@@ -45,13 +45,6 @@ double start_frame_time = 0.0;
                 
 // OpenGL
 SDL_GLContext gl_context;
-GLuint shaderProgram;
-GLuint textShaderProgram;
-GLuint deferredLightingShaderProgram;
-GLuint imageBlitShaderProgram;
-GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
-TTF_Font* font = NULL;
-GLuint textVAO, textVBO;
 
 typedef enum {
     SYS_SDL = 0,
@@ -141,20 +134,32 @@ int ExitCleanup(int status) {
 
     // OpenGL Cleanup
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    if (shaderProgram) glDeleteProgram(shaderProgram);
-    if (vao) glDeleteVertexArrays(1, &vao);
     for (int i=0;i<MODEL_COUNT;i++) {
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
     }
-
-    if (textShaderProgram) glDeleteProgram(textShaderProgram);
+    
+    if (vao) glDeleteVertexArrays(1, &vao);
+    if (chunkShaderProgram) glDeleteProgram(chunkShaderProgram);
+    
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
     if (textVBO) glDeleteBuffers(1, &textVBO);
-    if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
+    if (textShaderProgram) glDeleteProgram(textShaderProgram);
     
     if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
+    
+    if (inputImageID) glDeleteTextures(1,&inputImageID);
+    if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
+    if (inputDepthID) glDeleteTextures(1,&inputDepthID);
+    if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
+    
+    if (outputImageID) glDeleteTextures(1,&outputImageID);
+    
+    if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
+    
+    if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
+    if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
 
     // Cleanup initialized systems in reverse order.
     // Independent ifs so that we can exit from anywhere and de-init only as needed.

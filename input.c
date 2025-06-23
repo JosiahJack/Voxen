@@ -19,6 +19,16 @@ float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 
+float testLight_x = 10.24f;
+float testLight_y = 0.0f;
+float testLight_z = 0.0f;
+float testLight_intensity = 2.0f;
+float testLight_range = 10.0f;
+float testLight_r = 1.0f;
+float testLight_g = 1.0f;
+float testLight_b = 1.0f;
+float testLight_spotAng = 0.0f;
+
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
 
@@ -130,5 +140,45 @@ void ProcessInput(void) {
     } else if (keys[SDL_SCANCODE_Q]) {
         cam_roll -= move_speed * 5.0f; // Move down
         Input_MouselookApply();
+    }
+    
+    if (keys[SDL_SCANCODE_J]) {
+        testLight_x += finalMoveSpeed;
+    } else if (keys[SDL_SCANCODE_K]) {
+        testLight_x -= finalMoveSpeed;
+    }
+    
+    if (keys[SDL_SCANCODE_N]) {
+        testLight_y += finalMoveSpeed;
+    } else if (keys[SDL_SCANCODE_M]) {
+        testLight_y -= finalMoveSpeed;
+    }
+    
+    if (keys[SDL_SCANCODE_U]) {
+        testLight_z += finalMoveSpeed;
+    } else if (keys[SDL_SCANCODE_I]) {
+        testLight_z -= finalMoveSpeed;
+    }
+    
+    if (keys[SDL_SCANCODE_O]) {
+        testLight_intensity += finalMoveSpeed;
+    } else if (keys[SDL_SCANCODE_P]) {
+        testLight_intensity -= finalMoveSpeed;
+        if (testLight_intensity < 0.0f) testLight_intensity = 0.0f;
+    }
+    
+    if (keys[SDL_SCANCODE_L]) {
+        testLight_range += finalMoveSpeed;
+    } else if (keys[SDL_SCANCODE_SEMICOLON]) {
+        testLight_range -= finalMoveSpeed;
+        if (testLight_range < 0.0f) testLight_range = 0.0f;
+    }
+    
+    if (keys[SDL_SCANCODE_B]) {
+        testLight_spotAng += finalMoveSpeed * 2.0f;
+        if (testLight_spotAng > 180.0f) testLight_spotAng = 180.0f;
+    } else if (keys[SDL_SCANCODE_Z]) {
+        testLight_spotAng -= finalMoveSpeed * 2.0f;
+        if (testLight_spotAng < 0.0f) testLight_spotAng = 0.0f;
     }
 }

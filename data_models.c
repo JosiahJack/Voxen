@@ -15,6 +15,7 @@ const char *modelPaths[MODEL_COUNT] = {
 };
 
 uint32_t modelVertexCounts[MODEL_COUNT];
+GLuint vao; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];
 int32_t vbo_offsets[MODEL_COUNT];
 uint32_t totalVertexCount = 0;

@@ -10,15 +10,15 @@ extern TTF_Font* font;
 extern GLuint textVAO, textVBO;
 extern uint32_t drawCallCount;
 extern uint32_t vertexCount;
-extern GLuint quadVAO, quadVBO, outputTexture;
-extern GLuint shaderProgram;
+extern GLuint quadVAO, quadVBO;
+extern GLuint chunkShaderProgram;
+extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, outputImageID, gBufferFBO;
 extern GLuint textShaderProgram;
 extern GLuint deferredLightingShaderProgram;
 extern GLuint imageBlitShaderProgram;
 
 int CompileShaders(void);
 void SetupQuad(void);
-void SetupOutputTexture(void);
 void SetupTextQuad(void);
 int ClearFrameBuffers(void);
 void CacheUniformLocationsForChunkShader(void);

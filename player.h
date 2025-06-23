@@ -11,4 +11,11 @@ extern float cam_pitch;
 extern float cam_roll;
 extern bool in_cyberspace;
 
+extern float testLight_x;
+extern float testLight_y;
+extern float testLight_z;
+extern float testLight_intensity;
+extern float testLight_range;
+extern float testLight_spotAng;
+
 #endif // PLAYER_H
