@@ -20,6 +20,7 @@
 #include "cli_args.h"
 #include "lights.h"
 #include "network.h"
+#include "text.h"
 
 // Window
 SDL_Window *window;
@@ -69,14 +70,12 @@ int InitializeEnvironment(void) {
     if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) { fprintf(stderr, "IMG_Init failed: %s\n", IMG_GetError()); return SYS_IMG + 1; }
     systemInitialized[SYS_IMG] = true;
 
-    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10);
-    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
-
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -123,7 +122,9 @@ int InitializeEnvironment(void) {
     if (CompileShaders()) return SYS_COUNT + 1;
     CacheUniformLocationsForChunkShader();
     SetupQuad(); // For image blit for post processing effects like lighting.
-    SetupTextQuad();
+    int fontInit = InitializeTextAndFonts();
+    if (fontInit) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    
     InitializeLights();
     SetupGBuffer();
     Input_Init();

@@ -1,4 +1,6 @@
 // imageblit.glsl
+// Full screen quad unlit textured for presenting image buffers such as results
+// from compute shaders, image effects, post-processing, etc..
 const char *quadVertexShaderSource =
     "#version 450 core\n"
     "layout(location = 0) in vec2 aPos;\n"

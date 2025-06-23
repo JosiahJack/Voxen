@@ -55,6 +55,14 @@ int Input_KeyDown(uint32_t scancode) {
     } else if (keys[SDL_SCANCODE_I]) {
         offsetAmount_TEST -= 1;
     }
+    
+    if (keys[SDL_SCANCODE_O]) {
+        testLight_intensity += 8.0f / 256.0f;
+        if (testLight_intensity > 8.0f) testLight_intensity = 8.0f;
+    } else if (keys[SDL_SCANCODE_P]) {
+        testLight_intensity -= 8.0f / 256.0f;
+        if (testLight_intensity < 0.01f) testLight_intensity = 0.01f;
+    }
     return 0;
 }
 
@@ -155,13 +163,6 @@ void ProcessInput(void) {
         testLight_z += finalMoveSpeed;
     } else if (keys[SDL_SCANCODE_I]) {
         testLight_z -= finalMoveSpeed;
-    }
-    
-    if (keys[SDL_SCANCODE_O]) {
-        testLight_intensity += finalMoveSpeed;
-    } else if (keys[SDL_SCANCODE_P]) {
-        testLight_intensity -= finalMoveSpeed;
-        if (testLight_intensity < 0.0f) testLight_intensity = 0.0f;
     }
     
     if (keys[SDL_SCANCODE_L]) {

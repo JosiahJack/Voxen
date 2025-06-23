@@ -1,5 +1,5 @@
-#ifndef DATA_MODELS_H
-#define DATA_MODELS_H
+#ifndef VOXEN_DATA_MODELS_H
+#define VOXEN_DATA_MODELS_H
 
 #include <GL/glew.h>
 
@@ -14,4 +14,4 @@ extern GLuint vbos[];
 int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]);
 int SetupGeometry(void);
 
-#endif // DATA_MODELS_H
+#endif // VOXEN_DATA_MODELS_H

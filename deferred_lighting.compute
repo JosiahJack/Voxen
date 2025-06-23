@@ -1,0 +1,91 @@
+// deferred_lighting.compute
+// Compute shader for processing 
+const char *deferredLighting_computeShader =
+    "#version 450 core\n"
+    "\n"
+    "layout(local_size_x = 8, local_size_y = 8) in;\n"
+    "\n"
+    "layout(rgba8, binding = 0) uniform image2D inputImage;\n"
+    "layout(rgba16f, binding = 1) uniform image2D inputNormals;\n"
+    "layout(r32f, binding = 2) uniform image2D inputDepth;\n"
+    "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
+    "layout(rgba8, binding = 4) uniform image2D outputImage;\n"
+    "\n"
+    "uniform uint screenWidth;\n"
+    "uniform uint screenHeight;\n"
+    "uniform int lightDataSize;\n"
+    "\n"
+    "layout(std430, binding = 5) buffer LightBuffer {\n"
+    "    float lights[];\n"
+    "};\n"
+    "\n"
+    "void main() {\n"
+    "    uvec2 pixel = gl_GlobalInvocationID.xy;\n"
+    "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
+    "\n"
+    "    // Read G-buffer data\n"
+    "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
+    "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
+    "    float depth = imageLoad(inputDepth, ivec2(pixel)).r;\n"
+    "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
+    "\n"
+    "    vec3 lighting = vec3(0.0);\n"
+    "    int lightStride = lightDataSize > 0 && lightDataSize < 13 ? lightDataSize : 12;\n"
+//     "    int lightStride = lightDataSize;\n" // This on its own locks up program
+    "    for (int i = 0; i < lights.length(); i+=lightStride) {\n"
+    "        float intensity =    lights[i + 3];\n"
+    "        if (intensity < 0.015f) continue;\n" // LightAnimation has minIntensity of 0.01f
+    "\n"
+    "        float range =        lights[i + 4];\n"
+    "        vec3 lightPos = vec3(lights[i + 0],\n"  // posx
+    "                             lights[i + 1],\n"  // posy
+    "                             lights[i + 2]);\n" // posz
+    "        vec3 toLight = lightPos - worldPos;\n"
+    "        float dist = length(toLight);\n"    
+    "        if (dist > range) continue;\n"
+    "\n"
+    "        vec3 lightDir = normalize(toLight);\n"
+    "\n"
+    "        float spotAng =      lights[i + 5];\n"
+    "        vec3 spotDir =  vec3(lights[i + 6],\n"  // spotDirx
+    "                             lights[i + 7],\n"  // spotDiry
+    "                             lights[i + 8]);\n" // spotDirz
+    "        vec3 lightColor = vec3(lights[i + 9],\n"  // r
+    "                               lights[i +10],\n"  // g
+    "                               lights[i +11]);\n" // b
+    "\n"
+    "        float spotFalloff = 1.0;\n"
+    "        if (spotAng > 0.0) {\n"
+    "            float spotdot = dot(spotDir,-lightDir);\n"
+    "            float cosAngle = cos(radians(spotAng / 2.0));  // Convert half-angle to radians and get cosine\n"
+    "            if (spotdot < cosAngle) continue;\n"
+    "\n"
+    "            float cosOuterAngle = cos(radians(spotAng / 2.0));  // Outer angle in radians\n"
+    "            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));  // Inner angle for full brightness (80% of outer angle)\n"
+    "            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);\n"
+    "            if (spotFalloff <= 0.0) continue;  // Outside the cone completely\n"
+    "        }\n"
+    "\n"
+            // Shadows here (taken from RayTracer.shader from separate project
+//             Ray ray;
+//             ray.origin = pos;
+//             ray.dir = normalize(lit.position - pos);
+//             if (shadowsEnabled > 0 && lit.range > 1.5 && lit.intensity > 0.5) {
+//                 ModelHitInfo hitInfo = CalculateRayCollision(ray); // Light to point check (aka SHADOWS!)
+//                 float shaddist = length(hitInfo.hitPoint - ray.origin);
+//                 if (hitInfo.didHit && shaddist < distance && shaddist > 0.001) continue;
+//             }
+    "\n"
+    "        float attenuation = (1.0 - (dist / range)) * max(dot(normal,lightDir),0.0);\n"
+    "\n"
+    "        float redFinal = color.r * intensity * attenuation * lightColor.r * spotFalloff;\n"
+    "        float greenFinal = color.g * intensity * attenuation * lightColor.g * spotFalloff;\n"
+    "        float blueFinal = color.b * intensity * attenuation * lightColor.b * spotFalloff;\n"
+    "        lighting.r += redFinal;\n"
+    "        lighting.g += greenFinal;\n"
+    "        lighting.b += blueFinal;\n"
+    "    }\n"
+    "\n"
+    "    // Write to output image\n"
+    "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n" // Output world pos directly to debug.
+    "}\n";

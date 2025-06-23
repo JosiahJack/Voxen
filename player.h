@@ -1,5 +1,5 @@
-#ifndef PLAYER_H
-#define PLAYER_H
+#ifndef VOXEN_PLAYER_H
+#define VOXEN_PLAYER_H
 
 #include "quaternion.h"
 
@@ -18,4 +18,4 @@ extern float testLight_intensity;
 extern float testLight_range;
 extern float testLight_spotAng;
 
-#endif // PLAYER_H
+#endif // VOXEN_PLAYER_H

@@ -1,5 +1,5 @@
-#ifndef CONSTANTS_H
-#define CONSTANTS_H
+#ifndef VOXEN_CONSTANTS_H
+#define VOXEN_CONSTANTS_H
 
 #include "lights.h"
 
@@ -8,4 +8,4 @@
 #define TEXTURE_COUNT 3
 #define MODEL_COUNT 3
 
-#endif // CONSTANTS_H
+#endif // VOXEN_CONSTANTS_H
