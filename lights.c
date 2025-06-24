@@ -15,10 +15,10 @@ GLuint deferredLightingShaderProgram;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 GLuint lightBufferID;
 
-bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
-GLuint shadowMapShaderProgram;
-GLuint shadowFBO;
-GLuint shadowCubemaps[LIGHT_COUNT];
+// bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
+// GLuint shadowMapShaderProgram;
+// GLuint shadowFBO;
+// GLuint shadowCubemaps[LIGHT_COUNT];
 
 // Initialize lights with random positions
 void InitializeLights(void) {
@@ -70,10 +70,10 @@ void InitializeLights(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    SetupShadowMaps();
-    CacheUniformLocationsForShadowmapShader();
+//     SetupShadowMaps();
+//     CacheUniformLocationsForShadowmapShader();
 }
-
+/*
 // Create cubemaps for each light
 void SetupShadowMaps(void) {
     glGenTextures(LIGHT_COUNT, shadowCubemaps);
@@ -100,7 +100,6 @@ void SetupShadowMaps(void) {
     // Create shadow FBO
     glGenFramebuffers(1, &shadowFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubemaps[0], 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -139,17 +138,17 @@ void RenderPointLightShadowMap(int lightIndex, float lightPosX, float lightPosY,
         float pitch = 0.0f; // 0.0 == up, 180 == down
         float roll = 0.0f; // positive rotate view clockwise (world goes CCW)
         if (face == 0) {
-            yaw = 0.0f; pitch = 0.0f; roll = 0.0f; // +X
+            yaw = 270.0f; pitch = 0.0f; roll = 0.0f; // +X
         } else if (face == 1) {
-            yaw = 180.0f; pitch = 0.0f; roll = 00.0f; // -X           
+            yaw = 90.0f; pitch = 0.0f; roll = 0.0f; // -X           
         } else if (face == 2) {
-            yaw = 90.0f; pitch = 00.0f; roll = 0.0f; // +Y      
+            yaw = 0.0f; pitch = -90.0f; roll = 0.0f; // +Y      
         } else if (face == 3) {
-            yaw = 270.0f; pitch = 00.0f; roll = 0.0f; // -Y      
+            yaw = 0.0f; pitch = 90.0f; roll = 0.0f; // -Y      
         } else if (face == 4) {
-            yaw = 0.0f; pitch = -90.0f; roll = 0.0f; // +Z      
+            yaw = 0.0f; pitch = 0.0f; roll = 0.0f; // +Z      
         } else if (face == 5) {
-            yaw = 0.0f; pitch = 90.0f; roll = 0.0f; // -Z      
+            yaw = 180.0f; pitch = 0.0f; roll = 0.0f; // -Z      
         }
         
         quat_from_yaw_pitch_roll(&shadcam_rotation,yaw,pitch,roll);
@@ -159,20 +158,19 @@ void RenderPointLightShadowMap(int lightIndex, float lightPosX, float lightPosY,
         glBindVertexArray(vao);
 
         // Render each model instance, simple draw calls, no instancing yet
-        RenderMeshInstances();
+        RenderMeshInstances(shadmodelLoc, -1, shadmodelLoc);
     }
 
     lightDirty[lightIndex] = false;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glViewport(0, 0, screen_width, screen_height);
 }
 
 void RenderDirtyShadowMaps(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    glClearDepth(1.0f);
     glDepthFunc(GL_LESS);
     glUseProgram(shadowMapShaderProgram);
+    glDisable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);    
     int updatesThisFrame = 0;
     const int maxUpdatesPerFrame = 32;
@@ -184,5 +182,8 @@ void RenderDirtyShadowMaps(void) {
         }
     }
     
+    glEnable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
-}
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, screen_width, screen_height);
+}*/

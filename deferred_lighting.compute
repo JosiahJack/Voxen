@@ -16,7 +16,7 @@ const char *deferredLighting_computeShader =
     "\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-    "uniform samplerCube shadowCubemaps[16];\n"
+//     "uniform samplerCube shadowCubemaps[16];\n"
     "uniform float lightFarPlane = 20.0;\n"
     "\n"
     "void main() {\n"
@@ -67,13 +67,13 @@ const char *deferredLighting_computeShader =
     "        }\n"
     "\n"
              // Shadows here (taken from RayTracer.shader from separate project
-    "        vec3 lightDirRemapped = vec3(lightDir.x, lightDir.z, -lightDir.y);\n"
-    "        float sampledDepth = texture(shadowCubemaps[i], -lightDirRemapped).r * 20.0;\n" // Far plane.
-    "        float shadowBias = 0.01;\n"
-    "        float shadow = dist > sampledDepth + shadowBias ? 0.0 : 1.0;\n"
+//     "        vec3 lightDirRemapped = vec3(-lightDir.x, lightDir.z, lightDir.y);\n" // DIDN"T WORK
+//     "        float sampledDepth = texture(shadowCubemaps[i], -lightDirRemapped).r * 20.0;\n" // Far plane.
+//     "        float shadowBias = 0.01;\n"
+//     "        float shadow = dist > sampledDepth + shadowBias ? 0.0 : 1.0;\n"
     "\n"
     "        float attenuation = (1.0 - (dist / range)) * max(dot(normal,lightDir),0.0);\n"
-    "        attenuation *= shadow;\n"
+//     "        attenuation *= shadow;\n"
     "\n"
     "        float redFinal = color.r * intensity * attenuation * lightColor.r * spotFalloff;\n"
     "        float greenFinal = color.g * intensity * attenuation * lightColor.g * spotFalloff;\n"

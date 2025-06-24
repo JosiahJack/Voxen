@@ -133,9 +133,9 @@ void CacheUniformLocationsForChunkShader(void) {
     debugViewLoc = glGetUniformLocation(chunkShaderProgram, "debugView");
 }
 
-void RenderMeshInstances(void) {
+void RenderMeshInstances(GLint model_mat_loc, GLint texindex_loc, GLint modelindex_loc) {
     float model[16]; // 4x4 matrix
-    int drawCallLimit = 50;
+    int drawCallLimit = 10;
     int currentModelType = 0;
     int loopIter = 0;
     int modelIndex = 0;
@@ -143,9 +143,9 @@ void RenderMeshInstances(void) {
         for (int xarray=0;xarray<drawCallLimit;xarray+=2) {
             mat4_identity(model);
             mat4_translate(model,(float)xarray * 2.56f, (float)yarray * 2.56f, 0.0f);
-            glUniform1i(texIndexLoc, currentModelType);
-            glUniform1i(modelIndexLoc, modelIndex);
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+            if (texindex_loc >= 0) glUniform1i(texindex_loc, currentModelType);
+            glUniform1i(modelindex_loc, modelIndex);
+            glUniformMatrix4fv(model_mat_loc, 1, GL_FALSE, model);
             glBindVertexBuffer(0, vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[currentModelType]);
             drawCallCount++;
@@ -160,11 +160,13 @@ void RenderMeshInstances(void) {
         }
     }
     
+    // TODO: Figure out why this doesn't work
 //     for (int i=0;i<instanceCount;i++) {
 //         mat4_identity(model);
 //         mat4_translate(model,instances[i].posx,instances[i].posy,instances[i].posz);
-//         glUniform1i(texIndexLoc, instances[i].modelIndex);
-//         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, model);
+//         if (texindex_loc >= 0) glUniform1i(texindex_loc, currentModelType);
+//         glUniform1i(modelindex_loc, instances[i].modelIndex);
+//         glUniformMatrix4fv(model_mat_loc, 1, GL_FALSE, model);
 //         glBindVertexBuffer(0, vbos[instances[i].modelIndex], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
 //         glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
 //         drawCallCount++;
@@ -180,13 +182,13 @@ int RenderStaticMeshes(void) {
     lights[3] = testLight_intensity;
     lights[4] = testLight_range;
     lights[5] = testLight_spotAng;
-    lightDirty[0] = true;
+//     lightDirty[0] = true;
     
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
     
     // Render Shadowmaps (aka rerender whole scene for each light, YIKES!)
-    RenderDirtyShadowMaps(); // Uses separate FBO
+//     RenderDirtyShadowMaps(); // Uses separate FBO                        DIDN'T WORK!!
     
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glUseProgram(chunkShaderProgram);
@@ -206,7 +208,7 @@ int RenderStaticMeshes(void) {
     glBindVertexArray(vao);
 
     // Render each model instance, simple draw calls, no instancing yet
-    RenderMeshInstances();
+    RenderMeshInstances(modelLoc, texIndexLoc, modelIndexLoc);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Apply deferred lighting with compute shader
@@ -229,13 +231,13 @@ int RenderStaticMeshes(void) {
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
     
-    for (int i = 0; i < LIGHT_COUNT; i++) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemaps[i]);
-        char uniformName[32];
-        snprintf(uniformName, sizeof(uniformName), "shadowCubemaps[%d]", i);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, uniformName), i);
-    }
+//     for (int i = 0; i < LIGHT_COUNT; i++) {
+//         glActiveTexture(GL_TEXTURE0 + i);
+//         glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemaps[i]);
+//         char uniformName[32];
+//         snprintf(uniformName, sizeof(uniformName), "shadowCubemaps[%d]", i);
+//         glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, uniformName), i);
+//     }
 
     // Dispatch compute shader
     GLuint groupX = (screen_width + 7) / 8;
