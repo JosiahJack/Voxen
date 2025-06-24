@@ -2,6 +2,7 @@
 #define VOXEN_RENDER_H
 
 #include <GL/glew.h>
+#include <SDL2/SDL.h>
 #include <stdbool.h>
 
 extern int screen_width;

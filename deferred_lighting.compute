@@ -13,7 +13,6 @@ const char *deferredLighting_computeShader =
     "\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-    "uniform int lightDataSize;\n"
     "\n"
     "layout(std430, binding = 5) buffer LightBuffer {\n"
     "    float lights[];\n"
@@ -30,8 +29,7 @@ const char *deferredLighting_computeShader =
     "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
     "\n"
     "    vec3 lighting = vec3(0.0);\n"
-    "    int lightStride = lightDataSize > 0 && lightDataSize < 13 ? lightDataSize : 12;\n"
-//     "    int lightStride = lightDataSize;\n" // This on its own locks up program
+    "    int lightStride = 12;\n"
     "    for (int i = 0; i < lights.length(); i+=lightStride) {\n"
     "        float intensity =    lights[i + 3];\n"
     "        if (intensity < 0.015f) continue;\n" // LightAnimation has minIntensity of 0.01f

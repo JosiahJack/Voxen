@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <time.h>
 #include "constants.h"
-#include "text.glsl"
 #include "data_textures.h"
 #include "data_models.h"
 #include "event.h"
@@ -23,177 +22,12 @@
 #include "render.h"
 #include "input.h"
 #include "lights.h"
-#include "chunk.glsl"
-#include "imageblit.glsl"
-#include "deferred_lighting.compute"
 #include "text.h"
 
 uint32_t drawCallCount = 0;
 uint32_t vertexCount = 0;
 
 GLuint chunkShaderProgram;
-
-int CompileShaders(void) {
-    // ------------------------------
-    // Chunk Shader
-    
-    // Vertex Subshader
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    GLint success;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
-        fprintf(stderr, "Vertex Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Fragment Subshader
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    const char *fragSource = fragmentShaderTraditional;
-    glShaderSource(fragmentShader, 1, &fragSource, NULL);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
-        fprintf(stderr, "Fragment Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Shader Program
-    chunkShaderProgram = glCreateProgram();
-    glAttachShader(chunkShaderProgram, vertexShader);
-    glAttachShader(chunkShaderProgram, fragmentShader);
-    glLinkProgram(chunkShaderProgram);
-    glGetProgramiv(chunkShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(chunkShaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Chunk Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    // ------------------------------
-    // Text Shader
-    
-    // Text Vertex Subshader
-    GLuint textVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(textVertexShader, 1, &textVertexShaderSource, NULL);
-    glCompileShader(textVertexShader);
-    glGetShaderiv(textVertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(textVertexShader, 512, NULL, infoLog);
-        fprintf(stderr, "Text Vertex Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Text Fragment Subshader
-    GLuint textFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(textFragmentShader, 1, &textFragmentShaderSource, NULL);
-    glCompileShader(textFragmentShader);
-    glGetShaderiv(textFragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(textFragmentShader, 512, NULL, infoLog);
-        fprintf(stderr, "Text Fragment Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Text Shader Program
-    textShaderProgram = glCreateProgram();
-    glAttachShader(textShaderProgram, textVertexShader);
-    glAttachShader(textShaderProgram, textFragmentShader);
-    glLinkProgram(textShaderProgram);
-    glGetProgramiv(textShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(textShaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Text Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    glDeleteShader(textVertexShader);
-    glDeleteShader(textFragmentShader);
-
-    // ------------------------------  
-    // Deferred Lighting Compute Shader Program
-    GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderSource(computeShader, 1, &deferredLighting_computeShader, NULL);
-    glCompileShader(computeShader);
-    glGetShaderiv(computeShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(computeShader, 512, NULL, infoLog);
-        fprintf(stderr, "Compute Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    deferredLightingShaderProgram = glCreateProgram();
-    glAttachShader(deferredLightingShaderProgram, computeShader);
-    glLinkProgram(deferredLightingShaderProgram);
-    glGetProgramiv(deferredLightingShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(deferredLightingShaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Compute Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    glDeleteShader(computeShader);
-    
-    // ------------------------------  
-    // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
-    
-    // Full Screen Quad Vertex Subshader
-    GLuint quadVertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(quadVertexShader, 1, &quadVertexShaderSource, NULL);
-    glCompileShader(quadVertexShader);
-    glGetShaderiv(quadVertexShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(quadVertexShader, 512, NULL, infoLog);
-        fprintf(stderr, "Image Blit Vertex Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-
-    // Full Screen Quad Fragment Subshader
-    GLuint quadFragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(quadFragmentShader, 1, &quadFragmentShaderSource, NULL);
-    glCompileShader(quadFragmentShader);
-    glGetShaderiv(quadFragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(quadFragmentShader, 512, NULL, infoLog);
-        fprintf(stderr, "Image Blit Fragment Shader Compilation Failed: %s\n", infoLog);
-        return 1;
-    }
-    
-    imageBlitShaderProgram = glCreateProgram();
-    glAttachShader(imageBlitShaderProgram, quadVertexShader);
-    glAttachShader(imageBlitShaderProgram, quadFragmentShader);
-    glLinkProgram(imageBlitShaderProgram);
-    glGetProgramiv(imageBlitShaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(imageBlitShaderProgram, 512, NULL, infoLog);
-        fprintf(stderr, "Image Blit Shader Program Linking Failed: %s\n", infoLog);
-        return 1;
-    }
-    
-    glDeleteShader(quadVertexShader);
-    glDeleteShader(quadFragmentShader);
-
-    // ------------------------------  
-
-    return 0;
-}
 
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, outputImageID, gBufferFBO;
 
@@ -349,10 +183,8 @@ int RenderStaticMeshes(void) {
     glUseProgram(deferredLightingShaderProgram);
     GLint screenWidthLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     GLint screenHeightLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    GLint lightDataSizeLoc = glGetUniformLocation(deferredLightingShaderProgram, "lightDataSize");
     glUniform1ui(screenWidthLoc, screen_width);
     glUniform1ui(screenHeightLoc, screen_height);
-    glUniform1ui(lightDataSizeLoc, LIGHT_DATA_SIZE);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
