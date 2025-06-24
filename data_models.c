@@ -16,6 +16,7 @@ const char *modelPaths[MODEL_COUNT] = {
 
 GLuint chunkShaderProgram;
 uint32_t modelVertexCounts[MODEL_COUNT];
+GLint modelTriangleCounts[MODEL_COUNT];
 GLuint vao; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];
 int32_t vbo_offsets[MODEL_COUNT];
@@ -40,7 +41,8 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) vertexCount += scene->mMeshes[m]->mNumVertices;
 
         modelVertexCounts[i] = vertexCount;
-        printf("Model %s loaded with %d vertices\n", modelPaths[i], vertexCount);
+        modelTriangleCounts[i] = (GLint)(vertexCount / 3);
+        printf("Model %s loaded with %d vertices, %d tris\n", modelPaths[i], vertexCount, modelTriangleCounts[i]);
 
         // Allocate vertex data for this model
         float *tempVertices = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));

@@ -17,7 +17,7 @@ void SetupGBuffer(void);
 void SetupQuad(void);
 int ClearFrameBuffers(void);
 void CacheUniformLocationsForChunkShader(void);
-void RenderMeshInstances(GLint model_mat_loc, GLint texindex_loc, GLint modelindex_loc);
+void RenderMeshInstances(GLint model_mat_loc, GLint texindex_loc, GLint modelindex_loc, float* matrices, int* instanceCurrentCount);
 int RenderStaticMeshes(void);
 void render_debug_text(float x, float y, const char *text, SDL_Color color);
 int RenderUI(double deltaTime);

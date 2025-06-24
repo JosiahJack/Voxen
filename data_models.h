@@ -7,6 +7,7 @@
 #define VERTEX_ATTRIBUTES_COUNT 8
 
 extern uint32_t modelVertexCounts[];
+extern GLint modelTriangleCounts[];
 extern int32_t vbo_offsets[];
 extern uint32_t totalVertexCount;
 extern GLuint vao;

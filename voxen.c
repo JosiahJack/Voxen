@@ -25,7 +25,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 1366, screen_height = 768;
+int screen_width = 320, screen_height = 200;
 bool window_has_focus = false;
 
 // Event System states
