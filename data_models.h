@@ -3,6 +3,7 @@
 
 #include <GL/glew.h>
 
+#define MODEL_COUNT 3
 #define VERTEX_ATTRIBUTES_COUNT 8
 
 extern uint32_t modelVertexCounts[];

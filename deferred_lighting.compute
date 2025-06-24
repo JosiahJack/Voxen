@@ -5,28 +5,30 @@ const char *deferredLighting_computeShader =
     "\n"
     "layout(local_size_x = 8, local_size_y = 8) in;\n"
     "\n"
-    "layout(rgba8, binding = 0) uniform image2D inputImage;\n"
+    "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba16f, binding = 1) uniform image2D inputNormals;\n"
-    "layout(r32f, binding = 2) uniform image2D inputDepth;\n"
+    "layout(r32f,    binding = 2) uniform image2D inputDepth;\n"
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
-    "layout(rgba8, binding = 4) uniform image2D outputImage;\n"
+    "layout(rgba8,   binding = 4) uniform image2D outputImage;\n"
+    "layout(std430,  binding = 5) buffer LightBuffer {\n"
+    "    float lights[];\n"
+    "};\n"
     "\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-    "\n"
-    "layout(std430, binding = 5) buffer LightBuffer {\n"
-    "    float lights[];\n"
-    "};\n"
+    "uniform samplerCube shadowCubemaps[16];\n"
+    "uniform float lightFarPlane = 20.0;\n"
     "\n"
     "void main() {\n"
     "    uvec2 pixel = gl_GlobalInvocationID.xy;\n"
     "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
+
+    "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
     "\n"
     "    // Read G-buffer data\n"
     "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
     "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
     "    float depth = imageLoad(inputDepth, ivec2(pixel)).r;\n"
-    "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
     "\n"
     "    vec3 lighting = vec3(0.0);\n"
     "    int lightStride = 12;\n"
@@ -64,17 +66,14 @@ const char *deferredLighting_computeShader =
     "            if (spotFalloff <= 0.0) continue;  // Outside the cone completely\n"
     "        }\n"
     "\n"
-            // Shadows here (taken from RayTracer.shader from separate project
-//             Ray ray;
-//             ray.origin = pos;
-//             ray.dir = normalize(lit.position - pos);
-//             if (shadowsEnabled > 0 && lit.range > 1.5 && lit.intensity > 0.5) {
-//                 ModelHitInfo hitInfo = CalculateRayCollision(ray); // Light to point check (aka SHADOWS!)
-//                 float shaddist = length(hitInfo.hitPoint - ray.origin);
-//                 if (hitInfo.didHit && shaddist < distance && shaddist > 0.001) continue;
-//             }
+             // Shadows here (taken from RayTracer.shader from separate project
+    "        vec3 lightDirRemapped = vec3(lightDir.x, lightDir.z, -lightDir.y);\n"
+    "        float sampledDepth = texture(shadowCubemaps[i], -lightDirRemapped).r * 20.0;\n" // Far plane.
+    "        float shadowBias = 0.01;\n"
+    "        float shadow = dist > sampledDepth + shadowBias ? 0.0 : 1.0;\n"
     "\n"
     "        float attenuation = (1.0 - (dist / range)) * max(dot(normal,lightDir),0.0);\n"
+    "        attenuation *= shadow;\n"
     "\n"
     "        float redFinal = color.r * intensity * attenuation * lightColor.r * spotFalloff;\n"
     "        float greenFinal = color.g * intensity * attenuation * lightColor.g * spotFalloff;\n"

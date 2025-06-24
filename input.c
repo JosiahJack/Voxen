@@ -28,11 +28,12 @@ float testLight_spotAng = 0.0f;
 
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
+int debugView = 0;
 
 void Input_Init(void) {
     quat_identity(&cam_rotation);
     Quaternion pitch_quat;
-    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, -90.0f * M_PI / 180.0f); // Pitch -90° to look toward Y+
+    quat_from_axis_angle(&pitch_quat, 1.0f, 0.0f, 0.0f, deg2rad(-90.0f)); // Pitch -90° to look toward Y+
     quat_multiply(&cam_rotation, &pitch_quat, &cam_rotation);
     Input_MouselookApply();
 }
@@ -50,10 +51,9 @@ int Input_KeyDown(uint32_t scancode) {
         Input_MouselookApply();
     }
     
-    if (keys[SDL_SCANCODE_U]) {
-        offsetAmount_TEST += 1;
-    } else if (keys[SDL_SCANCODE_I]) {
-        offsetAmount_TEST -= 1;
+    if (keys[SDL_SCANCODE_R]) {
+        debugView++;
+        if (debugView > 3) debugView = 0;
     }
     
     if (keys[SDL_SCANCODE_O]) {
@@ -79,8 +79,6 @@ int Input_MouseMove(float xrel, float yrel) {
     Input_MouselookApply();
     return 0;
 }
-
-int offsetAmount_TEST = 0;
 
 // Update camera position based on input
 void ProcessInput(void) {

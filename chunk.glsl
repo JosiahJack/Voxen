@@ -28,6 +28,7 @@ const char *fragmentShaderTraditional =
     "\n"
     "in vec2 TexCoord;\n"
     "flat in int TexIndex;\n"
+    "uniform int modelIndex;\n"
     "in vec3 Normal;\n"
     "in vec3 FragPos;\n"
     "\n"
@@ -36,6 +37,7 @@ const char *fragmentShaderTraditional =
     "};\n"
     "uniform uint textureOffsets[3];\n" // Offsets for each texture
     "uniform ivec2 textureSizes[3];\n" // Width, height for each texture
+    "uniform int debugView;\n"
     "\n"
     "layout(location = 0) out vec4 outAlbedo;\n"
     "layout(location = 1) out vec4 outNormal;\n"
@@ -47,7 +49,14 @@ const char *fragmentShaderTraditional =
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
     "    int pixelIndex = int(textureOffsets[TexIndex] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
-    "    outAlbedo = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
+    "    if (debugView == 3) {\n"
+    "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
+    "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
+    "        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);\n"
+    "        outAlbedo = vec4(vec3(linearDepth), 1.0);\n"
+    "    } else {\n"
+    "        outAlbedo = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
+    "    }\n"
     "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
     "    outWorldPos = vec4(FragPos, 1.0);\n"
     "}\n";

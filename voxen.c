@@ -1,6 +1,5 @@
 // File: voxen.c
 // Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
-
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -21,6 +20,7 @@
 #include "lights.h"
 #include "network.h"
 #include "text.h"
+#include "shaders.h"
 #include "image_effects.h"
 
 // Window

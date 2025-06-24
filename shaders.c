@@ -2,9 +2,11 @@
 #include "shaders.h"
 #include "render.h"
 #include "text.h"
+#include "shadmap.glsl"
 #include "text.glsl"
 #include "chunk.glsl"
 #include "imageblit.glsl"
+#include "lights.h"
 #include "deferred_lighting.compute"
 #include "image_effects.h"
 
@@ -53,7 +55,7 @@ int CompileShaders(void) {
     // Chunk Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");            if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");           if (!chunkShaderProgram) { return 1; }
+    chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");    if (!chunkShaderProgram) { return 1; }
 
     // Text Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }
@@ -61,13 +63,18 @@ int CompileShaders(void) {
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
     
     // Deferred Lighting Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Compute Shader");     if (!computeShader) { return 1; }
+    computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Compute Shader");            if (!computeShader) { return 1; }
     deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program"); if (!deferredLightingShaderProgram) { return 1; }
     
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
-    vertShader = CompileShader(GL_VERTEX_SHADER, quadVertexShaderSource, "Image Blit Vertex Shader");         if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
+    vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program"); if (!imageBlitShaderProgram) { return 1; }
+
+    // Shadowmap Shader
+    vertShader = CompileShader(GL_VERTEX_SHADER,   shadMapVertSource, "Shadowmap Vertex Shader");            if (!vertShader) { return 1; }
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, shadMapFragSource, "Shadowmap Fragment Shader");          if (!fragShader) { glDeleteShader(vertShader); return 1; }
+    shadowMapShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmap Shader Program"); if (!shadowMapShaderProgram) { return 1; }
 
     return 0;
 }

@@ -5,7 +5,7 @@ extern float move_speed;
 extern float mouse_sensitivity;
 extern bool keys[];
 extern int mouse_x, mouse_y;
-extern int offsetAmount_TEST;
+extern int debugView;
 
 void Input_Init(void);
 void Input_MouselookApply();

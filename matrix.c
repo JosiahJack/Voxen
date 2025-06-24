@@ -89,6 +89,32 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
     m[3] = 0.0f;      m[7] = 0.0f;      m[11] = 0.0f;      m[15] = 1.0f;
 }
 
+void mat4_lookat_vec(float *m, float eye[3], float target[3], float up[3]) {
+    float f[3] = {target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]};
+    float len = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
+    if (len > 0.0f) { f[0] /= len; f[1] /= len; f[2] /= len; }
+
+    float s[3];
+    s[0] = f[1] * up[2] - f[2] * up[1];
+    s[1] = f[2] * up[0] - f[0] * up[2];
+    s[2] = f[0] * up[1] - f[1] * up[0];
+    len = sqrtf(s[0] * s[0] + s[1] * s[1] + s[2] * s[2]);
+    if (len > 0.0f) { s[0] /= len; s[1] /= len; s[2] /= len; }
+
+    float u[3];
+    u[0] = s[1] * f[2] - s[2] * f[1];
+    u[1] = s[2] * f[0] - s[0] * f[2];
+    u[2] = s[0] * f[1] - s[1] * f[0];
+
+    mat4_identity(m);
+    m[0] = s[0]; m[4] = s[1]; m[8] = s[2];
+    m[1] = u[0]; m[5] = u[1]; m[9] = u[2];
+    m[2] = -f[0]; m[6] = -f[1]; m[10] = -f[2];
+    m[12] = -(s[0] * eye[0] + s[1] * eye[1] + s[2] * eye[2]);
+    m[13] = -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]);
+    m[14] = (f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2]);
+}
+
 void mat4_rotate_x(float *m, float angle) {
     float c = cosf(angle), s = sinf(angle);
     float t[16];
@@ -108,4 +134,16 @@ void mat4_translate(float *m, float x, float y, float z) {
     m[12] = x;
     m[13] = y;
     m[14] = z;
+}
+
+void mat4_translate_shadowmap(float *m, float x, float y, float z) {
+    float t[16] = {
+        1.0f, 0.0f, 0.0f, -x,
+        0.0f, 1.0f, 0.0f, -y,
+        0.0f, 0.0f, 1.0f, -z,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+    float temp[16];
+    memcpy(temp, m, 16 * sizeof(float));
+    mat4_multiply(m, temp, t);
 }

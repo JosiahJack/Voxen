@@ -12,12 +12,12 @@ extern uint32_t vertexCount;
 extern GLuint quadVAO, quadVBO;
 extern GLuint chunkShaderProgram;
 extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, outputImageID, gBufferFBO;
-extern GLuint deferredLightingShaderProgram;
 
-int CompileShaders(void);
+void SetupGBuffer(void);
 void SetupQuad(void);
 int ClearFrameBuffers(void);
 void CacheUniformLocationsForChunkShader(void);
+void RenderMeshInstances(void);
 int RenderStaticMeshes(void);
 void render_debug_text(float x, float y, const char *text, SDL_Color color);
 int RenderUI(double deltaTime);
