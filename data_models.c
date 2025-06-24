@@ -14,6 +14,7 @@ const char *modelPaths[MODEL_COUNT] = {
     "./Models/med1_9.fbx"
 };
 
+GLuint chunkShaderProgram;
 uint32_t modelVertexCounts[MODEL_COUNT];
 GLuint vao; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];

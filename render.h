@@ -13,7 +13,6 @@ extern GLuint quadVAO, quadVBO;
 extern GLuint chunkShaderProgram;
 extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, outputImageID, gBufferFBO;
 extern GLuint deferredLightingShaderProgram;
-extern GLuint imageBlitShaderProgram;
 
 int CompileShaders(void);
 void SetupQuad(void);

@@ -21,6 +21,7 @@
 #include "lights.h"
 #include "network.h"
 #include "text.h"
+#include "image_effects.h"
 
 // Window
 SDL_Window *window;

@@ -6,6 +6,7 @@
 #include "chunk.glsl"
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
+#include "image_effects.h"
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
