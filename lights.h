@@ -19,18 +19,10 @@
 extern float spotAngTypes[];
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern GLuint lightBufferID;
+extern bool lightDirty[LIGHT_COUNT];
 extern GLuint inputImageID, inputNormalsID, inputDepthID, outputImageID;
-
-// extern bool lightDirty[LIGHT_COUNT];
-// extern GLuint shadowCubemaps[LIGHT_COUNT]; // Array of cubemap texture IDs
-// extern GLuint shadowFBO; // Single FBO for rendering shadow maps
 extern GLuint deferredLightingShaderProgram;
-// extern GLuint shadowMapShaderProgram;
 
 void InitializeLights(void);
-// void SetupShadowMaps(void);
-// void CacheUniformLocationsForShadowmapShader(void);
-// void RenderPointLightShadowMap(int lightIndex, float lightPosX, float lightPosY, float lightPosZ);
-// void RenderDirtyShadowMaps(void);
 
 #endif // VOXEN_LIGHTS_H

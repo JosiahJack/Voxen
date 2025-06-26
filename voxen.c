@@ -25,7 +25,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 320, screen_height = 200;
+int screen_width = 800, screen_height = 600;
 bool window_has_focus = false;
 
 // Event System states
@@ -128,6 +128,7 @@ int InitializeEnvironment(void) {
     
     InitializeLights();
     SetupGBuffer();
+    SetupInstances();
     Input_Init();
     InitializeNetworking();
     return 0;
@@ -163,6 +164,7 @@ int ExitCleanup(int status) {
     
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     
+    if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
 
@@ -269,6 +271,7 @@ int main(int argc, char* argv[]) {
         if (!log_playback) {
             // Enqueue input events
             SDL_Event event;
+            float mouse_xrel = 0.0f, mouse_yrel = 0.0f;
             while (SDL_PollEvent(&event)) {
                 if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
                 else if (event.type == SDL_KEYDOWN) {
@@ -277,7 +280,8 @@ int main(int argc, char* argv[]) {
                 } else if (event.type == SDL_KEYUP) {
                     EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
                 } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
-                    EnqueueEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
+                    mouse_xrel += event.motion.xrel;
+                    mouse_yrel += event.motion.yrel;
 
                 // These aren't really events so just handle them here.
                 } else if (event.type == SDL_WINDOWEVENT) {
@@ -289,6 +293,11 @@ int main(int argc, char* argv[]) {
                         SDL_SetRelativeMouseMode(SDL_FALSE);
                     }
                 }
+            }
+            
+            // After polling, enqueue a single mouse motion event if there was movement
+            if (mouse_xrel != 0.0f || mouse_yrel != 0.0f) {
+                EnqueueEvent_FloatFloat(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
             }
         } else {
             // Log playback controls (pause, fast forward, rewind, quit playback)

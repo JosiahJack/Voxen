@@ -5,9 +5,12 @@
 
 #define MODEL_COUNT 3
 #define VERTEX_ATTRIBUTES_COUNT 8
+#define BOUNDS_ATTRIBUTES_COUNT 6
 
 extern uint32_t modelVertexCounts[];
 extern GLint modelTriangleCounts[];
+extern float modelBounds[];
+extern GLuint modelBoundsID;
 extern int32_t vbo_offsets[];
 extern uint32_t totalVertexCount;
 extern GLuint vao;

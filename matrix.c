@@ -31,7 +31,7 @@ void mat4_ortho(float* m, float left, float right, float bottom, float top, floa
     m[15] = 1.0f;
 }
 
-void mat4_multiply(float* result, const float* a, const float* b) {
+void mat4_multiply(float* result, float* a, float* b) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             result[i * 4 + j] = 0.0f;
@@ -42,7 +42,15 @@ void mat4_multiply(float* result, const float* a, const float* b) {
     }
 }
 
-void mat4_inverse(float *out, const float *m) {
+void mat4_scale(float *m, float sx, float sy, float sz) {
+    float t[16];
+    memcpy(t, m, 16 * sizeof(float));
+    m[0] = t[0] * sx; m[4] = t[4] * sx; m[8] = t[8] * sx; m[12] = t[12] * sx;
+    m[1] = t[1] * sy; m[5] = t[5] * sy; m[9] = t[9] * sy; m[13] = t[13] * sy;
+    m[2] = t[2] * sz; m[6] = t[6] * sz; m[10] = t[10] * sz; m[14] = t[14] * sz;
+}
+
+void mat4_inverse(float *out, float *m) {
     float tmp[16];
     tmp[0]  =  m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
     tmp[4]  = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];

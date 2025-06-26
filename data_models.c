@@ -21,6 +21,8 @@ GLuint vao; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];
 int32_t vbo_offsets[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
+GLuint modelBoundsID;
+float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 
 int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]) {
     for (int i = 0; i < MODEL_COUNT; i++) {
@@ -54,6 +56,12 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
 
         // Extract vertex data
         uint32_t vertexIndex = 0;
+        float minx = 1E9f;
+        float miny = 1E9f;
+        float minz = 1E9f;
+        float maxx = -1E9f;
+        float maxy = -1E9f;
+        float maxz = -1E9f;
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
@@ -67,9 +75,23 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
                 float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
                 tempVertices[vertexIndex++] = tempU;
                 tempVertices[vertexIndex++] = tempV;
+                
+                if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
+                if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
+                if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
+                if (mesh->mVertices[v].y > maxy) maxy = mesh->mVertices[v].y;
+                if (mesh->mVertices[v].z < minz) minz = mesh->mVertices[v].z;
+                if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
             }
         }
 
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 0] = minx;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 1] = miny;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 2] = minz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 3] = maxx;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 4] = maxy;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 5] = maxz;
+        printf("Model index %d minx %f, miny %f, minz %f ;; maxx %f, maxy %f, maxz %f\n",i,minx,miny,minz,maxx,maxy,maxz);
         vertexDataArrays[i] = tempVertices;
         vertexCounts[i] = vertexCount;
         aiReleaseImport(scene);
@@ -121,5 +143,10 @@ int SetupGeometry(void) {
     glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
 
     glBindVertexArray(0);
+    
+    glGenBuffers(1, &modelBoundsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    
     return 0;
 }

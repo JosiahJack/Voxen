@@ -75,14 +75,15 @@ void SetupGBuffer(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-int instanceCount = 25;
-Instance instances[8] = { [0 ... 7] = 
+int instanceCount = 16;
+Instance instances[16] = { [0 ... 15] = 
     {0,
     0.0f,0.0f,0.0f,
     0.0f,0.0f,0.0f,
     0.0f,0.0f,0.0f,0.0f}
 };
-GLuint instanceBuffer;
+
+GLuint instancesBuffer;
 
 void SetupInstances(void) {
     int currentModelType = 0;
@@ -99,8 +100,17 @@ void SetupInstances(void) {
         instances[idx].rotx = 0.0f; // Quaternion identity
         instances[idx].roty = 0.0f;
         instances[idx].rotz = 0.0f;
-        instances[idx].rotw = 1.0f;
+        if (idx >= (instanceCount / 2)) {
+            instances[idx].posx -= (instanceCount / 2) * 5.12f;
+            instances[idx].posy -= (instanceCount / 2) * 1.28f;
+        }
     }
+    
+    glGenBuffers(1, &instancesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 int ClearFrameBuffers(void) {
@@ -140,74 +150,62 @@ void CacheUniformLocationsForChunkShader(void) {
     lightFarPlaneLoc = glGetUniformLocation(deferredLightingShaderProgram, "lightFarPlane");
 }
 
-void RenderMeshInstances(GLint model_mat_loc, GLint texindex_loc, GLint modelindex_loc, float* matrices, int* instanceCurrentCount) {
-    float model[16]; // 4x4 matrix
-    int drawCallLimit = 10;
-    int currentModelType = 0;
-    int modelIndex = 0;
-    for (int yarray=0;yarray<drawCallLimit;yarray+=2) {
-        for (int xarray=0;xarray<drawCallLimit;xarray+=2) {
-            mat4_identity(model);
-            mat4_translate(model,(float)xarray * 2.56f, (float)yarray * 2.56f, 0.0f);
-            if (texindex_loc >= 0) glUniform1i(texindex_loc, currentModelType);
-            glUniform1i(modelindex_loc, modelIndex);
-            glUniformMatrix4fv(model_mat_loc, 1, GL_FALSE, model);
-            glBindVertexBuffer(0, vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[currentModelType]);
-            drawCallCount++;
-            modelIndex++;
-            vertexCount += modelVertexCounts[currentModelType];
-            
-            // Store model matrix
-            memcpy(&matrices[(*instanceCurrentCount) * 16], model, 16 * sizeof(float));
-            (*instanceCurrentCount)++;
+GLuint matricesBuffer;
+float *modelMatrices;
 
-            if (xarray % 4 == 0) {
-                currentModelType++;
-                if (currentModelType >= MODEL_COUNT) currentModelType = 0;
-            }
-        }
-    }
+void RenderMeshInstances(GLint model_mat_loc, GLint texindex_loc, GLint modelindex_loc) {
+    // Set up view and projection matrices
+    modelMatrices = (float *)malloc(instanceCount * 16 * sizeof(float)); // Matrix4x4 = 16
     
-    // TODO: Figure out why this doesn't work
-//     for (int i=0;i<instanceCount;i++) {
-//         mat4_identity(model);
-//         mat4_translate(model,instances[i].posx,instances[i].posy,instances[i].posz);
-//         if (texindex_loc >= 0) glUniform1i(texindex_loc, currentModelType);
-//         glUniform1i(modelindex_loc, instances[i].modelIndex);
-//         glUniformMatrix4fv(model_mat_loc, 1, GL_FALSE, model);
-//         glBindVertexBuffer(0, vbos[instances[i].modelIndex], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-//         glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
-//         drawCallCount++;
-//         vertexCount += modelVertexCounts[0];
-//     }   
+    float model[16]; // 4x4 matrix
+    for (int i=0;i<instanceCount;i++) {
+        mat4_identity(model);
+        mat4_scale(model, instances[i].sclx, instances[i].scly, instances[i].sclz); // Apply scale
+        float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
+        float rot[16];
+        mat4_identity(rot);
+        rot[0] = 1.0f - 2.0f * (y*y + z*z);
+        rot[1] = 2.0f * (x*y - w*z);
+        rot[2] = 2.0f * (x*z + w*y);
+        rot[4] = 2.0f * (x*y + w*z);
+        rot[5] = 1.0f - 2.0f * (x*x + z*z);
+        rot[6] = 2.0f * (y*z - w*x);
+        rot[8] = 2.0f * (x*z - w*y);
+        rot[9] = 2.0f * (y*z + w*x);
+        rot[10] = 1.0f - 2.0f * (x*x + y*y);
+        mat4_multiply(model, model, rot); // Apply rotation
+        mat4_translate(model, instances[i].posx, instances[i].posy, instances[i].posz); // Apply translation
+        memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
+        if (texindex_loc >= 0) glUniform1i(texindex_loc, instances[i].modelIndex);
+        glUniform1i(modelindex_loc, instances[i].modelIndex);
+        glUniformMatrix4fv(model_mat_loc, 1, GL_FALSE, model);
+        glBindVertexBuffer(0, vbos[instances[i].modelIndex], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
+        drawCallCount++;
+        vertexCount += modelVertexCounts[instances[i].modelIndex];
+    }
 }
 
 bool shadowsEnabled = true;
 
 int RenderStaticMeshes(void) {
     // Update the test light to be "attached" to the player
-    lights[0] = testLight_x;
-    lights[1] = testLight_y;
-    lights[2] = testLight_z;
-    lights[3] = testLight_intensity;
-    lights[4] = testLight_range;
-    lights[5] = testLight_spotAng;
-//     lightDirty[0] = true;
+    int lightBase = 0;
+    lights[lightBase + 0] = testLight_x;
+    lights[lightBase + 1] = testLight_y;
+    lights[lightBase + 2] = testLight_z;
+    lights[lightBase + 3] = testLight_intensity;
+    lights[lightBase + 4] = testLight_range;
+    lights[lightBase + 5] = testLight_spotAng;
+    lightDirty[lightBase / 6] = true;
     
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
-    int instanceCurrentCount = 0;
-    
-    // Render Shadowmaps (aka rerender whole scene for each light, YIKES!)
-//     RenderDirtyShadowMaps(); // Uses separate FBO                        DIDN'T WORK!!
-    
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glUseProgram(chunkShaderProgram);
     glEnable(GL_DEPTH_TEST);
 
     // Set up view and projection matrices
-    float *modelMatrices = (float *)malloc(25 * 16 * sizeof(float)); // Matrix4x4 = 16
     float view[16], projection[16];
     float fov = 65.0f;
     mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
@@ -221,46 +219,39 @@ int RenderStaticMeshes(void) {
     glBindVertexArray(vao);
 
     // Render each model instance, simple draw calls, no instancing yet
-    RenderMeshInstances(modelLoc, texIndexLoc, modelIndexLoc, modelMatrices, &instanceCurrentCount);
+    RenderMeshInstances(modelLoc, texIndexLoc, modelIndexLoc);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Apply deferred lighting with compute shader
     glUseProgram(deferredLightingShaderProgram);
-    
-    // Get 
-    glGenBuffers(1, &instanceBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instanceBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCurrentCount * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW); // * 16 because matrix4x4
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instanceBuffer);
-    free(modelMatrices);
 
     glUniform1ui(screenWidthLoc, screen_width);
-    glUniform1ui(screenHeightLoc, screen_height);
-    glUniform1f(lightFarPlaneLoc, 20.0f);
-    
-    // Lights buffer
+    glUniform1ui(screenHeightLoc, screen_height);    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    // Bind Vertices for each model type
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, vbos[0]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
     
-    // Bind instance buffer
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instanceBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
+    
+    glGenBuffers(1, &matricesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW); // * 16 because matrix4x4
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    free(modelMatrices);
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
     glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
     glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-    
-    
-    
-    
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "vertexCount"), vertexCount);
     glUniform1iv(glGetUniformLocation(deferredLightingShaderProgram, "triangleCounts"), MODEL_COUNT, modelTriangleCounts);
@@ -268,24 +259,11 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "view"), 1, GL_FALSE, view);
     glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "projection"), 1, GL_FALSE, projection);
     float viewInv[16];
-    mat4_inverse(&viewInv,&view);
-    
+    mat4_inverse(viewInv,view);
     float projInv[16];
-    mat4_inverse(&projInv,&projection);
+    mat4_inverse(projInv,projection);
     glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "invView"), 1, GL_FALSE, viewInv);
     glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "invProjection"), 1, GL_FALSE, projInv);
-    
-
-    
-    
-    
-//     for (int i = 0; i < LIGHT_COUNT; i++) {
-//         glActiveTexture(GL_TEXTURE0 + i);
-//         glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubemaps[i]);
-//         char uniformName[32];
-//         snprintf(uniformName, sizeof(uniformName), "shadowCubemaps[%d]", i);
-//         glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, uniformName), i);
-//     }
 
     // Dispatch compute shader
     GLuint groupX = (screen_width + 7) / 8;

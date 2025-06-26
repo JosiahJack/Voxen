@@ -2,7 +2,6 @@
 #include "shaders.h"
 #include "render.h"
 #include "text.h"
-#include "shadmap.glsl"
 #include "text.glsl"
 #include "chunk.glsl"
 #include "imageblit.glsl"
@@ -70,11 +69,6 @@ int CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program"); if (!imageBlitShaderProgram) { return 1; }
-
-//     // Shadowmap Shader
-//     vertShader = CompileShader(GL_VERTEX_SHADER,   shadMapVertSource, "Shadowmap Vertex Shader");            if (!vertShader) { return 1; }
-//     fragShader = CompileShader(GL_FRAGMENT_SHADER, shadMapFragSource, "Shadowmap Fragment Shader");          if (!fragShader) { glDeleteShader(vertShader); return 1; }
-//     shadowMapShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmap Shader Program"); if (!shadowMapShaderProgram) { return 1; }
 
     return 0;
 }

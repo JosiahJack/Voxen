@@ -9,22 +9,23 @@
 
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
-// float cam_yaw = 0.0f, cam_pitch = 0.0f;         // Camera orientation
 Quaternion cam_rotation;
 float cam_yaw = 180.0f;
 float cam_pitch = 90.0f;
 float cam_roll = 0.0f;
+float cam_fov = 65.0f;
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 
-float testLight_x = 10.24f;
-float testLight_y = 10.24f;
-float testLight_z = 0.0f;
-float testLight_intensity = 2.0f;
-float testLight_range = 10.0f;
+float testLight_x = 5.6f;
+float testLight_y = 3.2f;
+float testLight_z = 0.48f;
+float testLight_intensity = 4.0f;
+float testLight_range = 16.0f;
 float testLight_spotAng = 0.0f;
+bool noclip = true;
 
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
@@ -131,12 +132,11 @@ void ProcessInput(void) {
         cam_z += finalMoveSpeed * strafe_z;
     }
 
-    if (keys[SDL_SCANCODE_V]) {
-        cam_z += finalMoveSpeed; // Move up
-    } else if (keys[SDL_SCANCODE_C]) {
-        cam_z -= finalMoveSpeed; // Move down
+    if (noclip) {
+        if (keys[SDL_SCANCODE_V]) cam_z += finalMoveSpeed; // Move up
+        else if (keys[SDL_SCANCODE_C]) cam_z -= finalMoveSpeed; // Move down
     }
-
+    
     if (keys[SDL_SCANCODE_T]) {
         cam_roll += move_speed * 5.0f; // Move up
         Input_MouselookApply();
@@ -145,23 +145,14 @@ void ProcessInput(void) {
         Input_MouselookApply();
     }
     
-    if (keys[SDL_SCANCODE_J]) {
-        testLight_x += finalMoveSpeed;
-    } else if (keys[SDL_SCANCODE_K]) {
-        testLight_x -= finalMoveSpeed;
-    }
+    if (keys[SDL_SCANCODE_J]) testLight_x += finalMoveSpeed;
+    else if (keys[SDL_SCANCODE_K]) testLight_x -= finalMoveSpeed;
     
-    if (keys[SDL_SCANCODE_N]) {
-        testLight_y += finalMoveSpeed;
-    } else if (keys[SDL_SCANCODE_M]) {
-        testLight_y -= finalMoveSpeed;
-    }
+    if (keys[SDL_SCANCODE_N]) testLight_y += finalMoveSpeed;
+    else if (keys[SDL_SCANCODE_M]) testLight_y -= finalMoveSpeed;
     
-    if (keys[SDL_SCANCODE_U]) {
-        testLight_z += finalMoveSpeed;
-    } else if (keys[SDL_SCANCODE_I]) {
-        testLight_z -= finalMoveSpeed;
-    }
+    if (keys[SDL_SCANCODE_U]) testLight_z += finalMoveSpeed;
+    else if (keys[SDL_SCANCODE_I]) testLight_z -= finalMoveSpeed;
     
     if (keys[SDL_SCANCODE_L]) {
         testLight_range += finalMoveSpeed;
