@@ -159,6 +159,7 @@ int ExitCleanup(int status) {
     if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
+    if (inputModelInstanceID) glDeleteTextures(1,&inputModelInstanceID);
     
     if (outputImageID) glDeleteTextures(1,&outputImageID);
     

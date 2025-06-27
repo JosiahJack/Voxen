@@ -36,8 +36,8 @@ void InitializeLights(void) {
         lightDirty[i] = true;
     }
     
-    lights[0] = 10.24f;
-    lights[1] = 0.0f;
+    lights[0] = 0.0f;
+    lights[1] = -1.28f;
     lights[2] = 0.0f; // Fixed Z height
     lights[3] = 2.0f; // Default intensity
     lights[4] = 10.0f; // Default radius

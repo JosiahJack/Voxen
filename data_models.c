@@ -7,11 +7,15 @@
 #include <assimp/postprocess.h>
 #include "constants.h"
 #include "data_models.h"
+#include "debug.h"
 
 const char *modelPaths[MODEL_COUNT] = {
     "./Models/med1_1.fbx",
     "./Models/med1_7.fbx",
-    "./Models/med1_9.fbx"
+    "./Models/med1_9.fbx",
+    "./Models/crate1.fbx",
+    "./Models/test_cube.fbx",
+    "./Models/test_light.fbx"
 };
 
 GLuint chunkShaderProgram;
@@ -25,6 +29,8 @@ GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 
 int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]) {
+    int totalVertCount = 0;
+    int totalBounds = 0;
     for (int i = 0; i < MODEL_COUNT; i++) {
         const struct aiScene *scene = aiImportFile(modelPaths[i],
                                                     aiProcess_FindInvalidData
@@ -45,6 +51,7 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
         modelVertexCounts[i] = vertexCount;
         modelTriangleCounts[i] = (GLint)(vertexCount / 3);
         printf("Model %s loaded with %d vertices, %d tris\n", modelPaths[i], vertexCount, modelTriangleCounts[i]);
+        totalVertCount += vertexCount;
 
         // Allocate vertex data for this model
         float *tempVertices = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -91,6 +98,7 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 3] = maxx;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 4] = maxy;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 5] = maxz;
+        totalBounds += 6;
         printf("Model index %d minx %f, miny %f, minz %f ;; maxx %f, maxy %f, maxz %f\n",i,minx,miny,minz,maxx,maxy,maxz);
         vertexDataArrays[i] = tempVertices;
         vertexCounts[i] = vertexCount;
@@ -98,7 +106,11 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
     }
 
     // Log vertex counts
-    printf("modelVertexCounts 0 %d 1 %d 2 %d\n", modelVertexCounts[0], modelVertexCounts[1], modelVertexCounts[2]);
+    printf("Total vertices in buffer %d (",totalVertCount);
+    print_bytes_no_newline(totalVertCount * 8 * 4); // x,y,z,nx,ny,nz,u,v * 4
+    printf(") (Bounds ");
+    print_bytes_no_newline( totalBounds * 6 * 4); //minx,miny,minz,maxx,maxy,maxz * 4 
+    printf(")\n");
     return 0;
 }
 

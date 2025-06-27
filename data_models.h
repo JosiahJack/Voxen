@@ -3,7 +3,7 @@
 
 #include <GL/glew.h>
 
-#define MODEL_COUNT 3
+#define MODEL_COUNT 6 // Also need to set in deferred_lighting.compute!!
 #define VERTEX_ATTRIBUTES_COUNT 8
 #define BOUNDS_ATTRIBUTES_COUNT 6
 

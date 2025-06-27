@@ -19,9 +19,9 @@ float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 
-float testLight_x = 5.6f;
-float testLight_y = 3.2f;
-float testLight_z = 0.48f;
+float testLight_x = 0.0f;
+float testLight_y = -0.64f;
+float testLight_z = 1.12f;
 float testLight_intensity = 4.0f;
 float testLight_range = 16.0f;
 float testLight_spotAng = 0.0f;
@@ -54,7 +54,7 @@ int Input_KeyDown(uint32_t scancode) {
     
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
-        if (debugView > 3) debugView = 0;
+        if (debugView > 4) debugView = 0;
     }
     
     if (keys[SDL_SCANCODE_O]) {

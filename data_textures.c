@@ -2,6 +2,7 @@
 #include <GL/glew.h>
 #include "data_textures.h"
 #include "constants.h"
+#include "debug.h"
 
 SDL_Surface *textureSurfaces[TEXTURE_COUNT];
 GLuint textureIDs[TEXTURE_COUNT];
@@ -14,7 +15,8 @@ int textureSizes[TEXTURE_COUNT * 2];
 const char *texturePaths[TEXTURE_COUNT] = {
     "./Textures/med1_1.png",
     "./Textures/med1_7.png",
-    "./Textures/med1_9.png"
+    "./Textures/med1_9.png",
+    "./Textures/white.png"
 };
 
 int LoadTextures(void) {
@@ -28,6 +30,7 @@ int LoadTextures(void) {
         textureSizes[i * 2] = surface->w;
         textureSizes[(i * 2) + 1] = surface->h;
         SDL_FreeSurface(surface);
+        printf("Texture %s loaded with %d pixels, %d wide by %d tall\n", texturePaths[i],  surface->w * surface->h, surface->w, surface->h);
     }
 
     // Allocate color buffer data
@@ -53,7 +56,12 @@ int LoadTextures(void) {
         SDL_FreeSurface(textureSurfaces[i]);
         textureSurfaces[i] = NULL;
     }
-
+    
+    printf("Last pixel: r %f, g %f, b %f, a %f\n",colorData[(totalPixels * 4) - 4],colorData[(totalPixels * 4) - 3],colorData[(totalPixels * 4) - 2],colorData[(totalPixels * 4) - 1]);
+    printf("Total pixels in buffer %d (",totalPixels);
+    print_bytes_no_newline(totalPixels * 4 * 4); // rgba = 4, 4 bytes per float = 4x4
+    printf(")\n");
+    
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);

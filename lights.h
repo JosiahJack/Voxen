@@ -20,7 +20,6 @@ extern float spotAngTypes[];
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern GLuint lightBufferID;
 extern bool lightDirty[LIGHT_COUNT];
-extern GLuint inputImageID, inputNormalsID, inputDepthID, outputImageID;
 extern GLuint deferredLightingShaderProgram;
 
 void InitializeLights(void);

@@ -11,6 +11,7 @@ const char *deferredLighting_computeShader =
     "layout(r32f,    binding = 2) uniform image2D inputDepth;\n"
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
     "layout(rgba8,   binding = 4) uniform image2D outputImage;\n"
+    "layout(r32i,    binding = 5) uniform iimage2D inputModelInstanceID;\n"
 
     // Light buffer
     "layout(std430, binding = 5) buffer LightBuffer {\n"
@@ -18,7 +19,7 @@ const char *deferredLighting_computeShader =
     "};\n"
 
     // Vertex buffers (one per model, bound as SSBOs)
-    "#define MODEL_COUNT 3\n"
+    "#define MODEL_COUNT 6\n"
     "layout(std430, binding = 6) buffer VertexBuffer0 { float vertices0[]; };\n"
     "layout(std430, binding = 7) buffer VertexBuffer1 { float vertices1[]; };\n"
     "layout(std430, binding = 8) buffer VertexBuffer2 { float vertices2[]; };\n"
@@ -90,7 +91,9 @@ const char *deferredLighting_computeShader =
 
     // --- Trace Ray for Shadow ---
     "bool TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
-    "    for (int i = 0; i < 1/*instanceCount*/; i++) {\n"
+    "    for (int i = 0; i < instanceCount; i++) {\n"
+    "        if (i == 3) continue;\n" // Test light
+
     "        Instance inst = instances[i];\n"
     "        mat4 invModel = inverse(instanceMatrices[i]);\n"
     "        vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;\n"
@@ -137,42 +140,47 @@ const char *deferredLighting_computeShader =
     "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
     "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
     "    float depth = imageLoad(inputDepth, ivec2(pixel)).r;\n"
-    "    vec3 lighting = vec3(0.0);\n"
+    "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
 
-    "    for (int i = 0; i < lights.length(); i += 12) {\n" // Stride of 12
-    "        float intensity = lights[i + 3];\n"
-    "        if (intensity < 0.015) continue;\n"
+    "    int texIndex = imageLoad(inputModelInstanceID, ivec2(pixel)).b;\n"
+    "    if (texIndex == 3) {\n"
+    "        lighting = color.rgb;\n"
+    "    } else {\n"
+        "    for (int i = 0; i < lights.length(); i += 12) {\n" // Stride of 12
+        "        float intensity = lights[i + 3];\n"
+        "        if (intensity < 0.015) continue;\n"
 
-    "        float range = lights[i + 4];\n"
-    "        vec3 lightPos = vec3(lights[i + 0], lights[i + 1], lights[i + 2]);\n"
-    "        vec3 toLight = lightPos - worldPos;\n"
-    "        float dist = length(toLight);\n"
-    "        if (dist > range) continue;\n"
+        "        float range = lights[i + 4];\n"
+        "        vec3 lightPos = vec3(lights[i + 0], lights[i + 1], lights[i + 2]);\n"
+        "        vec3 toLight = lightPos - worldPos;\n"
+        "        float dist = length(toLight);\n"
+        "        if (dist > range) continue;\n"
 
-    "        vec3 lightDir = normalize(toLight);\n"
-    "        float spotAng = lights[i + 5];\n"
-    "        vec3 spotDir = vec3(lights[i + 6], lights[i + 7], lights[i + 8]);\n"
-    "        vec3 lightColor = vec3(lights[i + 9], lights[i + 10], lights[i + 11]);\n"
-    "        float spotFalloff = 1.0;\n"
-    "        if (spotAng > 0.0) {\n"
-    "            float spotdot = dot(spotDir, -lightDir);\n"
-    "            float cosAngle = cos(radians(spotAng / 2.0));\n"
-    "            if (spotdot < cosAngle) continue;\n"
-    "            float cosOuterAngle = cos(radians(spotAng / 2.0));\n"
-    "            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));\n"
-    "            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);\n"
-    "            if (spotFalloff <= 0.0) continue;\n"
-    "        }\n"
+        "        vec3 lightDir = normalize(toLight);\n"
+        "        float spotAng = lights[i + 5];\n"
+        "        vec3 spotDir = vec3(lights[i + 6], lights[i + 7], lights[i + 8]);\n"
+        "        vec3 lightColor = vec3(lights[i + 9], lights[i + 10], lights[i + 11]);\n"
+        "        float spotFalloff = 1.0;\n"
+        "        if (spotAng > 0.0) {\n"
+        "            float spotdot = dot(spotDir, -lightDir);\n"
+        "            float cosAngle = cos(radians(spotAng / 2.0));\n"
+        "            if (spotdot < cosAngle) continue;\n"
+        "            float cosOuterAngle = cos(radians(spotAng / 2.0));\n"
+        "            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));\n"
+        "            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);\n"
+        "            if (spotFalloff <= 0.0) continue;\n"
+        "        }\n"
 
-    "        float shadow = 1.0;\n"
-    "        if (shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
-    "            if (TraceRay(worldPos + normal * 0.5, lightDir, 100.0)) shadow = 0.0;\n"
-    "        }\n"
+        "        float shadow = 1.0;\n"
+        "        if (shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
+        "            if (TraceRay(worldPos + normal * 0.01, lightDir, 100.0)) shadow = 0.0;\n"
+        "        }\n"
 
-    "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"
-    "        attenuation *= shadow;\n"
+        "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"
+        "        attenuation *= shadow;\n"
 
-    "        lighting += color.rgb * intensity * attenuation * lightColor * spotFalloff;\n"
+        "        lighting += color.rgb * intensity * attenuation * lightColor * spotFalloff;\n"
+        "    }\n"
     "    }\n"
 
     "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n"

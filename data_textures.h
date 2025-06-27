@@ -5,7 +5,7 @@
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 
-#define TEXTURE_COUNT 3
+#define TEXTURE_COUNT 4
 
 extern SDL_Surface *textureSurfaces[];
 // extern GLuint textureIDs[];
