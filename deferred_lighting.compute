@@ -90,7 +90,7 @@ const char *deferredLighting_computeShader =
     "}\n"
 
     // --- Trace Ray for Shadow ---
-    "bool TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
+    "float TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
     "    for (int i = 0; i < instanceCount; i++) {\n"
     "        if (i == 3) continue;\n" // Test light
 
@@ -105,7 +105,16 @@ const char *deferredLighting_computeShader =
     "        float maxx = bounds[boundsBase + 3];\n"
     "        float maxy = bounds[boundsBase + 4];\n"
     "        float maxz = bounds[boundsBase + 5];\n"
-    "        if (RayAABB(localOrigin, localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) return true;\n"
+    "        float blockFac = 0.0;\n"
+    "        float jitter = 0.01;\n"
+    "        if (RayAABB(localOrigin, localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        if (RayAABB(localOrigin + vec3(jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        if (RayAABB(localOrigin + vec3(0.0,jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        if (RayAABB(localOrigin + vec3(0.0,0.0,jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        if (RayAABB(localOrigin + vec3(-jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        if (RayAABB(localOrigin + vec3(0.0,-jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        if (RayAABB(localOrigin + vec3(0.0,0.0,-jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+    "        return 1.0 - (blockFac / 7.0);\n"
 //     "            int triCount = triangleCounts[inst.modelIndex];\n"
 //     "            for (int tri = 0; tri < triCount; tri++) {\n"
 //     "                int base = tri * 24;\n"
@@ -124,11 +133,11 @@ const char *deferredLighting_computeShader =
 //     "                    v2 = vec3(vertices2[base + 16], vertices2[base + 17], vertices2[base + 18]);\n"
 //     "                }\n"
 //     "                float t;\n"
-//     "                if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && t < maxDist) return true;\n"
+//     "                if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && t < maxDist) return 1.0;\n"
 //     "            }\n"
 //     "        }\n"
     "    }\n"
-    "    return false;\n"
+    "    return 1.0;\n"
     "}\n"
 
     // --- Main Compute Shader ---
@@ -173,7 +182,7 @@ const char *deferredLighting_computeShader =
 
         "        float shadow = 1.0;\n"
         "        if (shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
-        "            if (TraceRay(worldPos + normal * 0.01, lightDir, 100.0)) shadow = 0.0;\n"
+        "            shadow = TraceRay(worldPos + normal * 0.01, lightDir, 100.0);\n"
         "        }\n"
 
         "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"
