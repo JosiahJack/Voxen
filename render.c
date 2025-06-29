@@ -280,8 +280,10 @@ int RenderStaticMeshes(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, vbos[0]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
     
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * sizeof(Instance), instances);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     
