@@ -79,8 +79,8 @@ void SetupGBuffer(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-int instanceCount = 40;
-Instance instances[40] = { [0 ... 40 - 1] = 
+int instanceCount = 1000;
+Instance instances[1000] = { [0 ... 100 - 1] = 
     {0,
     0.0f,0.0f,0.0f,
     1.0f,1.0f,1.0f,
@@ -92,14 +92,13 @@ float * modelMatrices = NULL;
 
 void SetupInstances(void) {
     int currentModelType = 0;
-    float xpos = 0.0f;
-    float ypos = 0.0f;
-    float xoffset = 0.0f;
+    int x = 0;
+    int y = 0;
     for (int idx=0;idx<instanceCount;idx++) {
         instances[idx].modelIndex = currentModelType;
-        instances[idx].texIndex = 1; // Set by entity definition when loaded.
-        instances[idx].posx = xpos + ((float)idx * 2.56f) - xoffset; // Position in grid with gaps for shadow testing.
-        instances[idx].posy = ypos;
+        instances[idx].texIndex = 0; // Set by entity definition when loaded.
+        instances[idx].posx = ((float)x * 2.56f); // Position in grid with gaps for shadow testing.
+        instances[idx].posy = ((float)y * 5.12f);
         instances[idx].posz = 0.0f;
         instances[idx].sclx = 1.0f; // Default scale
         instances[idx].scly = 1.0f;
@@ -108,9 +107,10 @@ void SetupInstances(void) {
         instances[idx].roty = 0.0f;
         instances[idx].rotz = 0.0f;
         instances[idx].rotw = 1.0f;
-        if (idx == 20) {
-            ypos += 5.12f;
-            xoffset = instances[idx].posx + 2.56f;
+        x++;
+        if (idx == 100 || idx == 200 || idx == 300 || idx == 400 || idx == 500 || idx == 600 || idx == 700 || idx == 800 || idx == 900) {
+            x = 0;
+            y++;
         }
     }
     
@@ -282,8 +282,8 @@ int RenderStaticMeshes(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
     
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, instanceCount * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW); // * 16 because matrix4x4
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * sizeof(Instance), instances);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
     glUniform1uiv(textureOffsetsLoc_deferred, textureCount, textureOffsets);
