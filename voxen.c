@@ -169,6 +169,8 @@ int ExitCleanup(int status) {
     if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (modelMatrices) free(modelMatrices);
+    if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
+    if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
 
     // Cleanup initialized systems in reverse order.
     // Independent ifs so that we can exit from anywhere and de-init only as needed.

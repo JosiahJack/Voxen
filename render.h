@@ -10,6 +10,8 @@ extern int screen_height;
 extern uint32_t drawCallCount;
 extern uint32_t vertexCount;
 extern float * modelMatrices;
+extern GLuint matricesBuffer;
+extern GLuint instancesBuffer;
 extern GLuint quadVAO, quadVBO;
 extern GLuint chunkShaderProgram;
 extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;

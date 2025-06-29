@@ -79,8 +79,8 @@ void SetupGBuffer(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-int instanceCount = 4;
-Instance instances[4] = { [0 ... 4 - 1] = 
+int instanceCount = 40;
+Instance instances[40] = { [0 ... 40 - 1] = 
     {0,
     0.0f,0.0f,0.0f,
     1.0f,1.0f,1.0f,
@@ -91,14 +91,15 @@ GLuint instancesBuffer;
 float * modelMatrices = NULL;
 
 void SetupInstances(void) {
-    int currentModelType = 4;
+    int currentModelType = 0;
     float xpos = 0.0f;
     float ypos = 0.0f;
+    float xoffset = 0.0f;
     for (int idx=0;idx<instanceCount;idx++) {
         instances[idx].modelIndex = currentModelType;
         instances[idx].texIndex = 1; // Set by entity definition when loaded.
-        instances[idx].posx = xpos + ((float)idx * 5.12f); // Position in grid with gaps for shadow testing.
-        instances[idx].posy = ypos + ((float)idx * 2.56f);
+        instances[idx].posx = xpos + ((float)idx * 2.56f) - xoffset; // Position in grid with gaps for shadow testing.
+        instances[idx].posy = ypos;
         instances[idx].posz = 0.0f;
         instances[idx].sclx = 1.0f; // Default scale
         instances[idx].scly = 1.0f;
@@ -107,36 +108,17 @@ void SetupInstances(void) {
         instances[idx].roty = 0.0f;
         instances[idx].rotz = 0.0f;
         instances[idx].rotw = 1.0f;
-        if (idx >= (instanceCount / 2)) {
-            instances[idx].posx -= (instanceCount / 2) * 5.12f;
-            instances[idx].posy -= (instanceCount / 2) * 1.28f;
+        if (idx == 20) {
+            ypos += 5.12f;
+            xoffset = instances[idx].posx + 2.56f;
         }
     }
     
-    instances[1].modelIndex = 2;
-    instances[1].texIndex = 0;
-    instances[1].posx = 2.56f;
-    instances[1].posy = 0.0f;
-    instances[1].posz = 0.0f;
-    
-    instances[1].modelIndex = 0;
-    instances[1].texIndex = 1;
-    instances[2].posx = 2.56f;
-    instances[2].posy = -2.56f;
-    instances[2].posz = 0.0f;
-    instances[2].rotx = 0.0f;
-    instances[2].roty = 0.7071f; // 90deg about Y
-    instances[2].rotz = 0.0f;
-    instances[2].rotw = 0.7071f;
-    
-    instances[3].modelIndex = 5; // Test Light
-    instances[3].texIndex = 3; // white light
-    instances[3].posx = 2.56f;
-    instances[3].posy = 0.0f;
-    instances[3].posz = 0.0f;
-    instances[3].sclx = 0.16f;
-    instances[3].scly = 0.16f;
-    instances[3].sclz = 0.16f;
+    instances[39].modelIndex = 5; // Test Light
+    instances[39].texIndex = 3; // white light
+    instances[39].sclx = 0.16f;
+    instances[39].scly = 0.16f;
+    instances[39].sclz = 0.16f;
     
     glGenBuffers(1, &instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
@@ -149,6 +131,9 @@ void SetupInstances(void) {
     printf("\n");
     
     modelMatrices = malloc(instanceCount * 16 * sizeof(float)); // Matrix4x4 = 16
+    glGenBuffers(1, &matricesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
 }
 
 int ClearFrameBuffers(void) {
@@ -249,9 +234,9 @@ int RenderStaticMeshes(void) {
     lights[lightBase + 11] = 1.0f; // b
     lightDirty[lightBase / 6] = true;
     
-    instances[3].posx = testLight_x;
-    instances[3].posy = testLight_y;
-    instances[3].posz = testLight_z;
+    instances[39].posx = testLight_x;
+    instances[39].posy = testLight_y;
+    instances[39].posz = testLight_z;
     
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
@@ -297,14 +282,8 @@ int RenderStaticMeshes(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
     
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
-    
-    glGenBuffers(1, &matricesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW); // * 16 because matrix4x4
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, instanceCount * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW); // * 16 because matrix4x4
     
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
     glUniform1uiv(textureOffsetsLoc_deferred, textureCount, textureOffsets);
@@ -320,17 +299,12 @@ int RenderStaticMeshes(void) {
     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
     
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
-    glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "vertexCount"), vertexCount);
     glUniform1iv(glGetUniformLocation(deferredLightingShaderProgram, "triangleCounts"), MODEL_COUNT, modelTriangleCounts);
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "instanceCount"), instanceCount);
-    glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "view"), 1, GL_FALSE, view);
-    glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "projection"), 1, GL_FALSE, projection);
     float viewInv[16];
     mat4_inverse(viewInv,view);
     float projInv[16];
     mat4_inverse(projInv,projection);
-    glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "invView"), 1, GL_FALSE, viewInv);
-    glUniformMatrix4fv(glGetUniformLocation(deferredLightingShaderProgram, "invProjection"), 1, GL_FALSE, projInv);
 
     // Dispatch compute shader
     GLuint groupX = (screen_width + 7) / 8;

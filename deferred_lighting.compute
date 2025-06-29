@@ -27,6 +27,7 @@ const char *deferredLighting_computeShader =
 
     "struct Instance {\n"
     "    int modelIndex;\n"
+    "    int texIndex;\n"
     "    float posx;\n"
     "    float posy;\n"
     "    float posz;\n"
@@ -97,11 +98,13 @@ const char *deferredLighting_computeShader =
     "}\n"
 
     // --- Trace Ray for Shadow ---
-    "float TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
+    "float TraceRay(vec3 origin, vec3 dir, float maxDist, int pixelInstance) {\n"
     "    for (int i = 0; i < instanceCount; i++) {\n"
-    "        if (i == 3) continue;\n" // Test light
+    "        if (i == pixelInstance) continue;\n" // Don't self-shadow (for now, since ray traced shadows are off at the moment).
 
     "        Instance inst = instances[i];\n"
+    "        if (inst.texIndex == 3) continue;\n" // Fullbright light
+
     "        mat4 invModel = inverse(instanceMatrices[i]);\n"
     "        vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;\n"
     "        vec3 localDir = ((invModel * vec4(dir, 0.0)).xyz);\n"
@@ -115,14 +118,10 @@ const char *deferredLighting_computeShader =
     "        float blockFac = 0.0;\n"
     "        float jitter = 0.01;\n"
     "        if (RayAABB(localOrigin, localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        if (RayAABB(localOrigin + vec3(jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        if (RayAABB(localOrigin + vec3(0.0,jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        if (RayAABB(localOrigin + vec3(0.0,0.0,jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        if (RayAABB(localOrigin + vec3(-jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        if (RayAABB(localOrigin + vec3(0.0,-jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        if (RayAABB(localOrigin + vec3(0.0,0.0,-jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-//     "        return 1.0 - (blockFac / 7.0);\n"
-    "           return 1.0 - blockFac;\n"
+    "        return 1.0 - blockFac;\n"
+
+// Ray tracing disabled for now until RayAABB works for all instances.
+//     "        if (RayAABB(localOrigin, localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) {\n"
 //     "            int triCount = triangleCounts[inst.modelIndex];\n"
 //     "            for (int tri = 0; tri < triCount; tri++) {\n"
 //     "                int base = tri * 24;\n"
@@ -141,7 +140,7 @@ const char *deferredLighting_computeShader =
 //     "                    v2 = vec3(vertices2[base + 16], vertices2[base + 17], vertices2[base + 18]);\n"
 //     "                }\n"
 //     "                float t;\n"
-//     "                if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && t < maxDist) return 1.0;\n"
+//     "                if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && t < maxDist) return 0.0;\n"
 //     "            }\n"
 //     "        }\n"
     "    }\n"
@@ -159,7 +158,9 @@ const char *deferredLighting_computeShader =
     "    float depth = texture(inputDepth, ivec2(pixel)).r;\n"
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
 
-    "    int texIndex = imageLoad(inputModelInstanceID, ivec2(pixel)).b;\n"
+    "    ivec4 indicesPack = imageLoad(inputModelInstanceID, ivec2(pixel));\n"
+    "    int pixelInstance = indicesPack.r;\n"
+    "    int texIndex = indicesPack.b;\n"
     "    if (texIndex == 3) {\n"
     "        lighting = color.rgb;\n"
     "    } else {\n"
@@ -190,7 +191,7 @@ const char *deferredLighting_computeShader =
 
         "        float shadow = 1.0;\n"
         "        if (shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
-        "            shadow = TraceRay(worldPos + normal * 0.01, lightDir, 100.0);\n"
+        "            shadow = TraceRay(worldPos + normal * 0.01, lightDir, 100.0,pixelInstance);\n"
         "        }\n"
 
         "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"
