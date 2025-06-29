@@ -121,7 +121,8 @@ const char *deferredLighting_computeShader =
 //     "        if (RayAABB(localOrigin + vec3(-jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
 //     "        if (RayAABB(localOrigin + vec3(0.0,-jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
 //     "        if (RayAABB(localOrigin + vec3(0.0,0.0,-jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        return 1.0 - (blockFac / 7.0);\n"
+//     "        return 1.0 - (blockFac / 7.0);\n"
+    "           return 1.0 - blockFac;\n"
 //     "            int triCount = triangleCounts[inst.modelIndex];\n"
 //     "            for (int tri = 0; tri < triCount; tri++) {\n"
 //     "                int base = tri * 24;\n"
@@ -199,11 +200,12 @@ const char *deferredLighting_computeShader =
         "    }\n"
     "    }\n"
 
+    // Dither
     "    int blueNoiseTextureIndex = 4;\n"
     "    ivec2 texSize = textureSizes[blueNoiseTextureIndex];\n"
     "    int pixelIndex = int(textureOffsets[blueNoiseTextureIndex] * 4) + ((int(pixel.y) % texSize.y) * texSize.x + (int(pixel.x) % texSize.x)) * 4;\n" // Calculate 1D index.  * 4 for four rgba values.
     "    vec4 bluenoise = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
-    "    lighting += 0.0;//((bluenoise.rgb * 8.0/255.0) - (4.0/255.0));\n"
+    "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
 
     "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n"
     "}\n";
