@@ -8,10 +8,10 @@ const char *deferredLighting_computeShader =
     // G-buffer inputs
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba16f, binding = 1) uniform image2D inputNormals;\n"
-    "layout(r32f,    binding = 2) uniform image2D inputDepth;\n"
+    "layout(binding = 2) uniform sampler2D inputDepth;\n"
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
-    "layout(rgba8,   binding = 4) uniform image2D outputImage;\n"
-    "layout(r32i,    binding = 5) uniform iimage2D inputModelInstanceID;\n"
+    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
+    "layout(rgba32i, binding = 5) uniform iimage2D inputModelInstanceID;\n"
 
     // Light buffer
     "layout(std430, binding = 5) buffer LightBuffer {\n"
@@ -46,6 +46,13 @@ const char *deferredLighting_computeShader =
     "layout(std430, binding = 11) buffer InstanceBuffer {\n"
     "    mat4 instanceMatrices[];\n"
     "};\n"
+
+    "layout(std430, binding = 12) buffer ColorBuffer {\n"
+    "    float colors[];\n" // 1D color array (RGBA)
+    "};\n"
+
+    "uniform uint textureOffsets[];\n" // Offsets for each texture
+    "uniform ivec2 textureSizes[];\n" // Width, height for each texture
 
     // Uniforms from deferred shader
     "uniform uint screenWidth;\n"
@@ -108,12 +115,12 @@ const char *deferredLighting_computeShader =
     "        float blockFac = 0.0;\n"
     "        float jitter = 0.01;\n"
     "        if (RayAABB(localOrigin, localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        if (RayAABB(localOrigin + vec3(jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        if (RayAABB(localOrigin + vec3(0.0,jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        if (RayAABB(localOrigin + vec3(0.0,0.0,jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        if (RayAABB(localOrigin + vec3(-jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        if (RayAABB(localOrigin + vec3(0.0,-jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
-    "        if (RayAABB(localOrigin + vec3(0.0,0.0,-jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+//     "        if (RayAABB(localOrigin + vec3(jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+//     "        if (RayAABB(localOrigin + vec3(0.0,jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+//     "        if (RayAABB(localOrigin + vec3(0.0,0.0,jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+//     "        if (RayAABB(localOrigin + vec3(-jitter,0.0,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+//     "        if (RayAABB(localOrigin + vec3(0.0,-jitter,0.0), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
+//     "        if (RayAABB(localOrigin + vec3(0.0,0.0,-jitter), localDir, minx, miny, minz, maxx, maxy, maxz, maxDist)) blockFac += 1.0;\n"
     "        return 1.0 - (blockFac / 7.0);\n"
 //     "            int triCount = triangleCounts[inst.modelIndex];\n"
 //     "            for (int tri = 0; tri < triCount; tri++) {\n"
@@ -148,7 +155,7 @@ const char *deferredLighting_computeShader =
     "    vec3 worldPos = imageLoad(inputWorldPos, ivec2(pixel)).xyz;\n"
     "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
     "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
-    "    float depth = imageLoad(inputDepth, ivec2(pixel)).r;\n"
+    "    float depth = texture(inputDepth, ivec2(pixel)).r;\n"
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
 
     "    int texIndex = imageLoad(inputModelInstanceID, ivec2(pixel)).b;\n"
@@ -191,6 +198,12 @@ const char *deferredLighting_computeShader =
         "        lighting += color.rgb * intensity * attenuation * lightColor * spotFalloff;\n"
         "    }\n"
     "    }\n"
+
+    "    int blueNoiseTextureIndex = 4;\n"
+    "    ivec2 texSize = textureSizes[blueNoiseTextureIndex];\n"
+    "    int pixelIndex = int(textureOffsets[blueNoiseTextureIndex] * 4) + ((int(pixel.y) % texSize.y) * texSize.x + (int(pixel.x) % texSize.x)) * 4;\n" // Calculate 1D index.  * 4 for four rgba values.
+    "    vec4 bluenoise = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
+    "    lighting += 0.0;//((bluenoise.rgb * 8.0/255.0) - (4.0/255.0));\n"
 
     "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n"
     "}\n";

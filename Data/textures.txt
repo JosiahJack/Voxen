@@ -1,0 +1,25 @@
+// Texture Definitions
+// Defines each texture used by the game or mod
+// Format:
+// # Indicates start of an entry followed by the file path.  ./ is assumed
+// example: #Textures/my_super_awesome_image.png
+// Acceptable file formats: .png
+// The path must include the file extension
+// 
+// Next are key:value pairs separated by : and whitespace ignored
+// Acceptable keys: index
+// index indicates which index into the master texture array to use.
+// All other systems reference what texture to use by index (e.g. entity 
+// definition for a model will specify texture by index)
+// example: index: 451
+//
+#Textures/med1_1.png
+index: 0
+#Textures/med1_7.png
+index: 1
+#Textures/med1_9.png
+index: 2
+#Textures/white.png
+index: 3
+#Textures/bluenoise64.png
+index: 4

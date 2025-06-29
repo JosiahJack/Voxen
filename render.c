@@ -48,13 +48,13 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int he
 void SetupGBuffer(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,              GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
-    GenerateAndBindTexture(&inputNormalsID,          GL_RGBA16F, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, "Unlit Raster Normals");
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32F, screen_width, screen_height, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, "Unlit Raster Depth");
-    GenerateAndBindTexture(&inputWorldPosID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, "Unlit Raster World Positions");
+    GenerateAndBindTexture(&inputNormalsID,          GL_RGBA16F, screen_width, screen_height,            GL_RGBA,    GL_HALF_FLOAT, "Unlit Raster Normals");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32F, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, "Unlit Raster Depth");
+    GenerateAndBindTexture(&inputWorldPosID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, "Unlit Raster World Positions");
     GenerateAndBindTexture(&inputModelInstanceID,    GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,           GL_INT, "Unlit Raster Instance and Model Indices");
     
     // Second pass gbuffer images
-    GenerateAndBindTexture(&outputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,           GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, "Deferred Lighting Result Colors");
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -88,6 +88,7 @@ Instance instances[4] = { [0 ... 4 - 1] =
 };
 
 GLuint instancesBuffer;
+float * modelMatrices = NULL;
 
 void SetupInstances(void) {
     int currentModelType = 4;
@@ -95,6 +96,7 @@ void SetupInstances(void) {
     float ypos = 0.0f;
     for (int idx=0;idx<instanceCount;idx++) {
         instances[idx].modelIndex = currentModelType;
+        instances[idx].texIndex = 1; // Set by entity definition when loaded.
         instances[idx].posx = xpos + ((float)idx * 5.12f); // Position in grid with gaps for shadow testing.
         instances[idx].posy = ypos + ((float)idx * 2.56f);
         instances[idx].posz = 0.0f;
@@ -112,11 +114,13 @@ void SetupInstances(void) {
     }
     
     instances[1].modelIndex = 2;
+    instances[1].texIndex = 0;
     instances[1].posx = 2.56f;
     instances[1].posy = 0.0f;
     instances[1].posz = 0.0f;
     
     instances[1].modelIndex = 0;
+    instances[1].texIndex = 1;
     instances[2].posx = 2.56f;
     instances[2].posy = -2.56f;
     instances[2].posz = 0.0f;
@@ -126,29 +130,13 @@ void SetupInstances(void) {
     instances[2].rotw = 0.7071f;
     
     instances[3].modelIndex = 5; // Test Light
+    instances[3].texIndex = 3; // white light
     instances[3].posx = 2.56f;
     instances[3].posy = 0.0f;
     instances[3].posz = 0.0f;
     instances[3].sclx = 0.16f;
     instances[3].scly = 0.16f;
     instances[3].sclz = 0.16f;
-    
-//     
-//     instances[3].posx = 0.0f;
-//     instances[3].posy = -2.56f;
-//     instances[3].posz = 0.0f;
-//     instances[3].rotx = 0.0f;
-//     instances[3].roty = -0.7071f; // 270deg about Y
-//     instances[3].rotz = 0.0f;
-//     instances[3].rotw = 0.7071f;
-//     
-//     instances[4].posx = 0.0f;
-//     instances[4].posy = 0.0f;
-//     instances[4].posz = 2.56f;
-//     
-//     instances[5].posx = 2.56f;
-//     instances[5].posy = 0.0f;
-//     instances[5].posz = 2.56f;
     
     glGenBuffers(1, &instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
@@ -159,6 +147,8 @@ void SetupInstances(void) {
     printf("Total instance size ");
     print_bytes_no_newline(instanceCount * 11 * 4);
     printf("\n");
+    
+    modelMatrices = malloc(instanceCount * 16 * sizeof(float)); // Matrix4x4 = 16
 }
 
 int ClearFrameBuffers(void) {
@@ -178,9 +168,11 @@ int ClearFrameBuffers(void) {
 
 // Global uniform locations (cached during init)
 GLint viewLoc = -1, projectionLoc = -1, matrixLoc = -1, texIndexLoc = -1;
-GLint textureOffsetsLoc = -1, textureSizesLoc = -1, modelIndexLoc = -1;
+GLint textureOffsetsLoc_chunk = -1, textureSizesLoc_chunk = -1, modelIndexLoc = -1;
 GLint instanceIndexLoc = -1, instanceCountLoc_chunk = -1, modelCountLoc_chunk = -1;
-GLint textureCountLoc = -1, debugViewLoc = -1;
+GLint textureCountLoc_chunk = -1, debugViewLoc = -1;
+
+GLint textureOffsetsLoc_deferred = -1, textureSizesLoc_deferred = -1;
 
  GLint screenWidthLoc, screenHeightLoc, lightFarPlaneLoc;
 
@@ -190,9 +182,9 @@ void CacheUniformLocationsForChunkShader(void) {
     projectionLoc = glGetUniformLocation(chunkShaderProgram, "projection");
     matrixLoc = glGetUniformLocation(chunkShaderProgram, "matrix");
     texIndexLoc = glGetUniformLocation(chunkShaderProgram, "texIndex");
-    textureOffsetsLoc = glGetUniformLocation(chunkShaderProgram, "textureOffsets");
-    textureSizesLoc = glGetUniformLocation(chunkShaderProgram, "textureSizes");
-    textureCountLoc = glGetUniformLocation(chunkShaderProgram, "textureCount");
+    textureOffsetsLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureOffsets");
+    textureSizesLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureSizes");
+    textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
     instanceIndexLoc = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     instanceCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceCount");
     modelCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelCount");
@@ -202,6 +194,8 @@ void CacheUniformLocationsForChunkShader(void) {
     screenWidthLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     lightFarPlaneLoc = glGetUniformLocation(deferredLightingShaderProgram, "lightFarPlane");
+    textureOffsetsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureOffsets");
+    textureSizesLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureSizes");
 }
 
 GLuint matricesBuffer;
@@ -209,8 +203,6 @@ float *modelMatrices;
 
 void RenderMeshInstances() {
     // Set up view and projection matrices
-    modelMatrices = (float *)malloc(instanceCount * 16 * sizeof(float)); // Matrix4x4 = 16
-    
     float model[16]; // 4x4 matrix
     for (int i=0;i<instanceCount;i++) {
         mat4_identity(model);
@@ -230,7 +222,7 @@ void RenderMeshInstances() {
         mat4_multiply(model, model, rot); // Apply rotation
         mat4_translate(model, instances[i].posx, instances[i].posy, instances[i].posz); // Apply translation
         memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
-        glUniform1i(texIndexLoc, instances[i].modelIndex == 5 ? 3 : instances[i].modelIndex);
+        glUniform1i(texIndexLoc, instances[i].texIndex);
         glUniform1i(instanceIndexLoc, i);
         glUniform1i(modelIndexLoc, instances[i].modelIndex);
         glUniformMatrix4fv(matrixLoc, 1, GL_FALSE, model);
@@ -275,10 +267,10 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
     glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, projection);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, colorBufferID);
-    glUniform1uiv(textureOffsetsLoc, TEXTURE_COUNT, textureOffsets);
-    glUniform2iv(textureSizesLoc, TEXTURE_COUNT, textureSizes);
+    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets);
+    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes);
     glUniform1i(instanceCountLoc_chunk, instanceCount);
-    glUniform1ui(textureCountLoc, TEXTURE_COUNT);
+    glUniform1ui(textureCountLoc_chunk, textureCount);
     glUniform1ui(modelCountLoc_chunk, MODEL_COUNT);
     glUniform1i(debugViewLoc, debugView);
     glBindVertexArray(vao);
@@ -292,6 +284,7 @@ int RenderStaticMeshes(void) {
     // Apply deferred lighting with compute shader
     glUseProgram(deferredLightingShaderProgram);
 
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glUniform1ui(screenWidthLoc, screen_width);
     glUniform1ui(screenHeightLoc, screen_height);    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
@@ -312,16 +305,19 @@ int RenderStaticMeshes(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-    free(modelMatrices);
     
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
+    glUniform1uiv(textureOffsetsLoc_deferred, textureCount, textureOffsets);
+    glUniform2iv(textureSizesLoc_deferred, textureCount, textureSizes);
+
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
     glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
     glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Output
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
     
-    glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
     
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "vertexCount"), vertexCount);

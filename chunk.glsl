@@ -36,8 +36,8 @@ const char *fragmentShaderTraditional =
     "layout(std430, binding = 0) buffer ColorBuffer {\n"
     "    float colors[];\n" // 1D color array (RGBA)
     "};\n"
-    "uniform uint textureOffsets[4];\n" // Offsets for each texture
-    "uniform ivec2 textureSizes[4];\n" // Width, height for each texture
+    "uniform uint textureOffsets[5];\n" // Offsets for each texture
+    "uniform ivec2 textureSizes[5];\n" // Width, height for each texture
     "uniform uint textureCount;\n"
     "uniform uint instanceCount;\n"
     "uniform uint modelCount;\n"

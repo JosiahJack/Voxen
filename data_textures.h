@@ -5,15 +5,11 @@
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 
-#define TEXTURE_COUNT 4
-
-extern SDL_Surface *textureSurfaces[];
-// extern GLuint textureIDs[];
+extern SDL_Surface ** textureSurfaces;
 extern GLuint colorBufferID;
-extern uint32_t textureOffsets[]; // Pixel offsets for each texture (e.g. if first texture is 4x4 then 2nd texture's offset starts at 16)
-extern uint32_t totalPixels; // Total pixels across all textures
-extern GLuint64 textureHandles[];
-extern int textureSizes[];
+extern uint32_t * textureOffsets; // Pixel offsets for each texture (e.g. if first texture is 4x4 then 2nd texture's offset starts at 16)
+extern int * textureSizes;
+extern int32_t textureCount;
 
 int LoadTextures(void);
 

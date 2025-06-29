@@ -5,6 +5,7 @@
 
 typedef struct {
     int32_t modelIndex; // offset 0, size 4b
+    int32_t texIndex;
     float posx; // offset 4, size 4b
     float posy; // offset 8, size 4b
     float posz; // offset 12, size 4b
