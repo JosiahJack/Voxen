@@ -103,7 +103,7 @@ void SetupInstances(void) {
     int y = 0;
     for (int idx=0;idx<instanceCount;idx++) {
         instances[idx].modelIndex = currentModelType;
-        instances[idx].texIndex = 0; // Set by entity definition when loaded.
+        instances[idx].texIndex = idx; // Set by entity definition when loaded.
         instances[idx].posx = ((float)x * 2.56f); // Position in grid with gaps for shadow testing.
         instances[idx].posy = ((float)y * 5.12f);
         instances[idx].posz = 0.0f;
@@ -122,7 +122,7 @@ void SetupInstances(void) {
     }
     
     instances[39].modelIndex = 5; // Test Light
-    instances[39].texIndex = 3; // white light
+    instances[39].texIndex = 881; // white light
     instances[39].sclx = 0.16f;
     instances[39].scly = 0.16f;
     instances[39].sclz = 0.16f;

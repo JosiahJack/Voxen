@@ -4,4 +4,4 @@ gcc -o voxen \
     data_textures.c render.c network.c lights.c text.c shaders.c voxel.c \
     image_effects.c debug.c data_definitions.c \
     -std=c11 -Wall -Wextra -O3 -g -D_POSIX_C_SOURCE=199309L -lSDL2 -lSDL2_ttf \
-    -lSDL2_image -lGLEW -lGL -lm -lrt -lassimp -lenet
+    -lGLEW -lGL -lm -lrt -lassimp -lenet

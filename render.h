@@ -5,6 +5,8 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 
+#define MAX_UNIQUE_VALUE 65535
+
 extern int screen_width;
 extern int screen_height;
 extern uint32_t drawCallCount;
@@ -18,8 +20,6 @@ extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
 extern GLuint outputImageID, gBufferFBO, inputModelInstanceID;
 
 // Static chunk shader locations (set on texture or model load)
-extern GLint textureOffsetsLoc_chunk;
-extern GLint textureSizesLoc_chunk;
 extern GLint textureCountLoc_chunk;
 extern GLint modelCountLoc_chunk;
 

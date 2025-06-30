@@ -1,4 +1,10 @@
-#include <SDL2/SDL_image.h>
+#include <stdint.h>
+#define STB_IMAGE_IMPLEMENTATION // Indicate to stb_image to compile it in.
+#define STBI_NO_PSD // Excluded image formats to shrink binary size.
+#define STBI_NO_HDR
+#define STBI_NO_PIC
+#define STBI_NO_PNM
+#include "stb_image.h"
 #include <GL/glew.h>
 #include "data_definitions.h"
 #include "data_textures.h"
@@ -6,14 +12,80 @@
 #include "debug.h"
 #include "render.h"
 
-SDL_Surface ** textureSurfaces = NULL;
 GLuint * textureIDs = NULL;
 GLuint64 * textureHandles = NULL;
 GLuint colorBufferID = 0; // Single color buffer
+GLuint textureSizesID = 0;
+GLuint textureOffsetsID = 0;
 uint32_t * textureOffsets = NULL; // Pixel offsets
 uint32_t totalPixels = 0; // Total pixels across all textures
 int * textureSizes = NULL; // Needs to be textureCount * 2
 int textureCount;
+
+// Num unique colors exceeds 250,000 and is very very slow to process.
+
+// uint32_t uniqueCols[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
+// uint8_t uniqueReds[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
+// uint8_t uniqueGrns[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
+// uint8_t uniqueBlus[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
+// int numUniqueColorValues = 0;
+// int numUniqueRValues = 0;
+// int numUniqueGValues = 0;
+// int numUniqueBValues = 0;
+
+// 128 * 128 = 16384
+// 32 unique colors per texture = 
+// 224 total 128x128 textures in project.
+
+// int CheckIfUniqueColor(uint8_t valueR, uint8_t valueG, uint8_t valueB) { 
+//     if (numUniqueColorValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique colors\n", MAX_UNIQUE_VALUE); return -1; }
+//     
+//     for (int i=0;i<=numUniqueColorValues;i++) {
+//         if (   ((uint32_t)valueR << 16U) == (uniqueCols[i] & 0xFF0000U)
+//             && ((uint32_t)valueG << 8U) == (uniqueCols[i] & 0x00FF00U)
+//             && (uint32_t)valueB == (uniqueCols[i] & 0x0000FFU)) return i; // Found a match, return it.
+//     }
+//     
+//     uniqueCols[numUniqueColorValues] = ((uint32_t)valueR << 16U) | ((uint32_t)valueG << 8U) | (uint32_t)valueB;
+//     numUniqueColorValues++;
+//     return numUniqueColorValues - 1; // Return index of the value.
+// }
+// 
+// int CheckIfUniqueR(uint8_t value) {    
+//     if (numUniqueRValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique reds\n", MAX_UNIQUE_VALUE); return -1; }
+// 
+//     for (int i=0;i<=numUniqueRValues;i++) {
+//         if (value == uniqueReds[i]) return i; // Found a match, return it.
+//     }
+//     
+//     uniqueReds[numUniqueRValues] = value;
+//     numUniqueRValues++;
+//     return numUniqueRValues - 1; // Return index of the value.
+// }
+// 
+// int CheckIfUniqueG(uint8_t value) {    
+//     if (numUniqueGValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique greens\n", MAX_UNIQUE_VALUE); return -1; }
+// 
+//     for (int i=0;i<=numUniqueGValues;i++) {
+//         if (value == uniqueGrns[i]) return i; // Found a match, return it.
+//     }
+//     
+//     uniqueGrns[numUniqueGValues] = value;
+//     numUniqueGValues++;
+//     return numUniqueGValues - 1; // Return index of the value.
+// }
+// 
+// int CheckIfUniqueB(uint8_t value) {    
+//     if (numUniqueBValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique blues\n", MAX_UNIQUE_VALUE); return -1; }
+// 
+//     for (int i=0;i<=numUniqueBValues;i++) {
+//         if (value == uniqueBlus[i]) return i; // Found a match, return it.
+//     }
+//     
+//     uniqueBlus[numUniqueBValues] = value;
+//     numUniqueBValues++;
+//     return numUniqueBValues - 1; // Return index of the value.
+// }
 
 const char *valid_texdata_keys[] = {"index"};
 
@@ -30,7 +102,16 @@ int LoadTextures(void) {
     }
     
     textureCount = texture_parser.count;
-    textureSurfaces = malloc(textureCount * sizeof(SDL_Surface *));
+    if (textureCount > 2048) { printf("ERROR: Too many textures in parser count %d, greater than 2048!\n", textureCount); parser_free(&texture_parser); return 1;
+    } else printf("Parsing %d textures...\n",textureCount);
+    if (textureCount == 0) {
+        fprintf(stderr, "ERROR: No textures found in textures.txt\n");
+        parser_free(&texture_parser);
+        return 1;
+    } else if (textureCount == INT32_MAX) {
+        printf("WARNING: textureCount hit INT32_MAX!\n");
+    }
+
     textureIDs = malloc(textureCount * sizeof(GLuint));
     textureHandles = malloc(textureCount * sizeof(GLuint64));
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
@@ -46,86 +127,101 @@ int LoadTextures(void) {
             if (texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }
         }
         
-        if (matchedParserIdx < 0) { printf("Texture index %d not specified in textures.txt definitions file, skipped\n", i); continue; }
+        if (matchedParserIdx < 0) { /*printf(" texture index %d not specified in textures.txt definitions file, skipped\n", i);*/ continue; }
         
-        SDL_Surface *surface = IMG_Load(texture_parser.entries[matchedParserIdx].path);
-        if (!surface) { fprintf(stderr, "IMG_Load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, IMG_GetError()); free(textureSurfaces); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes); return 1; }
-        totalPixels += surface->w * surface->h;
-        textureSizes[i * 2] = surface->w;
-        textureSizes[(i * 2) + 1] = surface->h;
-        SDL_FreeSurface(surface);
-        printf("Texture %s loaded with %d pixels, %d wide by %d tall\n", texture_parser.entries[matchedParserIdx].path,  surface->w * surface->h, surface->w, surface->h);
+        int width, height, channels;
+        unsigned char* image_data = stbi_load(texture_parser.entries[matchedParserIdx].path,&width,&height,&channels,STBI_rgb_alpha);
+        if (!image_data) { fprintf(stderr, "stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes); return 1; }
+        totalPixels += width * height;
+        textureSizes[i * 2] = width;
+        textureSizes[(i * 2) + 1] = height;
+        stbi_image_free(image_data);
+//         printf("Texture ./%s loading with %d pixels, %d wide by %d tall\n", texture_parser.entries[matchedParserIdx].path,  width * height, width, height);
     }
 
     // Allocate color buffer data
-    float *colorData = (float *)malloc(totalPixels * 4 * sizeof(float));
-    if (!colorData) { fprintf(stderr, "Failed to allocate color buffer\n"); free(textureSurfaces); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes); return 1; }
-
-//     uint32_t *uniqueColors = malloc(totalPixels * sizeof(uint32_t));
-//     if (!uniqueColors) { fprintf(stderr, "Failed to allocate unique color buffer\n"); free(colorData); free(textureSurfaces); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes); return 1; }
-//     uint32_t uniqueColorHead = 0;
+    uint32_t *colorData = (uint32_t *)malloc(totalPixels * sizeof(uint32_t));
+    if (!colorData) { fprintf(stderr, "Failed to allocate color buffer\n"); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes); return 1; }
     
     // Load textures into color buffer
     uint32_t pixelIndex = 0;
     for (int i = 0; i < textureCount; i++) {
+//         printf("Actually loading texture index %d... ",i);
         // Find matching index to i that was parsed from file
         int matchedParserIdx = -1;
         for (int k=0;k<texture_parser.count;k++) {
             if (texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }
         }
         
-        if (matchedParserIdx < 0) { printf("Texture index %d not specified in textures.txt definitions file, skipped\n", i); continue; }
+        if (matchedParserIdx < 0) { /*printf("texture index %d not specified in textures.txt definitions file, skipped\n", i);*/ continue; }
+//         printf("matched index %d\n",matchedParserIdx);
 
-        SDL_Surface *surface = IMG_Load(texture_parser.entries[matchedParserIdx].path);
-        if (!surface) { fprintf(stderr, "IMG_Load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, IMG_GetError()); free(colorData); free(textureSurfaces); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes);  return 1; }
-        textureSurfaces[i] = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888, 0);
-        SDL_FreeSurface(surface);
-        if (!textureSurfaces[i]) { fprintf(stderr, "SDL_ConvertSurfaceFormat failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, SDL_GetError()); free(colorData); free(textureSurfaces); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes);  return 1; }
+        int width, height, channels;
+        unsigned char* image_data = stbi_load(texture_parser.entries[matchedParserIdx].path,&width,&height,&channels,STBI_rgb_alpha);
+        if (!image_data) { fprintf(stderr, "stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); free(colorData); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes);  return 1; }
 
-        uint8_t *pixels = (uint8_t *)textureSurfaces[i]->pixels;
-        for (int j = 0; j < textureSurfaces[i]->w * textureSurfaces[i]->h; j++) {
-            colorData[pixelIndex++] = pixels[j * 4 + 0] / 255.0f; // R
-            colorData[pixelIndex++] = pixels[j * 4 + 1] / 255.0f; // G
-            colorData[pixelIndex++] = pixels[j * 4 + 2] / 255.0f; // B
-            colorData[pixelIndex++] = pixels[j * 4 + 3] / 255.0f; // A
+        if (width > 4096 || height > 4096) {
+            printf("ERROR: Cannot load %s, texture size %d x %d exceeds 4096 in one dimension!\n", texture_parser.entries[matchedParserIdx].path,width,height);
+            free(colorData); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes);  return 1; 
         }
-        SDL_FreeSurface(textureSurfaces[i]);
-        textureSurfaces[i] = NULL;
+        
+        for (int j = 0; j < width * height; j++) {
+            colorData[pixelIndex] =   (uint32_t)image_data[j * 4 + 0] << 24 // R
+                                    | (uint32_t)image_data[j * 4 + 1] << 16 // G
+                                    | (uint32_t)image_data[j * 4 + 2] << 8  // B
+                                    | (uint32_t)image_data[j * 4 + 3];      // A
+            pixelIndex++;
+//             CheckIfUniqueR(image_data[j * 4 + 0]);
+//             CheckIfUniqueG(image_data[j * 4 + 1]);
+//             CheckIfUniqueB(image_data[j * 4 + 2]);
+//             int palleteIndex = CheckIfUniqueColor(image_data[j * 4 + 0],image_data[j * 4 + 1],image_data[j * 4 + 2]);
+//             if (palleteIndex < 0) { printf("ERROR, EXCEEDED PALLETE SIZE uint32 MAX!!\n"); free(colorData); free(textureIDs); free(textureHandles); free(textureOffsets); free(textureSizes);  return 1; }
+        }
+        
+        stbi_image_free(image_data);
     }
     
-    printf("Last pixel: r %f, g %f, b %f, a %f\n",colorData[(totalPixels * 4) - 4],colorData[(totalPixels * 4) - 3],colorData[(totalPixels * 4) - 2],colorData[(totalPixels * 4) - 1]);
     printf("Total pixels in buffer %d (",totalPixels);
-    print_bytes_no_newline(totalPixels * 4 * 4); // rgba = 4, 4 bytes per float = 4x4
+    print_bytes_no_newline(totalPixels * 4); // rgba = 4, 1 byte per channel
     printf(")\n");
+//     printf("numUniqueColorValues: %d, numUniqueRValues: %d, numUniqueGValues: %d, numUniqueBValues: %d\n",numUniqueColorValues,numUniqueRValues,numUniqueGValues,numUniqueBValues);
     
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * 4 * sizeof(float), colorData, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), colorData, GL_STATIC_DRAW);
     
-          // Set static buffer once for all shaders
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
-    
+         
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     free(colorData);
     
+    
+    // 13 is BlueNoise for deferred shader
+    
+    
     // Send static uniforms to chunk shader
-    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets);
-    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes);
+    glGenBuffers(1, &textureOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, textureOffsetsID); // Set static buffer once for all shaders
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    glGenBuffers(1, &textureSizesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureSizesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, textureSizesID); // Set static buffer once for all shaders
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
     glUniform1ui(textureCountLoc_chunk, textureCount);
 
-    // Send static uniforms to deferred lighting shader
-    glUniform1uiv(textureOffsetsLoc_deferred, textureCount, textureOffsets);
-    glUniform2iv(textureSizesLoc_deferred, textureCount, textureSizes);
-    
     // Delete individual texture IDs
     for (int i = 0; i < textureCount; i++) {
         if (textureIDs[i]) glDeleteTextures(1, &textureIDs[i]);
         textureIDs[i] = 0;
     }
     
-    free(textureSurfaces); // Free temporary buffers for texture loading
-    free(textureIDs);
+    free(textureIDs); // Free temporary buffers for texture loading
     free(textureHandles); 
     // Do not free textureOffsets, used by the program during runtime!  !!!
     // Do not free textureSizes, used by the program during runtime!    !!!

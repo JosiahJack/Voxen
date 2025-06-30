@@ -13,13 +13,2452 @@
 // definition for a model will specify texture by index)
 // example: index: 451
 //
-#Textures/med1_1.png
+// To automate generation of this file, run the following command after cd ./Textures
+// ls *.png | sort | awk '{print "#Textures/"$0"\nindex: "NR-1}'
+//
+#Textures/access_card01.png
 index: 0
-#Textures/med1_7.png
+#Textures/access_card02.png
 index: 1
-#Textures/med1_9.png
+#Textures/access_card03.png
 index: 2
-#Textures/white.png
+#Textures/access_card04.png
 index: 3
-#Textures/bluenoise64.png
+#Textures/access_card05.png
 index: 4
+#Textures/access_card06.png
+index: 5
+#Textures/access_card07.png
+index: 6
+#Textures/access_card08.png
+index: 7
+#Textures/access_card09.png
+index: 8
+#Textures/access_card10.png
+index: 9
+#Textures/access_card11.png
+index: 10
+#Textures/ammo_hollow.png
+index: 11
+#Textures/ammo_hornet.png
+index: 12
+#Textures/ammo_magcart.png
+index: 13
+#Textures/ammo_magnesium.png
+index: 14
+#Textures/ammo_needle.png
+index: 15
+#Textures/ammo_penetrator.png
+index: 16
+#Textures/ammo_rail.png
+index: 17
+#Textures/ammo_rubber2.png
+index: 18
+#Textures/ammo_rubber.png
+index: 19
+#Textures/ammo_slaglarge.png
+index: 20
+#Textures/ammo_slag.png
+index: 21
+#Textures/ammo_slug_glow.png
+index: 22
+#Textures/ammo_slug.png
+index: 23
+#Textures/ammo_splinter.png
+index: 24
+#Textures/ammo_standard.png
+index: 25
+#Textures/ammo_teflon.png
+index: 26
+#Textures/ammo_tranq.png
+index: 27
+#Textures/arm.png
+index: 28
+#Textures/ascr_static2.png
+index: 29
+#Textures/barrel_chemical.png
+index: 30
+#Textures/barrel_explosive.png
+index: 31
+#Textures/barrel_specular.png
+index: 32
+#Textures/barrel_toxic.png
+index: 33
+#Textures/battery_icad.png
+index: 34
+#Textures/battery.png
+index: 35
+#Textures/beaker.png
+index: 36
+#Textures/beverage01.png
+index: 37
+#Textures/beverage02.png
+index: 38
+#Textures/beverage03.png
+index: 39
+#Textures/beverage04.png
+index: 40
+#Textures/black.png
+index: 41
+#Textures/blood_core.png
+index: 42
+#Textures/bridg1_1_norm.png
+index: 43
+#Textures/bridg1_1.png
+index: 44
+#Textures/bridg1_2.png
+index: 45
+#Textures/bridg1_3b.png
+index: 46
+#Textures/bridg1_3.png
+index: 47
+#Textures/bridg1_4.png
+index: 48
+#Textures/bridg1_5_glow.png
+index: 49
+#Textures/bridg1_5.png
+index: 50
+#Textures/bridg1_5_spec.png
+index: 51
+#Textures/bridg2_1.png
+index: 52
+#Textures/bridg2_2.png
+index: 53
+#Textures/bridg2_3_glow.png
+index: 54
+#Textures/bridg2_3_norm.png
+index: 55
+#Textures/bridg2_3.png
+index: 56
+#Textures/bridg2_4.png
+index: 57
+#Textures/bridg2_5_norm.png
+index: 58
+#Textures/bridg2_5.png
+index: 59
+#Textures/bridg2_6.png
+index: 60
+#Textures/bridg2_7.png
+index: 61
+#Textures/bridg2_8.png
+index: 62
+#Textures/bridg2_9_glow.png
+index: 63
+#Textures/bridg2_9.png
+index: 64
+#Textures/briefcase_glow.png
+index: 65
+#Textures/briefcase.png
+index: 66
+#Textures/Burst.png
+index: 67
+#Textures/BurstSmooth.png
+index: 68
+#Textures/BurstTiny.png
+index: 69
+#Textures/cabinet.png
+index: 70
+#Textures/cable.png
+index: 71
+#Textures/camera_glow.png
+index: 72
+#Textures/camera.png
+index: 73
+#Textures/CameraSpatter.png
+index: 74
+#Textures/CenterFluff.png
+index: 75
+#Textures/charge_stat_glow.png
+index: 76
+#Textures/charge_stat.png
+index: 77
+#Textures/chipset_interface_demodulator.png
+index: 78
+#Textures/chipset_monopole_stabilizer.png
+index: 79
+#Textures/chipset.png
+index: 80
+#Textures/chipset_superconducting_processor.png
+index: 81
+#Textures/chipset_systemic_sequencer.png
+index: 82
+#Textures/citmat1_1.png
+index: 83
+#Textures/citmat1_2_glow.png
+index: 84
+#Textures/citmat1_2.png
+index: 85
+#Textures/citmat1_3.png
+index: 86
+#Textures/citmat1_4.png
+index: 87
+#Textures/citmat1_5.png
+index: 88
+#Textures/citmat1_6.png
+index: 89
+#Textures/citmat1_7.png
+index: 90
+#Textures/citmat1_8mutated.png
+index: 91
+#Textures/citmat1_8.png
+index: 92
+#Textures/citmat2_1.png
+index: 93
+#Textures/citmat2_2.png
+index: 94
+#Textures/citmat2_4.png
+index: 95
+#Textures/CliffNormals.png
+index: 96
+#Textures/clothes.png
+index: 97
+#Textures/console1_1.png
+index: 98
+#Textures/console1_2.png
+index: 99
+#Textures/console1_3.png
+index: 100
+#Textures/console1_4.png
+index: 101
+#Textures/console1_5.png
+index: 102
+#Textures/console1_6.png
+index: 103
+#Textures/console1_7.png
+index: 104
+#Textures/console1_8.png
+index: 105
+#Textures/console1_9.png
+index: 106
+#Textures/console2_1.png
+index: 107
+#Textures/console2_2.png
+index: 108
+#Textures/console2_3.png
+index: 109
+#Textures/console2_4.png
+index: 110
+#Textures/console2_5.png
+index: 111
+#Textures/console2_6.png
+index: 112
+#Textures/console2_7.png
+index: 113
+#Textures/console2_8.png
+index: 114
+#Textures/console2_9.png
+index: 115
+#Textures/console3_1_glow.png
+index: 116
+#Textures/console3_1.png
+index: 117
+#Textures/console3_2.png
+index: 118
+#Textures/console3_3.png
+index: 119
+#Textures/console3_4.png
+index: 120
+#Textures/console3_5.png
+index: 121
+#Textures/console3_6.png
+index: 122
+#Textures/console3_7.png
+index: 123
+#Textures/console3_8.png
+index: 124
+#Textures/console3_9.png
+index: 125
+#Textures/corpse_blueshirt.png
+index: 126
+#Textures/corpse_blueshirt_specular.png
+index: 127
+#Textures/corpse_brownshirt.png
+index: 128
+#Textures/corpse_brownshirt_specular.png
+index: 129
+#Textures/corpse_eaten.png
+index: 130
+#Textures/corpse_eaten_specular.png
+index: 131
+#Textures/corpse_labcoat.png
+index: 132
+#Textures/corpse_labcoat_specular.png
+index: 133
+#Textures/corpse_redshirt.png
+index: 134
+#Textures/corpse_redshirt_specular.png
+index: 135
+#Textures/corpse_security.png
+index: 136
+#Textures/corpse_security_specular.png
+index: 137
+#Textures/corpse_tan.png
+index: 138
+#Textures/crate1_1.png
+index: 139
+#Textures/crate1_2.png
+index: 140
+#Textures/crate1_3.png
+index: 141
+#Textures/crate1_4.png
+index: 142
+#Textures/crate2_1.png
+index: 143
+#Textures/crate2_2.png
+index: 144
+#Textures/crate2_3.png
+index: 145
+#Textures/crate2_4.png
+index: 146
+#Textures/crate_impenetrable2.png
+index: 147
+#Textures/crate_impenetrable3.png
+index: 148
+#Textures/crate_impenetrable4.png
+index: 149
+#Textures/crate_impenetrable.png
+index: 150
+#Textures/cyberpanel.png
+index: 151
+#Textures/cyberpanel_slice45.png
+index: 152
+#Textures/cyber.png
+index: 153
+#Textures/d_arrow1_glow.png
+index: 154
+#Textures/d_arrow1.png
+index: 155
+#Textures/d_arrow2_glow.png
+index: 156
+#Textures/d_arrow2.png
+index: 157
+#Textures/darthit.png
+index: 158
+#Textures/detail_metalsmooth.png
+index: 159
+#Textures/detail_noisesubtle.png
+index: 160
+#Textures/detail_rusty.png
+index: 161
+#Textures/dexmissile_glow.png
+index: 162
+#Textures/dexmissile_normal.png
+index: 163
+#Textures/dexmissile.png
+index: 164
+#Textures/d_logo10.png
+index: 165
+#Textures/d_logo11.png
+index: 166
+#Textures/d_logo12.png
+index: 167
+#Textures/d_logo13.png
+index: 168
+#Textures/d_logo14.png
+index: 169
+#Textures/d_logo15.png
+index: 170
+#Textures/d_logo16.png
+index: 171
+#Textures/d_logo17.png
+index: 172
+#Textures/d_logo18.png
+index: 173
+#Textures/d_logo1.png
+index: 174
+#Textures/d_logo2.png
+index: 175
+#Textures/d_logo3.png
+index: 176
+#Textures/d_logo4.png
+index: 177
+#Textures/d_logo5.png
+index: 178
+#Textures/d_logo6.png
+index: 179
+#Textures/d_logo7.png
+index: 180
+#Textures/d_logo8.png
+index: 181
+#Textures/d_logo9.png
+index: 182
+#Textures/door1_1_normal.png
+index: 183
+#Textures/door1_1.png
+index: 184
+#Textures/door1_2.png
+index: 185
+#Textures/door1_3_glow.png
+index: 186
+#Textures/door1_3.png
+index: 187
+#Textures/door1_4_glow.png
+index: 188
+#Textures/door1_4.png
+index: 189
+#Textures/door1_5.png
+index: 190
+#Textures/door1_6_glass.png
+index: 191
+#Textures/door1_6.png
+index: 192
+#Textures/door1_7.png
+index: 193
+#Textures/door7_lamp_glow.png
+index: 194
+#Textures/door7_lamp.png
+index: 195
+#Textures/door_bulk1.png
+index: 196
+#Textures/door_bulk2_glow.png
+index: 197
+#Textures/door_bulk2.png
+index: 198
+#Textures/door_bulk3_glow.png
+index: 199
+#Textures/door_bulk3.png
+index: 200
+#Textures/door_elev1_glow.png
+index: 201
+#Textures/door_elev1.png
+index: 202
+#Textures/door_elev2.png
+index: 203
+#Textures/door_elev3.png
+index: 204
+#Textures/door_elev4_glow.png
+index: 205
+#Textures/door_elev4.png
+index: 206
+#Textures/door_iris_glow.png
+index: 207
+#Textures/door_iris.png
+index: 208
+#Textures/door_wall1.png
+index: 209
+#Textures/door_wall2.png
+index: 210
+#Textures/door_wall3.png
+index: 211
+#Textures/door_x1_laserblue.png
+index: 212
+#Textures/door_x1_laser.png
+index: 213
+#Textures/door_x1.png
+index: 214
+#Textures/door_x2.png
+index: 215
+#Textures/d_paint1_glow.png
+index: 216
+#Textures/d_paint1_normal.png
+index: 217
+#Textures/d_paint1.png
+index: 218
+#Textures/d_paint2_glow.png
+index: 219
+#Textures/d_paint2.png
+index: 220
+#Textures/d_paint3_glow.png
+index: 221
+#Textures/d_paint3.png
+index: 222
+#Textures/d_post1_normal.png
+index: 223
+#Textures/d_post1.png
+index: 224
+#Textures/d_post2_normal.png
+index: 225
+#Textures/d_post2.png
+index: 226
+#Textures/d_scor1.png
+index: 227
+#Textures/d_scor2.png
+index: 228
+#Textures/d_scor3.png
+index: 229
+#Textures/d_scor4.png
+index: 230
+#Textures/d_scorchsplat1.png
+index: 231
+#Textures/d_scorchtiny.png
+index: 232
+#Textures/d_splat1.png
+index: 233
+#Textures/d_splat2.png
+index: 234
+#Textures/d_words1.png
+index: 235
+#Textures/d_words2.png
+index: 236
+#Textures/d_words3.png
+index: 237
+#Textures/d_words4.png
+index: 238
+#Textures/d_words5.png
+index: 239
+#Textures/d_words6.png
+index: 240
+#Textures/d_words7.png
+index: 241
+#Textures/d_words8.png
+index: 242
+#Textures/ef_cyber0.png
+index: 243
+#Textures/ef_cyber1.png
+index: 244
+#Textures/ef_shard.png
+index: 245
+#Textures/elev1_dn.png
+index: 246
+#Textures/elev1_up.png
+index: 247
+#Textures/elev2_dn.png
+index: 248
+#Textures/elev2_up.png
+index: 249
+#Textures/elev3_dn.png
+index: 250
+#Textures/elev3_up.png
+index: 251
+#Textures/EnemShot2.png
+index: 252
+#Textures/eng1_1d.png
+index: 253
+#Textures/eng1_1.png
+index: 254
+#Textures/eng1_2d.png
+index: 255
+#Textures/eng1_2.png
+index: 256
+#Textures/eng1_3d.png
+index: 257
+#Textures/eng1_3_glow.png
+index: 258
+#Textures/eng1_3.png
+index: 259
+#Textures/eng1_4.png
+index: 260
+#Textures/eng1_5d.png
+index: 261
+#Textures/eng1_5.png
+index: 262
+#Textures/eng1_6d_glow.png
+index: 263
+#Textures/eng1_6d.png
+index: 264
+#Textures/eng1_6_glow.png
+index: 265
+#Textures/eng1_6.png
+index: 266
+#Textures/eng1_7d.png
+index: 267
+#Textures/eng1_7_glow.png
+index: 268
+#Textures/eng1_7.png
+index: 269
+#Textures/eng1_8_glow.png
+index: 270
+#Textures/eng1_8.png
+index: 271
+#Textures/eng1_9d.png
+index: 272
+#Textures/eng1_9.png
+index: 273
+#Textures/eng2_1d_glow.png
+index: 274
+#Textures/eng2_1d.png
+index: 275
+#Textures/eng2_1.png
+index: 276
+#Textures/eng2_2d.png
+index: 277
+#Textures/eng2_2_normal.png
+index: 278
+#Textures/eng2_2.png
+index: 279
+#Textures/eng2_3d_glow.png
+index: 280
+#Textures/eng2_3d.png
+index: 281
+#Textures/eng2_3.png
+index: 282
+#Textures/eng2_4.png
+index: 283
+#Textures/eng2_5_normal.png
+index: 284
+#Textures/eng2_5.png
+index: 285
+#Textures/exec1_1d.png
+index: 286
+#Textures/exec1_1.png
+index: 287
+#Textures/exec1_2d_glow.png
+index: 288
+#Textures/exec1_2d.png
+index: 289
+#Textures/exec1_2_glow.png
+index: 290
+#Textures/exec1_2.png
+index: 291
+#Textures/exec2_1.png
+index: 292
+#Textures/exec2_2d_glow.png
+index: 293
+#Textures/exec2_2d.png
+index: 294
+#Textures/exec2_2.png
+index: 295
+#Textures/exec2_3.png
+index: 296
+#Textures/exec2_4.png
+index: 297
+#Textures/exec2_5.png
+index: 298
+#Textures/exec2_6.png
+index: 299
+#Textures/exec2_7.png
+index: 300
+#Textures/exec3_1d_glow.png
+index: 301
+#Textures/exec3_1d.png
+index: 302
+#Textures/exec3_1.png
+index: 303
+#Textures/exec3_2.png
+index: 304
+#Textures/exec3_4.png
+index: 305
+#Textures/exec4_1_glow.png
+index: 306
+#Textures/exec4_1.png
+index: 307
+#Textures/exec4_2.png
+index: 308
+#Textures/exec4_3.png
+index: 309
+#Textures/exec4_4_glow.png
+index: 310
+#Textures/exec4_4.png
+index: 311
+#Textures/exec4_5.png
+index: 312
+#Textures/exec4_6.png
+index: 313
+#Textures/exec6_1_glow.png
+index: 314
+#Textures/exec6_1.png
+index: 315
+#Textures/exterior_shieldpanel.png
+index: 316
+#Textures/fireextinguisher.png
+index: 317
+#Textures/flight1_1b.png
+index: 318
+#Textures/flight1_1.png
+index: 319
+#Textures/flight1_2.png
+index: 320
+#Textures/flight1_3.png
+index: 321
+#Textures/flight1_4.png
+index: 322
+#Textures/flight1_5.png
+index: 323
+#Textures/flight1_6_glow.png
+index: 324
+#Textures/flight1_6.png
+index: 325
+#Textures/flight2_1.png
+index: 326
+#Textures/flight2_2.png
+index: 327
+#Textures/flight2_3.png
+index: 328
+#Textures/foliage01.png
+index: 329
+#Textures/foliage_fern1_glow.png
+index: 330
+#Textures/foliage_fern1mutatedorange.png
+index: 331
+#Textures/foliage_fern1mutated.png
+index: 332
+#Textures/foliage_fern1.png
+index: 333
+#Textures/g_conc.png
+index: 334
+#Textures/gear_lg.png
+index: 335
+#Textures/gear.png
+index: 336
+#Textures/g_emp01_active.png
+index: 337
+#Textures/g_emp01.png
+index: 338
+#Textures/g_energmine_glow.png
+index: 339
+#Textures/g_energmine.png
+index: 340
+#Textures/generic_glow.png
+index: 341
+#Textures/generic_norm.png
+index: 342
+#Textures/generic.png
+index: 343
+#Textures/generic_spec.png
+index: 344
+#Textures/g_eshaker_active.png
+index: 345
+#Textures/g_eshaker.png
+index: 346
+#Textures/g_frag01_active.png
+index: 347
+#Textures/g_frag01.png
+index: 348
+#Textures/g_gas.png
+index: 349
+#Textures/g_mine_active_glow.png
+index: 350
+#Textures/g_mine_active.png
+index: 351
+#Textures/g_mine_glow.png
+index: 352
+#Textures/g_mine.png
+index: 353
+#Textures/g_nitroblink.png
+index: 354
+#Textures/g_nitro_glow.png
+index: 355
+#Textures/g_nitro.png
+index: 356
+#Textures/grass_mutatedorange.png
+index: 357
+#Textures/grass.png
+index: 358
+#Textures/grate1_1.png
+index: 359
+#Textures/grate1_2.png
+index: 360
+#Textures/grate1_3.png
+index: 361
+#Textures/grove1_1.png
+index: 362
+#Textures/grove1_2.png
+index: 363
+#Textures/grove1_3.png
+index: 364
+#Textures/grove1_4.png
+index: 365
+#Textures/grove1_4_specular.png
+index: 366
+#Textures/grove1_5.png
+index: 367
+#Textures/grove1_6.png
+index: 368
+#Textures/grove1_7.png
+index: 369
+#Textures/grove2_1.png
+index: 370
+#Textures/grove2_2.png
+index: 371
+#Textures/grove2_3.png
+index: 372
+#Textures/grove2_4_glow.png
+index: 373
+#Textures/grove2_4.png
+index: 374
+#Textures/grove2_5.png
+index: 375
+#Textures/grove2_6.png
+index: 376
+#Textures/grove2_7_glow.png
+index: 377
+#Textures/grove2_7.png
+index: 378
+#Textures/grove2_8.png
+index: 379
+#Textures/grove2_9b_normal.png
+index: 380
+#Textures/grove2_9b.png
+index: 381
+#Textures/grove2_9c_normal.png
+index: 382
+#Textures/grove2_9c.png
+index: 383
+#Textures/grove2_9_normal.png
+index: 384
+#Textures/grove2_9.png
+index: 385
+#Textures/gunhit02.png
+index: 386
+#Textures/gunhit.png
+index: 387
+#Textures/head_female.png
+index: 388
+#Textures/head_male.png
+index: 389
+#Textures/head_tan.png
+index: 390
+#Textures/healthkit01.png
+index: 391
+#Textures/hw_bio_glow.png
+index: 392
+#Textures/hw_bio.png
+index: 393
+#Textures/hw_booster_glow.png
+index: 394
+#Textures/hw_booster.png
+index: 395
+#Textures/hw_envirosuit.png
+index: 396
+#Textures/hw_ereader.png
+index: 397
+#Textures/hw_infrared.png
+index: 398
+#Textures/hw_jumpjet.png
+index: 399
+#Textures/hw_lantern_glow.png
+index: 400
+#Textures/hw_lantern.png
+index: 401
+#Textures/hw_sensaround.png
+index: 402
+#Textures/hw_shield.png
+index: 403
+#Textures/hw_system01_glow.png
+index: 404
+#Textures/hw_system01.png
+index: 405
+#Textures/hw_system02.png
+index: 406
+#Textures/hw_target_glow.png
+index: 407
+#Textures/hw_target.png
+index: 408
+#Textures/isolinearchipset.png
+index: 409
+#Textures/isotopex21_glow.png
+index: 410
+#Textures/isotopex21.png
+index: 411
+#Textures/isotopex22_glow.png
+index: 412
+#Textures/isotopex22.png
+index: 413
+#Textures/keypad1.png
+index: 414
+#Textures/keypad2.png
+index: 415
+#Textures/keypad3.png
+index: 416
+#Textures/keypad4.png
+index: 417
+#Textures/keypad5.png
+index: 418
+#Textures/keypad6.png
+index: 419
+#Textures/keypad7.png
+index: 420
+#Textures/keypad8.png
+index: 421
+#Textures/lamp_green.png
+index: 422
+#Textures/lamp.png
+index: 423
+#Textures/lite1_1_glow.png
+index: 424
+#Textures/lite1_1.png
+index: 425
+#Textures/lite1_2.png
+index: 426
+#Textures/logic_probe.png
+index: 427
+#Textures/magshot01.png
+index: 428
+#Textures/magshot02.png
+index: 429
+#Textures/maint1_1.png
+index: 430
+#Textures/maint1_2d.png
+index: 431
+#Textures/maint1_2.png
+index: 432
+#Textures/maint1_3b_glow.png
+index: 433
+#Textures/maint1_3b.png
+index: 434
+#Textures/maint1_3_glow.png
+index: 435
+#Textures/maint1_3.png
+index: 436
+#Textures/maint1_3_specular.png
+index: 437
+#Textures/maint1_4b_glow.png
+index: 438
+#Textures/maint1_4b.png
+index: 439
+#Textures/maint1_4_glow.png
+index: 440
+#Textures/maint1_4.png
+index: 441
+#Textures/maint1_5_glow.png
+index: 442
+#Textures/maint1_5.png
+index: 443
+#Textures/maint1_6_glow.png
+index: 444
+#Textures/maint1_6.png
+index: 445
+#Textures/maint1_7_glow.png
+index: 446
+#Textures/maint1_7.png
+index: 447
+#Textures/maint1_9d_glow.png
+index: 448
+#Textures/maint1_9d.png
+index: 449
+#Textures/maint1_9.png
+index: 450
+#Textures/maint2_1b.png
+index: 451
+#Textures/maint2_1d_glow.png
+index: 452
+#Textures/maint2_1d.png
+index: 453
+#Textures/maint2_1_normal.png
+index: 454
+#Textures/maint2_1.png
+index: 455
+#Textures/maint2_2_normal.png
+index: 456
+#Textures/maint2_2.png
+index: 457
+#Textures/maint2_3d_glow.png
+index: 458
+#Textures/maint2_3d.png
+index: 459
+#Textures/maint2_3.png
+index: 460
+#Textures/maint2_4d_glow.png
+index: 461
+#Textures/maint2_4d.png
+index: 462
+#Textures/maint2_4_glow.png
+index: 463
+#Textures/maint2_4.png
+index: 464
+#Textures/maint2_5d_glow.png
+index: 465
+#Textures/maint2_5d.png
+index: 466
+#Textures/maint2_5_glow.png
+index: 467
+#Textures/maint2_5.png
+index: 468
+#Textures/maint2_6d_glow.png
+index: 469
+#Textures/maint2_6d.png
+index: 470
+#Textures/maint2_6_glow.png
+index: 471
+#Textures/maint2_6.png
+index: 472
+#Textures/maint2_7d_glow.png
+index: 473
+#Textures/maint2_7d.png
+index: 474
+#Textures/maint2_7_glow.png
+index: 475
+#Textures/maint2_7.png
+index: 476
+#Textures/maint2_8_glow.png
+index: 477
+#Textures/maint2_8.png
+index: 478
+#Textures/maint2_9_glow.png
+index: 479
+#Textures/maint2_9.png
+index: 480
+#Textures/maint3_1d_glow.png
+index: 481
+#Textures/maint3_1d.png
+index: 482
+#Textures/maint3_1.png
+index: 483
+#Textures/med1_1d_glow.png
+index: 484
+#Textures/med1_1d.png
+index: 485
+#Textures/med1_1.png
+index: 486
+#Textures/med1_2d.png
+index: 487
+#Textures/med1_2_glow.png
+index: 488
+#Textures/med1_2.png
+index: 489
+#Textures/med1_3d_glow.png
+index: 490
+#Textures/med1_3d.png
+index: 491
+#Textures/med1_3_glow.png
+index: 492
+#Textures/med1_3.png
+index: 493
+#Textures/med1_4.png
+index: 494
+#Textures/med1_5.png
+index: 495
+#Textures/med1_6.png
+index: 496
+#Textures/med1_7d.png
+index: 497
+#Textures/med1_7_normal.png
+index: 498
+#Textures/med1_7.png
+index: 499
+#Textures/med1_8d_glow.png
+index: 500
+#Textures/med1_8d.png
+index: 501
+#Textures/med1_8_normal.png
+index: 502
+#Textures/med1_8.png
+index: 503
+#Textures/med1_9d_normal.png
+index: 504
+#Textures/med1_9d.png
+index: 505
+#Textures/med1_9_normal.png
+index: 506
+#Textures/med1_9.png
+index: 507
+#Textures/med2_1d_glow.png
+index: 508
+#Textures/med2_1_disp.png
+index: 509
+#Textures/med2_1d.png
+index: 510
+#Textures/med2_1_edge.png
+index: 511
+#Textures/med2_1_norm.png
+index: 512
+#Textures/med2_1.png
+index: 513
+#Textures/med2_2d_glow.png
+index: 514
+#Textures/med2_2d.png
+index: 515
+#Textures/med2_2_glow.png
+index: 516
+#Textures/med2_2.png
+index: 517
+#Textures/med2_3d_glow.png
+index: 518
+#Textures/med2_3d.png
+index: 519
+#Textures/med2_3_glow.png
+index: 520
+#Textures/med2_3.png
+index: 521
+#Textures/med2_4_glow.png
+index: 522
+#Textures/med2_4.png
+index: 523
+#Textures/med2_4_specular.png
+index: 524
+#Textures/med2_5_glass.png
+index: 525
+#Textures/med2_5_glow.png
+index: 526
+#Textures/med2_5.png
+index: 527
+#Textures/med2_6.png
+index: 528
+#Textures/med2_7_glow.png
+index: 529
+#Textures/med2_7.png
+index: 530
+#Textures/med2_8.png
+index: 531
+#Textures/med2_9d_glow.png
+index: 532
+#Textures/med2_9d.png
+index: 533
+#Textures/med2_9_glow.png
+index: 534
+#Textures/med2_9.png
+index: 535
+#Textures/med3_1.png
+index: 536
+#Textures/medical_bed.png
+index: 537
+#Textures/MessyStreakTrail.png
+index: 538
+#Textures/normal_blank.png
+index: 539
+#Textures/npc_autobombdark.png
+index: 540
+#Textures/npc_autobomb_glow.png
+index: 541
+#Textures/npc_autobomb.png
+index: 542
+#Textures/npc_cortex_reaver.png
+index: 543
+#Textures/npc_cyborgassassin_glow.png
+index: 544
+#Textures/npc_cyborgassassin.png
+index: 545
+#Textures/npc_cyborg_diego.png
+index: 546
+#Textures/npc_cyborg_drone.png
+index: 547
+#Textures/npc_cyborg_elite256.png
+index: 548
+#Textures/npc_cyborg_elite.png
+index: 549
+#Textures/npc_cyborg_enforcer256.png
+index: 550
+#Textures/npc_cyborg_enforcer.png
+index: 551
+#Textures/npc_cyborg.png
+index: 552
+#Textures/npc_cyborgwarrior_ambocc.png
+index: 553
+#Textures/npc_cyborgwarrior.png
+index: 554
+#Textures/npc_exec.png
+index: 555
+#Textures/npc_flierbot_muzzleburst1.png
+index: 556
+#Textures/npc_flierbot_muzzleburst2.png
+index: 557
+#Textures/npc_flierbot.png
+index: 558
+#Textures/npc_flierbot_redoff.png
+index: 559
+#Textures/npc_gortiger.png
+index: 560
+#Textures/npc_hopper_detail.png
+index: 561
+#Textures/npc_hopper.png
+index: 562
+#Textures/npc_humanoidmutant.png
+index: 563
+#Textures/npc_invisomut_dead.png
+index: 564
+#Textures/npc_invisomut.png
+index: 565
+#Textures/npc_maintbotmuzzburst.png
+index: 566
+#Textures/npc_maintenancebot.png
+index: 567
+#Textures/npc_mutant_avian.png
+index: 568
+#Textures/npc_mutant_cyborg.png
+index: 569
+#Textures/npc_plantmutant.png
+index: 570
+#Textures/npc_repairbot_deathburst.png
+index: 571
+#Textures/npc_repair_bot.png
+index: 572
+#Textures/npc_sec1bot.png
+index: 573
+#Textures/npc_sec2bot.png
+index: 574
+#Textures/npc_servbot.png
+index: 575
+#Textures/npc_virusmutant.png
+index: 576
+#Textures/npc_zerogmut0.png
+index: 577
+#Textures/onepixel_plain.png
+index: 578
+#Textures/onepixel.png
+index: 579
+#Textures/papers.png
+index: 580
+#Textures/ParticleBokeh.png
+index: 581
+#Textures/ParticleCloudBlack.png
+index: 582
+#Textures/ParticleCloudWhite.png
+index: 583
+#Textures/ParticleCloudWhiteReduced.png
+index: 584
+#Textures/ParticleFireballSheet.png
+index: 585
+#Textures/ParticleFirecloud.png
+index: 586
+#Textures/ParticleFlameLickSheet.png
+index: 587
+#Textures/ParticleFlamesSheet.png
+index: 588
+#Textures/ParticleFlare.png
+index: 589
+#Textures/p_berserk.png
+index: 590
+#Textures/p_detox.png
+index: 591
+#Textures/p_genius.png
+index: 592
+#Textures/phone.png
+index: 593
+#Textures/pinetreem.png
+index: 594
+#Textures/pipe1.png
+index: 595
+#Textures/pipe2.png
+index: 596
+#Textures/pipe3_90deg.png
+index: 597
+#Textures/pipe3.png
+index: 598
+#Textures/plastique.png
+index: 599
+#Textures/p_medi.png
+index: 600
+#Textures/pnl10_cl.png
+index: 601
+#Textures/pnl11_off.png
+index: 602
+#Textures/pnl12_on.png
+index: 603
+#Textures/pnl13_cl.png
+index: 604
+#Textures/pnl13_off.png
+index: 605
+#Textures/pnl13_on.png
+index: 606
+#Textures/pnl14_g_glow.png
+index: 607
+#Textures/pnl14_g.png
+index: 608
+#Textures/pnl14_r.png
+index: 609
+#Textures/pnl14_y.png
+index: 610
+#Textures/pnl1_cl.png
+index: 611
+#Textures/pnl1_off.png
+index: 612
+#Textures/pnl1_on.png
+index: 613
+#Textures/pnl2_cl.png
+index: 614
+#Textures/pnl2_off.png
+index: 615
+#Textures/pnl2_on.png
+index: 616
+#Textures/pnl3_cl.png
+index: 617
+#Textures/pnl3_ded.png
+index: 618
+#Textures/pnl3_off.png
+index: 619
+#Textures/pnl3_on.png
+index: 620
+#Textures/pnl4_cl.png
+index: 621
+#Textures/pnl4_op.png
+index: 622
+#Textures/pnl5_cl.png
+index: 623
+#Textures/pnl5_op.png
+index: 624
+#Textures/pnl6_cl.png
+index: 625
+#Textures/pnl6_off.png
+index: 626
+#Textures/pnl6_on.png
+index: 627
+#Textures/pnl7_cl.png
+index: 628
+#Textures/pnl7_off.png
+index: 629
+#Textures/pnl7_on.png
+index: 630
+#Textures/pnl8_cl.png
+index: 631
+#Textures/pnl8_off.png
+index: 632
+#Textures/pnl8_on.png
+index: 633
+#Textures/pnl9_cl.png
+index: 634
+#Textures/pnl9_off.png
+index: 635
+#Textures/pnl9_on.png
+index: 636
+#Textures/pnl_ded.png
+index: 637
+#Textures/poisonbushtrunk.png
+index: 638
+#Textures/poisonweeds.png
+index: 639
+#Textures/potted_plant.png
+index: 640
+#Textures/p_reflex.png
+index: 641
+#Textures/prop_bush_glow.png
+index: 642
+#Textures/prop_bush.png
+index: 643
+#Textures/prop_chandelier.png
+index: 644
+#Textures/prop_microscope.png
+index: 645
+#Textures/p_sight.png
+index: 646
+#Textures/p_stami.png
+index: 647
+#Textures/puddle1.png
+index: 648
+#Textures/puddle2_normal.png
+index: 649
+#Textures/puddle2.png
+index: 650
+#Textures/puddle_mask.png
+index: 651
+#Textures/puddleoil.png
+index: 652
+#Textures/puddleoil_shine.png
+index: 653
+#Textures/pumpkin_1.png
+index: 654
+#Textures/pumpkin_2_glow.png
+index: 655
+#Textures/pumpkin_2.png
+index: 656
+#Textures/pumpkin_3_glow.png
+index: 657
+#Textures/pumpkin_3.png
+index: 658
+#Textures/rad1_1_glow.png
+index: 659
+#Textures/rad1_1.png
+index: 660
+#Textures/rad1_2_glow.png
+index: 661
+#Textures/rad1_2.png
+index: 662
+#Textures/railshot.png
+index: 663
+#Textures/reac1_1.png
+index: 664
+#Textures/reac1_2.png
+index: 665
+#Textures/reac1_3.png
+index: 666
+#Textures/reac1_4_glow.png
+index: 667
+#Textures/reac1_4.png
+index: 668
+#Textures/reac1_4_specular.png
+index: 669
+#Textures/reac1_5_glow.png
+index: 670
+#Textures/reac1_5.png
+index: 671
+#Textures/reac1_6_glow.png
+index: 672
+#Textures/reac1_6.png
+index: 673
+#Textures/reac1_6_specular.png
+index: 674
+#Textures/reac1_7_glow.png
+index: 675
+#Textures/reac1_7.png
+index: 676
+#Textures/reac1_8_glow.png
+index: 677
+#Textures/reac1_8.png
+index: 678
+#Textures/reac1_9_glow.png
+index: 679
+#Textures/reac1_9.png
+index: 680
+#Textures/reac2_1b.png
+index: 681
+#Textures/reac2_1.png
+index: 682
+#Textures/reac2_2_glow.png
+index: 683
+#Textures/reac2_2.png
+index: 684
+#Textures/reac2_4.png
+index: 685
+#Textures/reac2_5_glow.png
+index: 686
+#Textures/reac2_5.png
+index: 687
+#Textures/reac2_6_glow.png
+index: 688
+#Textures/reac2_6.png
+index: 689
+#Textures/reac2_7_glow.png
+index: 690
+#Textures/reac2_7.png
+index: 691
+#Textures/reac2_8_glow.png
+index: 692
+#Textures/reac2_8.png
+index: 693
+#Textures/reac2_9.png
+index: 694
+#Textures/reac3_1_glow.png
+index: 695
+#Textures/reac3_1.png
+index: 696
+#Textures/reac3_2.png
+index: 697
+#Textures/reac3_3.png
+index: 698
+#Textures/reac3_4.png
+index: 699
+#Textures/reac3_5_glow.png
+index: 700
+#Textures/reac3_5.png
+index: 701
+#Textures/reac3_6_glow.png
+index: 702
+#Textures/reac3_6.png
+index: 703
+#Textures/reac3_7.png
+index: 704
+#Textures/reac3_7_specular.png
+index: 705
+#Textures/reac4_1_glow.png
+index: 706
+#Textures/reac4_1.png
+index: 707
+#Textures/reac4_2_glow.png
+index: 708
+#Textures/reac4_2.png
+index: 709
+#Textures/reac5_1_glow.png
+index: 710
+#Textures/reac5_1.png
+index: 711
+#Textures/reac5_2_glow.png
+index: 712
+#Textures/reac5_2.png
+index: 713
+#Textures/reac5_3_glow.png
+index: 714
+#Textures/reac5_3.png
+index: 715
+#Textures/reac6_1.png
+index: 716
+#Textures/reac6_2.png
+index: 717
+#Textures/reac6_3_glow.png
+index: 718
+#Textures/reac6_3.png
+index: 719
+#Textures/saturn-ring.png
+index: 720
+#Textures/sci1_1d.png
+index: 721
+#Textures/sci1_1.png
+index: 722
+#Textures/sci1_2d.png
+index: 723
+#Textures/sci1_2.png
+index: 724
+#Textures/sci1_3_glow.png
+index: 725
+#Textures/sci1_3.png
+index: 726
+#Textures/sci1_4.png
+index: 727
+#Textures/sci1_5.png
+index: 728
+#Textures/sci1_6.png
+index: 729
+#Textures/sci1_7d.png
+index: 730
+#Textures/sci1_7.png
+index: 731
+#Textures/sci1_8d_glow.png
+index: 732
+#Textures/sci1_8d.png
+index: 733
+#Textures/sci1_8.png
+index: 734
+#Textures/sci1_9d_glow.png
+index: 735
+#Textures/sci1_9d.png
+index: 736
+#Textures/sci1_9.png
+index: 737
+#Textures/sci2_1d.png
+index: 738
+#Textures/sci2_1.png
+index: 739
+#Textures/sci2_2d.png
+index: 740
+#Textures/sci2_2_glow.png
+index: 741
+#Textures/sci2_2.png
+index: 742
+#Textures/sci2_3_glow.png
+index: 743
+#Textures/sci2_3.png
+index: 744
+#Textures/sci2_4.png
+index: 745
+#Textures/sci2_5d.png
+index: 746
+#Textures/sci2_5.png
+index: 747
+#Textures/sci3_1d.png
+index: 748
+#Textures/sci3_1.png
+index: 749
+#Textures/sci3_2.png
+index: 750
+#Textures/sci3_3_glow.png
+index: 751
+#Textures/sci3_3.png
+index: 752
+#Textures/sci3_4_glow.png
+index: 753
+#Textures/sci3_4.png
+index: 754
+#Textures/sci3_5_glow.png
+index: 755
+#Textures/sci3_5.png
+index: 756
+#Textures/sci3_6_glow.png
+index: 757
+#Textures/sci3_6.png
+index: 758
+#Textures/screen1.png
+index: 759
+#Textures/screen2.png
+index: 760
+#Textures/screen3.png
+index: 761
+#Textures/screen4.png
+index: 762
+#Textures/screen5.png
+index: 763
+#Textures/screen8_1.png
+index: 764
+#Textures/screen8_2.png
+index: 765
+#Textures/screen8_3.png
+index: 766
+#Textures/screen8_4.png
+index: 767
+#Textures/screencode0.png
+index: 768
+#Textures/screencode1.png
+index: 769
+#Textures/screencode2.png
+index: 770
+#Textures/screencode3.png
+index: 771
+#Textures/screencode4.png
+index: 772
+#Textures/screencode5.png
+index: 773
+#Textures/screencode6.png
+index: 774
+#Textures/screencode7.png
+index: 775
+#Textures/screencode8.png
+index: 776
+#Textures/screencode9.png
+index: 777
+#Textures/seat1_1.png
+index: 778
+#Textures/seat1_2.png
+index: 779
+#Textures/seat1_3.png
+index: 780
+#Textures/seat1_4.png
+index: 781
+#Textures/seat1_5.png
+index: 782
+#Textures/seat1_6.png
+index: 783
+#Textures/seat1_7.png
+index: 784
+#Textures/sec1_1b.png
+index: 785
+#Textures/sec1_1c.png
+index: 786
+#Textures/sec1_1.png
+index: 787
+#Textures/sec1_2b.png
+index: 788
+#Textures/sec1_2.png
+index: 789
+#Textures/sec1_3.png
+index: 790
+#Textures/sec2bot.png
+index: 791
+#Textures/Sec2MuzzleBurst1.png
+index: 792
+#Textures/Sec2MuzzleBurst2.png
+index: 793
+#Textures/Sec2MuzzleBurst3.png
+index: 794
+#Textures/Sec2MuzzleBurst4.png
+index: 795
+#Textures/Sec2RotaryMuzzleBurst.png
+index: 796
+#Textures/Sec2RotaryMuzzleSquint.png
+index: 797
+#Textures/seedchunk.png
+index: 798
+#Textures/seedthorn.png
+index: 799
+#Textures/servbot_skin.png
+index: 800
+#Textures/severedhead.png
+index: 801
+#Textures/sheet_corpsehit.png
+index: 802
+#Textures/sheet_cratehit.png
+index: 803
+#Textures/sheet_emphit.png
+index: 804
+#Textures/sheet_enemshot4.png
+index: 805
+#Textures/sheet_gasexplosion.png
+index: 806
+#Textures/sheet_magpulse.png
+index: 807
+#Textures/sheet_plasmahit.png
+index: 808
+#Textures/sheet_plasmashot.png
+index: 809
+#Textures/sheet_railhit.png
+index: 810
+#Textures/sheet_screendestroyed.png
+index: 811
+#Textures/sheet_stunhit.png
+index: 812
+#Textures/sheet_vaporize.png
+index: 813
+#Textures/shodan_hires.png
+index: 814
+#Textures/skeleton.png
+index: 815
+#Textures/skull.png
+index: 816
+#Textures/Spark.png
+index: 817
+#Textures/sparqbeam.png
+index: 818
+#Textures/SparqSpatter.png
+index: 819
+#Textures/Sparqwave.png
+index: 820
+#Textures/SplashesFineParticle.png
+index: 821
+#Textures/SplashesLargeParticle.png
+index: 822
+#Textures/stor1_1_glow.png
+index: 823
+#Textures/stor1_1.png
+index: 824
+#Textures/stor1_2.png
+index: 825
+#Textures/stor1_3.png
+index: 826
+#Textures/stor1_4.png
+index: 827
+#Textures/stor1_5.png
+index: 828
+#Textures/stor1_6.png
+index: 829
+#Textures/stor1_7d_glow.png
+index: 830
+#Textures/stor1_7d.png
+index: 831
+#Textures/stor1_7_normal.png
+index: 832
+#Textures/stor1_7.png
+index: 833
+#Textures/stor1_7_spec.png
+index: 834
+#Textures/stunshot.png
+index: 835
+#Textures/Sun.png
+index: 836
+#Textures/sw1_dn.png
+index: 837
+#Textures/sw1_up.png
+index: 838
+#Textures/sw2_dn.png
+index: 839
+#Textures/sw2_up_glow.png
+index: 840
+#Textures/sw2_up.png
+index: 841
+#Textures/sw3_dn.png
+index: 842
+#Textures/sw3_up_glow.png
+index: 843
+#Textures/sw3_up.png
+index: 844
+#Textures/sw4_dn.png
+index: 845
+#Textures/sw4_up.png
+index: 846
+#Textures/sw5_ded.png
+index: 847
+#Textures/sw5_dn.png
+index: 848
+#Textures/sw5_up_glow.png
+index: 849
+#Textures/sw5_up.png
+index: 850
+#Textures/sw6_dn.png
+index: 851
+#Textures/sw6_up.png
+index: 852
+#Textures/sw7_dn.png
+index: 853
+#Textures/sw7_up.png
+index: 854
+#Textures/sw8_dn_glow.png
+index: 855
+#Textures/sw8_dn.png
+index: 856
+#Textures/sw8_up_glow.png
+index: 857
+#Textures/sw8_up.png
+index: 858
+#Textures/sw9_dn.png
+index: 859
+#Textures/sw9_lf.png
+index: 860
+#Textures/sw9_rt.png
+index: 861
+#Textures/sw9_up.png
+index: 862
+#Textures/thermos.png
+index: 863
+#Textures/toolbox_wheeled_normal.png
+index: 864
+#Textures/toolbox_wheeled.png
+index: 865
+#Textures/toolbox_wheeled_specular.png
+index: 866
+#Textures/TouchStick_Background.png
+index: 867
+#Textures/TouchStick_Knob.png
+index: 868
+#Textures/tycho3.png
+index: 869
+#Textures/vending1.png
+index: 870
+#Textures/vending2.png
+index: 871
+#Textures/vending3.png
+index: 872
+#Textures/v_rapier.png
+index: 873
+#Textures/w_blaster_glow.png
+index: 874
+#Textures/w_blaster.png
+index: 875
+#Textures/w_dartgun.png
+index: 876
+#Textures/weapon_magnum.png
+index: 877
+#Textures/weapon_pistol.png
+index: 878
+#Textures/w_flechette_glow.png
+index: 879
+#Textures/w_flechette.png
+index: 880
+#Textures/white.png
+index: 881
+#Textures/Wind.png
+index: 882
+#Textures/w_ion.png
+index: 883
+#Textures/w_magpulse.png
+index: 884
+#Textures/w_mk3.png
+index: 885
+#Textures/workerhelmet.png
+index: 886
+#Textures/w_pipe.png
+index: 887
+#Textures/w_plasma.png
+index: 888
+#Textures/w_railgun.png
+index: 889
+#Textures/w_rapier_glow.png
+index: 890
+#Textures/w_rapier.png
+index: 891
+#Textures/w_riotgun.png
+index: 892
+#Textures/w_skorpion.png
+index: 893
+#Textures/w_sparqbeam_glow.png
+index: 894
+#Textures/w_sparqbeam.png
+index: 895
+#Textures/w_stungun.png
+index: 896
+#Textures/UI/ammopane_orange.png
+index: 897
+#Textures/UI/ammopane.png
+index: 898
+#Textures/UI/ammopane_red.png
+index: 899
+#Textures/UI/berserk01.png
+index: 900
+#Textures/UI/berserk02.png
+index: 901
+#Textures/UI/berserk03.png
+index: 902
+#Textures/UI/berserk04.png
+index: 903
+#Textures/UI/berserk05.png
+index: 904
+#Textures/UI/berserk06.png
+index: 905
+#Textures/UI/berserk07.png
+index: 906
+#Textures/UI/biomonitorplaceholder.png
+index: 907
+#Textures/UI/buttonborder_orange.png
+index: 908
+#Textures/UI/centertab.png
+index: 909
+#Textures/UI/checkbox.png
+index: 910
+#Textures/UI/checkmarkbloom.png
+index: 911
+#Textures/UI/checkmark.png
+index: 912
+#Textures/UI/checkmarkssao.png
+index: 913
+#Textures/UI/circle_blue.png
+index: 914
+#Textures/UI/circle_green.png
+index: 915
+#Textures/UI/circle_purple.png
+index: 916
+#Textures/UI/circle_red.png
+index: 917
+#Textures/UI/clipindicator.png
+index: 918
+#Textures/UI/config_dropdown.png
+index: 919
+#Textures/UI/config_tabhilite.png
+index: 920
+#Textures/UI/config_tab.png
+index: 921
+#Textures/UI/datapanel.png
+index: 922
+#Textures/UI/elnum0.png
+index: 923
+#Textures/UI/elnum1.png
+index: 924
+#Textures/UI/elnum2.png
+index: 925
+#Textures/UI/elnum3.png
+index: 926
+#Textures/UI/elnum4.png
+index: 927
+#Textures/UI/elnum5.png
+index: 928
+#Textures/UI/elnum6.png
+index: 929
+#Textures/UI/elnum7.png
+index: 930
+#Textures/UI/elnum8.png
+index: 931
+#Textures/UI/elnum9.png
+index: 932
+#Textures/UI/elnumb.png
+index: 933
+#Textures/UI/elnumg.png
+index: 934
+#Textures/UI/elnum_null.png
+index: 935
+#Textures/UI/elnumr.png
+index: 936
+#Textures/UI/elnums.png
+index: 937
+#Textures/UI/energyindicatororange.png
+index: 938
+#Textures/UI/energyindicator.png
+index: 939
+#Textures/UI/energyindicatorred_1.png
+index: 940
+#Textures/UI/energyindicatorred_2.png
+index: 941
+#Textures/UI/energyindicatorred_3.png
+index: 942
+#Textures/UI/energyindicatorred_4.png
+index: 943
+#Textures/UI/energy_surge.png
+index: 944
+#Textures/UI/ener_overheatborder.png
+index: 945
+#Textures/UI/ener_overheattickblue.png
+index: 946
+#Textures/UI/ener_overheattickgreen.png
+index: 947
+#Textures/UI/ener_overheattickorange.png
+index: 948
+#Textures/UI/ener_overheattickred.png
+index: 949
+#Textures/UI/ener_overloadoff.png
+index: 950
+#Textures/UI/ener_overloadon.png
+index: 951
+#Textures/UI/ener_settingborder.png
+index: 952
+#Textures/UI/ener_settinghandle.png
+index: 953
+#Textures/UI/healthindicatorcyber.png
+index: 954
+#Textures/UI/healthindicatororange.png
+index: 955
+#Textures/UI/healthindicator.png
+index: 956
+#Textures/UI/healthindicatorred_1.png
+index: 957
+#Textures/UI/healthindicatorred_2.png
+index: 958
+#Textures/UI/healthindicatorred_3.png
+index: 959
+#Textures/UI/healthindicatorred_4.png
+index: 960
+#Textures/UI/healthindicatorred_5.png
+index: 961
+#Textures/UI/health_tickgreen.png
+index: 962
+#Textures/UI/health_tickorange.png
+index: 963
+#Textures/UI/health_tickred.png
+index: 964
+#Textures/UI/healthticks10.png
+index: 965
+#Textures/UI/healthticks11.png
+index: 966
+#Textures/UI/healthticks12.png
+index: 967
+#Textures/UI/healthticks13.png
+index: 968
+#Textures/UI/healthticks14.png
+index: 969
+#Textures/UI/healthticks15.png
+index: 970
+#Textures/UI/healthticks16.png
+index: 971
+#Textures/UI/healthticks17.png
+index: 972
+#Textures/UI/healthticks18.png
+index: 973
+#Textures/UI/healthticks19.png
+index: 974
+#Textures/UI/healthticks1.png
+index: 975
+#Textures/UI/healthticks20.png
+index: 976
+#Textures/UI/healthticks21.png
+index: 977
+#Textures/UI/healthticks22.png
+index: 978
+#Textures/UI/healthticks23.png
+index: 979
+#Textures/UI/healthticks24.png
+index: 980
+#Textures/UI/healthticks2.png
+index: 981
+#Textures/UI/healthticks3.png
+index: 982
+#Textures/UI/healthticks4.png
+index: 983
+#Textures/UI/healthticks5.png
+index: 984
+#Textures/UI/healthticks6.png
+index: 985
+#Textures/UI/healthticks7.png
+index: 986
+#Textures/UI/healthticks8.png
+index: 987
+#Textures/UI/healthticks9.png
+index: 988
+#Textures/UI/hud_hwico_biostats_off.png
+index: 989
+#Textures/UI/hud_hwico_biostats.png
+index: 990
+#Textures/UI/hud_hwico_biostats_v1.png
+index: 991
+#Textures/UI/hud_hwico_biostats_v2.png
+index: 992
+#Textures/UI/hud_hwico_booster_off.png
+index: 993
+#Textures/UI/hud_hwico_booster_onv1.png
+index: 994
+#Textures/UI/hud_hwico_booster_onv2.png
+index: 995
+#Textures/UI/hud_hwico_ereader_off.png
+index: 996
+#Textures/UI/hud_hwico_ereader_v1.png
+index: 997
+#Textures/UI/hud_hwico_infrared_off.png
+index: 998
+#Textures/UI/hud_hwico_infrared_v1.png
+index: 999
+#Textures/UI/hud_hwico_jumpjets_off.png
+index: 1000
+#Textures/UI/hud_hwico_jumpjets_onv1.png
+index: 1001
+#Textures/UI/hud_hwico_jumpjets_onv2.png
+index: 1002
+#Textures/UI/hud_hwico_jumpjets_onv3.png
+index: 1003
+#Textures/UI/hud_hwico_lantern_off.png
+index: 1004
+#Textures/UI/hud_hwico_lantern.png
+index: 1005
+#Textures/UI/hud_hwico_lantern_v1.png
+index: 1006
+#Textures/UI/hud_hwico_lantern_v2.png
+index: 1007
+#Textures/UI/hud_hwico_lantern_v3.png
+index: 1008
+#Textures/UI/hud_hwico_sensaround_off.png
+index: 1009
+#Textures/UI/hud_hwico_sensaround.png
+index: 1010
+#Textures/UI/hud_hwico_sensaround_v1.png
+index: 1011
+#Textures/UI/hud_hwico_sensaround_v2.png
+index: 1012
+#Textures/UI/hud_hwico_sensaround_v3.png
+index: 1013
+#Textures/UI/hud_hwico_shield_off.png
+index: 1014
+#Textures/UI/hud_hwico_shield_on_v1.png
+index: 1015
+#Textures/UI/hud_hwico_shield_on_v2.png
+index: 1016
+#Textures/UI/hud_hwico_shield_on_v3.png
+index: 1017
+#Textures/UI/hud_hwico_shield_on_v4.png
+index: 1018
+#Textures/UI/hud_hwico_shield.png
+index: 1019
+#Textures/UI/hud_shootmode.png
+index: 1020
+#Textures/UI/hudtab1.png
+index: 1021
+#Textures/UI/hudtab2.png
+index: 1022
+#Textures/UI/hudtab_highlight.png
+index: 1023
+#Textures/UI/hudtab_on.png
+index: 1024
+#Textures/UI/infopanel.png
+index: 1025
+#Textures/UI/menu_background_new.png
+index: 1026
+#Textures/UI/menu_background.png
+index: 1027
+#Textures/UI/menu_button_paddark.png
+index: 1028
+#Textures/UI/menu_button_padlit.png
+index: 1029
+#Textures/UI/menu_config.png
+index: 1030
+#Textures/UI/menudot1.png
+index: 1031
+#Textures/UI/menudot2.png
+index: 1032
+#Textures/UI/menudot3.png
+index: 1033
+#Textures/UI/menudot4.png
+index: 1034
+#Textures/UI/menudot5.png
+index: 1035
+#Textures/UI/menudot6.png
+index: 1036
+#Textures/UI/menu_load.png
+index: 1037
+#Textures/UI/nav_e.png
+index: 1038
+#Textures/UI/nav_I.png
+index: 1039
+#Textures/UI/nav_ne.png
+index: 1040
+#Textures/UI/nav_n.png
+index: 1041
+#Textures/UI/nav_nw.png
+index: 1042
+#Textures/UI/nav_se.png
+index: 1043
+#Textures/UI/nav_s.png
+index: 1044
+#Textures/UI/nav_sw.png
+index: 1045
+#Textures/UI/nav_tick.png
+index: 1046
+#Textures/UI/nav_w.png
+index: 1047
+#Textures/UI/newgame_background_inset.png
+index: 1048
+#Textures/UI/newgame_background.png
+index: 1049
+#Textures/UI/noammo.png
+index: 1050
+#Textures/UI/nodamage.png
+index: 1051
+#Textures/UI/nullsprite.png
+index: 1052
+#Textures/UI/num_0.png
+index: 1053
+#Textures/UI/num_1.png
+index: 1054
+#Textures/UI/num_2.png
+index: 1055
+#Textures/UI/num_3.png
+index: 1056
+#Textures/UI/num_4.png
+index: 1057
+#Textures/UI/num_5.png
+index: 1058
+#Textures/UI/num_6.png
+index: 1059
+#Textures/UI/num_7.png
+index: 1060
+#Textures/UI/num_8.png
+index: 1061
+#Textures/UI/num_9.png
+index: 1062
+#Textures/UI/num_colon.png
+index: 1063
+#Textures/UI/num_slash.png
+index: 1064
+#Textures/UI/painstatic_blue1.png
+index: 1065
+#Textures/UI/painstatic_blue2.png
+index: 1066
+#Textures/UI/painstatic_blue3.png
+index: 1067
+#Textures/UI/painstatic_blue4.png
+index: 1068
+#Textures/UI/painstatic_red1.png
+index: 1069
+#Textures/UI/painstatic_red2.png
+index: 1070
+#Textures/UI/painstatic_red3.png
+index: 1071
+#Textures/UI/painstatic_red4.png
+index: 1072
+#Textures/UI/painstatic_red_line.png
+index: 1073
+#Textures/UI/searchfx.png
+index: 1074
+#Textures/UI/selection_box.png
+index: 1075
+#Textures/UI/shieldwave.png
+index: 1076
+#Textures/UI/sightDimming.png
+index: 1077
+#Textures/UI/sliderhandle.png
+index: 1078
+#Textures/UI/slider.png
+index: 1079
+#Textures/UI/splash.png
+index: 1080
+#Textures/UI/splash_sprite.png
+index: 1081
+#Textures/UI/ss1_original_palette_FULL.png
+index: 1082
+#Textures/UI/ss1_original_palette_FULL_test01.png
+index: 1083
+#Textures/UI/teleportstatic_red.png
+index: 1084
+#Textures/UI/teleportstatic_white.png
+index: 1085
+#Textures/UI/vaporizebutton_outline_dark.png
+index: 1086
+#Textures/UI/vaporizebutton_outline.png
+index: 1087
+#Textures/sequences/ammo_magcart_00.png
+index: 1088
+#Textures/sequences/ammo_magcart_01.png
+index: 1089
+#Textures/sequences/ammo_magcart_02.png
+index: 1090
+#Textures/sequences/ammo_magcart_03.png
+index: 1091
+#Textures/sequences/ammo_magcart_04.png
+index: 1092
+#Textures/sequences/ammo_magcart_05.png
+index: 1093
+#Textures/sequences/ammo_magcart_06.png
+index: 1094
+#Textures/sequences/ammo_magcart_07.png
+index: 1095
+#Textures/sequences/ammo_magcart_08.png
+index: 1096
+#Textures/sequences/ammo_magcart_09.png
+index: 1097
+#Textures/sequences/ammo_magcart_10.png
+index: 1098
+#Textures/sequences/ammo_magcart_glow_00.png
+index: 1099
+#Textures/sequences/ammo_magcart_glow_01.png
+index: 1100
+#Textures/sequences/ammo_magcart_glow_02.png
+index: 1101
+#Textures/sequences/ammo_magcart_glow_03.png
+index: 1102
+#Textures/sequences/ammo_magcart_glow_04.png
+index: 1103
+#Textures/sequences/ammo_magcart_glow_05.png
+index: 1104
+#Textures/sequences/ammo_magcart_glow_06.png
+index: 1105
+#Textures/sequences/ammo_magcart_glow_07.png
+index: 1106
+#Textures/sequences/ammo_magcart_glow_08.png
+index: 1107
+#Textures/sequences/ammo_magcart_glow_09.png
+index: 1108
+#Textures/sequences/ammo_magcart_glow_10.png
+index: 1109
+#Textures/sequences/blocked_00.png
+index: 1110
+#Textures/sequences/blocked_01.png
+index: 1111
+#Textures/sequences/blocked_02.png
+index: 1112
+#Textures/sequences/blocked_03.png
+index: 1113
+#Textures/sequences/blocked_04.png
+index: 1114
+#Textures/sequences/broken_clock01_glow01.png
+index: 1115
+#Textures/sequences/broken_clock01_glow02.png
+index: 1116
+#Textures/sequences/broken_clock01.png
+index: 1117
+#Textures/sequences/broken_clock02.png
+index: 1118
+#Textures/sequences/door_x1_01.png
+index: 1119
+#Textures/sequences/door_x1_02.png
+index: 1120
+#Textures/sequences/door_x1_03.png
+index: 1121
+#Textures/sequences/engpump_03_glow.png
+index: 1122
+#Textures/sequences/engscreen1_04.png
+index: 1123
+#Textures/sequences/g_energmine_00.png
+index: 1124
+#Textures/sequences/g_energmine_01.png
+index: 1125
+#Textures/sequences/g_energmine_02.png
+index: 1126
+#Textures/sequences/g_energmine_03.png
+index: 1127
+#Textures/sequences/g_energmine_04.png
+index: 1128
+#Textures/sequences/g_energmine_05.png
+index: 1129
+#Textures/sequences/g_energmine_06.png
+index: 1130
+#Textures/sequences/g_energmine_glow_00.png
+index: 1131
+#Textures/sequences/g_energmine_glow_01.png
+index: 1132
+#Textures/sequences/g_energmine_glow_02.png
+index: 1133
+#Textures/sequences/g_energmine_glow_03.png
+index: 1134
+#Textures/sequences/g_energmine_glow_04.png
+index: 1135
+#Textures/sequences/g_energmine_glow_05.png
+index: 1136
+#Textures/sequences/g_energmine_glow_06.png
+index: 1137
+#Textures/sequences/g_energmine_glow_07.png
+index: 1138
+#Textures/sequences/medicalbed_00.png
+index: 1139
+#Textures/sequences/medicalbed_01.png
+index: 1140
+#Textures/sequences/medicalbed_02.png
+index: 1141
+#Textures/sequences/medicalbed_03.png
+index: 1142
+#Textures/sequences/medicalbed_04.png
+index: 1143
+#Textures/sequences/medicalbed_05.png
+index: 1144
+#Textures/sequences/medicalbed_06.png
+index: 1145
+#Textures/sequences/medicalbed_07.png
+index: 1146
+#Textures/sequences/medicalbed_08.png
+index: 1147
+#Textures/sequences/medicalbed_09.png
+index: 1148
+#Textures/sequences/screencode0.png
+index: 1149
+#Textures/sequences/screencode1.png
+index: 1150
+#Textures/sequences/screencode2.png
+index: 1151
+#Textures/sequences/screencode3.png
+index: 1152
+#Textures/sequences/screencode4.png
+index: 1153
+#Textures/sequences/screencode5.png
+index: 1154
+#Textures/sequences/screencode6.png
+index: 1155
+#Textures/sequences/screencode7.png
+index: 1156
+#Textures/sequences/screencode8.png
+index: 1157
+#Textures/sequences/screencode9.png
+index: 1158
+#Textures/sequences/scr_exp01.png
+index: 1159
+#Textures/sequences/scr_exp02.png
+index: 1160
+#Textures/sequences/scr_exp03.png
+index: 1161
+#Textures/sequences/scr_exp04.png
+index: 1162
+#Textures/sequences/scr_exp05.png
+index: 1163
+#Textures/sequences/scr_exp06.png
+index: 1164
+#Textures/sequences/telepad_00_glow.png
+index: 1165
+#Textures/sequences/telepad_00.png
+index: 1166
+#Textures/sequences/telepad_01.png
+index: 1167
+#Textures/sequences/telepad_02.png
+index: 1168
+#Textures/sequences/telepad_03.png
+index: 1169
+#Textures/sequences/zerog00.png
+index: 1170
+#Textures/sequences/zerog01.png
+index: 1171
+#Textures/sequences/zerog02.png
+index: 1172
+#Textures/sequences/zerog03.png
+index: 1173
+#Textures/sequences/zerog04.png
+index: 1174
+#Textures/sequences/zerog05.png
+index: 1175
+#Textures/sequences/zerog06.png
+index: 1176
+#Textures/sequences/zerog07.png
+index: 1177
+#Textures/sequences/zerog08.png
+index: 1178
+#Textures/sequences/zerog09.png
+index: 1179
+#Textures/sequences/zerog10.png
+index: 1180
+#Textures/sequences/zerog11.png
+index: 1181
+#Textures/sequences/zerog12.png
+index: 1182
+#Textures/sequences/zerog13.png
+index: 1183
+#Textures/sequences/zerog14.png
+index: 1184
+#Textures/sequences/zerog15.png
+index: 1185
+#Textures/sequences/zerog16.png
+index: 1186
+#Textures/sequences/zerog17.png
+index: 1187
+#Textures/sequences/zerog18.png
+index: 1188
+#Textures/sequences/zerog19.png
+index: 1189
+#Textures/sequences/zerog20.png
+index: 1190
+#Textures/sequences/zerog21.png
+index: 1191
+#Textures/sequences/zerog22.png
+index: 1192
+#Textures/sequences/zerog23.png
+index: 1193
+#Textures/sequences/zerog24.png
+index: 1194
+#Textures/sequences/zerog25.png
+index: 1195
+#Textures/sequences/zerog26.png
+index: 1196
+#Textures/sequences/zerog27.png
+index: 1197
+#Textures/sequences/zerog28.png
+index: 1198
+#Textures/sequences/zerog29.png
+index: 1199
+#Textures/sequences/zerog30.png
+index: 1200
+#Textures/sequences/zerog31.png
+index: 1201
+#Textures/sequences/zerog32.png
+index: 1202
+#Textures/sequences/zerog33.png
+index: 1203
+#Textures/sequences/zerog34.png
+index: 1204
+#Textures/sequences/zerog35.png
+index: 1205
+#Textures/sequences/zerog36.png
+index: 1206
+#Textures/sequences/zerog37.png
+index: 1207
+#Textures/sequences/zerog38.png
+index: 1208
+#Textures/sequences/zerog39.png
+index: 1209
+#Textures/sequences/zerog40.png
+index: 1210
+#Textures/sequences/zerog41.png
+index: 1211
+#Textures/sequences/zerog42.png
+index: 1212
+#Textures/sequences/zerog43.png
+index: 1213
+#Textures/sequences/zerog44.png
+index: 1214
+#Textures/sequences/zerog45.png
+index: 1215
+#Textures/sequences/zerog46.png
+index: 1216
+#Textures/sequences/zerog47.png
+index: 1217
+#Textures/sequences/zerog48.png
+index: 1218
+#Textures/sequences/zerog49.png
+index: 1219
+#Textures/sequences/zerog50.png
+index: 1220
+#Textures/sequences/zerog51.png
+index: 1221
+#Textures/sequences/zerog52.png
+index: 1222

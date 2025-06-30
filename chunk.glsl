@@ -52,10 +52,17 @@ const char *fragmentShaderTraditional =
     "in vec3 FragPos;\n"
     "\n"
     "layout(std430, binding = 12) buffer ColorBuffer {\n"
-    "    float colors[];\n" // 1D color array (RGBA)
+    "    uint colors[];\n" // 1D color array (RGBA)
     "};\n"
-    "uniform uint textureOffsets[5];\n" // Offsets for each texture
-    "uniform ivec2 textureSizes[5];\n" // Width, height for each texture
+
+    "layout(std430, binding = 14) buffer TextureOffsets {\n"
+    "    uint textureOffsets[];\n" // Starting index in colors for each texture
+    "};\n"
+
+    "layout(std430, binding = 15) buffer TextureSizes {\n"
+    "    ivec2 textureSizes[];\n" // x,y pairs for width and height of textures
+    "};\n"
+
     "uniform int debugView;\n"
     "\n"
     "layout(location = 0) out vec4 outAlbedo;\n"              // GL_COLOR_ATTACHMENT0
@@ -71,7 +78,7 @@ const char *fragmentShaderTraditional =
     "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V, OpenGL convention vs import
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
-    "    int pixelIndex = int(textureOffsets[texIndexChecked] * 4) + (y * texSize.x + x) * 4;\n" // Calculate 1D index
+    "    int pixelIndex = int(textureOffsets[texIndexChecked]) + (y * texSize.x + x);\n" // Calculate 1D index
     "    outModelInstanceIndex = ivec4(InstanceIndex,ModelIndex,texIndexChecked, 1.0);\n"
     "    if (debugView == 3) {\n"
     "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
@@ -84,7 +91,13 @@ const char *fragmentShaderTraditional =
     "        outAlbedo.b = float(texIndexChecked) / float(TextureCount);\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else {\n"
-    "        outAlbedo = vec4(colors[pixelIndex], colors[pixelIndex + 1], colors[pixelIndex + 2], colors[pixelIndex + 3]);\n"
+        // Unpack RGBA from a single uint
+    "        uint color = colors[pixelIndex];\n"
+    "        float r = float((color >> 24) & 0xFF) / 255.0;\n" // Extract red
+    "        float g = float((color >> 16) & 0xFF) / 255.0;\n" // Extract green
+    "        float b = float((color >> 8) & 0xFF) / 255.0;\n"  // Extract blue
+    "        float a = float(color & 0xFF) / 255.0;\n"         // Extract alpha
+    "        outAlbedo  = vec4(r, g, b, a);\n"
     "    }\n"
     "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
     "    outWorldPos = vec4(FragPos, 1.0);\n"

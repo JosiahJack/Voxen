@@ -16,7 +16,8 @@ const char *modelPaths[MODEL_COUNT] = {
     "./Models/med1_9.fbx",
     "./Models/crate1.fbx",
     "./Models/test_cube.fbx",
-    "./Models/test_light.fbx"
+    "./Models/test_light.fbx",
+    "./Models/eng1_1.fbx"
 };
 
 GLuint chunkShaderProgram;
@@ -28,6 +29,54 @@ int32_t vbo_offsets[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+
+#define WORLD_EPSILON 0.0001f
+float uniqueXPositions[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0.0f };
+float uniqueYPositions[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0.0f };
+float uniqueZPositions[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0.0f };
+int numUniqueXValues = 0;
+int numUniqueYValues = 0;
+int numUniqueZValues = 0;
+
+// Checks if the value given matches an existing value in the unique value array
+// and stores it at head of unique value array if it is unique.  Returns the
+// index into the unique value array for the value that was passed whether new
+// or pre-existing.
+int CheckIfUniqueX(float value) {    
+    for (int i=0;i<=numUniqueXValues;i++) {
+        if (fabs(value - uniqueXPositions[i]) <= WORLD_EPSILON) { // Matches existing value.
+            return i; // Found a match, return it.
+        }
+    }
+    
+    uniqueXPositions[numUniqueXValues] = value; // numUniqueXValues starts at 0 so offset by 1 to assign first value to index 0.
+    numUniqueXValues++;
+    return numUniqueXValues - 1; // Return index of the value.
+}
+
+int CheckIfUniqueY(float value) {    
+    for (int i=0;i<=numUniqueYValues;i++) {
+        if (fabs(value - uniqueYPositions[i]) <= WORLD_EPSILON) { // Matches existing value.
+            return i; // Found a match, return it.
+        }
+    }
+    
+    uniqueYPositions[numUniqueYValues] = value; // numUniqueXValues starts at 0 so offset by 1 to assign first value to index 0.
+    numUniqueYValues++;
+    return numUniqueYValues - 1; // Return index of the value.
+}
+
+int CheckIfUniqueZ(float value) {    
+    for (int i=0;i<=numUniqueZValues;i++) {
+        if (fabs(value - uniqueZPositions[i]) <= WORLD_EPSILON) { // Matches existing value.
+            return i; // Found a match, return it.
+        }
+    }
+    
+    uniqueZPositions[numUniqueYValues] = value; // numUniqueXValues starts at 0 so offset by 1 to assign first value to index 0.
+    numUniqueZValues++;
+    return numUniqueZValues - 1; // Return index of the value.
+}
 
 int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]) {
     int totalVertCount = 0;
@@ -55,7 +104,7 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
 
         modelVertexCounts[i] = vertexCount;
         modelTriangleCounts[i] = (GLint)triCount;//(vertexCount / 3);
-        printf("Model %s loaded with %d vertices, %d tris\n", modelPaths[i], vertexCount, modelTriangleCounts[i]);
+//         printf("Model %s loaded with %d vertices, %d tris\n", modelPaths[i], vertexCount, modelTriangleCounts[i]);
         totalVertCount += vertexCount;
 
         // Allocate vertex data for this model
@@ -78,8 +127,12 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
                 tempVertices[vertexIndex++] = mesh->mVertices[v].x; // Position
+                //tempVertices[vertexIndex++] = CheckIfUniqueX(mesh-mVertices[v].x);
+                CheckIfUniqueX(mesh->mVertices[v].x);
                 tempVertices[vertexIndex++] = mesh->mVertices[v].y;
+                CheckIfUniqueY(mesh->mVertices[v].y);
                 tempVertices[vertexIndex++] = mesh->mVertices[v].z;
+                CheckIfUniqueZ(mesh->mVertices[v].z);
                 tempVertices[vertexIndex++] = mesh->mNormals[v].x; // Normal
                 tempVertices[vertexIndex++] = mesh->mNormals[v].y;
                 tempVertices[vertexIndex++] = mesh->mNormals[v].z;
@@ -104,7 +157,7 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 4] = maxy;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 5] = maxz;
         totalBounds += 6;
-        printf("Model index %d minx %f, miny %f, minz %f ;; maxx %f, maxy %f, maxz %f\n",i,minx,miny,minz,maxx,maxy,maxz);
+//         printf("Model index %d minx %f, miny %f, minz %f ;; maxx %f, maxy %f, maxz %f\n",i,minx,miny,minz,maxx,maxy,maxz);
         vertexDataArrays[i] = tempVertices;
         vertexCounts[i] = vertexCount;
         aiReleaseImport(scene);
@@ -116,6 +169,7 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
     printf(") (Bounds ");
     print_bytes_no_newline( totalBounds * 6 * 4); //minx,miny,minz,maxx,maxy,maxz * 4 
     printf(")\n");
+    printf("numUniqueXValues: %d, numUniqueYValues: %d, numUniqueZValues: %d\n",numUniqueXValues,numUniqueYValues,numUniqueZValues);
     return 0;
 }
 

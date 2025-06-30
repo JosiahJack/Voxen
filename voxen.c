@@ -2,7 +2,6 @@
 // Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
-#include <SDL2/SDL_image.h>
 #include <GL/glew.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,14 +51,13 @@ SDL_GLContext gl_context;
 typedef enum {
     SYS_SDL = 0,
     SYS_TTF,
-    SYS_IMG,
     SYS_WIN,
     SYS_CTX,
     SYS_OGL,
     SYS_COUNT // Number of subsystems
 } SystemType;
 
-bool systemInitialized[SYS_COUNT] = {false,false,false,false,false,false};
+bool systemInitialized[SYS_COUNT] = { [0 ... SYS_COUNT - 1] = false };
 
 int InitializeEnvironment(void) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
@@ -67,9 +65,6 @@ int InitializeEnvironment(void) {
     
     if (TTF_Init() < 0) { fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     systemInitialized[SYS_TTF] = true;
-
-    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) { fprintf(stderr, "IMG_Init failed: %s\n", IMG_GetError()); return SYS_IMG + 1; }
-    systemInitialized[SYS_IMG] = true;
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
@@ -180,7 +175,6 @@ int ExitCleanup(int status) {
     
     if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window); // SDL window was created so destroy the window
     if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font); // Font was loaded, so clean it up
-    if (systemInitialized[SYS_IMG]) IMG_Quit();
     if (systemInitialized[SYS_TTF]) TTF_Quit(); // TTF was init'ed, so also TTF Quit
     if (systemInitialized[SYS_SDL]) SDL_Quit(); // SDL was init'ed, so SDL_Quit
     return status;
