@@ -219,12 +219,13 @@ void RenderMeshInstances() {
         memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
         glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
         glUniform1i(instanceIndexLoc_chunk, i);
-        glUniform1i(modelIndexLoc_chunk, instances[i].modelIndex);
+        int modelType = instances[i].modelIndex;
+        glUniform1i(modelIndexLoc_chunk, modelType);
         glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, model);
-        glBindVertexBuffer(0, vbos[instances[i].modelIndex], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
+        glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
         drawCallCount++;
-        vertexCount += modelVertexCounts[instances[i].modelIndex];
+        vertexCount += modelVertexCounts[modelType];
     }
 }
 
@@ -273,7 +274,8 @@ int RenderStaticMeshes(void) {
     // These should be static but cause issues if not...
     glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets); // Needed or else everything renders with texture index 0 
     glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes); // Needed or everything renders with its texture's relative pixel index 0 only
-    glUniform1ui(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
+    glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
+    glUniform1i(modelCountLoc_chunk, MODEL_COUNT);
     
     RenderMeshInstances(); // Render each model type's instances
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

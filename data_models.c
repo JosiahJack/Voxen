@@ -144,6 +144,7 @@ int LoadGeometry(void) {
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
     glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
+    glVertexAttribFormat(3, 1, GL_INT, GL_FALSE, 6 * sizeof(float)); // Tex Index (int)
 
     // Bind attributes to a single binding point (0)
     glVertexAttribBinding(0, 0); // Position
