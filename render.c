@@ -228,7 +228,7 @@ void RenderMeshInstances() {
     }
 }
 
-bool shadowsEnabled = true;
+bool shadowsEnabled = false;
 
 void TestStuffForRendering_DELETE_ME_LATER() {
     // Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
@@ -294,8 +294,14 @@ int RenderStaticMeshes(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
 
     glUniform1i(instanceCountLoc_deferred, instanceCount);
+    
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * sizeof(Instance), instances);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
+    
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
 
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
