@@ -1,8 +1,5 @@
 // File: voxen.c
-// Description: A realtime OpenGL based application for experimenting with 
-//              voxel lighting techniques to derive new methods of high speed
-//              accurate lighting in resource constrained environements.
-
+// Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_image.h>
@@ -13,14 +10,18 @@
 #include <stdbool.h>
 #include <math.h>
 #include <string.h>
-#include "cli_args.h"
 #include "event.h"
 #include "constants.h"
-#include "data_models.h"
-#include "shaders.glsl.h"
 #include "input.h"
 #include "data_textures.h"
+#include "data_models.h"
 #include "render.h"
+#include "cli_args.h"
+#include "lights.h"
+#include "network.h"
+#include "text.h"
+#include "shaders.h"
+#include "image_effects.h"
 
 // Window
 SDL_Window *window;
@@ -42,23 +43,11 @@ int eventIndex; // Event that made it to the counter.  Indices below this were
 int eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
+double current_time = 0.0;
+double start_frame_time = 0.0;
                 
 // OpenGL
 SDL_GLContext gl_context;
-GLuint shaderProgram;
-GLuint textShaderProgram;
-GLuint cullShaderProgram;
-GLuint transformShaderProgram;
-GLuint rasterizeShaderProgram;
-GLuint imageBlitShaderProgram;
-GLuint vao, vbo; // Vertex Array Object and Vertex Buffer Object
-TTF_Font* font = NULL;
-GLuint textVAO, textVBO;
-GLuint instanceSSBO;
-GLuint modelBoundsBuffer;
-GLuint indirectBuffer;
-GLuint instanceIDBuffer;
-GLuint drawCountBuffer;
 
 typedef enum {
     SYS_SDL = 0,
@@ -82,14 +71,12 @@ int InitializeEnvironment(void) {
     if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) { fprintf(stderr, "IMG_Init failed: %s\n", IMG_GetError()); return SYS_IMG + 1; }
     systemInitialized[SYS_IMG] = true;
 
-    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10);
-    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
-
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) {
         fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
@@ -121,45 +108,67 @@ int InitializeEnvironment(void) {
     fprintf(stderr, "OpenGL Version: %s\n", version ? (const char*)version : "unknown");
     fprintf(stderr, "Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
-    SDL_GL_SetSwapInterval(0.0);
+    int vsync_enable = 0;//1; // Set to 0 for false.
+    SDL_GL_SetSwapInterval(vsync_enable);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
     glFrontFace(GL_CW); // Flip triangle sorting order
-    glEnable(GL_NORMALIZE); // Normalize normals for lighting
-    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); // One-sided lighting
     glViewport(0, 0, screen_width, screen_height);
 
     if (CompileShaders()) return SYS_COUNT + 1;
-    SetupTextQuad();
+    CacheUniformLocationsForShaders(); // After CompileShaders()
+    SetupQuad(); // For image blit for post processing effects like lighting.
+    int fontInit = InitializeTextAndFonts();
+    if (fontInit) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    
+    InitializeLights();
+    SetupGBuffer();
+    SetupInstances();
     Input_Init();
+    InitializeNetworking();
     return 0;
 }
 
 int ExitCleanup(int status) {
+    CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
 
     // OpenGL Cleanup
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    if (instanceSSBO) glDeleteBuffers(1, &instanceSSBO);
-    if (modelBoundsBuffer) glDeleteBuffers(1, &modelBoundsBuffer);
-    if (indirectBuffer) glDeleteBuffers(1, &indirectBuffer);
-    if (instanceIDBuffer) glDeleteBuffers(1, &instanceIDBuffer);
-    if (drawCountBuffer) glDeleteBuffers(1, &drawCountBuffer);
-    if (shaderProgram) glDeleteProgram(shaderProgram);
+    for (int i=0;i<MODEL_COUNT;i++) {
+        if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
+    }
+    
     if (vao) glDeleteVertexArrays(1, &vao);
-    if (vbo) glDeleteBuffers(1, &vbo);
-    if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
-    if (quadVBO) glDeleteBuffers(1, &quadVBO);
-    if (textShaderProgram) glDeleteProgram(textShaderProgram);
-    if (cullShaderProgram) glDeleteProgram(cullShaderProgram);
-    if (transformShaderProgram) glDeleteProgram(transformShaderProgram);
-    if (rasterizeShaderProgram) glDeleteProgram(rasterizeShaderProgram);
-    if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
+    if (chunkShaderProgram) glDeleteProgram(chunkShaderProgram);
+    
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
     if (textVBO) glDeleteBuffers(1, &textVBO);
+    if (textShaderProgram) glDeleteProgram(textShaderProgram);
+    
+    if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
+    if (quadVBO) glDeleteBuffers(1, &quadVBO);
+    if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
+    
+    if (inputImageID) glDeleteTextures(1,&inputImageID);
+    if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
+    if (inputDepthID) glDeleteTextures(1,&inputDepthID);
+    if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
+    if (inputModelInstanceID) glDeleteTextures(1,&inputModelInstanceID);
+    
+    if (outputImageID) glDeleteTextures(1,&outputImageID);
+    
+    if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
+    
+    if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
+    if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
+    if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
+    if (modelMatrices) free(modelMatrices);
+    if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
+    if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
 
     // Cleanup initialized systems in reverse order.
     // Independent ifs so that we can exit from anywhere and de-init only as needed.
@@ -179,20 +188,15 @@ int ExitCleanup(int status) {
 
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
+
 int EventExecute(Event* event) {
     switch(event->type) {
-        case EV_INIT: return InitializeEnvironment(); // Initialization and Loading
+        case EV_INIT: return InitializeEnvironment(); // Init called prior to Loading Data
         case EV_LOAD_TEXTURES: return LoadTextures();
-        case EV_LOAD_MODELS: return SetupGeometry();
-        
-        case EV_KEYDOWN: return Input_KeyDown(event->payload1u); // Input
+        case EV_LOAD_MODELS: return LoadGeometry();
+        case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
-        
-        case EV_CLEAR_FRAME_BUFFERS: return ClearFrameBuffers(); // Rendering
-        case EV_RENDER_STATICS: return RenderStaticMeshes();
-        case EV_RENDER_UI: return RenderUI(get_time() - last_time);
-
         case EV_QUIT: return 1; break;
     }
 
@@ -204,6 +208,34 @@ int main(int argc, char* argv[]) {
 
     if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
         cli_args_print_help();
+        return 0;
+    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
+        printf("Converting log: %s ...", argv[2]);
+        JournalDump(argv[2]);
+        printf("DONE!\n");
+        return 0;
+    }
+
+    if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
+        printf("Voxen the OpenGL Voxel Lit Rendering Engine\n");
+        printf("-----------------------------------------------------------\n");
+        printf("        This is a rendering engine designed for optimized focused\n");
+        printf("        usage of OpenGL making maximal use of GPU Driven rendering\n");
+        printf("        techniques, a unified event system for debugging and log\n");
+        printf("        playback, full mod support loading all data from external\n");
+        printf("        files and using definition files for what to do with the\n");
+        printf("        data.\n\n");
+        printf("        This project aims to have minimal overhead, profiling,\n");
+        printf("        traceability, robustness, and low level control.\n\n");
+        printf("\n");
+        printf("Valid arguments:\n");
+        printf(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
+        printf("-v, --version\n    Prints version information\n\n");
+        printf("play <file>\n    Plays back recorded log from current directory\n\n");
+        printf("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
+        printf("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
+        printf("-h, --help\n    Provides this help text.  Neat!\n\n");
+        printf("-----------------------------------------------------------\n");
         return 0;
     } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
         printf("Converting log: %s ...", argv[2]);
@@ -237,9 +269,11 @@ int main(int argc, char* argv[]) {
     last_time = get_time();
     lastJournalWriteTime = get_time();
     while(1) {
+        start_frame_time = get_time();
         if (!log_playback) {
             // Enqueue input events
             SDL_Event event;
+            float mouse_xrel = 0.0f, mouse_yrel = 0.0f;
             while (SDL_PollEvent(&event)) {
                 if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
                 else if (event.type == SDL_KEYDOWN) {
@@ -248,7 +282,8 @@ int main(int argc, char* argv[]) {
                 } else if (event.type == SDL_KEYUP) {
                     EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
                 } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
-                    EnqueueEvent_FloatFloat(EV_MOUSEMOVE,event.motion.xrel,event.motion.yrel);
+                    mouse_xrel += event.motion.xrel;
+                    mouse_yrel += event.motion.yrel;
 
                 // These aren't really events so just handle them here.
                 } else if (event.type == SDL_WINDOWEVENT) {
@@ -261,11 +296,11 @@ int main(int argc, char* argv[]) {
                     }
                 }
             }
-
-            // Enqueue render events in pipeline order
-            EnqueueEvent_Simple(EV_CLEAR_FRAME_BUFFERS);
-            EnqueueEvent_Simple(EV_RENDER_STATICS);
-            EnqueueEvent_Simple(EV_RENDER_UI);
+            
+            // After polling, enqueue a single mouse motion event if there was movement
+            if (mouse_xrel != 0.0f || mouse_yrel != 0.0f) {
+                EnqueueEvent_FloatFloat(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
+            }
         } else {
             // Log playback controls (pause, fast forward, rewind, quit playback)
             SDL_Event event;
@@ -290,9 +325,8 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        double current_time = get_time();
+        current_time = get_time();
         double frame_time = current_time - last_time;
-        last_time = current_time;
         accumulator += frame_time;
         while (accumulator >= time_step) {
             if (window_has_focus) ProcessInput();
@@ -313,8 +347,10 @@ int main(int argc, char* argv[]) {
 
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
-
+        
+        exitCode = ClientRender();
         SDL_GL_SwapWindow(window); // Present frame
+        last_time = current_time;
         globalFrameNum++;
     }
 

@@ -1,0 +1,28 @@
+name: Build Voxen Engine
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Build Voxen Engine
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run build.sh bash script
+        run: |
+          sudo apt-get update
+          sudo apt-get install libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev libglew-dev libgl1-mesa-dev libassimp-dev libenet-dev
+          chmod +x ./build.sh
+          ./build.sh
+      - name: Upload voxen binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voxen
+          path: voxen

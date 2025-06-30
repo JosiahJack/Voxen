@@ -1,239 +1,343 @@
+// render.c
+// Handles setup of OpenGL rendering related objects, buffers.  Defines calls
+// for all rendering tasks.
+// Render order should be:
+// 1. Clear
+// 2. Render static geometry 
+// 3. Render UI images (TODO)
+// 4. Render UI text (debug only at the moment, e.g. frame stats)
+
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <GL/glew.h>
+#include <stdio.h>
+#include <time.h>
 #include "constants.h"
-#include "shaders.glsl.h"
 #include "data_textures.h"
 #include "data_models.h"
 #include "event.h"
-#include "transform.h"
 #include "quaternion.h"
-#include "transform.h"
 #include "matrix.h"
 #include "player.h"
 #include "render.h"
+#include "input.h"
+#include "lights.h"
+#include "text.h"
+#include "image_effects.h"
+#include "instance.h"
+#include "debug.h"
 
-// Image Effect quad
-GLuint quadVAO, quadVBO;
-void SetupQuad(void) {
-    float vertices[] = {
-        -1.0f, -1.0f, 0.0f, 0.0f, // Bottom-left
-        -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
-         1.0f,  1.0f, 1.0f, 1.0f, // Top-right
-         1.0f, -1.0f, 1.0f, 0.0f  // Bottom-right
-    };
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
+uint32_t drawCallCount = 0;
+uint32_t vertexCount = 0;
 
-InstanceData instancesBuffer[INSTANCE_COUNT] = {
-    // Model 0: med1_1.fbx at (0, 1.28, 0), no rotation, scale 1
-    {{ 0.00f, 1.28f, 0.00f}, {0.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}, 0},
-};
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
+GLuint outputImageID, gBufferFBO, inputModelInstanceID;
 
-GLuint transformedVBO, outputTexture;
-
-// Setup output texture for compute shader
-void SetupOutputTexture(void) {
-    glGenTextures(1, &outputTexture);
-    glBindTexture(GL_TEXTURE_2D, outputTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, screen_width, screen_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, const char *name) {
+    glGenTextures(1, id);
+    glBindTexture(GL_TEXTURE_2D, *id);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) fprintf(stderr, "Failed to create texture %s: OpenGL error %d\n", name, error);
 }
 
-// Quad for text (2 triangles, positions and tex coords)
-float textQuadVertices[] = {
-    // Positions   // Tex Coords
-    0.0f, 0.0f,    0.0f, 0.0f, // Bottom-left
-    1.0f, 0.0f,    1.0f, 0.0f, // Bottom-right
-    1.0f, 1.0f,    1.0f, 1.0f, // Top-right
-    0.0f, 1.0f,    0.0f, 1.0f  // Top-left
+// Create G-buffer textures
+void SetupGBuffer(void) {
+    // First pass gbuffer images
+    GenerateAndBindTexture(&inputImageID,              GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
+    GenerateAndBindTexture(&inputNormalsID,          GL_RGBA16F, screen_width, screen_height,            GL_RGBA,    GL_HALF_FLOAT, "Unlit Raster Normals");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32F, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, "Unlit Raster Depth");
+    GenerateAndBindTexture(&inputWorldPosID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, "Unlit Raster World Positions");
+    GenerateAndBindTexture(&inputModelInstanceID,    GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,           GL_INT, "Unlit Raster Instance and Model Indices");
+    
+    // Second pass gbuffer images
+    GenerateAndBindTexture(&outputImageID,           GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, "Deferred Lighting Result Colors");
+
+    // Create framebuffer
+    glGenFramebuffers(1, &gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputModelInstanceID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+    glDrawBuffers(4, drawBuffers);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        switch (status) {
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: fprintf(stderr, "Framebuffer incomplete: Attachment issue\n"); break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: fprintf(stderr, "Framebuffer incomplete: Missing attachment\n"); break;
+            case GL_FRAMEBUFFER_UNSUPPORTED: fprintf(stderr, "Framebuffer incomplete: Unsupported configuration\n"); break;
+            default: fprintf(stderr, "Framebuffer incomplete: Error code %d\n", status);
+        }
+    }
+    
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
+    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+    glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+int instanceCount = 1000;
+Instance instances[1000] = { [0 ... 100 - 1] = 
+    {0,
+    0.0f,0.0f,0.0f,
+    1.0f,1.0f,1.0f,
+    0.0f,0.0f,0.0f,0.0f}
 };
 
-void SetupTextQuad(void) {
-    glGenVertexArrays(1, &textVAO);
-    glGenBuffers(1, &textVBO);
-    glBindVertexArray(textVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(textQuadVertices), textQuadVertices, GL_STATIC_DRAW);
+GLuint instancesBuffer;
+float * modelMatrices = NULL;
 
-    // Position
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+void SetupInstances(void) {
+    int currentModelType = 0;
+    int x = 0;
+    int y = 0;
+    for (int idx=0;idx<instanceCount;idx++) {
+        instances[idx].modelIndex = currentModelType;
+        instances[idx].texIndex = 0; // Set by entity definition when loaded.
+        instances[idx].posx = ((float)x * 2.56f); // Position in grid with gaps for shadow testing.
+        instances[idx].posy = ((float)y * 5.12f);
+        instances[idx].posz = 0.0f;
+        instances[idx].sclx = 1.0f; // Default scale
+        instances[idx].scly = 1.0f;
+        instances[idx].sclz = 1.0f;
+        instances[idx].rotx = 0.0f; // Quaternion identity
+        instances[idx].roty = 0.0f;
+        instances[idx].rotz = 0.0f;
+        instances[idx].rotw = 1.0f;
+        x++;
+        if (idx == 100 || idx == 200 || idx == 300 || idx == 400 || idx == 500 || idx == 600 || idx == 700 || idx == 800 || idx == 900) {
+            x = 0;
+            y++;
+        }
+    }
     
-    // Tex Coord
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-}
-
-// Create just a plain old ground plane
-    float vertexDataTest[] = {
-        // x,    y,    z, |   nx,   ny,   nz, |   u,    v | texIndex
-        0.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 0.0f,      0.0f,
-        5.0f, 0.0f, 0.0f,   0.0f, 0.0f, 1.0f,  1.0f, 0.0f,      0.0f,
-        5.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  1.0f, 1.0f,      0.0f,
-        0.0f, 5.0f, 0.0f,   0.0f, 0.0f, 1.0f,  0.0f, 1.0f,      0.0f       
-    };
-
-float *vertexData = NULL;
-int SetupGeometry(void) {    
-    // Load models first to know how to size other buffers.
-    uint32_t vertexCount = 0;
-    if (LoadModels(&vertexData, &vertexCount)) { fprintf(stderr, "Failed to load models!\n"); return 1; }
+    instances[39].modelIndex = 5; // Test Light
+    instances[39].texIndex = 3; // white light
+    instances[39].sclx = 0.16f;
+    instances[39].scly = 0.16f;
+    instances[39].sclz = 0.16f;
     
-    glGenBuffers(1, &transformedVBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);
-    int numModel0 = INSTANCE_COUNT;
-    int numModel1 = 0;
-    int numModel2 = 0;
-    
-    // VBO and VAO setup
-    
-    // TEST OVERRIDES!! DELETE LATER!
-//     totalVertexCount = 4;
-//     vertexCount = 4;
-//     modelVertexCounts[0] = 4;
-//     modelVertexCounts[1] = 0;
-//     modelVertexCounts[2] = 0;
-    
-    glBufferData(GL_SHADER_STORAGE_BUFFER, ((modelVertexCounts[0] * numModel0) + (modelVertexCounts[1] * numModel1) + (modelVertexCounts[2] * numModel2)) * 6 * sizeof(float), vertexDataTest, GL_STATIC_DRAW);
+    glGenBuffers(1, &instancesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    SetupOutputTexture();
-    SetupQuad();
+    printf("Total instance size ");
+    print_bytes_no_newline(instanceCount * 11 * 4);
+    printf("\n");
     
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertexCount * 9 * sizeof(float), vertexDataTest, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(8 * sizeof(float)));
-    glEnableVertexAttribArray(3);
-
-    // Instance SSBO
-    glGenBuffers(1, &instanceSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instanceSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(InstanceData), instancesBuffer, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, instanceSSBO);
-
-    // Model bounds SSBO
-    glGenBuffers(1, &modelBoundsBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(float), modelRadius, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, modelBoundsBuffer);
-
-    // Indirect draw buffer
-    glGenBuffers(1, &indirectBuffer);
-    glBindBuffer(GL_DRAW_INDIRECT_BUFFER, indirectBuffer);
-    glBufferData(GL_DRAW_INDIRECT_BUFFER, INSTANCE_COUNT * sizeof(DrawArraysIndirectCommand), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, indirectBuffer);
-
-    // Instance ID buffer
-    glGenBuffers(1, &instanceIDBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instanceIDBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, instanceIDBuffer);
-
-    // Draw count buffer
-    glGenBuffers(1, &drawCountBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, drawCountBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, drawCountBuffer);
-
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glBindVertexArray(0);
-    free(vertexData);
-    return 0;
+    modelMatrices = malloc(instanceCount * 16 * sizeof(float)); // Matrix4x4 = 16
+    glGenBuffers(1, &matricesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
 }
 
 int ClearFrameBuffers(void) {
+    // Clear the G-buffer FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Set clear color (black, fully opaque)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Clear the default framebuffer
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Ensure consistent clear color
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+//     glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil each frame TODO: can do this here instead of down below?
     return 0;
 }
 
+// Global uniform locations (cached during init)
+GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1;
+GLint texIndexLoc_chunk = -1, textureOffsetsLoc_chunk = -1;
+GLint textureSizesLoc_chunk = -1, textureCountLoc_chunk = -1;
+GLint instanceIndexLoc_chunk = -1, instanceCountLoc_chunk = -1;
+GLint modelCountLoc_chunk = -1, modelIndexLoc_chunk = -1;
+GLint debugViewLoc_chunk = -1;
+
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
+GLint textureOffsetsLoc_deferred = -1, textureSizesLoc_deferred = -1;
+GLint instanceCountLoc_deferred = -1;
+
+
+void CacheUniformLocationsForShaders(void) {
+    // Called after shader compilation in InitializeEnvironment
+    viewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "view");
+    projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
+    matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
+    texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
+    textureOffsetsLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureOffsets");
+    textureSizesLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureSizes");
+    textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
+    instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
+    instanceCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceCount");
+    modelCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelCount");
+    modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
+    debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
+    
+    screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
+    screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
+    textureOffsetsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureOffsets");
+    textureSizesLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureSizes");
+    instanceCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "instanceCount");
+}
+
+GLuint matricesBuffer;
+float *modelMatrices;
+
+void RenderMeshInstances() {
+    // Set up view and projection matrices
+    float model[16]; // 4x4 matrix
+    for (int i=0;i<instanceCount;i++) {
+        mat4_identity(model);
+        mat4_scale(model, instances[i].sclx, instances[i].scly, instances[i].sclz); // Apply scale
+        float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
+        float rot[16];
+        mat4_identity(rot);
+        rot[0] = 1.0f - 2.0f * (y*y + z*z);
+        rot[1] = 2.0f * (x*y - w*z);
+        rot[2] = 2.0f * (x*z + w*y);
+        rot[4] = 2.0f * (x*y + w*z);
+        rot[5] = 1.0f - 2.0f * (x*x + z*z);
+        rot[6] = 2.0f * (y*z - w*x);
+        rot[8] = 2.0f * (x*z - w*y);
+        rot[9] = 2.0f * (y*z + w*x);
+        rot[10] = 1.0f - 2.0f * (x*x + y*y);
+        mat4_multiply(model, model, rot); // Apply rotation
+        mat4_translate(model, instances[i].posx, instances[i].posy, instances[i].posz); // Apply translation
+        memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
+        glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+        glUniform1i(instanceIndexLoc_chunk, i);
+        glUniform1i(modelIndexLoc_chunk, instances[i].modelIndex);
+        glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, model);
+        glBindVertexBuffer(0, vbos[instances[i].modelIndex], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
+        drawCallCount++;
+        vertexCount += modelVertexCounts[instances[i].modelIndex];
+    }
+}
+
+bool shadowsEnabled = true;
+
+void TestStuffForRendering_DELETE_ME_LATER() {
+    // Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
+    int lightBase = 0;
+    lights[lightBase + 0] = testLight_x;
+    lights[lightBase + 1] = testLight_y;
+    lights[lightBase + 2] = testLight_z;
+    lights[lightBase + 3] = testLight_intensity;
+    lights[lightBase + 4] = testLight_range;
+    lights[lightBase + 5] = testLight_spotAng;
+    lights[lightBase + 9] = 1.0f; // r
+    lights[lightBase + 10] = 1.0f; // g
+    lights[lightBase + 11] = 1.0f; // b
+    lightDirty[lightBase / 6] = true;
+    instances[39].posx = testLight_x;
+    instances[39].posy = testLight_y;
+    instances[39].posz = testLight_z;
+}
+
 int RenderStaticMeshes(void) {
-    float *vertexDataOut = (float *)malloc(totalVertexCount * INSTANCE_COUNT * 6 * sizeof(float));
-    if (!vertexDataOut) {
-        fprintf(stderr, "Memory allocation failed for vertexDataOut\n");
-        return 1;
-    }
+    TestStuffForRendering_DELETE_ME_LATER();
+
+    drawCallCount = 0; // Reset per frame
+    vertexCount = 0;
     
-    // Transform vertices on CPU
-    transform_vertices(vertexData, vertexDataOut, totalVertexCount, instancesBuffer, modelVertexCounts, vbo_offsets);
+    // 1. Unlit Raterized Geometry
+    //        Standard vertex + fragment rendering, but
+    //        with special packing to minimize transfer data amounts
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glUseProgram(chunkShaderProgram);
+    glEnable(GL_DEPTH_TEST);
+    float view[16], projection[16]; // Set up view and projection matrices
+    float fov = 65.0f;
+    mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
+    mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
+    glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+    glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
+    glUniform1i(instanceCountLoc_chunk, instanceCount);
+    glUniform1i(debugViewLoc_chunk, debugView);
+    glBindVertexArray(vao);
     
-    // Update transformedVBO with CPU-transformed data
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, transformedVBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertexCount * INSTANCE_COUNT * 6 * sizeof(float), vertexDataOut, GL_DYNAMIC_DRAW);
+    // These should be static but cause issues if not...
+    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets); // Needed or else everything renders with texture index 0 
+    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes); // Needed or everything renders with its texture's relative pixel index 0 only
+    glUniform1ui(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
+    
+    RenderMeshInstances(); // Render each model type's instances
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 2. Deferred Lighting + Shadow Calculations
+    //        Apply deferred lighting with compute shader.  All lights are
+    //        dynamic and can be updated at any time (flicker, light switches,
+    //        move, change color, get marked as "culled" so shader can skip it,
+    //        etc.).
+    glUseProgram(deferredLightingShaderProgram);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    for (uint32_t i=0; i < (totalVertexCount * INSTANCE_COUNT * 6);i+=6) {
-        printf("Vertex: %d, x: %f, y: %f, depth: %f, u: %f, v: %f, texIndex: %f  at cam_x: %f, cam_y: %f, cam_z: %f with cam_yaw: %f, cam_pitch %f\n",
-               i,vertexDataOut[i],vertexDataOut[i + 1],vertexDataOut[i + 2],vertexDataOut[i + 3],vertexDataOut[i + 4],vertexDataOut[i + 5],cam_x,cam_y,cam_z,cam_yaw,cam_pitch);
-    }
+  
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+
+    glUniform1i(instanceCountLoc_deferred, instanceCount);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * sizeof(Instance), instances);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+
+    // These should be static but cause issues if not...
+    glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
+    glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
     
-    free(vertexDataOut);
+    glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
+    glUniform1iv(glGetUniformLocation(deferredLightingShaderProgram, "triangleCounts"), MODEL_COUNT, modelTriangleCounts);
+    glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "instanceCount"), instanceCount);
+    float viewInv[16];
+    mat4_inverse(viewInv,view);
+    float projInv[16];
+    mat4_inverse(projInv,projection);
 
-//     // Transform compute shader
-//     glUseProgram(transformShaderProgram);
-// 
-//     // Bind buffers
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, vbo);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, transformedVBO);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, instanceSSBO);
-// 
-//     // Set uniforms
-//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "vertexCount"), totalVertexCount);
-//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "instanceCount"), INSTANCE_COUNT);
-//     glUniform1uiv(glGetUniformLocation(transformShaderProgram, "modelVertexCounts"), MODEL_COUNT, modelVertexCounts);
-//     glUniform1uiv(glGetUniformLocation(transformShaderProgram, "vbo_offsets"), MODEL_COUNT, vbo_offsets);
-//     glUniform3f(glGetUniformLocation(transformShaderProgram, "cameraPos"), cam_x, cam_y, cam_z);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraYaw"), cam_yaw);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "cameraPitch"), cam_pitch);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovH"), cam_fovH);
-//     glUniform1f(glGetUniformLocation(transformShaderProgram, "fovV"), cam_fovY);
-//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenWidth"), screen_width);
-//     glUniform1ui(glGetUniformLocation(transformShaderProgram, "screenHeight"), screen_height);
-// 
-//     // Dispatch compute shader
-//     uint32_t workGroups = (totalVertexCount + 63) / 64;
-//     glDispatchCompute(workGroups, 1, 1);
-//     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    // Rasterization compute shader
-    glUseProgram(rasterizeShaderProgram);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, transformedVBO);
-    glBindImageTexture(1, outputTexture, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, colorBufferID);
-    glUniform1uiv(glGetUniformLocation(rasterizeShaderProgram, "textureOffsets"), TEXTURE_COUNT, textureOffsets);
-    glUniform2uiv(glGetUniformLocation(rasterizeShaderProgram, "textureSizes"), TEXTURE_COUNT, textureSizes);
-    glUniform1ui(glGetUniformLocation(rasterizeShaderProgram, "screenWidth"), screen_width);
-    glUniform1ui(glGetUniformLocation(rasterizeShaderProgram, "screenHeight"), screen_height);
-    glDispatchCompute((GLuint)ceil(screen_width / 8.0), (GLuint)ceil(screen_height / 8.0), 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-    // Rest of the rendering code (imageBlit, etc.) remains the same
+    // Dispatch compute shader
+    GLuint groupX = (screen_width + 7) / 8;
+    GLuint groupY = (screen_height + 7) / 8;
+    glDispatchCompute(groupX, groupY, 1);
+//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    
+    // 3. Shadow Softening Compute Shader
+    //        Takes delta between lit and lit+shadow result found in Pass 2
+    //        above and applies the shadow results to the lit results with a
+    //        blending based on distance from nearest unshadowed pixel if
+    //        coherent (same normal and depth with tolerance band).
+    
+    // TODO
+    
+    // 4. Render Output
+    //        Render final gather lighting results with full screen quad.
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, outputTexture);
+    if (debugView == 0) {
+        glBindTexture(GL_TEXTURE_2D, outputImageID); // Normal
+    } else if (debugView == 1) {
+        glBindTexture(GL_TEXTURE_2D, inputImageID); // Unlit
+    } else if (debugView == 2) {
+        glBindTexture(GL_TEXTURE_2D, inputNormalsID); // Triangle Normals 
+    } else if (debugView == 3) {
+        glBindTexture(GL_TEXTURE_2D, inputImageID); // Depth.  Values must be decoded in shader
+    } else if (debugView == 4) {
+        glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
+    }
     glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
     glBindVertexArray(quadVAO);
     glDisable(GL_BLEND);
@@ -243,111 +347,60 @@ int RenderStaticMeshes(void) {
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
     glUseProgram(0);
-
     return 0;
 }
 
-// Renders text at x,y coordinates specified using pointer to the string array.
-void render_debug_text(float x, float y, const char *text, SDL_Color color) {
-    if (!font || !text) { fprintf(stderr, "Font or text is NULL\n"); return; }
-    SDL_Surface *surface = TTF_RenderText_Solid(font, text, color);
-    if (!surface) { fprintf(stderr, "TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
-    SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface(surface);
-    if (!rgba_surface) { fprintf(stderr, "SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
-
-    // Create and bind texture
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba_surface->w, rgba_surface->h, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    // Use text shader
-    glUseProgram(textShaderProgram);
-
-    // Set up orthographic projection
-    float projection[16];
-    mat4_ortho(projection, 0.0f, (float)screen_width, (float)screen_height, 0.0f, -1.0f, 1.0f);
-    GLint projLoc = glGetUniformLocation(textShaderProgram, "projection");
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, projection);
-
-    // Set text color (convert SDL_Color to 0-1 range)
-    float r = color.r / 255.0f;
-    float g = color.g / 255.0f;
-    float b = color.b / 255.0f;
-    float a = color.a / 255.0f;
-    GLint colorLoc = glGetUniformLocation(textShaderProgram, "textColor");
-    glUniform4f(colorLoc, r, g, b, a);
-
-    // Bind texture
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    GLint texLoc = glGetUniformLocation(textShaderProgram, "textTexture");
-    glUniform1i(texLoc, 0);
-
-    // Enable blending for text transparency
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST); // Disable depth test for 2D overlay
-
-    // Bind VAO and adjust quad position/size
-    glBindVertexArray(textVAO);
-    float scaleX = (float)rgba_surface->w;
-    float scaleY = (float)rgba_surface->h;
-    float vertices[] = {
-        x,          y,          0.0f, 0.0f, // Bottom-left
-        x + scaleX, y,          1.0f, 0.0f, // Bottom-right
-        x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
-        x,          y + scaleY, 0.0f, 1.0f  // Top-left
-    };
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-    // Render quad (two triangles)
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-    // Cleanup
-    glBindVertexArray(0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST); // Re-enable depth test for 3D rendering
-    glUseProgram(0);
-    glDeleteTextures(1, &texture);
-    SDL_FreeSurface(rgba_surface);
-}
+double lastFrameSecCountTime = 0.00;
+uint32_t lastFrameSecCount = 0;
+uint32_t framesPerLastSecond = 0;
 
 int RenderUI(double deltaTime) {
+    glEnable(GL_STENCIL_TEST);
+    glStencilMask(0xFF); // Enable stencil writes
+    glStencilFunc(GL_ALWAYS, 1, 0xFF); // Always write 1
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); // Replace stencil value
+    glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil each frame TODO: Ok to do in ClearFrameBuffers()??
     glDisable(GL_LIGHTING); // Disable lighting for text
-    SDL_Color textCol = {255, 255, 255, 255}; // White
-
-    // Draw debug text
-    char text0[128];
-    snprintf(text0, sizeof(text0), "Frame time: %.6f", deltaTime * 1000.0);
-    render_debug_text(10, 10, text0, textCol); // Top-left corner (10, 10)
-
-    char text1[128];
-    snprintf(text1, sizeof(text1), "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
-    render_debug_text(10, 25, text1, textCol); // Top-left corner (10, 10)
 
     float cam_quat_yaw = 0.0f;
     float cam_quat_pitch = 0.0f;
     float cam_quat_roll = 0.0f;
     quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
-    char text2[128];
-    snprintf(text2, sizeof(text2), "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-    render_debug_text(10, 40, text2, textCol);
+    
+    RenderFormattedText(10, 25, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+    RenderFormattedText(10, 40, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+    RenderFormattedText(10, 55, TEXT_WHITE, "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
+    RenderFormattedText(10, 70, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+    RenderFormattedText(10, 95, TEXT_WHITE, "testLight_spotAng: %.4f", testLight_spotAng);
+    RenderFormattedText(10, 110, TEXT_WHITE, "testLight_intensity: %.4f", testLight_intensity);
+    RenderFormattedText(10, 125, TEXT_WHITE, "DebugView: %d", debugView);
+    
+    // Frame stats
+    drawCallCount++; // Add one more for this text render ;)
+    RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d",
+                        deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
+    
+    double time_now = get_time();
+    if ((time_now - lastFrameSecCountTime) >= 1.00) {
+        lastFrameSecCountTime = time_now;
+        framesPerLastSecond = globalFrameNum - lastFrameSecCount;
+        lastFrameSecCount = globalFrameNum;
+    }
 
-    char text3[128];
-    snprintf(text3, sizeof(text3), "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
-    render_debug_text(10, 55, text3, textCol);
-
-    char text4[128];
-    snprintf(text4, sizeof(text4), "Peak frame queue count: %.2d", maxEventCount_debug);
-    render_debug_text(10, 70, text4, textCol);
+    glDisable(GL_STENCIL_TEST);
+    glStencilMask(0x00); // Disable stencil writes
     return 0;
+}
+
+// Main render call for entire graphics pipeline.
+int ClientRender() {
+    int exitCode = 0;
+    exitCode = ClearFrameBuffers();
+    if (exitCode) return exitCode;
+    
+    exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
+    if (exitCode) return exitCode;
+
+    exitCode = RenderUI(get_time() - last_time);
+    return exitCode;
 }

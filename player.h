@@ -1,8 +1,6 @@
 #ifndef VOXEN_PLAYER_H
 #define VOXEN_PLAYER_H
 
-#include <GL/glew.h>
-#include <stdbool.h>
 #include "quaternion.h"
 
 // Camera variables
@@ -11,8 +9,13 @@ extern Quaternion cam_rotation;
 extern float cam_yaw;
 extern float cam_pitch;
 extern float cam_roll;
-extern float cam_fovH;
-extern float cam_fovV;
 extern bool in_cyberspace;
+
+extern float testLight_x;
+extern float testLight_y;
+extern float testLight_z;
+extern float testLight_intensity;
+extern float testLight_range;
+extern float testLight_spotAng;
 
 #endif // VOXEN_PLAYER_H

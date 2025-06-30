@@ -3,17 +3,20 @@
 
 #include <GL/glew.h>
 
-extern float modelRadius[];
-extern GLuint indirectBuffer;
-extern GLuint instanceIDBuffer;
+#define MODEL_COUNT 6 // Also need to set in deferred_lighting.compute!!
+#define VERTEX_ATTRIBUTES_COUNT 8
+#define BOUNDS_ATTRIBUTES_COUNT 6
+
 extern uint32_t modelVertexCounts[];
-extern GLuint vbo_offsets[];
+extern GLint modelTriangleCounts[];
+extern float modelBounds[];
+extern GLuint modelBoundsID;
+extern int32_t vbo_offsets[];
 extern uint32_t totalVertexCount;
 extern GLuint vao;
-extern GLuint vbo;
-extern GLuint quadVAO;
-extern GLuint quadVBO;
+extern GLuint vbos[];
 
-int LoadModels(float **vertexData, uint32_t *vertexCount);
+int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]);
+int LoadGeometry(void);
 
 #endif // VOXEN_DATA_MODELS_H

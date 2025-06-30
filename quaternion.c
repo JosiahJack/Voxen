@@ -83,23 +83,23 @@ void quat_to_euler(Quaternion* q, float* yaw, float* pitch, float* roll) {
     // Pitch (X-axis rotation)
     float sinp = 2.0f * (q->w * q->x + q->y * q->z);
     float cosp = 1.0f - 2.0f * (q->x * q->x + q->y * q->y);
-    *pitch = rad2deg(atan2(sinp, cosp));
+    *pitch = atan2(sinp, cosp) * 180.0f / M_PI;
 
     // Yaw (Z-axis rotation)
     float siny = 2.0f * (q->w * q->z + q->x * q->y);
     float cosy = 1.0f - 2.0f * (q->y * q->y + q->z * q->z);
-    *yaw = rad2deg(atan2(siny, cosy));
+    *yaw = atan2(siny, cosy) * 180.0f / M_PI;
 
     // Roll (Y-axis rotation, not used here)
     float sinr = 2.0f * (q->w * q->y - q->z * q->x);
-    *roll = rad2deg(asin(sinr));
+    *roll = asin(sinr) * 180.0f / M_PI;
 }
 
 // Create a quaternion from yaw (around Z) and pitch (around X) in degrees
 void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg) {
     // Convert yaw and pitch from degrees to radians
-    float yaw = deg2rad(yaw_deg);
-    float pitch = deg2rad(pitch_deg);
+    float yaw = yaw_deg * M_PI / 180.0f;
+    float pitch = pitch_deg * M_PI / 180.0f;
 
     // Compute half angles
     float half_yaw = yaw * 0.5f;
@@ -132,9 +132,9 @@ void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg) {
 // Create a quaternion from yaw (around Z), pitch (around X), and roll (around Y) in degrees
 void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
     // Convert yaw, pitch, and roll from degrees to radians
-    float yaw = deg2rad(yaw_deg);
-    float pitch = deg2rad(pitch_deg);
-    float roll = deg2rad(roll_deg);
+    float yaw = yaw_deg * M_PI / 180.0f;
+    float pitch = pitch_deg * M_PI / 180.0f;
+    float roll = roll_deg * M_PI / 180.0f;
 
     // Compute half angles
     float half_yaw = yaw * 0.5f;
