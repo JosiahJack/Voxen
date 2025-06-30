@@ -4,6 +4,7 @@
 #include "data_textures.h"
 #include "constants.h"
 #include "debug.h"
+#include "render.h"
 
 SDL_Surface ** textureSurfaces = NULL;
 GLuint * textureIDs = NULL;
@@ -101,9 +102,22 @@ int LoadTextures(void) {
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * 4 * sizeof(float), colorData, GL_STATIC_DRAW);
+    
+          // Set static buffer once for all shaders
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
+    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     free(colorData);
+    
+    // Send static uniforms to chunk shader
+    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets);
+    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes);
+    glUniform1ui(textureCountLoc_chunk, textureCount);
 
+    // Send static uniforms to deferred lighting shader
+    glUniform1uiv(textureOffsetsLoc_deferred, textureCount, textureOffsets);
+    glUniform2iv(textureSizesLoc_deferred, textureCount, textureSizes);
+    
     // Delete individual texture IDs
     for (int i = 0; i < textureCount; i++) {
         if (textureIDs[i]) glDeleteTextures(1, &textureIDs[i]);

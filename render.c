@@ -75,6 +75,13 @@ void SetupGBuffer(void) {
             default: fprintf(stderr, "Framebuffer incomplete: Error code %d\n", status);
         }
     }
+    
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
+    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+    glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -152,35 +159,38 @@ int ClearFrameBuffers(void) {
 }
 
 // Global uniform locations (cached during init)
-GLint viewLoc = -1, projectionLoc = -1, matrixLoc = -1, texIndexLoc = -1;
-GLint textureOffsetsLoc_chunk = -1, textureSizesLoc_chunk = -1, modelIndexLoc = -1;
-GLint instanceIndexLoc = -1, instanceCountLoc_chunk = -1, modelCountLoc_chunk = -1;
-GLint textureCountLoc_chunk = -1, debugViewLoc = -1;
+GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1;
+GLint texIndexLoc_chunk = -1, textureOffsetsLoc_chunk = -1;
+GLint textureSizesLoc_chunk = -1, textureCountLoc_chunk = -1;
+GLint instanceIndexLoc_chunk = -1, instanceCountLoc_chunk = -1;
+GLint modelCountLoc_chunk = -1, modelIndexLoc_chunk = -1;
+GLint debugViewLoc_chunk = -1;
 
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
 GLint textureOffsetsLoc_deferred = -1, textureSizesLoc_deferred = -1;
+GLint instanceCountLoc_deferred = -1;
 
- GLint screenWidthLoc, screenHeightLoc, lightFarPlaneLoc;
 
-void CacheUniformLocationsForChunkShader(void) {
+void CacheUniformLocationsForShaders(void) {
     // Called after shader compilation in InitializeEnvironment
-    viewLoc = glGetUniformLocation(chunkShaderProgram, "view");
-    projectionLoc = glGetUniformLocation(chunkShaderProgram, "projection");
-    matrixLoc = glGetUniformLocation(chunkShaderProgram, "matrix");
-    texIndexLoc = glGetUniformLocation(chunkShaderProgram, "texIndex");
+    viewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "view");
+    projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
+    matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
+    texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
     textureOffsetsLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureOffsets");
     textureSizesLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureSizes");
     textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
-    instanceIndexLoc = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
+    instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     instanceCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceCount");
     modelCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelCount");
-    modelIndexLoc = glGetUniformLocation(chunkShaderProgram, "modelIndex");
-    debugViewLoc = glGetUniformLocation(chunkShaderProgram, "debugView");
+    modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
+    debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
     
-    screenWidthLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
-    screenHeightLoc = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    lightFarPlaneLoc = glGetUniformLocation(deferredLightingShaderProgram, "lightFarPlane");
+    screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
+    screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     textureOffsetsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureOffsets");
     textureSizesLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureSizes");
+    instanceCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "instanceCount");
 }
 
 GLuint matricesBuffer;
@@ -207,10 +217,10 @@ void RenderMeshInstances() {
         mat4_multiply(model, model, rot); // Apply rotation
         mat4_translate(model, instances[i].posx, instances[i].posy, instances[i].posz); // Apply translation
         memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
-        glUniform1i(texIndexLoc, instances[i].texIndex);
-        glUniform1i(instanceIndexLoc, i);
-        glUniform1i(modelIndexLoc, instances[i].modelIndex);
-        glUniformMatrix4fv(matrixLoc, 1, GL_FALSE, model);
+        glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+        glUniform1i(instanceIndexLoc_chunk, i);
+        glUniform1i(modelIndexLoc_chunk, instances[i].modelIndex);
+        glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, model);
         glBindVertexBuffer(0, vbos[instances[i].modelIndex], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
         drawCallCount++;
@@ -220,8 +230,8 @@ void RenderMeshInstances() {
 
 bool shadowsEnabled = true;
 
-int RenderStaticMeshes(void) {
-    // Update the test light to be "attached" to the player
+void TestStuffForRendering_DELETE_ME_LATER() {
+    // Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
     int lightBase = 0;
     lights[lightBase + 0] = testLight_x;
     lights[lightBase + 1] = testLight_y;
@@ -233,72 +243,63 @@ int RenderStaticMeshes(void) {
     lights[lightBase + 10] = 1.0f; // g
     lights[lightBase + 11] = 1.0f; // b
     lightDirty[lightBase / 6] = true;
-    
     instances[39].posx = testLight_x;
     instances[39].posy = testLight_y;
     instances[39].posz = testLight_z;
-    
+}
+
+int RenderStaticMeshes(void) {
+    TestStuffForRendering_DELETE_ME_LATER();
+
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
+    
+    // 1. Unlit Raterized Geometry
+    //        Standard vertex + fragment rendering, but
+    //        with special packing to minimize transfer data amounts
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glUseProgram(chunkShaderProgram);
     glEnable(GL_DEPTH_TEST);
-
-    // Set up view and projection matrices
-    float view[16], projection[16];
+    float view[16], projection[16]; // Set up view and projection matrices
     float fov = 65.0f;
     mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
     mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, view);
-    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, projection);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, colorBufferID);
-    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets);
-    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes);
+    glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+    glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
     glUniform1i(instanceCountLoc_chunk, instanceCount);
-    glUniform1ui(textureCountLoc_chunk, textureCount);
-    glUniform1ui(modelCountLoc_chunk, MODEL_COUNT);
-    glUniform1i(debugViewLoc, debugView);
+    glUniform1i(debugViewLoc_chunk, debugView);
     glBindVertexArray(vao);
-
-    glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "instanceCount"), instanceCount);
-
-    // Render each model instance, simple draw calls, no instancing yet
-    RenderMeshInstances();
+    
+    // These should be static but cause issues if not...
+    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets); // Needed or else everything renders with texture index 0 
+    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes); // Needed or everything renders with its texture's relative pixel index 0 only
+    glUniform1ui(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
+    
+    RenderMeshInstances(); // Render each model type's instances
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Apply deferred lighting with compute shader
+    // 2. Deferred Lighting + Shadow Calculations
+    //        Apply deferred lighting with compute shader.  All lights are
+    //        dynamic and can be updated at any time (flicker, light switches,
+    //        move, change color, get marked as "culled" so shader can skip it,
+    //        etc.).
     glUseProgram(deferredLightingShaderProgram);
-
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glUniform1ui(screenWidthLoc, screen_width);
-    glUniform1ui(screenHeightLoc, screen_height);    
+  
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, vbos[0]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
-    
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
 
+    glUniform1i(instanceCountLoc_deferred, instanceCount);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * sizeof(Instance), instances);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-    
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
-    glUniform1uiv(textureOffsetsLoc_deferred, textureCount, textureOffsets);
-    glUniform2iv(textureSizesLoc_deferred, textureCount, textureSizes);
 
-    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
-    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-    
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
-    
-    glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
+    // These should be static but cause issues if not...
+    glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
+    glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
     
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
     glUniform1iv(glGetUniformLocation(deferredLightingShaderProgram, "triangleCounts"), MODEL_COUNT, modelTriangleCounts);
@@ -312,9 +313,18 @@ int RenderStaticMeshes(void) {
     GLuint groupX = (screen_width + 7) / 8;
     GLuint groupY = (screen_height + 7) / 8;
     glDispatchCompute(groupX, groupY, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     
-    // Render final gather lighting
+    // 3. Shadow Softening Compute Shader
+    //        Takes delta between lit and lit+shadow result found in Pass 2
+    //        above and applies the shadow results to the lit results with a
+    //        blending based on distance from nearest unshadowed pixel if
+    //        coherent (same normal and depth with tolerance band).
+    
+    // TODO
+    
+    // 4. Render Output
+    //        Render final gather lighting results with full screen quad.
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     if (debugView == 0) {

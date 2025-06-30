@@ -8,6 +8,7 @@
 #include "constants.h"
 #include "data_models.h"
 #include "debug.h"
+#include "render.h"
 
 const char *modelPaths[MODEL_COUNT] = {
     "./Models/med1_1.fbx",
@@ -46,10 +47,14 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
 
         // Count total vertices in the model
         uint32_t vertexCount = 0;
-        for (unsigned int m = 0; m < scene->mNumMeshes; m++) vertexCount += scene->mMeshes[m]->mNumVertices;
+        uint32_t triCount = 0;
+        for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
+            vertexCount += scene->mMeshes[m]->mNumVertices;
+            triCount += scene->mMeshes[m]->mNumFaces;
+        }
 
         modelVertexCounts[i] = vertexCount;
-        modelTriangleCounts[i] = (GLint)(vertexCount / 3);
+        modelTriangleCounts[i] = (GLint)triCount;//(vertexCount / 3);
         printf("Model %s loaded with %d vertices, %d tris\n", modelPaths[i], vertexCount, modelTriangleCounts[i]);
         totalVertCount += vertexCount;
 
@@ -114,7 +119,8 @@ int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL
     return 0;
 }
 
-int SetupGeometry(void) {
+// Loads all geometry, from 3D meshes or otherwise
+int LoadGeometry(void) {
     float *vertexDataArrays[MODEL_COUNT];
     uint32_t vertexCounts[MODEL_COUNT];
     if (LoadModels(vertexDataArrays, vertexCounts)) {
@@ -160,5 +166,15 @@ int SetupGeometry(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     
+    // Send static uniforms to chunk shader
+    glUniform1ui(modelCountLoc_chunk, MODEL_COUNT);
+    
+    // Set static buffers once for Deferred Lighting shader
+    glUniform1ui(screenWidthLoc_deferred, screen_width);
+    glUniform1ui(screenHeightLoc_deferred, screen_height);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, vbos[0]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
+
     return 0;
 }

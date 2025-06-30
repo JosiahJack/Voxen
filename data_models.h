@@ -17,6 +17,6 @@ extern GLuint vao;
 extern GLuint vbos[];
 
 int LoadModels(float *vertexDataArrays[MODEL_COUNT], uint32_t vertexCounts[MODEL_COUNT]);
-int SetupGeometry(void);
+int LoadGeometry(void);
 
 #endif // VOXEN_DATA_MODELS_H

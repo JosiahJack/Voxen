@@ -33,7 +33,7 @@ const char *fragmentShaderTraditional =
     "in vec3 Normal;\n"
     "in vec3 FragPos;\n"
     "\n"
-    "layout(std430, binding = 0) buffer ColorBuffer {\n"
+    "layout(std430, binding = 12) buffer ColorBuffer {\n"
     "    float colors[];\n" // 1D color array (RGBA)
     "};\n"
     "uniform uint textureOffsets[5];\n" // Offsets for each texture
@@ -43,10 +43,10 @@ const char *fragmentShaderTraditional =
     "uniform uint modelCount;\n"
     "uniform int debugView;\n"
     "\n"
-    "layout(location = 0) out vec4 outAlbedo;\n"
-    "layout(location = 1) out vec4 outNormal;\n"
-    "layout(location = 2) out vec4 outWorldPos;\n"
-    "layout(location = 3) out ivec4 outModelInstanceIndex;\n"
+    "layout(location = 0) out vec4 outAlbedo;\n"              // GL_COLOR_ATTACHMENT0
+    "layout(location = 1) out vec4 outNormal;\n"              // GL_COLOR_ATTACHMENT1
+    "layout(location = 2) out vec4 outWorldPos;\n"            // GL_COLOR_ATTACHMENT2
+    "layout(location = 3) out ivec4 outModelInstanceIndex;\n" // GL_COLOR_ATTACHMENT3
     "\n"
     "void main() {\n"
     "    int texIndexChecked = 0;\n"

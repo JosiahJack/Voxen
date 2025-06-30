@@ -116,12 +116,10 @@ int InitializeEnvironment(void) {
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
     glFrontFace(GL_CW); // Flip triangle sorting order
-    glEnable(GL_NORMALIZE); // Normalize normals for lighting
-    glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_FALSE); // One-sided lighting
     glViewport(0, 0, screen_width, screen_height);
 
     if (CompileShaders()) return SYS_COUNT + 1;
-    CacheUniformLocationsForChunkShader();
+    CacheUniformLocationsForShaders(); // After CompileShaders()
     SetupQuad(); // For image blit for post processing effects like lighting.
     int fontInit = InitializeTextAndFonts();
     if (fontInit) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
@@ -193,12 +191,12 @@ int ExitCleanup(int status) {
 
 int EventExecute(Event* event) {
     switch(event->type) {
-        case EV_INIT: return InitializeEnvironment();
+        case EV_INIT: return InitializeEnvironment(); // Init called prior to Loading Data
+        case EV_LOAD_TEXTURES: return LoadTextures();
+        case EV_LOAD_MODELS: return LoadGeometry();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
-        case EV_LOAD_TEXTURES: return LoadTextures();
-        case EV_LOAD_MODELS: return SetupGeometry();
         case EV_QUIT: return 1; break;
     }
 
