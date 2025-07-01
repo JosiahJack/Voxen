@@ -698,14 +698,7 @@ index: 338
 index: 339
 #Textures/g_energmine.png
 index: 340
-#Textures/generic_glow.png
-index: 341
-#Textures/generic_norm.png
-index: 342
-#Textures/generic.png
-index: 343
-#Textures/generic_spec.png
-index: 344
+
 #Textures/g_eshaker_active.png
 index: 345
 #Textures/g_eshaker.png

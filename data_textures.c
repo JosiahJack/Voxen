@@ -6,6 +6,7 @@
 #define STBI_NO_PNM
 #include "stb_image.h"
 #include <GL/glew.h>
+#include <uthash.h>
 #include "data_definitions.h"
 #include "data_textures.h"
 #include "constants.h"
@@ -133,7 +134,6 @@ int LoadTextures(void) {
         textureSizes[(i * 2) + 1] = height;
         stbi_image_free(image_data);
     }
-
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
