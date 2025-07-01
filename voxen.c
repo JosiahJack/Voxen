@@ -21,6 +21,7 @@
 #include "text.h"
 #include "shaders.h"
 #include "image_effects.h"
+#include "audio.h"
 
 // Window
 SDL_Window *window;
@@ -54,6 +55,8 @@ typedef enum {
     SYS_WIN,
     SYS_CTX,
     SYS_OGL,
+    SYS_NET,
+    SYS_AUD,
     SYS_COUNT // Number of subsystems
 } SystemType;
 
@@ -124,11 +127,19 @@ int InitializeEnvironment(void) {
     SetupInstances();
     Input_Init();
     InitializeNetworking();
+    systemInitialized[SYS_NET] = true;
+
+    InitializeAudio();
+    systemInitialized[SYS_AUD] = true;
+    
+    play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
+    play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
     return 0;
 }
 
 int ExitCleanup(int status) {
-    CleanupNetworking();
+    if (systemInitialized[SYS_AUD]) CleanupAudio();
+    if (systemInitialized[SYS_NET]) CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
 
     // OpenGL Cleanup
