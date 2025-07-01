@@ -1632,9 +1632,7 @@ index: 811
 #Textures/sheet_stunhit.png
 index: 812
 #Textures/sheet_vaporize.png
-index: 813
-#Textures/shodan_hires.png
-index: 814
+index: 813s
 #Textures/skeleton.png
 index: 815
 #Textures/skull.png
@@ -2165,10 +2163,6 @@ index: 1077
 index: 1078
 #Textures/UI/slider.png
 index: 1079
-#Textures/UI/splash.png
-index: 1080
-#Textures/UI/splash_sprite.png
-index: 1081
 #Textures/UI/teleportstatic_red.png
 index: 1084
 #Textures/UI/teleportstatic_white.png

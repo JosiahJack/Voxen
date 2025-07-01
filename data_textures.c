@@ -174,7 +174,7 @@ int LoadTextures(void) {
             uint8_t gval = image_data[j + 1];
             uint8_t bval = image_data[j + 2];
             uint8_t aval = image_data[j + 3];
-//             if (aval <= 2) rval = gval = bval = 0;
+//             if (aval < 1) rval = gval = bval = 0;
             uint32_t color = ((uint32_t)rval << 24) | ((uint32_t)gval << 16) |
                              ((uint32_t)bval << 8) | aval;
 
@@ -196,7 +196,7 @@ int LoadTextures(void) {
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t), indices);
         pixel_offset += width * height;
         palette_offset += palette_size;
-        if (palette_size > 16384U) printf("Loaded %s with palette size of %d\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+        if (palette_size > 4096U) printf("Loaded %s with large palette size of %d!\n", texture_parser.entries[matchedParserIdx].path, palette_size);
         if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
         
         // Clean up

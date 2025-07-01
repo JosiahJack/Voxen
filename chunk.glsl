@@ -82,7 +82,8 @@ const char *fragmentShaderTraditional =
     "        float((color >> 24) & 0xFF) / 255.0,\n"
     "        float((color >> 16) & 0xFF) / 255.0,\n"
     "        float((color >> 8) & 0xFF) / 255.0,\n"
-    "        float(color & 0xFF) / 255.0\n"
+    "        1.0\n"
+//     "        float(color & 0xFF) / 255.0\n"
     "    );\n"
     "}\n"
 
