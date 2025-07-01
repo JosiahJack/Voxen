@@ -63,6 +63,29 @@ const char *fragmentShaderTraditional =
     "    ivec2 textureSizes[];\n" // x,y pairs for width and height of textures
     "};\n"
 
+    "layout(std430, binding = 16) buffer TexturePalettes {\n"
+    "    uint texturePalettes[];\n"  // Palette colors
+    "};\n"
+
+    "layout(std430, binding = 17) buffer TexturePaletteOffsets {\n"
+    "    uint texturePaletteOffsets[];\n"  // Palette starting indices for each texture
+    "};\n"
+
+    "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
+    "    if (TexIndex >= TextureCount) return vec4(0.0);\n"
+
+    "    uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;\n"
+    "    uint paletteIndex = colors[pixelOffset];\n"
+    "    uint paletteOffset = texturePaletteOffsets[texIndex];\n"
+    "    uint color = texturePalettes[paletteOffset + paletteIndex];\n"
+    "    return vec4(\n"
+    "        float((color >> 24) & 0xFF) / 255.0,\n"
+    "        float((color >> 16) & 0xFF) / 255.0,\n"
+    "        float((color >> 8) & 0xFF) / 255.0,\n"
+    "        float(color & 0xFF) / 255.0\n"
+    "    );\n"
+    "}\n"
+
     "uniform int debugView;\n"
     "\n"
     "layout(location = 0) out vec4 outAlbedo;\n"              // GL_COLOR_ATTACHMENT0
@@ -78,7 +101,6 @@ const char *fragmentShaderTraditional =
     "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V, OpenGL convention vs import
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
-    "    int pixelIndex = int(textureOffsets[texIndexChecked]) + (y * texSize.x + x);\n" // Calculate 1D index
     "    outModelInstanceIndex = ivec4(InstanceIndex,ModelIndex,texIndexChecked, 1.0);\n"
     "    if (debugView == 3) {\n"
     "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
@@ -91,13 +113,7 @@ const char *fragmentShaderTraditional =
     "        outAlbedo.b = float(texIndexChecked) / float(TextureCount);\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else {\n"
-        // Unpack RGBA from a single uint
-    "        uint color = colors[pixelIndex];\n"
-    "        float a = float((color >> 24) & 0xFF) / 255.0;\n" // Extract ARGB (stb_image loads them in backerds)
-    "        float b = float((color >> 16) & 0xFF) / 255.0;\n"
-    "        float g = float((color >> 8) & 0xFF) / 255.0;\n"
-    "        float r = float(color & 0xFF) / 255.0;\n"
-    "        outAlbedo  = vec4(r, g, b, a);\n"
+    "        outAlbedo  = getTextureColor(texIndexChecked,ivec2(x,y));\n"
     "    }\n"
     "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
     "    outWorldPos = vec4(FragPos, 1.0);\n"

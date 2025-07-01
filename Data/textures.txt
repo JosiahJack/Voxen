@@ -208,8 +208,8 @@ index: 93
 index: 94
 #Textures/citmat2_4.png
 index: 95
-#Textures/CliffNormals.png
-index: 96
+-- #Textures/CliffNormals.png
+-- index: 96
 #Textures/clothes.png
 index: 97
 #Textures/console1_1.png
@@ -1107,12 +1107,8 @@ index: 546
 index: 547
 #Textures/npc_cyborg_elite256.png
 index: 548
-#Textures/npc_cyborg_elite.png
-index: 549
 #Textures/npc_cyborg_enforcer256.png
 index: 550
-#Textures/npc_cyborg_enforcer.png
-index: 551
 #Textures/npc_cyborg.png
 index: 552
 #Textures/npc_cyborgwarrior_ambocc.png
@@ -1449,8 +1445,8 @@ index: 717
 index: 718
 #Textures/reac6_3.png
 index: 719
-#Textures/saturn-ring.png
-index: 720
+-- #Textures/saturn-ring.png
+-- index: 720
 #Textures/sci1_1d.png
 index: 721
 #Textures/sci1_1.png
@@ -2173,10 +2169,6 @@ index: 1079
 index: 1080
 #Textures/UI/splash_sprite.png
 index: 1081
-#Textures/UI/ss1_original_palette_FULL.png
-index: 1082
-#Textures/UI/ss1_original_palette_FULL_test01.png
-index: 1083
 #Textures/UI/teleportstatic_red.png
 index: 1084
 #Textures/UI/teleportstatic_white.png

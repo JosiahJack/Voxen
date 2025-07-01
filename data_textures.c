@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 #define STB_IMAGE_IMPLEMENTATION // Indicate to stb_image to compile it in.
 #define STBI_NO_PSD // Excluded image formats to shrink binary size.
 #define STBI_NO_HDR
@@ -13,86 +14,45 @@
 #include "debug.h"
 #include "render.h"
 
+#define MAX_PALETTE_SIZE 65535u
+
+DataParser texture_parser;
 GLuint colorBufferID = 0; // Single color buffer
 GLuint textureSizesID = 0;
 GLuint textureOffsetsID = 0;
+GLuint texturePalettesID = 0; // New SSBO for palette colors
+GLuint texturePaletteOffsetsID = 0; // New SSBO for palette offsets
 uint32_t * textureOffsets = NULL; // Pixel offsets
+uint32_t *texturePaletteOffsets = NULL; // Offsets into texturePalettes
+uint32_t *texturePalettes = NULL; // Concatenated palette colors
 uint32_t totalPixels = 0; // Total pixels across all textures
+uint32_t totalPaletteColors = 0; // Total colors across all palettes
 int * textureSizes = NULL; // Needs to be textureCount * 2
 int textureCount;
-
-// Num unique colors exceeds 250,000 and is very very slow to process.
-
-// uint32_t uniqueCols[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
-// uint8_t uniqueReds[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
-// uint8_t uniqueGrns[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
-// uint8_t uniqueBlus[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0 };
-// int numUniqueColorValues = 0;
-// int numUniqueRValues = 0;
-// int numUniqueGValues = 0;
-// int numUniqueBValues = 0;
-
-// 128 * 128 = 16384
-// 32 unique colors per texture = 
-// 224 total 128x128 textures in project.
-
-// int CheckIfUniqueColor(uint8_t valueR, uint8_t valueG, uint8_t valueB) { 
-//     if (numUniqueColorValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique colors\n", MAX_UNIQUE_VALUE); return -1; }
-//     
-//     for (int i=0;i<=numUniqueColorValues;i++) {
-//         if (   ((uint32_t)valueR << 16U) == (uniqueCols[i] & 0xFF0000U)
-//             && ((uint32_t)valueG << 8U) == (uniqueCols[i] & 0x00FF00U)
-//             && (uint32_t)valueB == (uniqueCols[i] & 0x0000FFU)) return i; // Found a match, return it.
-//     }
-//     
-//     uniqueCols[numUniqueColorValues] = ((uint32_t)valueR << 16U) | ((uint32_t)valueG << 8U) | (uint32_t)valueB;
-//     numUniqueColorValues++;
-//     return numUniqueColorValues - 1; // Return index of the value.
-// }
-// 
-// int CheckIfUniqueR(uint8_t value) {    
-//     if (numUniqueRValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique reds\n", MAX_UNIQUE_VALUE); return -1; }
-// 
-//     for (int i=0;i<=numUniqueRValues;i++) {
-//         if (value == uniqueReds[i]) return i; // Found a match, return it.
-//     }
-//     
-//     uniqueReds[numUniqueRValues] = value;
-//     numUniqueRValues++;
-//     return numUniqueRValues - 1; // Return index of the value.
-// }
-// 
-// int CheckIfUniqueG(uint8_t value) {    
-//     if (numUniqueGValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique greens\n", MAX_UNIQUE_VALUE); return -1; }
-// 
-//     for (int i=0;i<=numUniqueGValues;i++) {
-//         if (value == uniqueGrns[i]) return i; // Found a match, return it.
-//     }
-//     
-//     uniqueGrns[numUniqueGValues] = value;
-//     numUniqueGValues++;
-//     return numUniqueGValues - 1; // Return index of the value.
-// }
-// 
-// int CheckIfUniqueB(uint8_t value) {    
-//     if (numUniqueBValues >= MAX_UNIQUE_VALUE) { fprintf(stderr, "ERROR: Exceeded MAX_UNIQUE_VALUE (%d) for unique blues\n", MAX_UNIQUE_VALUE); return -1; }
-// 
-//     for (int i=0;i<=numUniqueBValues;i++) {
-//         if (value == uniqueBlus[i]) return i; // Found a match, return it.
-//     }
-//     
-//     uniqueBlus[numUniqueBValues] = value;
-//     numUniqueBValues++;
-//     return numUniqueBValues - 1; // Return index of the value.
-// }
-
 const char *valid_texdata_keys[] = {"index"};
+
+typedef struct {
+    uint32_t color; // RGBA color (packed)
+    int index;      // Palette index
+    UT_hash_handle hh;
+} ColorEntry;
+
+typedef enum {
+    TEX_PARSER = 0,
+    TEX_OFFSETS,
+    TEX_SIZES,
+    TEX_PALOFFSETS,
+    TEX_PALETS,
+    TEX_SSBOS,
+    TEX_COUNT // Number of subsystems
+} TextureLoadDataType;
+
+bool loadTextureItemInitialized[TEX_COUNT] = { [0 ... TEX_COUNT - 1] = false };
 
 int LoadTextures(void) {
     textureCount = 0;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    DataParser texture_parser;
     parser_init(&texture_parser, valid_texdata_keys, 1);
     if (!parse_data_file(&texture_parser, "./Data/textures.txt")) {
         printf("ERROR: Could not parse ./Data/textures.txt!\n");
@@ -100,25 +60,36 @@ int LoadTextures(void) {
         return 1;
     }
     
+    loadTextureItemInitialized[TEX_PARSER] = true;
     textureCount = texture_parser.count;
-    if (textureCount > 2048) { printf("ERROR: Too many textures in parser count %d, greater than 2048!\n", textureCount); parser_free(&texture_parser); return 1;
-    } else printf("Parsing %d textures...\n",textureCount);
+    if (textureCount > 2048) { printf("ERROR: Too many textures in parser count %d, greater than 2048!\n", textureCount); CleanupLoad(true); return 1; } 
+    
     if (textureCount == 0) {
         fprintf(stderr, "ERROR: No textures found in textures.txt\n");
         parser_free(&texture_parser);
         return 1;
-    } else if (textureCount == INT32_MAX) {
-        printf("WARNING: textureCount hit INT32_MAX!\n");
     }
+    
+    printf("Parsing %d textures...\n",textureCount);
 
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
+    if (!textureOffsets) { fprintf(stderr, "ERROR: Failed to allocate textureOffsets buffer\n"); CleanupLoad(true); return 1; }
+    loadTextureItemInitialized[TEX_OFFSETS] = true;
+
     textureSizes = malloc(textureCount * 2 * sizeof(int)); // Times 2 for x and y pairs flat packed (e.g. x,y,x,y,x,y for 3 textures)
+    if (!textureSizes) { fprintf(stderr, "ERROR: Failed to allocate textureSizes buffer\n"); free(textureOffsets); CleanupLoad(true); return 1; }
+    loadTextureItemInitialized[TEX_SIZES] = true;
+
+    texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
+    if (!texturePaletteOffsets) { fprintf(stderr, "ERROR: Failed to allocate textureOffsets buffer\n"); CleanupLoad(true); return 1; }
+    loadTextureItemInitialized[TEX_PALOFFSETS] = true;
     
-    // Now load each one
-    // Calculate total pixels and offsets
+    // First Pass: Calculate total pixels and offsets
     totalPixels = 0;
+    totalPaletteColors = 0;
     for (int i = 0; i < textureCount; i++) {
         textureOffsets[i] = totalPixels;
+        texturePaletteOffsets[i] = totalPaletteColors;
         int matchedParserIdx = -1;
         for (int k=0;k<texture_parser.count;k++) {
             if (texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }
@@ -128,19 +99,58 @@ int LoadTextures(void) {
         
         int width, height, channels;
         unsigned char* image_data = stbi_load(texture_parser.entries[matchedParserIdx].path,&width,&height,&channels,STBI_rgb_alpha);
-        if (!image_data) { fprintf(stderr, "stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); free(textureOffsets); free(textureSizes); return 1; }
+        if (!image_data) { fprintf(stderr, "stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
+        
+        // Build palette for this texture using uthash
+        ColorEntry *color_table = NULL, *entry, *tmp;
+        uint32_t palette_size = 0;
+        for (int j = 0; j < width * height * 4; j += 4) {
+            uint32_t color = ((uint32_t)image_data[j] << 24) | ((uint32_t)image_data[j + 1] << 16) |
+                             ((uint32_t)image_data[j + 2] << 8) | (uint32_t)image_data[j + 3];
+            HASH_FIND_INT(color_table, &color, entry);
+            if (!entry) {
+                if (palette_size >= MAX_PALETTE_SIZE) { printf("WARNING: Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdx].path); palette_size = MAX_PALETTE_SIZE - 1; break; }// { fprintf(stderr, "ERROR: Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdx].path); HASH_CLEAR(hh, color_table); stbi_image_free(image_data); CleanupLoad(true); return 1; }
+                
+                entry = malloc(sizeof(ColorEntry));
+                entry->color = color;
+                entry->index = palette_size++;
+                HASH_ADD_INT(color_table, color, entry);
+            }
+        }
+
+        totalPaletteColors += palette_size;
+        HASH_ITER(hh, color_table, entry, tmp) {
+            HASH_DEL(color_table, entry);
+            free(entry); // Clean up hash table
+        }
+        
         totalPixels += width * height;
         textureSizes[i * 2] = width;
         textureSizes[(i * 2) + 1] = height;
         stbi_image_free(image_data);
     }
+    
+    texturePalettes = malloc(totalPaletteColors * sizeof(uint32_t));
+    if (!texturePalettes) { fprintf(stderr, "ERROR: Failed to allocate texturePalettes\n"); CleanupLoad(true); return 1; }
+   
+    loadTextureItemInitialized[TEX_PALETS] = true;
+
+    // Create SSBO for texture palettes
+    glGenBuffers(1, &texturePalettesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColors * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    
-    // Load textures into color buffer
-    uint32_t offset = 0;
+
+    loadTextureItemInitialized[TEX_SSBOS] = true;
+
+    // Second pass: Load textures into color buffer
+    uint32_t pixel_offset = 0;
+    uint32_t palette_offset = 0;
+    uint32_t maxPalletSize = 0;
     for (int i = 0; i < textureCount; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<texture_parser.count;k++) { // Find matching index to i that was parsed from file
@@ -150,28 +160,70 @@ int LoadTextures(void) {
         if (matchedParserIdx < 0) continue;
 
         int width, height, channels;
-        uint32_t * image_data = (uint32_t *)stbi_load(texture_parser.entries[matchedParserIdx].path,&width,&height,&channels,STBI_rgb_alpha);
-        if (!image_data) { fprintf(stderr, "stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); free(textureOffsets); free(textureSizes);  return 1; }
+        uint8_t * image_data = stbi_load(texture_parser.entries[matchedParserIdx].path,&width,&height,&channels,STBI_rgb_alpha);
+        if (!image_data) { fprintf(stderr, "stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
         
-        int pixelCount = width * height;
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, offset, pixelCount * sizeof(uint32_t), image_data);
-        offset += pixelCount * sizeof(uint32_t);
-//             CheckIfUniqueR(image_data[j * 4 + 0]);
-//             CheckIfUniqueG(image_data[j * 4 + 1]);
-//             CheckIfUniqueB(image_data[j * 4 + 2]);
-//             int palleteIndex = CheckIfUniqueColor(image_data[j * 4 + 0],image_data[j * 4 + 1],image_data[j * 4 + 2]);
-//             if (palleteIndex < 0) { printf("ERROR, EXCEEDED PALLETE SIZE uint32 MAX!!\n"); free(textureOffsets); free(textureSizes);  return 1; }
+        // Populate palette and indices
+        ColorEntry *color_table = NULL, *entry, *tmp;
+        uint32_t palette_size = 0;
+        uint32_t *indices = malloc(width * height * sizeof(uint32_t));
+        if (!indices) { fprintf(stderr, "ERROR: Failed to allocate indices buffer\n"); stbi_image_free(image_data); CleanupLoad(true); return 1; }
         
+        for (int j = 0; j < width * height * 4; j += 4) {
+            uint8_t rval = image_data[j];
+            uint8_t gval = image_data[j + 1];
+            uint8_t bval = image_data[j + 2];
+            uint8_t aval = image_data[j + 3];
+//             if (aval <= 2) rval = gval = bval = 0;
+            uint32_t color = ((uint32_t)rval << 24) | ((uint32_t)gval << 16) |
+                             ((uint32_t)bval << 8) | aval;
+
+            HASH_FIND_INT(color_table, &color, entry);
+            if (!entry) {
+                if (palette_size >= MAX_PALETTE_SIZE) { printf("WARNING: Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdx].path); palette_size = MAX_PALETTE_SIZE - 1; break; }// { fprintf(stderr, "ERROR: Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdx].path); HASH_CLEAR(hh, color_table); stbi_image_free(image_data); CleanupLoad(true); return 1; }
+
+                entry = malloc(sizeof(ColorEntry));
+                entry->color = color;
+                entry->index = palette_size++;
+                HASH_ADD_INT(color_table, color, entry);
+                texturePalettes[palette_offset + entry->index] = color;
+            }
+            
+            indices[j / 4] = entry->index;
+        }
+
+        // Upload indices to colorBuffer
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t), indices);
+        pixel_offset += width * height;
+        palette_offset += palette_size;
+        if (palette_size > 16384U) printf("Loaded %s with palette size of %d\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+        if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
+        
+        // Clean up
+        HASH_ITER(hh, color_table, entry, tmp) {
+            HASH_DEL(color_table, entry);
+            free(entry);
+        }
+        
+        free(indices);
         stbi_image_free(image_data);
     }
     
+    printf("Largest palette size of %d\n", maxPalletSize);
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    printf("Total pixels in buffer %d (",totalPixels);
-    print_bytes_no_newline(totalPixels * 4); // rgba = 4, 1 byte per channel
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, totalPaletteColors * sizeof(uint32_t), texturePalettes);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 16, texturePalettesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    printf("Total pixels in buffer %d (", totalPixels);
+    print_bytes_no_newline(totalPixels * 4);
+    printf("), total palette colors %d (", totalPaletteColors);
+    print_bytes_no_newline(totalPaletteColors * 4);
     printf(")\n");
-//     printf("numUniqueColorValues: %d, numUniqueRValues: %d, numUniqueGValues: %d, numUniqueBValues: %d\n",numUniqueColorValues,numUniqueRValues,numUniqueGValues,numUniqueBValues);
 
     // 13 is BlueNoise for deferred shader
     
@@ -188,9 +240,29 @@ int LoadTextures(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, textureSizesID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
+    glGenBuffers(1, &texturePaletteOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePaletteOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 17, texturePaletteOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
     glUniform1ui(textureCountLoc_chunk, textureCount);
 
-    free(textureOffsets);
-    free(textureSizes);
+    CleanupLoad(false);
     return 0;
+}
+
+void CleanupLoad(bool isBad) {
+    if (loadTextureItemInitialized[TEX_OFFSETS]) free(textureOffsets);
+    if (loadTextureItemInitialized[TEX_SIZES]) free(textureSizes);
+    if (loadTextureItemInitialized[TEX_PALOFFSETS]) free(texturePaletteOffsets);
+    if (loadTextureItemInitialized[TEX_PALETS]) free(texturePalettes);
+    if (loadTextureItemInitialized[TEX_PARSER]) parser_free(&texture_parser);
+    
+    if (isBad) { // Also free GPU resources if we are handling exit conditions.
+        if (loadTextureItemInitialized[TEX_SSBOS]) {
+            glDeleteBuffers(1, &colorBufferID);
+            glDeleteBuffers(1, &texturePalettesID);
+        }
+    }
 }
