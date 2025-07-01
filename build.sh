@@ -17,6 +17,7 @@ fi
 mkdir -p $TEMP_DIR
 
 # Compile sources in parallel to temporary object files
+pids=()
 for src in $SOURCES; do
     obj="$TEMP_DIR/${src%.c}.o"
     if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
@@ -26,6 +27,16 @@ for src in $SOURCES; do
         else
             $CC -c $src $CFLAGS -o $obj &
         fi
+
+        pids+=($!) # Store process ID
+    fi
+done
+
+for pid in "${pids[@]}"; do
+    wait $pid
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Compilation failed for one or more source files."
+        exit 1
     fi
 done
 
