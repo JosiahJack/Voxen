@@ -160,14 +160,12 @@ int ClearFrameBuffers(void) {
 
 // Global uniform locations (cached during init)
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1;
-GLint texIndexLoc_chunk = -1, textureOffsetsLoc_chunk = -1;
-GLint textureSizesLoc_chunk = -1, textureCountLoc_chunk = -1;
+GLint texIndexLoc_chunk = -1, textureCountLoc_chunk = -1;
 GLint instanceIndexLoc_chunk = -1, instanceCountLoc_chunk = -1;
 GLint modelCountLoc_chunk = -1, modelIndexLoc_chunk = -1;
 GLint debugViewLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
-GLint textureOffsetsLoc_deferred = -1, textureSizesLoc_deferred = -1;
 GLint instanceCountLoc_deferred = -1;
 
 
@@ -177,8 +175,6 @@ void CacheUniformLocationsForShaders(void) {
     projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
     matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
-    textureOffsetsLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureOffsets");
-    textureSizesLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureSizes");
     textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     instanceCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceCount");
@@ -188,8 +184,6 @@ void CacheUniformLocationsForShaders(void) {
     
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    textureOffsetsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureOffsets");
-    textureSizesLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "textureSizes");
     instanceCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "instanceCount");
 }
 
@@ -272,8 +266,6 @@ int RenderStaticMeshes(void) {
     glBindVertexArray(vao);
     
     // These should be static but cause issues if not...
-    glUniform1uiv(textureOffsetsLoc_chunk, textureCount, textureOffsets); // Needed or else everything renders with texture index 0 
-    glUniform2iv(textureSizesLoc_chunk, textureCount, textureSizes); // Needed or everything renders with its texture's relative pixel index 0 only
     glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
     glUniform1i(modelCountLoc_chunk, MODEL_COUNT);
     

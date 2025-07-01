@@ -93,10 +93,10 @@ const char *fragmentShaderTraditional =
     "    } else {\n"
         // Unpack RGBA from a single uint
     "        uint color = colors[pixelIndex];\n"
-    "        float r = float((color >> 24) & 0xFF) / 255.0;\n" // Extract red
-    "        float g = float((color >> 16) & 0xFF) / 255.0;\n" // Extract green
-    "        float b = float((color >> 8) & 0xFF) / 255.0;\n"  // Extract blue
-    "        float a = float(color & 0xFF) / 255.0;\n"         // Extract alpha
+    "        float a = float((color >> 24) & 0xFF) / 255.0;\n" // Extract ARGB (stb_image loads them in backerds)
+    "        float b = float((color >> 16) & 0xFF) / 255.0;\n"
+    "        float g = float((color >> 8) & 0xFF) / 255.0;\n"
+    "        float r = float(color & 0xFF) / 255.0;\n"
     "        outAlbedo  = vec4(r, g, b, a);\n"
     "    }\n"
     "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"

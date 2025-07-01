@@ -26,8 +26,6 @@ extern GLint modelCountLoc_chunk;
 // Static deferred shader locations (set on model load)
 extern GLint screenWidthLoc_deferred;
 extern GLint screenHeightLoc_deferred;
-extern GLint textureOffsetsLoc_deferred;
-extern GLint textureSizesLoc_deferred;
 
 void SetupGBuffer(void);
 void SetupInstances(void);
