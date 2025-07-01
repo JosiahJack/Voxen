@@ -1,6 +1,4 @@
 #!/bin/bash
-
-# Compiler and flags
 CC=gcc
 CFLAGS="-std=c11 -Wall -Wextra -O3 -g -D_POSIX_C_SOURCE=199309L"
 MINIAUDIO_CFLAGS="-std=c11 -Wall -Wextra -O2 -g -D_POSIX_C_SOURCE=199309L -DNDEBUG"
@@ -15,10 +13,7 @@ if [ "$1" = "clean" ]; then
     exit 0
 fi
 
-# Fixed temporary directory for object files
-TEMP_DIR=voxen_build_temp
-
-# Create temporary directory if it doesn't exist
+TEMP_DIR=build
 mkdir -p $TEMP_DIR
 
 # Compile sources in parallel to temporary object files

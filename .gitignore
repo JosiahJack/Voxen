@@ -1,3 +1,4 @@
+*.o
 *.dem
 log_dump.txt
 
