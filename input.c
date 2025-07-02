@@ -6,6 +6,7 @@
 #include "input.h"
 #include "quaternion.h"
 #include "player.h"
+#include "audio.h"
 
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
@@ -63,6 +64,10 @@ int Input_KeyDown(uint32_t scancode) {
     } else if (keys[SDL_SCANCODE_P]) {
         testLight_intensity -= 8.0f / 256.0f;
         if (testLight_intensity < 0.01f) testLight_intensity = 0.01f;
+    }
+    
+    if (keys[SDL_SCANCODE_E]) {
+        play_wav("./Audio/weapons/wpistol.wav",0.5f);
     }
     return 0;
 }

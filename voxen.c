@@ -132,8 +132,8 @@ int InitializeEnvironment(void) {
     InitializeAudio();
     systemInitialized[SYS_AUD] = true;
     
-    play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
-    play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
+    //play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
+    //play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
     return 0;
 }
 

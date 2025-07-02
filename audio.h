@@ -6,7 +6,7 @@
 // #include <fluidlite.h>
 // #include <libxmi.h>
 
-#define MAX_CHANNELS 16
+#define MAX_CHANNELS 64
 
 extern ma_engine audio_engine;
 // extern fluid_synth_t* midi_synth;

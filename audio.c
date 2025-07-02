@@ -83,14 +83,29 @@ void play_mp3(const char* path, float volume, int fade_in_ms) {
 }
 
 void play_wav(const char* path, float volume) {
-    if (wav_count >= MAX_CHANNELS) { printf("WARNING: Max WAV channels (%d) reached\n", MAX_CHANNELS); return; }
+    // Try to find a free slot (either unused or finished)
+    int slot = -1;
+    for (int i = 0; i < wav_count; i++) {
+        if (!ma_sound_is_playing(&wav_sounds[i]) && ma_sound_at_end(&wav_sounds[i])) {
+            ma_sound_uninit(&wav_sounds[i]);
+            slot = i;
+            break;
+        }
+    }
     
-    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &wav_sounds[wav_count]);
-    if (result != MA_SUCCESS) { printf("ERROR: Failed to load WAV %s: %d\n", path, result); return; }
+    // If no free slot, use a new one if available
+    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++;
+    if (slot == -1) { printf("WARNING: Max WAV channels (%d) reached\n", MAX_CHANNELS); return; }
+
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
+    if (result != MA_SUCCESS) {
+        printf("ERROR: Failed to load WAV %s: %d\n", path, result);
+        if (slot == wav_count - 1) wav_count--; // Revert count if init fails
+        return;
+    }
     
-    ma_sound_set_volume(&wav_sounds[wav_count], volume);
-    ma_sound_start(&wav_sounds[wav_count]);
-    wav_count++;
+    ma_sound_set_volume(&wav_sounds[slot], volume);
+    ma_sound_start(&wav_sounds[slot]);
 }
 
 void CleanupAudio() {
