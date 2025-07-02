@@ -19,7 +19,6 @@ const char *deferredLighting_computeShader =
     "};\n"
 
     // Vertex buffers (one per model, bound as SSBOs)
-    "#define MODEL_COUNT 7\n"
     "layout(std430, binding = 6) buffer VertexBuffer0 { float vertices0[]; };\n"
     "layout(std430, binding = 7) buffer VertexBuffer1 { float vertices1[]; };\n"
     "layout(std430, binding = 8) buffer VertexBuffer2 { float vertices2[]; };\n"
@@ -58,10 +57,10 @@ const char *deferredLighting_computeShader =
     // Uniforms from deferred shader
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
+    "uniform uint modelCount;\n"
 
     // Uniforms for ray tracing
     "uniform int shadowsEnabled;\n"
-    "uniform int triangleCounts[MODEL_COUNT];\n" // Triangles per model
     "uniform int instanceCount;\n"
 
     // --- Main Compute Shader ---

@@ -171,7 +171,7 @@ GLint modelCountLoc_chunk = -1, modelIndexLoc_chunk = -1;
 GLint debugViewLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
-GLint instanceCountLoc_deferred = -1;
+GLint instanceCountLoc_deferred = -1, modelCountLoc_deferred = -1;
 
 
 void CacheUniformLocationsForShaders(void) {
@@ -190,6 +190,7 @@ void CacheUniformLocationsForShaders(void) {
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     instanceCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "instanceCount");
+    modelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "modelCount");
 }
 
 GLuint matricesBuffer;
@@ -289,7 +290,7 @@ int RenderStaticMeshes(void) {
     
     // These should be static but cause issues if not...
     glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
-    glUniform1i(modelCountLoc_chunk, MODEL_COUNT);
+    glUniform1i(modelCountLoc_chunk, modelCount);
     
     RenderMeshInstances(); // Render each model type's instances
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -307,7 +308,7 @@ int RenderStaticMeshes(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, modelCount * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
 
     glUniform1i(instanceCountLoc_deferred, instanceCount);
     
@@ -322,9 +323,9 @@ int RenderStaticMeshes(void) {
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
     glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
+    glUniform1ui(modelCountLoc_deferred, modelCount);
     
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
-    glUniform1iv(glGetUniformLocation(deferredLightingShaderProgram, "triangleCounts"), MODEL_COUNT, modelTriangleCounts);
     glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "instanceCount"), instanceCount);
     float viewInv[16];
     mat4_inverse(viewInv,view);

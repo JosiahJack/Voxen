@@ -5,7 +5,7 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 
-#define MAX_UNIQUE_VALUE 65535
+#define MAX_UNIQUE_VALUE 20000
 
 extern int screen_width;
 extern int screen_height;

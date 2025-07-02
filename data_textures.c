@@ -61,8 +61,14 @@ int LoadTextures(void) {
     }
     
     loadTextureItemInitialized[TEX_PARSER] = true;
+    
+    int maxIndex = -1;
+    for (int k=0;k<texture_parser.count;k++) {
+        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) {maxIndex = texture_parser.entries[k].index; }
+    }
+    
     textureCount = texture_parser.count;
-    if (textureCount > 2048) { printf("ERROR: Too many textures in parser count %d, greater than 2048!\n", textureCount); CleanupLoad(true); return 1; } 
+    if (textureCount > 4096) { printf("ERROR: Too many textures in parser count %d, greater than 4096!\n", textureCount); CleanupLoad(true); return 1; } 
     
     if (textureCount == 0) {
         fprintf(stderr, "ERROR: No textures found in textures.txt\n");
@@ -96,6 +102,7 @@ int LoadTextures(void) {
         }
         
         if (matchedParserIdx < 0) continue;
+//         if (!texture_parser.entries[matchedParserIdx].path || texture_parser.entries[matchedParserIdx].path[0] == '\0') continue;
         
         int width, height, channels;
         unsigned char* image_data = stbi_load(texture_parser.entries[matchedParserIdx].path,&width,&height,&channels,STBI_rgb_alpha);

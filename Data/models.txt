@@ -1,0 +1,1340 @@
+// Model Definitions
+// Defines each model used by the game or mod
+// Format:
+// # Indicates start of an entry followed by the file path.  ./ is assumed
+// example: Models/my_super_awesome_image.fbx
+// Acceptable file formats: .fbx
+// The path must include the file extension
+// 
+// Next are key:value pairs separated by : and whitespace ignored
+// Acceptable keys: index
+// index indicates which index into the master model array to use.
+// All other systems reference what model to use by index (e.g. entity 
+// definition for a pickup item will specify model by index)
+// example: index: 451
+//
+// To automate generation of this file, run the following command after cd ./Models
+// ls *.fbx | sort | awk '{print "#Models/"$0"\nindex: "NR-1}'
+//
+#Models/access_card.fbx
+index: 0
+#Models/a_hornet.fbx
+index: 1
+#Models/a_magcart.fbx
+index: 2
+#Models/a_magnum.fbx
+index: 3
+#Models/a_needle.fbx
+index: 4
+#Models/a_pistol.fbx
+index: 5
+#Models/a_rail.fbx
+index: 6
+#Models/arm.fbx
+index: 7
+#Models/a_rubber.fbx
+index: 8
+#Models/a_slag.fbx
+index: 9
+#Models/a_slaglarge.fbx
+index: 10
+#Models/audiolog.fbx
+index: 11
+#Models/barrel_toxic.fbx
+index: 12
+#Models/battery.fbx
+index: 13
+#Models/beaker.fbx
+index: 14
+#Models/beaker_holder.fbx
+index: 15
+#Models/bed1.fbx
+index: 16
+#Models/bed_neurosurgery.fbx
+index: 17
+#Models/beverage.fbx
+index: 18
+#Models/bonepile1.fbx
+index: 19
+#Models/bridg1_3.fbx
+index: 20
+#Models/bridg1_3slice45.fbx
+index: 21
+#Models/bridg1_4.fbx
+index: 22
+#Models/bridg1_4_slice32.fbx
+index: 23
+#Models/bridg1_4_slice32flipx.fbx
+index: 24
+#Models/bridg1_5.fbx
+index: 25
+#Models/bridg2_2.fbx
+index: 26
+#Models/bridg2_3.fbx
+index: 27
+#Models/bridg2_4.fbx
+index: 28
+#Models/bridg2_5.fbx
+index: 29
+#Models/bridg2_6.fbx
+index: 30
+#Models/bridg2_8.fbx
+index: 31
+#Models/bridg2_9.fbx
+index: 32
+#Models/bridgewall1.fbx
+index: 33
+#Models/briefcase.fbx
+index: 34
+#Models/briefcase_gib1.fbx
+index: 35
+#Models/briefcase_gib2.fbx
+index: 36
+#Models/briefcase_gib3.fbx
+index: 37
+#Models/broken_clock.fbx
+index: 38
+#Models/cabinet.fbx
+index: 39
+#Models/cart1.fbx
+index: 40
+#Models/chair01.fbx
+index: 41
+#Models/chair02.fbx
+index: 42
+#Models/chair03.fbx
+index: 43
+#Models/charge_station.fbx
+index: 44
+#Models/chipset.fbx
+index: 45
+#Models/chipset_isolinear.fbx
+index: 46
+#Models/clothes.fbx
+index: 47
+#Models/computer.fbx
+index: 48
+#Models/console01.fbx
+index: 49
+#Models/console02.fbx
+index: 50
+#Models/corpse_blueshirt.fbx
+index: 51
+#Models/corpse_brownshirt.fbx
+index: 52
+#Models/corpse_eaten.fbx
+index: 53
+#Models/corpse_humanoid_base.fbx
+index: 54
+#Models/corpse_labcoat.fbx
+index: 55
+#Models/corpse_security.fbx
+index: 56
+#Models/corpse_tan.fbx
+index: 57
+#Models/corpse_torso.fbx
+index: 58
+#Models/couch.fbx
+index: 59
+#Models/crate1.fbx
+index: 60
+#Models/crate_impenetrable.fbx
+index: 61
+#Models/cyber_access_port.fbx
+index: 62
+#Models/cyber_bullet_dog.fbx
+index: 63
+#Models/cyber_bullet.fbx
+index: 64
+#Models/cyber_data.fbx
+index: 65
+#Models/cyber_datafrag.fbx
+index: 66
+#Models/cyber_exit.fbx
+index: 67
+#Models/cyber_ice.fbx
+index: 68
+#Models/cyber_integrity.fbx
+index: 69
+#Models/cyber_item.fbx
+index: 70
+#Models/cyber_mine.fbx
+index: 71
+#Models/cyberplayer.fbx
+index: 72
+#Models/cyber_switch.fbx
+index: 73
+#Models/desk01.fbx
+index: 74
+#Models/desk02.fbx
+index: 75
+#Models/dexmissile.fbx
+index: 76
+#Models/d_logo.fbx
+index: 77
+#Models/door10.fbx
+index: 78
+#Models/door1.fbx
+index: 79
+#Models/door2.fbx
+index: 80
+#Models/door3.fbx
+index: 81
+#Models/door4.fbx
+index: 82
+#Models/door5.fbx
+index: 83
+#Models/door6.fbx
+index: 84
+#Models/door7.fbx
+index: 85
+#Models/door8.fbx
+index: 86
+#Models/door9.fbx
+index: 87
+#Models/door_elevator1.fbx
+index: 88
+#Models/door_elevator2.fbx
+index: 89
+#Models/door_elevator3.fbx
+index: 90
+#Models/door_elevator4.fbx
+index: 91
+#Models/door_wall1.fbx
+index: 92
+#Models/door_wall2.fbx
+index: 93
+#Models/door_wall3.fbx
+index: 94
+#Models/eng1_1d.fbx
+index: 95
+#Models/eng1_1.fbx
+index: 96
+#Models/eng1_2d.fbx
+index: 97
+#Models/eng1_2.fbx
+index: 98
+#Models/eng1_3d.fbx
+index: 99
+#Models/eng1_3.fbx
+index: 100
+#Models/eng1_4.fbx
+index: 101
+#Models/eng1_5d.fbx
+index: 102
+#Models/eng1_5.fbx
+index: 103
+#Models/eng1_5_slice45.fbx
+index: 104
+#Models/eng1_5_slice45rh.fbx
+index: 105
+#Models/eng1_6d.fbx
+index: 106
+#Models/eng1_6.fbx
+index: 107
+#Models/eng1_7.fbx
+index: 108
+#Models/eng1_8.fbx
+index: 109
+#Models/eng1_9d.fbx
+index: 110
+#Models/eng1_9.fbx
+index: 111
+#Models/eng2_1d.fbx
+index: 112
+#Models/eng2_1.fbx
+index: 113
+#Models/eng2_1_slice384high.fbx
+index: 114
+#Models/eng2_1_slice384highrh.fbx
+index: 115
+#Models/eng2_1_slice45.fbx
+index: 116
+#Models/eng2_2.fbx
+index: 117
+#Models/eng2_3d.fbx
+index: 118
+#Models/eng2_3.fbx
+index: 119
+#Models/eng2_5.fbx
+index: 120
+#Models/eng2_5_slice45.fbx
+index: 121
+#Models/eng_wallpump.fbx
+index: 122
+#Models/exec1_1d.fbx
+index: 123
+#Models/exec1_1.fbx
+index: 124
+#Models/exec1_2d.fbx
+index: 125
+#Models/exec1_2.fbx
+index: 126
+#Models/exec2_1.fbx
+index: 127
+#Models/exec2_2d.fbx
+index: 128
+#Models/exec2_2.fbx
+index: 129
+#Models/exec2_3.fbx
+index: 130
+#Models/exec2_4.fbx
+index: 131
+#Models/exec2_4_slice45.fbx
+index: 132
+#Models/exec2_5.fbx
+index: 133
+#Models/exec2_6.fbx
+index: 134
+#Models/exec3_1d.fbx
+index: 135
+#Models/exec4_1.fbx
+index: 136
+#Models/exec4_2.fbx
+index: 137
+#Models/exec4_3.fbx
+index: 138
+#Models/exec4_4.fbx
+index: 139
+#Models/exec4_5.fbx
+index: 140
+#Models/exec4_6.fbx
+index: 141
+#Models/exec6_1.fbx
+index: 142
+#Models/exterior_shieldgenerator.fbx
+index: 143
+#Models/fireextinguisher.fbx
+index: 144
+#Models/flask.fbx
+index: 145
+#Models/flight1_1.fbx
+index: 146
+#Models/flight1_2.fbx
+index: 147
+#Models/flight1_2_slice45lh.fbx
+index: 148
+#Models/flight1_2_slice45rh.fbx
+index: 149
+#Models/flight1_3.fbx
+index: 150
+#Models/flight1_4.fbx
+index: 151
+#Models/flight1_6.fbx
+index: 152
+#Models/flight2_1.fbx
+index: 153
+#Models/flight2_2.fbx
+index: 154
+#Models/flight2_2_slice45.fbx
+index: 155
+#Models/flight2_3.fbx
+index: 156
+#Models/flight_fanwall.fbx
+index: 157
+#Models/flightpods_exterior.fbx
+index: 158
+#Models/foliage_fernblueflower.fbx
+index: 159
+#Models/foliage_fern.fbx
+index: 160
+#Models/foliage_grass1.fbx
+index: 161
+#Models/foliage_grass2.fbx
+index: 162
+#Models/foliage_grass3.fbx
+index: 163
+#Models/foliage_grass4.fbx
+index: 164
+#Models/g_conc.fbx
+index: 165
+#Models/gear_large.fbx
+index: 166
+#Models/gear_small.fbx
+index: 167
+#Models/g_emp.fbx
+index: 168
+#Models/g_energmine.fbx
+index: 169
+#Models/genericLOD3card_112ofs.fbx
+index: 170
+#Models/genericLOD3card_128ofs.fbx
+index: 171
+#Models/genericLOD3card_144s.fbx
+index: 172
+#Models/genericLOD3card_192ofs.fbx
+index: 173
+#Models/genericLOD3card_256ofs.fbx
+index: 174
+#Models/genericLOD3card_32ofs.fbx
+index: 175
+#Models/genericLOD3card_64ofs.fbx
+index: 176
+#Models/genericLOD3card_96ofs.fbx
+index: 177
+#Models/genericLOD3card.fbx
+index: 178
+#Models/genericLOD3card_ofs128.fbx
+index: 179
+#Models/genericLOD3card_slice45.fbx
+index: 180
+#Models/g_eshaker.fbx
+index: 181
+#Models/g_frag.fbx
+index: 182
+#Models/g_gas.fbx
+index: 183
+#Models/g_mine.fbx
+index: 184
+#Models/g_nitro.fbx
+index: 185
+#Models/grate1_1.fbx
+index: 186
+#Models/grate1_2.fbx
+index: 187
+#Models/grate1_3.fbx
+index: 188
+#Models/grove1_1.fbx
+index: 189
+#Models/grove2_1.fbx
+index: 190
+#Models/grove2_3.fbx
+index: 191
+#Models/grove2_5.fbx
+index: 192
+#Models/head_female.fbx
+index: 193
+#Models/head_male.fbx
+index: 194
+#Models/healingbed.fbx
+index: 195
+#Models/healthkit.fbx
+index: 196
+#Models/hw_bio.fbx
+index: 197
+#Models/hw_booster.fbx
+index: 198
+#Models/hw_enviro.fbx
+index: 199
+#Models/hw_ereader.fbx
+index: 200
+#Models/hw_infrared.fbx
+index: 201
+#Models/hw_jumpjets.fbx
+index: 202
+#Models/hw_lantern.fbx
+index: 203
+#Models/hw_navunit.fbx
+index: 204
+#Models/hw_sensaround.fbx
+index: 205
+#Models/hw_shield.fbx
+index: 206
+#Models/hw_system.fbx
+index: 207
+#Models/hw_targetid.fbx
+index: 208
+#Models/isotopex22.fbx
+index: 209
+#Models/keypad1.fbx
+index: 210
+#Models/keypad2.fbx
+index: 211
+#Models/lamp.fbx
+index: 212
+#Models/lift1.fbx
+index: 213
+#Models/lift1_lod2.fbx
+index: 214
+#Models/lift2.fbx
+index: 215
+#Models/light_emergsignal.fbx
+index: 216
+#Models/logic_probe.fbx
+index: 217
+#Models/maint1_1.fbx
+index: 218
+#Models/maint1_2d.fbx
+index: 219
+#Models/maint1_2.fbx
+index: 220
+#Models/maint1_3b.fbx
+index: 221
+#Models/maint1_3.fbx
+index: 222
+#Models/maint1_4d.fbx
+index: 223
+#Models/maint1_4.fbx
+index: 224
+#Models/maint1_5.fbx
+index: 225
+#Models/maint1_6.fbx
+index: 226
+#Models/maint1_7.fbx
+index: 227
+#Models/maint2_1b.fbx
+index: 228
+#Models/maint2_1d.fbx
+index: 229
+#Models/maint2_2.fbx
+index: 230
+#Models/maint2_3d.fbx
+index: 231
+#Models/maint2_3.fbx
+index: 232
+#Models/maint2_4.fbx
+index: 233
+#Models/maint2_5d.fbx
+index: 234
+#Models/maint2_5.fbx
+index: 235
+#Models/maint2_6.fbx
+index: 236
+#Models/maint2_7d.fbx
+index: 237
+#Models/maint2_7.fbx
+index: 238
+#Models/maint2_8.fbx
+index: 239
+#Models/maint2_9.fbx
+index: 240
+#Models/maint2_9_slice128_top.fbx
+index: 241
+#Models/maint2_9_slice45_rh.fbx
+index: 242
+#Models/maint3_1d.fbx
+index: 243
+#Models/maint3_1.fbx
+index: 244
+#Models/maint3_1_slice32.fbx
+index: 245
+#Models/maint3_1_slice32lh.fbx
+index: 246
+#Models/maint3_1_slice45.fbx
+index: 247
+#Models/med1_1d.fbx
+index: 248
+#Models/med1_1.fbx
+index: 249
+#Models/med1_1_half.fbx
+index: 250
+#Models/med1_1_slice128high.fbx
+index: 251
+#Models/med1_1_slice192_rh.fbx
+index: 252
+#Models/med1_1_slice256.fbx
+index: 253
+#Models/med1_2d.fbx
+index: 254
+#Models/med1_2.fbx
+index: 255
+#Models/med1_3d.fbx
+index: 256
+#Models/med1_3.fbx
+index: 257
+#Models/med1_4.fbx
+index: 258
+#Models/med1_6.fbx
+index: 259
+#Models/med1_7d.fbx
+index: 260
+#Models/med1_7d_slice128.fbx
+index: 261
+#Models/med1_7.fbx
+index: 262
+#Models/med1_7_slice14_64.fbx
+index: 263
+#Models/med1_7_slice45_320.fbx
+index: 264
+#Models/med1_7_slice45_320rh.fbx
+index: 265
+#Models/med1_7_slice96high.fbx
+index: 266
+#Models/med1_8d.fbx
+index: 267
+#Models/med1_8.fbx
+index: 268
+#Models/med1_9d.fbx
+index: 269
+#Models/med1_9d_ofs112_90.fbx
+index: 270
+#Models/med1_9d_ofs128_90.fbx
+index: 271
+#Models/med1_9d_ofs144_90.fbx
+index: 272
+#Models/med1_9d_ofs192_90.fbx
+index: 273
+#Models/med1_9d_ofs32_90.fbx
+index: 274
+#Models/med1_9d_ofs48_90.fbx
+index: 275
+#Models/med1_9d_ofs64_90.fbx
+index: 276
+#Models/med1_9d_ofs96_90.fbx
+index: 277
+#Models/med1_9.fbx
+index: 278
+#Models/med2_1d.fbx
+index: 279
+#Models/med2_1.fbx
+index: 280
+#Models/med2_1_slice32RH.fbx
+index: 281
+#Models/med2_2d.fbx
+index: 282
+#Models/med2_2.fbx
+index: 283
+#Models/med2_2_half_bottom.fbx
+index: 284
+#Models/med2_3d.fbx
+index: 285
+#Models/med2_3.fbx
+index: 286
+#Models/med2_4.fbx
+index: 287
+#Models/med2_5.fbx
+index: 288
+#Models/med2_6.fbx
+index: 289
+#Models/med2_7.fbx
+index: 290
+#Models/med2_8.fbx
+index: 291
+#Models/med2_8_half_top.fbx
+index: 292
+#Models/med2_8_slice32RH.fbx
+index: 293
+#Models/med2_8_slice45.fbx
+index: 294
+#Models/med2_9d.fbx
+index: 295
+#Models/med2_9.fbx
+index: 296
+#Models/med3_1.fbx
+index: 297
+#Models/microscope.fbx
+index: 298
+#Models/npc_autobomb.fbx
+index: 299
+#Models/npc_bot_cortex_reaver.fbx
+index: 300
+#Models/npc_bot_cortex_reaver_gibs.fbx
+index: 301
+#Models/npc_cyberdog.fbx
+index: 302
+#Models/npc_cyberguard1.fbx
+index: 303
+#Models/npc_cyberram.fbx
+index: 304
+#Models/npc_cyberreaver.fbx
+index: 305
+#Models/npc_cyborgassassin.fbx
+index: 306
+#Models/npc_cyborgassassin_throwingstar.fbx
+index: 307
+#Models/npc_cyborgassassin_weapon.fbx
+index: 308
+// #Models/npc_cyborg_diego_die.fbx
+// index: 309
+// #Models/npc_cyborg_diego.fbx
+// index: 310
+#Models/npc_cyborg_diegoteleportfx.fbx
+index: 311
+#Models/npc_cyborg_drone.fbx
+index: 312
+#Models/npc_cyborg_elite.fbx
+index: 313
+#Models/npc_cyborg_enforcer.fbx
+index: 314
+#Models/npc_cyborgwarrior.fbx
+index: 315
+#Models/npc_execbot.fbx
+index: 316
+#Models/npc_execbot_gibs.fbx
+index: 317
+#Models/npc_flierbot.fbx
+index: 318
+#Models/npc_flierbot_gibs.fbx
+index: 319
+#Models/npc_gortiger.fbx
+index: 320
+#Models/npc_hopper_die.fbx
+index: 321
+#Models/npc_hopper.fbx
+index: 322
+#Models/npc_humanoidmutant.fbx
+index: 323
+#Models/npc_invisomut.fbx
+index: 324
+#Models/npc_maintenancebot.fbx
+index: 325
+#Models/npc_maintenancebot_gibs.fbx
+index: 326
+#Models/npc_mutant_avian_corpse.fbx
+index: 327
+#Models/npc_mutant_avian.fbx
+index: 328
+#Models/npc_mutant_cyborg.fbx
+index: 329
+#Models/npc_plantmutant.fbx
+index: 330
+#Models/npc_repairbot.fbx
+index: 331
+#Models/npc_repairbot_gibs.fbx
+index: 332
+#Models/npc_sec1bot.fbx
+index: 333
+#Models/npc_sec1bot_gibs.fbx
+index: 334
+#Models/npc_sec2bot.fbx
+index: 335
+#Models/npc_sec2botgibs.fbx
+index: 336
+#Models/npc_servbot.fbx
+index: 337
+#Models/npc_servbot_gibs.fbx
+index: 338
+#Models/npc_zerogmut100.fbx
+index: 339
+#Models/npc_zerogmut101.fbx
+index: 340
+#Models/npc_zerogmut102.fbx
+index: 341
+#Models/npc_zerogmut103.fbx
+index: 342
+#Models/npc_zerogmut104.fbx
+index: 343
+#Models/npc_zerogmut105.fbx
+index: 344
+#Models/npc_zerogmut106.fbx
+index: 345
+#Models/npc_zerogmut107.fbx
+index: 346
+#Models/npc_zerogmut108.fbx
+index: 347
+#Models/npc_zerogmut109.fbx
+index: 348
+#Models/npc_zerogmut10.fbx
+index: 349
+#Models/npc_zerogmut110.fbx
+index: 350
+#Models/npc_zerogmut111.fbx
+index: 351
+#Models/npc_zerogmut112.fbx
+index: 352
+#Models/npc_zerogmut113.fbx
+index: 353
+#Models/npc_zerogmut114.fbx
+index: 354
+#Models/npc_zerogmut115.fbx
+index: 355
+#Models/npc_zerogmut116.fbx
+index: 356
+#Models/npc_zerogmut117.fbx
+index: 357
+#Models/npc_zerogmut118.fbx
+index: 358
+#Models/npc_zerogmut119.fbx
+index: 359
+#Models/npc_zerogmut11.fbx
+index: 360
+#Models/npc_zerogmut120.fbx
+index: 361
+#Models/npc_zerogmut121.fbx
+index: 362
+#Models/npc_zerogmut122.fbx
+index: 363
+#Models/npc_zerogmut123.fbx
+index: 364
+#Models/npc_zerogmut124.fbx
+index: 365
+#Models/npc_zerogmut125.fbx
+index: 366
+#Models/npc_zerogmut126.fbx
+index: 367
+#Models/npc_zerogmut127.fbx
+index: 368
+#Models/npc_zerogmut128.fbx
+index: 369
+#Models/npc_zerogmut129.fbx
+index: 370
+#Models/npc_zerogmut12.fbx
+index: 371
+#Models/npc_zerogmut130.fbx
+index: 372
+#Models/npc_zerogmut131.fbx
+index: 373
+#Models/npc_zerogmut132.fbx
+index: 374
+#Models/npc_zerogmut133.fbx
+index: 375
+#Models/npc_zerogmut134.fbx
+index: 376
+#Models/npc_zerogmut135.fbx
+index: 377
+#Models/npc_zerogmut136.fbx
+index: 378
+#Models/npc_zerogmut137.fbx
+index: 379
+#Models/npc_zerogmut138.fbx
+index: 380
+#Models/npc_zerogmut139.fbx
+index: 381
+#Models/npc_zerogmut13.fbx
+index: 382
+#Models/npc_zerogmut140.fbx
+index: 383
+#Models/npc_zerogmut141.fbx
+index: 384
+#Models/npc_zerogmut142.fbx
+index: 385
+#Models/npc_zerogmut143.fbx
+index: 386
+#Models/npc_zerogmut144.fbx
+index: 387
+#Models/npc_zerogmut145.fbx
+index: 388
+#Models/npc_zerogmut14.fbx
+index: 389
+#Models/npc_zerogmut15.fbx
+index: 390
+#Models/npc_zerogmut16.fbx
+index: 391
+#Models/npc_zerogmut17.fbx
+index: 392
+#Models/npc_zerogmut18.fbx
+index: 393
+#Models/npc_zerogmut19.fbx
+index: 394
+#Models/npc_zerogmut1.fbx
+index: 395
+#Models/npc_zerogmut20.fbx
+index: 396
+#Models/npc_zerogmut21.fbx
+index: 397
+#Models/npc_zerogmut22.fbx
+index: 398
+#Models/npc_zerogmut23.fbx
+index: 399
+#Models/npc_zerogmut24.fbx
+index: 400
+#Models/npc_zerogmut25.fbx
+index: 401
+#Models/npc_zerogmut26.fbx
+index: 402
+#Models/npc_zerogmut27.fbx
+index: 403
+#Models/npc_zerogmut28.fbx
+index: 404
+#Models/npc_zerogmut29.fbx
+index: 405
+#Models/npc_zerogmut2.fbx
+index: 406
+#Models/npc_zerogmut30.fbx
+index: 407
+#Models/npc_zerogmut31.fbx
+index: 408
+#Models/npc_zerogmut32.fbx
+index: 409
+#Models/npc_zerogmut33.fbx
+index: 410
+#Models/npc_zerogmut34.fbx
+index: 411
+#Models/npc_zerogmut35.fbx
+index: 412
+#Models/npc_zerogmut36.fbx
+index: 413
+#Models/npc_zerogmut37.fbx
+index: 414
+#Models/npc_zerogmut38.fbx
+index: 415
+#Models/npc_zerogmut39.fbx
+index: 416
+#Models/npc_zerogmut3.fbx
+index: 417
+#Models/npc_zerogmut40.fbx
+index: 418
+#Models/npc_zerogmut41.fbx
+index: 419
+#Models/npc_zerogmut42.fbx
+index: 420
+#Models/npc_zerogmut43.fbx
+index: 421
+#Models/npc_zerogmut44.fbx
+index: 422
+#Models/npc_zerogmut45.fbx
+index: 423
+#Models/npc_zerogmut46.fbx
+index: 424
+#Models/npc_zerogmut47.fbx
+index: 425
+#Models/npc_zerogmut48.fbx
+index: 426
+#Models/npc_zerogmut49.fbx
+index: 427
+#Models/npc_zerogmut4.fbx
+index: 428
+#Models/npc_zerogmut50.fbx
+index: 429
+#Models/npc_zerogmut51.fbx
+index: 430
+#Models/npc_zerogmut52.fbx
+index: 431
+#Models/npc_zerogmut53.fbx
+index: 432
+#Models/npc_zerogmut54.fbx
+index: 433
+#Models/npc_zerogmut55.fbx
+index: 434
+#Models/npc_zerogmut56.fbx
+index: 435
+#Models/npc_zerogmut57.fbx
+index: 436
+#Models/npc_zerogmut58.fbx
+index: 437
+#Models/npc_zerogmut59.fbx
+index: 438
+#Models/npc_zerogmut5.fbx
+index: 439
+#Models/npc_zerogmut60.fbx
+index: 440
+#Models/npc_zerogmut61.fbx
+index: 441
+#Models/npc_zerogmut62.fbx
+index: 442
+#Models/npc_zerogmut63.fbx
+index: 443
+#Models/npc_zerogmut64.fbx
+index: 444
+#Models/npc_zerogmut65.fbx
+index: 445
+#Models/npc_zerogmut66.fbx
+index: 446
+#Models/npc_zerogmut67.fbx
+index: 447
+#Models/npc_zerogmut68.fbx
+index: 448
+#Models/npc_zerogmut69.fbx
+index: 449
+#Models/npc_zerogmut6.fbx
+index: 450
+#Models/npc_zerogmut70.fbx
+index: 451
+#Models/npc_zerogmut71.fbx
+index: 452
+#Models/npc_zerogmut72.fbx
+index: 453
+#Models/npc_zerogmut73.fbx
+index: 454
+#Models/npc_zerogmut74.fbx
+index: 455
+#Models/npc_zerogmut75.fbx
+index: 456
+#Models/npc_zerogmut76.fbx
+index: 457
+#Models/npc_zerogmut77.fbx
+index: 458
+#Models/npc_zerogmut78.fbx
+index: 459
+#Models/npc_zerogmut79.fbx
+index: 460
+#Models/npc_zerogmut7.fbx
+index: 461
+#Models/npc_zerogmut80.fbx
+index: 462
+#Models/npc_zerogmut81.fbx
+index: 463
+#Models/npc_zerogmut82.fbx
+index: 464
+#Models/npc_zerogmut83.fbx
+index: 465
+#Models/npc_zerogmut84.fbx
+index: 466
+#Models/npc_zerogmut85.fbx
+index: 467
+#Models/npc_zerogmut86.fbx
+index: 468
+#Models/npc_zerogmut87.fbx
+index: 469
+#Models/npc_zerogmut88.fbx
+index: 470
+#Models/npc_zerogmut89.fbx
+index: 471
+#Models/npc_zerogmut8.fbx
+index: 472
+#Models/npc_zerogmut90.fbx
+index: 473
+#Models/npc_zerogmut91.fbx
+index: 474
+#Models/npc_zerogmut92.fbx
+index: 475
+#Models/npc_zerogmut93.fbx
+index: 476
+#Models/npc_zerogmut94.fbx
+index: 477
+#Models/npc_zerogmut95.fbx
+index: 478
+#Models/npc_zerogmut96.fbx
+index: 479
+#Models/npc_zerogmut97.fbx
+index: 480
+#Models/npc_zerogmut98.fbx
+index: 481
+#Models/npc_zerogmut99.fbx
+index: 482
+#Models/npc_zerogmut9.fbx
+index: 483
+#Models/papers01.fbx
+index: 484
+#Models/papers02.fbx
+index: 485
+#Models/papers03.fbx
+index: 486
+#Models/paper_wad.fbx
+index: 487
+#Models/patch.fbx
+index: 488
+#Models/pinetreem.fbx
+index: 489
+#Models/pipe128.fbx
+index: 490
+#Models/plane_generic.fbx
+index: 491
+#Models/plastique.fbx
+index: 492
+#Models/poisonbush1.fbx
+index: 493
+#Models/pot.fbx
+index: 494
+#Models/prop_bush.fbx
+index: 495
+#Models/prop_chandelier.fbx
+index: 496
+#Models/pumpkin.fbx
+index: 497
+#Models/puzzlepanel1.fbx
+index: 498
+#Models/puzzlepanel2.fbx
+index: 499
+#Models/puzzlepanel3.fbx
+index: 500
+#Models/rad1_1.fbx
+index: 501
+#Models/reac1_1.fbx
+index: 502
+#Models/reac1_2.fbx
+index: 503
+#Models/reac1_3.fbx
+index: 504
+#Models/reac1_4.fbx
+index: 505
+#Models/reac1_5.fbx
+index: 506
+#Models/reac1_6.fbx
+index: 507
+#Models/reac1_8.fbx
+index: 508
+#Models/reac1_9.fbx
+index: 509
+#Models/reac2_1b.fbx
+index: 510
+#Models/reac2_1bmirror.fbx
+index: 511
+#Models/reac2_1.fbx
+index: 512
+#Models/reac2_1_mirror.fbx
+index: 513
+#Models/reac2_1slice45lh.fbx
+index: 514
+#Models/reac2_1slice45lh_up.fbx
+index: 515
+#Models/reac2_1slice45rh.fbx
+index: 516
+#Models/reac2_1slice45rh_up.fbx
+index: 517
+#Models/reac2_2.fbx
+index: 518
+#Models/reac2_4.fbx
+index: 519
+#Models/reac2_5.fbx
+index: 520
+#Models/reac2_6.fbx
+index: 521
+#Models/reac2_7.fbx
+index: 522
+#Models/reac2_8.fbx
+index: 523
+#Models/reac2_9.fbx
+index: 524
+#Models/reac3_1.fbx
+index: 525
+#Models/reac3_2.fbx
+index: 526
+#Models/reac3_3.fbx
+index: 527
+#Models/reac3_4.fbx
+index: 528
+#Models/reac3_5.fbx
+index: 529
+#Models/reac3_6.fbx
+index: 530
+#Models/reac3_7.fbx
+index: 531
+#Models/reac4_1.fbx
+index: 532
+#Models/reac4_1_slice45lh.fbx
+index: 533
+#Models/reac4_2.fbx
+index: 534
+#Models/reac5_1.fbx
+index: 535
+#Models/reac5_2.fbx
+index: 536
+#Models/reac5_3.fbx
+index: 537
+#Models/reac6_1.fbx
+index: 538
+#Models/reac6_3.fbx
+index: 539
+#Models/saturn.fbx
+index: 540
+#Models/sci1_1d.fbx
+index: 541
+#Models/sci1_1_slice45_top_lh.fbx
+index: 542
+#Models/sci1_1_slice45_top_rh.fbx
+index: 543
+#Models/sci1_2d.fbx
+index: 544
+#Models/sci1_2.fbx
+index: 545
+#Models/sci1_2_slice45_lh.fbx
+index: 546
+#Models/sci1_2_slice45lh_up.fbx
+index: 547
+#Models/sci1_2_slice45_rh.fbx
+index: 548
+#Models/sci1_2_slice45rh_up.fbx
+index: 549
+#Models/sci1_3.fbx
+index: 550
+#Models/sci1_5.fbx
+index: 551
+#Models/sci1_6.fbx
+index: 552
+#Models/sci1_6_slice45.fbx
+index: 553
+#Models/sci1_7d.fbx
+index: 554
+#Models/sci1_7.fbx
+index: 555
+#Models/sci1_8d.fbx
+index: 556
+#Models/sci1_8.fbx
+index: 557
+#Models/sci1_9d.fbx
+index: 558
+#Models/sci1_9.fbx
+index: 559
+#Models/sci2_1d.fbx
+index: 560
+#Models/sci2_1.fbx
+index: 561
+#Models/sci2_1_slice45rh.fbx
+index: 562
+#Models/sci2_1_slicelh.fbx
+index: 563
+#Models/sci2_2d.fbx
+index: 564
+#Models/sci2_2.fbx
+index: 565
+#Models/sci2_3.fbx
+index: 566
+#Models/sci2_4.fbx
+index: 567
+#Models/sci2_5d.fbx
+index: 568
+#Models/sci2_5.fbx
+index: 569
+#Models/sci3_1d.fbx
+index: 570
+#Models/sci3_1.fbx
+index: 571
+#Models/sci3_2.fbx
+index: 572
+#Models/sci3_3.fbx
+index: 573
+#Models/sci3_4.fbx
+index: 574
+#Models/sci3_5.fbx
+index: 575
+#Models/sci3_6.fbx
+index: 576
+#Models/sec1_1c.fbx
+index: 577
+#Models/sec1_1c_slice320high.fbx
+index: 578
+#Models/sec1_1c_slice320highrh.fbx
+index: 579
+#Models/sec1_1c_slice45.fbx
+index: 580
+#Models/sec1_1c_slice64high.fbx
+index: 581
+#Models/sec1_1c_slice64highrh.fbx
+index: 582
+#Models/sec1_2b.fbx
+index: 583
+#Models/sec1_2.fbx
+index: 584
+#Models/sec1_3.fbx
+index: 585
+#Models/sec1_3_slice45.fbx
+index: 586
+#Models/sec_cpunode.fbx
+index: 587
+#Models/sec_cpunode_small.fbx
+index: 588
+#Models/security_camera.fbx
+index: 589
+#Models/severedhead.fbx
+index: 590
+#Models/shelves.fbx
+index: 591
+#Models/skeleton.fbx
+index: 592
+#Models/skull.fbx
+index: 593
+#Models/skysphere.fbx
+index: 594
+#Models/sleeping_cables.fbx
+index: 595
+#Models/sparkingwire.fbx
+index: 596
+#Models/stor1_1.fbx
+index: 597
+#Models/stor1_3.fbx
+index: 598
+#Models/stor1_4.fbx
+index: 599
+#Models/stor1_5.fbx
+index: 600
+#Models/stor1_6.fbx
+index: 601
+#Models/stor1_6_slice128_up_lh.fbx
+index: 602
+#Models/stor1_6_slice128_up_rh.fbx
+index: 603
+#Models/stor1_6_slice192lh.fbx
+index: 604
+#Models/stor1_6_slice192rh.fbx
+index: 605
+#Models/stor1_7.fbx
+index: 606
+#Models/stor1_7_slice45.fbx
+index: 607
+#Models/surgery_table.fbx
+index: 608
+#Models/switch1.fbx
+index: 609
+#Models/switch2.fbx
+index: 610
+#Models/switch3.fbx
+index: 611
+#Models/switch4.fbx
+index: 612
+#Models/switch5_broken.fbx
+index: 613
+#Models/switch5.fbx
+index: 614
+#Models/switch6.fbx
+index: 615
+#Models/switch8.fbx
+index: 616
+#Models/switch_broken1.fbx
+index: 617
+#Models/switch_elev3.fbx
+index: 618
+#Models/table.fbx
+index: 619
+#Models/test_cube.fbx
+index: 620
+#Models/test_light.fbx
+index: 621
+#Models/testtube.fbx
+index: 622
+#Models/thermos.fbx
+index: 623
+#Models/toolcart.fbx
+index: 624
+#Models/tv_on_a_post.fbx
+index: 625
+#Models/v_dartgun.fbx
+index: 626
+#Models/vending1.fbx
+index: 627
+#Models/vending2.fbx
+index: 628
+#Models/vending3.fbx
+index: 629
+#Models/v_flechette.fbx
+index: 630
+#Models/v_magnum.fbx
+index: 631
+#Models/v_magpulse.fbx
+index: 632
+#Models/v_pipe.fbx
+index: 633
+#Models/v_pistol.fbx
+index: 634
+#Models/v_plasma.fbx
+index: 635
+#Models/v_rapier.fbx
+index: 636
+#Models/warecasing.fbx
+index: 637
+#Models/w_blaster.fbx
+index: 638
+#Models/w_brokengun.fbx
+index: 639
+#Models/w_dartgun.fbx
+index: 640
+#Models/weapon_rack.fbx
+index: 641
+#Models/w_flechette.fbx
+index: 642
+#Models/w_ionrifle.fbx
+index: 643
+#Models/w_magnum.fbx
+index: 644
+#Models/w_magpulse.fbx
+index: 645
+#Models/w_mk3.fbx
+index: 646
+#Models/w_muzzleflashcard.fbx
+index: 647
+#Models/workerhelmet.fbx
+index: 648
+#Models/w_pipe.fbx
+index: 649
+#Models/w_pistol.fbx
+index: 650
+#Models/w_plasma.fbx
+index: 651
+#Models/w_railgun.fbx
+index: 652
+#Models/w_rapier.fbx
+index: 653
+#Models/w_riotgun.fbx
+index: 654
+#Models/w_skorpion.fbx
+index: 655
+#Models/w_sparqbeam.fbx
+index: 656
+#Models/w_stungun.fbx
+index: 657
+#Models/xdoor1.fbx
+index: 658
+#Models/xdoor2.fbx
+index: 659
+#Models/xray_machine.fbx
+index: 660

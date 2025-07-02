@@ -144,7 +144,7 @@ int ExitCleanup(int status) {
 
     // OpenGL Cleanup
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    for (int i=0;i<MODEL_COUNT;i++) {
+    for (uint32_t i=0;i<modelCount;i++) {
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
     }
     
