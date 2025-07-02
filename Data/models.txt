@@ -634,8 +634,8 @@ index: 306
 index: 307
 #Models/npc_cyborgassassin_weapon.fbx
 index: 308
-// #Models/npc_cyborg_diego_die.fbx
-// index: 309
+#Models/npc_cyborg_diego_die.fbx
+index: 309
 // #Models/npc_cyborg_diego.fbx
 // index: 310
 #Models/npc_cyborg_diegoteleportfx.fbx

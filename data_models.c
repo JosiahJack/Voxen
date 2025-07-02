@@ -232,25 +232,30 @@ int LoadGeometry(void) {
     // Generate and bind VAO
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
-    printf("Made to 0\n");
 
     vbos = malloc(modelCount * sizeof(uint32_t));
     if (!vbos) { fprintf(stderr, "ERROR: Failed to allocate vbos buffer\n"); CleanupModelLoadOnFail(); return 1; }
     loadModelItemInitialized[MDL_VBOS] = true;
-        printf("Made to 1\n");
 
+//     for (uint32_t i = 0; i < modelCount; i++) {
+//         printf("  [%d] vertexData = %p, count = %u\n", i, (void*)vertexDataArrays[i], modelVertexCounts[i]);
+//     }
+        
     // Generate and populate VBOs
     glGenBuffers(modelCount, vbos);
     for (uint32_t i = 0; i < modelCount; i++) {
+        if (modelVertexCounts[i] == 0) continue; // No model specified with this index.
+        if (vertexDataArrays[i] == NULL) {
+            printf("WARNING: model %d has invalid vertex data (count=%u, ptr=%p)\n",
+                i, modelVertexCounts[i], (void*)vertexDataArrays[i]);
+            continue;
+        }
+        
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), vertexDataArrays[i], GL_STATIC_DRAW);
-//         printf("Made to 2\n");
-//         if (vertexDataArrays[i]) free(vertexDataArrays[i]); // Free after uploading to GPU
-//         printf("Made to 3\n");
+        if (vertexDataArrays[i]) free(vertexDataArrays[i]); // Free after uploading to GPU
     }
     
-    printf("Made to 4\n");
-
     // Define vertex attribute formats
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
@@ -287,7 +292,6 @@ int LoadGeometry(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, vbos[0]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
-    printf("Made to 3\n");
 
     return 0;
 }

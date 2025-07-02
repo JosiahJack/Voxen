@@ -203,7 +203,7 @@ int LoadTextures(void) {
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t), indices);
         pixel_offset += width * height;
         palette_offset += palette_size;
-        if (palette_size > 4096U) printf("Loaded %s with large palette size of %d!\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+//         if (palette_size > 4096U) printf("Loaded %s with large palette size of %d!\n", texture_parser.entries[matchedParserIdx].path, palette_size);
         if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
         
         // Clean up
