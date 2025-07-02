@@ -42,4 +42,5 @@ done
 
 wait
 $CC $TEMP_DIR/*.o -o voxen $LDFLAGS
+rm ./$TEMP_DIR/*.o
 echo "Build complete."
