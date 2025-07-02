@@ -8,13 +8,14 @@ SOURCES="voxen.c cli_args.c event.c quaternion.c matrix.c input.c data_models.c 
          image_effects.c debug.c data_definitions.c audio.c"
 
 TEMP_DIR=temp_build
-if [ "$1" = "clean" ]; then
-    rm ./$TEMP_DIR/*.o
-    echo "Cleaned build artifacts."
-    exit 0
-fi
+#if [ "$1" = "clean" ]; then
+#    rm ./$TEMP_DIR/*.o
+#    echo "Cleaned build artifacts."
+#    exit 0
+#fi
 
 mkdir -p $TEMP_DIR
+rm ./$TEMP_DIR/*.o
 
 # Compile sources in parallel to temporary object files
 pids=()

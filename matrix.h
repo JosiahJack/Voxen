@@ -14,6 +14,5 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
 void mat4_lookat_vec(float *m, float eye[3], float target[3], float up[3]);
 void mat4_rotate_x(float *m, float angle);
 void mat4_translate(float *m, float x, float y, float z);
-void mat4_translate_shadowmap(float *m, float x, float y, float z);
 
 #endif // VOXEN_MATRIX_H

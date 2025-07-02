@@ -47,14 +47,14 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int he
 // Create G-buffer textures
 void SetupGBuffer(void) {
     // First pass gbuffer images
-    GenerateAndBindTexture(&inputImageID,              GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
-    GenerateAndBindTexture(&inputNormalsID,          GL_RGBA16F, screen_width, screen_height,            GL_RGBA,    GL_HALF_FLOAT, "Unlit Raster Normals");
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32F, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, "Unlit Raster Depth");
-    GenerateAndBindTexture(&inputWorldPosID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, "Unlit Raster World Positions");
-    GenerateAndBindTexture(&inputModelInstanceID,    GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,           GL_INT, "Unlit Raster Instance and Model Indices");
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
+    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, "Unlit Raster Normals");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, "Unlit Raster Depth");
+    GenerateAndBindTexture(&inputWorldPosID,         GL_RGBA32F, screen_width, screen_height,           GL_RGBA,                   GL_FLOAT, "Unlit Raster World Positions");
+    GenerateAndBindTexture(&inputModelInstanceID,    GL_RGBA32I, screen_width, screen_height,   GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Instance and Model Indices");
     
     // Second pass gbuffer images
-    GenerateAndBindTexture(&outputImageID,           GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,           GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                  GL_FLOAT, "Deferred Lighting Result Colors");
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -78,7 +78,7 @@ void SetupGBuffer(void) {
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
     glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT32F);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT24);
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
@@ -110,7 +110,7 @@ void SetupInstances(void) {
         instances[idx].sclx = 1.0f; // Default scale
         instances[idx].scly = 1.0f;
         instances[idx].sclz = 1.0f;
-        instances[idx].rotx = 0.0f; // Quaternion identity
+        instances[idx].rotx = 0.0f;
         instances[idx].roty = 0.0f;
         instances[idx].rotz = 0.0f;
         instances[idx].rotw = 1.0f;
@@ -123,9 +123,14 @@ void SetupInstances(void) {
     
     instances[39].modelIndex = 5; // Test Light
     instances[39].texIndex = 881; // white light
-    instances[39].sclx = 0.16f;
+    instances[39].sclx = 0.16f; // Attempt to scale down test light mesh, does nothing.
     instances[39].scly = 0.16f;
     instances[39].sclz = 0.16f;
+    
+    instances[0].rotx = 0.707f;
+    instances[0].roty = 0.0f;
+    instances[0].rotz = 0.0f;
+    instances[0].rotw = 0.707f;
     
     glGenBuffers(1, &instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
@@ -190,13 +195,18 @@ void CacheUniformLocationsForShaders(void) {
 GLuint matricesBuffer;
 float *modelMatrices;
 
-void RenderMeshInstances() {
+void RenderMeshInstances() {    
     // Set up view and projection matrices
     float model[16]; // 4x4 matrix
     for (int i=0;i<instanceCount;i++) {
-        mat4_identity(model);
-        mat4_scale(model, instances[i].sclx, instances[i].scly, instances[i].sclz); // Apply scale
         float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
+        float len = sqrtf(x*x + y*y + z*z + w*w);
+        if (len > 0.0f) {
+            x /= len; y /= len; z /= len; w /= len;
+        } else {
+            x = 0.0f; y = 0.0f; z = 0.0f; w = 1.0f; // Default to identity rotation
+        }
+        
         float rot[16];
         mat4_identity(rot);
         rot[0] = 1.0f - 2.0f * (y*y + z*z);
@@ -208,8 +218,16 @@ void RenderMeshInstances() {
         rot[8] = 2.0f * (x*z - w*y);
         rot[9] = 2.0f * (y*z + w*x);
         rot[10] = 1.0f - 2.0f * (x*x + y*y);
-        mat4_multiply(model, model, rot); // Apply rotation
-        mat4_translate(model, instances[i].posx, instances[i].posy, instances[i].posz); // Apply translation
+        
+        // Account for bad scale.  If instance is in the list, it should be visible!
+        float sx = instances[i].sclx > 0.0f ? instances[i].sclx : 1.0f;
+        float sy = instances[i].scly > 0.0f ? instances[i].scly : 1.0f;
+        float sz = instances[i].sclz > 0.0f ? instances[i].sclz : 1.0f;
+        
+        model[0]  =       rot[0] * sx; model[1]  =       rot[1] * sy; model[2] =       rot[2]  * sz; model[3]  = 0.0f;
+        model[4]  =       rot[4] * sx; model[5]  =       rot[5] * sy; model[6]  =      rot[6]  * sz; model[7]  = 0.0f;
+        model[8]  =       rot[8] * sx; model[9]  =       rot[9] * sy; model[10] =      rot[10] * sz; model[11] = 0.0f;
+        model[12] = instances[i].posx; model[13] = instances[i].posy; model[14] = instances[i].posz; model[15] = 1.0f;
         memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
         glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
         glUniform1i(instanceIndexLoc_chunk, i);
@@ -220,6 +238,10 @@ void RenderMeshInstances() {
         glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
         drawCallCount++;
         vertexCount += modelVertexCounts[modelType];
+
+        // Uncomment for fun and mayhem
+//         GLenum err;
+//         while ((err = glGetError()) != GL_NO_ERROR) printf("GL Error for draw call %d: %x\n",i, err);
     }
 }
 

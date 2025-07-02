@@ -143,15 +143,3 @@ void mat4_translate(float *m, float x, float y, float z) {
     m[13] = y;
     m[14] = z;
 }
-
-void mat4_translate_shadowmap(float *m, float x, float y, float z) {
-    float t[16] = {
-        1.0f, 0.0f, 0.0f, -x,
-        0.0f, 1.0f, 0.0f, -y,
-        0.0f, 0.0f, 1.0f, -z,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
-    float temp[16];
-    memcpy(temp, m, 16 * sizeof(float));
-    mat4_multiply(m, temp, t);
-}
