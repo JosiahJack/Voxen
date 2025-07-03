@@ -10,88 +10,21 @@
 #include "debug.h"
 #include "render.h"
 #include "data_definitions.h"
+#include "voxel.h"
 
-uint32_t modelCount = 0;
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 GLuint chunkShaderProgram;
-uint32_t * modelVertexCounts = NULL;
+uint32_t modelVertexCounts[MODEL_COUNT];
 GLuint vao; // Vertex Array Object
-GLuint * vbos = NULL;
+GLuint vbos[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
 GLuint modelBoundsID;
-float * modelBounds = NULL; // Needs to be modelCount * BOUNDS_ATTRIBUTES_COUNT
-float ** vertexDataArrays = NULL;
-
-// #define WORLD_EPSILON 0.0001f
-// float uniqueXPositions[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0.0f };
-// float uniqueYPositions[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0.0f };
-// float uniqueZPositions[MAX_UNIQUE_VALUE] = { [0 ... MAX_UNIQUE_VALUE - 1] = 0.0f };
-// int numUniqueXValues = 0;
-// int numUniqueYValues = 0;
-// int numUniqueZValues = 0;
-
-// Checks if the value given matches an existing value in the unique value array
-// and stores it at head of unique value array if it is unique.  Returns the
-// index into the unique value array for the value that was passed whether new
-// or pre-existing.
-// int CheckIfUniqueX(float value) {
-//     if (numUniqueXValues >= MAX_UNIQUE_VALUE) {
-//         printf("Hit MAX UNIQUE VALUES for X: %d\n",numUniqueXValues);
-//         return -1;
-//     }
-//     
-//     for (int i=0;i<=numUniqueXValues;i++) {
-//         if (fabs(value - uniqueXPositions[i]) <= WORLD_EPSILON) { // Matches existing value.
-//             return i; // Found a match, return it.
-//         }
-//     }
-//     
-//     uniqueXPositions[numUniqueXValues] = value; // numUniqueXValues starts at 0 so offset by 1 to assign first value to index 0.
-//     numUniqueXValues++;
-//     return numUniqueXValues - 1; // Return index of the value.
-// }
-// 
-// int CheckIfUniqueY(float value) {
-//     if (numUniqueXValues >= MAX_UNIQUE_VALUE) {
-//         printf("Hit MAX UNIQUE VALUES for Y: %d\n",numUniqueYValues);
-//         return -1;
-//     }
-//     
-//     for (int i=0;i<=numUniqueYValues;i++) {
-//         if (fabs(value - uniqueYPositions[i]) <= WORLD_EPSILON) { // Matches existing value.
-//             return i; // Found a match, return it.
-//         }
-//     }
-//     
-//     uniqueYPositions[numUniqueYValues] = value; // numUniqueXValues starts at 0 so offset by 1 to assign first value to index 0.
-//     numUniqueYValues++;
-//     return numUniqueYValues - 1; // Return index of the value.
-// }
-// 
-// int CheckIfUniqueZ(float value) {
-//     if (numUniqueZValues >= MAX_UNIQUE_VALUE) {
-//         printf("Hit MAX UNIQUE VALUES for Z: %d\n",numUniqueZValues);
-//         return -1;
-//     }
-//     
-//     for (int i=0;i<=numUniqueZValues;i++) {
-//         if (fabs(value - uniqueZPositions[i]) <= WORLD_EPSILON) { // Matches existing value.
-//             return i; // Found a match, return it.
-//         }
-//     }
-//     
-//     uniqueZPositions[numUniqueZValues] = value; // numUniqueXValues starts at 0 so offset by 1 to assign first value to index 0.
-//     numUniqueZValues++;
-//     return numUniqueZValues - 1; // Return index of the value.
-// }
+float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+float * vertexDataArrays[MODEL_COUNT];
 
 typedef enum {
     MDL_PARSER = 0,
-    MDL_VERTICES,
-    MDL_COUNTS,
-    MDL_BOUNDS,
-    MDL_VBOS,
     MDL_COUNT // Number of subsystems
 } ModelLoadDataType;
 
@@ -99,8 +32,6 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 
 // Loads all geometry, from 3D meshes or otherwise
 int LoadGeometry(void) {
-    modelCount = 0;
-    
     // First parse ./Data/textures.txt to see what textures to load to what indices
     parser_init(&model_parser, valid_mdldata_keys, 1);
     if (!parse_data_file(&model_parser, "./Data/models.txt")) {
@@ -115,26 +46,11 @@ int LoadGeometry(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) {maxIndex = model_parser.entries[k].index; }
     }
         
-    modelCount = maxIndex + 1;
-//     if (modelCount > 4096) { printf("ERROR: Too many models in parser count %d, greater than 4096!\n", modelCount); CleanupModelLoadOnFail(); return 1; } 
-
-    printf("Parsing %d models...\n",modelCount);
-    
-    vertexDataArrays = malloc(modelCount * sizeof(float *));
-    if (!vertexDataArrays) { fprintf(stderr, "ERROR: Failed to allocate vertexDataArrays buffer\n"); CleanupModelLoadOnFail(); return 1; }
-    loadModelItemInitialized[MDL_VERTICES] = true;
-    
-    modelVertexCounts = malloc(modelCount * sizeof(uint32_t));
-    if (!modelVertexCounts) { fprintf(stderr, "ERROR: Failed to allocate modelVertexCounts buffer\n"); CleanupModelLoadOnFail(); return 1; }
-    loadModelItemInitialized[MDL_COUNTS] = true;
-    
-    modelBounds = malloc(modelCount * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
-    if (!modelBounds) { fprintf(stderr, "ERROR: Failed to allocate modelBounds buffer\n"); CleanupModelLoadOnFail(); return 1; }
-    loadModelItemInitialized[MDL_BOUNDS] = true;
+    printf("Parsing %d models out of max allowed %d...\n",model_parser.count,MODEL_COUNT);
     
     int totalVertCount = 0;
     int totalBounds = 0;
-    for (uint32_t i = 0; i < modelCount; i++) {
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<model_parser.count;k++) {
             if (model_parser.entries[k].index == i) {matchedParserIdx = k; break; }
@@ -144,11 +60,12 @@ int LoadGeometry(void) {
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
         
         const struct aiScene *scene = aiImportFile(model_parser.entries[matchedParserIdx].path,
-                                                    aiProcess_FindInvalidData
-                                                    | aiProcess_Triangulate
-                                                    | aiProcess_GenNormals
-                                                    | aiProcess_ImproveCacheLocality
-                                                    | aiProcess_FindDegenerates);
+//                                                     aiProcess_FindInvalidData
+//                                                     | aiProcess_Triangulate
+//                                                     | aiProcess_GenNormals
+                                                     aiProcess_ImproveCacheLocality
+                                                    | aiProcess_FindDegenerates
+                                                    | aiProcess_LimitBoneWeights);
         
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
             fprintf(stderr, "Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString());
@@ -170,7 +87,7 @@ int LoadGeometry(void) {
         // Allocate vertex data for this model
         float *tempVertices = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         if (!tempVertices) {
-            fprintf(stderr, "Failed to reallocate vertex buffer for %s\n", model_parser.entries[matchedParserIdx].path);
+            fprintf(stderr, "Failed to allocate vertex buffer for %s\n", model_parser.entries[matchedParserIdx].path);
             aiReleaseImport(scene);
             return 1;
         }
@@ -187,12 +104,8 @@ int LoadGeometry(void) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
                 tempVertices[vertexIndex++] = mesh->mVertices[v].x; // Position
-                //tempVertices[vertexIndex++] = CheckIfUniqueX(mesh-mVertices[v].x);
-//                 CheckIfUniqueX(mesh->mVertices[v].x);
                 tempVertices[vertexIndex++] = mesh->mVertices[v].y;
-//                 CheckIfUniqueY(mesh->mVertices[v].y);
                 tempVertices[vertexIndex++] = mesh->mVertices[v].z;
-//                 CheckIfUniqueZ(mesh->mVertices[v].z);
                 tempVertices[vertexIndex++] = mesh->mNormals[v].x; // Normal
                 tempVertices[vertexIndex++] = mesh->mNormals[v].y;
                 tempVertices[vertexIndex++] = mesh->mNormals[v].z;
@@ -225,25 +138,18 @@ int LoadGeometry(void) {
     printf("Total vertices in buffer %d (",totalVertCount);
     print_bytes_no_newline(totalVertCount * 8 * 4); // x,y,z,nx,ny,nz,u,v * 4
     printf(") (Bounds ");
-    print_bytes_no_newline( totalBounds * 6 * 4); //minx,miny,minz,maxx,maxy,maxz * 4 
+    print_bytes_no_newline(totalBounds * 4); //minx,miny,minz,maxx,maxy,maxz * 4 
     printf(")\n");
-//     printf("numUniqueXValues: %d, numUniqueYValues: %d, numUniqueZValues: %d\n",numUniqueXValues,numUniqueYValues,numUniqueZValues);
 
     // Generate and bind VAO
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
-    vbos = malloc(modelCount * sizeof(uint32_t));
-    if (!vbos) { fprintf(stderr, "ERROR: Failed to allocate vbos buffer\n"); CleanupModelLoadOnFail(); return 1; }
-    loadModelItemInitialized[MDL_VBOS] = true;
-
-//     for (uint32_t i = 0; i < modelCount; i++) {
-//         printf("  [%d] vertexData = %p, count = %u\n", i, (void*)vertexDataArrays[i], modelVertexCounts[i]);
-//     }
+    memset(vbos, 0, MODEL_COUNT * sizeof(uint32_t));
         
     // Generate and populate VBOs
-    glGenBuffers(modelCount, vbos);
-    for (uint32_t i = 0; i < modelCount; i++) {
+    glGenBuffers(MODEL_COUNT, vbos);
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         if (modelVertexCounts[i] == 0) continue; // No model specified with this index.
         if (vertexDataArrays[i] == NULL) {
             printf("WARNING: model %d has invalid vertex data (count=%u, ptr=%p)\n",
@@ -253,7 +159,6 @@ int LoadGeometry(void) {
         
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), vertexDataArrays[i], GL_STATIC_DRAW);
-        if (vertexDataArrays[i]) free(vertexDataArrays[i]); // Free after uploading to GPU
     }
     
     // Define vertex attribute formats
@@ -274,17 +179,11 @@ int LoadGeometry(void) {
     glEnableVertexAttribArray(2);
     glEnableVertexAttribArray(3);
 
-    // Initial binding (optional, will be overridden in RenderStaticMeshes)
-    glBindVertexBuffer(0, vbos[0], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-
     glBindVertexArray(0);
     
     glGenBuffers(1, &modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, modelCount * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-
-    // Send static uniforms to chunk shader
-    glUniform1ui(modelCountLoc_chunk, modelCount);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     
     // Set static buffers once for Deferred Lighting shader
     glUniform1ui(screenWidthLoc_deferred, screen_width);
@@ -297,9 +196,5 @@ int LoadGeometry(void) {
 }
 
 void CleanupModelLoadOnFail(void) {
-    if (loadModelItemInitialized[MDL_VERTICES]) free(vertexDataArrays);
-    if (loadModelItemInitialized[MDL_VBOS]) free(vbos);
     if (loadModelItemInitialized[MDL_PARSER]) parser_free(&model_parser);
-    if (loadModelItemInitialized[MDL_BOUNDS]) free(modelBounds);
-    if (loadModelItemInitialized[MDL_COUNTS]) free(modelVertexCounts);
 }

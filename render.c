@@ -8,6 +8,7 @@
 // 4. Render UI text (debug only at the moment, e.g. frame stats)
 
 #include <SDL2/SDL.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <stdio.h>
@@ -26,6 +27,7 @@
 #include "image_effects.h"
 #include "instance.h"
 #include "debug.h"
+#include "voxel.h"
 
 uint32_t drawCallCount = 0;
 uint32_t vertexCount = 0;
@@ -82,70 +84,7 @@ void SetupGBuffer(void) {
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-int instanceCount = 1000;
-Instance instances[1000] = { [0 ... 100 - 1] = 
-    {0,
-    0.0f,0.0f,0.0f,
-    1.0f,1.0f,1.0f,
-    0.0f,0.0f,0.0f,0.0f}
-};
-
-GLuint instancesBuffer;
-float * modelMatrices = NULL;
-
-void SetupInstances(void) {
-    int currentModelType = 0;
-    int x = 0;
-    int y = 0;
-    for (int idx=0;idx<instanceCount;idx++) {
-        instances[idx].modelIndex = currentModelType;
-        instances[idx].texIndex = idx; // Set by entity definition when loaded.
-        instances[idx].posx = ((float)x * 2.56f); // Position in grid with gaps for shadow testing.
-        instances[idx].posy = ((float)y * 5.12f);
-        instances[idx].posz = 0.0f;
-        instances[idx].sclx = 1.0f; // Default scale
-        instances[idx].scly = 1.0f;
-        instances[idx].sclz = 1.0f;
-        instances[idx].rotx = 0.0f;
-        instances[idx].roty = 0.0f;
-        instances[idx].rotz = 0.0f;
-        instances[idx].rotw = 1.0f;
-        x++;
-        if (idx == 100 || idx == 200 || idx == 300 || idx == 400 || idx == 500 || idx == 600 || idx == 700 || idx == 800 || idx == 900) {
-            x = 0;
-            y++;
-        }
-    }
-    
-    instances[39].modelIndex = 5; // Test Light
-    instances[39].texIndex = 881; // white light
-    instances[39].sclx = 0.16f; // Attempt to scale down test light mesh, does nothing.
-    instances[39].scly = 0.16f;
-    instances[39].sclz = 0.16f;
-    
-    instances[0].rotx = 0.707f;
-    instances[0].roty = 0.0f;
-    instances[0].rotz = 0.0f;
-    instances[0].rotw = 0.707f;
-    
-    glGenBuffers(1, &instancesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, instanceCount * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
-    printf("Total instance size ");
-    print_bytes_no_newline(instanceCount * 11 * 4);
-    printf("\n");
-    
-    modelMatrices = malloc(instanceCount * 16 * sizeof(float)); // Matrix4x4 = 16
-    glGenBuffers(1, &matricesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);    
 }
 
 int ClearFrameBuffers(void) {
@@ -166,13 +105,12 @@ int ClearFrameBuffers(void) {
 // Global uniform locations (cached during init)
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1;
 GLint texIndexLoc_chunk = -1, textureCountLoc_chunk = -1;
-GLint instanceIndexLoc_chunk = -1, instanceCountLoc_chunk = -1;
-GLint modelCountLoc_chunk = -1, modelIndexLoc_chunk = -1;
+GLint instanceIndexLoc_chunk = -1;
+GLint modelIndexLoc_chunk = -1;
 GLint debugViewLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
-GLint instanceCountLoc_deferred = -1, modelCountLoc_deferred = -1;
-
+GLint shadowsEnabledLoc_deferred = -1, vxgiEnabledLoc_deferred = -1, voxelCountLoc_deferred = -1;
 
 void CacheUniformLocationsForShaders(void) {
     // Called after shader compilation in InitializeEnvironment
@@ -182,24 +120,25 @@ void CacheUniformLocationsForShaders(void) {
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
     textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
-    instanceCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceCount");
-    modelCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelCount");
     modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
     
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    instanceCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "instanceCount");
-    modelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "modelCount");
+    shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
+    vxgiEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "vxgiEnabled");
+    voxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "voxelCount");
 }
 
-GLuint matricesBuffer;
-float *modelMatrices;
 
 void RenderMeshInstances() {    
     // Set up view and projection matrices
     float model[16]; // 4x4 matrix
-    for (int i=0;i<instanceCount;i++) {
+    for (int i=0;i<INSTANCE_COUNT;i++) {
+        if (instances[i].modelIndex >= MODEL_COUNT) continue;
+        if (instances[i].modelIndex < 0) continue; // Culled
+        if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+        
         float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
         float len = sqrtf(x*x + y*y + z*z + w*w);
         if (len > 0.0f) {
@@ -284,18 +223,19 @@ int RenderStaticMeshes(void) {
     mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
     glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
     glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
-    glUniform1i(instanceCountLoc_chunk, instanceCount);
     glUniform1i(debugViewLoc_chunk, debugView);
     glBindVertexArray(vao);
     
     // These should be static but cause issues if not...
     glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
-    glUniform1i(modelCountLoc_chunk, modelCount);
     
     RenderMeshInstances(); // Render each model type's instances
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    // 2. Transfer VXGI Data to GPU, if ready
+    VXGI_UpdateGL();
 
-    // 2. Deferred Lighting + Shadow Calculations
+    // 3. Deferred Lighting + Shadow Calculations
     //        Apply deferred lighting with compute shader.  All lights are
     //        dynamic and can be updated at any time (flicker, light switches,
     //        move, change color, get marked as "culled" so shader can skip it,
@@ -308,25 +248,21 @@ int RenderStaticMeshes(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, modelCount * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-
-    glUniform1i(instanceCountLoc_deferred, instanceCount);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * sizeof(Instance), instances);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * sizeof(Instance), instances);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instanceCount * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
 
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
     glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
-    glUniform1ui(modelCountLoc_deferred, modelCount);
     
-    glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled"), shadowsEnabled);
-    glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "instanceCount"), instanceCount);
+    glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
     float viewInv[16];
     mat4_inverse(viewInv,view);
     float projInv[16];
@@ -336,9 +272,9 @@ int RenderStaticMeshes(void) {
     GLuint groupX = (screen_width + 7) / 8;
     GLuint groupY = (screen_height + 7) / 8;
     glDispatchCompute(groupX, groupY, 1);
-//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); Runs slightly faster 0.1ms without this, but may need if more shaders added in between
     
-    // 3. Shadow Softening Compute Shader
+    // 4. Shadow Softening Compute Shader
     //        Takes delta between lit and lit+shadow result found in Pass 2
     //        above and applies the shadow results to the lit results with a
     //        blending based on distance from nearest unshadowed pixel if
@@ -346,7 +282,7 @@ int RenderStaticMeshes(void) {
     
     // TODO
     
-    // 4. Render Output
+    // 5. Render Output
     //        Render final gather lighting results with full screen quad.
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);

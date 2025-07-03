@@ -5,11 +5,18 @@
 #include <stdbool.h>
 
 #define MAX_ENTRIES 65535 // uint16_t limit
+#define MAX_PATH 256
 
 typedef struct {
-    char path[256]; // File path (e.g., ./Textures/med1_1.png)
+    char path[MAX_PATH]; // File path (e.g., ./Textures/med1_1.png)
     uint16_t index; // Unique index (0–65535)
-    // Add more fields for future key-value pairs (e.g., texture format, audio type)
+    
+    // Entity specific fields
+    uint32_t modelIndex;
+    uint32_t texIndex;
+    uint32_t glowIndex;
+    uint32_t specIndex;
+    uint32_t normIndex;
 } DataEntry;
 
 typedef struct {

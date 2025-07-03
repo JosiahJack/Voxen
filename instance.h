@@ -1,7 +1,11 @@
 #ifndef VOXEN_INSTANCE_H
 #define VOXEN_INSTANCE_H
 
+#include <GL/glew.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+#define INSTANCE_COUNT 5500 // Max 5454 for Citadel level 7
 
 typedef struct {
     int32_t modelIndex; // offset 0, size 4b
@@ -20,5 +24,13 @@ typedef struct {
     float rotz; // offset 36, size 4b
     float rotw; // offset 40, size 4b
 } Instance;
+
+extern bool instanceInPVS[INSTANCE_COUNT];
+extern Instance instances[INSTANCE_COUNT];
+extern float modelMatrices[INSTANCE_COUNT * 16];
+extern GLuint instancesBuffer;
+extern GLuint matricesBuffer;
+
+int SetupInstances(void);
 
 #endif // VOXEN_INSTANCE_H

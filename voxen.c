@@ -22,6 +22,8 @@
 #include "shaders.h"
 #include "image_effects.h"
 #include "audio.h"
+#include "instance.h"
+#include "voxel.h"
 
 // Window
 SDL_Window *window;
@@ -57,6 +59,7 @@ typedef enum {
     SYS_OGL,
     SYS_NET,
     SYS_AUD,
+    SYS_VOX,
     SYS_COUNT // Number of subsystems
 } SystemType;
 
@@ -131,20 +134,21 @@ int InitializeEnvironment(void) {
 
     InitializeAudio();
     systemInitialized[SYS_AUD] = true;
-    
+
     //play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
     //play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
     return 0;
 }
 
 int ExitCleanup(int status) {
+    if (systemInitialized[SYS_VOX]) VXGI_Shutdown();
     if (systemInitialized[SYS_AUD]) CleanupAudio();
     if (systemInitialized[SYS_NET]) CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
 
     // OpenGL Cleanup
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    for (uint32_t i=0;i<modelCount;i++) {
+    for (uint32_t i=0;i<MODEL_COUNT;i++) {
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
     }
     
@@ -172,7 +176,6 @@ int ExitCleanup(int status) {
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
-    if (modelMatrices) free(modelMatrices);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
 
@@ -199,6 +202,12 @@ int EventExecute(Event* event) {
         case EV_INIT: return InitializeEnvironment(); // Init called prior to Loading Data
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
+        case EV_LOAD_ENTITIES: return 0;//LoadEntities(); TODO
+        case EV_LOAD_LEVELS: return 0;//LoadLevels(); TODO
+        case EV_LOAD_VOXELS:
+            VXGI_Init(); // Initialize the voxels after loading models and instances so that svo's can be populated.
+            systemInitialized[SYS_VOX] = true;
+            return 0;
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -267,9 +276,18 @@ int main(int argc, char* argv[]) {
         manualLogName = argv[2];
     }
 
+    // Queue order for loading is IMPORTANT!
     EnqueueEvent_Simple(EV_INIT);
     EnqueueEvent_Simple(EV_LOAD_TEXTURES);
     EnqueueEvent_Simple(EV_LOAD_MODELS);
+    EnqueueEvent_Simple(EV_LOAD_ENTITIES); // Must be after models and textures
+                                           // else entity types can't be validated.
+    EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities or else 
+                                         // instances can't know what to do.
+    EnqueueEvent_Simple(EV_LOAD_VOXELS); // Must be after models! Needed for 
+                                         // generating voxels), entities (lets 
+                                         // instances know what models), and
+                                         // levels (populates instances.
     double accumulator = 0.0;
     last_time = get_time();
     lastJournalWriteTime = get_time();

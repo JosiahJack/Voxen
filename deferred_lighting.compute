@@ -53,15 +53,26 @@ const char *deferredLighting_computeShader =
     "layout(std430, binding = 13) buffer BlueNoise {\n"
     "    float blueNoiseColors[];\n"
     "};\n"
+    
+    "struct VXGIVoxel {\n"
+    "    vec3 direct_light;\n"
+    "    vec3 indirect_light;\n"
+    "    float occupancy;\n"
+    "};\n"
+    
+    "layout(std430, binding = 19) buffer VXGIBuffer {\n"
+    "    float voxels[];\n"
+    "};\n"
+    
+    "uniform int voxelCount;\n"
 
     // Uniforms from deferred shader
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-    "uniform uint modelCount;\n"
 
     // Uniforms for ray tracing
     "uniform int shadowsEnabled;\n"
-    "uniform int instanceCount;\n"
+    "uniform int vxgiEnabled;\n"
 
     // --- Main Compute Shader ---
     "void main() {\n"

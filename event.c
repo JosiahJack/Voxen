@@ -97,7 +97,7 @@ bool IsPlayableEventType(uint8_t type) {
     if (type == EV_KEYDOWN || type == EV_KEYUP) return true;
     return type != EV_INIT
            && type != EV_LOAD_TEXTURES
-           && type != EV_LOAD_AUDIO
+           && type != EV_LOAD_ENTITIES
            && type != EV_LOAD_MODELS
            && type != EV_NULL;
 }

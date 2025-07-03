@@ -5,7 +5,7 @@ MINIAUDIO_CFLAGS="-std=c11 -Wall -Wextra -O2 -g -D_POSIX_C_SOURCE=199309L -DNDEB
 LDFLAGS="-lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lassimp -lenet -lpthread"
 SOURCES="voxen.c cli_args.c event.c quaternion.c matrix.c input.c data_models.c \
          data_textures.c render.c network.c lights.c text.c shaders.c voxel.c \
-         image_effects.c debug.c data_definitions.c audio.c"
+         image_effects.c debug.c data_definitions.c instance.c audio.c"
 
 TEMP_DIR=temp_build
 #if [ "$1" = "clean" ]; then
