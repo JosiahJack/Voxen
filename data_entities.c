@@ -1,7 +1,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <SDL2/SDL.h>
-#include "data_definitions.h"
+#include "data_entities.h"
+#include "data_parser.h"
 #include "constants.h"
 
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
@@ -17,9 +18,12 @@ typedef enum {
 
 bool loadEntityItemInitialized[ENT_COUNT] = { [0 ... ENT_COUNT - 1] = false };
 
+// Suppress -Wformat-truncation for LoadEntities so it can share 256 length "path" and truncate it into 32 length "name".
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 int LoadEntities(void) {
     // Initialize parser with entity-specific keys
-    parser_init(&entity_parser, valid_entity_keys, sizeof(valid_entity_keys) / sizeof(valid_entity_keys[0]));
+    parser_init(&entity_parser, valid_entity_keys, sizeof(valid_entity_keys) / sizeof(valid_entity_keys[0]), PARSER_DATA);
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) {
         SDL_Log("ERROR: Could not parse ./Data/entities.txt!");
         parser_free(&entity_parser);
@@ -47,19 +51,26 @@ int LoadEntities(void) {
     for (int i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
-        strncpy(entities[i].name, entity_parser.entries[i].path, MAX_PATH - 1);
-        entities[i].name[MAX_PATH - 1] = 0;
+        // Copy with truncation to 31 characters to fit 32 char array for name.  Smaller for RAM constraints.
+        snprintf(entities[i].name, ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1, "%s", entity_parser.entries[i].path);
         entities[i].modelIndex = entity_parser.entries[i].modelIndex;
         entities[i].texIndex = entity_parser.entries[i].texIndex;
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
+        
+        printf("Added entity type: %s, modelIndex: %d, texIndex: %d, "
+               "glowIndex: %d, specIndex: %d, normIndex: %d\n",
+               entities[i].name, entities[i].modelIndex, entities[i].texIndex,
+               entities[i].glowIndex, entities[i].specIndex,
+               entities[i].normIndex);
     }
 
     SDL_Log("Loaded %d entity definitions", entityCount);
     CleanupEntities(false);
     return 0;
 }
+#pragma GCC diagnostic pop // Ok restore string truncation warning
 
 void CleanupEntities(bool isBad) {
     if (loadEntityItemInitialized[ENT_PARSER] && entity_parser_initialized) {

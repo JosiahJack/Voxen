@@ -16,6 +16,7 @@
 // To automate generation of this file, run the following command after cd ./Textures
 // ls *.png | sort | awk '{print "#Textures/"$0"\nindex: "NR-1}'
 //
+// Unneeded fields do not need to be specified.
 #Textures/access_card01.png
 index: 0
 #Textures/access_card02.png
@@ -2441,3 +2442,19 @@ index: 1220
 index: 1221
 #Textures/sequences/zerog52.png
 index: 1222
+#Textures/col1.png
+index: 1223
+#Textures/col2.png
+index: 1224
+#Textures/col3.png
+index: 1225
+#Textures/col4.png
+index: 1226
+#Textures/col5.png
+index: 1227
+#Textures/col6.png
+index: 1228
+#Textures/col7.png
+index: 1229
+#Textures/col8.png
+index: 1230

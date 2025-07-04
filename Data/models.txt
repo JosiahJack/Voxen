@@ -1338,3 +1338,7 @@ index: 658
 index: 659
 #Models/xray_machine.fbx
 index: 660
+#Models/bridg1_1.fbx
+index: 661
+#Models/bridg1_2.fbx
+index: 662

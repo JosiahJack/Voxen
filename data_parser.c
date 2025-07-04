@@ -1,14 +1,15 @@
-#include "data_definitions.h"
+#include "data_parser.h"
 #include <SDL2/SDL.h>
 #include <string.h>
 #include <stdlib.h>
 
-void parser_init(DataParser *parser, const char **valid_keys, int num_keys) {
+void parser_init(DataParser *parser, const char **valid_keys, int num_keys, ParserType partype) {
     parser->entries = NULL;
     parser->count = 0;
     parser->capacity = 0;
     parser->valid_keys = valid_keys;
     parser->num_keys = num_keys;
+    parser->parser_type = partype;
 }
 
 bool parse_data_file(DataParser *parser, const char *filename) {

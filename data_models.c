@@ -9,7 +9,7 @@
 #include "data_models.h"
 #include "debug.h"
 #include "render.h"
-#include "data_definitions.h"
+#include "data_parser.h"
 #include "voxel.h"
 
 DataParser model_parser;
@@ -33,7 +33,7 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 // Loads all geometry, from 3D meshes or otherwise
 int LoadGeometry(void) {
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    parser_init(&model_parser, valid_mdldata_keys, 1);
+    parser_init(&model_parser, valid_mdldata_keys, 1, PARSER_DATA);
     if (!parse_data_file(&model_parser, "./Data/models.txt")) {
         printf("ERROR: Could not parse ./Data/models.txt!\n");
         parser_free(&model_parser);

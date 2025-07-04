@@ -1,0 +1,2221 @@
+// Entity Definitions
+// Defines each entity type used by the game or mod
+// Format:
+// # Indicates start of an entry followed by the entity name
+// example: #weapon_pistol
+// 
+// Next are key:value pairs separated by : and whitespace ignored
+// Acceptable keys:
+//   index      - The index into the master entity type table
+//   model - The index into the model type table
+//   texture   - The index into the texture table for albedo
+//   glowtexture  - The index into the texture table for the emissive glow map
+//   spectexture  - The index into the texture table for the specular map
+//   normtexture  - The index into the texture table for the normal map
+//
+// examples:
+//   index: 451
+//   model: 123
+//   texture: 199
+//
+// Unneeded fields do not need to be specified.
+// Since 0 is a valid index, use 65535 to indicate an unused entry if you
+// want to list every field.
+#chunk_black
+index: 0
+model: 178
+texture: 41
+#chunk_blocker
+index: 1
+model: 178
+texture: 1230
+#chunk_bridg1_1
+index: 2
+model: 661
+texture: 44
+#chunk_bridg1_1flipx
+index: 3
+model: 661
+texture: 44
+#chunk_bridg1_2
+index: 4
+texture: 45
+#chunk_bridg1_3
+index: 5
+model: 20
+texture: 47
+#chunk_bridg1_3_slice45
+index: 6
+model: 21
+texture: 47
+#chunk_bridg1_3flipx
+index: 7
+model: 20
+texture: 47
+#chunk_bridg1_4
+index: 8
+model: 22
+texture: 48
+#chunk_bridg1_4_slice32
+index: 9
+model: 23
+texture: 48
+#chunk_bridg1_4_slice32flipx
+index: 10
+model: 24
+texture: 48
+#chunk_bridg1_5
+index: 11
+model: 25
+texture: 50
+#chunk_bridg2_2
+index: 12
+model: 26
+texture: 6
+#chunk_bridg2_3
+index: 13
+model: 27
+texture: 7
+#chunk_bridg2_4
+index: 14
+model: 28
+texture: 8
+#chunk_bridg2_5
+index: 15
+model: 29
+texture: 9
+#chunk_bridg2_6
+index: 16
+model: 30
+texture: 10
+#chunk_bridg2_7
+index: 17
+texture: 11
+#chunk_bridg2_8
+index: 18
+model: 31
+texture: 12
+#chunk_bridg2_9
+index: 19
+model: 32
+texture: 13
+#chunk_crate_impenetrable
+index: 20
+model: 61
+#chunk_cyberpanel
+index: 21
+#chunk_cyberpanel_slice45
+index: 22
+#chunk_eng1_1
+index: 23
+model: 96
+texture: 14
+#chunk_eng1_1d
+index: 24
+model: 95
+texture: 14
+#chunk_eng1_2
+index: 25
+model: 98
+texture: 16
+#chunk_eng1_2d
+index: 26
+model: 97
+texture: 16
+#chunk_eng1_3
+index: 27
+model: 100
+texture: 18
+#chunk_eng1_3d
+index: 28
+model: 99
+texture: 19
+#chunk_eng1 _4
+index: 29
+model: 101
+texture: 20
+#chunk_eng1_5
+index: 30
+model: 103
+texture: 21
+#chunk_eng1_5_slice45lh
+index: 31
+model: 104
+texture: 21
+#chunk_eng1_5_slice45rh
+index: 32
+model: 105
+texture: 21
+#chunk_eng1_5d
+index: 33
+model: 102
+texture: 22
+#chunk_eng1_6
+index: 34
+model: 107
+texture: 23
+#chunk_eng1_6d
+index: 35
+model: 106
+texture: 24
+#chunk_eng1_7
+index: 36
+model: 108
+texture: 21
+#chunk_eng1_7d
+index: 37
+texture: 26
+#chunk_eng1_8
+index: 38
+model: 109
+texture: 21
+#chunk_eng1_9
+index: 39
+model: 111
+texture: 28
+#chunk_eng1_9d
+index: 40
+model: 110
+texture: 29
+#chunk_eng2_1
+index: 41
+model: 113
+texture: 30
+#chunk_eng2_1_slice45
+index: 42
+model: 116
+texture: 30
+#chunk_eng2_1_slice384high
+index: 43
+model: 114
+texture: 30
+#chunk_eng2_1_slice384highrh
+index: 44
+model: 115
+texture: 30
+#chunk_eng2_1d
+index: 45
+model: 112
+texture: 31
+#chunk_eng2_2
+index: 46
+model: 117
+texture: 32
+#chunk_eng2_2d
+index: 47
+texture: 33
+#chunk_eng2_3
+index: 48
+model: 119
+texture: 34
+#chunk_eng2_3d
+index: 49
+model: 118
+texture: 35
+#chunk_eng2_4
+index: 50
+texture: 36
+#chunk_eng2_5
+index: 51
+model: 120
+texture: 37
+#chunk_eng2_5_slice45
+index: 52
+model: 121
+texture: 37
+#chunk_eng2_6
+index: 53
+#chunk_exec1_1
+index: 54
+model: 124
+texture: 38
+#chunk_exec1_1d
+index: 55
+model: 123
+texture: 39
+#chunk_exec1_2
+index: 56
+model: 126
+texture: 40
+#chunk_exec1_2d
+index: 57
+model: 125
+texture: 41
+#chunk_exec2_1
+index: 58
+model: 127
+texture: 42
+#chunk_exec2_2
+index: 59
+model: 129
+texture: 43
+#chunk_exec2_2d
+index: 60
+model: 128
+texture: 44
+#chunk_exec2_3
+index: 61
+model: 130
+texture: 45
+#chunk_exec2_4
+index: 62
+model: 131
+texture: 46
+#chunk_exec2_4_slice45
+index: 63
+model: 132
+texture: 46
+#chunk_exec2_5
+index: 64
+model: 133
+texture: 47
+#chunk_exec2_6
+index: 65
+model: 134
+texture: 48
+#chunk_exec2_7
+index: 66
+texture: 49
+#chunk_exec3_1
+index: 67 
+texture: 50
+#chunk_exec3_1d
+index: 68
+model: 135
+texture: 51
+#chunk_exec3_2
+index: 69
+texture: 52
+#chunk_exec3_4
+index: 70
+texture: 53
+#chunk_exec4_1
+index: 71
+model: 136
+texture: 54
+#chunkappdata: 72
+model: 137
+texture: 55
+#chunk_exec4_3
+index: 73
+model: 138
+texture: 56
+#chunk_exec4_4
+index: 74
+model: 139
+texture: 57
+#chunk_exec4_5
+index: 75
+model: 140
+texture: 58
+#chunk_exec4_6
+index: 76
+model: 141
+texture: 59
+#chunk_exec6_1
+index: 77
+model: 142
+texture: 60
+#chunk_exteriorpanel1
+index: 78
+model: 143
+#chunk_fan1
+index: 79
+model: 157
+#chunk_flight1_1
+index: 80
+model: 146
+texture: 61
+#chunk_flight1_1b
+index: 81
+texture: 62
+#chunk_flight1_2
+index: 82
+model: 147
+texture: 63
+#chunk_flight1_2_slice45rh
+index: 83
+model: 149
+texture: 63
+#chunk_flight1_3
+index: 84
+model: 150
+texture: 64
+#chunk_flight1_4
+index: 85
+model: 151
+texture: 65
+#chunk_flight1_5
+index: 86
+texture: 66
+#chunk_flight1_5_slice45lh
+index: 87
+model: 148
+texture: 66
+#chunk_flight1_6
+index: 88
+model: 152
+texture: 67
+#chunk_flight2_1
+index: 89
+model: 153
+texture: 68
+#chunk_flight2_2
+index: 90
+model: 154
+texture: 69
+#chunk_flight2_2_slice45
+index: 91
+model: 155
+texture: 69
+#chunk_flight2_3
+index: 92
+model: 156
+texture: 70
+#chunk_grove1_1
+index: 93
+model: 189
+#chunk_grove1_2
+index: 94
+texture: 71
+#chunk_grove1_2_slice45
+index: 95
+texture: 71
+#chunk_grove1_3
+index: 96
+texture: 72
+#chunk_grove1_4
+index: 97
+texture: 73
+#chunk_grove1_5
+index: 98
+texture: 74
+#chunk_grove1_6
+index: 99
+texture: 75
+#chunk_grove1_7
+index: 100
+texture: 76
+#chunk_grove2_1
+index: 101
+model: 190
+texture: 77
+#chunk_grove2_2
+index: 102
+texture: 78
+#chunk_grove2_3
+index: 103
+model: 191
+texture: 79
+#chunk_grove2_4
+index: 104
+texture: 80
+#chunk_grove2_5
+index: 105
+model: 192
+texture: 81
+#chunk_grove2_6
+index: 106
+texture: 82
+#chunk_grove2_7
+index: 107
+texture: 83
+#chunk_grove2_8
+index: 108
+texture: 84
+#chunk_grove2_9
+index: 109
+texture: 85
+#chunk_grove2_9b
+index: 110
+texture: 86
+#chunk_g rove2_9c
+index: 111
+texture: 87
+#chunk_lift1
+index: 112
+model: 213
+#chunk_maint1_1
+index: 113
+model: 218
+texture: 88
+#chunk_maint1_2
+index: 114
+model: 220
+texture: 89
+#chunk_maint1_2d
+index: 115
+model: 219
+texture: 90
+#chunk_maint1_3
+index: 116
+model: 222
+texture: 91
+#chunk_maint1_3b
+index: 117
+model: 221
+texture: 92
+#chunk_maint1_4
+index: 118
+model: 224
+texture: 93
+#chunk_maint1_4b
+index: 119
+texture: 94
+#chunk_maint1_5
+index: 120
+model: 225
+texture: 95
+#chunk_maint1_6
+index: 121
+model: 226
+texture: 96
+#chunk_maint1_7
+index: 122
+model: 227
+texture: 97
+#chunk_blockerflightbay
+index: 123
+#chunk_maint1_9
+index: 124
+texture: 98
+#chunk_maint1_9d
+index: 125
+texture: 99
+#chunk_maint2_1
+index: 126
+model: 230
+texture: 100
+#chunk_maint2_1b
+index: 127
+model: 228
+texture: 101
+#chunk_maint2_1d
+index: 128
+model: 229
+texture: 102
+#chunk_maint2_2
+index: 129
+model: 230
+texture: 103
+#chunk_maint2_3
+index: 130
+model: 232
+texture: 104
+#chunk_maint2_3d
+index: 131
+model: 231
+texture: 105
+#chunk_maint2_4
+index: 132
+model: 233
+texture: 106
+#chunk_maint2_4d
+index: 133
+texture: 107
+#chunk_maint2_5
+index: 134
+model: 235
+texture: 108
+#chunk_maint2_5d
+index: 135
+model: 234
+texture: 109
+#chunk_maint2_6
+index: 136
+model: 236
+texture: 110
+#chunk_maint2_6d
+index: 137
+texture: 111
+#chunk_maint2_7
+index: 138
+model: 238
+texture: 112
+#chunk_maint2_7d
+index: 139
+model: 237
+texture: 113
+#chunk_maint2_8
+index: 140
+model: 239
+texture: 114
+#chunk_maint2_9
+index: 141
+model: 240
+texture: 115
+#chunk_maint2_9_slice45RH
+index: 142
+model: 242
+texture: 115
+#chunk_maint2_9_slice128_top
+index: 143
+model: 241
+texture: 115
+#chunk_maint3_1
+index: 144
+model: 244
+texture: 116
+#chunk_maint3_1_slice32_lh
+index: 145
+model: 246
+texture: 116
+#chunk_maint3_1_slice32_rh
+index: 146
+model: 245
+texture: 116
+#chunk_maint3_1_slice45
+index: 147
+model: 247
+texture: 116
+#chunk_maint3_1d
+index: 148
+model: 243
+texture: 117
+#chunk_med1_1
+index: 149
+model: 249
+texture: 118
+#chunk_med1_1_half_top
+index: 150
+model: 250
+texture: 118
+#chunk_med1_1_slice128high
+index: 151
+model: 251
+texture: 118
+#chunk_med1_1_slice192RH
+index: 152
+model: 252
+texture: 118
+#chunk_med1_1_slice256
+index: 153
+model: 253
+texture: 118
+#chunk_med1_1d
+index: 154
+model: 248
+texture: 119
+#chunk_med1_2
+index: 155
+model: 255
+texture: 120
+#chunk_med1_2d
+index: 156
+model: 254
+texture: 121
+#chunk_med1_3
+index: 157
+model: 257
+texture: 122
+#chunk_med1_3d
+index: 158
+model: 256
+texture: 123
+#chunk_med1_4
+index: 159
+model: 258
+texture: 124
+#chunk_med1_5
+index: 160
+texture: 125
+#chunk_med1_6
+index: 161
+model: 259
+texture: 126
+#chunk_med1_7
+index: 162
+model: 262
+texture: 127
+#chunk_med1_7_slice14_64
+index: 163
+model: 263
+texture: 127
+#chunk_med1_7_slice45_320lh
+index: 164
+model: 264
+texture: 127
+#chunk_med1_7_slice45_320rh
+index: 165
+model: 265
+texture: 127
+#chunk_med1_7_slice96high
+index: 166
+model: 266
+texture: 127
+#chunk_med1_7d
+index: 167
+model: 260
+texture: 128
+#chunk_med 1_7d_slice128
+index: 168
+model: 261
+texture: 128
+#chunk_med1_8
+index: 169
+model: 268
+texture: 129
+#chunk_med1_8d
+index: 170
+model: 267
+texture: 130
+#chunk_med1_9
+index: 171
+model: 278
+texture: 131
+#chunk_med1_9d
+index: 174
+model: 269
+texture: 132
+#chunk_med1_9d_ofs112_90
+index: 176
+model: 270
+texture: 132
+#chunk_med1_9d_ofs144_90
+index: 177
+model: 272
+texture: 132
+#chunk_med2_1
+index: 178
+model: 280
+texture: 133
+#chunk_med2_1_slice32RH
+index: 179
+model: 281
+texture: 133
+#chunk_med2_1d
+index: 180
+model: 279
+texture: 134
+#chunk_med2_2
+index: 181
+model: 283
+texture: 135
+#chunk_med2_2_half_bottom
+index: 182
+model: 284
+texture: 135
+#chunk_med2_2d
+index: 183
+model: 282
+texture: 136
+#chunk_med2_3
+index: 184
+model: 286
+texture: 137
+#chunk_med2_3d
+index: 185
+model: 285
+texture: 138
+#chunk_med2_4
+index: 186
+model: 287
+texture: 139
+#chunk_med2_5
+index: 187
+model: 288
+texture: 140
+#chunk_med2_6
+index: 188
+model: 289
+texture: 141
+#chunk_med2_7
+index: 189
+model: 290
+texture: 142
+#chunk_med2_8
+index: 190
+model: 291
+texture: 143
+#chunk_med2_8_half_top
+index: 191
+model: 292
+texture: 143
+#chunk_med2_8_slice32RH
+index: 192
+model: 293
+texture: 143
+#chunk_med2_8_slice45
+index: 193
+model: 294
+texture: 143
+#chunk_med2_9
+index: 194
+model: 296
+texture: 144
+#chunk_med2_9d
+index: 195
+model: 295
+texture: 145
+#chunk_med3_1
+index: 196
+model: 297
+texture: 146
+#chunk_rad1_1
+index: 197
+model: 501
+texture: 147
+#chunk_rad1_2
+index: 198
+texture: 148
+#chunk_reac1_1
+index: 199
+model: 502
+texture: 149
+#chunk_reac1_1_slice45
+index: 200
+texture: 149
+#chunk_reac1_2
+index: 201
+model: 503
+texture: 150
+#chunk_reac1_3
+index: 202
+model: 504
+texture: 151
+#chunk_reac1_4
+index: 203
+model: 505
+texture: 152
+#chunk_reac1_5
+index: 204
+model: 506
+texture: 153
+#chunk_reac1_6
+index: 205
+model: 507
+texture: 154
+#chunk_reac1_7
+index: 206
+texture: 155
+#chunk_reac1_8
+index: 207
+model: 508
+texture: 156
+#chunk_reac1_9
+index: 208
+model: 509
+texture: 157
+#chunk_reac2_1
+index: 209
+model: 512
+texture: 158
+#chunk_reac2_1_slice45LH
+index: 210
+model: 514
+texture: 158
+#chunk_reac2_1_slice45LH_up
+index: 211
+model: 515
+texture: 158
+#chunk_reac2_1_slice45RH
+index: 212
+model: 516
+texture: 158
+#chunk_reac2_1_slice45RH_up
+index: 213
+model: 517
+texture: 158
+#chunk_reac2_1b
+index: 214
+model: 510
+texture: 159
+#chunk_reac2_1bmirror
+index: 215
+model: 511
+texture: 159
+#chunk_reac2_1mirror
+index: 216
+model: 513
+texture: 158
+#chunk_reac2_2
+index: 217
+model: 518
+texture: 160
+#chunk_reac2_4
+index: 218
+model: 519
+texture: 161
+#chunk_reac2_4_slice128lower
+index: 219
+texture: 161
+#chunk_reac2_5
+index: 220
+model: 520
+texture: 162
+#chunk_reac2_6
+index: 221
+model: 521
+texture: 163
+#chunk_reac2_7
+index: 222
+model: 522
+texture: 164
+#chunk_reac2_8
+index: 223
+model: 523
+texture: 165
+#chunk_reac2_9
+index: 224
+model: 524
+texture: 166
+#chunk_reac3_1
+index: 225
+model: 525
+texture: 167
+#chunk_reac3_2
+index: 226
+model: 526
+texture: 168
+#chunk_reac3_3
+index: 227
+model: 527
+texture: 169
+#chunk_reac3_4
+index: 228
+model: 528
+texture: 170
+#chunk_reac3_5
+index: 229
+model: 529
+texture: 171
+#chunk_reac3_6
+index: 230
+model: 530
+texture: 172
+#chunk_reac3_7
+index: 231
+model: 531
+texture: 173
+#chunk_reac4_1
+index: 232
+model: 532
+texture: 174
+#chunk_reac4_1_slice45lh
+index: 233
+model: 533
+texture: 174
+#chunk_reac4_2
+index: 234
+model: 534
+texture: 175
+#chunk_reac5_1
+index: 235
+model: 535
+texture: 176
+#chunk_reac5_2
+index: 236
+model: 536
+texture: 177
+#chunk_reac5_3
+index: 237
+model: 537
+texture: 178
+#chunk_reac6_1
+index: 238
+model: 538
+texture: 179
+#chunk_reac6_2
+index: 239
+texture: 180
+#chunk_reac6_3
+index: 240
+model: 539
+texture: 181
+#chunk_sci1_1
+index: 241
+model: 545
+texture: 182
+#chunk_sci1_1_slice45_toplh
+index: 242
+model: 542
+texture: 182
+#chunk_sci1_1_slice45_toprh
+index: 243
+model: 543
+texture: 182
+#chunk_sci1_1d
+index: 244
+model: 541
+texture: 183
+#chunk_sci1_2
+index: 245
+model: 545
+texture: 184
+#chunk_sci1_2_slice45lh
+index: 246
+model: 546
+texture: 184
+#chunk_sci1_2_slice45lh_up
+index: 247
+model: 547
+texture: 184
+#chunk_sci1_2_slice45rh
+index: 248
+model: 548
+texture: 184
+#chunk_sci1_2_slice45rh_up
+index: 249
+model: 549
+texture: 184
+#chunk_sci1_2d
+index: 250
+model: 544
+texture: 185
+#chunk_sci1_3
+index: 251
+model: 550
+texture: 186
+#chunk_sci1_4
+index: 252
+texture: 187
+#chunk_sci1_5
+index: 253
+model: 551
+texture: 188
+#chunk_sci1_6
+index: 254
+model: 552
+texture: 189
+#chunk_sci1_6_slice45
+index: 255
+model: 553
+texture: 189
+#chunk_sci1_7
+index: 256
+model: 555
+texture: 190
+#chunk_sci1_7d
+index: 257
+model: 554
+texture: 191
+#chunk_sci1_8
+index: 258
+model: 557
+texture: 192
+#chunk_sci1_8d
+index: 259
+model: 556
+texture: 193
+#chunk_sci1_9
+index: 260
+model: 559
+texture: 194
+#chunk_sci1_9d
+index: 261
+model: 558
+texture: 195
+#chunk_sci2_1
+index: 262
+model: 561
+texture: 196
+#chunk_sci2_1_slice45lh
+index: 263
+model: 563
+texture: 196
+#chunk_sci2_1_slice45rh
+index: 264
+model: 562
+texture: 196
+#chunk_sci2_1d
+index: 265
+model: 560
+texture: 197
+#chunk_sci2_2
+index: 266
+model: 565
+texture: 198
+#chunk_sci2_2d
+index: 267
+model: 564
+texture: 199
+#chunk_sci2_3
+index: 268
+model: 566
+texture: 200
+#chunk_sci2_4
+index: 269
+model: 567
+texture: 201
+#chunk_sci2_5
+index: 270
+model: 569
+texture: 202
+#chunk_sci2_5d
+index: 271
+model: 568
+texture: 203
+#chunk_sci3_1
+index: 272
+model: 571
+texture: 204
+#chunk_sci3_1d
+index: 273
+model: 570
+texture: 205
+#chunk_sci3_2
+index: 274
+model: 572
+texture: 206
+#chunk_sci3_3
+index: 275
+model: 573
+texture: 207
+#chunk_sci3_4
+index: 276
+model: 574
+texture: 208
+#chunk_sci3_5
+index: 277
+model: 575
+texture: 209
+#chunk_sci3_6
+index: 278
+model: 576
+texture: 210
+#chunk_screen
+index: 279
+#chunk_sec1_1
+index: 280
+texture: 211
+#chunk_sec1_1b
+index: 281
+texture: 212
+#chunk_sec1_1c
+index: 282
+model: 577
+texture: 213
+#chunk_sec1_1c_slice45
+index: 283
+model: 580
+texture: 213
+#chunk_sec1_1c_slice64highlh
+index: 284
+model: 581
+texture: 213
+#chunk_sec1_1c_slice64highrh
+index: 285
+model: 582
+texture: 213
+#chunk_sec1_2
+index: 288
+model: 584
+texture: 214
+#chunk_sec1_2b
+index: 289
+model: 583
+texture: 215
+#chunk_sec1_3
+index: 290
+model: 585
+texture: 216
+#chunk_sec1_3_slice45
+index: 291
+model: 586
+texture: 216
+#chunk_stor1_1
+index: 292
+model: 597
+texture: 217
+#chunk_stor1_2
+index: 293
+texture: 218
+#chunk_stor1_3
+index: 294
+model: 598
+texture: 219
+#chunk_stor1_4
+index: 295
+model: 599
+texture: 220
+#chunk_stor1_5
+index: 296
+model: 600
+texture: 221
+#chunk_stor1_6
+index: 297
+model: 601
+texture: 222
+#chunk_stor1_6_slice128_up_lh
+index: 298
+model: 602
+texture: 222
+#chunk_stor1_6_slice128_up_rh
+index: 299
+model: 603
+texture: 222
+#chunk_stor1_6_slice192lh
+index: 300
+model: 604
+texture: 222
+#chunk_stor1_6_slice192rh
+index: 301
+model: 605
+texture: 222
+#chunk_stor1_7
+index: 302
+model: 606
+texture: 223
+#chunk_stor1_7_slice45
+index: 303
+model: 607
+texture: 223
+#chunk_stor1_7d
+index: 304
+texture: 224
+#chunk_teleporter
+index: 305
+#chunk_white
+index: 306
+#item_paper_wad
+index: 307
+model: 487
+#item_warecasing
+index: 308
+model: 637
+#item_beaker
+index: 309
+model: 14
+#item_beverage
+index: 310
+model: 18
+#item_skull
+index: 311
+model: 593
+#item_arm
+index: 312
+model: 7
+#item_audiolog
+index: 313
+model: 11
+#weapon_grenadefrag
+index: 314
+model: 182
+#weapon_grenadeconc
+index: 315
+model: 165
+#weapon_grenadeemp
+index: 316
+model: 168
+#weapon_grenadeearth
+index: 317
+model: 181
+#weapon_grenademine
+index: 318
+model: 184
+#weapon_grenadenitro
+index: 319
+model: 185
+#weapon_grenadegas
+index: 320
+model: 183
+#item_patch_berserk
+index: 321
+model: 488
+#item_patch_detox
+index: 322
+model: 488
+#item_patch_genius
+index: 323
+model: 488
+#item_patch_medi
+index: 324
+model: 488
+#item_patch_reflex
+index: 325
+model: 488
+#item_patch_sight
+index: 326
+model: 488
+#item_patch_staminup
+index: 327
+model: 488
+#item_hw_system
+index: 328
+model: 207
+#item_hw_navunit
+index: 329
+model: 204
+#item_hw_ereader
+index: 330
+model: 200
+#item_hw_sensaround
+index: 331
+model: 205
+#item_hw_targetid
+index: 332
+model: 208
+#item_hw_shield
+index: 333
+model: 206
+#item_hw_bio
+index: 334
+model: 197
+#item_hw_lantern
+index: 335
+model: 203
+#item_hw_envirosuit
+index: 336
+model: 199
+#item_hw_booster
+index: 337
+model: 198
+#item_hw_jumpjets
+index: 338
+model: 202
+#item_hw_infrared
+index: 339
+model: 201
+#item_fireextinguisher
+index: 340
+model: 144
+#item_access_card_admin
+index: 341
+model: 0
+#item_workerhelmet
+index: 342
+model: 648
+#weapon_mk3
+index: 343
+model: 646
+#weapon_blaster
+index: 344 
+model: 638
+#weapon_dartgun
+index: 345
+model: 640
+#weapon_flechette
+index: 346
+model: 642
+#weapon_ionrifle
+index: 347
+model: 643
+#weapon_rapier
+index: 348
+model: 653
+#weapon_pipe
+index: 349
+model: 649
+#weapon_magnum
+index: 350
+model: 644
+#weapon_magpulse
+index: 351
+model: 645
+#weapon_pistol
+index: 352
+model: 650
+#weapon_plasma
+index: 353
+model: 651
+#weapon_railgun
+index: 354
+model: 652
+#weapon_riotgun
+index: 355
+model: 654
+#weapon_skorpion
+index: 356
+model: 655
+#weapon_sparqbeam
+index: 357
+model: 656
+#weapon_stungun
+index: 358
+model: 657
+#item_battery
+index: 359
+model: 13
+#item_battery_icad
+index: 360
+model: 13
+#item_logic_probe
+index: 361
+model: 217
+#item_healthkit
+index: 362
+model: 196
+#item_plastique
+index: 363
+model: 492
+#item_chipset_interfacedemod
+index: 364
+model: 45
+#item_flask
+index: 365
+model: 145
+#item_chipset_bitflag
+index: 366
+model: 45
+#item_ammo_rubber
+index: 367
+model: 8
+#item_isotopex22
+index: 368
+model: 209
+#item_testtube
+index: 369
+model: 622
+#weapon_grenadefrag_live
+index: 370
+model: 182
+#item_chipset_isolinear
+index: 371
+model: 46
+#weapon_grenadeconc_live
+index: 372
+model: 165
+#item_ammo_needle
+index: 373
+model: 4
+#item_ammo_tranq
+index: 374
+model: 626
+#item_ammo_standard
+index: 375
+model: 5
+#item_ammo_teflon
+index: 376
+model: 5
+#item_ammo_hollow
+index: 377
+model: 5
+#item_ammo_slug
+index: 378
+model: 3
+#item_ammo_magnesium
+index: 379
+model: 3
+#item_ammo_penetrator
+index: 380
+model: 3
+#item_ammo_hornet
+index: 381
+model: 1
+#item_ammo_splinter
+index: 382
+model: 630
+#item_ammo_rail
+index: 383
+model: 6
+#item_ammo_slag
+index: 384
+model: 9
+#item_ammo_slaglarge
+index: 385
+model: 10
+#item_ammo_magcart
+index: 386
+model: 2
+#weapon_grenadeemp_live
+index: 387
+model: 168
+#item_access_card_std
+index: 388
+model: 0
+#weapon_grenadeearth_live
+index: 389
+model: 181
+#item_access_card_group1
+index: 390
+model: 0
+#item_access_card_science
+index: 391
+model: 0
+#item_access_card_eng
+index: 392
+model: 0
+#item_access_card_groupB
+index: 393
+model: 0
+#item_access_card_security
+index: 394
+model: 0
+#item_access_card_per5diego
+index: 395
+model: 0
+#item_access_card_medi
+index: 396
+model: 0
+#item_access_card_group3
+index: 397
+model: 0
+#item_access_card_purple
+index: 398
+model: 0
+#item_head_male
+index: 399
+model: 194
+#item_head_female
+index: 400
+model: 193
+#item_severedhead
+index: 401
+model: 590
+#weapon_grenademine_live
+index: 402
+model: 184
+#weapon_grenadenitro_live
+index: 403
+model: 185
+#weapon_grenadegas_live
+index: 404
+model: 183
+#line_sparqbeam
+index: 405
+model: 656
+#line_blaster
+index: 406
+model: 638
+#line_ion
+index: 407
+model: 643
+#line_hopperbeam
+index: 408
+#red_crosshair
+index: 409
+#orange_crosshair
+index: 410
+#yellow_crosshair
+index: 411
+#green_crosshair_small
+index: 412
+#teal_crosshair
+index: 413
+#blue_crosshair
+index: 414
+#cursor_vmail
+index: 415
+#cursor_cyberspace
+index: 416
+#item_access_card_perdarcy
+index: 417
+model: 0
+#npc_autobomb
+index: 419
+model: 299
+#npc_cyborg_assassin
+index: 420
+model: 306
+#npc_avian_mutant
+index: 421
+model: 328
+#npc_exec_bot
+index: 422
+model: 316
+#npc_cyborg_drone
+index: 423
+model: 312
+#npc_cortex_reaver
+index: 424
+model: 300
+#npc_cyborg_warrior
+index: 425
+model: 315
+#npc_cyborg_enforcer
+index: 426
+model: 314
+#npc_cyborg_elite
+index: 427
+model: 313
+#npc_cyborg_diego
+index: 428
+model: 309
+#npc_sec1_bot
+index: 429
+model: 333
+#npc_sec2_bot
+index: 430
+model: 335
+#npc_maint_bot
+index: 431
+model: 325
+#npc_mutant_cyborg
+index: 432
+model: 329
+#npc_hopper
+index: 433
+model: 322
+#npc_humanoid_mutant
+index: 434
+model: 323
+#npc_invisomut
+index: 435
+model: 324
+#npc_virus_mutant
+index: 436
+model: 330
+#npc_servbot
+index: 437
+model: 337
+#npc_flier_bot
+index: 438
+model: 318
+#npc_zerog_mutant
+index: 439
+model: 395
+#npc_gorilla_tiger_mutant
+index: 440
+model: 320
+#npc_repairbot
+index: 441
+model: 331
+#npc_plant_mutant
+index: 442
+model: 330
+#npc_cyberdog
+index: 443
+model: 302
+#npc_cyberguard
+index: 444
+model: 303
+#npc_cyberram
+index: 445
+model: 304
+#npc_cyber_reaver
+index: 446
+model: 305
+#npc_cybershodan
+index: 447
+#item_cyber_data
+index: 448
+model: 65
+#item_cyber_decoy
+index: 449
+#item_cyber_drill
+index: 450
+#item_cyber_game
+index: 451
+#item_cyber_integrity
+index: 452
+model: 69
+#item_cyber_keycard
+index: 453
+model: 0
+#item_cyber_pulser
+index: 454
+#item_cyber_recall
+index: 455
+#item_cyber_shield
+index: 456
+#item_cyber_turbo
+index: 457
+#prop_phys_barrel_chemical
+index: 458
+#prop_phys_barrel_radiation
+index: 459
+#prop_phys_barrel_toxic
+index: 460
+model: 12
+#prop_phys_cart
+index: 461
+model: 40
+#prop_phys_pot
+index: 462
+model: 494
+#prop_phys_toolcart
+index: 463
+model: 624
+#se_briefcase
+index: 464
+model: 34
+#se_corpse_blueshirt
+index: 465
+model: 51
+#se_corpse_brownshirt
+index: 466
+model: 52
+#se_corpse_eaten
+index: 467
+model: 53
+#se_corpse_labcoat
+index: 468
+model: 55
+#se_corpse_security
+index: 469
+model: 56
+#se_corpse_tan
+index: 470
+model: 57
+#se_corpse_torso
+index: 471
+model: 58
+#se_crate1
+index: 472
+model: 60
+#se_crate2
+index: 473
+model: 60
+#se_crate3
+index: 474
+model: 60
+#se_crate4
+index: 475
+model: 60
+#se_crate5
+index: 476
+model: 60
+#sec_camera
+index: 477
+model: 589
+#sec_cpunode
+index: 478
+model: 587
+#sec_cpunode_small
+index: 479
+model: 588
+#weapon_cyber_mine
+index: 480
+model: 71
+#proj_enemshot2
+index: 481
+#proj_magpulse_shot
+index: 482
+model: 645
+#proj_stungun_shot
+index: 483
+model: 657
+#proj_rail_shot
+index: 484
+model: 652
+#proj_plasmarifle_shot
+index: 485
+model: 651
+#proj_enemshot6
+index: 486
+#proj_enemshot5
+index: 487
+#proj_enemshot4
+index: 488
+#proj_throwingstar
+index: 489
+model: 307
+#proj_magpulsenpc_shot
+index: 490
+model: 645
+#proj_Antimicrobial_shot
+index: 491
+#proj_cyberplayer_shot
+index: 492
+model: 72
+#proj_cyberdog_shot
+index: 493
+model: 63
+#proj_cyberreaver_shot
+index: 494
+model: 64
+#proj_cyberice_shot
+index: 495
+model: 68
+#doorA
+index: 496
+model: 79
+#doorB
+index: 497
+model: 80
+#doorC
+index: 498
+model: 81
+#doorD
+index: 499
+model: 82
+#doorE
+index: 500
+#doorF
+index: 501
+#doorG
+index: 502
+#doorH
+index: 503
+#doorI
+index: 504
+#doorJ
+index: 505
+#doorK
+index: 506
+#doorL
+index: 507
+#door_elevator1
+index: 508
+#door_elevator2
+index: 509
+#door_elevator3
+index: 510
+#door_elevator4
+index: 511
+#door_secret1
+index: 512
+#door_secret2
+index: 513
+#door_secret3
+index: 514 
+#func_forcebridge
+index: 515
+#prop_lift2
+index: 516
+#func_wall
+index: 517
+#BulletHoleLarge
+index: 518
+#BulletHoleScorchLarge
+index: 519
+#BulletHoleScorchSmall
+index: 520
+#BulletHoleSmall
+index: 521
+#BulletHoleTiny
+index: 522
+#BulletHoleTinySpread
+index: 523
+#func_door_cyber
+index: 524
+#prop_console01
+index: 525
+#prop_console02
+index: 526
+#prop_grate1_1
+index: 527
+#prop_grate1_2
+index: 528
+#prop_grate1_3
+index: 529
+#se_cabinet
+index: 530
+#se_thermos
+index: 531
+#prop_beaker_holder
+index: 532
+#prop_bed
+index: 533
+#prop_bed_hospital
+index: 534
+#prop_bed_neurosurgery
+index: 535
+#prop_bonepile1
+index: 536
+#prop_bridgewall1
+index: 537
+#prop_broken_clock
+index: 538
+#prop_brokengun
+index: 539
+#prop_chair01
+index: 540
+#prop_chair02
+index: 541
+#prop_chair03
+index: 542
+#prop_chair04
+index: 543
+#prop_chair05
+index: 544
+#prop_chandelier
+index: 545
+#prop_charge_station
+index: 546
+#prop_clothes
+index: 547
+#prop_computer
+index: 548
+#prop_couch
+index: 549
+#prop_couch2
+index: 550
+#prop_cpuscreen
+index: 551
+#prop_cyber_datafrag
+index: 552
+#prop_cyber_decoy
+index: 553
+#prop_cyber_exit
+index: 554
+#prop_cyber_switch
+index: 555
+#prop_cyberport
+index: 556
+#prop_desk01
+index: 557
+#prop_desk02
+index: 558
+#prop_dexmissile
+index: 559
+#prop_foliage_fernpoison
+index: 560
+#prop_foliage_bush
+index: 561
+#prop_foliage_fern
+index: 562
+#prop_foliage_fernblueflower
+index: 563
+#prop_foliage_pinetreem
+index: 564
+#prop_foliage_poisonbush1
+index: 565
+#prop_gear_large
+index: 566
+#prop_gear_small
+index: 567
+#prop_grass1
+index: 568
+#prop_grass2
+index: 569
+#prop_grass3
+index: 570
+#prop_grass4
+index: 571
+#prop_grass5
+index: 572
+#prop_grate4
+index: 573
+#prop_healingbed
+index: 574
+#prop_lamp
+index: 575
+#prop_light_emergsignal
+index: 576
+#prop_microscope
+index: 577
+#prop_pipe
+index: 578
+#prop_puddle
+index: 579
+#prop_puddle_grease
+index: 580
+#prop_puddle_oil
+index: 581
+#prop_shelves
+index: 582
+#prop_skeleton
+index: 583
+#prop_sleeping_cables
+index: 584
+#prop_sparkingwire
+index: 585
+#prop_table
+index: 586
+#prop_tv_on_a_post
+index: 587
+#prop_vendingmachines1
+index: 588
+#prop_vendingmachines2
+index: 589
+#prop_weapon_rack
+index: 590
+#prop_xray
+index: 591
+#text_decal
+index: 592
+#text_decalStopDSS1
+index: 593
+#trigger_counter
+index: 594
+#trigger_cyberpush
+index: 595
+#trigger_gravitylift
+index: 596
+#trigger_ladder
+index: 597
+#trigger_multiple
+index: 598
+#trigger_music
+index: 599
+#trigger_once
+index: 600
+#trigger_radiation
+index: 601
+#us_isotopepanel
+index: 602
+#us_paperlog
+index: 603
+#us_puz_elevatorkeypad
+index: 604
+#us_puz_elevatorkeypad2
+index: 605
+#us_puz_elevatorkeypad3
+index: 606
+#us_puz_elevatorkeypad4
+index: 607
+#us_puz_keypad
+index: 608
+#us_puz_panel_blue_grid
+index: 609
+#us_puz_panel_brown_grid
+index: 610
+#us_puz_panel_gray_grid
+index: 611
+#us_puz_panel_red_grid
+index: 612
+#us_puz_panel_teal_grid
+index: 613
+#us_relaypanel
+index: 614
+#us_retinalscanner
+index: 615
+#prop_vending1_1
+index: 616
+#prop_vending1_2
+index: 617
+#prop_vending1_3
+index: 618
+#prop_vending2_1
+index: 619
+#prop_vending2_2
+index: 620
+#ambient_airhiss
+index: 621
+#ambient_clicker
+index: 622
+#ambient_compressor
+index: 623
+#ambient_dishwasher
+index: 624
+#ambient_drip_amb
+index: 625
+#ambient_fan
+index: 626
+#ambient_generator_gas
+index: 627
+#ambient_gurgle
+index: 628
+#ambient_icemaker
+index: 629
+#ambient_intake
+index: 630
+#ambient_lathe
+index: 631
+#ambient_lev3loop1
+index: 632
+#ambient_lev3loop2
+index: 633
+#ambient_lev3loop3
+index: 634
+#ambient_lev3loop4
+index: 635
+#ambient_liquid_bubble
+index: 636
+#ambient_liquid_lava2
+index: 637
+#ambient_looping
+index: 638
+#ambient_machgear_loop
+index: 639
+#ambient_machine_ambience
+index: 640
+#ambient_machine_go
+index: 641
+#ambient_machine_humamb7
+index: 642
+#ambient_machine_humlonoise
+index: 643
+#ambient_machine_loop1
+index: 644
+#ambient_machine_loop2
+index: 645
+#ambient_machinea1
+index: 646
+#ambient_machinevat_loop
+index: 647
+#ambient_mist
+index: 648
+#ambient_pipewater_loop
+index: 649
+#ambient_powerloom
+index: 650
+#ambient_pump
+index: 651
+#ambient_pump2
+index: 652
+#ambient_rain
+index: 653
+#ambient_steam_loop
+index: 654
+#ambient_washing_machine
+index: 655
+#decal_blood_die
+index: 656
+#decal_blood_resist
+index: 657
+#decal_blood_stayaway
+index: 658
+#decal_blood_words2
+index: 659
+#decal_bloodfonta
+index: 660
+#decal_bloodfonte
+index: 661
+#decal_bloodfontg
+index: 662
+#decal_bloodfonth
+index: 663
+#decal_bloodfontr
+index: 664
+#decal_bloodfonty
+index: 665
+#decal_bloodsplat2
+index: 666
+#decal_logo_antenna
+index: 667
+#decal_logo_armory
+index: 668
+#decal_logo_biohazard
+index: 669
+#decal_logo_bridge
+index: 670
+#decal_logo_cyborg
+index: 671
+#decal_logo_gears
+index: 672
+#decal_logo_medical
+index: 673
+#decal_logo_radhazard
+index: 674
+#decal_logo_research
+index: 675
+#decal_logo_security
+index: 676
+#decal_painting1
+index: 677
+#decal_painting2
+index: 678
+#decal_painting3
+index: 679
+#decal_posterbetterfuture
+index: 680
+#decal_postergenetics
+index: 681
+#decal_scorch1
+index: 682
+#decal_scorch2
+index: 683
+#decal_scorch3
+index: 684
+#decal_scorch4
+index: 685
+#decal_scorchtiny
+index: 686
+#decal_blood_splat
+index: 687
+#func_switch1
+index: 688
+#func_switch2
+index: 689
+#func_switch3
+index: 690
+#func_switch4
+index: 691
+#func_switch5
+index: 692
+#func_switch5broken
+index: 693
+#func_switch7
+index: 694
+#func_switch8
+index: 695
+#func_switchbroken1
+index: 696
+#clip_npc
+index: 697
+#clip_objects
+index: 698
+#logic_relay
+index: 699
+#logic_branch
+index: 700
+#logic_timer
+index: 701
+#logic_spawner
+index: 702
+#info_teleport_destination
+index: 703
+#prop_debris_panel
+index: 704
+#info_cyborgconversion
+index: 705
+#info_elev_destination
+index: 706
+#info_email
+index: 707
+#info_gameend
+index: 708
+#info_message
+index: 709
+#info_mission
+index: 710
+#info_note
+index: 711
+#info_playsound
+index: 712
+#info_ressurection_point
+index: 713
+#info_screenshake
+index: 714
+#info_spawnpoint
+index: 715
+#fx_reverbzone
+index: 716
+#ef_cyber_ice
+index: 717
+#ef_fragexplosion
+index: 718
+#ef_line_sparqbeam
+index: 719
+#ef_mist
+index: 720
+#ef_particle_bloodspurtsmall
+index: 721
+#ef_particle_bloodspurtsmallgreen
+index: 722
+#ef_particle_bloodspurtsmallyellow
+index: 723
+#ef_particle_bloodspurttiny
+index: 724
+#ef_particle_camerahit
+index: 725
+#ef_particle_darthit
+index: 726
+#ef_particle_sec2muzburst
+index: 727
+#ef_particle_sec2rotmuzburst
+index: 728
+#ef_particle_sparksmall
+index: 729
+#ef_particle_sparksmallblue
+index: 730
+#ef_particle_sparqhit
+index: 731
+#ef_sparkspits
+index: 732
+#ef_spraydrips
+index: 733
+#ef_steam
+index: 734
+#env_sparksmall
+index: 735
+#TargetIDInstance
+index: 736
+#prop_papers01
+index: 737
+#prop_papers02
+index: 738
+#ef_particle_blasterhit
+index: 739
+#ef_particle_ionhit
+index: 740
+#us_puz_panel_blue_wire
+index: 741
+#us_puz_panel_brown_wire
+index: 742
+#us_puz_panel_gray_wire
+index: 743
+#us_puz_panel_red_wire
+index: 744
+#us_puz_panel_teal_wire
+index: 745
+#weapon_grenadeenergmine_live
+index: 746
+#decal_logo_storage
+index: 747
+#light_animated
+index: 748
+#generic_transform
+index: 749

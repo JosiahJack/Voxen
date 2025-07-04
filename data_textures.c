@@ -8,7 +8,7 @@
 #include "stb_image.h"
 #include <GL/glew.h>
 #include <uthash.h>
-#include "data_definitions.h"
+#include "data_parser.h"
 #include "data_textures.h"
 #include "constants.h"
 #include "debug.h"
@@ -53,7 +53,7 @@ int LoadTextures(void) {
     textureCount = 0;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    parser_init(&texture_parser, valid_texdata_keys, 1);
+    parser_init(&texture_parser, valid_texdata_keys, 1, PARSER_DATA);
     if (!parse_data_file(&texture_parser, "./Data/textures.txt")) {
         printf("ERROR: Could not parse ./Data/textures.txt!\n");
         parser_free(&texture_parser);
