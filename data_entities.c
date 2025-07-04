@@ -4,6 +4,7 @@
 #include "data_entities.h"
 #include "data_parser.h"
 #include "constants.h"
+#include "debug.h"
 
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 int entityCount = 0;            // Number of entities loaded
@@ -24,28 +25,16 @@ bool loadEntityItemInitialized[ENT_COUNT] = { [0 ... ENT_COUNT - 1] = false };
 int LoadEntities(void) {
     // Initialize parser with entity-specific keys
     parser_init(&entity_parser, valid_entity_keys, sizeof(valid_entity_keys) / sizeof(valid_entity_keys[0]), PARSER_DATA);
-    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) {
-        SDL_Log("ERROR: Could not parse ./Data/entities.txt!");
-        parser_free(&entity_parser);
-        return 1;
-    }
+    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!"); parser_free(&entity_parser); return 1; }
+    
     loadEntityItemInitialized[ENT_PARSER] = true;
     entity_parser_initialized = true;
 
     entityCount = entity_parser.count;
-    if (entityCount > MAX_ENTITIES) {
-        SDL_Log("ERROR: Too many entities in parser count %d, greater than %d!", entityCount, MAX_ENTITIES);
-        CleanupEntities(true);
-        return 1;
-    }
+    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!", entityCount, MAX_ENTITIES); CleanupEntities(true); return 1; }
+    if (entityCount == 0) { DualLogError("No entities found in entities.txt"); CleanupEntities(true); return 1; }
 
-    if (entityCount == 0) {
-        SDL_Log("ERROR: No entities found in entities.txt");
-        CleanupEntities(true);
-        return 1;
-    }
-
-    SDL_Log("Parsing %d entities...", entityCount);
+    DualLog("Parsing %d entities...", entityCount);
 
     // Populate entities array
     for (int i = 0; i < entityCount; i++) {
@@ -59,14 +48,14 @@ int LoadEntities(void) {
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
         
-        printf("Added entity type: %s, modelIndex: %d, texIndex: %d, "
-               "glowIndex: %d, specIndex: %d, normIndex: %d\n",
-               entities[i].name, entities[i].modelIndex, entities[i].texIndex,
-               entities[i].glowIndex, entities[i].specIndex,
-               entities[i].normIndex);
+        DualLog("Added entity type: %s, modelIndex: %d, texIndex: %d, "
+                "glowIndex: %d, specIndex: %d, normIndex: %d\n",
+                entities[i].name, entities[i].modelIndex, entities[i].texIndex,
+                entities[i].glowIndex, entities[i].specIndex,
+                entities[i].normIndex);
     }
 
-    SDL_Log("Loaded %d entity definitions", entityCount);
+    DualLog("Loaded %d entity definitions", entityCount);
     CleanupEntities(false);
     return 0;
 }

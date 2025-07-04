@@ -18,6 +18,7 @@
 //       |         ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~
 // Added `= 0` to line 57827 to make it `ma_uint64 framesProcessed = 0;`
 #include "audio.h"
+#include "debug.h"
 
 // Temporarily disabled midi support until wav+mp3 is working.
 // #include <fluidlite.h>
@@ -37,7 +38,7 @@ int InitializeAudio() {
 
     result = ma_engine_init(&engine_config, &audio_engine);
     if (result != MA_SUCCESS) {
-        printf("ERROR: Failed to initialize miniaudio engine: %d\n", result);
+        DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
         return 1;
     }
     
@@ -75,7 +76,7 @@ void play_mp3(const char* path, float volume, int fade_in_ms) {
     static int current_sound = 0;
     ma_sound_uninit(&mp3_sounds[current_sound]);
     ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &mp3_sounds[current_sound]);
-    if (result != MA_SUCCESS) { printf("ERROR: Failed to load MP3 %s: %d\n", path, result);  return; }
+    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result);  return; }
     
     ma_sound_set_fade_in_milliseconds(&mp3_sounds[current_sound], 0.0f, volume, fade_in_ms);
     ma_sound_start(&mp3_sounds[current_sound]);
@@ -95,11 +96,11 @@ void play_wav(const char* path, float volume) {
     
     // If no free slot, use a new one if available
     if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++;
-    if (slot == -1) { printf("WARNING: Max WAV channels (%d) reached\n", MAX_CHANNELS); return; }
+    if (slot == -1) { DualLog("WARNING: Max WAV channels (%d) reached\n", MAX_CHANNELS); return; }
 
     ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
     if (result != MA_SUCCESS) {
-        printf("ERROR: Failed to load WAV %s: %d\n", path, result);
+        DualLog("ERROR: Failed to load WAV %s: %d\n", path, result);
         if (slot == wav_count - 1) wav_count--; // Revert count if init fails
         return;
     }

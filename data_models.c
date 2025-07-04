@@ -34,11 +34,7 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 int LoadGeometry(void) {
     // First parse ./Data/textures.txt to see what textures to load to what indices
     parser_init(&model_parser, valid_mdldata_keys, 1, PARSER_DATA);
-    if (!parse_data_file(&model_parser, "./Data/models.txt")) {
-        printf("ERROR: Could not parse ./Data/models.txt!\n");
-        parser_free(&model_parser);
-        return 1;
-    }
+    if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); parser_free(&model_parser); return 1; }
     
     loadModelItemInitialized[MDL_PARSER] = true;
     int maxIndex = -1;
@@ -46,7 +42,7 @@ int LoadGeometry(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) {maxIndex = model_parser.entries[k].index; }
     }
         
-    printf("Parsing %d models out of max allowed %d...\n",model_parser.count,MODEL_COUNT);
+    DualLog("Parsing %d models out of max allowed %d...\n",model_parser.count,MODEL_COUNT);
     
     int totalVertCount = 0;
     int totalBounds = 0;
@@ -60,15 +56,15 @@ int LoadGeometry(void) {
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
         
         const struct aiScene *scene = aiImportFile(model_parser.entries[matchedParserIdx].path,
-//                                                     aiProcess_FindInvalidData
-//                                                     | aiProcess_Triangulate
-//                                                     | aiProcess_GenNormals
-                                                     aiProcess_ImproveCacheLocality
+                                                    aiProcess_FindInvalidData
+                                                    | aiProcess_Triangulate
+                                                    | aiProcess_GenNormals
+                                                    | aiProcess_ImproveCacheLocality
                                                     | aiProcess_FindDegenerates
                                                     | aiProcess_LimitBoneWeights);
         
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            fprintf(stderr, "Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString());
+            DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString());
             return 1;
         }
 
@@ -81,13 +77,13 @@ int LoadGeometry(void) {
         }
 
         modelVertexCounts[i] = vertexCount;
-//         printf("Model %s loaded with %d vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+//         DualLog("Model %s loaded with %d vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         totalVertCount += vertexCount;
 
         // Allocate vertex data for this model
         float *tempVertices = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         if (!tempVertices) {
-            fprintf(stderr, "Failed to allocate vertex buffer for %s\n", model_parser.entries[matchedParserIdx].path);
+            DualLogError("Failed to allocate vertex buffer for %s\n", model_parser.entries[matchedParserIdx].path);
             aiReleaseImport(scene);
             return 1;
         }
@@ -135,11 +131,11 @@ int LoadGeometry(void) {
     }
 
     // Log vertex counts
-    printf("Total vertices in buffer %d (",totalVertCount);
+    DualLog("Total vertices in buffer %d (",totalVertCount);
     print_bytes_no_newline(totalVertCount * 8 * 4); // x,y,z,nx,ny,nz,u,v * 4
-    printf(") (Bounds ");
+    DualLog(") (Bounds ");
     print_bytes_no_newline(totalBounds * 4); //minx,miny,minz,maxx,maxy,maxz * 4 
-    printf(")\n");
+    DualLog(")\n");
 
     // Generate and bind VAO
     glGenVertexArrays(1, &vao);
@@ -152,8 +148,8 @@ int LoadGeometry(void) {
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         if (modelVertexCounts[i] == 0) continue; // No model specified with this index.
         if (vertexDataArrays[i] == NULL) {
-            printf("WARNING: model %d has invalid vertex data (count=%u, ptr=%p)\n",
-                i, modelVertexCounts[i], (void*)vertexDataArrays[i]);
+            DualLog("\033[33mWARNING: model %d has invalid vertex data (count=%u, ptr=%p)\033[0m\n",
+                    i, modelVertexCounts[i], (void*)vertexDataArrays[i]);
             continue;
         }
         

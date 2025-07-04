@@ -30,6 +30,7 @@ typedef struct {
     int capacity;            // Allocated capacity
     const char **valid_keys; // Array of allowed keys (e.g., {"index"})
     int num_keys;            // Number of valid keys
+    uint8_t parser_type;
 } DataParser;
 
 void parser_init(DataParser *parser, const char **valid_keys, int num_keys, ParserType partype);

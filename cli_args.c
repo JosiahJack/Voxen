@@ -3,7 +3,7 @@
 
 void cli_args_print_version() {
     printf("-----------------------------------------------------------\n");
-    printf("Voxen v0.01.00 6/10/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT licensed\n\n\n");
+    printf("Voxen v0.02.00 7/04/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT-0 licensed\n\n\n");
 }
 
 void cli_args_print_help() {

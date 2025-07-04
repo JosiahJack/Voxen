@@ -30,6 +30,7 @@
 SDL_Window *window;
 int screen_width = 800, screen_height = 600;
 bool window_has_focus = false;
+static FILE *console_log_file = NULL;
 
 // Event System states
 int maxEventCount_debug = 0;
@@ -192,6 +193,8 @@ int ExitCleanup(int status) {
     if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font); // Font was loaded, so clean it up
     if (systemInitialized[SYS_TTF]) TTF_Quit(); // TTF was init'ed, so also TTF Quit
     if (systemInitialized[SYS_SDL]) SDL_Quit(); // SDL was init'ed, so SDL_Quit
+    
+    if (console_log_file) { fclose(console_log_file); console_log_file = NULL; }
     return status;
 }
 
@@ -218,9 +221,33 @@ int EventExecute(Event* event) {
     return 99; // Something went wrong
 }
 
-int main(int argc, char* argv[]) {
-    if (argc == 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { cli_args_print_version(); return 0; }
+void DualLog(const char *fmt, ...) {
+    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
+    vfprintf(stdout, fmt, args1); // Print to console/terminal.
+    va_end(args1);
+    if (console_log_file) { vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
+    va_end(args2);
+}
 
+void DualLogError(const char *fmt, ...) {
+    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
+    fprintf(stderr, "\033[1;31mERROR: \033[0;31m"); vfprintf(stderr, fmt, args1); fprintf(stderr,"\033[0;0m"); fflush(stderr); // Print to console/terminal.
+    va_end(args1);
+    if (console_log_file) { fprintf(console_log_file, "ERROR: "); vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
+    va_end(args2);
+}
+
+void print_bytes_no_newline(int count) {
+    DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
+}
+
+int main(int argc, char* argv[]) {
+    console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
+    if (!console_log_file) fprintf(stderr, "Failed to open log file voxen.log\n");
+    
+    if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { cli_args_print_version(); return 0; }
+    if (argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) { cli_args_print_help(); return 0; }
+    if (argc == 3 && strcmp(argv[1], "dump") == 0) { DualLog("Converting log to plaintext: %s ...", argv[2]); JournalDump(argv[2]); DualLog("DONE!\n"); return 0; }
     if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
         cli_args_print_help();
         return 0;
@@ -231,33 +258,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) {
-        printf("Voxen the OpenGL Voxel Lit Rendering Engine\n");
-        printf("-----------------------------------------------------------\n");
-        printf("        This is a rendering engine designed for optimized focused\n");
-        printf("        usage of OpenGL making maximal use of GPU Driven rendering\n");
-        printf("        techniques, a unified event system for debugging and log\n");
-        printf("        playback, full mod support loading all data from external\n");
-        printf("        files and using definition files for what to do with the\n");
-        printf("        data.\n\n");
-        printf("        This project aims to have minimal overhead, profiling,\n");
-        printf("        traceability, robustness, and low level control.\n\n");
-        printf("\n");
-        printf("Valid arguments:\n");
-        printf(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
-        printf("-v, --version\n    Prints version information\n\n");
-        printf("play <file>\n    Plays back recorded log from current directory\n\n");
-        printf("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
-        printf("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
-        printf("-h, --help\n    Provides this help text.  Neat!\n\n");
-        printf("-----------------------------------------------------------\n");
-        return 0;
-    } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
-        printf("Converting log: %s ...", argv[2]);
-        JournalDump(argv[2]);
-        printf("DONE!\n");
-        return 0;
-    }
 
     int exitCode = 0;
     globalFrameNum = 0;
