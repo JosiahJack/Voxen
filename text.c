@@ -5,6 +5,7 @@
 #include "matrix.h"
 #include "text.h"
 #include "data_textures.h"
+#include "debug.h"
 
 GLuint textShaderProgram;
 TTF_Font* font = NULL;
@@ -35,7 +36,7 @@ float textQuadVertices[] = {
 int InitializeTextAndFonts(void) {
     SetupTextQuad();
     font = TTF_OpenFont("./Fonts/SystemShockText.ttf", 12);
-    if (!font) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return 1; }
+    if (!font) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return 1; }
     return 0;
 }
 
@@ -59,15 +60,15 @@ void SetupTextQuad(void) {
 
 // Renders text at x,y coordinates specified using pointer to the string array.
 void RenderText(float x, float y, const char *text, int colorIdx) {
-    if (!font) { fprintf(stderr, "Font is NULL\n"); return; }
-    if (!text) { fprintf(stderr, "Text is NULL\n"); return; }
+    if (!font) { DualLogError("Font is NULL\n"); return; }
+    if (!text) { DualLogError("Text is NULL\n"); return; }
     
     SDL_Surface *surface = TTF_RenderText_Solid(font, text, textColors[colorIdx]);
-    if (!surface) { fprintf(stderr, "TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
+    if (!surface) { DualLogError("TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
     
     SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
     SDL_FreeSurface(surface);
-    if (!rgba_surface) { fprintf(stderr, "SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
+    if (!rgba_surface) { DualLogError("SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
 
     // Create and bind texture
     GLuint texture;

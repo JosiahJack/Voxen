@@ -1,20 +1,18 @@
 #include <stdio.h>
 #include "levels.h"
 #include "data_parser.h"
+#include "debug.h"
 
 int numLevels = 14; // Can be set by gamedata.txt
 
 int LoadLevelGeometry(int curlevel) {
-    printf("Loading start level: %d...\n",curlevel);
-//     if (curlevel < 0 || curlevel >= numLevels) { printf("ERROR: Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+    DualLog("Loading start level: %d...\n",curlevel);
+//     if (curlevel < 0 || curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 //     
 //     char filename[64];
 //     snprintf(filename, sizeof(filename), "CitadelScene_geometry_level%d.txt", curlevel);
 //     FILE* file = fopen(filename, "r");
-//     if (!file) {
-//         fprintf(stderr, "Geometry input file path invalid: %s\n", filename);
-//         return;
-//     }
+//     if (!file) { DualLogError("Geometry input file path invalid: %s\n", filename); return 1; }
 // 
 //     GameObjectArray* container = &lm->geometry_containers[curlevel];
 //     container->objects = malloc(100 * sizeof(GameObject)); // Initial capacity

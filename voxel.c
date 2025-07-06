@@ -40,7 +40,7 @@ SDL_Thread* vxgi_thread = NULL;
 _Atomic bool vxgi_running = true;
 GLuint vxgiID;
 
-void SVO_Init(SVO* svo) {
+void SVO_Init(SVO* svo, int index) {
     svo->nodeCapacity = SVO_INITIAL_NODE_CAPACITY;
     svo->voxelCapacity = SVO_INITIAL_VOXEL_CAPACITY;
     svo->nodes = malloc(sizeof(SVONode) * svo->nodeCapacity);
@@ -49,19 +49,20 @@ void SVO_Init(SVO* svo) {
     svo->voxelCount = 0;
     svo->nodes[0].childrenMask = 0;
     memset(svo->nodes[0].children, 0, sizeof(uint32_t) * SVO_NODE_CHILDREN);
-    printf("SVO buffer initialized with ");
+    DualLog("SVO buffer %d initialized with ",index);
     print_bytes_no_newline(sizeof(VXGIVoxel) * svo->voxelCapacity + sizeof(SVONode) * svo->nodeCapacity);
-    printf("\n");
+    DualLog("\n");
 }
 
 void VXGI_Init(void) {
-    printf("VXGI Init\n");
+    DualLog("VXGI Init\n");
     for (int i = 0; i < 2; ++i) {
-        SVO_Init(&vxgi_buffers[i].svo);
+        SVO_Init(&vxgi_buffers[i].svo,i);
         atomic_store(&vxgi_buffers[i].ready, false);
-        printf("Buffer %d initialized\n", i);
+        DualLog("Buffer %d initialized\n", i);
     }
-    printf("Spawning VXGI worker thread... ");
+    
+    DualLog("Spawning VXGI worker thread... ");
     VXGIWorkerData* workerData = malloc(sizeof(VXGIWorkerData));
     workerData->lights = lights;
     workerData->lightCount = LIGHT_COUNT;
@@ -76,7 +77,8 @@ void VXGI_Init(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glUniform1i(vxgiEnabledLoc_deferred, 0); // Mark as unusable until first vxgi thread iteration completes.
     glUniform1i(voxelCountLoc_deferred, 0);
-    printf("DONE\n");
+    DualLog("DONE\n");
+    DebugRAM("after initializing all voxels");
 }
 
 bool vxgiEnabled = true;
@@ -185,7 +187,7 @@ void InsertModelInstanceVoxels(int modelIdx, int texIdx, float posX, float posY,
     SVO* svo = &vxgi_buffers[current_vxgi_upload_index].svo;
 
     // Get vertex data for the model
-    if (vertexDataArrays[modelIdx] == NULL) { printf("ERROR: vertex data null for model index %i\n",modelIdx); return; }
+    if (vertexDataArrays[modelIdx] == NULL) { DualLogError("Vertex data null for model index %i\n",modelIdx); return; }
     
     float* vertices = vertexDataArrays[modelIdx];
     int vertexCount = modelVertexCounts[modelIdx];

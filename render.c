@@ -43,7 +43,7 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int he
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(GL_TEXTURE_2D, 0);
     GLenum error = glGetError();
-    if (error != GL_NO_ERROR) fprintf(stderr, "Failed to create texture %s: OpenGL error %d\n", name, error);
+    if (error != GL_NO_ERROR) DualLogError("Failed to create texture %s: OpenGL error %d\n", name, error);
 }
 
 // Create G-buffer textures
@@ -71,10 +71,10 @@ void SetupGBuffer(void) {
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         switch (status) {
-            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: fprintf(stderr, "Framebuffer incomplete: Attachment issue\n"); break;
-            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: fprintf(stderr, "Framebuffer incomplete: Missing attachment\n"); break;
-            case GL_FRAMEBUFFER_UNSUPPORTED: fprintf(stderr, "Framebuffer incomplete: Unsupported configuration\n"); break;
-            default: fprintf(stderr, "Framebuffer incomplete: Error code %d\n", status);
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
+            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
+            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
         }
     }
     
@@ -181,7 +181,7 @@ void RenderMeshInstances() {
 
         // Uncomment for fun and mayhem
 //         GLenum err;
-//         while ((err = glGetError()) != GL_NO_ERROR) printf("GL Error for draw call %d: %x\n",i, err);
+//         while ((err = glGetError()) != GL_NO_ERROR) DualLogError("GL Error for draw call %d: %x\n",i, err);
     }
 }
 
@@ -257,6 +257,8 @@ int RenderStaticMeshes(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
 
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.

@@ -50,7 +50,7 @@ extern _Atomic bool vxgi_running;
 extern GLuint vxgiID;
 extern bool vxgiEnabled;
 
-void SVO_Init(SVO* svo);
+void SVO_Init(SVO* svo, int index);
 void VXGI_Init(void);
 void VXGI_UpdateGL(void);
 void WorldToVoxel(float x, float y, float z, int* vx, int* vy, int* vz);

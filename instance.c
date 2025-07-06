@@ -54,9 +54,9 @@ int SetupInstances(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    printf("Total instance size ");
+    DualLog("Total instance size ");
     print_bytes_no_newline(INSTANCE_COUNT * 11 * 4);
-    printf("\n");
+    DualLog("\n");
     
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     glGenBuffers(1, &matricesBuffer);

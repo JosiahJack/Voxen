@@ -9,6 +9,7 @@
 #include "deferred_lighting.compute"
 #include "image_effects.h"
 #include "bluenoise64.cginc"
+#include "debug.h"
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
@@ -19,7 +20,7 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     if (!success) {
         char infoLog[512];
         glGetShaderInfoLog(shader, 512, NULL, infoLog);
-        fprintf(stderr, "%s Compilation Failed: %s\n", shaderName, infoLog);
+        DualLogError("%s Compilation Failed: %s\n", shaderName, infoLog);
         glDeleteShader(shader);
         return 0;
     }
@@ -38,7 +39,7 @@ GLuint LinkProgram(GLuint *shaders, int count, const char *programName) {
     if (!success) {
         char infoLog[512];
         glGetProgramInfoLog(program, 512, NULL, infoLog);
-        fprintf(stderr, "%s Linking Failed: %s\n", programName, infoLog);
+        DualLogError("%s Linking Failed: %s\n", programName, infoLog);
         glDeleteProgram(program);
         return 0;
     }

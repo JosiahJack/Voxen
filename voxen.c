@@ -1,5 +1,6 @@
 // File: voxen.c
 // Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
+#include <malloc.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <GL/glew.h>
@@ -9,6 +10,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <string.h>
+#include <unistd.h>
 #include "event.h"
 #include "constants.h"
 #include "input.h"
@@ -53,6 +55,80 @@ double start_frame_time = 0.0;
 // OpenGL
 SDL_GLContext gl_context;
 
+void DualLog(const char *fmt, ...) {
+    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
+    vfprintf(stdout, fmt, args1); // Print to console/terminal.
+    va_end(args1);
+    if (console_log_file) { vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
+    va_end(args2);
+}
+
+void DualLogError(const char *fmt, ...) {
+    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
+    fprintf(stderr, "\033[1;31mERROR: \033[0;31m"); vfprintf(stderr, fmt, args1); fprintf(stderr,"\033[0;0m"); fflush(stderr); // Print to console/terminal.
+    va_end(args1);
+    if (console_log_file) { fprintf(console_log_file, "ERROR: "); vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
+    va_end(args2);
+}
+
+// Get RSS aka the total RAM reported by btop or other utilities that's allocated virtual ram for the process.
+size_t get_rss_bytes(void) {
+    FILE *fp = fopen("/proc/self/stat", "r");
+    if (!fp) {
+        DualLogError("Failed to open /proc/self/stat\n");
+        return 0;
+    }
+
+    char buffer[1024];
+    if (!fgets(buffer, sizeof(buffer), fp)) {
+        DualLogError("Failed to read /proc/self/stat\n");
+        fclose(fp);
+        return 0;
+    }
+    fclose(fp);
+
+    // Parse the 24th field (RSS in pages)
+    char *token = strtok(buffer, " ");
+    int field = 0;
+    size_t rss_pages = 0;
+    while (token && field < 23) {
+        token = strtok(NULL, " ");
+        field++;
+    }
+    if (token) {
+        rss_pages = atol(token);
+    } else {
+        DualLogError("Failed to parse RSS from /proc/self/stat\n");
+        return 0;
+    }
+
+    return rss_pages * sysconf(_SC_PAGESIZE);
+}
+
+void DebugRAM(const char *context, ...) {
+    struct mallinfo2 info = mallinfo2();
+    size_t rss_bytes = get_rss_bytes();
+
+    // Buffer to hold formatted context string
+    char formatted_context[1024];
+
+    // Process variable arguments
+    va_list args;
+    va_start(args, context);
+    vsnprintf(formatted_context, sizeof(formatted_context), context, args);
+    va_end(args);
+
+    // Log heap and RSS usage with formatted context
+    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), RSS %zu bytes (%zu KB | %.2f MB)\n",
+            formatted_context,
+            info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
+            rss_bytes, rss_bytes / 1024, rss_bytes / 1024.0 / 1024.0);
+}
+
+void print_bytes_no_newline(int count) {
+    DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
+}
+
 typedef enum {
     SYS_SDL = 0,
     SYS_TTF,
@@ -68,10 +144,10 @@ typedef enum {
 bool systemInitialized[SYS_COUNT] = { [0 ... SYS_COUNT - 1] = false };
 
 int InitializeEnvironment(void) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) { fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) { DualLogError("SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
     systemInitialized[SYS_SDL] = true;
     
-    if (TTF_Init() < 0) { fprintf(stderr, "TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     systemInitialized[SYS_TTF] = true;
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -81,35 +157,26 @@ int InitializeEnvironment(void) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
-    if (!window) {
-        fprintf(stderr, "SDL_CreateWindow failed: %s\n", SDL_GetError());
-        return SYS_WIN + 1;
-    }
+    if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
     
     systemInitialized[SYS_WIN] = true;
 
     gl_context = SDL_GL_CreateContext(window);
-    if (!gl_context) {
-        fprintf(stderr, "SDL_GL_CreateContext failed: %s\n", SDL_GetError());
-        return SYS_CTX + 1;
-    }
+    if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return SYS_CTX + 1; }
     
     systemInitialized[SYS_CTX] = true;
 
     SDL_GL_MakeCurrent(window, gl_context);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
-    if (glewInit() != GLEW_OK) {
-        fprintf(stderr, "GLEW initialization failed\n");
-        return SYS_OGL + 1;
-    }
+    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_OGL + 1; }
     
     systemInitialized[SYS_OGL] = true;
 
     // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
-    fprintf(stderr, "OpenGL Version: %s\n", version ? (const char*)version : "unknown");
-    fprintf(stderr, "Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
+    DualLog("OpenGL Version: %s\n", version ? (const char*)version : "unknown");
+    DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
     int vsync_enable = 0;//1; // Set to 0 for false.
     SDL_GL_SetSwapInterval(vsync_enable);
@@ -125,7 +192,7 @@ int InitializeEnvironment(void) {
     CacheUniformLocationsForShaders(); // After CompileShaders()
     SetupQuad(); // For image blit for post processing effects like lighting.
     int fontInit = InitializeTextAndFonts();
-    if (fontInit) { fprintf(stderr, "TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    if (fontInit) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     
     InitializeLights();
     SetupGBuffer();
@@ -221,29 +288,9 @@ int EventExecute(Event* event) {
     return 99; // Something went wrong
 }
 
-void DualLog(const char *fmt, ...) {
-    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
-    vfprintf(stdout, fmt, args1); // Print to console/terminal.
-    va_end(args1);
-    if (console_log_file) { vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
-    va_end(args2);
-}
-
-void DualLogError(const char *fmt, ...) {
-    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
-    fprintf(stderr, "\033[1;31mERROR: \033[0;31m"); vfprintf(stderr, fmt, args1); fprintf(stderr,"\033[0;0m"); fflush(stderr); // Print to console/terminal.
-    va_end(args1);
-    if (console_log_file) { fprintf(console_log_file, "ERROR: "); vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
-    va_end(args2);
-}
-
-void print_bytes_no_newline(int count) {
-    DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
-}
-
 int main(int argc, char* argv[]) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
-    if (!console_log_file) fprintf(stderr, "Failed to open log file voxen.log\n");
+    if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
     
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { cli_args_print_version(); return 0; }
     if (argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) { cli_args_print_help(); return 0; }
@@ -252,9 +299,9 @@ int main(int argc, char* argv[]) {
         cli_args_print_help();
         return 0;
     } else if (argc == 3 && strcmp(argv[1], "dump") == 0) { // Log dump as text
-        printf("Converting log: %s ...", argv[2]);
+        DualLog("Converting log: %s ...", argv[2]);
         JournalDump(argv[2]);
-        printf("DONE!\n");
+        DualLog("DONE!\n");
         return 0;
     }
 
@@ -266,10 +313,10 @@ int main(int argc, char* argv[]) {
     if (exitCode) return ExitCleanup(exitCode);
 
     if (argc == 3 && strcmp(argv[1], "play") == 0) { // Log playback
-        printf("Playing log: %s\n", argv[2]);
+        DualLog("Playing log: %s\n", argv[2]);
         activeLogFile = fopen(argv[2], "rb");
         if (!activeLogFile) {
-            printf("Failed to read log: %s\n", argv[2]);
+            DualLogError("Failed to read log: %s\n", argv[2]);
         } else {
             log_playback = true; // Perform log playback.
         }
@@ -333,7 +380,7 @@ int main(int argc, char* argv[]) {
                 else if (event.type == SDL_KEYDOWN) {
                     if (event.key.keysym.sym == SDLK_ESCAPE) {
                         log_playback = false;
-                        printf("Exited log playback manually.  Control returned\n");
+                        DualLog("Exited log playback manually.  Control returned\n");
                     }
                     
                 // These aren't really events so just handle them here.
@@ -362,9 +409,9 @@ int main(int argc, char* argv[]) {
             // Read the log file for current frame and enqueue events from log.
             int read_status = ReadActiveLog();
             if (read_status == 2) { // EOF reached, no more events
-                printf("Log playback completed.  Control returned.\n");
+                DualLog("Log playback completed.  Control returned.\n");
             } else if (read_status == -1) { // Read error
-                printf("Error reading log file, exiting playback\n");
+                DualLogError("Error reading log file, exiting playback\n");
                 EnqueueEvent_Simple(EV_QUIT);
             }
         }

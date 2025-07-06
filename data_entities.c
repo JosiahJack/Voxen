@@ -48,15 +48,16 @@ int LoadEntities(void) {
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
         
-        DualLog("Added entity type: %s, modelIndex: %d, texIndex: %d, "
-                "glowIndex: %d, specIndex: %d, normIndex: %d\n",
-                entities[i].name, entities[i].modelIndex, entities[i].texIndex,
-                entities[i].glowIndex, entities[i].specIndex,
-                entities[i].normIndex);
+//         DualLog("Added entity type: %s, modelIndex: %d, texIndex: %d, "
+//                 "glowIndex: %d, specIndex: %d, normIndex: %d\n",
+//                 entities[i].name, entities[i].modelIndex, entities[i].texIndex,
+//                 entities[i].glowIndex, entities[i].specIndex,
+//                 entities[i].normIndex);
     }
 
     DualLog("Loaded %d entity definitions", entityCount);
     CleanupEntities(false);
+    DebugRAM("after loading all entities");
     return 0;
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning

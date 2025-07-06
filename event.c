@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <time.h>
 #include "event.h"
+#include "debug.h"
 
 // Initializes unified event system variables
 bool journalFirstWrite = true;
@@ -19,9 +20,9 @@ int EventInit(void) {
 }
 
 int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
-    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { printf("Queue buffer filled!\n"); return 1; }
+    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { DualLogError("Queue buffer filled!\n"); return 1; }
 
-    //printf("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
+    //DualLog("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
     eventQueue[eventQueueEnd].frameNum = globalFrameNum;
     eventQueue[eventQueueEnd].type = type;
     eventQueue[eventQueueEnd].timestamp = 0;
@@ -78,7 +79,7 @@ void JournalLog(void) {
     } else fp = fopen("./voxen.dem", "ab"); // Append
     
     if (!fp) {
-        printf("Failed to open voxen.dem\n");
+        DualLogError("Failed to open voxen.dem for journal log\n");
         return;
     }
 
@@ -112,7 +113,7 @@ int ReadActiveLog() {
         return 2; // Indicate EOF was previously reached
     }
 
-    printf("------ ReadActiveLog start for frame %d ------\n",globalFrameNum);
+    DualLog("------ ReadActiveLog start for frame %d ------\n",globalFrameNum);
     while (events_processed < MAX_EVENTS_PER_FRAME) {
         size_t read_count = fread(&event, sizeof(Event), 1, activeLogFile);
         if (read_count != 1) {
@@ -123,7 +124,7 @@ int ReadActiveLog() {
             }
 
             if (ferror(activeLogFile)) {
-                printf("Error reading log file\n");
+                DualLogError("Could not read log file\n");
                 return -1; // Read error
             }
         }
@@ -134,17 +135,17 @@ int ReadActiveLog() {
             // Enqueue events matching the current frame
             EnqueueEvent(event.type, event.payload1u, event.payload2u, event.payload1f, event.payload2f);
             events_processed++;
-            printf("Enqueued event %d from log for frame %d\n",event.type,event.frameNum);
+            DualLog("Enqueued event %d from log for frame %d\n",event.type,event.frameNum);
         } else if (event.frameNum > globalFrameNum) {
             // Event is for a future frame; seek back and stop processing
             fseek(activeLogFile, -(long)sizeof(Event), SEEK_CUR);
-            printf("Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
+            DualLog("Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
             return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if no matching events
         }
         // If event.frameNum < globalFrameNum, skip it (past event)
     }
 
-    printf("End of log. Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
+    DualLog("End of log. Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
     return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if limit reached with no matching events
 }
 
@@ -152,14 +153,14 @@ int ReadActiveLog() {
 int JournalDump(const char* dem_file) {
     FILE* fpR = fopen(dem_file, "rb");
     if (!fpR) {
-        printf("Failed to open .dem file\n");
+        DualLogError("Failed to open .dem file\n");
         return -1;
     }
 
     FILE* fpW = fopen("./log_dump.txt", "wb");
     if (!fpW) {
         fclose(fpR); // Close .dem file that we were reading.
-        printf("Failed to open voxen.dem\n");
+        DualLogError("Failed to open voxen.dem\n");
         return -1;
     }
 
@@ -197,7 +198,7 @@ void clear_ev_queue(void) {
 double get_time(void) {
     struct timespec ts;
     if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-        fprintf(stderr, "Error: clock_gettime failed\n");
+        DualLogError("clock_gettime failed\n");
         return 0.0;
     }
 
@@ -232,9 +233,9 @@ int EventQueueProcess(void) {
             if (!log_playback) {
                 JournalLog();
                 lastJournalWriteTime = get_time();
-//                 printf("Event queue cleared after journal filled, log updated\n");
+//                 DualLog("Event queue cleared after journal filled, log updated\n");
             } else {
-//                 printf("Event queue cleared after journal filled, not writing to log during playback.\n");
+//                 DualLog("Event queue cleared after journal filled, not writing to log during playback.\n");
             }
             
             clear_ev_journal(); // Also sets eventJournalIndex to 0.
@@ -253,7 +254,7 @@ int EventQueueProcess(void) {
         // journal buffer on error and last entry will be the problematic event.
         status = EventExecute(&eventQueue[eventIndex]);
         if (status) {
-            if (status != 1) printf("EventExecute returned nonzero status: %d !", status);
+            if (status != 1) DualLog("EventExecute returned nonzero status: %d\n", status);
             return status;
         }
 

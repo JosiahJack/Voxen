@@ -32,6 +32,7 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 
 // Loads all geometry, from 3D meshes or otherwise
 int LoadGeometry(void) {
+    DebugRAM("start of loading all models");
     // First parse ./Data/textures.txt to see what textures to load to what indices
     parser_init(&model_parser, valid_mdldata_keys, 1, PARSER_DATA);
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); parser_free(&model_parser); return 1; }
@@ -188,6 +189,7 @@ int LoadGeometry(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
 
+    DebugRAM("after loading all models");
     return 0;
 }
 
