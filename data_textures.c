@@ -161,7 +161,11 @@ int LoadTextures(void) {
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    glBufferStorage(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_MAP_WRITE_BIT);
+    void *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, totalPixels * sizeof(uint32_t),
+                                           GL_MAP_WRITE_BIT);
+    
     loadTextureItemInitialized[TEX_SSBOS] = true;
     DebugRAM("after glGenBuffers colorBufferID");
 
@@ -169,7 +173,7 @@ int LoadTextures(void) {
     uint32_t pixel_offset = 0;
     uint32_t palette_offset = 0;
     uint32_t maxPalletSize = 0;
-    uint32_t *indices = malloc(4096 * 4096 * sizeof(uint32_t));
+    uint32_t *indices = malloc(4096 * 2048 * sizeof(uint32_t));
     if (!indices) { DualLogError("Failed to allocate indices buffer\n"); CleanupLoad(true); return 1; }
     
     DebugRAM("after indices malloc");
@@ -228,14 +232,15 @@ int LoadTextures(void) {
         }
 
         // Upload indices to colorBuffer
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t), indices);
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT); // Drops RAM by 1MB in btop report
-        GLsync fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-        glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED); // Drops RAM by 1MB in btop report.  Upload to GPU RIGHT NOW!  please?
-        glDeleteSync(fence);
-        glFlush(); // Drops RAM by 1MB in btop report.  Purty please?
-        glFinish(); // Drops RAM by 5MB in btop report.  Oh for the love of all that is holy JUST UPLOAD IT TO THE GPU AND FREE IT YOU STUPID OPENGL DRIVER!!!
-        DebugRAM("after glFinish for %s", texture_parser.entries[matchedParserIdx].path);
+//         glBufferSubData(GL_SHADER_STORAGE_BUFFER, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t), indices);
+//         glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT); // Drops RAM by 1MB in btop report
+//         GLsync fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+//         glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED); // Drops RAM by 1MB in btop report.  Upload to GPU RIGHT NOW!  please?
+//         glDeleteSync(fence);
+//         glFlush(); // Drops RAM by 1MB in btop report.  Purty please?
+//         glFinish(); // Drops RAM by 5MB in btop report.  Oh for the love of all that is holy JUST UPLOAD IT TO THE GPU AND FREE IT YOU STUPID OPENGL DRIVER!!!
+//         DebugRAM("after glFinish for %s", texture_parser.entries[matchedParserIdx].path);
+        memcpy((uint32_t *)mapped_buffer + pixel_offset, indices, width * height * sizeof(uint32_t));
         pixel_offset += width * height;
         palette_offset += palette_size;
 //         if (palette_size > 4096U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
@@ -247,17 +252,23 @@ int LoadTextures(void) {
             free(entry);
         }
         
-        DebugRAM("before stbi_image_free for %s", texture_parser.entries[matchedParserIdx].path);
+//         DebugRAM("before stbi_image_free for %s", texture_parser.entries[matchedParserIdx].path);
         stbi_image_free(image_data);
-        DebugRAM("after stbi_image_free for %s", texture_parser.entries[matchedParserIdx].path);
+//         DebugRAM("after stbi_image_free for %s", texture_parser.entries[matchedParserIdx].path);
     }
     
     free(indices);
     free(file_buffer);
     DebugRAM("freeing indices and file_buffer");
+    glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+    glFlush();
+    glFinish();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    DebugRAM("after SSBO upload");
     DualLog("Largest palette size of %d\n", maxPalletSize);
 
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);

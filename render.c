@@ -258,8 +258,6 @@ int RenderStaticMeshes(void) {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
-
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
     glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
