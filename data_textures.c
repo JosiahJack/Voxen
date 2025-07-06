@@ -161,13 +161,7 @@ int LoadTextures(void) {
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-//     glBufferStorage(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_MAP_WRITE_BIT);
-//     void *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, totalPixels * sizeof(uint32_t),
-//                                            GL_MAP_WRITE_BIT);
-    
-    
     loadTextureItemInitialized[TEX_SSBOS] = true;
     DebugRAM("after glGenBuffers colorBufferID");
 
@@ -239,19 +233,14 @@ int LoadTextures(void) {
             indices[j / 4] = entry->index;
         }
 
-        // Upload indices to colorBuffer
-//         glBufferSubData(GL_SHADER_STORAGE_BUFFER, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t), indices);
-//         glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT); // Drops RAM by 1MB in btop report
-//         GLsync fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-//         glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, GL_TIMEOUT_IGNORED); // Drops RAM by 1MB in btop report.  Upload to GPU RIGHT NOW!  please?
-//         glDeleteSync(fence);
-//         glFlush(); // Drops RAM by 1MB in btop report.  Purty please?
-//         glFinish(); // Drops RAM by 5MB in btop report.  Oh for the love of all that is holy JUST UPLOAD IT TO THE GPU AND FREE IT YOU STUPID OPENGL DRIVER!!!
-//         DebugRAM("after glFinish for %s", texture_parser.entries[matchedParserIdx].path);
-
+        // Upload indices to colorBuffer via temporary staging buffer.
+        // The staging buffer (reused for all textures) is deleted afterwards
+        // letting the OpenGL driver delete the copy in RAM for CPU side and
+        // just let VRAM alone store the texture data.
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
         void *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, width * height * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         if (!mapped_buffer) { DualLogError("Failed to map stagingBuffer for %s\n", texture_parser.entries[matchedParserIdx].path); free(indices); glDeleteBuffers(1, &stagingBuffer); CleanupLoad(true); return 1; }
+        
         memcpy(mapped_buffer, indices, width * height * sizeof(uint32_t));
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
         glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
@@ -259,13 +248,9 @@ int LoadTextures(void) {
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t));
         glFlush();
         glFinish();
-        DebugRAM("after copy to colorBufferID for %s (index %d)", texture_parser.entries[matchedParserIdx].path, i);
-
-//         memcpy((uint32_t *)mapped_buffer + pixel_offset, indices, width * height * sizeof(uint32_t));
-//         glFlushMappedBufferRange(GL_SHADER_STORAGE_BUFFER, pixel_offset, width * height * sizeof(uint32_t));
         pixel_offset += width * height;
         palette_offset += palette_size;
-//         if (palette_size > 4096U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+        if (palette_size > 10000U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
         if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
         
         // Clean up
@@ -274,9 +259,7 @@ int LoadTextures(void) {
             free(entry);
         }
         
-//         DebugRAM("before stbi_image_free for %s", texture_parser.entries[matchedParserIdx].path);
         stbi_image_free(image_data);
-//         DebugRAM("after stbi_image_free for %s", texture_parser.entries[matchedParserIdx].path);
     }
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);  
@@ -284,7 +267,6 @@ int LoadTextures(void) {
     free(indices);
     free(file_buffer);
     DebugRAM("freeing indices and file_buffer");
-//     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     glFlush();
     glFinish();
