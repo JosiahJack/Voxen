@@ -335,12 +335,7 @@ index: 156
 index: 157
 #Textures/darthit.png
 index: 158
-#Textures/detail_metalsmooth.png
-index: 159
-#Textures/detail_noisesubtle.png
-index: 160
-#Textures/detail_rusty.png
-index: 161
+
 #Textures/dexmissile_glow.png
 index: 162
 #Textures/dexmissile_normal.png
@@ -1112,8 +1107,7 @@ index: 548
 index: 550
 #Textures/npc_cyborg.png
 index: 552
-#Textures/npc_cyborgwarrior_ambocc.png
-index: 553
+
 #Textures/npc_cyborgwarrior.png
 index: 554
 #Textures/npc_exec.png
@@ -1160,8 +1154,7 @@ index: 574
 index: 575
 #Textures/npc_virusmutant.png
 index: 576
-#Textures/npc_zerogmut0.png
-index: 577
+
 #Textures/onepixel_plain.png
 index: 578
 #Textures/onepixel.png
@@ -1768,8 +1761,7 @@ index: 879
 index: 880
 #Textures/white.png
 index: 881
-#Textures/Wind.png
-index: 882
+
 #Textures/w_ion.png
 index: 883
 #Textures/w_magpulse.png
@@ -2058,8 +2050,6 @@ index: 1024
 index: 1025
 #Textures/UI/menu_background_new.png
 index: 1026
-#Textures/UI/menu_background.png
-index: 1027
 #Textures/UI/menu_button_paddark.png
 index: 1028
 #Textures/UI/menu_button_padlit.png

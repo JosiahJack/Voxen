@@ -1,3 +1,4 @@
+#include <malloc.h>
 #include <stdint.h>
 #include <stdbool.h>
 #define STB_IMAGE_IMPLEMENTATION // Indicate to stb_image to compile it in.
@@ -82,7 +83,7 @@ int LoadTextures(void) {
     loadTextureItemInitialized[TEX_PALOFFSETS] = true;
     DebugRAM("after texturePaletteOffsets mallocn");
     
-    size_t maxFileSize = 3662509;//2048 * 2048 * 4 * sizeof(uint8_t);
+    size_t maxFileSize = 10000000; // 10MB
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.
     if (!file_buffer) { DualLogError("Failed to allocate file buffer for loading png files\n"); CleanupLoad(true); return 1; }
     
@@ -250,7 +251,7 @@ int LoadTextures(void) {
         glFinish();
         pixel_offset += width * height;
         palette_offset += palette_size;
-        if (palette_size > 10000U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+        if (palette_size > 2048U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
         if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
         
         // Clean up
@@ -260,6 +261,7 @@ int LoadTextures(void) {
         }
         
         stbi_image_free(image_data);
+        malloc_trim(0);
     }
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);  

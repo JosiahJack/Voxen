@@ -55,11 +55,10 @@ void SVO_Init(SVO* svo, int index) {
 }
 
 void VXGI_Init(void) {
-    DualLog("VXGI Init\n");
+    DebugRAM("VXGI Init\n");
     for (int i = 0; i < 2; ++i) {
         SVO_Init(&vxgi_buffers[i].svo,i);
         atomic_store(&vxgi_buffers[i].ready, false);
-        DualLog("Buffer %d initialized\n", i);
     }
     
     DualLog("Spawning VXGI worker thread... ");

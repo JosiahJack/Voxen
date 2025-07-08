@@ -1,3 +1,4 @@
+#include <malloc.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -47,6 +48,7 @@ int LoadGeometry(void) {
     
     int totalVertCount = 0;
     int totalBounds = 0;
+    uint32_t largestVertCount = 0;
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<model_parser.count;k++) {
@@ -56,18 +58,14 @@ int LoadGeometry(void) {
         if (matchedParserIdx < 0) continue;
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
         
-        const struct aiScene *scene = aiImportFile(model_parser.entries[matchedParserIdx].path,
-                                                    aiProcess_FindInvalidData
-                                                    | aiProcess_Triangulate
-                                                    | aiProcess_GenNormals
-                                                    | aiProcess_ImproveCacheLocality
-                                                    | aiProcess_FindDegenerates
-                                                    | aiProcess_LimitBoneWeights);
-        
+        const struct aiScene *scene = aiImportFile(model_parser.entries[matchedParserIdx].path,aiProcess_Triangulate | aiProcess_GenNormals);
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
             DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString());
             return 1;
         }
+        
+//         DebugRAM("after assimp scene made for %s",model_parser.entries[matchedParserIdx].path);
+
 
         // Count total vertices in the model
         uint32_t vertexCount = 0;
@@ -78,7 +76,12 @@ int LoadGeometry(void) {
         }
 
         modelVertexCounts[i] = vertexCount;
-//         DualLog("Model %s loaded with %d vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        if (vertexCount > largestVertCount) largestVertCount = vertexCount;
+        if (vertexCount > 5000U) {
+            DualLog("Model %s loaded with \033[1;33m%d\033[0;0m vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        } else {
+            DualLog("Model %s loaded with %d vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        }
         totalVertCount += vertexCount;
 
         // Allocate vertex data for this model
@@ -88,6 +91,8 @@ int LoadGeometry(void) {
             aiReleaseImport(scene);
             return 1;
         }
+        
+//         DebugRAM("after tempVertices malloc for %s",model_parser.entries[matchedParserIdx].path);
 
         // Extract vertex data
         uint32_t vertexIndex = 0;
@@ -119,6 +124,8 @@ int LoadGeometry(void) {
                 if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
             }
         }
+        
+//         DebugRAM("after vertices for loop for %s",model_parser.entries[matchedParserIdx].path);
 
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 0] = minx;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 1] = miny;
@@ -129,7 +136,12 @@ int LoadGeometry(void) {
         totalBounds += 6;
         vertexDataArrays[i] = tempVertices;
         aiReleaseImport(scene);
+        malloc_trim(0);
+//         DebugRAM("after assimp release %s",model_parser.entries[matchedParserIdx].path);
     }
+    
+    DualLog("Largest vertex count for a model: %d\n",largestVertCount);
+    DebugRAM("after model load first pass");
 
     // Log vertex counts
     DualLog("Total vertices in buffer %d (",totalVertCount);
@@ -146,6 +158,12 @@ int LoadGeometry(void) {
         
     // Generate and populate VBOs
     glGenBuffers(MODEL_COUNT, vbos);
+    
+    GLuint stagingBuffer;
+    glGenBuffers(1, &stagingBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, stagingBuffer);
+    glBufferData(GL_ARRAY_BUFFER, largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    DebugRAM("after glGenBuffers vbos");
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         if (modelVertexCounts[i] == 0) continue; // No model specified with this index.
         if (vertexDataArrays[i] == NULL) {
@@ -154,16 +172,36 @@ int LoadGeometry(void) {
             continue;
         }
         
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), vertexDataArrays[i], GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, stagingBuffer);
+        void *mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        if (!mapped_buffer) { DualLogError("Failed to map stagingBuffer for model %d\n", i); continue; }
+        
+        memcpy(mapped_buffer, vertexDataArrays[i], modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+
+        // Copy to VBO
+        glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
+        glBufferData(GL_COPY_WRITE_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glFlush();
+        glFinish();
     }
     
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);  
+    glDeleteBuffers(1, &stagingBuffer);
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+    glFlush();
+    glFinish();
+    DebugRAM("after model staging buffer clear");
+
+            
     // Define vertex attribute formats
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
     glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
     glVertexAttribFormat(3, 1, GL_INT, GL_FALSE, 6 * sizeof(float)); // Tex Index (int)
-    
+
     // Bind attributes to a single binding point (0)
     glVertexAttribBinding(0, 0); // Position
     glVertexAttribBinding(1, 0); // Normal
@@ -177,11 +215,13 @@ int LoadGeometry(void) {
     glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
-    
+    DebugRAM("after vao bind");
+
     glGenBuffers(1, &modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-    
+    DebugRAM("after model bounds bind");
+
     // Set static buffers once for Deferred Lighting shader
     glUniform1ui(screenWidthLoc_deferred, screen_width);
     glUniform1ui(screenHeightLoc_deferred, screen_height);

@@ -48,6 +48,7 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int he
 
 // Create G-buffer textures
 void SetupGBuffer(void) {
+    DebugRAM("setup gbuffer start");
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, "Unlit Raster Normals");
@@ -85,6 +86,7 @@ void SetupGBuffer(void) {
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    
+    DebugRAM("setup gbuffer end");
 }
 
 int ClearFrameBuffers(void) {
