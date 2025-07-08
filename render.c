@@ -53,11 +53,11 @@ void SetupGBuffer(void) {
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, "Unlit Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, "Unlit Raster Depth");
-    GenerateAndBindTexture(&inputWorldPosID,         GL_RGBA32F, screen_width, screen_height,           GL_RGBA,                   GL_FLOAT, "Unlit Raster World Positions");
-    GenerateAndBindTexture(&inputModelInstanceID,    GL_RGBA32I, screen_width, screen_height,   GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Instance and Model Indices");
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, "Unlit Raster World Positions");
+    GenerateAndBindTexture(&inputModelInstanceID,   GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Instance and Model Indices");
     
     // Second pass gbuffer images
-    GenerateAndBindTexture(&outputImageID,           GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                  GL_FLOAT, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Deferred Lighting Result Colors");
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -83,7 +83,7 @@ void SetupGBuffer(void) {
     glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
     glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT24);
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Output
     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    
     DebugRAM("setup gbuffer end");
