@@ -16,7 +16,7 @@ TEMP_DIR=temp_build
 #fi
 
 mkdir -p $TEMP_DIR
-rm ./$TEMP_DIR/*.o
+rm -f ./$TEMP_DIR/*.o
 
 # Compile sources in parallel to temporary object files
 pids=()

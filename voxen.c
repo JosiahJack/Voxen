@@ -144,11 +144,16 @@ typedef enum {
 bool systemInitialized[SYS_COUNT] = { [0 ... SYS_COUNT - 1] = false };
 
 int InitializeEnvironment(void) {
+    DebugRAM("InitializeEnvironment start");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { DualLogError("SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
     systemInitialized[SYS_SDL] = true;
-    
+    DebugRAM("SDL init");
+    malloc_trim(0);
+
     if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     systemInitialized[SYS_TTF] = true;
+    DebugRAM("TTF init");
+    malloc_trim(0);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
@@ -158,25 +163,29 @@ int InitializeEnvironment(void) {
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
-    
     systemInitialized[SYS_WIN] = true;
+    DebugRAM("window init"); 
+    malloc_trim(0);
 
     gl_context = SDL_GL_CreateContext(window);
-    if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return SYS_CTX + 1; }
-    
+    if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return SYS_CTX + 1; }    
     systemInitialized[SYS_CTX] = true;
+    DebugRAM("GL init"); 
+    malloc_trim(0);
 
     SDL_GL_MakeCurrent(window, gl_context);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_OGL + 1; }
-    
     systemInitialized[SYS_OGL] = true;
+    DebugRAM("GLEW init"); 
+    malloc_trim(0);
 
     // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     DualLog("OpenGL Version: %s\n", version ? (const char*)version : "unknown");
     DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
+    malloc_trim(0);
 
     int vsync_enable = 0;//1; // Set to 0 for false.
     SDL_GL_SetSwapInterval(vsync_enable);
@@ -189,23 +198,34 @@ int InitializeEnvironment(void) {
     glViewport(0, 0, screen_width, screen_height);
 
     if (CompileShaders()) return SYS_COUNT + 1;
+    DebugRAM("compile shaders"); 
+    malloc_trim(0);
     CacheUniformLocationsForShaders(); // After CompileShaders()
     SetupQuad(); // For image blit for post processing effects like lighting.
     int fontInit = InitializeTextAndFonts();
     if (fontInit) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    DebugRAM("setup full screen quad"); 
     
     InitializeLights();
+    DebugRAM("init lights"); 
     SetupGBuffer();
     SetupInstances();
+    DebugRAM("instances init"); 
     Input_Init();
+    DebugRAM("input init"); 
     InitializeNetworking();
+    DebugRAM("network init"); 
     systemInitialized[SYS_NET] = true;
+    malloc_trim(0);
 
     InitializeAudio();
+    DebugRAM("audio init"); 
     systemInitialized[SYS_AUD] = true;
+    malloc_trim(0);
 
     //play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
     //play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
+    DebugRAM("InitializeEnvironment end");
     return 0;
 }
 
@@ -237,9 +257,9 @@ int ExitCleanup(int status) {
     if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
-    if (inputModelInstanceID) glDeleteTextures(1,&inputModelInstanceID);
+//     if (inputModelInstanceID) glDeleteTextures(1,&inputModelInstanceID);
     
-    if (outputImageID) glDeleteTextures(1,&outputImageID);
+//     if (outputImageID) glDeleteTextures(1,&outputImageID);
     
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     
@@ -310,6 +330,7 @@ int main(int argc, char* argv[]) {
     int exitCode = 0;
     globalFrameNum = 0;
     activeLogFile = 0;
+    DebugRAM("prior to event system init");
     exitCode = EventInit();
     if (exitCode) return ExitCleanup(exitCode);
 
@@ -324,6 +345,8 @@ int main(int argc, char* argv[]) {
     } else if (argc == 3 && strcmp(argv[1], "record") == 0) { // Log record
         manualLogName = argv[2];
     }
+    
+    DebugRAM("prior init events queued");
 
     // Queue order for loading is IMPORTANT!
     EnqueueEvent_Simple(EV_INIT);
@@ -340,6 +363,7 @@ int main(int argc, char* argv[]) {
     double accumulator = 0.0;
     last_time = get_time();
     lastJournalWriteTime = get_time();
+    DebugRAM("prior to game loop");
     while(1) {
         start_frame_time = get_time();
         if (!log_playback) {

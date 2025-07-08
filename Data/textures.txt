@@ -105,8 +105,8 @@ index: 40
 index: 41
 #Textures/blood_core.png
 index: 42
-// #Textures/bridg1_1_norm.png
-// index: 43
+#Textures/bridg1_1_norm.png
+index: 43
 #Textures/bridg1_1.png
 index: 44
 #Textures/bridg1_2.png
@@ -121,22 +121,22 @@ index: 48
 index: 49
 #Textures/bridg1_5.png
 index: 50
-// #Textures/bridg1_5_spec.png
-// index: 51
+#Textures/bridg1_5_spec.png
+index: 51
 #Textures/bridg2_1.png
 index: 52
 #Textures/bridg2_2.png
 index: 53
 #Textures/bridg2_3_glow.png
 index: 54
-// #Textures/bridg2_3_norm.png
-// index: 55
+#Textures/bridg2_3_norm.png
+index: 55
 #Textures/bridg2_3.png
 index: 56
 #Textures/bridg2_4.png
 index: 57
-// #Textures/bridg2_5_norm.png
-// index: 58
+#Textures/bridg2_5_norm.png
+index: 58
 #Textures/bridg2_5.png
 index: 59
 #Textures/bridg2_6.png
@@ -169,8 +169,8 @@ index: 72
 index: 73
 #Textures/CameraSpatter.png
 index: 74
-// #Textures/CenterFluff.png
-// index: 75
+#Textures/CenterFluff.png
+index: 75
 #Textures/charge_stat_glow.png
 index: 76
 #Textures/charge_stat.png
@@ -263,32 +263,32 @@ index: 123
 index: 124
 #Textures/console3_9.png
 index: 125
-// #Textures/corpse_blueshirt.png
-// index: 126
-// #Textures/corpse_blueshirt_specular.png
-// index: 127
-// #Textures/corpse_brownshirt.png
-// index: 128
-// #Textures/corpse_brownshirt_specular.png
-// index: 129
-// #Textures/corpse_eaten.png
-// index: 130
-// #Textures/corpse_eaten_specular.png
-// index: 131
-// #Textures/corpse_labcoat.png
-// index: 132
-// #Textures/corpse_labcoat_specular.png
-// index: 133
-// #Textures/corpse_redshirt.png
-// index: 134
-// #Textures/corpse_redshirt_specular.png
-// index: 135
-// #Textures/corpse_security.png
-// index: 136
-// #Textures/corpse_security_specular.png
-// index: 137
-// #Textures/corpse_tan.png
-// index: 138
+#Textures/corpse_blueshirt.png
+index: 126
+#Textures/corpse_blueshirt_specular.png
+index: 127
+#Textures/corpse_brownshirt.png
+index: 128
+#Textures/corpse_brownshirt_specular.png
+index: 129
+#Textures/corpse_eaten.png
+index: 130
+#Textures/corpse_eaten_specular.png
+index: 131
+#Textures/corpse_labcoat.png
+index: 132
+#Textures/corpse_labcoat_specular.png
+index: 133
+#Textures/corpse_redshirt.png
+index: 134
+#Textures/corpse_redshirt_specular.png
+index: 135
+#Textures/corpse_security.png
+index: 136
+#Textures/corpse_security_specular.png
+index: 137
+#Textures/corpse_tan.png
+index: 138
 #Textures/crate1_1.png
 index: 139
 #Textures/crate1_2.png
@@ -332,8 +332,8 @@ index: 158
 
 #Textures/dexmissile_glow.png
 index: 162
-// #Textures/dexmissile_normal.png
-// index: 163
+#Textures/dexmissile_normal.png
+index: 163
 #Textures/dexmissile.png
 index: 164
 #Textures/d_logo10.png
@@ -372,8 +372,8 @@ index: 180
 index: 181
 #Textures/d_logo9.png
 index: 182
-// #Textures/door1_1_normal.png
-// index: 183
+#Textures/door1_1_normal.png
+index: 183
 #Textures/door1_1.png
 index: 184
 #Textures/door1_2.png
@@ -440,8 +440,8 @@ index: 214
 index: 215
 #Textures/d_paint1_glow.png
 index: 216
-// #Textures/d_paint1_normal.png
-// index: 217
+#Textures/d_paint1_normal.png
+index: 217
 #Textures/d_paint1.png
 index: 218
 #Textures/d_paint2_glow.png
@@ -452,12 +452,12 @@ index: 220
 index: 221
 #Textures/d_paint3.png
 index: 222
-// #Textures/d_post1_normal.png
-// index: 223
+#Textures/d_post1_normal.png
+index: 223
 #Textures/d_post1.png
 index: 224
-// #Textures/d_post2_normal.png
-// index: 225
+#Textures/d_post2_normal.png
+index: 225
 #Textures/d_post2.png
 index: 226
 #Textures/d_scor1.png
@@ -562,8 +562,8 @@ index: 275
 index: 276
 #Textures/eng2_2d.png
 index: 277
-// #Textures/eng2_2_normal.png
-// index: 278
+#Textures/eng2_2_normal.png
+index: 278
 #Textures/eng2_2.png
 index: 279
 #Textures/eng2_3d_glow.png
@@ -574,8 +574,8 @@ index: 281
 index: 282
 #Textures/eng2_4.png
 index: 283
-// #Textures/eng2_5_normal.png
-// index: 284
+#Textures/eng2_5_normal.png
+index: 284
 #Textures/eng2_5.png
 index: 285
 #Textures/exec1_1d.png
@@ -759,16 +759,16 @@ index: 377
 index: 378
 #Textures/grove2_8.png
 index: 379
-// #Textures/grove2_9b_normal.png
-// index: 380
+#Textures/grove2_9b_normal.png
+index: 380
 #Textures/grove2_9b.png
 index: 381
-// #Textures/grove2_9c_normal.png
-// index: 382
+#Textures/grove2_9c_normal.png
+index: 382
 #Textures/grove2_9c.png
 index: 383
-// #Textures/grove2_9_normal.png
-// index: 384
+#Textures/grove2_9_normal.png
+index: 384
 #Textures/grove2_9.png
 index: 385
 #Textures/gunhit02.png
@@ -907,12 +907,12 @@ index: 451
 index: 452
 #Textures/maint2_1d.png
 index: 453
-// #Textures/maint2_1_normal.png
-// index: 454
+#Textures/maint2_1_normal.png
+index: 454
 #Textures/maint2_1.png
 index: 455
-// #Textures/maint2_2_normal.png
-// index: 456
+#Textures/maint2_2_normal.png
+index: 456
 #Textures/maint2_2.png
 index: 457
 #Textures/maint2_3d_glow.png
@@ -995,24 +995,24 @@ index: 495
 index: 496
 #Textures/med1_7d.png
 index: 497
-// #Textures/med1_7_normal.png
-// index: 498
+#Textures/med1_7_normal.png
+index: 498
 #Textures/med1_7.png
 index: 499
 #Textures/med1_8d_glow.png
 index: 500
 #Textures/med1_8d.png
 index: 501
-// #Textures/med1_8_normal.png
-// index: 502
+#Textures/med1_8_normal.png
+index: 502
 #Textures/med1_8.png
 index: 503
-// #Textures/med1_9d_normal.png
-// index: 504
+#Textures/med1_9d_normal.png
+index: 504
 #Textures/med1_9d.png
 index: 505
-// #Textures/med1_9_normal.png
-// index: 506
+#Textures/med1_9_normal.png
+index: 506
 #Textures/med1_9.png
 index: 507
 #Textures/med2_1d_glow.png
@@ -1023,8 +1023,8 @@ index: 509
 index: 510
 #Textures/med2_1_edge.png
 index: 511
-// #Textures/med2_1_norm.png
-// index: 512
+#Textures/med2_1_norm.png
+index: 512
 #Textures/med2_1.png
 index: 513
 #Textures/med2_2d_glow.png
@@ -1075,10 +1075,10 @@ index: 535
 index: 536
 #Textures/medical_bed.png
 index: 537
-// #Textures/MessyStreakTrail.png
-// index: 538
-// #Textures/normal_blank.png
-// index: 539
+#Textures/MessyStreakTrail.png
+index: 538
+#Textures/normal_blank.png
+index: 539
 #Textures/npc_autobombdark.png
 index: 540
 #Textures/npc_autobomb_glow.png
@@ -1155,22 +1155,22 @@ index: 578
 index: 579
 #Textures/papers.png
 index: 580
-// #Textures/ParticleCloudBlack.png
-// index: 582
-// #Textures/ParticleCloudWhite.png
-// index: 583
-// #Textures/ParticleCloudWhiteReduced.png
-// index: 584
-// #Textures/ParticleFireballSheet.png
-// index: 585
-// #Textures/ParticleFirecloud.png
-// index: 586
-// #Textures/ParticleFlameLickSheet.png
-// index: 587
-// #Textures/ParticleFlamesSheet.png
-// index: 588
-// #Textures/ParticleFlare.png
-// index: 589
+#Textures/ParticleCloudBlack.png
+index: 582
+#Textures/ParticleCloudWhite.png
+index: 583
+#Textures/ParticleCloudWhiteReduced.png
+index: 584
+#Textures/ParticleFireballSheet.png
+index: 585
+#Textures/ParticleFirecloud.png
+index: 586
+#Textures/ParticleFlameLickSheet.png
+index: 587
+#Textures/ParticleFlamesSheet.png
+index: 588
+#Textures/ParticleFlare.png
+index: 589
 #Textures/p_berserk.png
 index: 590
 #Textures/p_detox.png
@@ -1289,26 +1289,26 @@ index: 646
 index: 647
 #Textures/puddle1.png
 index: 648
-// #Textures/puddle2_normal.png
-// index: 649
+#Textures/puddle2_normal.png
+index: 649
 #Textures/puddle2.png
 index: 650
-// #Textures/puddle_mask.png
-// index: 651
+#Textures/puddle_mask.png
+index: 651
 #Textures/puddleoil.png
 index: 652
 #Textures/puddleoil_shine.png
 index: 653
-// #Textures/pumpkin_1.png
-// index: 654
-// #Textures/pumpkin_2_glow.png
-// index: 655
-// #Textures/pumpkin_2.png
-// index: 656
-// #Textures/pumpkin_3_glow.png
-// index: 657
-// #Textures/pumpkin_3.png
-// index: 658
+#Textures/pumpkin_1.png
+index: 654
+#Textures/pumpkin_2_glow.png
+index: 655
+#Textures/pumpkin_2.png
+index: 656
+#Textures/pumpkin_3_glow.png
+index: 657
+#Textures/pumpkin_3.png
+index: 658
 #Textures/rad1_1_glow.png
 index: 659
 #Textures/rad1_1.png
@@ -1431,8 +1431,8 @@ index: 717
 index: 718
 #Textures/reac6_3.png
 index: 719
-// #Textures/saturn-ring.png
-// index: 720
+#Textures/saturn-ring.png
+index: 720
 #Textures/sci1_1d.png
 index: 721
 #Textures/sci1_1.png
@@ -1527,26 +1527,26 @@ index: 765
 index: 766
 #Textures/screen8_4.png
 index: 767
-// #Textures/screencode0.png
-// index: 768
-// #Textures/screencode1.png
-// index: 769
-// #Textures/screencode2.png
-// index: 770
-// #Textures/screencode3.png
-// index: 771
-// #Textures/screencode4.png
-// index: 772
-// #Textures/screencode5.png
-// index: 773
-// #Textures/screencode6.png
-// index: 774
-// #Textures/screencode7.png
-// index: 775
-// #Textures/screencode8.png
-// index: 776
-// #Textures/screencode9.png
-// index: 777
+#Textures/screencode0.png
+index: 768
+#Textures/screencode1.png
+index: 769
+#Textures/screencode2.png
+index: 770
+#Textures/screencode3.png
+index: 771
+#Textures/screencode4.png
+index: 772
+#Textures/screencode5.png
+index: 773
+#Textures/screencode6.png
+index: 774
+#Textures/screencode7.png
+index: 775
+#Textures/screencode8.png
+index: 776
+#Textures/screencode9.png
+index: 777
 #Textures/seat1_1.png
 index: 778
 #Textures/seat1_2.png
@@ -1653,8 +1653,8 @@ index: 829
 index: 830
 #Textures/stor1_7d.png
 index: 831
-// #Textures/stor1_7_normal.png
-// index: 832
+#Textures/stor1_7_normal.png
+index: 832
 #Textures/stor1_7.png
 index: 833
 #Textures/stor1_7_spec.png
@@ -1717,16 +1717,12 @@ index: 861
 index: 862
 #Textures/thermos.png
 index: 863
-// #Textures/toolbox_wheeled_normal.png
-// index: 864
+#Textures/toolbox_wheeled_normal.png
+index: 864
 #Textures/toolbox_wheeled.png
 index: 865
 #Textures/toolbox_wheeled_specular.png
 index: 866
-// #Textures/TouchStick_Background.png
-// index: 867
-// #Textures/TouchStick_Knob.png
-// index: 868
 #Textures/tycho3.png
 index: 869
 #Textures/vending1.png

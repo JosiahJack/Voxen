@@ -206,7 +206,7 @@ int LoadTextures(void) {
         unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
         if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
         
-        DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
+//         DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
         
         // Populate palette and indices
         ColorEntry *color_table = NULL, *entry, *tmp;

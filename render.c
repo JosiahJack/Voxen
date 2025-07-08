@@ -33,7 +33,9 @@ uint32_t drawCallCount = 0;
 uint32_t vertexCount = 0;
 
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
-GLuint outputImageID, gBufferFBO, inputModelInstanceID;
+// GLuint outputImageID;
+GLuint gBufferFBO;
+// GLuint inputModelInstanceID;
 
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, const char *name) {
     glGenTextures(1, id);
@@ -54,10 +56,10 @@ void SetupGBuffer(void) {
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, "Unlit Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, "Unlit Raster Depth");
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, "Unlit Raster World Positions");
-    GenerateAndBindTexture(&inputModelInstanceID,   GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Instance and Model Indices");
+//     GenerateAndBindTexture(&inputModelInstanceID,   GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Instance and Model Indices");
     
     // Second pass gbuffer images
-    GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Deferred Lighting Result Colors");
+//     GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Deferred Lighting Result Colors");
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -65,7 +67,7 @@ void SetupGBuffer(void) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputModelInstanceID, 0);
+//     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputModelInstanceID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
     glDrawBuffers(4, drawBuffers);
@@ -79,12 +81,12 @@ void SetupGBuffer(void) {
         }
     }
     
-    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_DEPTH_COMPONENT24);
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_DEPTH_COMPONENT24);
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Output
-    glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32I);
+//     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Output
+//     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    
     DebugRAM("setup gbuffer end");
 }
@@ -113,6 +115,7 @@ GLint debugViewLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
 GLint shadowsEnabledLoc_deferred = -1, vxgiEnabledLoc_deferred = -1, voxelCountLoc_deferred = -1;
+GLint debugViewLoc_deferred = -1;
 
 void CacheUniformLocationsForShaders(void) {
     // Called after shader compilation in InitializeEnvironment
@@ -130,6 +133,7 @@ void CacheUniformLocationsForShaders(void) {
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     vxgiEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "vxgiEnabled");
     voxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "voxelCount");
+    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
 }
 
 
@@ -263,7 +267,8 @@ int RenderStaticMeshes(void) {
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
     glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
-    
+    glUniform1i(debugViewLoc_deferred, debugView);
+
     glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
     float viewInv[16];
     mat4_inverse(viewInv,view);
@@ -289,7 +294,8 @@ int RenderStaticMeshes(void) {
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     if (debugView == 0) {
-        glBindTexture(GL_TEXTURE_2D, outputImageID); // Normal
+//         glBindTexture(GL_TEXTURE_2D, outputImageID); // Normal
+        glBindTexture(GL_TEXTURE_2D, inputImageID); // Normal
     } else if (debugView == 1) {
         glBindTexture(GL_TEXTURE_2D, inputImageID); // Unlit
     } else if (debugView == 2) {

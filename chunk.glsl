@@ -84,7 +84,7 @@ const char *fragmentShaderTraditional =
     "layout(location = 0) out vec4 outAlbedo;\n"              // GL_COLOR_ATTACHMENT0
     "layout(location = 1) out vec4 outNormal;\n"              // GL_COLOR_ATTACHMENT1
     "layout(location = 2) out vec4 outWorldPos;\n"            // GL_COLOR_ATTACHMENT2
-    "layout(location = 3) out ivec4 outModelInstanceIndex;\n" // GL_COLOR_ATTACHMENT3
+//     "layout(location = 3) out ivec4 outModelInstanceIndex;\n" // GL_COLOR_ATTACHMENT3
     "\n"
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
@@ -94,7 +94,7 @@ const char *fragmentShaderTraditional =
     "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V, OpenGL convention vs import
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
-    "    outModelInstanceIndex = ivec4(InstanceIndex,ModelIndex,texIndexChecked,0);\n"
+//     "    outModelInstanceIndex = ivec4(InstanceIndex,ModelIndex,texIndexChecked,0);\n"
     "    if (debugView == 3) {\n"
     "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
     "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
@@ -109,5 +109,5 @@ const char *fragmentShaderTraditional =
     "        outAlbedo = getTextureColor(texIndexChecked,ivec2(x,y));\n"
     "    }\n"
     "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
-    "    outWorldPos = vec4(FragPos,0.0);\n"
+    "    outWorldPos = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
     "}\n";

@@ -137,7 +137,7 @@ int LoadGeometry(void) {
         vertexDataArrays[i] = tempVertices;
         aiReleaseImport(scene);
         malloc_trim(0);
-//         DebugRAM("after assimp release %s",model_parser.entries[matchedParserIdx].path);
+        DebugRAM("after assimp release %s",model_parser.entries[matchedParserIdx].path);
     }
     
     DualLog("Largest vertex count for a model: %d\n",largestVertCount);
