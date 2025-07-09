@@ -446,7 +446,14 @@ int main(int argc, char* argv[]) {
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
         
-        exitCode = ClientRender();
+        // Client Render
+        exitCode = ClearFrameBuffers();
+        if (exitCode) break;
+        
+        exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
+        if (exitCode) break;
+
+        exitCode = RenderUI(get_time() - last_time);
         SDL_GL_SwapWindow(window); // Present frame
         last_time = current_time;
         globalFrameNum++;

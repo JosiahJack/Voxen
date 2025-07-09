@@ -38,6 +38,5 @@ void RenderMeshInstances();
 int RenderStaticMeshes(void);
 void render_debug_text(float x, float y, const char *text, SDL_Color color);
 int RenderUI(double deltaTime);
-int ClientRender();
 
 #endif // VOXEN_RENDER_H

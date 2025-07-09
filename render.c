@@ -281,7 +281,7 @@ int RenderStaticMeshes(void) {
     GLuint groupX = (screen_width + 7) / 8;
     GLuint groupY = (screen_height + 7) / 8;
     glDispatchCompute(groupX, groupY, 1);
-//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
     
     // 4. Shadow Softening Compute Shader
     //        Takes delta between lit and lit+shadow result found in Pass 2
@@ -359,17 +359,4 @@ int RenderUI(double deltaTime) {
     glDisable(GL_STENCIL_TEST);
     glStencilMask(0x00); // Disable stencil writes
     return 0;
-}
-
-// Main render call for entire graphics pipeline.
-int ClientRender() {
-    int exitCode = 0;
-    exitCode = ClearFrameBuffers();
-    if (exitCode) return exitCode;
-    
-    exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
-    if (exitCode) return exitCode;
-
-    exitCode = RenderUI(get_time() - last_time);
-    return exitCode;
 }
