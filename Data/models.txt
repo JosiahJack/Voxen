@@ -1342,3 +1342,13 @@ index: 660
 index: 661
 #Models/bridg1_2.fbx
 index: 662
+#Models/bridg1_3_flipx.fbx
+index: 663
+#Models/bridg2_7.fbx
+index: 664
+#Models/eng1_7d.fbx
+index: 665
+#Models/eng2_2d.fbx
+index: 666
+#Models/bridg1_1_flipx.fbx
+index: 667

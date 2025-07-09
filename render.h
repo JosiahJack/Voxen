@@ -17,7 +17,7 @@ extern GLuint chunkShaderProgram;
 extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
 // extern GLuint outputImageID;
 extern GLuint gBufferFBO;
-// extern GLuint inputModelInstanceID;
+extern GLuint inputTexMapsID;
 
 // Static chunk shader locations (set on texture or model load)
 extern GLint textureCountLoc_chunk;

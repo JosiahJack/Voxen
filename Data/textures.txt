@@ -123,8 +123,7 @@ index: 49
 index: 50
 #Textures/bridg1_5_spec.png
 index: 51
-#Textures/bridg2_1.png
-index: 52
+
 #Textures/bridg2_2.png
 index: 53
 #Textures/bridg2_3_glow.png

@@ -14,6 +14,8 @@
 #include "debug.h"
 #include "render.h"
 
+// #define DEBUG_TEXTURE_LOAD_DATA 0
+
 #define MAX_PALETTE_SIZE 65535u
 
 DataParser texture_parser;
@@ -251,7 +253,9 @@ int LoadTextures(void) {
         glFinish();
         pixel_offset += width * height;
         palette_offset += palette_size;
+#ifdef DEBUG_TEXTURE_LOAD_DATA
         if (palette_size > 2048U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+#endif
         if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
         
         // Clean up
@@ -273,8 +277,9 @@ int LoadTextures(void) {
     glFlush();
     glFinish();
     DebugRAM("after SSBO upload");
+#ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Largest palette size of %d\n", maxPalletSize);
-
+#endif
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
@@ -283,11 +288,13 @@ int LoadTextures(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 16, texturePalettesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
+#ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Total pixels in buffer %d (", totalPixels);
     print_bytes_no_newline(totalPixels * 4);
     DualLog("), total palette colors %d (", totalPaletteColors);
     print_bytes_no_newline(totalPaletteColors * 4);
     DualLog(")\n");
+#endif
 
     // 13 is BlueNoise for deferred shader
     

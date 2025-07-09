@@ -28,6 +28,8 @@
 #include "voxel.h"
 #include "data_entities.h"
 
+// #define DEBUG_RAM_OUTPUT 0
+
 // Window
 SDL_Window *window;
 int screen_width = 800, screen_height = 600;
@@ -106,9 +108,6 @@ size_t get_rss_bytes(void) {
 }
 
 void DebugRAM(const char *context, ...) {
-    struct mallinfo2 info = mallinfo2();
-    size_t rss_bytes = get_rss_bytes();
-
     // Buffer to hold formatted context string
     char formatted_context[1024];
 
@@ -118,11 +117,15 @@ void DebugRAM(const char *context, ...) {
     vsnprintf(formatted_context, sizeof(formatted_context), context, args);
     va_end(args);
 
+#ifdef DEBUG_RAM_OUTPUT
+    struct mallinfo2 info = mallinfo2();
+    size_t rss_bytes = get_rss_bytes();
     // Log heap and RSS usage with formatted context
     DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), RSS %zu bytes (%zu KB | %.2f MB)\n",
             formatted_context,
             info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
             rss_bytes, rss_bytes / 1024, rss_bytes / 1024.0 / 1024.0);
+#endif
 }
 
 void print_bytes_no_newline(int count) {
@@ -194,7 +197,7 @@ int InitializeEnvironment(void) {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
-    glFrontFace(GL_CW); // Flip triangle sorting order
+    glFrontFace(GL_CCW); // Flip triangle sorting order
     glViewport(0, 0, screen_width, screen_height);
 
     if (CompileShaders()) return SYS_COUNT + 1;
@@ -209,8 +212,6 @@ int InitializeEnvironment(void) {
     InitializeLights();
     DebugRAM("init lights"); 
     SetupGBuffer();
-    SetupInstances();
-    DebugRAM("instances init"); 
     Input_Init();
     DebugRAM("input init"); 
     InitializeNetworking();
@@ -257,10 +258,8 @@ int ExitCleanup(int status) {
     if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
-//     if (inputModelInstanceID) glDeleteTextures(1,&inputModelInstanceID);
-    
-//     if (outputImageID) glDeleteTextures(1,&outputImageID);
-    
+    if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
+        
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
@@ -300,6 +299,7 @@ int EventExecute(Event* event) {
             VXGI_Init(); // Initialize the voxels after loading models and instances so that svo's can be populated.
             systemInitialized[SYS_VOX] = true;
             return 0;
+        case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -360,6 +360,8 @@ int main(int argc, char* argv[]) {
                                          // generating voxels), entities (lets 
                                          // instances know what models), and
                                          // levels (populates instances.
+    EnqueueEvent_Simple(EV_LOAD_INSTANCES);
+    
     double accumulator = 0.0;
     last_time = get_time();
     lastJournalWriteTime = get_time();

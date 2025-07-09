@@ -4,6 +4,7 @@
 #include "instance.h"
 #include "data_models.h"
 #include "debug.h"
+#include "data_entities.h"
 
 Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -14,12 +15,12 @@ int SetupInstances(void) {
     int x = 0;
     int y = 0;
     for (int idx=0;idx<INSTANCE_COUNT;idx++) {
-        int mdx = idx < MODEL_COUNT ? idx : 0;
-        instances[idx].modelIndex = mdx;
-        instances[idx].texIndex = idx; // Set by entity definition when loaded.
-        instances[idx].glowIndex = 0; // Set by entity definition when loaded.
-        instances[idx].specIndex = 0; // Set by entity definition when loaded.
-        instances[idx].normIndex = 0; // Set by entity definition when loaded.
+        int entIdx = idx < MAX_ENTITIES ? idx : 0;
+        instances[idx].modelIndex = entities[entIdx].modelIndex;
+        instances[idx].texIndex = entities[entIdx].texIndex;
+        instances[idx].glowIndex = entities[entIdx].glowIndex;
+        instances[idx].specIndex = entities[entIdx].specIndex;
+        instances[idx].normIndex = entities[entIdx].normIndex;
         instances[idx].posx = ((float)x * 2.56f); // Position in grid with gaps for shadow testing.
         instances[idx].posy = ((float)y * 5.12f);
         instances[idx].posz = 0.0f;
@@ -35,18 +36,21 @@ int SetupInstances(void) {
             x = 0;
             y++;
         }
+        
+//         DualLog("Instance %d using entity %d:: mdx: %d, tex: %d, glw: %d, spc: %d, nrm: %d\n",
+//                 idx,entIdx,instances[idx].modelIndex,instances[idx].texIndex,instances[idx].glowIndex,instances[idx].specIndex,instances[idx].normIndex);
     }
     
-    instances[39].modelIndex = 5; // Test Light
+    instances[39].modelIndex = 620; // Test Light cube
     instances[39].texIndex = 881; // white light
-    instances[39].sclx = 0.16f; // Attempt to scale down test light mesh, does nothing.
+    instances[39].sclx = 0.16f;
     instances[39].scly = 0.16f;
     instances[39].sclz = 0.16f;
     
-    instances[0].rotx = 0.707f;
-    instances[0].roty = 0.0f;
-    instances[0].rotz = 0.0f;
-    instances[0].rotw = 0.707f;
+//     instances[0].rotx = 0.707f;
+//     instances[0].roty = 0.0f;
+//     instances[0].rotz = 0.0f;
+//     instances[0].rotw = 0.707f;
     
     glGenBuffers(1, &instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);

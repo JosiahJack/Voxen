@@ -35,7 +35,7 @@ uint32_t vertexCount = 0;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
 // GLuint outputImageID;
 GLuint gBufferFBO;
-// GLuint inputModelInstanceID;
+GLuint inputTexMapsID;
 
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, const char *name) {
     glGenTextures(1, id);
@@ -56,10 +56,7 @@ void SetupGBuffer(void) {
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, "Unlit Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, "Unlit Raster Depth");
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, "Unlit Raster World Positions");
-//     GenerateAndBindTexture(&inputModelInstanceID,   GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Instance and Model Indices");
-    
-    // Second pass gbuffer images
-//     GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&inputTexMapsID,         GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Glow and Specular Map Indices");
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -67,7 +64,7 @@ void SetupGBuffer(void) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
-//     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputModelInstanceID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputTexMapsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
     glDrawBuffers(4, drawBuffers);
@@ -85,8 +82,7 @@ void SetupGBuffer(void) {
     glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
     glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_DEPTH_COMPONENT24);
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-//     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Output
-//     glBindImageTexture(5, inputModelInstanceID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
+    glBindImageTexture(5, inputTexMapsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    
     DebugRAM("setup gbuffer end");
 }
@@ -112,6 +108,8 @@ GLint texIndexLoc_chunk = -1, textureCountLoc_chunk = -1;
 GLint instanceIndexLoc_chunk = -1;
 GLint modelIndexLoc_chunk = -1;
 GLint debugViewLoc_chunk = -1;
+GLint glowIndexLoc_chunk = -1;
+GLint specIndexLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
 GLint shadowsEnabledLoc_deferred = -1, vxgiEnabledLoc_deferred = -1, voxelCountLoc_deferred = -1;
@@ -123,6 +121,8 @@ void CacheUniformLocationsForShaders(void) {
     projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
     matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
+    glowIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowIndex");
+    specIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "specIndex");
     textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
@@ -176,6 +176,8 @@ void RenderMeshInstances() {
         model[12] = instances[i].posx; model[13] = instances[i].posy; model[14] = instances[i].posz; model[15] = 1.0f;
         memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
         glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+        glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
+        glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
         glUniform1i(instanceIndexLoc_chunk, i);
         int modelType = instances[i].modelIndex;
         glUniform1i(modelIndexLoc_chunk, modelType);

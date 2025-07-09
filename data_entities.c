@@ -34,7 +34,7 @@ int LoadEntities(void) {
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!", entityCount, MAX_ENTITIES); CleanupEntities(true); return 1; }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt"); CleanupEntities(true); return 1; }
 
-    DualLog("Parsing %d entities...", entityCount);
+    DualLog("Parsing %d entities...\n", entityCount);
 
     // Populate entities array
     for (int i = 0; i < entityCount; i++) {

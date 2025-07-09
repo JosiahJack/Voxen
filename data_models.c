@@ -13,6 +13,8 @@
 #include "data_parser.h"
 #include "voxel.h"
 
+// #define DEBUG_MODEL_LOAD_DATA
+
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 GLuint chunkShaderProgram;
@@ -77,11 +79,13 @@ int LoadGeometry(void) {
 
         modelVertexCounts[i] = vertexCount;
         if (vertexCount > largestVertCount) largestVertCount = vertexCount;
+#ifdef DEBUG_MODEL_LOAD_DATA
         if (vertexCount > 5000U) {
             DualLog("Model %s loaded with \033[1;33m%d\033[0;0m vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         } else {
             DualLog("Model %s loaded with %d vertices, %d tris\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         }
+#endif
         totalVertCount += vertexCount;
 
         // Allocate vertex data for this model
@@ -105,11 +109,11 @@ int LoadGeometry(void) {
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
-                tempVertices[vertexIndex++] = mesh->mVertices[v].x; // Position
+                tempVertices[vertexIndex++] = -mesh->mVertices[v].x; // Position
                 tempVertices[vertexIndex++] = mesh->mVertices[v].y;
                 tempVertices[vertexIndex++] = mesh->mVertices[v].z;
-                tempVertices[vertexIndex++] = mesh->mNormals[v].x; // Normal
-                tempVertices[vertexIndex++] = mesh->mNormals[v].y;
+                tempVertices[vertexIndex++] = -mesh->mNormals[v].x; // Normal (actually y, huh).
+                tempVertices[vertexIndex++] = mesh->mNormals[v].y; // Actually X normal.  weird
                 tempVertices[vertexIndex++] = mesh->mNormals[v].z;
                 float tempU = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].x : 0.0f;
                 float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
@@ -140,15 +144,19 @@ int LoadGeometry(void) {
         DebugRAM("after assimp release %s",model_parser.entries[matchedParserIdx].path);
     }
     
+#ifdef DEBUG_MODEL_LOAD_DATA
     DualLog("Largest vertex count for a model: %d\n",largestVertCount);
+#endif
     DebugRAM("after model load first pass");
 
+#ifdef DEBUG_MODEL_LOAD_DATA
     // Log vertex counts
     DualLog("Total vertices in buffer %d (",totalVertCount);
     print_bytes_no_newline(totalVertCount * 8 * 4); // x,y,z,nx,ny,nz,u,v * 4
     DualLog(") (Bounds ");
     print_bytes_no_newline(totalBounds * 4); //minx,miny,minz,maxx,maxy,maxz * 4 
     DualLog(")\n");
+#endif
 
     // Generate and bind VAO
     glGenVertexArrays(1, &vao);

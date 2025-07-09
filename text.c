@@ -60,6 +60,7 @@ void SetupTextQuad(void) {
 
 // Renders text at x,y coordinates specified using pointer to the string array.
 void RenderText(float x, float y, const char *text, int colorIdx) {
+    glDisable(GL_CULL_FACE); // Disable backface culling
     if (!font) { DualLogError("Font is NULL\n"); return; }
     if (!text) { DualLogError("Text is NULL\n"); return; }
     
@@ -138,6 +139,7 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     glUseProgram(0);
     glDeleteTextures(1, &texture);
     SDL_FreeSurface(rgba_surface);
+    glEnable(GL_CULL_FACE); // Reenable backface culling
 }
 
 void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...) {
