@@ -1,13 +1,16 @@
 #define MINIAUDIO_IMPLEMENTATION
-#define MA_NO_FLAC          // Disable FLAC decoder (not used, only need WAV and MP3)
-#define MA_NO_WEBAUDIO      // Disable WebAudio backend (not needed for desktop)
-#define MA_NO_AAUDIO        // Disable AAudio backend (Android-specific)
-#define MA_NO_OPENSL        // Disable OpenSL|ES backend (Android-specific)
-#define MA_NO_JACK          // Disable JACK backend (not commonly used on desktop)
-#define MA_NO_SNDIO         // Disable sndio backend (BSD-specific, not needed)
-#define MA_NO_AUDIO4        // Disable audio(4) backend (BSD-specific, not needed)
-#define MA_NO_OSS           // Disable OSS backend (legacy Linux, not needed)
-#define MA_NO_GENERATION    // Disable waveform/noise generation (not needed for file playback)
+#define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
+#define MA_ENABLE_WASAPI // For windows
+#define MA_ENABLE_WINMM  // For windows
+#define MA_ENABLE_DSOUND // For windows
+#define MA_ENABLE_ALSA       // For Linux
+#define MA_ENABLE_PULSEAUDIO // For Linux
+#define MA_ENABLE_COREAUDIO  // For Mac
+#define MA_NO_ENCODING // Don't need to save out audio files.
+#define MA_NO_GENERATION // Disable waveform/noise generation (not needed for file playback)
+#define MA_NO_FLAC
+#define MA_NO_NEON
+
 #include <SDL2/SDL.h>
 #include "miniaudio.h"
 // Minor modification made to miniaudio.h, otherwise unchanged vs https://github.com/mackron/miniaudio version 0.11.22 (350784a...)

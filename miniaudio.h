@@ -18634,6 +18634,8 @@ Timing
             #define MA_CLOCK_ID CLOCK_REALTIME
         #endif
 
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wunused-function"
         static void ma_timer_init(ma_timer* pTimer)
         {
             struct timespec newTime;
@@ -18655,6 +18657,7 @@ Timing
 
             return (newTimeCounter - oldTimeCounter) / 1000000000.0;
         }
+        #pragma GCC diagnostic pop
     #else
         static void ma_timer_init(ma_timer* pTimer)
         {

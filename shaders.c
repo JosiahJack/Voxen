@@ -7,9 +7,10 @@
 #include "imageblit.glsl"
 #include "lights.h"
 #include "deferred_lighting.compute"
-#include "image_effects.h"
 #include "bluenoise64.cginc"
 #include "debug.h"
+
+GLuint blueNoiseBuffer;
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
@@ -29,9 +30,7 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
 
 GLuint LinkProgram(GLuint *shaders, int count, const char *programName) {
     GLuint program = glCreateProgram();
-    for (int i = 0; i < count; i++) {
-        glAttachShader(program, shaders[i]);
-    }
+    for (int i = 0; i < count; i++) glAttachShader(program, shaders[i]);
     glLinkProgram(program);
 
     GLint success;
@@ -44,19 +43,8 @@ GLuint LinkProgram(GLuint *shaders, int count, const char *programName) {
         return 0;
     }
 
-    for (int i = 0; i < count; i++) {
-        glDeleteShader(shaders[i]);
-    }
+    for (int i = 0; i < count; i++) glDeleteShader(shaders[i]);
     return program;
-}
-
-GLuint blueNoiseBuffer;
-void SetupBlueNoise(void) {
-    glGenBuffers(1, &blueNoiseBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, blueNoiseBuffer); // Use binding point 13
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 int CompileShaders(void) {
@@ -73,14 +61,20 @@ int CompileShaders(void) {
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
     
     // Deferred Lighting Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader");            if (!computeShader) { return 1; }
-    deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program"); if (!deferredLightingShaderProgram) { return 1; }
+    computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
+    deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program");        if (!deferredLightingShaderProgram) { return 1; }
     
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program"); if (!imageBlitShaderProgram) { return 1; }
 
-    SetupBlueNoise();
+    glGenBuffers(1, &blueNoiseBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, blueNoiseBuffer); // Use binding point 13
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    CacheUniformLocationsForShaders(); // After shader compile!
     return 0;
 }

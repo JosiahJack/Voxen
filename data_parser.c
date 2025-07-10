@@ -1,7 +1,8 @@
-#include "data_parser.h"
 #include <SDL2/SDL.h>
 #include <string.h>
 #include <stdlib.h>
+#include "data_parser.h"
+#include "debug.h"
 
 void parser_init(DataParser *parser, const char **valid_keys, int num_keys, ParserType partype) {
     parser->entries = NULL;
@@ -68,14 +69,16 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 parser->entries[entry.index] = entry;
             }
             strncpy(entry.path, line + 1, sizeof(entry.path) - 1);
+//             DualLog("Parsing %s...\n", entry.path);
             entry.index = UINT16_MAX;
             entry.modelIndex = UINT16_MAX;
             entry.texIndex = UINT16_MAX;
             entry.glowIndex = UINT16_MAX;
             entry.specIndex = UINT16_MAX;
             entry.normIndex = UINT16_MAX;
-        } else if (line[0] == '/' && line[1] == '/') {
-            continue; // Skip comments
+            entry.doublesided = false;
+        } else if ((line[0] == '/' && line[1] == '/') || (line[0] == '\\' && line[1] == 'n')) {
+            continue; // Skip comments and empty lines
         } else {
             // Check valid keys
             for (int i = 0; i < parser->num_keys; i++) {
@@ -89,6 +92,10 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(parser->valid_keys[i], "glowtexture") == 0) entry.glowIndex  = atoi(value);
                     else if (strcmp(parser->valid_keys[i], "spectexture") == 0) entry.specIndex  = atoi(value);
                     else if (strcmp(parser->valid_keys[i], "normtexture") == 0) entry.normIndex  = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "doublesided") == 0) {
+                        entry.doublesided  = (atoi(value) > 0);
+                        DualLog("Parsed %s with doublesided value of %d evaluated as %d\n", entry.path, atoi(value), entry.doublesided);
+                    }
 
                     break;
                 }

@@ -17,6 +17,7 @@ typedef struct {
     uint16_t index; // Unique index (0–65535)
     
     // Entity specific fields
+    bool doublesided;
     uint32_t modelIndex;
     uint32_t texIndex;
     uint32_t glowIndex;

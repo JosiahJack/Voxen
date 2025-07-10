@@ -10,6 +10,7 @@ Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 int entityCount = 0;            // Number of entities loaded
 DataParser entity_parser;
 const char *valid_entity_keys[] = {"index", "model", "texture", "glowtexture", "spectexture", "normtexture"};
+#define NUM_ENTITY_KEYS 6
 bool entity_parser_initialized = false;
 
 typedef enum {
@@ -24,7 +25,7 @@ bool loadEntityItemInitialized[ENT_COUNT] = { [0 ... ENT_COUNT - 1] = false };
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 int LoadEntities(void) {
     // Initialize parser with entity-specific keys
-    parser_init(&entity_parser, valid_entity_keys, sizeof(valid_entity_keys) / sizeof(valid_entity_keys[0]), PARSER_DATA);
+    parser_init(&entity_parser, valid_entity_keys, NUM_ENTITY_KEYS, PARSER_DATA);
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!"); parser_free(&entity_parser); return 1; }
     
     loadEntityItemInitialized[ENT_PARSER] = true;

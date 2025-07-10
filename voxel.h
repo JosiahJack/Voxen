@@ -7,41 +7,30 @@
 #include <stdatomic.h>
 #include "lights.h"
 
-#define SVO_MAX_DEPTH 6  // Adjust for 1024x1024x512 resolution
-#define SVO_NODE_CHILDREN 8
-#define TOTAL_VOXELS (64 * 64 * 32 * 8 * 8 * 8) // 67108864
-#define SVO_INITIAL_NODE_CAPACITY 20000
-#define SVO_INITIAL_VOXEL_CAPACITY 80000
+#define WORLDCELL_X_MAX 64
+#define WORLDCELL_Y_MAX 64
+#define WORLDCELL_Z_MAX 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
+#define TOTAL_WORLD_CELLS (64 * 64 * 18)
+#define VOXELS_PER_CELL (8 * 8 * 8)
+#define VOXELS_WORLD_X_MAX (WORLDCELL_X_MAX * 8)
+#define VOXELS_WORLD_Y_MAX (WORLDCELL_Y_MAX * 8)
+#define VOXELS_WORLD_Z_MAX (WORLDCELL_Z_MAX * 8)
+#define VOXEL_WIDTH_F 0.32f
+#define WORLDCELL_WIDTH_F 2.56f
+#define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
+
+#define TOTAL_VOXELS (WORLDCELL_X_MAX * WORLDCELL_Y_MAX * WORLDCELL_Z_MAX * VOXELS_PER_CELL) // 37748736
+#define TOTAL_VOXEL_BITS (TOTAL_VOXELS / 8)
+#define INVALID_LIGHTSET (uint64_t)(TOTAL_VOXELS) + 1ULL
+#define MAX_LIGHTS_VISIBLE_PER_CELL 64
+uint64_t lightSubsetBitmasks[TOTAL_WORLD_CELLS]; // One per world cell xy, 4096 * 32 * 64bits = 1MB
+bool cellOccupancy[TOTAL_WORLD_CELLS]; // 131072 * 4byte = 524kb
+uint8_t voxels[TOTAL_VOXELS]; // Stores bitfields
 
 typedef struct {
     float* lights;
     uint32_t lightCount;
 } VXGIWorkerData;
-
-typedef struct {
-    uint8_t childrenMask;  // 8-bit mask: 1 bit per child (0 = empty, 1 = has child/voxel)
-    uint32_t children[SVO_NODE_CHILDREN];  // Indices to children or voxel data
-} SVONode;
-
-typedef struct {
-    float direct_light[3];  // RGB direct light result
-    float indirect_light[3];  // RGB bounce light accumulation
-    float occupancy;      // optional, for occlusion
-} VXGIVoxel;
-
-typedef struct {
-    SVONode* nodes;  // Dynamic array of nodes
-    uint32_t nodeCount;
-    uint32_t nodeCapacity;
-    VXGIVoxel* voxels;  // Dynamic array of voxel data
-    uint32_t voxelCount;
-    uint32_t voxelCapacity;
-} SVO;
-
-typedef struct {
-    SVO svo;
-    _Atomic bool ready;
-} VXGIBuffer;
 
 extern VXGIBuffer vxgi_buffers[2];
 extern int current_vxgi_upload_index;
@@ -50,12 +39,12 @@ extern _Atomic bool vxgi_running;
 extern GLuint vxgiID;
 extern bool vxgiEnabled;
 
-void SVO_Init(SVO* svo, int index);
 void VXGI_Init(void);
-void VXGI_UpdateGL(void);
-void WorldToVoxel(float x, float y, float z, int* vx, int* vy, int* vz);
-void SVO_InsertVoxel(SVO* svo, int vx, int vy, int vz, VXGIVoxel voxel);
-void InsertModelInstanceVoxels(int modelIdx, int texIdx, float posX, float posY, float posZ);
+uint32_t PositionToVoxelIndex(float x, float y, float z);
+uint32_t PositionToWorldCellIndex(float x, float y, float z);
+uint64_t GetLightSubsetFromPosition(float x, float y, float z);
+void InsertOccupiedVoxel(float x, float y, float z);
+void InsertLightToVoxels(uint32_t lightIdx);
 int VXGI_Worker(__attribute__((unused)) void * imathread);
 void VXGI_Shutdown(void);
 

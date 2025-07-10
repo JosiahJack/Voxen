@@ -314,8 +314,10 @@ index: 149
 index: 150
 #Textures/cyberpanel.png
 index: 151
+doublesided: 1
 #Textures/cyberpanel_slice45.png
 index: 152
+doublesided: 1
 #Textures/cyber.png
 index: 153
 #Textures/d_arrow1_glow.png
@@ -337,40 +339,58 @@ index: 163
 index: 164
 #Textures/d_logo10.png
 index: 165
+doublesided: 1
 #Textures/d_logo11.png
 index: 166
+doublesided: 1
 #Textures/d_logo12.png
 index: 167
+doublesided: 1
 #Textures/d_logo13.png
 index: 168
+doublesided: 1
 #Textures/d_logo14.png
 index: 169
+doublesided: 1
 #Textures/d_logo15.png
 index: 170
+doublesided: 1
 #Textures/d_logo16.png
 index: 171
+doublesided: 1
 #Textures/d_logo17.png
 index: 172
+doublesided: 1
 #Textures/d_logo18.png
 index: 173
+doublesided: 1
 #Textures/d_logo1.png
 index: 174
+doublesided: 1
 #Textures/d_logo2.png
 index: 175
+doublesided: 1
 #Textures/d_logo3.png
 index: 176
+doublesided: 1
 #Textures/d_logo4.png
 index: 177
+doublesided: 1
 #Textures/d_logo5.png
 index: 178
+doublesided: 1
 #Textures/d_logo6.png
 index: 179
+doublesided: 1
 #Textures/d_logo7.png
 index: 180
+doublesided: 1
 #Textures/d_logo8.png
 index: 181
+doublesided: 1
 #Textures/d_logo9.png
 index: 182
+doublesided: 1
 #Textures/door1_1_normal.png
 index: 183
 #Textures/door1_1.png
@@ -665,14 +685,18 @@ index: 327
 index: 328
 #Textures/foliage01.png
 index: 329
+doublesided: 1
 #Textures/foliage_fern1_glow.png
 index: 330
 #Textures/foliage_fern1mutatedorange.png
 index: 331
+doublesided: 1
 #Textures/foliage_fern1mutated.png
 index: 332
+doublesided: 1
 #Textures/foliage_fern1.png
 index: 333
+doublesided: 1
 #Textures/g_conc.png
 index: 334
 #Textures/gear_lg.png

@@ -115,10 +115,12 @@ texture: 150
 index: 21
 model: 178
 texture: 151
+glowtexture: 151
 #chunk_cyberpanel_slice45
 index: 22
 model: 180
 texture: 152
+glowtexture: 152
 #chunk_eng1_1
 index: 23
 model: 96
@@ -139,6 +141,7 @@ texture: 255
 index: 27
 model: 100
 texture: 259
+glowtexture: 258
 #chunk_eng1_3d
 index: 28
 model: 99
@@ -146,39 +149,42 @@ texture: 257
 #chunk_eng1_4
 index: 29
 model: 101
-texture: 20
+texture: 260
 #chunk_eng1_5
 index: 30
 model: 103
-texture: 21
+texture: 262
 #chunk_eng1_5_slice45lh
 index: 31
 model: 104
-texture: 21
+texture: 262
 #chunk_eng1_5_slice45rh
 index: 32
 model: 105
-texture: 21
+texture: 262
 #chunk_eng1_5d
 index: 33
 model: 102
-texture: 22
+texture: 261
 #chunk_eng1_6
 index: 34
 model: 107
-texture: 23
+texture: 266
+glowtexture: 265
 #chunk_eng1_6d
 index: 35
 model: 106
-texture: 24
+texture: 264
+glowtexture: 263
 #chunk_eng1_7
 index: 36
 model: 108
-texture: 21
+texture: 269
+glowtexture: 268
 #chunk_eng1_7d
 index: 37
 model: 665
-texture: 26
+texture: 267
 #chunk_eng1_8
 index: 38
 model: 109

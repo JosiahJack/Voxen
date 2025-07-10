@@ -33,33 +33,15 @@
 #include "data_models.h"
 #include "render.h"
 
-VXGIBuffer vxgi_buffers[2];
-int current_vxgi_upload_index = 0;
-
-SDL_Thread* vxgi_thread = NULL;
-_Atomic bool vxgi_running = true;
-GLuint vxgiID;
-
-void SVO_Init(SVO* svo, int index) {
-    svo->nodeCapacity = SVO_INITIAL_NODE_CAPACITY;
-    svo->voxelCapacity = SVO_INITIAL_VOXEL_CAPACITY;
-    svo->nodes = malloc(sizeof(SVONode) * svo->nodeCapacity);
-    svo->voxels = malloc(sizeof(VXGIVoxel) * svo->voxelCapacity);
-    svo->nodeCount = 1;  // Root node
-    svo->voxelCount = 0;
-    svo->nodes[0].childrenMask = 0;
-    memset(svo->nodes[0].children, 0, sizeof(uint32_t) * SVO_NODE_CHILDREN);
-    DualLog("SVO buffer %d initialized with ",index);
-    print_bytes_no_newline(sizeof(VXGIVoxel) * svo->voxelCapacity + sizeof(SVONode) * svo->nodeCapacity);
-    DualLog("\n");
-}
-
 void VXGI_Init(void) {
     DebugRAM("VXGI Init\n");
-    for (int i = 0; i < 2; ++i) {
-        SVO_Init(&vxgi_buffers[i].svo,i);
-        atomic_store(&vxgi_buffers[i].ready, false);
-    }
+//     for (int i = 0; i < 2; ++i) {
+//         SVO_Init(&vxgi_buffers[i].svo,i);
+//         atomic_store(&vxgi_buffers[i].ready, false);
+//     }
+    memset(voxels,INVALID_LIGHTSET,TOTAL_VOXELS * sizeof(uint32_t));
+    memset(cellOccupancy,0,TOTAL_WORLD_CELLS * sizeof(bool));
+    memset(lightSubsetBitmasks,0,TOTAL_WORLD_CELLS * sizeof(uint64_t));
     
     DualLog("Spawning VXGI worker thread... ");
     VXGIWorkerData* workerData = malloc(sizeof(VXGIWorkerData));
@@ -70,8 +52,7 @@ void VXGI_Init(void) {
     glGenBuffers(1, &vxgiID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
     
-    // Allocate initial buffer size for voxels
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(VXGIVoxel) * SVO_INITIAL_VOXEL_CAPACITY, NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 64 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW); // Light indices of current subset, 64 max.
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glUniform1i(vxgiEnabledLoc_deferred, 0); // Mark as unusable until first vxgi thread iteration completes.
@@ -80,134 +61,85 @@ void VXGI_Init(void) {
     DebugRAM("after initializing all voxels");
 }
 
-bool vxgiEnabled = true;
-
-void VXGI_UpdateGL(void) {
-    static int last_write_index = -1;
-    int read_index = 1 - current_vxgi_upload_index;  // Read from the buffer the worker just wrote
-
-    VXGIBuffer* buffer = &vxgi_buffers[read_index];
-    if (!atomic_load(&buffer->ready) || read_index == last_write_index) {
-        return;  // No new data or already processed
-    }
-
-    // Resize SSBO if voxel count exceeds current capacity
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-    if (buffer->svo.voxelCount > SVO_INITIAL_VOXEL_CAPACITY) {  // Check against current buffer size
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(VXGIVoxel) * buffer->svo.voxelCount, NULL, GL_DYNAMIC_DRAW);
-    }
-
-    // Upload voxel data
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(VXGIVoxel) * buffer->svo.voxelCount, buffer->svo.voxels);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-    // Update uniforms
-    glUniform1i(vxgiEnabledLoc_deferred, vxgiEnabled); // Enable VXGI
-    glUniform1i(voxelCountLoc_deferred, buffer->svo.voxelCount);
-
-    last_write_index = read_index;  // Track processed buffer
+static inline uint32_t Flatten3DIndex(int x, int y, int z, int xMax, int yMax, int zMax) {
+    int x_old = x;
+    int y_old = y;
+    int z_old = z;
+    int xi = x < 0 ? 0 : (x >= xMax ? xMax - 1 : x);
+    int yi = y < 0 ? 0 : (y >= yMax ? yMax - 1 : y);
+    int zi = z < 0 ? 0 : (z >= zMax ? zMax - 1 : z);
+    if (xi != x_old) DualLog("WARNING: Clamped x index from %d to %d from given position x: %f, y: %f, z: %f\n",x_old,xi,x,y,z);
+    if (yi != y_old) DualLog("WARNING: Clamped y index from %d to %d from given position x: %f, y: %f, z: %f\n",y_old,yi,x,y,z);
+    if (zi != z_old) DualLog("WARNING: Clamped z index from %d to %d from given position x: %f, y: %f, z: %f\n",z_old,zi,x,y,z);
+    return (uint32_t)(x + (y * xMax) + (z * xMax * yMax));
 }
 
-//     if (vxgiEnabled) {
-//         for (int i = 0; i < 2; ++i) {
-//             if (atomic_load(&vxgi_buffers[i].ready)) {            
-//                 // Upload buffer to SSBO binding 19
-//                 glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-//                 glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(VXGIVoxel) * VXGI_BUFFER_SIZE, vxgi_buffers[i].data);
-//                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-//                 glUniform1i(vxgiEnabledLoc_deferred, 1);  // Tell shader GI is active
-//                 current_vxgi_upload_index = i;
-// //                 atomic_store(&vxgi_buffers[i].ready, false);
-//                 break;
-//             }
-//         }
-//     }
-
-// Helper to map world position to voxel grid coordinates
-void WorldToVoxel(float x, float y, float z, int* vx, int* vy, int* vz) {
-    *vx = (int)(x / 0.32f);
-    *vy = (int)(y / 0.32f);
-    *vz = (int)(z / 0.32f);
+uint32_t PositionToVoxelIndex(float x, float y, float z) {
+    int xi = (int)floorf(x / VOXEL_WIDTH_F);
+    int yi = (int)floorf(y / VOXEL_WIDTH_F);
+    int zi = (int)floorf(z / VOXEL_WIDTH_F);
+    return Flatten3DIndex(xi, yi, zi, VOXELS_WORLD_X_MAX, VOXELS_WORLD_Y_MAX,
+                          VOXELS_WORLD_Z_MAX);
 }
 
-// Insert a voxel into the SVO at the given grid coordinates
-void SVO_InsertVoxel(SVO* svo, int vx, int vy, int vz, VXGIVoxel voxel) {
-    if (vx < 0 || vx >= 1024 || vy < 0 || vy >= 1024 || vz < 0 || vz >= 512) return;
+uint32_t VoxelIndexToPosition(uint32_t voxelIdx, float * x, float * y, float * z) {
+    int zIdx = voxelIdx / (VOXELS_WORLD_X_MAX * VOXELS_WORLD_Y_MAX);
+    int yzRemainder = voxelIdx % (VOXELS_WORLD_X_MAX * VOXELS_WORLD_Y_MAX);
+    int yIdx = yzRemainder / VOXELS_WORLD_X_MAX;
+    int xIdx = yzRemainder % VOXELS_WORLD_X_MAX;
 
-    uint32_t nodeIdx = 0;  // Start at root
-    int minX = 0, minY = 0, minZ = 0;
-    int size = 1024;  // Max size x,y
-
-    for (int depth = 0; depth < SVO_MAX_DEPTH; ++depth) {
-        SVONode* node = &svo->nodes[nodeIdx];
-        int halfSize = size / 2;
-        int childX = (vx >= minX + halfSize) ? 1 : 0;
-        int childY = (vy >= minY + halfSize) ? 1 : 0;
-        int childZ = (vz >= minZ + halfSize) ? 1 : 0;
-        int childBit = (childZ << 2) | (childY << 1) | childX;
-
-        if (depth == SVO_MAX_DEPTH - 1) {  // Leaf level
-            if (!(node->childrenMask & (1 << childBit))) {
-                if (svo->voxelCount >= svo->voxelCapacity) {
-                    svo->voxelCapacity *= 2;
-                    svo->voxels = realloc(svo->voxels, sizeof(VXGIVoxel) * svo->voxelCapacity);
-                }
-                
-                node->children[childBit] = svo->voxelCount;
-                svo->voxels[svo->voxelCount++] = voxel;
-                node->childrenMask |= (1 << childBit);
-            }
-            return;
-        }
-
-        // Non-leaf: create child node if needed
-        if (!(node->childrenMask & (1 << childBit))) {
-            if (svo->nodeCount >= svo->nodeCapacity) {
-                svo->nodeCapacity *= 2;
-                svo->nodes = realloc(svo->nodes, sizeof(SVONode) * svo->nodeCapacity);
-            }
-            
-            node->children[childBit] = svo->nodeCount++;
-            svo->nodes[node->children[childBit]].childrenMask = 0;
-            memset(svo->nodes[node->children[childBit]].children, 0, sizeof(uint32_t) * SVO_NODE_CHILDREN);
-            node->childrenMask |= (1 << childBit);
-        }
-
-        nodeIdx = node->children[childBit];
-        minX += childX * halfSize;
-        minY += childY * halfSize;
-        minZ += childZ * halfSize;
-        size = halfSize;
-    }
+    *x = xIdx * VOXEL_WIDTH_F + (VOXEL_WIDTH_F / 2.0f);
+    *y = yIdx * VOXEL_WIDTH_F + (VOXEL_WIDTH_F / 2.0f);
+    *z = zIdx * VOXEL_WIDTH_F + (VOXEL_WIDTH_F / 2.0f);
 }
 
-void InsertModelInstanceVoxels(int modelIdx, int texIdx, float posX, float posY, float posZ) {
-    SVO* svo = &vxgi_buffers[current_vxgi_upload_index].svo;
+uint32_t PositionToWorldCellIndex(float x, float y, float z) {
+    int xi = (int)floorf(x / WORLDCELL_WIDTH_F);
+    int yi = (int)floorf(y / WORLDCELL_WIDTH_F);
+    int zi = (int)floorf(z / WORLDCELL_WIDTH_F);
+    return Flatten3DIndex(xi, yi, zi, WORLDCELL_X_MAX, WORLDCELL_Y_MAX, WORLDCELL_Z_MAX);
+}
 
-    // Get vertex data for the model
-    if (vertexDataArrays[modelIdx] == NULL) { DualLogError("Vertex data null for model index %i\n",modelIdx); return; }
+uint64_t GetLightSubsetFromPosition(float x, float y, float z) {
+    uint32_t cellIdx = PositionToWorldCellIndex(x,y,z);
+    uint32_t voxelIdx = PositionToVoxelIndex(x,y,z);
+    if (!cellOccupancy[cellIdx]) return INVALID_LIGHTSET;
+    if (voxels[voxelIdx] >= INVALID_LIGHTSET) return INVALID_LIGHTSET;
     
-    float* vertices = vertexDataArrays[modelIdx];
-    int vertexCount = modelVertexCounts[modelIdx];
-
-    for (int i = 0; i < vertexCount; i += VERTEX_ATTRIBUTES_COUNT) {
-        float x = vertices[i] + posX;
-        float y = vertices[i + 1] + posY;
-        float z = vertices[i + 2] + posZ;
-
-        int vx, vy, vz;
-        WorldToVoxel(x, y, z, &vx, &vy, &vz);
-
-        float lit = texIdx == 881 ? 1.0f : 0.0f; // TODO specify via textures.txt into array of emissive indices and then create function to check against the list
-                                                 // TODO get rgb average at texture load time and use the average texture color here (or average uv color!).
-        VXGIVoxel voxel = { .direct_light = {lit, lit, lit}, .indirect_light = {0.0f, 0.0f, 0.0f}, .occupancy = lit > 0.0f ? 0.5f : 1.0f }; // TODO: Hack!  Use bit packing or something instead.
-        SVO_InsertVoxel(svo, vx, vy, vz, voxel);
-    }
-
-    atomic_store(&vxgi_buffers[current_vxgi_upload_index].ready, true);
+    return lightSubsetBitmasks[voxels[voxelIdx]];
 }
 
+void InsertOccupiedVoxel(float x, float y, float z) {
+    uint32_t voxelIdx = PositionToVoxelIndex(x, y, z);
+    uint32_t byteIdx = voxelIdx / 8;
+    uint8_t bitIdx = voxelIdx % 8;
+    voxelOccupancy[byteIdx] |= (1 << bitIdx);
+    uint32_t cellIdx = PositionToWorldCellIndex(x, y, z);
+    cellOccupancy[cellIdx] = true;
+}
+
+void InsertLightToVoxels(uint32_t lightIdx, uint32_t bitIndex) {
+    float x,y,z;
+    GetLightPos(lightIdx,x,y,z);
+    uint32_t cellIdx = PositionToWorldCellIndex(x,y,z);
+    if (!cellOccupancy[cellIdx]) InsertOccupiedVoxel(x,y,z);
+    uint64_t lightSubset = GetLightSubsetFromPosition(x,y,z);
+    lightSubset |= (1ULL << bitIndex);
+}
+
+float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
+    float dx = (x2 - x1);
+    float dy = (y2 - y1);
+    float dz = (z2 - z1);
+    return (dx * dx) + (dy * dy) + (dz * dz);
+}
+
+// Currently iterates over all world cells, updating each cell's lightSubset
+// bitmask enabling up to 64 lights to be visible from that cell.
+// This is it so far.  Just hinting to the deferred renderer to limit number of
+// lights processed per pixel by indexing into the shader's buffer for light
+// subsets using the pixel's worldPos and then checking against the current
+// lights buffer of 64 lights based on player's current cell index.
 int VXGI_Worker(__attribute__((unused)) void* data) {
     VXGIWorkerData* workerData = (VXGIWorkerData*)data;
     int write_index = 0;
@@ -218,24 +150,35 @@ int VXGI_Worker(__attribute__((unused)) void* data) {
             continue;
         }
 
+        uint32_t lightSubset;
+        uint32_t litIdx;
+        
         // Process voxels with lights
-        for (uint32_t i = 0; i < buffer->svo.voxelCount; ++i) {
-            VXGIVoxel* voxel = &buffer->svo.voxels[i];  // Fixed typo
-            // Placeholder: Accumulate light contributions
-            float r = voxel->direct_light[0];
-            float g = voxel->direct_light[1];
-            float b = voxel->direct_light[2];
-            for (uint32_t j = 0; j < workerData->lightCount; ++j) {
-                int lightBaseIdx = j * LIGHT_DATA_SIZE;
-                // TODO: Compute light influence (e.g., distance-based attenuation)
-                float intensity = workerData->lights[lightBaseIdx + 3];  // intensity
-                r += intensity * 0.1f;  // Placeholder
-                g += intensity * 0.1f;
-                b += intensity * 0.1f;
+        for (uint32_t worldCellIdx = 0; worldCellIdx < TOTAL_WORLD_CELLS; ++worldCellIdx) {
+            lightSubset = lightSubsetBitmasks[worldCellIdx];
+            for (uint32_t voxelIdx = 0; voxelIdx < TOTAL_VOXELS; ++voxelIdx) { // Nested, terrible but this is in a separate thread, let 'im cook.
+                float vox_x, vox_y, vox_z;
+                VoxelIndexToPosition(voxelIdx,&vox_x,&vox_y,&vox_z);
+                
+                float xmin = vox_x - LIGHT_RANGE_MAX;
+                float ymin = vox_y - LIGHT_RANGE_MAX;
+                float zmin = vox_z - LIGHT_RANGE_MAX;
+                float xmax = vox_x + LIGHT_RANGE_MAX;
+                float ymax = vox_y + LIGHT_RANGE_MAX;
+                float zmax = vox_z + LIGHT_RANGE_MAX;
+                for (uint32_t lightIdx = 0; lightIdx < (workerData->lightCount * LIGHT_DATA_SIZE); lightIdx += LIGHT_DATA_SIZE) {
+                    float lit_x,lit_y,lit_z;
+                    GetLightPos(lightIdx,lit_x,lit_y,lit_z,&workerData->lights);
+                    if (squareDistance3D(vox_x,vox_y,vox_z,lit_x,lit_y,lit_z) < LIGHT_RANGE_MAX_SQUARED) {
+                        lightSubset |= true << litIdx; // Turn on the nth bit for this light for this world cell's lightSubset.
+                        litIdx++;
+                        if (litIdx >= 64) goto subsetComplete;// Don't hate me
+                    }
+                }
             }
-            voxel->direct_light[0] = fminf(r, 1.0f);
-            voxel->direct_light[1] = fminf(g, 1.0f);
-            voxel->direct_light[2] = fminf(b, 1.0f);
+            
+            subsetComplete:
+            break;
         }
 
         atomic_store(&buffer->ready, true);

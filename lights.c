@@ -16,6 +16,12 @@ float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 GLuint lightBufferID;
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
 
+void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer) {
+    *x = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSX]; // Index into shared flat GPU buffer
+    *y = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSY];
+    *z = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSZ];
+}
+
 // Initialize lights with random positions
 void InitializeLights(void) {
     srand(time(NULL)); // Seed random number generator

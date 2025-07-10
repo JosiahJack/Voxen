@@ -24,7 +24,6 @@
 #include "input.h"
 #include "lights.h"
 #include "text.h"
-#include "image_effects.h"
 #include "instance.h"
 #include "debug.h"
 #include "voxel.h"
@@ -113,7 +112,8 @@ GLint specIndexLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
 GLint shadowsEnabledLoc_deferred = -1, vxgiEnabledLoc_deferred = -1, voxelCountLoc_deferred = -1;
-GLint debugViewLoc_deferred = -1;
+GLint debugViewLoc_deferred = -1, lightSubsetALoc_deferred = -1, lightSubsetBLoc_deferred = -1;
+GLint activeLightCountLoc_deferred = -1;
 
 void CacheUniformLocationsForShaders(void) {
     // Called after shader compilation in InitializeEnvironment
@@ -134,6 +134,9 @@ void CacheUniformLocationsForShaders(void) {
     vxgiEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "vxgiEnabled");
     voxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "voxelCount");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    lightSubsetALoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetA");
+    lightSubsetBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetB");
+    activeLightCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "activeLightCount");
 }
 
 
@@ -183,7 +186,10 @@ void RenderMeshInstances() {
         glUniform1i(modelIndexLoc_chunk, modelType);
         glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, model);
         glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        
+        if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
         glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+        if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
         drawCallCount++;
         vertexCount += modelVertexCounts[modelType];
 
@@ -241,7 +247,26 @@ int RenderStaticMeshes(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // 2. Transfer VXGI Data to GPU, if ready
-    VXGI_UpdateGL();
+//     VXGI_UpdateGL();
+    uint32_t playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
+    uint64_t lightSubset = lightSubsetBitmasks[playerCellIdx];
+    uint32_t lightSubsetA = (uint32_t)(lightSubset & 0xFFFFFFFFULL); // Lower 32 bits
+    uint32_t lightSubsetB = (uint32_t)(lightSubset >> 32);          // Upper 32 bits
+    uint32_t lightIndices[64];
+    int activeLightCount = 0;
+    for (activeLightCount = 0; activeLightCount < 64; i++) {
+        if (lightSubset & (1ULL << activeLightCount)) { // Bit for light is on.
+            lightIndices[activeLightCount] = activeLightCount * LIGHT_DATA_SIZE; // Index into lights buffer
+            activeLightCount++;
+        }
+    }
+    glUniform1ui(lightSubsetALoc_deferred,lightSubsetA);
+    glUniform1ui(lightSubsetBLoc_deferred,lightSubsetB);
+    glUniform1ui(activeLightCountLoc_deferred,activeLightCount);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, activeLightCount * sizeof(uint32_t), lightIndices);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // 3. Deferred Lighting + Shadow Calculations
     //        Apply deferred lighting with compute shader.  All lights are

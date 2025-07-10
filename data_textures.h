@@ -6,6 +6,7 @@
 extern GLuint colorBufferID;
 extern int32_t textureCount;
 
+bool isDoubleSided(uint32_t texIndexToCheck);
 int LoadTextures(void);
 void CleanupLoad(bool isBad);
 

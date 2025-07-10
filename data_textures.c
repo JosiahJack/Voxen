@@ -31,7 +31,15 @@ uint32_t totalPixels = 0; // Total pixels across all textures
 uint32_t totalPaletteColors = 0; // Total colors across all palettes
 int * textureSizes = NULL; // Needs to be textureCount * 2
 int textureCount;
-const char *valid_texdata_keys[] = {"index"};
+const char *valid_texdata_keys[] = {"index","doublesided"};
+#define NUM_TEX_KEYS 2
+
+bool *doubleSidedTexture = NULL;
+
+bool isDoubleSided(uint32_t texIndexToCheck) {
+//     return texIndexToCheck == 151 || texIndexToCheck == 152;
+    return (doubleSidedTexture[texIndexToCheck]);
+}
 
 typedef struct {
     uint32_t color; // RGBA color (packed)
@@ -46,6 +54,7 @@ typedef enum {
     TEX_PALOFFSETS,
     TEX_PALETS,
     TEX_SSBOS,
+    TEX_DOUBLESIDES,
     TEX_COUNT // Number of subsystems
 } TextureLoadDataType;
 
@@ -56,7 +65,7 @@ int LoadTextures(void) {
     textureCount = 0;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    parser_init(&texture_parser, valid_texdata_keys, 1, PARSER_DATA);
+    parser_init(&texture_parser, valid_texdata_keys, NUM_TEX_KEYS, PARSER_DATA);
     if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); parser_free(&texture_parser); return 1; }
     loadTextureItemInitialized[TEX_PARSER] = true;
     
@@ -84,6 +93,11 @@ int LoadTextures(void) {
     if (!texturePaletteOffsets) { DualLogError("Failed to allocate textureOffsets buffer\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_PALOFFSETS] = true;
     DebugRAM("after texturePaletteOffsets mallocn");
+    
+    doubleSidedTexture = malloc(textureCount * sizeof(bool));
+    if (!doubleSidedTexture) { DualLogError("Failed to allocate doubleSidedTexture buffer\n"); CleanupLoad(true); return 1; }
+    loadTextureItemInitialized[TEX_DOUBLESIDES] = true;
+    DebugRAM("after doubleSidedTexture malloc");
     
     size_t maxFileSize = 10000000; // 10MB
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.
@@ -120,6 +134,9 @@ int LoadTextures(void) {
         int width, height, channels;
         unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
         if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
+        
+        doubleSidedTexture[i] = texture_parser.entries[matchedParserIdx].doublesided;
+        if (doubleSidedTexture[i]) DualLog("Loaded doublesided texture %s\n",texture_parser.entries[matchedParserIdx].path);
         
         // Build palette for this texture using uthash
         ColorEntry *color_table = NULL, *entry, *tmp;
@@ -332,6 +349,7 @@ void CleanupLoad(bool isBad) {
     if (loadTextureItemInitialized[TEX_PARSER]) parser_free(&texture_parser);
     
     if (isBad) { // Also free GPU resources if we are handling exit conditions.
+        if (loadTextureItemInitialized[TEX_DOUBLESIDES]) free(doubleSidedTexture);
         if (loadTextureItemInitialized[TEX_SSBOS]) {
             glDeleteBuffers(1, &colorBufferID);
             glDeleteBuffers(1, &texturePalettesID);

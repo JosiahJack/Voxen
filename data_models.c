@@ -17,6 +17,7 @@
 
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
+#define NUM_MODEL_KEYS 1
 GLuint chunkShaderProgram;
 uint32_t modelVertexCounts[MODEL_COUNT];
 GLuint vao; // Vertex Array Object
@@ -37,7 +38,7 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 int LoadGeometry(void) {
     DebugRAM("start of loading all models");
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    parser_init(&model_parser, valid_mdldata_keys, 1, PARSER_DATA);
+    parser_init(&model_parser, valid_mdldata_keys, NUM_MODEL_KEYS, PARSER_DATA);
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); parser_free(&model_parser); return 1; }
     
     loadModelItemInitialized[MDL_PARSER] = true;

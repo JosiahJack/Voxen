@@ -107,6 +107,16 @@ const char *fragmentShaderTraditional =
     "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V, OpenGL convention vs import
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
+    "    vec4 albedoColor = getTextureColor(texIndexChecked,ivec2(x,y));\n"
+    "    if (albedoColor.a < 0.05) {\n" // Alpha cutout threshold
+    "        discard;\n" // And we're outta here!
+    "    }\n"
+
+    "    vec3 adjustedNormal = Normal;\n"
+    "    if (!gl_FrontFacing) {\n"
+    "        adjustedNormal = -Normal;\n"
+    "    }\n"
+
     "    vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));\n"
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
     "    outTexMaps = ivec4(packColor(glowColor),packColor(specColor),0,0);\n"
@@ -121,9 +131,9 @@ const char *fragmentShaderTraditional =
     "        outAlbedo.b = float(texIndexChecked) / float(TextureCount);\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else {\n"
-    "        outAlbedo = getTextureColor(texIndexChecked,ivec2(x,y));\n"
+    "        outAlbedo = albedoColor;\n"
     "        if (outAlbedo.a < 0.01) outAlbedo = vec4(0.0,1.0,1.0,outAlbedo.a);\n"
     "    }\n"
-    "    outNormal = vec4(normalize(Normal) * 0.5 + 0.5, 1.0);\n"
+    "    outNormal = vec4(normalize(adjustedNormal) * 0.5 + 0.5, 1.0);\n"
     "    outWorldPos = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
     "}\n";

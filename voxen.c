@@ -22,7 +22,6 @@
 #include "network.h"
 #include "text.h"
 #include "shaders.h"
-#include "image_effects.h"
 #include "audio.h"
 #include "instance.h"
 #include "voxel.h"
@@ -56,6 +55,9 @@ double start_frame_time = 0.0;
                 
 // OpenGL
 SDL_GLContext gl_context;
+
+GLuint imageBlitShaderProgram;
+GLuint quadVAO, quadVBO;
 
 void DualLog(const char *fmt, ...) {
     va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
@@ -203,8 +205,26 @@ int InitializeEnvironment(void) {
     if (CompileShaders()) return SYS_COUNT + 1;
     DebugRAM("compile shaders"); 
     malloc_trim(0);
-    CacheUniformLocationsForShaders(); // After CompileShaders()
-    SetupQuad(); // For image blit for post processing effects like lighting.
+    
+    // Setup full screen quad for image blit for post processing effects like lighting.
+    float vertices[] = {
+         1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
+         1.0f,  1.0f, 1.0f, 1.0f, // Top-right
+        -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
+        -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
+    };
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+    
     int fontInit = InitializeTextAndFonts();
     if (fontInit) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     DebugRAM("setup full screen quad"); 
@@ -368,59 +388,46 @@ int main(int argc, char* argv[]) {
     DebugRAM("prior to game loop");
     while(1) {
         start_frame_time = get_time();
-        if (!log_playback) {
-            // Enqueue input events
-            SDL_Event event;
-            float mouse_xrel = 0.0f, mouse_yrel = 0.0f;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
-                else if (event.type == SDL_KEYDOWN) {
-                    if (event.key.keysym.sym == SDLK_ESCAPE) EnqueueEvent_Simple(EV_QUIT);
-                    else EnqueueEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
-                } else if (event.type == SDL_KEYUP) {
-                    EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
-                } else if (event.type == SDL_MOUSEMOTION && window_has_focus) {
-                    mouse_xrel += event.motion.xrel;
-                    mouse_yrel += event.motion.yrel;
 
-                // These aren't really events so just handle them here.
-                } else if (event.type == SDL_WINDOWEVENT) {
-                    if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                        window_has_focus = true;
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                    } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                        window_has_focus = false;
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
-                    }
-                }
-            }
-            
-            // After polling, enqueue a single mouse motion event if there was movement
-            if (mouse_xrel != 0.0f || mouse_yrel != 0.0f) {
-                EnqueueEvent_FloatFloat(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
-            }
-        } else {
-            // Log playback controls (pause, fast forward, rewind, quit playback)
-            SDL_Event event;
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT);
-                else if (event.type == SDL_KEYDOWN) {
-                    if (event.key.keysym.sym == SDLK_ESCAPE) {
+        // Enqueue input events
+        SDL_Event event;
+        float mouse_xrel = 0.0f, mouse_yrel = 0.0f;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT); // [x] button
+            else if (event.type == SDL_KEYDOWN) {
+                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                    if (log_playback) {
                         log_playback = false;
-                        DualLog("Exited log playback manually.  Control returned\n");
-                    }
-                    
-                // These aren't really events so just handle them here.
-                } else if (event.type == SDL_WINDOWEVENT) {
-                    if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                        window_has_focus = true;
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                    } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                        window_has_focus = false;
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        DualLog("Exited log playback manually.  Control returned\n");                           
+                    } else EnqueueEvent_Simple(EV_QUIT); // <<< THAT"S ALL FOLKS!
+                } else {
+                    if (!log_playback) {
+                        EnqueueEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
+                    } else {
+                        // Handle pause, rewind, fastforward of logs here
                     }
                 }
+            } else if (event.type == SDL_KEYUP && !log_playback) {
+                EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
+            } else if (event.type == SDL_MOUSEMOTION && window_has_focus && !log_playback) {
+                mouse_xrel += event.motion.xrel;
+                mouse_yrel += event.motion.yrel;
+
+            // These aren't really events so just handle them here.
+            } else if (event.type == SDL_WINDOWEVENT) {
+                if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    window_has_focus = true;
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                    window_has_focus = false;
+                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                }
             }
+        }
+        
+        // After polling, enqueue a single mouse motion event if there was movement
+        if (!log_playback && (mouse_xrel != 0.0f || mouse_yrel != 0.0f)) {
+            EnqueueEvent_FloatFloat(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
         }
         
         current_time = get_time();
@@ -443,9 +450,15 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // Server Actions
+        // ====================================================================
+        // Server Event Queue
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
+
         
+        // Client Actions
+        // ====================================================================
         // Client Render
         exitCode = ClearFrameBuffers();
         if (exitCode) break;
