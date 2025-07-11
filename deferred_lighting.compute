@@ -62,7 +62,7 @@ const char *deferredLighting_computeShader =
     // The indices of the current lightSubset we are in for indexing into full
     // lights[LIGHT_COUNT * LIGHT_DATA_SIZE] buffer.
     "layout(std430, binding = 19) buffer LightIndices {\n"
-    "    uint lightIndicesForCell[];\n"
+    "    uint lightIndicesForCell[32];\n"
     "};\n"
     
     "uniform int voxelCount;\n"
@@ -75,9 +75,9 @@ const char *deferredLighting_computeShader =
     "uniform int shadowsEnabled;\n"
     "uniform int vxgiEnabled;\n"
     "uniform int debugView;\n"
-    "uniform int playerCellIdx;\n"
-    "uniform int lightCount;\n" // Same as LIGHT_COUNT, not LIGHT_COUNT * LIGHT_DATA_SIZE
-    "uniform int lightDataSize;\n" // Same as LIGHT_DATA_SIZE
+//     "uniform int playerCellIdx;\n"
+//     "uniform int lightCount;\n" // Same as LIGHT_COUNT, not LIGHT_COUNT * LIGHT_DATA_SIZE
+//     "uniform int lightDataSize;\n" // Same as LIGHT_DATA_SIZE
 
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -103,9 +103,12 @@ const char *deferredLighting_computeShader =
     "    vec4 glowColor = unpackColor32(indicesPack.r);\n"
     "    vec4 specColor = unpackColor32(indicesPack.g);\n"
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
-
+    "    uint lightIdx = 0;\n"
     "    for (int i = 0; i < 32; i++) {\n"
-    "        uint lightIdx = lightIndicesForCell[(playerCellIdx * 32) + i];\n"
+//     "    for (int i = 0; i < lights.length(); i += 12) {\n" // Stride of 12
+//     "    for (int i = 0; i < lightCount; i++) {\n"
+//     "        uint lightIdx = i * lightDataSize;\n"
+    "        uint lightIdx = i * 12;\n"
 //     "        if (lightIdx > ((lightCount * lightDataSize))) break;\n" // Finished all occupied indices.  Empty ones are set to INVALID_LIGHT_INDEX (LIGHT_COUNT + 1).
     
     "        float intensity = lights[lightIdx + 3];\n"

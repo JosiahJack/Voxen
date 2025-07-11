@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 #include "constants.h"
 #include "data_textures.h"
@@ -35,6 +36,7 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
 // GLuint outputImageID;
 GLuint gBufferFBO;
 GLuint inputTexMapsID;
+float lightsInProximity[32 * LIGHT_DATA_SIZE];
 
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, const char *name) {
     glGenTextures(1, id);
@@ -256,10 +258,45 @@ int RenderStaticMeshes(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // 2. Transfer VXGI Data to GPU, if ready
-    playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
-    glUniform1ui(playerCellLoc_deferred,playerCellIdx);
-    glUniform1i(lightCountLoc_deferred,LIGHT_COUNT);
-    glUniform1i(lightDataSizeLoc_deferred,LIGHT_DATA_SIZE);
+//     double vstart_time = get_time();
+    float litRange = 0.0f;
+    int numLightsFound = 0;
+    for (int i=0;i<LIGHT_COUNT;++i) {
+        if (lights[i + LIGHT_DATA_OFFSET_INTENSITY] < 0.015f) continue; // Off
+        
+        litRange = lights[i + LIGHT_DATA_OFFSET_RANGE];
+        litRange *= litRange; // squareDist
+        if (squareDistance3D(cam_x, cam_y, cam_z,
+                             lights[i + LIGHT_DATA_OFFSET_POSX],
+                             lights[i + LIGHT_DATA_OFFSET_POSY],
+                             lights[i + LIGHT_DATA_OFFSET_POSZ]) < litRange) {
+            
+            memcpy(&lightsInProximity[numLightsFound],&lights[i],LIGHT_DATA_SIZE * sizeof(float));
+            numLightsFound++;
+            if (numLightsFound >= 32) break; // Ok found 32 lights, cap it there.
+        }
+    }
+    DualLog("Found %d lights this frame to send to deferred shader\n",numLightsFound);
+//     double vend_time = get_time();
+//     DualLog("Visible lights calc took %f seconds\n", vend_time - vstart_time);
+    // Output was
+// ...
+//Visible lights calc took 0.000000 seconds
+//Visible lights calc took 0.000000 seconds
+//Visible lights calc took 0.000001 seconds
+//Visible lights calc took 0.000000 seconds
+//Visible lights calc took 0.000000 seconds
+// ...
+// So basically nothing.
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
+//     glUniform1ui(playerCellLoc_deferred,playerCellIdx);
+//     glUniform1i(lightCountLoc_deferred,LIGHT_COUNT);
+//     glUniform1i(lightDataSizeLoc_deferred,LIGHT_DATA_SIZE);
     glUniform1i(vxgiEnabledLoc_deferred, vxgiEnabled);
 //     DualLog("Player can see these lights:: ");
 //     for (uint32_t i=0;i<MAX_LIGHTS_VISIBLE_PER_CELL;i++) {

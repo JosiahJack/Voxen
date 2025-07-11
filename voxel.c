@@ -37,52 +37,52 @@ GLuint vxgiID;
 
 void VXGI_Init(void) {
     DebugRAM("VXGI Init\n");
-    glGenBuffers(1, &vxgiID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW); // Light indices of current subset, 64 max.
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    double start_time = get_time();
-
-    float cell_x,cell_y,cell_z;
-    uint32_t activeLightCount;
-    for (uint32_t cellIdx = 0; cellIdx < TOTAL_WORLD_CELLS; cellIdx++) {
-        // First blank it out
-        for (int i = 0; i < MAX_LIGHTS_VISIBLE_PER_CELL; i++) {
-            cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i] = (LIGHT_COUNT * LIGHT_DATA_SIZE) + 1;
-        }
-        
-        // Now fill indices
-        WorldCellIndexToPosition(cellIdx,&cell_x,&cell_y,&cell_z);
-        activeLightCount = 0;
-        for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT * LIGHT_DATA_SIZE; lightIdx += LIGHT_DATA_SIZE) {
-            float lit_x, lit_y, lit_z;
-            GetLightPos(lightIdx, &lit_x, &lit_y, &lit_z, lights);
-            if (squareDistance3D(cell_x, cell_y, cell_z, lit_x, lit_y, lit_z) < lights[lightIdx + LIGHT_DATA_OFFSET_RANGE] * lights[lightIdx + LIGHT_DATA_OFFSET_RANGE]) {
-                cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + activeLightCount] = lightIdx;
-                activeLightCount++;
-                if (activeLightCount >= MAX_LIGHTS_VISIBLE_PER_CELL) break;
-            }
-            
-        }
-        
-        if (cellIdx < 5 || cellIdx == 158) {
-            DualLog("Light indices for cell %d:: ",cellIdx);
-            for (uint32_t i=0;i<MAX_LIGHTS_VISIBLE_PER_CELL;i++) {
-                DualLog("%d, ",cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i]);
-            }
-            DualLog("\n");
-        }
-    }
-
-    double end_time = get_time();
-    DualLog("Light indices per cell computation took %f seconds\n", end_time - start_time);
-    glUniform1i(vxgiEnabledLoc_deferred, 1); // Mark as ready
-    
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL * sizeof(uint32_t), cellOccupancy);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     glGenBuffers(1, &vxgiID);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW); // Light indices of current subset, 64 max.
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     double start_time = get_time();
+// 
+//     float cell_x,cell_y,cell_z;
+//     uint32_t activeLightCount;
+//     for (uint32_t cellIdx = 0; cellIdx < TOTAL_WORLD_CELLS; cellIdx++) {
+//         // First blank it out
+//         for (int i = 0; i < MAX_LIGHTS_VISIBLE_PER_CELL; i++) {
+//             cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i] = (LIGHT_COUNT * LIGHT_DATA_SIZE) + 1;
+//         }
+//         
+//         // Now fill indices
+//         WorldCellIndexToPosition(cellIdx,&cell_x,&cell_y,&cell_z);
+//         activeLightCount = 0;
+//         for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT * LIGHT_DATA_SIZE; lightIdx += LIGHT_DATA_SIZE) {
+//             float lit_x, lit_y, lit_z;
+//             GetLightPos(lightIdx, &lit_x, &lit_y, &lit_z, lights);
+//             if (squareDistance3D(cell_x, cell_y, cell_z, lit_x, lit_y, lit_z) < lights[lightIdx + LIGHT_DATA_OFFSET_RANGE] * lights[lightIdx + LIGHT_DATA_OFFSET_RANGE]) {
+//                 cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + activeLightCount] = lightIdx;
+//                 activeLightCount++;
+//                 if (activeLightCount >= MAX_LIGHTS_VISIBLE_PER_CELL) break;
+//             }
+//             
+//         }
+//         
+//         if (cellIdx < 5 || cellIdx == 158) {
+//             DualLog("Light indices for cell %d:: ",cellIdx);
+//             for (uint32_t i=0;i<MAX_LIGHTS_VISIBLE_PER_CELL;i++) {
+//                 DualLog("%d, ",cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i]);
+//             }
+//             DualLog("\n");
+//         }
+//     }
+// 
+//     double end_time = get_time();
+//     DualLog("Light indices per cell computation took %f seconds\n", end_time - start_time);
+//     glUniform1i(vxgiEnabledLoc_deferred, 1); // Mark as ready
+//     
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
+//     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL * sizeof(uint32_t), cellOccupancy);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     DualLog("VXGI Init DONE\n");
     DebugRAM("after VXGI Init");
