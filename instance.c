@@ -49,6 +49,7 @@ int SetupInstances(void) {
     
     instances[39].modelIndex = 620; // Test Light cube
     instances[39].texIndex = 881; // white light
+    instances[39].glowIndex = 881; // white light
     instances[39].sclx = 0.16f;
     instances[39].scly = 0.16f;
     instances[39].sclz = 0.16f;
@@ -64,9 +65,9 @@ int SetupInstances(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    DualLog("Total instance size ");
-    print_bytes_no_newline(INSTANCE_COUNT * 11 * 4);
-    DualLog("\n");
+//     DualLog("Total instance size ");
+//     print_bytes_no_newline(INSTANCE_COUNT * 11 * 4);
+//     DualLog("\n");
     
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     glGenBuffers(1, &matricesBuffer);

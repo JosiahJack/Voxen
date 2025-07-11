@@ -27,8 +27,6 @@ extern GLint textureCountLoc_chunk;
 // Static deferred shader locations (set on model load)
 extern GLint screenWidthLoc_deferred;
 extern GLint screenHeightLoc_deferred;
-extern GLint vxgiEnabledLoc_deferred;
-extern GLint voxelCountLoc_deferred;
 extern GLint shadowsEnabledLoc_deferred;
 extern bool shadowsEnabled;
 

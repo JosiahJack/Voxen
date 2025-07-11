@@ -113,13 +113,8 @@ GLint glowIndexLoc_chunk = -1;
 GLint specIndexLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
-GLint shadowsEnabledLoc_deferred = -1, vxgiEnabledLoc_deferred = -1, voxelCountLoc_deferred = -1;
+GLint shadowsEnabledLoc_deferred = -1;
 GLint debugViewLoc_deferred = -1;
-// GLint lightSubsetALoc_deferred = -1, lightSubsetBLoc_deferred = -1;
-// GLint activeLightCountLoc_deferred = -1;
-GLint playerCellLoc_deferred = -1;
-GLint lightCountLoc_deferred = -1;
-GLint lightDataSizeLoc_deferred = -1;
 
 void CacheUniformLocationsForShaders(void) {
     // Called after shader compilation in InitializeEnvironment
@@ -137,15 +132,7 @@ void CacheUniformLocationsForShaders(void) {
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
-    vxgiEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "vxgiEnabled");
-    voxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "voxelCount");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
-    playerCellLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "playerCellIdx");
-    lightCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightCount");
-    lightDataSizeLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightDataSize");
-//     lightSubsetALoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetA");
-//     lightSubsetBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetB");
-//     activeLightCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "activeLightCount");
 }
 
 
@@ -209,8 +196,11 @@ void RenderMeshInstances() {
 }
 
 bool shadowsEnabled = false;
-bool vxgiEnabled = false;
 uint32_t playerCellIdx = 80000;
+uint32_t playerCellIdx_x = 20000;
+uint32_t playerCellIdx_y = 10000;
+uint32_t playerCellIdx_z = 451;
+int numLightsFound = 0;
 
 void TestStuffForRendering_DELETE_ME_LATER() {
     // Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
@@ -258,53 +248,50 @@ int RenderStaticMeshes(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // 2. Transfer VXGI Data to GPU, if ready
-//     double vstart_time = get_time();
+    playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
+    playerCellIdx_x = PositionToWorldCellIndexX(cam_x);
+    playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
+    playerCellIdx_z = PositionToWorldCellIndexZ(cam_z);
+    
     float litRange = 0.0f;
-    int numLightsFound = 0;
+    numLightsFound = 0;
     for (int i=0;i<LIGHT_COUNT;++i) {
         if (lights[i + LIGHT_DATA_OFFSET_INTENSITY] < 0.015f) continue; // Off
         
-        litRange = lights[i + LIGHT_DATA_OFFSET_RANGE];
+        litRange = (30.0f * 2.56f);
         litRange *= litRange; // squareDist
+        uint32_t litIdx = (i * LIGHT_DATA_SIZE);
         if (squareDistance3D(cam_x, cam_y, cam_z,
-                             lights[i + LIGHT_DATA_OFFSET_POSX],
-                             lights[i + LIGHT_DATA_OFFSET_POSY],
-                             lights[i + LIGHT_DATA_OFFSET_POSZ]) < litRange) {
+                             lights[litIdx + LIGHT_DATA_OFFSET_POSX],
+                             lights[litIdx + LIGHT_DATA_OFFSET_POSY],
+                             lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) < litRange) {
             
-            memcpy(&lightsInProximity[numLightsFound],&lights[i],LIGHT_DATA_SIZE * sizeof(float));
+            int idx = numLightsFound * LIGHT_DATA_SIZE;
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY] = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ] = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_R] = lights[litIdx + LIGHT_DATA_OFFSET_R];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_G] = lights[litIdx + LIGHT_DATA_OFFSET_G];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_B] = lights[litIdx + LIGHT_DATA_OFFSET_B];
             numLightsFound++;
             if (numLightsFound >= 32) break; // Ok found 32 lights, cap it there.
         }
     }
-    DualLog("Found %d lights this frame to send to deferred shader\n",numLightsFound);
-//     double vend_time = get_time();
-//     DualLog("Visible lights calc took %f seconds\n", vend_time - vstart_time);
-    // Output was
-// ...
-//Visible lights calc took 0.000000 seconds
-//Visible lights calc took 0.000000 seconds
-//Visible lights calc took 0.000001 seconds
-//Visible lights calc took 0.000000 seconds
-//Visible lights calc took 0.000000 seconds
-// ...
-// So basically nothing.
+    
+    for (int i=numLightsFound;i<32;++i) {
+        lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
+    }
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-//     playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
-//     glUniform1ui(playerCellLoc_deferred,playerCellIdx);
-//     glUniform1i(lightCountLoc_deferred,LIGHT_COUNT);
-//     glUniform1i(lightDataSizeLoc_deferred,LIGHT_DATA_SIZE);
-    glUniform1i(vxgiEnabledLoc_deferred, vxgiEnabled);
-//     DualLog("Player can see these lights:: ");
-//     for (uint32_t i=0;i<MAX_LIGHTS_VISIBLE_PER_CELL;i++) {
-//         uint32_t lightIdx = cellOccupancy[(playerCellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i];
-//         if (lightIdx > (LIGHT_COUNT * LIGHT_DATA_SIZE)) break; // No more valid lights for this cell.
-//         DualLog("%d, ",lightIdx);
-//     }
-//     DualLog("\n");
 
     // 3. Deferred Lighting + Shadow Calculations
     //        Apply deferred lighting with compute shader.  All lights are
@@ -313,21 +300,6 @@ int RenderStaticMeshes(void) {
     //        etc.).
     glUseProgram(deferredLightingShaderProgram);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-  
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-    
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * sizeof(Instance), instances);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
-    
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
 
     // These should be static but cause issues if not...
     glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
@@ -346,15 +318,7 @@ int RenderStaticMeshes(void) {
     glDispatchCompute(groupX, groupY, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
     
-    // 4. Shadow Softening Compute Shader
-    //        Takes delta between lit and lit+shadow result found in Pass 2
-    //        above and applies the shadow results to the lit results with a
-    //        blending based on distance from nearest unshadowed pixel if
-    //        coherent (same normal and depth with tolerance band).
-    
-    // TODO
-    
-    // 5. Render Output
+    // 4. Render Output
     //        Render final gather lighting results with full screen quad.
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
@@ -385,6 +349,7 @@ int RenderStaticMeshes(void) {
 double lastFrameSecCountTime = 0.00;
 uint32_t lastFrameSecCount = 0;
 uint32_t framesPerLastSecond = 0;
+uint32_t worstFPS = UINT32_MAX;
 
 int RenderUI(double deltaTime) {
     glEnable(GL_STENCIL_TEST);
@@ -403,20 +368,20 @@ int RenderUI(double deltaTime) {
     RenderFormattedText(10, 40, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
     RenderFormattedText(10, 55, TEXT_WHITE, "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
     RenderFormattedText(10, 70, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-    RenderFormattedText(10, 95, TEXT_WHITE, "testLight_spotAng: %.4f", testLight_spotAng);
-    RenderFormattedText(10, 110, TEXT_WHITE, "testLight_intensity: %.4f", testLight_intensity);
-    RenderFormattedText(10, 125, TEXT_WHITE, "DebugView: %d", debugView);
-    RenderFormattedText(10, 140, TEXT_WHITE, "Player Cell: %d", playerCellIdx);
+    RenderFormattedText(10, 85, TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
+    RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d, %s", debugView, debugView == 1 ? "unlit" : "normal");
+    RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d   Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
     
     // Frame stats
     drawCallCount++; // Add one more for this text render ;)
-    RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d",
-                        deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount);
+    RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d, Worst FPS: %d",
+                        deltaTime * 1000.0,framesPerLastSecond,drawCallCount,vertexCount,worstFPS);
     
     double time_now = get_time();
     if ((time_now - lastFrameSecCountTime) >= 1.00) {
         lastFrameSecCountTime = time_now;
         framesPerLastSecond = globalFrameNum - lastFrameSecCount;
+        if (framesPerLastSecond < worstFPS && globalFrameNum > 10) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
         lastFrameSecCount = globalFrameNum;
     }
 

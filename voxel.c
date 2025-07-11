@@ -32,59 +32,16 @@
 #include "data_models.h"
 #include "render.h"
 
-uint32_t cellOccupancy[TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL]; // 131072 * 4byte = 524kb
+// uint32_t cellOccupancy[TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL]; // 131072 * 4byte = 524kb
 GLuint vxgiID;
 
 void VXGI_Init(void) {
     DebugRAM("VXGI Init\n");
-//     glGenBuffers(1, &vxgiID);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW); // Light indices of current subset, 64 max.
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-//     double start_time = get_time();
-// 
-//     float cell_x,cell_y,cell_z;
-//     uint32_t activeLightCount;
-//     for (uint32_t cellIdx = 0; cellIdx < TOTAL_WORLD_CELLS; cellIdx++) {
-//         // First blank it out
-//         for (int i = 0; i < MAX_LIGHTS_VISIBLE_PER_CELL; i++) {
-//             cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i] = (LIGHT_COUNT * LIGHT_DATA_SIZE) + 1;
-//         }
-//         
-//         // Now fill indices
-//         WorldCellIndexToPosition(cellIdx,&cell_x,&cell_y,&cell_z);
-//         activeLightCount = 0;
-//         for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT * LIGHT_DATA_SIZE; lightIdx += LIGHT_DATA_SIZE) {
-//             float lit_x, lit_y, lit_z;
-//             GetLightPos(lightIdx, &lit_x, &lit_y, &lit_z, lights);
-//             if (squareDistance3D(cell_x, cell_y, cell_z, lit_x, lit_y, lit_z) < lights[lightIdx + LIGHT_DATA_OFFSET_RANGE] * lights[lightIdx + LIGHT_DATA_OFFSET_RANGE]) {
-//                 cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + activeLightCount] = lightIdx;
-//                 activeLightCount++;
-//                 if (activeLightCount >= MAX_LIGHTS_VISIBLE_PER_CELL) break;
-//             }
-//             
-//         }
-//         
-//         if (cellIdx < 5 || cellIdx == 158) {
-//             DualLog("Light indices for cell %d:: ",cellIdx);
-//             for (uint32_t i=0;i<MAX_LIGHTS_VISIBLE_PER_CELL;i++) {
-//                 DualLog("%d, ",cellOccupancy[(cellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i]);
-//             }
-//             DualLog("\n");
-//         }
-//     }
-// 
-//     double end_time = get_time();
-//     DualLog("Light indices per cell computation took %f seconds\n", end_time - start_time);
-//     glUniform1i(vxgiEnabledLoc_deferred, 1); // Mark as ready
-//     
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-//     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL * sizeof(uint32_t), cellOccupancy);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
-    DualLog("VXGI Init DONE\n");
+    glGenBuffers(1, &vxgiID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);    
     DebugRAM("after VXGI Init");
 }
 
@@ -96,6 +53,24 @@ void WorldCellIndexToPosition(uint32_t worldIdx, float * x, float * y, float * z
     *x = (worldIdx % WORLDCELL_X_MAX) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
     *y = ((worldIdx / WORLDCELL_X_MAX) % WORLDCELL_Y_MAX) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
     *z = (worldIdx / (WORLDCELL_X_MAX * WORLDCELL_Y_MAX)) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;   
+}
+
+uint32_t PositionToWorldCellIndexX(float x) {
+    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
+    int xi = (int)floorf((x + cellHalf) / WORLDCELL_WIDTH_F);
+    return (xi < 0 ? 0 : (xi >= WORLDCELL_X_MAX ? WORLDCELL_X_MAX - 1 : xi));
+}
+
+uint32_t PositionToWorldCellIndexY(float y) {
+    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
+    int yi = (int)floorf((y + cellHalf) / WORLDCELL_WIDTH_F);
+    return (yi < 0 ? 0 : (yi >= WORLDCELL_Y_MAX ? WORLDCELL_Y_MAX - 1 : yi));
+}
+
+uint32_t PositionToWorldCellIndexZ(float z) {
+    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
+    int zi = (int)floorf((z + cellHalf) / WORLDCELL_WIDTH_F);
+    return (zi < 0 ? 0 : (zi >= WORLDCELL_Z_MAX ? WORLDCELL_Z_MAX - 1 : zi));
 }
 
 uint32_t PositionToWorldCellIndex(float x, float y, float z) {

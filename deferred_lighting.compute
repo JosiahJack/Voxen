@@ -13,71 +13,23 @@ const char *deferredLighting_computeShader =
     "layout(rgba32i, binding = 5) uniform iimage2D inputTexMaps;\n"
 
     // Light buffer
-    "layout(std430, binding = 5) buffer LightBuffer {\n"
-    "    float lights[];\n"
-    "};\n"
-
-    // Vertex buffers (one per model, bound as SSBOs)
-    "layout(std430, binding = 6) buffer VertexBuffer0 { float vertices0[]; };\n"
-    "layout(std430, binding = 7) buffer VertexBuffer1 { float vertices1[]; };\n"
-    "layout(std430, binding = 8) buffer VertexBuffer2 { float vertices2[]; };\n"
-    "layout(std430, binding = 9) buffer BoundsBuffer { float bounds[]; };\n"
-
-    "struct Instance {\n"
-    "    int modelIndex;\n"
-    "    int texIndex;\n"
-    "    int glowIndex;\n"
-    "    int specIndex;\n"
-    "    int normIndex;\n"
-    "    float posx;\n"
-    "    float posy;\n"
-    "    float posz;\n"
-    "    float sclx;\n"
-    "    float scly;\n"
-    "    float sclz;\n"
-    "    float rotx;\n"
-    "    float roty;\n"
-    "    float rotz;\n"
-    "    float rotw;\n"
-    "};\n"
-
-    "layout(std430, binding = 10) buffer InstancesBuffer {\n"
-    "    Instance instances[];\n"
-    "};\n"
-
-    "layout(std430, binding = 11) buffer InstanceBuffer {\n"
-    "    mat4 instanceMatrices[];\n"
-    "};\n"
+//     "layout(std430, binding = 5) buffer LightBuffer {\n"
+//     "    float lights[];\n"
+//     "};\n"
 
     "layout(std430, binding = 13) buffer BlueNoise {\n"
     "    float blueNoiseColors[];\n"
     "};\n"
-    
-    "struct VXGIVoxel {\n"
-    "    vec3 direct_light;\n"
-    "    vec3 indirect_light;\n"
-    "    float occupancy;\n"
-    "};\n"
-    
-    // The indices of the current lightSubset we are in for indexing into full
-    // lights[LIGHT_COUNT * LIGHT_DATA_SIZE] buffer.
-    "layout(std430, binding = 19) buffer LightIndices {\n"
-    "    uint lightIndicesForCell[32];\n"
-    "};\n"
-    
-    "uniform int voxelCount;\n"
 
-    // Uniforms from deferred shader
+    "layout(std430, binding = 19) buffer LightIndices {\n"
+    "    float lightInPVS[];\n"
+    "};\n"
+
+    // Uniforms, why must we all wear these ridiculous types!
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-
-    // Uniforms for ray tracing
     "uniform int shadowsEnabled;\n"
-    "uniform int vxgiEnabled;\n"
     "uniform int debugView;\n"
-//     "uniform int playerCellIdx;\n"
-//     "uniform int lightCount;\n" // Same as LIGHT_COUNT, not LIGHT_COUNT * LIGHT_DATA_SIZE
-//     "uniform int lightDataSize;\n" // Same as LIGHT_DATA_SIZE
 
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -105,25 +57,20 @@ const char *deferredLighting_computeShader =
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
     "    uint lightIdx = 0;\n"
     "    for (int i = 0; i < 32; i++) {\n"
-//     "    for (int i = 0; i < lights.length(); i += 12) {\n" // Stride of 12
-//     "    for (int i = 0; i < lightCount; i++) {\n"
-//     "        uint lightIdx = i * lightDataSize;\n"
     "        uint lightIdx = i * 12;\n"
-//     "        if (lightIdx > ((lightCount * lightDataSize))) break;\n" // Finished all occupied indices.  Empty ones are set to INVALID_LIGHT_INDEX (LIGHT_COUNT + 1).
-    
-    "        float intensity = lights[lightIdx + 3];\n"
+    "        float intensity = lightInPVS[lightIdx + 3];\n"
     "        if (intensity < 0.015) continue;\n"
 
-    "        float range = lights[lightIdx + 4];\n"
-    "        vec3 lightPos = vec3(lights[lightIdx + 0], lights[lightIdx + 1], lights[lightIdx + 2]);\n"
+    "        float range = lightInPVS[lightIdx + 4];\n"
+    "        vec3 lightPos = vec3(lightInPVS[lightIdx + 0], lightInPVS[lightIdx + 1], lightInPVS[lightIdx + 2]);\n"
     "        vec3 toLight = lightPos - worldPos;\n"
     "        float dist = length(toLight);\n"
     "        if (dist > range) continue;\n"
 
     "        vec3 lightDir = normalize(toLight);\n"
-    "        float spotAng = lights[lightIdx + 5];\n"
-    "        vec3 spotDir = vec3(lights[lightIdx + 6], lights[lightIdx + 7], lights[lightIdx + 8]);\n"
-    "        vec3 lightColor = vec3(lights[lightIdx + 9], lights[lightIdx + 10], lights[lightIdx + 11]);\n"
+    "        float spotAng = lightInPVS[lightIdx + 5];\n"
+    "        vec3 spotDir = vec3(lightInPVS[lightIdx + 6], lightInPVS[lightIdx + 7], lightInPVS[lightIdx + 8]);\n"
+    "        vec3 lightColor = vec3(lightInPVS[lightIdx + 9], lightInPVS[lightIdx + 10], lightInPVS[lightIdx + 11]);\n"
     "        float spotFalloff = 1.0;\n"
     "        if (spotAng > 0.0) {\n"
     "            float spotdot = dot(spotDir, -lightDir);\n"

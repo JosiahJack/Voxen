@@ -47,7 +47,7 @@ int LoadGeometry(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) {maxIndex = model_parser.entries[k].index; }
     }
         
-    DualLog("Parsing %d models out of max allowed %d...\n",model_parser.count,MODEL_COUNT);
+    DualLog("Parsing %d models...\n",model_parser.count);
     
     int totalVertCount = 0;
     int totalBounds = 0;

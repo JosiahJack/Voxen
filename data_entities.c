@@ -56,7 +56,7 @@ int LoadEntities(void) {
 //                 entities[i].normIndex);
     }
 
-    DualLog("Loaded %d entity definitions\n", entityCount);
+//     DualLog("Loaded %d entity definitions\n", entityCount);
     CleanupEntities(false);
     DebugRAM("after loading all entities");
     return 0;
