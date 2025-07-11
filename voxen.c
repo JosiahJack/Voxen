@@ -142,7 +142,6 @@ typedef enum {
     SYS_OGL,
     SYS_NET,
     SYS_AUD,
-    SYS_VOX,
     SYS_COUNT // Number of subsystems
 } SystemType;
 
@@ -251,7 +250,6 @@ int InitializeEnvironment(void) {
 }
 
 int ExitCleanup(int status) {
-    if (systemInitialized[SYS_VOX]) VXGI_Shutdown();
     if (systemInitialized[SYS_AUD]) CleanupAudio();
     if (systemInitialized[SYS_NET]) CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
@@ -317,7 +315,6 @@ int EventExecute(Event* event) {
         case EV_LOAD_LEVELS: return 0;//LoadLevels(); TODO
         case EV_LOAD_VOXELS:
             VXGI_Init(); // Initialize the voxels after loading models and instances so that svo's can be populated.
-            systemInitialized[SYS_VOX] = true;
             return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
@@ -376,12 +373,11 @@ int main(int argc, char* argv[]) {
                                            // else entity types can't be validated.
     EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities or else 
                                          // instances can't know what to do.
+    EnqueueEvent_Simple(EV_LOAD_INSTANCES);
     EnqueueEvent_Simple(EV_LOAD_VOXELS); // Must be after models! Needed for 
                                          // generating voxels), entities (lets 
                                          // instances know what models), and
                                          // levels (populates instances.
-    EnqueueEvent_Simple(EV_LOAD_INSTANCES);
-    
     double accumulator = 0.0;
     last_time = get_time();
     lastJournalWriteTime = get_time();

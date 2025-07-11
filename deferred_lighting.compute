@@ -62,7 +62,7 @@ const char *deferredLighting_computeShader =
     // The indices of the current lightSubset we are in for indexing into full
     // lights[LIGHT_COUNT * LIGHT_DATA_SIZE] buffer.
     "layout(std430, binding = 19) buffer LightIndices {\n"
-    "    uint lightIndicesForSubset[64];\n"
+    "    uint lightIndicesForCell[];\n"
     "};\n"
     
     "uniform int voxelCount;\n"
@@ -75,13 +75,9 @@ const char *deferredLighting_computeShader =
     "uniform int shadowsEnabled;\n"
     "uniform int vxgiEnabled;\n"
     "uniform int debugView;\n"
-    
-    "uniform uint lightSubsetA;\n" // Bottom 32bits of uint64_t for lightSubs of worldcell we are in
-    "uniform uint lightSubsetB;\n" //    Top 32bits of uint64_t for lightSubs of worldcell we are in
-    "uniform uint activeLightCount;\n" // How many of the 64 bits are actually active lights, subsets must be tightly packed to one end!
-//     "uniform vec3 worldMin;\n" // World bounds min (e.g., 0, 0, 0)
-//     "uniform vec3 worldMax;\n" // World bounds max (e.g., 512*0.32, 512*0.32, 144*0.32)
-//     "uniform ivec3 cellCounts;\n" // (64, 64, 18)
+    "uniform int playerCellIdx;\n"
+    "uniform int lightCount;\n" // Same as LIGHT_COUNT, not LIGHT_COUNT * LIGHT_DATA_SIZE
+    "uniform int lightDataSize;\n" // Same as LIGHT_DATA_SIZE
 
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -99,16 +95,8 @@ const char *deferredLighting_computeShader =
     "    vec3 worldPos = worldPosPack.xyz;\n"
     "    vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
     "    if (debugView == 1 || color.a < 1.0) return;\n"
-    
-    "    ivec3 cellIdx = ivec3(floor((worldPos - worldMin) / vec3(\n"
-    "        (worldMax.x - worldMin.x) / cellCounts.x,\n"
-    "        (worldMax.y - worldMin.y) / cellCounts.y,\n"
-    "        (worldMax.z - worldMin.z) / cellCounts.z\n"
-    "    )));\n"
-//     "    int cell1D = cellIdx.x + cellIdx.y * cellCounts.x + cellIdx.z * cellCounts.x * cellCounts.y;\n"
-    
+
     "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
-//     "    float depth = texture(inputDepth, ivec2(pixel)).r;\n"
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
 
     "    ivec4 indicesPack = imageLoad(inputTexMaps, ivec2(pixel));\n"
@@ -116,13 +104,9 @@ const char *deferredLighting_computeShader =
     "    vec4 specColor = unpackColor32(indicesPack.g);\n"
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
 
-    "    for (int i = 0; i < activeLightCount; i++) {\n"
-    "        uint lightIdx = lightIndicesForSubset[i];\n"
-    "        if (i < 32) {\n"
-    "            if ((lightSubsetA & (1u << i)) == 0) continue;\n"
-    "        } else {\n"
-    "            if ((lightSubsetB & (1u << (i - 32))) == 0) continue;\n"
-    "        }\n"
+    "    for (int i = 0; i < 32; i++) {\n"
+    "        uint lightIdx = lightIndicesForCell[(playerCellIdx * 32) + i];\n"
+//     "        if (lightIdx > ((lightCount * lightDataSize))) break;\n" // Finished all occupied indices.  Empty ones are set to INVALID_LIGHT_INDEX (LIGHT_COUNT + 1).
     
     "        float intensity = lights[lightIdx + 3];\n"
     "        if (intensity < 0.015) continue;\n"
@@ -165,7 +149,6 @@ const char *deferredLighting_computeShader =
     "    int pixelIndex = int(((int(pixel.y) % 64) * 64 + (int(pixel.x) % 64))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
     "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
     "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
-
-//     "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n"
+    
     "    imageStore(inputImage, ivec2(pixel), vec4(lighting, color.a));\n"
     "}\n";

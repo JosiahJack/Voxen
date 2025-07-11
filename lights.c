@@ -30,7 +30,7 @@ void InitializeLights(void) {
         lights[base + 0] = base * 0.08f; // posx
         lights[base + 1] = base * 0.08f; // posy
         lights[base + 2] = 0.0f; // posz
-        lights[base + 3] = base > 12 * 256 ? 0.0f : 2.0f; // intensity
+        lights[base + 3] = 5.0f; // intensity
         lights[base + 4] = 5.24f; // radius
         lights[base + 5] = 0.0f; // spotAng
         lights[base + 6] = 0.0f; // spotDirx

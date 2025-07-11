@@ -136,7 +136,7 @@ int LoadTextures(void) {
         if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
         
         doubleSidedTexture[i] = texture_parser.entries[matchedParserIdx].doublesided;
-        if (doubleSidedTexture[i]) DualLog("Loaded doublesided texture %s\n",texture_parser.entries[matchedParserIdx].path);
+//         if (doubleSidedTexture[i]) DualLog("Loaded doublesided texture %s\n",texture_parser.entries[matchedParserIdx].path);
         
         // Build palette for this texture using uthash
         ColorEntry *color_table = NULL, *entry, *tmp;

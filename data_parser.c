@@ -86,16 +86,13 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 if (strncmp(line, parser->valid_keys[i], key_len) == 0 && line[key_len] == ':') {
                     const char *value = line + key_len + 1;
                     while (*value == ' ') value++; // Skip the space after :
-                         if (strcmp(parser->valid_keys[i], "index") == 0)       entry.index      = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "model") == 0)       entry.modelIndex = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "texture") == 0)     entry.texIndex   = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "glowtexture") == 0) entry.glowIndex  = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "spectexture") == 0) entry.specIndex  = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "normtexture") == 0) entry.normIndex  = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "doublesided") == 0) {
-                        entry.doublesided  = (atoi(value) > 0);
-                        DualLog("Parsed %s with doublesided value of %d evaluated as %d\n", entry.path, atoi(value), entry.doublesided);
-                    }
+                         if (strcmp(parser->valid_keys[i], "index") == 0)       entry.index       = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "model") == 0)       entry.modelIndex  = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "texture") == 0)     entry.texIndex    = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "glowtexture") == 0) entry.glowIndex   = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "spectexture") == 0) entry.specIndex   = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "normtexture") == 0) entry.normIndex   = atoi(value);
+                    else if (strcmp(parser->valid_keys[i], "doublesided") == 0) entry.doublesided = (atoi(value) > 0);
 
                     break;
                 }

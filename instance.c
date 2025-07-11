@@ -5,6 +5,7 @@
 #include "data_models.h"
 #include "debug.h"
 #include "data_entities.h"
+#include "voxel.h"
 
 Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -36,6 +37,11 @@ int SetupInstances(void) {
             x = 0;
             y++;
         }
+        
+//         if (instances[idx].modelIndex < MODEL_COUNT && instances[idx].modelIndex >= 0) {
+//             DualLog("Inserting occupied voxel for instance %d\n",idx);
+//             InsertOccupiedVoxel(instances[idx].posx,instances[idx].posy,instances[idx].posz);
+//         }
         
 //         DualLog("Instance %d using entity %d:: mdx: %d, tex: %d, glw: %d, spc: %d, nrm: %d\n",
 //                 idx,entIdx,instances[idx].modelIndex,instances[idx].texIndex,instances[idx].glowIndex,instances[idx].specIndex,instances[idx].normIndex);

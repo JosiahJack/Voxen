@@ -112,8 +112,12 @@ GLint specIndexLoc_chunk = -1;
 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1;
 GLint shadowsEnabledLoc_deferred = -1, vxgiEnabledLoc_deferred = -1, voxelCountLoc_deferred = -1;
-GLint debugViewLoc_deferred = -1, lightSubsetALoc_deferred = -1, lightSubsetBLoc_deferred = -1;
-GLint activeLightCountLoc_deferred = -1;
+GLint debugViewLoc_deferred = -1;
+// GLint lightSubsetALoc_deferred = -1, lightSubsetBLoc_deferred = -1;
+// GLint activeLightCountLoc_deferred = -1;
+GLint playerCellLoc_deferred = -1;
+GLint lightCountLoc_deferred = -1;
+GLint lightDataSizeLoc_deferred = -1;
 
 void CacheUniformLocationsForShaders(void) {
     // Called after shader compilation in InitializeEnvironment
@@ -134,9 +138,12 @@ void CacheUniformLocationsForShaders(void) {
     vxgiEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "vxgiEnabled");
     voxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "voxelCount");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
-    lightSubsetALoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetA");
-    lightSubsetBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetB");
-    activeLightCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "activeLightCount");
+    playerCellLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "playerCellIdx");
+    lightCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightCount");
+    lightDataSizeLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightDataSize");
+//     lightSubsetALoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetA");
+//     lightSubsetBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "lightSubsetB");
+//     activeLightCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "activeLightCount");
 }
 
 
@@ -200,6 +207,8 @@ void RenderMeshInstances() {
 }
 
 bool shadowsEnabled = false;
+bool vxgiEnabled = false;
+uint32_t playerCellIdx = 80000;
 
 void TestStuffForRendering_DELETE_ME_LATER() {
     // Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
@@ -247,26 +256,18 @@ int RenderStaticMeshes(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // 2. Transfer VXGI Data to GPU, if ready
-//     VXGI_UpdateGL();
-    uint32_t playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
-    uint64_t lightSubset = lightSubsetBitmasks[playerCellIdx];
-    uint32_t lightSubsetA = (uint32_t)(lightSubset & 0xFFFFFFFFULL); // Lower 32 bits
-    uint32_t lightSubsetB = (uint32_t)(lightSubset >> 32);          // Upper 32 bits
-    uint32_t lightIndices[64];
-    int activeLightCount = 0;
-    for (activeLightCount = 0; activeLightCount < 64; i++) {
-        if (lightSubset & (1ULL << activeLightCount)) { // Bit for light is on.
-            lightIndices[activeLightCount] = activeLightCount * LIGHT_DATA_SIZE; // Index into lights buffer
-            activeLightCount++;
-        }
-    }
-    glUniform1ui(lightSubsetALoc_deferred,lightSubsetA);
-    glUniform1ui(lightSubsetBLoc_deferred,lightSubsetB);
-    glUniform1ui(activeLightCountLoc_deferred,activeLightCount);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, activeLightCount * sizeof(uint32_t), lightIndices);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
+    glUniform1ui(playerCellLoc_deferred,playerCellIdx);
+    glUniform1i(lightCountLoc_deferred,LIGHT_COUNT);
+    glUniform1i(lightDataSizeLoc_deferred,LIGHT_DATA_SIZE);
+    glUniform1i(vxgiEnabledLoc_deferred, vxgiEnabled);
+//     DualLog("Player can see these lights:: ");
+//     for (uint32_t i=0;i<MAX_LIGHTS_VISIBLE_PER_CELL;i++) {
+//         uint32_t lightIdx = cellOccupancy[(playerCellIdx * MAX_LIGHTS_VISIBLE_PER_CELL) + i];
+//         if (lightIdx > (LIGHT_COUNT * LIGHT_DATA_SIZE)) break; // No more valid lights for this cell.
+//         DualLog("%d, ",lightIdx);
+//     }
+//     DualLog("\n");
 
     // 3. Deferred Lighting + Shadow Calculations
     //        Apply deferred lighting with compute shader.  All lights are
@@ -368,6 +369,7 @@ int RenderUI(double deltaTime) {
     RenderFormattedText(10, 95, TEXT_WHITE, "testLight_spotAng: %.4f", testLight_spotAng);
     RenderFormattedText(10, 110, TEXT_WHITE, "testLight_intensity: %.4f", testLight_intensity);
     RenderFormattedText(10, 125, TEXT_WHITE, "DebugView: %d", debugView);
+    RenderFormattedText(10, 140, TEXT_WHITE, "Player Cell: %d", playerCellIdx);
     
     // Frame stats
     drawCallCount++; // Add one more for this text render ;)
