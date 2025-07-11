@@ -13,6 +13,7 @@
 #include "constants.h"
 #include "debug.h"
 #include "render.h"
+#include "event.h"
 
 // #define DEBUG_TEXTURE_LOAD_DATA 0
 
@@ -61,6 +62,7 @@ typedef enum {
 bool loadTextureItemInitialized[TEX_COUNT] = { [0 ... TEX_COUNT - 1] = false };
 
 int LoadTextures(void) {
+    double start_time = get_time();
     DebugRAM("before LoadTextures");
     textureCount = 0;
     
@@ -338,6 +340,8 @@ int LoadTextures(void) {
 
     CleanupLoad(false);
     DebugRAM("CleanupLoad for LoadTextures");
+    double end_time = get_time();
+    DualLog("Load Textures took %f seconds\n", end_time - start_time);
     return 0;
 }
 

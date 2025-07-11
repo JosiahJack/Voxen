@@ -5,6 +5,7 @@
 #include "data_parser.h"
 #include "constants.h"
 #include "debug.h"
+#include "event.h"
 
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 int entityCount = 0;            // Number of entities loaded
@@ -24,6 +25,8 @@ bool loadEntityItemInitialized[ENT_COUNT] = { [0 ... ENT_COUNT - 1] = false };
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 int LoadEntities(void) {
+    double start_time = get_time();
+    
     // Initialize parser with entity-specific keys
     parser_init(&entity_parser, valid_entity_keys, NUM_ENTITY_KEYS, PARSER_DATA);
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!"); parser_free(&entity_parser); return 1; }
@@ -59,6 +62,8 @@ int LoadEntities(void) {
 //     DualLog("Loaded %d entity definitions\n", entityCount);
     CleanupEntities(false);
     DebugRAM("after loading all entities");
+    double end_time = get_time();
+    DualLog("Load Entities took %f seconds\n", end_time - start_time);
     return 0;
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning

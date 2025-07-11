@@ -12,6 +12,7 @@
 #include "render.h"
 #include "data_parser.h"
 #include "voxel.h"
+#include "event.h"
 
 // #define DEBUG_MODEL_LOAD_DATA
 
@@ -36,7 +37,9 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 
 // Loads all geometry, from 3D meshes or otherwise
 int LoadGeometry(void) {
+    double start_time = get_time();
     DebugRAM("start of loading all models");
+    
     // First parse ./Data/textures.txt to see what textures to load to what indices
     parser_init(&model_parser, valid_mdldata_keys, NUM_MODEL_KEYS, PARSER_DATA);
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); parser_free(&model_parser); return 1; }
@@ -67,8 +70,7 @@ int LoadGeometry(void) {
             return 1;
         }
         
-//         DebugRAM("after assimp scene made for %s",model_parser.entries[matchedParserIdx].path);
-
+        DebugRAM("after assimp scene made for %s",model_parser.entries[matchedParserIdx].path);
 
         // Count total vertices in the model
         uint32_t vertexCount = 0;
@@ -97,7 +99,7 @@ int LoadGeometry(void) {
             return 1;
         }
         
-//         DebugRAM("after tempVertices malloc for %s",model_parser.entries[matchedParserIdx].path);
+        DebugRAM("after tempVertices malloc for %s",model_parser.entries[matchedParserIdx].path);
 
         // Extract vertex data
         uint32_t vertexIndex = 0;
@@ -130,7 +132,7 @@ int LoadGeometry(void) {
             }
         }
         
-//         DebugRAM("after vertices for loop for %s",model_parser.entries[matchedParserIdx].path);
+        DebugRAM("after vertices for loop for %s",model_parser.entries[matchedParserIdx].path);
 
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 0] = minx;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 1] = miny;
@@ -229,16 +231,16 @@ int LoadGeometry(void) {
     glGenBuffers(1, &modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightBufferID);
     DebugRAM("after model bounds bind");
 
     // Set static buffers once for Deferred Lighting shader
     glUniform1ui(screenWidthLoc_deferred, screen_width);
     glUniform1ui(screenHeightLoc_deferred, screen_height);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, vbos[0]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vbos[1]);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, vbos[2]);
 
     DebugRAM("after loading all models");
+    double end_time = get_time();
+    DualLog("Load Models took %f seconds\n", end_time - start_time);
     return 0;
 }
 
