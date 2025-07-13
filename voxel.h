@@ -20,13 +20,10 @@
 #define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
 // #define TOTAL_VOXELS (WORLDCELL_X_MAX * WORLDCELL_Y_MAX * WORLDCELL_Z_MAX * VOXELS_PER_CELL) // 37748736
 // #define TOTAL_VOXEL_BITS (TOTAL_VOXELS / 8)
-// #define INVALID_LIGHTSET (uint64_t)(TOTAL_VOXELS) + 1ULL
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define MAX_LIGHTS_VISIBLE_PER_CELL 32
 
-// extern uint64_t lightSubsetBitmasks[]; // One per world cell xy, 4096 * 32 * 64bits = 1MB
 extern uint32_t cellOccupancy[]; // Stores flat array of indices for each lightSubset 131072 * 64 * 4byte = 33MB
-// extern uint8_t voxelOccupancy[]; // Stores bitfields
 extern GLuint vxgiID;
 extern bool vxgiEnabled;
 
@@ -37,13 +34,7 @@ uint32_t PositionToWorldCellIndexX(float x);
 uint32_t PositionToWorldCellIndexY(float y);
 uint32_t PositionToWorldCellIndexZ(float z);
 uint32_t PositionToWorldCellIndex(float x, float y, float z);
-// uint32_t PositionToVoxelIndex(float x, float y, float z);
-// void VoxelIndexToPosition(uint32_t voxelIdx, float * x, float * y, float * z);
-// bool IsVoxelOccupied(uint32_t voxelIdx);
-// bool IsLightVisible(float cell_x, float cell_y, float cell_z, float light_x, float light_y, float light_z);
-// void InsertOccupiedVoxel(float x, float y, float z);
 float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2);
-// uint64_t GetLightSubsetFromPosition(float x, float y, float z);
 
 #endif // VOXEN_VOXEL_H
 

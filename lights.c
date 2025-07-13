@@ -75,3 +75,13 @@ void InitializeLights(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
+
+// void InitLightVolumes(uint16_t * dirtyLightIndices) {
+void InitLightVolumes(void) {
+//     float * lightVolumeVertices[32];
+//     for (int i=0;i<32;++i) {
+//         float x = 
+// //     lightVolumeVertices = malloc(32 * 
+//         
+//     }
+}

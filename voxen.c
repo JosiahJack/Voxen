@@ -312,7 +312,9 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS: return 0;//LoadLevels(); TODO
+        case EV_LOAD_LEVELS:
+            //LoadLevels(); TODO
+            return 0;
         case EV_LOAD_VOXELS:
             VXGI_Init(); // Initialize the voxels after loading models and instances so that svo's can be populated.
             return 0;

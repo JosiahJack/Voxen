@@ -38,5 +38,6 @@ extern GLuint deferredLightingShaderProgram;
 
 void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer);
 void InitializeLights(void);
+void InitLightVolumes(void);
 
 #endif // VOXEN_LIGHTS_H

@@ -32,7 +32,6 @@
 #include "data_models.h"
 #include "render.h"
 
-// uint32_t cellOccupancy[TOTAL_WORLD_CELLS * MAX_LIGHTS_VISIBLE_PER_CELL]; // 131072 * 4byte = 524kb
 GLuint vxgiID;
 
 void VXGI_Init(void) {

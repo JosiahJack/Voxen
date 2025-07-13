@@ -135,11 +135,11 @@ void CacheUniformLocationsForShaders(void) {
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
 }
 
-
-void RenderMeshInstances() {    
+void RenderMeshInstances(bool * instanceIsCulledArray) {    
     // Set up view and projection matrices
     float model[16]; // 4x4 matrix
     for (int i=0;i<INSTANCE_COUNT;i++) {
+        if (instanceIsCulledArray[i]) continue;
         if (instances[i].modelIndex >= MODEL_COUNT) continue;
         if (instances[i].modelIndex < 0) continue; // Culled
         if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
@@ -189,7 +189,7 @@ void RenderMeshInstances() {
         drawCallCount++;
         vertexCount += modelVertexCounts[modelType];
 
-        // Uncomment for fun and mayhem
+        // Uncomment for fun and mayhem, draw call 1, instance 0, error 501 for invalid input
 //         GLenum err;
 //         while ((err = glGetError()) != GL_NO_ERROR) DualLogError("GL Error for draw call %d: %x\n",i, err);
     }
@@ -226,28 +226,8 @@ int RenderStaticMeshes(void) {
     drawCallCount = 0; // Reset per frame
     vertexCount = 0;
     
-    // 1. Unlit Raterized Geometry
-    //        Standard vertex + fragment rendering, but
-    //        with special packing to minimize transfer data amounts
-    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-    glUseProgram(chunkShaderProgram);
-    glEnable(GL_DEPTH_TEST);
-    float view[16], projection[16]; // Set up view and projection matrices
-    float fov = 65.0f;
-    mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
-    mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
-    glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
-    glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
-    glUniform1i(debugViewLoc_chunk, debugView);
-    glBindVertexArray(vao);
-    
-    // These should be static but cause issues if not...
-    glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
-    
-    RenderMeshInstances(); // Render each model type's instances
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    // 2. Transfer VXGI Data to GPU, if ready
+    // 1.Culling
+    // 1a. Light Culling to max 32
     playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
     playerCellIdx_x = PositionToWorldCellIndexX(cam_x);
     playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
@@ -292,6 +272,39 @@ int RenderStaticMeshes(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    // 1b. Instance Culling to only those in range of lights and player
+    bool instanceIsCulledArray[INSTANCE_COUNT];
+    memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
+    float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
+    float distSqrd = 0.0f;
+    for (int i=0;i<INSTANCE_COUNT;++i) {
+        distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
+        if (distSqrd < sightRangeSquared) {
+            instanceIsCulledArray[i] = false;
+        }
+    }
+    
+    // 1. Unlit Raterized Geometry
+    //        Standard vertex + fragment rendering, but
+    //        with special packing to minimize transfer data amounts
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glUseProgram(chunkShaderProgram);
+    glEnable(GL_DEPTH_TEST);
+    float view[16], projection[16]; // Set up view and projection matrices
+    float fov = 65.0f;
+    mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
+    mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
+    glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+    glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
+    glUniform1i(debugViewLoc_chunk, debugView);
+    glBindVertexArray(vao);
+    
+    // These should be static but cause issues if not...
+    glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
+    
+    RenderMeshInstances(instanceIsCulledArray); // Render each model type's instances
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // 3. Deferred Lighting + Shadow Calculations
     //        Apply deferred lighting with compute shader.  All lights are
@@ -318,12 +331,10 @@ int RenderStaticMeshes(void) {
     glDispatchCompute(groupX, groupY, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
     
-    // 4. Render Output
-    //        Render final gather lighting results with full screen quad.
+    // 4. Render final results with full screen quad.
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     if (debugView == 0) {
-//         glBindTexture(GL_TEXTURE_2D, outputImageID); // Normal
         glBindTexture(GL_TEXTURE_2D, inputImageID); // Normal
     } else if (debugView == 1) {
         glBindTexture(GL_TEXTURE_2D, inputImageID); // Unlit
@@ -334,6 +345,7 @@ int RenderStaticMeshes(void) {
     } else if (debugView == 4) {
         glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
     }
+    
     glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
     glBindVertexArray(quadVAO);
     glDisable(GL_BLEND);

@@ -133,14 +133,22 @@ int LoadGeometry(void) {
         }
         
         DebugRAM("after vertices for loop for %s",model_parser.entries[matchedParserIdx].path);
-
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 0] = minx;
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 1] = miny;
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 2] = minz;
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 3] = maxx;
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 4] = maxy;
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + 5] = maxz;
-        totalBounds += 6;
+        float minx_pos = fabs(minx);
+        float miny_pos = fabs(miny);
+        float minz_pos = fabs(minz);
+        float boundradius = minx_pos > miny_pos ? minx_pos : miny_pos;
+        boundradius = boundradius > minz_pos ? boundradius : minz_pos;
+        boundradius = boundradius > maxx ? boundradius : maxx;
+        boundradius = boundradius > maxy ? boundradius : maxy;
+        boundradius = boundradius > maxz ? boundradius : maxz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
+        totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         vertexDataArrays[i] = tempVertices;
         aiReleaseImport(scene);
         malloc_trim(0);

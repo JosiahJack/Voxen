@@ -73,5 +73,7 @@ int SetupInstances(void) {
     glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    
+    InitLightVolumes(); // Create Light Volume meshes
     return 0;
 }
