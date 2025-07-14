@@ -72,7 +72,6 @@ void InitializeLights(void) {
     lightDirty[1] = true;
 }
 
-// void InitLightVolumes(uint16_t * dirtyLightIndices) {
 void InitLightVolumes(void) {
 //     float * lightVolumeVertices[32];
 //     for (int i=0;i<32;++i) {

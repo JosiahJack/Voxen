@@ -28,9 +28,11 @@ typedef struct {
 extern bool instanceInPVS[INSTANCE_COUNT];
 extern Instance instances[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
+extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern GLuint instancesBuffer;
 extern GLuint matricesBuffer;
 
 int SetupInstances(void);
+void UpdateInstanceMatrix(int i);
 
 #endif // VOXEN_INSTANCE_H

@@ -28,6 +28,8 @@ GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 float * vertexDataArrays[MODEL_COUNT];
 
+GLuint vboMasterTable;
+
 typedef enum {
     MDL_PARSER = 0,
     MDL_COUNT // Number of subsystems
@@ -214,7 +216,24 @@ int LoadGeometry(void) {
     glFinish();
     DebugRAM("after model staging buffer clear");
 
-            
+    // Create duplicate of all mesh data in one flat buffer in VRAM without using RAM
+    glGenBuffers(1, &vboMasterTable);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);  
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+    uint32_t offset = 0;
+    for (int i = 0; i < MODEL_COUNT; ++i) {
+        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
+        glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, offset * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        offset += modelVertexCounts[i];
+    }
+    
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+    
+    DebugRAM("after copying to VBO Master Table");
+                
     // Define vertex attribute formats
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)

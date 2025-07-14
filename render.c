@@ -135,66 +135,6 @@ void CacheUniformLocationsForShaders(void) {
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
 }
 
-void RenderMeshInstances(bool * instanceIsCulledArray) {    
-    // Set up view and projection matrices
-    float model[16]; // 4x4 matrix
-    for (int i=0;i<INSTANCE_COUNT;i++) {
-        if (instanceIsCulledArray[i]) continue;
-        if (instances[i].modelIndex >= MODEL_COUNT) continue;
-        if (instances[i].modelIndex < 0) continue; // Culled
-        if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
-        
-        float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
-        float len = sqrtf(x*x + y*y + z*z + w*w);
-        if (len > 0.0f) {
-            x /= len; y /= len; z /= len; w /= len;
-        } else {
-            x = 0.0f; y = 0.0f; z = 0.0f; w = 1.0f; // Default to identity rotation
-        }
-        
-        float rot[16];
-        mat4_identity(rot);
-        rot[0] = 1.0f - 2.0f * (y*y + z*z);
-        rot[1] = 2.0f * (x*y - w*z);
-        rot[2] = 2.0f * (x*z + w*y);
-        rot[4] = 2.0f * (x*y + w*z);
-        rot[5] = 1.0f - 2.0f * (x*x + z*z);
-        rot[6] = 2.0f * (y*z - w*x);
-        rot[8] = 2.0f * (x*z - w*y);
-        rot[9] = 2.0f * (y*z + w*x);
-        rot[10] = 1.0f - 2.0f * (x*x + y*y);
-        
-        // Account for bad scale.  If instance is in the list, it should be visible!
-        float sx = instances[i].sclx > 0.0f ? instances[i].sclx : 1.0f;
-        float sy = instances[i].scly > 0.0f ? instances[i].scly : 1.0f;
-        float sz = instances[i].sclz > 0.0f ? instances[i].sclz : 1.0f;
-        
-        model[0]  =       rot[0] * sx; model[1]  =       rot[1] * sy; model[2] =       rot[2]  * sz; model[3]  = 0.0f;
-        model[4]  =       rot[4] * sx; model[5]  =       rot[5] * sy; model[6]  =      rot[6]  * sz; model[7]  = 0.0f;
-        model[8]  =       rot[8] * sx; model[9]  =       rot[9] * sy; model[10] =      rot[10] * sz; model[11] = 0.0f;
-        model[12] = instances[i].posx; model[13] = instances[i].posy; model[14] = instances[i].posz; model[15] = 1.0f;
-        memcpy(&modelMatrices[i * 16], model, 16 * sizeof(float));
-        glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
-        glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
-        glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
-        glUniform1i(instanceIndexLoc_chunk, i);
-        int modelType = instances[i].modelIndex;
-        glUniform1i(modelIndexLoc_chunk, modelType);
-        glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, model);
-        glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        
-        if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
-        glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
-        if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
-        drawCallCount++;
-        vertexCount += modelVertexCounts[modelType];
-
-        // Uncomment for fun and mayhem, draw call 1, instance 0, error 501 for invalid input
-//         GLenum err;
-//         while ((err = glGetError()) != GL_NO_ERROR) DualLogError("GL Error for draw call %d: %x\n",i, err);
-    }
-}
-
 bool shadowsEnabled = false;
 uint32_t playerCellIdx = 80000;
 uint32_t playerCellIdx_x = 20000;
@@ -219,6 +159,7 @@ void TestStuffForRendering_DELETE_ME_LATER() {
     instances[39].posx = testLight_x;
     instances[39].posy = testLight_y;
     instances[39].posz = testLight_z;
+    dirtyInstances[39] = true;
 }
 
 int RenderStaticMeshes(void) {
@@ -297,6 +238,15 @@ int RenderStaticMeshes(void) {
 //             }
 //         }
 //     }
+
+    // Pass instances to GPU binding points
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * sizeof(Instance), instances);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
+    
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     
     // 1. Unlit Raterized Geometry
     //        Standard vertex + fragment rendering, but
@@ -316,7 +266,34 @@ int RenderStaticMeshes(void) {
     // These should be static but cause issues if not...
     glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
     
-    RenderMeshInstances(instanceIsCulledArray); // Render each model type's instances
+    // Render Mesh Instances
+    // Set up view and projection matrices
+    for (int i=0;i<INSTANCE_COUNT;i++) {
+        if (instanceIsCulledArray[i]) continue;
+        if (instances[i].modelIndex >= MODEL_COUNT) continue;
+        if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+        if (instances[i].modelIndex < 0) continue; // Culled
+
+        if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+        glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+        glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
+        glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+        glUniform1i(instanceIndexLoc_chunk, i);
+        int modelType = instances[i].modelIndex;
+        glUniform1i(modelIndexLoc_chunk, modelType);
+        glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+        glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        
+        if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
+        glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+        if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
+        drawCallCount++;
+        vertexCount += modelVertexCounts[modelType];
+
+        // Uncomment for fun and mayhem, draw call 1, instance 0, error 501 for invalid input
+//         GLenum err;
+//         while ((err = glGetError()) != GL_NO_ERROR) DualLogError("GL Error for draw call %d: %x\n",i, err);
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // 3. Deferred Lighting + Shadow Calculations

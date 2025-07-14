@@ -34,7 +34,6 @@ void SetupGBuffer(void);
 void SetupQuad(void);
 int ClearFrameBuffers(void);
 void CacheUniformLocationsForShaders(void);
-void RenderMeshInstances();
 int RenderStaticMeshes(void);
 void render_debug_text(float x, float y, const char *text, SDL_Color color);
 int RenderUI(double deltaTime);

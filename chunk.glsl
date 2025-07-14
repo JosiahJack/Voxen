@@ -1,4 +1,4 @@
-// Generic shader for unlit textured surfaces (all world geometry, items,
+// chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
 // enemies, doors, etc., without transparency for first pass prior to lighting.
 const char *vertexShaderSource =
     "#version 450 core\n"
