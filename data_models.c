@@ -239,7 +239,7 @@ int LoadGeometry(void) {
     glGenBuffers(1, &modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightBufferID);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelBoundsID);
     DebugRAM("after model bounds bind");
 
     // Set static buffers once for Deferred Lighting shader

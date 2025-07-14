@@ -22,6 +22,7 @@
 #define LIGHT_DATA_OFFSET_B 11
                    
 #define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7
+#define MAX_VISIBLE_LIGHTS 32
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
@@ -32,7 +33,7 @@
 
 extern float spotAngTypes[];
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-extern GLuint lightBufferID;
+extern float lightsRangeSquared[LIGHT_COUNT];
 extern bool lightDirty[LIGHT_COUNT];
 extern GLuint deferredLightingShaderProgram;
 

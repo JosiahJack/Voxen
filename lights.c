@@ -13,8 +13,8 @@ float spotAngTypes[8] = { 0.0f, 30.0f, 45.0f, 60.0f, 75.0f, 90.0f, 135.0f, 151.7
 
 GLuint deferredLightingShaderProgram;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-GLuint lightBufferID;
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
+float lightsRangeSquared[LIGHT_COUNT];
 
 void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer) {
     *x = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSX]; // Index into shared flat GPU buffer
@@ -32,6 +32,7 @@ void InitializeLights(void) {
         lights[base + 2] = 0.0f; // posz
         lights[base + 3] = 5.0f; // intensity
         lights[base + 4] = 5.24f; // radius
+        lightsRangeSquared[i] = 5.24f * 5.24f;
         lights[base + 5] = 0.0f; // spotAng
         lights[base + 6] = 0.0f; // spotDirx
         lights[base + 7] = 0.0f; // spotDiry
@@ -47,6 +48,7 @@ void InitializeLights(void) {
     lights[2] = 0.0f; // Fixed Z height
     lights[3] = 2.0f; // Default intensity
     lights[4] = 10.0f; // Default radius
+    lightsRangeSquared[0] = 10.0f * 10.0f;
     lights[6] = 0.0f;
     lights[7] = 0.0f;
     lights[8] = -1.0f;
@@ -60,6 +62,7 @@ void InitializeLights(void) {
     lights[2 + 12] = 0.0f; // Fixed Z height
     lights[3 + 12] = 2.0f; // Default intensity
     lights[4 + 12] = 10.0f; // Default radius
+    lightsRangeSquared[1] = 10.0f * 10.0f;
     lights[6 + 12] = 0.0f;
     lights[7 + 12] = 0.0f;
     lights[8 + 12] = -1.0f;
@@ -67,13 +70,6 @@ void InitializeLights(void) {
     lights[10 + 12] = 0.0f;
     lights[11 + 12] = 0.0f;
     lightDirty[1] = true;
-
-    // Create and bind SSBO
-    glGenBuffers(1, &lightBufferID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightBufferID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, lightBufferID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 // void InitLightVolumes(uint16_t * dirtyLightIndices) {

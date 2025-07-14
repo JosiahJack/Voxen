@@ -281,7 +281,7 @@ int ExitCleanup(int status) {
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
-    if (lightBufferID) glDeleteBuffers(1, &lightBufferID);
+    if (vxgiID) glDeleteBuffers(1, &vxgiID);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);

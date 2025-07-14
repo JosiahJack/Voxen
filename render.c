@@ -210,6 +210,7 @@ void TestStuffForRendering_DELETE_ME_LATER() {
     lights[lightBase + 2] = testLight_z;
     lights[lightBase + 3] = testLight_intensity;
     lights[lightBase + 4] = testLight_range;
+    lightsRangeSquared[lightBase] = testLight_range * testLight_range;
     lights[lightBase + 5] = testLight_spotAng;
     lights[lightBase + 9] = 1.0f; // r
     lights[lightBase + 10] = 1.0f; // g
@@ -232,19 +233,16 @@ int RenderStaticMeshes(void) {
     playerCellIdx_x = PositionToWorldCellIndexX(cam_x);
     playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
     playerCellIdx_z = PositionToWorldCellIndexZ(cam_z);
-    
-    float litRange = 0.0f;
+    float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
     numLightsFound = 0;
     for (int i=0;i<LIGHT_COUNT;++i) {
         if (lights[i + LIGHT_DATA_OFFSET_INTENSITY] < 0.015f) continue; // Off
         
-        litRange = (30.0f * 2.56f);
-        litRange *= litRange; // squareDist
         uint32_t litIdx = (i * LIGHT_DATA_SIZE);
         if (squareDistance3D(cam_x, cam_y, cam_z,
                              lights[litIdx + LIGHT_DATA_OFFSET_POSX],
                              lights[litIdx + LIGHT_DATA_OFFSET_POSY],
-                             lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) < litRange) {
+                             lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) < sightRangeSquared) {
             
             int idx = numLightsFound * LIGHT_DATA_SIZE;
             lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -260,30 +258,45 @@ int RenderStaticMeshes(void) {
             lightsInProximity[idx + LIGHT_DATA_OFFSET_G] = lights[litIdx + LIGHT_DATA_OFFSET_G];
             lightsInProximity[idx + LIGHT_DATA_OFFSET_B] = lights[litIdx + LIGHT_DATA_OFFSET_B];
             numLightsFound++;
-            if (numLightsFound >= 32) break; // Ok found 32 lights, cap it there.
+            if (numLightsFound >= MAX_VISIBLE_LIGHTS) break; // Ok found 32 lights, cap it there.
         }
     }
     
-    for (int i=numLightsFound;i<32;++i) {
+    for (int i=numLightsFound;i<MAX_VISIBLE_LIGHTS;++i) {
         lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vxgiID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, vxgiID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     // 1b. Instance Culling to only those in range of lights and player
     bool instanceIsCulledArray[INSTANCE_COUNT];
     memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
-    float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
     float distSqrd = 0.0f;
+    
+    // Range to player culling of instances
     for (int i=0;i<INSTANCE_COUNT;++i) {
         distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
-        if (distSqrd < sightRangeSquared) {
-            instanceIsCulledArray[i] = false;
-        }
+        if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
     }
+    
+    // Range to lights culling of instances
+    // Well this is horribly slow for zero benefit (negative actually, adds 5 draw calls in test scene.
+//     for (int j=0;j<LIGHT_COUNT;++j) {
+//         for (int i=0;i<INSTANCE_COUNT;++i) {
+//             if (!instanceIsCulledArray[i]) continue;
+//             distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,
+//                                         lights[j + LIGHT_DATA_OFFSET_POSX], lights[j + LIGHT_DATA_OFFSET_POSY], lights[j + LIGHT_DATA_OFFSET_POSZ]);
+//             
+//             float boundsRadiusSquared = modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+//             boundsRadiusSquared *= boundsRadiusSquared;
+//             if ((distSqrd - (lightsRangeSquared[i] / 2.0f) - (boundsRadiusSquared / 2.0f)) < 0.0f) {
+//                 instanceIsCulledArray[i] = false; // 1 - 0.4 - 0.3 = 0.3, circles not touching; 1 - 0.6 - 0.5 = -0.1, circles touching
+//             }
+//         }
+//     }
     
     // 1. Unlit Raterized Geometry
     //        Standard vertex + fragment rendering, but

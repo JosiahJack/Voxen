@@ -12,11 +12,6 @@ const char *deferredLighting_computeShader =
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
     "layout(rgba32i, binding = 5) uniform iimage2D inputTexMaps;\n"
 
-    // Light buffer
-//     "layout(std430, binding = 5) buffer LightBuffer {\n"
-//     "    float lights[];\n"
-//     "};\n"
-
     "layout(std430, binding = 13) buffer BlueNoise {\n"
     "    float blueNoiseColors[];\n"
     "};\n"
