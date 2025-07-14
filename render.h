@@ -14,6 +14,7 @@ extern uint32_t vertexCount;
 extern GLuint matricesBuffer;
 extern GLuint quadVAO, quadVBO;
 extern GLuint chunkShaderProgram;
+extern GLuint lightVolumeShaderProgram;
 extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
 extern GLuint gBufferFBO;
 extern GLuint inputTexMapsID;

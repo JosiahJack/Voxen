@@ -4,7 +4,9 @@
 #include <GL/glew.h>
 
 #define MODEL_COUNT 1024
-#define VERTEX_ATTRIBUTES_COUNT 8
+#define VERTEX_ATTRIBUTES_COUNT 14 // x,y,z,nx,ny,nz,u,v,texIdx,glowIdx,specIdx,normIdx,modelIdx,instanceIdx
+              // Make sure this^^^^ matches in createLightVolume_computeShader!
+
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
 #define BOUNDS_DATA_OFFSET_MINY 1
@@ -18,10 +20,11 @@ extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint modelBoundsID;
 extern uint32_t totalVertexCount;
-extern GLuint vao;
+extern GLuint vao_chunk;
 extern GLuint vbos[MODEL_COUNT];
 extern float * vertexDataArrays[MODEL_COUNT];
 extern GLuint vboMasterTable;
+extern GLuint modelVertexOffsetsID;
 
 int LoadGeometry(void);
 void CleanupModelLoadOnFail(void);

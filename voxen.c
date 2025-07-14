@@ -260,8 +260,10 @@ int ExitCleanup(int status) {
         free(vertexDataArrays[i]);
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
     }
+    if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
+    if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
     
-    if (vao) glDeleteVertexArrays(1, &vao);
+    if (vao_chunk) glDeleteVertexArrays(1, &vao_chunk);
     if (chunkShaderProgram) glDeleteProgram(chunkShaderProgram);
     
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
@@ -280,9 +282,11 @@ int ExitCleanup(int status) {
         
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     
+    if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
+    if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
+    
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (vxgiID) glDeleteBuffers(1, &vxgiID);
-    if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
 

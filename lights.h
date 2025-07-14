@@ -27,6 +27,8 @@
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 
+#define MAX_VERTS_PER_LIGHT_VOLUME 65535
+
 #define VOXEL_DATA_SIZE 1
 #define SHADOW_MAP_SIZE 512
 #define SHADOW_MAP_FARPLANE 20.0
@@ -36,6 +38,7 @@ extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
 extern bool lightDirty[LIGHT_COUNT];
 extern GLuint deferredLightingShaderProgram;
+extern GLuint lightVolumeMeshShaderProgram;
 
 void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer);
 void InitializeLights(void);

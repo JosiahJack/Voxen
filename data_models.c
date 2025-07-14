@@ -20,8 +20,9 @@ DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 #define NUM_MODEL_KEYS 1
 GLuint chunkShaderProgram;
+GLuint lightVolumeShaderProgram;
 uint32_t modelVertexCounts[MODEL_COUNT];
-GLuint vao; // Vertex Array Object
+GLuint vao_chunk; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
 GLuint modelBoundsID;
@@ -29,6 +30,7 @@ float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 float * vertexDataArrays[MODEL_COUNT];
 
 GLuint vboMasterTable;
+GLuint modelVertexOffsetsID;
 
 typedef enum {
     MDL_PARSER = 0,
@@ -124,6 +126,12 @@ int LoadGeometry(void) {
                 float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
                 tempVertices[vertexIndex++] = tempU;
                 tempVertices[vertexIndex++] = tempV;
+                tempVertices[vertexIndex++] = 0; // Tex Index      Indices used later
+                tempVertices[vertexIndex++] = 0; // Glow Index
+                tempVertices[vertexIndex++] = 0; // Spec Index
+                tempVertices[vertexIndex++] = 0; // Normal Index
+                tempVertices[vertexIndex++] = 0; // Model Index
+                tempVertices[vertexIndex++] = 0; // Instance Index
                 
                 if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
                 if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
@@ -171,10 +179,6 @@ int LoadGeometry(void) {
     DualLog(")\n");
 #endif
 
-    // Generate and bind VAO
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
     memset(vbos, 0, MODEL_COUNT * sizeof(uint32_t));
         
     // Generate and populate VBOs
@@ -216,54 +220,64 @@ int LoadGeometry(void) {
     glFinish();
     DebugRAM("after model staging buffer clear");
 
+    // Upload modelVertexOffsets
+    uint32_t modelVertexOffsets[MODEL_COUNT];
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
+        modelVertexOffsets[i] = offset;
+        offset += modelVertexCounts[i];
+    }
+    
+    glGenBuffers(1, &modelVertexOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
+    
     // Create duplicate of all mesh data in one flat buffer in VRAM without using RAM
     glGenBuffers(1, &vboMasterTable);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);  
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-    uint32_t offset = 0;
     for (int i = 0; i < MODEL_COUNT; ++i) {
         glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
         glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
-        glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, offset * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        offset += modelVertexCounts[i];
+        glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     }
     
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-    
+
     DebugRAM("after copying to VBO Master Table");
-                
-    // Define vertex attribute formats
+      
+    // VAO for Generic Chunk Rendering
+    glGenVertexArrays(1, &vao_chunk);
+    glBindVertexArray(vao_chunk);
+    
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
     glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    glVertexAttribFormat(3, 1, GL_INT, GL_FALSE, 6 * sizeof(float)); // Tex Index (int)
-
-    // Bind attributes to a single binding point (0)
-    glVertexAttribBinding(0, 0); // Position
-    glVertexAttribBinding(1, 0); // Normal
-    glVertexAttribBinding(2, 0); // Tex Coord
-    glVertexAttribBinding(3, 0); // Tex Index
-
-    // Enable attributes
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-    glEnableVertexAttribArray(3);
+    glVertexAttribFormat(3, 1, GL_INT, GL_FALSE, 8 * sizeof(float)); // Tex Index (int)
+    glVertexAttribFormat(4, 1, GL_INT, GL_FALSE, 9 * sizeof(float)); // Glow Index (int)
+    glVertexAttribFormat(5, 1, GL_INT, GL_FALSE, 10 * sizeof(float)); // Spec Index (int)
+    glVertexAttribFormat(6, 1, GL_INT, GL_FALSE, 11 * sizeof(float)); // Normal Index (int)
+    glVertexAttribFormat(7, 1, GL_INT, GL_FALSE, 12 * sizeof(float)); // Model Index (int)
+    glVertexAttribFormat(8, 1, GL_INT, GL_FALSE, 13 * sizeof(float)); // Instance Index (int)
+    for (int i = 0; i < 9; i++) {
+        glVertexAttribBinding(i, 0);
+        glEnableVertexAttribArray(i);
+    }
 
     glBindVertexArray(0);
-    DebugRAM("after vao bind");
+    DebugRAM("after vao chunk bind");
 
+    // Pass Model Type Bounds to GPU
     glGenBuffers(1, &modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelBoundsID);
     DebugRAM("after model bounds bind");
-
-    // Set static buffers once for Deferred Lighting shader
-    glUniform1ui(screenWidthLoc_deferred, screen_width);
-    glUniform1ui(screenHeightLoc_deferred, screen_height);
+    
+    malloc_trim(0);
 
     DebugRAM("after loading all models");
     double end_time = get_time();
