@@ -229,17 +229,12 @@ int RenderStaticMeshes(void) {
     memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
     float distSqrd = 0.0f;
     
-    int visibleInstanceCount = 0;
-    
     // Range to player culling of instances
     for (int i=0;i<INSTANCE_COUNT;++i) {
         if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
         
         distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
-        if (distSqrd < sightRangeSquared) {
-            instanceIsCulledArray[i] = false;
-            visibleInstanceCount++;
-        }
+        if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
     }
     
     // Range to lights culling of instances
@@ -268,8 +263,7 @@ int RenderStaticMeshes(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     
     // 1. Unlit Raterized Geometry
-    //        Standard vertex + fragment rendering, but
-    //        with special packing to minimize transfer data amounts
+    //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glUseProgram(chunkShaderProgram);
     glEnable(GL_DEPTH_TEST);
@@ -281,12 +275,7 @@ int RenderStaticMeshes(void) {
     glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
     glUniform1i(debugViewLoc_chunk, debugView);
     glBindVertexArray(vao_chunk);
-    
-    // These should be static but cause issues if not...
-    glUniform1i(textureCountLoc_chunk, textureCount); // Needed or else the texture index for test light stops rendering as unlit by deferred shader
-    
-    // Render Mesh Instances
-    // Set up view and projection matrices
+    glUniform1i(textureCountLoc_chunk, textureCount); // Needed else test light stops rendering as unlit
     for (int i=0;i<INSTANCE_COUNT;i++) {
         if (instanceIsCulledArray[i]) continue;
         if (instances[i].modelIndex >= MODEL_COUNT) continue;
@@ -294,6 +283,7 @@ int RenderStaticMeshes(void) {
         if (instances[i].modelIndex < 0) continue; // Culled
 
         if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+        if (i != 39 && i > 5) continue;
         glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
         glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
         glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
@@ -308,10 +298,6 @@ int RenderStaticMeshes(void) {
         if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
         drawCallCount++;
         vertexCount += modelVertexCounts[modelType];
-
-        // Uncomment for fun and mayhem, draw call 1, instance 0, error 501 for invalid input
-//         GLenum err;
-//         while ((err = glGetError()) != GL_NO_ERROR) DualLogError("GL Error for draw call %d: %x\n",i, err);
     }
     
     // 2. Light Volume Meshes
@@ -319,13 +305,6 @@ int RenderStaticMeshes(void) {
     GLuint lightVolumeVBOs[MAX_VISIBLE_LIGHTS];
     uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
     glGenBuffers(MAX_VISIBLE_LIGHTS, lightVolumeVBOs);
-    
-    GLuint atomicCounterBuffer;
-    glGenBuffers(1, &atomicCounterBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, atomicCounterBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    uint32_t counter = 0;
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &counter);
 
 //     for (int i=0;i<numLightsFound;++i) {
     for (int lightIdx=0;lightIdx<1;++lightIdx) { // Just test light for now
@@ -333,42 +312,74 @@ int RenderStaticMeshes(void) {
         glGenBuffers(1, &outVertexBuffer);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, outVertexBuffer);
         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VERTS_PER_LIGHT_VOLUME * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-        lightVolumeVBOs[lightIdx] = outVertexBuffer;
+        
+        GLuint outInRange;
+        glGenBuffers(1, &outInRange);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, outInRange);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VERTS_PER_LIGHT_VOLUME * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
         
         uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
         float lit_x = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lit_y = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY];
         float lit_z = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float lit_range = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, atomicCounterBuffer);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, outInRange);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, outVertexBuffer);
         glUseProgram(lightVolumeMeshShaderProgram);
         glUniform1f(lightPosXLoc_lightvol, lit_x);
         glUniform1f(lightPosYLoc_lightvol, lit_y);
         glUniform1f(lightPosZLoc_lightvol, lit_z);
         glUniform1f(lightRangeLoc_lightvol, lit_range);
-        glDispatchCompute((visibleInstanceCount * 4000 / 3 + 63) / 64, 1, 1);
+        glDispatchCompute((INSTANCE_COUNT * 65535 + 63) / 64, 1, 1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT); // Ensure all light volume meshes ready prior to draw calls.
-        
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, atomicCounterBuffer);
-        glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &lightVertexCounts[lightIdx]);
-        lightVertexCounts[lightIdx] /= 14; // Convert float count to vertex count
+        DualLog("Made it past light volume mesh generation dispatch and mem barrier\n");
+        // Read back and compact vertices
+        uint32_t maxVerts = INSTANCE_COUNT * 65535;
+        float *tempVertices = (float *)malloc(maxVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        float *tempValid = (float *)malloc(maxVerts * sizeof(uint32_t));
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, outVertexBuffer); DualLog("Bound outVertexBuffer\n");
+        glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, maxVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float), tempVertices); DualLog("Retrieved outVertexBuffer into tempVertices\n");
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, outInRange); DualLog("Bound outInRange\n");
+        glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, maxVerts * sizeof(uint32_t), tempValid); DualLog("Retrieved outInRange into tempValid\n");
+
+        uint32_t validVertexCount = 0;
+        float *compactedVertices = (float *)malloc(maxVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        DualLog("malloc'ed compactedVertices with %d\n",maxVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        for (uint32_t i = 0; i < maxVerts; i++) {
+            if (tempValid[i] == 1) {
+                memcpy(&compactedVertices[validVertexCount * VERTEX_ATTRIBUTES_COUNT],
+                       &tempVertices[i * VERTEX_ATTRIBUTES_COUNT],
+                       VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                validVertexCount++;
+            }
+        }
+        DualLog("compacted light volume for %d lightIdx\n",lightIdx);
+        lightVertexCounts[lightIdx] = validVertexCount;
 #ifdef DEBUG_LIGHT_VOLUME
-        DualLog("Light volume mesh %d created with %d vertices\n", lightIdx, lightVertexCounts[lightIdx]);
+        DualLog("Light volume mesh %d created with %d vertices\n", lightIdx, validVertexCount);
 #endif
+        // Update VBO with compacted data
+        glBindBuffer(GL_ARRAY_BUFFER, lightVolumeVBOs[lightIdx]);
+        glBufferData(GL_ARRAY_BUFFER, validVertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), compactedVertices, GL_STATIC_DRAW);
+        free(tempVertices);
+        free(tempValid);
+        free(compactedVertices);
     }
 
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT); // Ensure all light volume meshes ready prior to draw calls.
 
     // Now render them
     glUseProgram(lightVolumeShaderProgram);
-    glBindVertexArray(vao_chunk);
     float identity[16];
     mat4_identity(identity);
     glUniformMatrix4fv(glGetUniformLocation(lightVolumeShaderProgram, "matrix"), 1, GL_FALSE, identity);
     glUniformMatrix4fv(glGetUniformLocation(lightVolumeShaderProgram, "view"), 1, GL_FALSE, view);
     glUniformMatrix4fv(glGetUniformLocation(lightVolumeShaderProgram, "projection"), 1, GL_FALSE, projection);
     glUniform1i(glGetUniformLocation(lightVolumeShaderProgram, "textureCount"), textureCount);
+    glUniform1i(glGetUniformLocation(lightVolumeShaderProgram, "debugView"), debugView);
+    
+    glDisable(GL_CULL_FACE); // Disable backface culling
 //     for (uint32_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
     for (uint32_t lightIdx = 0; lightIdx < 1; lightIdx++) {
         if (lightVertexCounts[lightIdx] == 0) continue;
@@ -378,8 +389,8 @@ int RenderStaticMeshes(void) {
         drawCallCount++;
         vertexCount += lightVertexCounts[lightIdx];
     }
+    glEnable(GL_CULL_FACE); // Reenable backface culling
     
-    glDeleteBuffers(1, &atomicCounterBuffer);
     glDeleteBuffers(MAX_VISIBLE_LIGHTS, lightVolumeVBOs);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

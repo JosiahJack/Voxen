@@ -32,8 +32,8 @@ const char *createLightVolume_computeShader =
     "    uint vertexOffsets[];\n" // Go this many floats into the MasterVertexBuffer to get model i
     "};\n"
 
-    "layout(std430, binding = 7) buffer AtomicCounter {\n"
-    "    uint vertexCounter;\n"
+    "layout(std430, binding = 7) buffer OutputInRangeFlag {\n" // Resulting light volume mesh comprised of all various meshes data and instance data carried accross same as chunk.glsl
+    "    uint outInRange[];\n" // Resulting light volume mesh, ready to feed direct into chunk.glsl fragment shader skipping the vert shader... um wait?  Wut??
     "};\n"
 
     "layout(std430, binding = 10) buffer InstancesBuffer {\n"
@@ -59,91 +59,51 @@ const char *createLightVolume_computeShader =
 
     "void main() {\n"
     "    uint globalIdx = gl_GlobalInvocationID.x;\n"
-    "    uint instanceIdx = globalIdx / (65535 / 3);\n" // MAX_VERTS_PER_LIGHT_VOLUME
-    "    uint triIdx = globalIdx % (65535 / 3);\n" // Triangle index
-    "    if (instanceIdx >= instances.length() || triIdx * 3 >= vertexOffsets.length()) return;\n"
+    "    if (globalIdx >= vertexData.length() / 14) return;\n"
 
-    "    uint vertexBase = vertexOffsets[instances[instanceIdx].modelIndex] + triIdx * 3;\n"
-    "    if (vertexBase + 2 >= vertexData.length() / 14) return;\n"
+    "    uint instanceIdx = globalIdx / (65535);\n" // MAX_VERTS_PER_LIGHT_VOLUME
+    "    if (instanceIdx >= instances.length()) return;\n"
+
+    "    uint vertexBase = vertexOffsets[instances[instanceIdx].modelIndex ] + (globalIdx % 65535);\n"
+    "    if (vertexBase >= vertexData.length() / 14) return;\n"
 
     "    uint vertAttribs = 14;\n"
-    "    vec3 v0 = vec3(vertexData[vertexBase * vertAttribs + 0], vertexData[vertexBase * vertAttribs + 1], vertexData[vertexBase * vertAttribs + 2]);\n"
-    "    vec3 v1 = vec3(vertexData[(vertexBase + 1) * vertAttribs + 0], vertexData[(vertexBase + 1) * vertAttribs + 1], vertexData[(vertexBase + 1) * vertAttribs + 2]);\n"
-    "    vec3 v2 = vec3(vertexData[(vertexBase + 2) * vertAttribs + 0], vertexData[(vertexBase + 2) * vertAttribs + 1], vertexData[(vertexBase + 2) * vertAttribs + 2]);\n"
-    "    vec3 n0 = vec3(vertexData[vertexBase * 8 + 3], vertexData[vertexBase * 8 + 4], vertexData[vertexBase * 8 + 5]);\n"
-    "    vec3 n1 = vec3(vertexData[(vertexBase + 1) * vertAttribs + 3], vertexData[(vertexBase + 1) * vertAttribs + 4], vertexData[(vertexBase + 1) * vertAttribs + 5]);\n"
-    "    vec3 n2 = vec3(vertexData[(vertexBase + 2) * vertAttribs + 3], vertexData[(vertexBase + 2) * vertAttribs + 4], vertexData[(vertexBase + 2) * vertAttribs + 5]);\n"
-    "    vec2 uv0 = vec2(vertexData[vertexBase * 8 + 6], vertexData[vertexBase * vertAttribs + 7]);\n"
-    "    vec2 uv1 = vec2(vertexData[(vertexBase + 1) * vertAttribs + 6], vertexData[(vertexBase + 1) * vertAttribs + 7]);\n"
-    "    vec2 uv2 = vec2(vertexData[(vertexBase + 2) * vertAttribs + 6], vertexData[(vertexBase + 2) * vertAttribs + 7]);\n"
+    "    vec3 v = vec3(vertexData[vertexBase * vertAttribs + 0], vertexData[vertexBase * vertAttribs + 1], vertexData[vertexBase * vertAttribs + 2]);\n"
+    "    vec3 n = vec3(vertexData[vertexBase * vertAttribs + 3], vertexData[vertexBase * vertAttribs + 4], vertexData[vertexBase * vertAttribs + 5]);\n"
+    "    vec2 uv = vec2(vertexData[vertexBase * vertAttribs + 6], vertexData[vertexBase * vertAttribs + 7]);\n"
+    "    float texIdx = vertexData[vertexBase * vertAttribs + 8];\n"
+    "    float glowIdx = vertexData[vertexBase * vertAttribs + 9];\n"
+    "    float specIdx = vertexData[vertexBase * vertAttribs + 10];\n"
+    "    float normIdx = vertexData[vertexBase * vertAttribs + 11];\n"
+    "    float modelIdx = vertexData[vertexBase * vertAttribs + 12];\n"
+    "    float instanceIdxData = vertexData[vertexBase * vertAttribs + 13];\n"
 
-        // Transform to world space
+    // Transform to world space
     "    mat4 transform = instanceMatrices[instanceIdx];\n"
-    "    v0 = (transform * vec4(v0, 1.0)).xyz;\n"
-    "    v1 = (transform * vec4(v1, 1.0)).xyz;\n"
-    "    v2 = (transform * vec4(v2, 1.0)).xyz;\n"
-    "    n0 = normalize(mat3(transpose(inverse(transform))) * n0);\n"
-    "    n1 = normalize(mat3(transpose(inverse(transform))) * n1);\n"
-    "    n2 = normalize(mat3(transpose(inverse(transform))) * n2);\n"
+    "    v = (transform * vec4(v, 1.0)).xyz;\n"
+    "    n = normalize(mat3(transpose(inverse(transform))) * n);\n"
+    // Light-local space
+    "    vec3 lightPos = vec3(lightPosX, lightPosY, lightPosZ);\n"
+    "    vec3 localV = v - lightPos;\n"
 
-        // Light-local space
-    "    vec3 lightPos = vec3(lightPosX,lightPosY,lightPosZ);\n"
-    "    vec3 localV0 = v0 - lightPos;\n"
-    "    vec3 localV1 = v1 - lightPos;\n"
-    "    vec3 localV2 = v2 - lightPos;\n"
-
-        // Distance check
-    "    float rangeSq = lightRange * lightRange;\n"
-    "    float d0 = dot(localV0, localV0);\n"
-    "    float d1 = dot(localV1, localV1);\n"
-    "    float d2 = dot(localV2, localV2);\n"
-    "    if (d0 > rangeSq && d1 > rangeSq && d2 > rangeSq) return;\n"
-
-    "    uint vertexIdx = atomicAdd(vertexCounter, 3 * vertAttribs);\n"
-
-        // Write source triangle
-    "    outVertices[vertexIdx]      =  v0.x;\n"
-    "    outVertices[vertexIdx + 1]  =  v0.y;\n"
-    "    outVertices[vertexIdx + 2]  =  v0.z;\n"
-    "    outVertices[vertexIdx + 3]  =  n0.x;\n"
-    "    outVertices[vertexIdx + 4]  =  n0.y;\n"
-    "    outVertices[vertexIdx + 5]  =  n0.z;\n"
-    "    outVertices[vertexIdx + 6]  = uv0.x;\n"
-    "    outVertices[vertexIdx + 7]  = uv0.y;\n"
-    "    outVertices[vertexIdx + 8]  = instances[instanceIdx].texIndex;\n"
-    "    outVertices[vertexIdx + 9]  = instances[instanceIdx].glowIndex;\n"
-    "    outVertices[vertexIdx + 10] = instances[instanceIdx].specIndex;\n"
-    "    outVertices[vertexIdx + 11] = instances[instanceIdx].normIndex;\n"
-    "    outVertices[vertexIdx + 12] = instances[instanceIdx].modelIndex;\n"
-    "    outVertices[vertexIdx + 13] = instanceIdx;\n"
-
-    "    outVertices[vertexIdx + 14] =  v1.x;\n"
-    "    outVertices[vertexIdx + 15] =  v1.y;\n"
-    "    outVertices[vertexIdx + 16] =  v1.z;\n"
-    "    outVertices[vertexIdx + 17] =  n1.x;\n"
-    "    outVertices[vertexIdx + 18] =  n1.y;\n"
-    "    outVertices[vertexIdx + 19] =  n1.z;\n"
-    "    outVertices[vertexIdx + 20] = uv1.x;\n"
-    "    outVertices[vertexIdx + 21] = uv1.y;\n"
-    "    outVertices[vertexIdx + 22] = instances[instanceIdx].texIndex;\n"
-    "    outVertices[vertexIdx + 23] = instances[instanceIdx].glowIndex;\n"
-    "    outVertices[vertexIdx + 24] = instances[instanceIdx].specIndex;\n"
-    "    outVertices[vertexIdx + 25] = instances[instanceIdx].normIndex;\n"
-    "    outVertices[vertexIdx + 26] = instances[instanceIdx].modelIndex;\n"
-    "    outVertices[vertexIdx + 27] = instanceIdx;\n"
-
-    "    outVertices[vertexIdx + 28] =  v2.x;\n"
-    "    outVertices[vertexIdx + 29] =  v2.y;\n"
-    "    outVertices[vertexIdx + 30] =  v2.z;\n"
-    "    outVertices[vertexIdx + 31] =  n2.x;\n"
-    "    outVertices[vertexIdx + 32] =  n2.y;\n"
-    "    outVertices[vertexIdx + 33] =  n2.z;\n"
-    "    outVertices[vertexIdx + 34] = uv2.x;\n"
-    "    outVertices[vertexIdx + 35] = uv2.y;\n"
-    "    outVertices[vertexIdx + 36] = instances[instanceIdx].texIndex;\n"
-    "    outVertices[vertexIdx + 37] = instances[instanceIdx].glowIndex;\n"
-    "    outVertices[vertexIdx + 38] = instances[instanceIdx].specIndex;\n"
-    "    outVertices[vertexIdx + 39] = instances[instanceIdx].normIndex;\n"
-    "    outVertices[vertexIdx + 40] = instances[instanceIdx].modelIndex;\n"
-    "    outVertices[vertexIdx + 41] = instanceIdx;\n"
+    // Distance check
+    "    float rangeSq = lightRange * lightRange;\n" 
+    "    float d = dot(localV, localV);\n"
+    "    uint vertexIdx = globalIdx * vertAttribs;\n"
+    "    outInRange[globalIdx] = uint(d <= rangeSq);\n"
+    // Write vertex
+    "    outVertices[vertexIdx] = v.x;\n"
+    "    outVertices[vertexIdx + 1] = v.y;\n"
+    "    outVertices[vertexIdx + 2] = v.z;\n"
+    "    outVertices[vertexIdx + 3] = n.x;\n"
+    "    outVertices[vertexIdx + 4] = n.y;\n"
+    "    outVertices[vertexIdx + 5] = n.z;\n"
+    "    outVertices[vertexIdx + 6] = uv.x;\n"
+    "    outVertices[vertexIdx + 7] = uv.y;\n"
+    "    outVertices[vertexIdx + 8]  = float(instances[instanceIdx].texIndex);\n"
+    "    outVertices[vertexIdx + 9]  = float(instances[instanceIdx].glowIndex);\n"
+    "    outVertices[vertexIdx + 10] = float(instances[instanceIdx].specIndex);\n"
+    "    outVertices[vertexIdx + 11] = float(instances[instanceIdx].normIndex);\n"
+    "    outVertices[vertexIdx + 12] = float(instances[instanceIdx].modelIndex);\n"
+    "    outVertices[vertexIdx + 13] = float(instanceIdx);\n"
     "}\n";

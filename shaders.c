@@ -60,17 +60,17 @@ int CompileShaders(void) {
     // Light Volume Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, lightVolumeVertexShaderSource, "Light Volume Vertex Shader"); if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    lightVolumeShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Light Volume Shader Program");    if (!chunkShaderProgram) { return 1; }
-
-    // Text Shader
-    vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
+    lightVolumeShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Light Volume Shader Program");    if (!lightVolumeShaderProgram) { return 1; }
     
     // Light Volume Procedural Mesh Generation Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, createLightVolume_computeShader, "Light Volume Mesh Compute Shader"); if (!computeShader) { return 1; }
     lightVolumeMeshShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Light Volume Mesh Shader Program");        if (!lightVolumeMeshShaderProgram) { return 1; }
     
+    // Text Shader
+    vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
+    textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
+
     // Deferred Lighting Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
     deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program");        if (!deferredLightingShaderProgram) { return 1; }
