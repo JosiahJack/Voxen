@@ -67,6 +67,7 @@ void SetupTextQuad(void) {
 // Renders text at x,y coordinates specified using pointer to the string array.
 void RenderText(float x, float y, const char *text, int colorIdx) {
     glDisable(GL_CULL_FACE); // Disable backface culling
+    CHECK_GL_ERROR();
     if (!font) { DualLogError("Font is NULL\n"); return; }
     if (!text) { DualLogError("Text is NULL\n"); return; }
     
@@ -80,9 +81,12 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     // Create and bind texture
     GLuint texture;
     glGenTextures(1, &texture);
+    CHECK_GL_ERROR();
     glBindTexture(GL_TEXTURE_2D, texture);
+    CHECK_GL_ERROR();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, rgba_surface->w, rgba_surface->h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
+    CHECK_GL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -90,6 +94,7 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
 
     // Use text shader
     glUseProgram(textShaderProgram);
+    CHECK_GL_ERROR();
 
     // Set up orthographic projection
     float projection[16];
@@ -104,25 +109,34 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     float a = textColors[colorIdx].a / 255.0f;
     GLint colorLoc = glGetUniformLocation(textShaderProgram, "textColor");
     glUniform4f(colorLoc, r, g, b, a);
+    CHECK_GL_ERROR();
 
     // Bind texture
     glActiveTexture(GL_TEXTURE0);
+    CHECK_GL_ERROR();
     glBindTexture(GL_TEXTURE_2D, texture);
+    CHECK_GL_ERROR();
     GLint texLoc = glGetUniformLocation(textShaderProgram, "textTexture");
     glUniform1i(texLoc, 0);
+    CHECK_GL_ERROR();
     
     float scaleX = (float)rgba_surface->w;
     float scaleY = (float)rgba_surface->h;
     GLint texelSizeLoc = glGetUniformLocation(textShaderProgram, "texelSize");
     glUniform2f(texelSizeLoc, 1.0f / scaleX, 1.0f / scaleY);
+    CHECK_GL_ERROR();
 
     // Enable blending for text transparency
     glEnable(GL_BLEND);
+    CHECK_GL_ERROR();
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    CHECK_GL_ERROR();
     glDisable(GL_DEPTH_TEST); // Disable depth test for 2D overlay
+    CHECK_GL_ERROR();
 
     // Bind VAO and adjust quad position/size
     glBindVertexArray(textVAO);
+    CHECK_GL_ERROR();
     float vertices[] = {
         x,          y,          0.0f, 0.0f, // Bottom-left
         x + scaleX, y,          1.0f, 0.0f, // Bottom-right
@@ -130,7 +144,9 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
         x,          y + scaleY, 0.0f, 1.0f  // Top-left
     };
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    CHECK_GL_ERROR();
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
 
     // Render quad (two triangles)
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
@@ -139,12 +155,19 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
 
     // Cleanup
     glBindVertexArray(0);
+    CHECK_GL_ERROR();
     glBindTexture(GL_TEXTURE_2D, 0);
+    CHECK_GL_ERROR();
     glDisable(GL_BLEND);
+    CHECK_GL_ERROR();
     glEnable(GL_DEPTH_TEST); // Re-enable depth test for 3D rendering
+    CHECK_GL_ERROR();
     glUseProgram(0);
+    CHECK_GL_ERROR();
     glDeleteTextures(1, &texture);
+    CHECK_GL_ERROR();
     SDL_FreeSurface(rgba_surface);
+    CHECK_GL_ERROR();
     glEnable(GL_CULL_FACE); // Reenable backface culling
     CHECK_GL_ERROR();
 }

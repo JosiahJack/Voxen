@@ -69,6 +69,8 @@ int SetupInstances(void) {
     CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     CHECK_GL_ERROR();
     malloc_trim(0);

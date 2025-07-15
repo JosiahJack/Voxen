@@ -530,82 +530,146 @@ void ClearGLErrors(void) {
 }
 
 void UpdateLightVolumes(void) {
-    DualLog("Updating light volume procedural meshes...\n");    
-    memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(uint32_t)); // Blank out the pointers
-    glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs); // Generate buffers and assign GL pointers to lightVBOs.
-    CHECK_GL_ERROR();
+    DualLog("Updating light volume procedural meshes...\n");
+    if (SDL_GL_GetCurrentContext() != gl_context) {
+        DualLogError("No valid OpenGL context in UpdateLightVolumes\n");
+        return;
+    }
+    ClearGLErrors();
 
-    double start_time = get_time();
+    // Validate MAX_VISIBLE_LIGHTS
+    if (MAX_VISIBLE_LIGHTS <= 0) {
+        DualLogError("Invalid MAX_VISIBLE_LIGHTS: %d\n", MAX_VISIBLE_LIGHTS);
+        return;
+    }
+
+    // Generate VBOs and validate
+    memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(GLuint));
+    glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        DualLogError("glGenBuffers failed for lightVBOs with error: %d\n", error);
+        return;
+    }
+    
+    for (uint32_t i = 0; i < MAX_VISIBLE_LIGHTS; ++i) {
+        if (lightVBOs[i] == 0) {
+            DualLogError("lightVBOs[%d] is invalid (0)\n", i);
+        }/* else {
+            DualLog("lightVBOs[%d] = %u\n", i, lightVBOs[i]);
+        }*/
+    }
+
+    // Allocate tempVerts
+    if (largestVertCount <= 0 || VERTEX_ATTRIBUTES_COUNT <= 0) {
+        DualLogError("Invalid largestVertCount (%u) or VERTEX_ATTRIBUTES_COUNT (%u)\n", 
+                     largestVertCount, VERTEX_ATTRIBUTES_COUNT);
+        return;
+    }
     size_t sizeOfTempVertices = largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-    float * tempVerts = (float *)malloc(sizeOfTempVertices);
+    float *tempVerts = (float *)malloc(sizeOfTempVertices);
     if (!tempVerts) {
         DualLogError("Failed to allocate tempVerts buffer for light volume mesh generation\n");
         return;
     }
-        
-    int32_t modelIdx = -1;
-    float dist;
-    uint32_t headVertIdx;
-    
+    DualLog("Allocated tempVerts: %zu bytes (largestVertCount=%u, VERTEX_ATTRIBUTES_COUNT=%u)\n", 
+            sizeOfTempVertices, largestVertCount, VERTEX_ATTRIBUTES_COUNT);
+
+    // Clear lightVertexCounts
     DualLog("Clearing light volume mesh buffers...\n");
-    for (uint32_t lightIdx=0;lightIdx<MAX_VISIBLE_LIGHTS;++lightIdx) {
+    for (uint32_t lightIdx = 0; lightIdx < MAX_VISIBLE_LIGHTS; ++lightIdx) {
         lightVertexCounts[lightIdx] = 0;
     }
-    
+
     DualLog("Iterating over and getting light volume mesh vertices...\n");
     uint64_t iterCounter1 = 0;
     uint64_t iterCounter2 = 0;
     uint64_t iterCounter3 = 0;
-//     for (uint32_t lightIdx=0;lightIdx<MAX_VISIBLE_LIGHTS;++lightIdx) {
-    for (uint32_t lightIdx=0;lightIdx<1;++lightIdx) {
-        memset(tempVerts,0,sizeOfTempVertices); // Clear reused buffer.
+    double start_time = get_time();
+
+    for (uint32_t lightIdx = 0; lightIdx < 1; ++lightIdx) {
+        memset(tempVerts, 0, sizeOfTempVertices);
         uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
         float lit_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lit_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float lit_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float sqrRange = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         sqrRange *= sqrRange;
-        headVertIdx = 0;
+        uint32_t headVertIdx = 0;
         iterCounter1++;
-        for (uint32_t instanceIdx=0;instanceIdx<INSTANCE_COUNT;++instanceIdx) {
-            modelIdx = instances[instanceIdx].modelIndex;
-            if (modelIdx < 0 || modelIdx > MODEL_COUNT) continue;
-            
-            uint32_t vertCount = modelVertexCounts[modelIdx];
-            if (modelVertexCounts[modelIdx] < 1) continue;
 
-            iterCounter2++;            
+        for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
+            int32_t modelIdx = instances[instanceIdx].modelIndex;
+            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue; // Skipping invalid modelIdx, fine as not all games/mods use all slots.
+
+            uint32_t vertCount = modelVertexCounts[modelIdx];
+            if (vertCount <= 0) {
+                DualLog("Skipping model %d with zero vertices\n", modelIdx);
+                continue;
+            }
+            
+            if (!vertexDataArrays[modelIdx]) {
+                DualLogError("vertexDataArrays[%d] is NULL\n", modelIdx);
+                continue;
+            }
+            iterCounter2++;
+
             for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < maxLightVolumeMeshVerts); ++vertIdx) {
                 uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
-                float * model = vertexDataArrays[modelIdx];
+                float *model = vertexDataArrays[modelIdx];
                 float vert_x = model[vertexIdx + 0];
                 float vert_y = model[vertexIdx + 1];
                 float vert_z = model[vertexIdx + 2];
-                dist = squareDistance3D(lit_x,lit_y,lit_z, vert_x,vert_y,vert_z);
+                float dist = squareDistance3D(lit_x, lit_y, lit_z, vert_x, vert_y, vert_z);
                 if (dist < sqrRange) {
+                    if (headVertIdx >= largestVertCount) {
+                        DualLogError("headVertIdx (%u) exceeds largestVertCount (%u)\n", headVertIdx, largestVertCount);
+                        break;
+                    }
                     uint32_t workingIdx = (headVertIdx * VERTEX_ATTRIBUTES_COUNT);
-                    for (uint32_t ofs = 0; ofs < VERTEX_ATTRIBUTES_COUNT; ++ofs) tempVerts[workingIdx + ofs] = model[vertexIdx + ofs];
+                    for (uint32_t ofs = 0; ofs < VERTEX_ATTRIBUTES_COUNT; ++ofs) {
+                        tempVerts[workingIdx + ofs] = model[vertexIdx + ofs];
+                    }
                     headVertIdx++;
                 }
-                
                 iterCounter3++;
             }
-            
-            lightVertexCounts[lightIdx] += headVertIdx;
+            lightVertexCounts[lightIdx] = headVertIdx; // Update per light, not accumulate
+        }
+
+        lightVolumeVertices[lightIdx] = tempVerts; // Note: tempVerts will be reused, consider copying
+        if (lightVBOs[lightIdx] == 0) {
+            DualLogError("Skipping lightVBOs[%d] due to invalid buffer ID\n", lightIdx);
+            continue;
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            DualLogError("glBindBuffer failed for lightVBOs[%d] with error: %d\n", lightIdx, error);
+            continue;
+        }
+
+        // Validate size
+        size_t bufferSize = lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+        if (lightVertexCounts[lightIdx] == 0 || bufferSize > sizeOfTempVertices) {
+            DualLogError("Invalid buffer size for lightVBOs[%d]: %zu (vertices=%u)\n", 
+                         lightIdx, bufferSize, lightVertexCounts[lightIdx]);
+            continue;
         }
         
-        lightVolumeVertices[lightIdx] = tempVerts;
-        glBindBuffer(GL_ARRAY_BUFFER,lightVBOs[lightIdx]);
-        CHECK_GL_ERROR();
-        DualLog("About to index lightVertexCounts[%d]\n",lightIdx);
-        glBufferData(GL_ARRAY_BUFFER,lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), tempVerts, GL_DYNAMIC_DRAW);
-        CHECK_GL_ERROR();
-        DualLog("end iteration for light %d\n",lightIdx);
+//         DualLog("Uploading %zu bytes to lightVBOs[%d]\n", bufferSize, lightIdx);
+        glBufferData(GL_ARRAY_BUFFER, bufferSize, tempVerts, GL_DYNAMIC_DRAW);
+        error = glGetError();
+        if (error != GL_NO_ERROR) {
+            DualLogError("glBufferData failed for lightVBOs[%d] with error: %d\n", lightIdx, error);
+            continue;
+        }
     }
-    
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    CHECK_GL_ERROR();
-    DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n",iterCounter1,iterCounter2,iterCounter3);
+    ClearGLErrors();
+    DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n", 
+            iterCounter1, iterCounter2, iterCounter3);
     double end_time = get_time();
     DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
 }
@@ -766,16 +830,20 @@ int main(int argc, char* argv[]) {
         // Client Actions
         // ====================================================================
         // Client Render
-        bool debugRenderSegfaults = true;
+        bool debugRenderSegfaults = false;//true;
         drawCallCount = 0; // Reset per frame
         vertexCount = 0;
         
         // 0. Clear Frame Buffers and Depth
         if (debugRenderSegfaults) DualLog("0. Clear Frame Buffers and Depth\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+        CHECK_GL_ERROR();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        CHECK_GL_ERROR();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        CHECK_GL_ERROR();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        CHECK_GL_ERROR();
         
         // Test Stuff DELETE ME LATER, Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
         int lightBase = 0;
@@ -835,9 +903,13 @@ int main(int argc, char* argv[]) {
         }
 
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
+        CHECK_GL_ERROR();
         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
+        CHECK_GL_ERROR();
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
+        CHECK_GL_ERROR();
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        CHECK_GL_ERROR();
         
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
@@ -854,23 +926,33 @@ int main(int argc, char* argv[]) {
         // 3. Pass all instance matrices to GPU
         if (debugRenderSegfaults) DualLog("3. Pass all instance matrices to GPU\n");
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+        CHECK_GL_ERROR();
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+        CHECK_GL_ERROR();
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+        CHECK_GL_ERROR();
         
         // 4. Unlit Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
         if (debugRenderSegfaults) DualLog("4. Unlit Raterized Geometry\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+        CHECK_GL_ERROR();
         glUseProgram(chunkShaderProgram);
+        CHECK_GL_ERROR();
         glEnable(GL_DEPTH_TEST);
+        CHECK_GL_ERROR();
         float view[16], projection[16]; // Set up view and projection matrices
         float fov = 65.0f;
         mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
         mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
         glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+        CHECK_GL_ERROR();
         glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
+        CHECK_GL_ERROR();
         glUniform1i(debugViewLoc_chunk, debugView);
+        CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
+        CHECK_GL_ERROR();
         for (int i=0;i<INSTANCE_COUNT;i++) {
             if (instanceIsCulledArray[i]) continue;
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
@@ -881,16 +963,24 @@ int main(int argc, char* argv[]) {
 //             if (i != 39) continue; // Skip everything except test light's white cube.
             
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+            CHECK_GL_ERROR();
             glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
+            CHECK_GL_ERROR();
             glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+            CHECK_GL_ERROR();
             glUniform1i(instanceIndexLoc_chunk, i);
+            CHECK_GL_ERROR();
             int modelType = instances[i].modelIndex;
             glUniform1i(modelIndexLoc_chunk, modelType);
+            CHECK_GL_ERROR();
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+            CHECK_GL_ERROR();
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            CHECK_GL_ERROR();
             
             if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
             glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+            CHECK_GL_ERROR();
             if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
             drawCallCount++;
             vertexCount += modelVertexCounts[modelType];
@@ -899,31 +989,39 @@ int main(int argc, char* argv[]) {
         // 5. Render Light Volume Meshes
         if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
         glUseProgram(lightVolumeShaderProgram);
+        CHECK_GL_ERROR();
         float identity[16];
         mat4_identity(identity);
         glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
+        CHECK_GL_ERROR();
         glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
+        CHECK_GL_ERROR();
         glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
+        CHECK_GL_ERROR();
         glUniform1i(textureCount_lightvol, textureCount);
+        CHECK_GL_ERROR();
         glUniform1i(debugView_lightvol, debugView);
+        CHECK_GL_ERROR();
         glDisable(GL_CULL_FACE); // Disable backface culling
+        CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
-        if (debugRenderSegfaults) DualLog("Made it as far as just prior to the render calls for light volume meshes\n");
+        CHECK_GL_ERROR();
     //     for (uint32_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
         for (uint32_t lightIdx = 0; lightIdx < 1; lightIdx++) {
             if (lightVertexCounts[lightIdx] == 0) continue;
 
-            if (debugRenderSegfaults) DualLog("Rendering light %d volume mesh...\n",lightIdx);
             glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            if (debugRenderSegfaults) DualLog("testpoint 2\n",lightIdx);
+            CHECK_GL_ERROR();
             glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
-            if (debugRenderSegfaults) DualLog("testpoint 3\n",lightIdx);
+            CHECK_GL_ERROR();
             drawCallCount++;
             vertexCount += lightVertexCounts[lightIdx];
         }
         
         glEnable(GL_CULL_FACE); // Reenable backface culling
+        CHECK_GL_ERROR();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        CHECK_GL_ERROR();
 
         // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
@@ -932,14 +1030,19 @@ int main(int argc, char* argv[]) {
         //        etc.).
         if (debugRenderSegfaults) DualLog("6. Deferred Lighting + Shadow Calculations\n");
         glUseProgram(deferredLightingShaderProgram);
+        CHECK_GL_ERROR();
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        CHECK_GL_ERROR();
 
         // These should be static but cause issues if not...
         glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
+        CHECK_GL_ERROR();
         glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
+        CHECK_GL_ERROR();
         glUniform1i(debugViewLoc_deferred, debugView);
-
+        CHECK_GL_ERROR();
         glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
+        CHECK_GL_ERROR();
         float viewInv[16];
         mat4_inverse(viewInv,view);
         float projInv[16];
@@ -949,33 +1052,51 @@ int main(int argc, char* argv[]) {
         GLuint groupX = (screen_width + 7) / 8;
         GLuint groupY = (screen_height + 7) / 8;
         glDispatchCompute(groupX, groupY, 1);
+        CHECK_GL_ERROR();
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+        CHECK_GL_ERROR();
         
         // 7. Render final meshes' results with full screen quad
         if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");
         glUseProgram(imageBlitShaderProgram);
+        CHECK_GL_ERROR();
         glActiveTexture(GL_TEXTURE0);
+        CHECK_GL_ERROR();
         if (debugView == 0) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Normal
+            CHECK_GL_ERROR();
         } else if (debugView == 1) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Unlit
+            CHECK_GL_ERROR();
         } else if (debugView == 2) {
             glBindTexture(GL_TEXTURE_2D, inputNormalsID); // Triangle Normals 
+            CHECK_GL_ERROR();
         } else if (debugView == 3) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Depth.  Values must be decoded in shader
+            CHECK_GL_ERROR();
         } else if (debugView == 4) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
+            CHECK_GL_ERROR();
         }
         
         glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
+        CHECK_GL_ERROR();
         glBindVertexArray(quadVAO);
+        CHECK_GL_ERROR();
         glDisable(GL_BLEND);
+        CHECK_GL_ERROR();
         glDisable(GL_DEPTH_TEST);
+        CHECK_GL_ERROR();
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        CHECK_GL_ERROR();
         glEnable(GL_DEPTH_TEST);
+        CHECK_GL_ERROR();
         glBindVertexArray(0);
+        CHECK_GL_ERROR();
         glBindTexture(GL_TEXTURE_2D, 0);
+        CHECK_GL_ERROR();
         glUseProgram(0);
+        CHECK_GL_ERROR();
         
         // 8. Render UI Images
         if (debugRenderSegfaults) DualLog("8. Render UI Images\n");
@@ -983,11 +1104,15 @@ int main(int argc, char* argv[]) {
         // 9. Render UI Text
         if (debugRenderSegfaults) DualLog("9. Render UI Text\n");
         glEnable(GL_STENCIL_TEST);
+        CHECK_GL_ERROR();
         glStencilMask(0xFF); // Enable stencil writes
+        CHECK_GL_ERROR();
         glStencilFunc(GL_ALWAYS, 1, 0xFF); // Always write 1
+        CHECK_GL_ERROR();
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); // Replace stencil value
+        CHECK_GL_ERROR();
         glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil each frame TODO: Ok to do in ClearFrameBuffers()??
-        glDisable(GL_LIGHTING); // Disable lighting for text
+        CHECK_GL_ERROR();
 
         float cam_quat_yaw = 0.0f;
         float cam_quat_pitch = 0.0f;
@@ -995,17 +1120,25 @@ int main(int argc, char* argv[]) {
         quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
         
         RenderFormattedText(10, 25, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+        CHECK_GL_ERROR();
         RenderFormattedText(10, 40, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        CHECK_GL_ERROR();
         RenderFormattedText(10, 55, TEXT_WHITE, "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
+        CHECK_GL_ERROR();
         RenderFormattedText(10, 70, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+        CHECK_GL_ERROR();
         RenderFormattedText(10, 85, TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
+        CHECK_GL_ERROR();
         RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d, %s", debugView, debugView == 1 ? "unlit" : "normal");
+        CHECK_GL_ERROR();
         RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d   Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        CHECK_GL_ERROR();
         
         // Frame stats
         drawCallCount++; // Add one more for this text render ;)
         RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d, Worst FPS: %d",
                             (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallCount,vertexCount,worstFPS);
+        CHECK_GL_ERROR();
         
         double time_now = get_time();
         if ((time_now - lastFrameSecCountTime) >= 1.00) {
@@ -1016,8 +1149,11 @@ int main(int argc, char* argv[]) {
         }
 
         glDisable(GL_STENCIL_TEST);
+        CHECK_GL_ERROR();
         glStencilMask(0x00); // Disable stencil writes
+        CHECK_GL_ERROR();
         SDL_GL_SwapWindow(window); // Present frame
+        CHECK_GL_ERROR();
         last_time = current_time;
         globalFrameNum++;
     }
