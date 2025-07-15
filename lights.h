@@ -22,23 +22,14 @@
 #define LIGHT_DATA_OFFSET_B 11
                    
 #define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7
-#define MAX_VISIBLE_LIGHTS 32
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-
+#define MAX_VISIBLE_LIGHTS 32
 #define MAX_VERTS_PER_LIGHT_VOLUME 65535
 
 #define VOXEL_DATA_SIZE 1
 #define SHADOW_MAP_SIZE 512
 #define SHADOW_MAP_FARPLANE 20.0
-
-extern float spotAngTypes[];
-extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-extern float lightsRangeSquared[LIGHT_COUNT];
-extern bool lightDirty[LIGHT_COUNT];
-
-void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer);
-void UpdateLightVolumes(void);
 
 #endif // VOXEN_LIGHTS_H

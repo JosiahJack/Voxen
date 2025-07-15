@@ -25,6 +25,7 @@ extern GLuint vbos[MODEL_COUNT];
 extern float * vertexDataArrays[MODEL_COUNT];
 extern GLuint vboMasterTable;
 extern GLuint modelVertexOffsetsID;
+extern uint32_t largestVertCount;
 
 int LoadGeometry(void);
 void CleanupModelLoadOnFail(void);

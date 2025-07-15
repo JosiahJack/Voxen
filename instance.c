@@ -62,6 +62,5 @@ int SetupInstances(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     malloc_trim(0);
-    UpdateLightVolumes(); // Create Light Volume meshes
     return 0;
 }

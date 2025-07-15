@@ -88,15 +88,19 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
       debugViewLoc_deferred = -1; // uniform locations
 
+// Lights
+// float spotAngTypes[8] = { 0.0f, 30.0f, 45.0f, 60.0f, 75.0f, 90.0f, 135.0f, 151.7f }; // TODO reduce spotAng to minimal bits. What?  I only have 6 spot lights and half are 151.7 and other half are 135.
+float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
+float lightsRangeSquared[LIGHT_COUNT];
 GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
 GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
 GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1,
       matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, textureCount_lightvol = -1,
       debugView_lightvol = -1; // uniform locations
-GLuint lightVolumeVBOs[MAX_VISIBLE_LIGHTS];
+GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
+float * lightVolumeVertices[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
-
-// Culling
 float lightsInProximity[32 * LIGHT_DATA_SIZE];
 // ----------------------------------------------------------------------------
 
@@ -451,7 +455,16 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (systemInitialized[SYS_NET]) CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    for (uint32_t i=0;i<MODEL_COUNT;i++) { free(vertexDataArrays[i]); if (vbos[i]) { glDeleteBuffers(1, &vbos[i]); } }
+    for (uint32_t i=0;i<MODEL_COUNT;i++) {
+        if (vertexDataArrays[i]) free(vertexDataArrays[i]);
+        if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
+    }
+    
+    for (uint32_t i=0;i<MAX_VISIBLE_LIGHTS;i++) {
+        if (lightVolumeVertices[i]) free(lightVolumeVertices[i]);
+        if (lightVBOs[i]) glDeleteBuffers(1, &lightVBOs[i]);
+    }
+    
     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
     if (vao_chunk) glDeleteVertexArrays(1, &vao_chunk);
@@ -483,6 +496,75 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     return status;
 }
 
+void UpdateLightVolumes(void) {
+    DualLog("Updating light volume procedural meshes...\n");
+    memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(uint32_t)); // Blank out the pointers
+    glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs); // Generate buffers and assign GL pointers to lightVBOs.
+    double start_time = get_time();
+    size_t sizeOfTempVertices = largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+    float * tempVerts = (float *)malloc(sizeOfTempVertices);
+    int32_t modelIdx = -1;
+    float dist;
+    uint32_t headVertIdx;
+    
+    DualLog("Clearing light volume mesh buffers...\n");
+    for (uint32_t lightIdx=0;lightIdx<MAX_VISIBLE_LIGHTS;++lightIdx) {
+        lightVertexCounts[lightIdx] = 0;
+    }
+    
+    DualLog("Iterating over and getting light volume mesh vertices...\n");
+    uint64_t iterCounter1 = 0;
+    uint64_t iterCounter2 = 0;
+    uint64_t iterCounter3 = 0;
+//     for (uint32_t lightIdx=0;lightIdx<MAX_VISIBLE_LIGHTS;++lightIdx) {
+    for (uint32_t lightIdx=0;lightIdx<1;++lightIdx) {
+        memset(tempVerts,0,sizeOfTempVertices); // Clear reused buffer.
+        uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
+        float lit_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float lit_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float lit_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float sqrRange = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        sqrRange *= sqrRange;
+        headVertIdx = 0;
+        iterCounter1++;
+        for (uint32_t instanceIdx=0;instanceIdx<INSTANCE_COUNT;++instanceIdx) {
+            modelIdx = instances[instanceIdx].modelIndex;
+            if (modelIdx < 0 || modelIdx > MODEL_COUNT) continue;
+            
+            uint32_t vertCount = modelVertexCounts[modelIdx];
+            if (modelVertexCounts[modelIdx] < 1) continue;
+
+            iterCounter2++;            
+            for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < maxLightVolumeMeshVerts); ++vertIdx) {
+                uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
+                float * model = vertexDataArrays[modelIdx];
+                float vert_x = model[vertexIdx + 0];
+                float vert_y = model[vertexIdx + 1];
+                float vert_z = model[vertexIdx + 2];
+                dist = squareDistance3D(lit_x,lit_y,lit_z, vert_x,vert_y,vert_z);
+                if (dist < sqrRange) {
+                    uint32_t workingIdx = (headVertIdx * VERTEX_ATTRIBUTES_COUNT);
+                    for (uint32_t ofs = 0; ofs < VERTEX_ATTRIBUTES_COUNT; ++ofs) tempVerts[workingIdx + ofs] = model[vertexIdx + ofs];
+                    headVertIdx++;
+                }
+                
+                iterCounter3++;
+            }
+            
+            lightVertexCounts[lightIdx] += headVertIdx;
+        }
+        
+        lightVolumeVertices[lightIdx] = tempVerts;
+        glBufferData(GL_ARRAY_BUFFER,lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), tempVerts, GL_DYNAMIC_DRAW);
+    }
+    
+    DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n",iterCounter1,iterCounter2,iterCounter3);
+    
+    free(tempVerts);
+    double end_time = get_time();
+    DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
+}
+
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
 int EventExecute(Event* event) {
@@ -497,7 +579,10 @@ int EventExecute(Event* event) {
         case EV_LOAD_VOXELS:
             VXGI_Init(); // Initialize the voxels after loading models and instances so that svo's can be populated.
             return 0;
-        case EV_LOAD_INSTANCES: return SetupInstances();
+        case EV_LOAD_INSTANCES:
+            int exitCode = SetupInstances();
+            UpdateLightVolumes();
+            return exitCode;
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -636,10 +721,12 @@ int main(int argc, char* argv[]) {
         // Client Actions
         // ====================================================================
         // Client Render
+        bool debugRenderSegfaults = true;
         drawCallCount = 0; // Reset per frame
         vertexCount = 0;
         
-        // 1. Clear Frame Buffers and Depth
+        // 0. Clear Frame Buffers and Depth
+        if (debugRenderSegfaults) DualLog("0. Clear Frame Buffers and Depth\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -664,6 +751,7 @@ int main(int argc, char* argv[]) {
         dirtyInstances[39] = true;
         
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
+        if (debugRenderSegfaults) DualLog("1. Light Culling to limit of MAX_VISIBLE_LIGHTS\n");
         playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
         playerCellIdx_x = PositionToWorldCellIndexX(cam_x);
         playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
@@ -707,6 +795,7 @@ int main(int argc, char* argv[]) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         
         // 2. Instance Culling to only those in range of player
+        if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
         bool instanceIsCulledArray[INSTANCE_COUNT];
         memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
         float distSqrd = 0.0f;
@@ -718,12 +807,14 @@ int main(int argc, char* argv[]) {
         }
 
         // 3. Pass all instance matrices to GPU
+        if (debugRenderSegfaults) DualLog("3. Pass all instance matrices to GPU\n");
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         
         // 4. Unlit Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
+        if (debugRenderSegfaults) DualLog("4. Unlit Raterized Geometry\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glUseProgram(chunkShaderProgram);
         glEnable(GL_DEPTH_TEST);
@@ -762,6 +853,7 @@ int main(int argc, char* argv[]) {
         }
         
         // 5. Generate Light Volume Meshes
+        if (debugRenderSegfaults) DualLog("5. Generate Light Volume Meshes\n");
 //         glGenBuffers(MAX_VISIBLE_LIGHTS, lightVolumeVBOs);
 //         for (int lightIdx=0;lightIdx < 1/*numLightsFound*/;++lightIdx) { // Just test light for now
 //             GLuint outVertexBuffer;
@@ -828,27 +920,30 @@ int main(int argc, char* argv[]) {
         glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
         glUniform1i(textureCount_lightvol, textureCount);
         glUniform1i(debugView_lightvol, debugView);
-        
         glDisable(GL_CULL_FACE); // Disable backface culling
+        if (debugRenderSegfaults) DualLog("Made it as far as just prior to the render calls for light volume meshes\n");
     //     for (uint32_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
         for (uint32_t lightIdx = 0; lightIdx < 1; lightIdx++) {
             if (lightVertexCounts[lightIdx] == 0) continue;
 
-            glBindVertexBuffer(0, lightVolumeVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            if (debugRenderSegfaults) DualLog("Rendering light %d volume mesh...\n",lightIdx);
+            glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            if (debugRenderSegfaults) DualLog("testpoint 2\n",lightIdx);
             glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
+            if (debugRenderSegfaults) DualLog("testpoint 3\n",lightIdx);
             drawCallCount++;
             vertexCount += lightVertexCounts[lightIdx];
         }
-        glEnable(GL_CULL_FACE); // Reenable backface culling
         
-        glDeleteBuffers(MAX_VISIBLE_LIGHTS, lightVolumeVBOs);
+        glEnable(GL_CULL_FACE); // Reenable backface culling
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // 3. Deferred Lighting + Shadow Calculations
+        // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
         //        dynamic and can be updated at any time (flicker, light switches,
         //        move, change color, get marked as "culled" so shader can skip it,
         //        etc.).
+        if (debugRenderSegfaults) DualLog("6. Deferred Lighting + Shadow Calculations\n");
         glUseProgram(deferredLightingShaderProgram);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
@@ -869,7 +964,8 @@ int main(int argc, char* argv[]) {
         glDispatchCompute(groupX, groupY, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
         
-        // 4. Render final results with full screen quad.
+        // 7. Render final meshes' results with full screen quad
+        if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         if (debugView == 0) {
@@ -893,7 +989,12 @@ int main(int argc, char* argv[]) {
         glBindVertexArray(0);
         glBindTexture(GL_TEXTURE_2D, 0);
         glUseProgram(0);
-
+        
+        // 8. Render UI Images
+        if (debugRenderSegfaults) DualLog("8. Render UI Images\n");
+ 
+        // 9. Render UI Text
+        if (debugRenderSegfaults) DualLog("9. Render UI Text\n");
         glEnable(GL_STENCIL_TEST);
         glStencilMask(0xFF); // Enable stencil writes
         glStencilFunc(GL_ALWAYS, 1, 0xFF); // Always write 1

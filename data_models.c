@@ -26,7 +26,7 @@ uint32_t totalVertexCount = 0;
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 float * vertexDataArrays[MODEL_COUNT];
-
+uint32_t largestVertCount = 0;
 GLuint vboMasterTable;
 GLuint modelVertexOffsetsID;
 
@@ -56,7 +56,7 @@ int LoadGeometry(void) {
     
     int totalVertCount = 0;
     int totalBounds = 0;
-    uint32_t largestVertCount = 0;
+    largestVertCount = 0;
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<model_parser.count;k++) {
