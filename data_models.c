@@ -39,6 +39,7 @@ bool loadModelItemInitialized[MDL_COUNT] = { [0 ... MDL_COUNT - 1] = false };
 
 // Loads all geometry, from 3D meshes or otherwise
 int LoadGeometry(void) {
+    CHECK_GL_ERROR();
     double start_time = get_time();
     DebugRAM("start of loading all models");
     
@@ -181,11 +182,14 @@ int LoadGeometry(void) {
         
     // Generate and populate VBOs
     glGenBuffers(MODEL_COUNT, vbos);
+    CHECK_GL_ERROR();
     
     GLuint stagingBuffer;
     glGenBuffers(1, &stagingBuffer);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_ARRAY_BUFFER, stagingBuffer);
     glBufferData(GL_ARRAY_BUFFER, largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    CHECK_GL_ERROR();
     DebugRAM("after glGenBuffers vbos");
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         if (modelVertexCounts[i] == 0) continue; // No model specified with this index.
@@ -204,18 +208,24 @@ int LoadGeometry(void) {
 
         // Copy to VBO
         glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
+        CHECK_GL_ERROR();
         glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
+        CHECK_GL_ERROR();
         glBufferData(GL_COPY_WRITE_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+        CHECK_GL_ERROR();
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         glFlush();
         glFinish();
     }
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);  
+    CHECK_GL_ERROR();
     glDeleteBuffers(1, &stagingBuffer);
+    CHECK_GL_ERROR();
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     glFlush();
     glFinish();
+    CHECK_GL_ERROR();
     DebugRAM("after model staging buffer clear");
 
     // Upload modelVertexOffsets
@@ -227,29 +237,43 @@ int LoadGeometry(void) {
     }
     
     glGenBuffers(1, &modelVertexOffsetsID);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
     
     // Create duplicate of all mesh data in one flat buffer in VRAM without using RAM
     glGenBuffers(1, &vboMasterTable);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);  
+    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
     for (int i = 0; i < MODEL_COUNT; ++i) {
         glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
+        CHECK_GL_ERROR();
         glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
+        CHECK_GL_ERROR();
         glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        CHECK_GL_ERROR();
     }
     
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    CHECK_GL_ERROR();
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
     DebugRAM("after copying to VBO Master Table");
       
     // VAO for Generic Chunk Rendering
     glGenVertexArrays(1, &vao_chunk);
+    CHECK_GL_ERROR();
     glBindVertexArray(vao_chunk);
+    CHECK_GL_ERROR();
     
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
@@ -270,9 +294,13 @@ int LoadGeometry(void) {
 
     // Pass Model Type Bounds to GPU
     glGenBuffers(1, &modelBoundsID);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
+    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelBoundsID);
+    CHECK_GL_ERROR();
     DebugRAM("after model bounds bind");
     
     malloc_trim(0);

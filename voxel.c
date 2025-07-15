@@ -37,10 +37,15 @@ GLuint visibleLightsID;
 void VXGI_Init(void) {
     DebugRAM("VXGI Init\n");
     glGenBuffers(1, &visibleLightsID);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
+    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);    
+    CHECK_GL_ERROR();
     DebugRAM("after VXGI Init");
 }
 

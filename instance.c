@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include "render.h"
 #include "instance.h"
 #include "data_models.h"
 #include "debug.h"
@@ -17,6 +18,7 @@ GLuint instancesBuffer;
 GLuint matricesBuffer;
 
 int SetupInstances(void) {    
+    CHECK_GL_ERROR();
     int x = 0;
     int y = 0;
     for (int idx=0;idx<INSTANCE_COUNT;idx++) {
@@ -53,14 +55,22 @@ int SetupInstances(void) {
     }
     
     glGenBuffers(1, &instancesBuffer);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
+    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    CHECK_GL_ERROR();
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     glGenBuffers(1, &matricesBuffer);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    CHECK_GL_ERROR();
     malloc_trim(0);
     return 0;
 }

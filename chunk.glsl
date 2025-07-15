@@ -12,7 +12,6 @@ const char *vertexShaderSource =
     "uniform int normalIndex;\n"
     "uniform int instanceIndex;\n"
     "uniform int modelIndex;\n"
-    "uniform int textureCount;\n"
     "uniform mat4 matrix;\n"
     "uniform mat4 view;\n"
     "uniform mat4 projection;\n"
@@ -23,7 +22,6 @@ const char *vertexShaderSource =
     "flat out int GlowIndex;\n"
     "flat out int SpecIndex;\n"
     "flat out int NormalIndex;\n"
-    "flat out int TextureCount;\n"
     "flat out int InstanceIndex;\n"
     "flat out int ModelIndex;\n"
     "\n"
@@ -35,7 +33,6 @@ const char *vertexShaderSource =
     "    GlowIndex = glowIndex;\n"
     "    SpecIndex = specIndex;\n"
     "    NormalIndex = normalIndex;\n"
-    "    TextureCount = textureCount;\n"
     "    ModelIndex = modelIndex;\n"
     "    InstanceIndex = instanceIndex;\n"
     "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
@@ -49,7 +46,6 @@ const char *fragmentShaderTraditional =
     "flat in int GlowIndex;\n"
     "flat in int SpecIndex;\n"
     "flat in int NormalIndex;\n"
-    "flat in int TextureCount;\n"
     "flat in int InstanceIndex;\n"
     "flat in int ModelIndex;\n"
     "in vec3 Normal;\n"
@@ -76,7 +72,6 @@ const char *fragmentShaderTraditional =
     "};\n"
 
     "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
-    "    if (texIndex >= TextureCount) return vec4(0.0);\n"
     "    if (texIndex >= 65535) return vec4(0.0);\n"
 
     "    uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;\n"
@@ -105,7 +100,7 @@ const char *fragmentShaderTraditional =
     "\n"
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
-    "    if (TexIndex < TextureCount) texIndexChecked = TexIndex;\n"
+    "    if (TexIndex >= 0) texIndexChecked = TexIndex;\n"
     "    ivec2 texSize = textureSizes[texIndexChecked];\n"
 
     "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V, OpenGL convention vs import
@@ -132,7 +127,7 @@ const char *fragmentShaderTraditional =
     "    } else if (debugView == 4) {\n"
     "        outAlbedo.r = float(InstanceIndex) / 5500.0;\n"
     "        outAlbedo.g = float(ModelIndex) / 1024.0;\n"
-    "        outAlbedo.b = float(texIndexChecked) / float(TextureCount);\n"
+    "        outAlbedo.b = float(texIndexChecked) / 1282.0;\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else {\n"
     "        outAlbedo = albedoColor;\n"

@@ -42,10 +42,15 @@ int InitializeTextAndFonts(void) {
 
 void SetupTextQuad(void) {
     glGenVertexArrays(1, &textVAO);
+    CHECK_GL_ERROR();
     glGenBuffers(1, &textVBO);
+    CHECK_GL_ERROR();
     glBindVertexArray(textVAO);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    CHECK_GL_ERROR();
     glBufferData(GL_ARRAY_BUFFER, sizeof(textQuadVertices), textQuadVertices, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
 
     // Position
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
@@ -55,6 +60,7 @@ void SetupTextQuad(void) {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glEnableVertexAttribArray(1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    CHECK_GL_ERROR();
     glBindVertexArray(0);
 }
 
@@ -140,6 +146,7 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     glDeleteTextures(1, &texture);
     SDL_FreeSurface(rgba_surface);
     glEnable(GL_CULL_FACE); // Reenable backface culling
+    CHECK_GL_ERROR();
 }
 
 void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...) {

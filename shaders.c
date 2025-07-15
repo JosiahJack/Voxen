@@ -17,6 +17,7 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &source, NULL);
     glCompileShader(shader);
+    CHECK_GL_ERROR();
     GLint success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
@@ -80,10 +81,15 @@ int CompileShaders(void) {
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program"); if (!imageBlitShaderProgram) { return 1; }
 
     glGenBuffers(1, &blueNoiseBuffer);
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
+    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, blueNoiseBuffer); // Use binding point 13
+    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    CHECK_GL_ERROR();
     
     CacheUniformLocationsForShaders(); // After shader compile!
     return 0;
