@@ -537,13 +537,20 @@ void UpdateLightVolumes(void) {
     }
     ClearGLErrors();
 
-    // Validate MAX_VISIBLE_LIGHTS
     if (MAX_VISIBLE_LIGHTS <= 0) {
         DualLogError("Invalid MAX_VISIBLE_LIGHTS: %d\n", MAX_VISIBLE_LIGHTS);
         return;
     }
 
-    // Generate VBOs and validate
+    // Free previous lightVolumeVertices
+    for (uint32_t i = 0; i < MAX_VISIBLE_LIGHTS; ++i) {
+        if (lightVolumeVertices[i]) {
+            DualLog("Freeing lightVolumeVertices[%d] at %p\n", i, lightVolumeVertices[i]);
+            free(lightVolumeVertices[i]);
+            lightVolumeVertices[i] = NULL;
+        }
+    }
+
     memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(GLuint));
     glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs);
     GLenum error = glGetError();
@@ -551,40 +558,27 @@ void UpdateLightVolumes(void) {
         DualLogError("glGenBuffers failed for lightVBOs with error: %d\n", error);
         return;
     }
-    
-    for (uint32_t i = 0; i < MAX_VISIBLE_LIGHTS; ++i) {
-        if (lightVBOs[i] == 0) {
-            DualLogError("lightVBOs[%d] is invalid (0)\n", i);
-        }/* else {
-            DualLog("lightVBOs[%d] = %u\n", i, lightVBOs[i]);
-        }*/
-    }
 
-    // Allocate tempVerts
-    if (largestVertCount <= 0 || VERTEX_ATTRIBUTES_COUNT <= 0) {
-        DualLogError("Invalid largestVertCount (%u) or VERTEX_ATTRIBUTES_COUNT (%u)\n", 
-                     largestVertCount, VERTEX_ATTRIBUTES_COUNT);
+    if (largestVertCount <= 0) {
+        DualLogError("Invalid largestVertCount (%u)\n", largestVertCount);
         return;
     }
-    size_t sizeOfTempVertices = largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+    const uint32_t NEW_VERTEX_ATTRIBUTES_COUNT = 9; // pos:3, normal:3, texcoord:2, texIndex:1, glowIndex:1, specIndex:1, normalIndex:1, modelIndex:1, instanceIndex:1
+    size_t sizeOfTempVertices = largestVertCount * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float);
     float *tempVerts = (float *)malloc(sizeOfTempVertices);
     if (!tempVerts) {
-        DualLogError("Failed to allocate tempVerts buffer for light volume mesh generation\n");
+        DualLogError("Failed to allocate tempVerts buffer\n");
         return;
     }
-    DualLog("Allocated tempVerts: %zu bytes (largestVertCount=%u, VERTEX_ATTRIBUTES_COUNT=%u)\n", 
-            sizeOfTempVertices, largestVertCount, VERTEX_ATTRIBUTES_COUNT);
+    DualLog("Allocated tempVerts: %zu bytes (largestVertCount=%u, VERTEX_ATTRIBUTES_COUNT=%u)\n",
+            sizeOfTempVertices, largestVertCount, NEW_VERTEX_ATTRIBUTES_COUNT);
 
-    // Clear lightVertexCounts
-    DualLog("Clearing light volume mesh buffers...\n");
     for (uint32_t lightIdx = 0; lightIdx < MAX_VISIBLE_LIGHTS; ++lightIdx) {
         lightVertexCounts[lightIdx] = 0;
     }
 
     DualLog("Iterating over and getting light volume mesh vertices...\n");
-    uint64_t iterCounter1 = 0;
-    uint64_t iterCounter2 = 0;
-    uint64_t iterCounter3 = 0;
+    uint64_t iterCounter1 = 0, iterCounter2 = 0, iterCounter3 = 0;
     double start_time = get_time();
 
     for (uint32_t lightIdx = 0; lightIdx < 1; ++lightIdx) {
@@ -600,19 +594,24 @@ void UpdateLightVolumes(void) {
 
         for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
             int32_t modelIdx = instances[instanceIdx].modelIndex;
-            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue; // Skipping invalid modelIdx, fine as not all games/mods use all slots.
+            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
 
             uint32_t vertCount = modelVertexCounts[modelIdx];
             if (vertCount <= 0) {
                 DualLog("Skipping model %d with zero vertices\n", modelIdx);
                 continue;
             }
-            
             if (!vertexDataArrays[modelIdx]) {
                 DualLogError("vertexDataArrays[%d] is NULL\n", modelIdx);
                 continue;
             }
             iterCounter2++;
+
+            float transform[16];
+            mat4_compose(transform,
+                         instances[instanceIdx].posx, instances[instanceIdx].posy, instances[instanceIdx].posz,
+                         instances[instanceIdx].rotx, instances[instanceIdx].roty, instances[instanceIdx].rotz, instances[instanceIdx].rotw,
+                         instances[instanceIdx].sclx, instances[instanceIdx].scly, instances[instanceIdx].sclz);
 
             for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < maxLightVolumeMeshVerts); ++vertIdx) {
                 uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
@@ -620,56 +619,75 @@ void UpdateLightVolumes(void) {
                 float vert_x = model[vertexIdx + 0];
                 float vert_y = model[vertexIdx + 1];
                 float vert_z = model[vertexIdx + 2];
-                float dist = squareDistance3D(lit_x, lit_y, lit_z, vert_x, vert_y, vert_z);
+
+                float world_pos[3];
+                mat4_transform_vec3(transform, vert_x, vert_y, vert_z, world_pos);
+                float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[0], world_pos[1], world_pos[2]);
                 if (dist < sqrRange) {
-                    if (headVertIdx >= largestVertCount) {
-                        DualLogError("headVertIdx (%u) exceeds largestVertCount (%u)\n", headVertIdx, largestVertCount);
-                        break;
-                    }
-                    uint32_t workingIdx = (headVertIdx * VERTEX_ATTRIBUTES_COUNT);
-                    for (uint32_t ofs = 0; ofs < VERTEX_ATTRIBUTES_COUNT; ++ofs) {
-                        tempVerts[workingIdx + ofs] = model[vertexIdx + ofs];
-                    }
+                    if (headVertIdx >= largestVertCount) { DualLogError("headVertIdx (%u) exceeds largestVertCount (%u)\n", headVertIdx, largestVertCount); break; }
+                    
+                    uint32_t workingIdx = (headVertIdx * NEW_VERTEX_ATTRIBUTES_COUNT);
+                    tempVerts[workingIdx + 0] = world_pos[0];
+                    tempVerts[workingIdx + 1] = world_pos[1];
+                    tempVerts[workingIdx + 2] = world_pos[2];
+                    DualLog("Adding vertex %d to light %d with position x %f, y %f, z %f\n",headVertIdx,lightIdx,tempVerts[workingIdx + 0],tempVerts[workingIdx + 1],tempVerts[workingIdx + 2]);
+                    tempVerts[workingIdx + 3] = model[vertexIdx + 3]; // Normal X
+                    tempVerts[workingIdx + 4] = model[vertexIdx + 4]; // Normal Y
+                    tempVerts[workingIdx + 5] = model[vertexIdx + 5]; // Normal Z
+                    tempVerts[workingIdx + 6] = model[vertexIdx + 6]; // Texcoord U
+                    tempVerts[workingIdx + 7] = model[vertexIdx + 7]; // Texcoord V
+                    tempVerts[workingIdx + 8] = (float)instances[instanceIdx].texIndex;
+                    tempVerts[workingIdx + 9] = (float)instances[instanceIdx].glowIndex;
+                    tempVerts[workingIdx + 10] = (float)instances[instanceIdx].specIndex;
+                    tempVerts[workingIdx + 11] = (float)instances[instanceIdx].normIndex;
+                    tempVerts[workingIdx + 12] = (float)modelIdx;
+                    tempVerts[workingIdx + 13] = (float)instanceIdx;
                     headVertIdx++;
                 }
                 iterCounter3++;
             }
-            lightVertexCounts[lightIdx] = headVertIdx; // Update per light, not accumulate
+            lightVertexCounts[lightIdx] = headVertIdx;
         }
 
-        lightVolumeVertices[lightIdx] = tempVerts; // Note: tempVerts will be reused, consider copying
-        if (lightVBOs[lightIdx] == 0) {
-            DualLogError("Skipping lightVBOs[%d] due to invalid buffer ID\n", lightIdx);
-            continue;
+        DualLog("Light %d position: (%.2f, %.2f, %.2f)\n", lightIdx, lit_x, lit_y, lit_z);
+        if (headVertIdx > 0) {
+            DualLog("Light %d vertex 0: (%.2f, %.2f, %.2f)\n",
+                    lightIdx, tempVerts[0], tempVerts[1], tempVerts[2]);
         }
+
+        if (lightVertexCounts[lightIdx] > 0) {
+            float *persistentVerts = (float *)malloc(lightVertexCounts[lightIdx] * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            if (!persistentVerts) {
+                DualLogError("Failed to allocate persistentVerts for light %d\n", lightIdx);
+                continue;
+            }
+            memcpy(persistentVerts, tempVerts, lightVertexCounts[lightIdx] * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            lightVolumeVertices[lightIdx] = persistentVerts;
+            DualLog("Allocated lightVolumeVertices[%d] at %p, vertices: %u\n",
+                    lightIdx, persistentVerts, lightVertexCounts[lightIdx]);
+        } else {
+            lightVolumeVertices[lightIdx] = NULL;
+            DualLog("No vertices for light %d\n", lightIdx);
+        }
+
+        if (lightVBOs[lightIdx] == 0) { DualLogError("Skipping lightVBOs[%d] due to invalid buffer ID\n", lightIdx); continue; }
+        
         glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
-            DualLogError("glBindBuffer failed for lightVBOs[%d] with error: %d\n", lightIdx, error);
-            continue;
-        }
+        if (error != GL_NO_ERROR) { DualLogError("glBindBuffer failed for lightVBOs[%d] with error: %d\n", lightIdx, error); continue; }
 
-        // Validate size
-        size_t bufferSize = lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        if (lightVertexCounts[lightIdx] == 0 || bufferSize > sizeOfTempVertices) {
-            DualLogError("Invalid buffer size for lightVBOs[%d]: %zu (vertices=%u)\n", 
-                         lightIdx, bufferSize, lightVertexCounts[lightIdx]);
-            continue;
-        }
-        
-//         DualLog("Uploading %zu bytes to lightVBOs[%d]\n", bufferSize, lightIdx);
+        size_t bufferSize = lightVertexCounts[lightIdx] * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+        if (lightVertexCounts[lightIdx] == 0 || bufferSize > sizeOfTempVertices) { DualLogError("Invalid buffer size for lightVBOs[%d]: %zu (vertices=%u)\n",lightIdx,bufferSize,lightVertexCounts[lightIdx]); continue; }
+            
         glBufferData(GL_ARRAY_BUFFER, bufferSize, tempVerts, GL_DYNAMIC_DRAW);
         error = glGetError();
-        if (error != GL_NO_ERROR) {
-            DualLogError("glBufferData failed for lightVBOs[%d] with error: %d\n", lightIdx, error);
-            continue;
-        }
+        if (error != GL_NO_ERROR) { DualLogError("glBufferData failed for lightVBOs[%d] with error: %d\n", lightIdx, error); continue; }
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    free(tempVerts);
     ClearGLErrors();
-    DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n", 
-            iterCounter1, iterCounter2, iterCounter3);
+    DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n",iterCounter1,iterCounter2,iterCounter3);
     double end_time = get_time();
     DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
 }
@@ -682,16 +700,9 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS:
-            //LoadLevels(); TODO
-            return 0;
-        case EV_LOAD_VOXELS:
-            VXGI_Init(); // Initialize the voxels after loading models and instances so that svo's can be populated.
-            return 0;
-        case EV_LOAD_INSTANCES:
-            int exitCode = SetupInstances();
-            UpdateLightVolumes();
-            return exitCode;
+        case EV_LOAD_LEVELS: /*LoadLevels(); TODO*/ return 0;
+        case EV_LOAD_VOXELS: VXGI_Init(); return 0;
+        case EV_LOAD_INSTANCES: int exitCode = SetupInstances(); UpdateLightVolumes(); return exitCode;
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -960,7 +971,7 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex < 0) continue; // Culled
 
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-//             if (i != 39) continue; // Skip everything except test light's white cube.
+            if (i != 39) continue; // Skip everything except test light's white cube.
             
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             CHECK_GL_ERROR();
@@ -988,7 +999,7 @@ int main(int argc, char* argv[]) {
         
         // 5. Render Light Volume Meshes
         if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
-        glUseProgram(lightVolumeShaderProgram);
+//         glUseProgram(lightVolumeShaderProgram); // Comment out to keep using chunk shader
         CHECK_GL_ERROR();
         float identity[16];
         mat4_identity(identity);
@@ -1002,7 +1013,7 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glUniform1i(debugView_lightvol, debugView);
         CHECK_GL_ERROR();
-        glDisable(GL_CULL_FACE); // Disable backface culling
+//         glDisable(GL_CULL_FACE); // Disable backface culling
         CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
         CHECK_GL_ERROR();
@@ -1018,7 +1029,7 @@ int main(int argc, char* argv[]) {
             vertexCount += lightVertexCounts[lightIdx];
         }
         
-        glEnable(GL_CULL_FACE); // Reenable backface culling
+//         glEnable(GL_CULL_FACE); // Reenable backface culling
         CHECK_GL_ERROR();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
