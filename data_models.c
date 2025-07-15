@@ -19,8 +19,6 @@
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 #define NUM_MODEL_KEYS 1
-GLuint chunkShaderProgram;
-GLuint lightVolumeShaderProgram;
 uint32_t modelVertexCounts[MODEL_COUNT];
 GLuint vao_chunk; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];

@@ -33,6 +33,5 @@ extern GLuint instancesBuffer;
 extern GLuint matricesBuffer;
 
 int SetupInstances(void);
-void UpdateInstanceMatrix(int i);
 
 #endif // VOXEN_INSTANCE_H

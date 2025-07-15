@@ -26,8 +26,10 @@
 #include "instance.h"
 #include "voxel.h"
 #include "data_entities.h"
+#include "player.h"
+#include "matrix.h"
 
-// #define DEBUG_RAM_OUTPUT 0
+// #define DEBUG_RAM_OUTPUT
 
 // Window
 SDL_Window *window;
@@ -52,12 +54,51 @@ const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
 double start_frame_time = 0.0;
-                
-// OpenGL
+         
+// ----------------------------------------------------------------------------
+// OpenGL / Rendering
 SDL_GLContext gl_context;
+
+double lastFrameSecCountTime = 0.00;
+uint32_t lastFrameSecCount = 0;
+uint32_t framesPerLastSecond = 0;
+uint32_t worstFPS = UINT32_MAX;
+uint32_t drawCallCount = 0;
+uint32_t vertexCount = 0;
+bool shadowsEnabled = false;
+uint32_t playerCellIdx = 80000;
+uint32_t playerCellIdx_x = 20000;
+uint32_t playerCellIdx_y = 10000;
+uint32_t playerCellIdx_z = 451;
+int numLightsFound = 0;
+float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
+uint32_t maxLightVolumeMeshVerts = 65535;
+
+// Shaders
+GLuint chunkShaderProgram;
+GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
+      textureCountLoc_chunk = -1, instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1,
+      glowIndexLoc_chunk = -1, specIndexLoc_chunk = -1; // uniform locations
 
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
+
+GLuint deferredLightingShaderProgram;
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, inputTexMapsID; // FBO inputs
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
+      debugViewLoc_deferred = -1; // uniform locations
+
+GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
+GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
+GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1,
+      matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, textureCount_lightvol = -1,
+      debugView_lightvol = -1; // uniform locations
+GLuint lightVolumeVBOs[MAX_VISIBLE_LIGHTS];
+uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
+
+// Culling
+float lightsInProximity[32 * LIGHT_DATA_SIZE];
+// ----------------------------------------------------------------------------
 
 void DualLog(const char *fmt, ...) {
     va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
@@ -134,12 +175,86 @@ void print_bytes_no_newline(int count) {
     DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
 }
 
+// ============================================================================
+// OpenGL / Rendering Helper Functions
+void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, const char *name) {
+    glGenTextures(1, id);
+    glBindTexture(GL_TEXTURE_2D, *id);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) DualLogError("Failed to create texture %s: OpenGL error %d\n", name, error);
+}
+
+void CacheUniformLocationsForShaders(void) {
+    // Called after shader compilation in InitializeEnvironment
+    viewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "view");
+    projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
+    matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
+    texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
+    glowIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowIndex");
+    specIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "specIndex");
+    textureCountLoc_chunk = glGetUniformLocation(chunkShaderProgram, "textureCount");
+    instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
+    modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
+    debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
+    
+    screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
+    screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
+    shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
+    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    
+    lightPosXLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosX");
+    lightPosYLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosY");
+    lightPosZLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosZ");
+    lightRangeLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightRange");
+    matrix_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "matrix");
+    view_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "view");
+    projection_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "projection");
+    textureCount_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "textureCount");
+    debugView_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "debugView");
+}
+
+void UpdateInstanceMatrix(int i) {
+    if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; }
+    if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
+    if (instances[i].modelIndex < 0) return; // Culled
+    
+    float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
+    float rot[16];
+    mat4_identity(rot);
+    rot[0] = 1.0f - 2.0f * (y*y + z*z);
+    rot[1] = 2.0f * (x*y - w*z);
+    rot[2] = 2.0f * (x*z + w*y);
+    rot[4] = 2.0f * (x*y + w*z);
+    rot[5] = 1.0f - 2.0f * (x*x + z*z);
+    rot[6] = 2.0f * (y*z - w*x);
+    rot[8] = 2.0f * (x*z - w*y);
+    rot[9] = 2.0f * (y*z + w*x);
+    rot[10] = 1.0f - 2.0f * (x*x + y*y);
+    
+    // Account for bad scale.  If instance is in the list, it should be visible!
+    float sx = instances[i].sclx > 0.0f ? instances[i].sclx : 1.0f;
+    float sy = instances[i].scly > 0.0f ? instances[i].scly : 1.0f;
+    float sz = instances[i].sclz > 0.0f ? instances[i].sclz : 1.0f;
+    
+    float mat[16]; // 4x4 matrix
+    mat[0]  =       rot[0] * sx; mat[1]  =       rot[1] * sy; mat[2] =       rot[2]  * sz; mat[3]  = 0.0f;
+    mat[4]  =       rot[4] * sx; mat[5]  =       rot[5] * sy; mat[6]  =      rot[6]  * sz; mat[7]  = 0.0f;
+    mat[8]  =       rot[8] * sx; mat[9]  =       rot[9] * sy; mat[10] =      rot[10] * sz; mat[11] = 0.0f;
+    mat[12] = instances[i].posx; mat[13] = instances[i].posy; mat[14] = instances[i].posz; mat[15] = 1.0f;
+    memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
+    dirtyInstances[i] = false;
+}
+// ============================================================================
+
 typedef enum {
     SYS_SDL = 0,
     SYS_TTF,
     SYS_WIN,
     SYS_CTX,
-    SYS_OGL,
     SYS_NET,
     SYS_AUD,
     SYS_COUNT // Number of subsystems
@@ -179,8 +294,7 @@ int InitializeEnvironment(void) {
 
     SDL_GL_MakeCurrent(window, gl_context);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
-    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_OGL + 1; }
-    systemInitialized[SYS_OGL] = true;
+    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_CTX + 1; }
     DebugRAM("GLEW init"); 
     malloc_trim(0);
 
@@ -202,7 +316,7 @@ int InitializeEnvironment(void) {
     glViewport(0, 0, screen_width, screen_height);
 
     if (CompileShaders()) return SYS_COUNT + 1;
-    DebugRAM("compile shaders"); 
+    DebugRAM("compile shaders");
     malloc_trim(0);
     
     // Setup full screen quad for image blit for post processing effects like lighting.
@@ -228,13 +342,96 @@ int InitializeEnvironment(void) {
     if (fontInit) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     DebugRAM("setup full screen quad"); 
     
-    InitializeLights();
+    // Initialize Lights
+    for (int i = 0; i < LIGHT_COUNT; i++) {
+        int base = i * LIGHT_DATA_SIZE; // Step by 12
+        lights[base + 0] = base * 0.08f; // posx
+        lights[base + 1] = base * 0.08f; // posy
+        lights[base + 2] = 0.0f; // posz
+        lights[base + 3] = 5.0f; // intensity
+        lights[base + 4] = 5.24f; // radius
+        lightsRangeSquared[i] = 5.24f * 5.24f;
+        lights[base + 5] = 0.0f; // spotAng
+        lights[base + 6] = 0.0f; // spotDirx
+        lights[base + 7] = 0.0f; // spotDiry
+        lights[base + 8] = -1.0f; // spotDirz
+        lights[base + 9] = 1.0f; // r
+        lights[base + 10] = 1.0f; // g
+        lights[base + 11] = 1.0f; // b
+        lightDirty[i] = true;
+    }
+    
+    lights[0] = 0.0f;
+    lights[1] = -1.28f;
+    lights[2] = 0.0f; // Fixed Z height
+    lights[3] = 2.0f; // Default intensity
+    lights[4] = 10.0f; // Default radius
+    lightsRangeSquared[0] = 10.0f * 10.0f;
+    lights[6] = 0.0f;
+    lights[7] = 0.0f;
+    lights[8] = -1.0f;
+    lights[9] = 1.0f;
+    lights[10] = 1.0f;
+    lights[11] = 1.0f;
+    lightDirty[0] = true;
+    
+    lights[0 + 12] = 10.24f;
+    lights[1 + 12] = 0.0f;
+    lights[2 + 12] = 0.0f; // Fixed Z height
+    lights[3 + 12] = 2.0f; // Default intensity
+    lights[4 + 12] = 10.0f; // Default radius
+    lightsRangeSquared[1] = 10.0f * 10.0f;
+    lights[6 + 12] = 0.0f;
+    lights[7 + 12] = 0.0f;
+    lights[8 + 12] = -1.0f;
+    lights[9 + 12] = 1.0f;
+    lights[10 + 12] = 0.0f;
+    lights[11 + 12] = 0.0f;
+    lightDirty[1] = true;
     DebugRAM("init lights"); 
-    SetupGBuffer();
+    
+    DebugRAM("setup gbuffer start");
+    
+    // First pass gbuffer images
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
+    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, "Unlit Raster Normals");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, "Unlit Raster Depth");
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, "Unlit Raster World Positions");
+    GenerateAndBindTexture(&inputTexMapsID,         GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, "Unlit Raster Glow and Specular Map Indices");
+
+    // Create framebuffer
+    glGenFramebuffers(1, &gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputTexMapsID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+    glDrawBuffers(4, drawBuffers);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        switch (status) {
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
+            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
+            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
+        }
+    }
+    
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+    glBindImageTexture(2, inputDepthID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_DEPTH_COMPONENT24);
+    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindImageTexture(5, inputTexMapsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);    
+    DebugRAM("setup gbuffer end");
     Input_Init();
     DebugRAM("input init"); 
+    
     InitializeNetworking();
     DebugRAM("network init"); 
+    
     systemInitialized[SYS_NET] = true;
     malloc_trim(0);
 
@@ -249,67 +446,45 @@ int InitializeEnvironment(void) {
     return 0;
 }
 
-int ExitCleanup(int status) {
+int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (systemInitialized[SYS_AUD]) CleanupAudio();
     if (systemInitialized[SYS_NET]) CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
-
-    // OpenGL Cleanup
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    for (uint32_t i=0;i<MODEL_COUNT;i++) {
-        free(vertexDataArrays[i]);
-        if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
-    }
+    for (uint32_t i=0;i<MODEL_COUNT;i++) { free(vertexDataArrays[i]); if (vbos[i]) { glDeleteBuffers(1, &vbos[i]); } }
     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
-    
     if (vao_chunk) glDeleteVertexArrays(1, &vao_chunk);
     if (chunkShaderProgram) glDeleteProgram(chunkShaderProgram);
-    
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
     if (textVBO) glDeleteBuffers(1, &textVBO);
     if (textShaderProgram) glDeleteProgram(textShaderProgram);
-    
     if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
-    
     if (inputImageID) glDeleteTextures(1,&inputImageID);
     if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
-        
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
-    
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
-    
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
-    if (vxgiID) glDeleteBuffers(1, &vxgiID);
+    if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
-
-    // Cleanup initialized systems in reverse order.
-    // Independent ifs so that we can exit from anywhere and de-init only as needed.
-    
-    // if (systemInitialized[SYS_OGL]) Nothing to be done for GLEW de-init.
-    
-    // Delete context after deleting buffers relevant to that context.
-    if (systemInitialized[SYS_CTX]) SDL_GL_DeleteContext(gl_context); // GL context was created so delete the context
-    
-    if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window); // SDL window was created so destroy the window
-    if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font); // Font was loaded, so clean it up
-    if (systemInitialized[SYS_TTF]) TTF_Quit(); // TTF was init'ed, so also TTF Quit
-    if (systemInitialized[SYS_SDL]) SDL_Quit(); // SDL was init'ed, so SDL_Quit
-    
+    if (systemInitialized[SYS_CTX]) SDL_GL_DeleteContext(gl_context); // Delete context after deleting buffers relevant to that context.
+    if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window);
+    if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font);
+    if (systemInitialized[SYS_TTF]) TTF_Quit();
+    if (systemInitialized[SYS_SDL]) SDL_Quit();
     if (console_log_file) { fclose(console_log_file); console_log_file = NULL; }
     return status;
 }
 
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
-
 int EventExecute(Event* event) {
     switch(event->type) {
         case EV_INIT: return InitializeEnvironment(); // Init called prior to Loading Data
@@ -457,18 +632,303 @@ int main(int argc, char* argv[]) {
         // Server Event Queue
         exitCode = EventQueueProcess(); // Do everything
         if (exitCode) break;
-
         
         // Client Actions
         // ====================================================================
         // Client Render
-        exitCode = ClearFrameBuffers();
-        if (exitCode) break;
+        drawCallCount = 0; // Reset per frame
+        vertexCount = 0;
         
-        exitCode = RenderStaticMeshes(); // FIRST FOR RESETTING DRAW CALL COUNTER!
-        if (exitCode) break;
+        // 1. Clear Frame Buffers and Depth
+        glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        // Test Stuff DELETE ME LATER, Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
+        int lightBase = 0;
+        lights[lightBase + 0] = testLight_x;
+        lights[lightBase + 1] = testLight_y;
+        lights[lightBase + 2] = testLight_z;
+        lights[lightBase + 3] = testLight_intensity;
+        lights[lightBase + 4] = testLight_range;
+        lightsRangeSquared[lightBase] = testLight_range * testLight_range;
+        lights[lightBase + 5] = testLight_spotAng;
+        lights[lightBase + 9] = 1.0f; // r
+        lights[lightBase + 10] = 1.0f; // g
+        lights[lightBase + 11] = 1.0f; // b
+        lightDirty[lightBase / 6] = true;
+        instances[39].posx = testLight_x;
+        instances[39].posy = testLight_y;
+        instances[39].posz = testLight_z;
+        dirtyInstances[39] = true;
+        
+        // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
+        playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
+        playerCellIdx_x = PositionToWorldCellIndexX(cam_x);
+        playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
+        playerCellIdx_z = PositionToWorldCellIndexZ(cam_z);
+        numLightsFound = 0;
+        for (int i=0;i<LIGHT_COUNT;++i) {
+            uint32_t litIdx = (i * LIGHT_DATA_SIZE);
+            float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+            if (litIntensity < 0.015f) continue; // Off
+            
+            float litx = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+            float lity = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+            float litz = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+            if (squareDistance3D(cam_x, cam_y, cam_z, litx, lity, litz) < sightRangeSquared) {
+                
+                int idx = numLightsFound * LIGHT_DATA_SIZE;
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = litx;
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY] = lity;
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ] = litz;
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY] = litIntensity;
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_R] = lights[litIdx + LIGHT_DATA_OFFSET_R];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_G] = lights[litIdx + LIGHT_DATA_OFFSET_G];
+                lightsInProximity[idx + LIGHT_DATA_OFFSET_B] = lights[litIdx + LIGHT_DATA_OFFSET_B];
+                numLightsFound++;
+                if (numLightsFound >= MAX_VISIBLE_LIGHTS) break; // Ok found 32 lights, cap it there.
+            }
+        }
+        
+        for (int i=numLightsFound;i<MAX_VISIBLE_LIGHTS;++i) {
+            lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
+        }
 
-        exitCode = RenderUI(get_time() - last_time);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        
+        // 2. Instance Culling to only those in range of player
+        bool instanceIsCulledArray[INSTANCE_COUNT];
+        memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
+        float distSqrd = 0.0f;
+        for (int i=0;i<INSTANCE_COUNT;++i) {
+            if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
+            
+            distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
+            if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
+        }
+
+        // 3. Pass all instance matrices to GPU
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+        
+        // 4. Unlit Raterized Geometry
+        //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
+        glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+        glUseProgram(chunkShaderProgram);
+        glEnable(GL_DEPTH_TEST);
+        float view[16], projection[16]; // Set up view and projection matrices
+        float fov = 65.0f;
+        mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
+        mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
+        glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+        glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
+        glUniform1i(debugViewLoc_chunk, debugView);
+        glBindVertexArray(vao_chunk);
+        glUniform1i(textureCountLoc_chunk, textureCount); // Needed else test light stops rendering as unlit
+        for (int i=0;i<INSTANCE_COUNT;i++) {
+            if (instanceIsCulledArray[i]) continue;
+            if (instances[i].modelIndex >= MODEL_COUNT) continue;
+            if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+            if (instances[i].modelIndex < 0) continue; // Culled
+
+            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+//             if (i != 39) continue; // Skip everything except test light's white cube.
+            
+            glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+            glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
+            glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+            glUniform1i(instanceIndexLoc_chunk, i);
+            int modelType = instances[i].modelIndex;
+            glUniform1i(modelIndexLoc_chunk, modelType);
+            glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            
+            if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
+            glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+            if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
+            drawCallCount++;
+            vertexCount += modelVertexCounts[modelType];
+        }
+        
+        // 5. Generate Light Volume Meshes
+//         glGenBuffers(MAX_VISIBLE_LIGHTS, lightVolumeVBOs);
+//         for (int lightIdx=0;lightIdx < 1/*numLightsFound*/;++lightIdx) { // Just test light for now
+//             GLuint outVertexBuffer;
+//             glGenBuffers(1, &outVertexBuffer);
+//             glBindBuffer(GL_SHADER_STORAGE_BUFFER, outVertexBuffer);
+//             glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VERTS_PER_LIGHT_VOLUME * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+//             
+//             GLuint outInRange;
+//             glGenBuffers(1, &outInRange);
+//             glBindBuffer(GL_SHADER_STORAGE_BUFFER, outInRange);
+//             glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VERTS_PER_LIGHT_VOLUME * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+//             
+//             uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
+//             float lit_x = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX];
+//             float lit_y = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY];
+//             float lit_z = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ];
+//             float lit_range = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE];
+//             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, outInRange);
+//             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, outVertexBuffer);
+//             glUseProgram(lightVolumeMeshShaderProgram);
+//             glUniform1f(lightPosXLoc_lightvol, lit_x);
+//             glUniform1f(lightPosYLoc_lightvol, lit_y);
+//             glUniform1f(lightPosZLoc_lightvol, lit_z);
+//             glUniform1f(lightRangeLoc_lightvol, lit_range);
+//             glDispatchCompute((INSTANCE_COUNT * 65535 + 63) / 64, 1, 1);
+//             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT); // Ensure all light volume meshes ready prior to draw calls.
+//             
+//             // Read back and compact vertices
+//             float *tempVertices = (float *)malloc(maxLightVolumeMeshVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//             float *tempValid = (float *)malloc(maxLightVolumeMeshVerts * sizeof(uint32_t));
+//             glBindBuffer(GL_SHADER_STORAGE_BUFFER, outVertexBuffer);
+//             glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, maxLightVolumeMeshVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float), tempVertices);
+//             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//             glBindBuffer(GL_SHADER_STORAGE_BUFFER, outInRange);
+//             glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, maxLightVolumeMeshVerts * sizeof(uint32_t), tempValid);
+// 
+//             uint32_t validVertexCount = 0;
+//             float *compactedVertices = (float *)malloc(maxLightVolumeMeshVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//             DualLog("malloc'ed compactedVertices with %d\n",maxLightVolumeMeshVerts * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//             for (uint32_t i = 0; i < maxLightVolumeMeshVerts; i++) {
+//                 if (tempValid[i] == 1) {
+//                     memcpy(&compactedVertices[validVertexCount * VERTEX_ATTRIBUTES_COUNT], &tempVertices[i * VERTEX_ATTRIBUTES_COUNT], VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//                     validVertexCount++;
+//                 }
+//             }
+//             
+//             lightVertexCounts[lightIdx] = validVertexCount;
+//             DualLog("Light volume mesh %d created with %d vertices\n", lightIdx, validVertexCount);
+//             glBindBuffer(GL_ARRAY_BUFFER, lightVolumeVBOs[lightIdx]);
+//             glBufferData(GL_ARRAY_BUFFER, validVertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), compactedVertices, GL_STATIC_DRAW);
+//             free(tempVertices);
+//             free(tempValid);
+//             free(compactedVertices);
+//         }
+// 
+//         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT); // Ensure all light volume meshes ready prior to draw calls.
+
+        // Now render them
+        glUseProgram(lightVolumeShaderProgram);
+        float identity[16];
+        mat4_identity(identity);
+        glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
+        glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
+        glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
+        glUniform1i(textureCount_lightvol, textureCount);
+        glUniform1i(debugView_lightvol, debugView);
+        
+        glDisable(GL_CULL_FACE); // Disable backface culling
+    //     for (uint32_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
+        for (uint32_t lightIdx = 0; lightIdx < 1; lightIdx++) {
+            if (lightVertexCounts[lightIdx] == 0) continue;
+
+            glBindVertexBuffer(0, lightVolumeVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
+            drawCallCount++;
+            vertexCount += lightVertexCounts[lightIdx];
+        }
+        glEnable(GL_CULL_FACE); // Reenable backface culling
+        
+        glDeleteBuffers(MAX_VISIBLE_LIGHTS, lightVolumeVBOs);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // 3. Deferred Lighting + Shadow Calculations
+        //        Apply deferred lighting with compute shader.  All lights are
+        //        dynamic and can be updated at any time (flicker, light switches,
+        //        move, change color, get marked as "culled" so shader can skip it,
+        //        etc.).
+        glUseProgram(deferredLightingShaderProgram);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+        // These should be static but cause issues if not...
+        glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
+        glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
+        glUniform1i(debugViewLoc_deferred, debugView);
+
+        glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
+        float viewInv[16];
+        mat4_inverse(viewInv,view);
+        float projInv[16];
+        mat4_inverse(projInv,projection);
+
+        // Dispatch compute shader
+        GLuint groupX = (screen_width + 7) / 8;
+        GLuint groupY = (screen_height + 7) / 8;
+        glDispatchCompute(groupX, groupY, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+        
+        // 4. Render final results with full screen quad.
+        glUseProgram(imageBlitShaderProgram);
+        glActiveTexture(GL_TEXTURE0);
+        if (debugView == 0) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Normal
+        } else if (debugView == 1) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Unlit
+        } else if (debugView == 2) {
+            glBindTexture(GL_TEXTURE_2D, inputNormalsID); // Triangle Normals 
+        } else if (debugView == 3) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Depth.  Values must be decoded in shader
+        } else if (debugView == 4) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
+        }
+        
+        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
+        glBindVertexArray(quadVAO);
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glEnable(GL_DEPTH_TEST);
+        glBindVertexArray(0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glUseProgram(0);
+
+        glEnable(GL_STENCIL_TEST);
+        glStencilMask(0xFF); // Enable stencil writes
+        glStencilFunc(GL_ALWAYS, 1, 0xFF); // Always write 1
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE); // Replace stencil value
+        glClear(GL_STENCIL_BUFFER_BIT); // Clear stencil each frame TODO: Ok to do in ClearFrameBuffers()??
+        glDisable(GL_LIGHTING); // Disable lighting for text
+
+        float cam_quat_yaw = 0.0f;
+        float cam_quat_pitch = 0.0f;
+        float cam_quat_roll = 0.0f;
+        quat_to_euler(&cam_rotation,&cam_quat_yaw,&cam_quat_pitch,&cam_quat_roll);
+        
+        RenderFormattedText(10, 25, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+        RenderFormattedText(10, 40, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(10, 55, TEXT_WHITE, "cam quat yaw: %.2f, cam quat pitch: %.2f, cam quat roll: %.2f", cam_quat_yaw, cam_quat_pitch, cam_quat_roll);
+        RenderFormattedText(10, 70, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+        RenderFormattedText(10, 85, TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
+        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d, %s", debugView, debugView == 1 ? "unlit" : "normal");
+        RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d   Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        
+        // Frame stats
+        drawCallCount++; // Add one more for this text render ;)
+        RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d, Worst FPS: %d",
+                            (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallCount,vertexCount,worstFPS);
+        
+        double time_now = get_time();
+        if ((time_now - lastFrameSecCountTime) >= 1.00) {
+            lastFrameSecCountTime = time_now;
+            framesPerLastSecond = globalFrameNum - lastFrameSecCount;
+            if (framesPerLastSecond < worstFPS && globalFrameNum > 10) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
+            lastFrameSecCount = globalFrameNum;
+        }
+
+        glDisable(GL_STENCIL_TEST);
+        glStencilMask(0x00); // Disable stencil writes
         SDL_GL_SwapWindow(window); // Present frame
         last_time = current_time;
         globalFrameNum++;

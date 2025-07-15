@@ -24,7 +24,7 @@
 #define MAX_LIGHTS_VISIBLE_PER_CELL 32
 
 extern uint32_t cellOccupancy[]; // Stores flat array of indices for each lightSubset 131072 * 64 * 4byte = 33MB
-extern GLuint vxgiID;
+extern GLuint visibleLightsID;
 extern bool vxgiEnabled;
 
 void VXGI_Init(void);

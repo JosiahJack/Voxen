@@ -8,7 +8,7 @@
 //       being worth it for the only 2 or 3% of meshes with smoothed normals.
 const char *createLightVolume_computeShader =
     "#version 450\n"
-    "layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;\n"
+    "layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;\n"
 
     "struct Instance {\n"
     "    int modelIndex;\n"
@@ -82,6 +82,7 @@ const char *createLightVolume_computeShader =
     "    mat4 transform = instanceMatrices[instanceIdx];\n"
     "    v = (transform * vec4(v, 1.0)).xyz;\n"
     "    n = normalize(mat3(transpose(inverse(transform))) * n);\n"
+
     // Light-local space
     "    vec3 lightPos = vec3(lightPosX, lightPosY, lightPosZ);\n"
     "    vec3 localV = v - lightPos;\n"
@@ -91,6 +92,7 @@ const char *createLightVolume_computeShader =
     "    float d = dot(localV, localV);\n"
     "    uint vertexIdx = globalIdx * vertAttribs;\n"
     "    outInRange[globalIdx] = uint(d <= rangeSq);\n"
+
     // Write vertex
     "    outVertices[vertexIdx] = v.x;\n"
     "    outVertices[vertexIdx + 1] = v.y;\n"

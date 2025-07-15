@@ -11,73 +11,10 @@
 
 float spotAngTypes[8] = { 0.0f, 30.0f, 45.0f, 60.0f, 75.0f, 90.0f, 135.0f, 151.7f }; // What?  I only have 6 spot lights and half are 151.7 and other half are 135.
 
-GLuint deferredLightingShaderProgram;
-GLuint lightVolumeMeshShaderProgram;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
 
-void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer) {
-    *x = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSX]; // Index into shared flat GPU buffer
-    *y = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSY];
-    *z = lightsBuffer[lightIdx + LIGHT_DATA_OFFSET_POSZ];
-}
+void UpdateLightVolumes(void) {
 
-// Initialize lights with random positions
-void InitializeLights(void) {
-    srand(time(NULL)); // Seed random number generator
-    for (int i = 0; i < LIGHT_COUNT; i++) {
-        int base = i * LIGHT_DATA_SIZE; // Step by 12
-        lights[base + 0] = base * 0.08f; // posx
-        lights[base + 1] = base * 0.08f; // posy
-        lights[base + 2] = 0.0f; // posz
-        lights[base + 3] = 5.0f; // intensity
-        lights[base + 4] = 5.24f; // radius
-        lightsRangeSquared[i] = 5.24f * 5.24f;
-        lights[base + 5] = 0.0f; // spotAng
-        lights[base + 6] = 0.0f; // spotDirx
-        lights[base + 7] = 0.0f; // spotDiry
-        lights[base + 8] = -1.0f; // spotDirz
-        lights[base + 9] = 1.0f; // r
-        lights[base + 10] = 1.0f; // g
-        lights[base + 11] = 1.0f; // b
-        lightDirty[i] = true;
-    }
-    
-    lights[0] = 0.0f;
-    lights[1] = -1.28f;
-    lights[2] = 0.0f; // Fixed Z height
-    lights[3] = 2.0f; // Default intensity
-    lights[4] = 10.0f; // Default radius
-    lightsRangeSquared[0] = 10.0f * 10.0f;
-    lights[6] = 0.0f;
-    lights[7] = 0.0f;
-    lights[8] = -1.0f;
-    lights[9] = 1.0f;
-    lights[10] = 1.0f;
-    lights[11] = 1.0f;
-    lightDirty[0] = true;
-    
-    lights[0 + 12] = 10.24f;
-    lights[1 + 12] = 0.0f;
-    lights[2 + 12] = 0.0f; // Fixed Z height
-    lights[3 + 12] = 2.0f; // Default intensity
-    lights[4 + 12] = 10.0f; // Default radius
-    lightsRangeSquared[1] = 10.0f * 10.0f;
-    lights[6 + 12] = 0.0f;
-    lights[7 + 12] = 0.0f;
-    lights[8 + 12] = -1.0f;
-    lights[9 + 12] = 1.0f;
-    lights[10 + 12] = 0.0f;
-    lights[11 + 12] = 0.0f;
-    lightDirty[1] = true;
-}
-
-void InitLightVolumes(void) {
-//     float * lightVolumeVertices[32];
-//     for (int i=0;i<32;++i) {
-//         float x = 
-// //     lightVolumeVertices = malloc(32 * 
-//         
-//     }
 }

@@ -12,31 +12,14 @@ extern int screen_height;
 extern uint32_t drawCallCount;
 extern uint32_t vertexCount;
 extern GLuint matricesBuffer;
-extern GLuint quadVAO, quadVBO;
 extern GLuint chunkShaderProgram;
 extern GLuint lightVolumeShaderProgram;
-extern GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID;
-extern GLuint gBufferFBO;
-extern GLuint inputTexMapsID;
-
 extern GLuint imageBlitShaderProgram;
-extern GLuint quadVAO, quadVBO;
-
-// Static chunk shader locations (set on texture or model load)
+extern GLuint deferredLightingShaderProgram;
+extern GLuint lightVolumeMeshShaderProgram;
 extern GLint textureCountLoc_chunk;
 
-// Static deferred shader locations (set on model load)
-extern GLint screenWidthLoc_deferred;
-extern GLint screenHeightLoc_deferred;
-extern GLint shadowsEnabledLoc_deferred;
-extern bool shadowsEnabled;
-
-void SetupGBuffer(void);
-void SetupQuad(void);
-int ClearFrameBuffers(void);
 void CacheUniformLocationsForShaders(void);
-int RenderStaticMeshes(void);
-void render_debug_text(float x, float y, const char *text, SDL_Color color);
-int RenderUI(double deltaTime);
+// void render_debug_text(float x, float y, const char *text, SDL_Color color);
 
 #endif // VOXEN_RENDER_H

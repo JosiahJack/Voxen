@@ -37,11 +37,8 @@ extern float spotAngTypes[];
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
 extern bool lightDirty[LIGHT_COUNT];
-extern GLuint deferredLightingShaderProgram;
-extern GLuint lightVolumeMeshShaderProgram;
 
 void GetLightPos(uint32_t lightIdx, float * x, float * y, float * z, float * lightsBuffer);
-void InitializeLights(void);
-void InitLightVolumes(void);
+void UpdateLightVolumes(void);
 
 #endif // VOXEN_LIGHTS_H

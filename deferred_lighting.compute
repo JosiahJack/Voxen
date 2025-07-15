@@ -52,7 +52,7 @@ const char *deferredLighting_computeShader =
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
     "    uint lightIdx = 0;\n"
     "    for (int i = 0; i < 32; i++) {\n"
-    "        uint lightIdx = i * 12;\n"
+    "        uint lightIdx = i * 12;\n" // LIGHT_DATA_SIZE
     "        float intensity = lightInPVS[lightIdx + 3];\n"
     "        if (intensity < 0.015) continue;\n"
 

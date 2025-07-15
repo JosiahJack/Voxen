@@ -5,7 +5,6 @@
 #include "text.glsl"
 #include "chunk.glsl"
 #include "imageblit.glsl"
-#include "lights.h"
 #include "deferred_lighting.compute"
 #include "lightvolume.compute"
 #include "lightvolume.glsl"
