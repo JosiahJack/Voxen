@@ -6,8 +6,7 @@
 #include "chunk.glsl"
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
-#include "lightvolume.compute"
-#include "lightvolume.glsl"
+// #include "lightvolume.compute"
 #include "bluenoise64.cginc"
 #include "debug.h"
 
@@ -63,8 +62,8 @@ int CompileShaders(void) {
     lightVolumeShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Light Volume Shader Program");    if (!lightVolumeShaderProgram) { return 1; }
     
     // Light Volume Procedural Mesh Generation Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, createLightVolume_computeShader, "Light Volume Mesh Compute Shader"); if (!computeShader) { return 1; }
-    lightVolumeMeshShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Light Volume Mesh Shader Program");        if (!lightVolumeMeshShaderProgram) { return 1; }
+//     computeShader = CompileShader(GL_COMPUTE_SHADER, createLightVolume_computeShader, "Light Volume Mesh Compute Shader"); if (!computeShader) { return 1; }
+//     lightVolumeMeshShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Light Volume Mesh Shader Program");        if (!lightVolumeMeshShaderProgram) { return 1; }
     
     // Text Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }

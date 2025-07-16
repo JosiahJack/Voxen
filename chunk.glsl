@@ -38,6 +38,44 @@ const char *vertexShaderSource =
     "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
     "}\n";
 
+const char *lightVolumeVertexShaderSource =
+    "#version 450 core\n"
+    "\n"
+    "layout(location = 0) in vec3 aPos;\n"
+    "layout(location = 1) in vec3 aNormal;\n"
+    "layout(location = 2) in vec2 aTexCoord;\n"
+    "layout(location = 3) in float aTexIndex;\n"
+    "layout(location = 4) in float aGlowIndex;\n"
+    "layout(location = 5) in float aSpecIndex;\n"
+    "layout(location = 6) in float aNormalIndex;\n"
+    "layout(location = 7) in float aModelIndex;\n"
+    "layout(location = 8) in float aInstanceIndex;\n"
+    "uniform mat4 matrix;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
+    "out vec3 FragPos;\n"
+    "out vec3 Normal;\n"
+    "out vec2 TexCoord;\n"
+    "flat out int TexIndex;\n"
+    "flat out int GlowIndex;\n"
+    "flat out int SpecIndex;\n"
+    "flat out int NormalIndex;\n"
+    "flat out int InstanceIndex;\n"
+    "flat out int ModelIndex;\n"
+    "\n"
+    "void main() {\n"
+    "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
+    "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"
+    "    TexCoord = floatBitsToInt(aTexCoord);\n" // Pass along data to each vertex, shared for whole tri's pixels.
+    "    TexIndex = floatBitsToInt(aTexIndex);\n"
+    "    GlowIndex = floatBitsToInt(aGlowIndex);\n"
+    "    SpecIndex = floatBitsToInt(aSpecIndex);\n"
+    "    NormalIndex = floatBitsToInt(aNormalIndex);\n"
+    "    ModelIndex = floatBitsToInt(aModelIndex);\n"
+    "    InstanceIndex = floatBitsToInt(aInstanceIndex);\n"
+    "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
+    "}\n";
+
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
     "\n"

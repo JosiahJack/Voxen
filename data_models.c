@@ -278,12 +278,12 @@ int LoadGeometry(void) {
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
     glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    glVertexAttribIFormat(3, 1, GL_INT, 8 * sizeof(float)); // Tex Index (int)
-    glVertexAttribIFormat(4, 1, GL_INT, 9 * sizeof(float)); // Glow Index (int)
-    glVertexAttribIFormat(5, 1, GL_INT, 10 * sizeof(float)); // Spec Index (int)
-    glVertexAttribIFormat(6, 1, GL_INT, 11 * sizeof(float)); // Normal Index (int)
-    glVertexAttribIFormat(7, 1, GL_INT, 12 * sizeof(float)); // Model Index (int)
-    glVertexAttribIFormat(8, 1, GL_INT, 13 * sizeof(float)); // Instance Index (int)
+    glVertexAttribFormat(3, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float)); // Tex Index (int)
+    glVertexAttribFormat(4, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float)); // Glow Index (int)
+    glVertexAttribFormat(5, 1, GL_FLOAT, GL_FALSE, 10 * sizeof(float)); // Spec Index (int)
+    glVertexAttribFormat(6, 1, GL_FLOAT, GL_FALSE, 11 * sizeof(float)); // Normal Index (int)
+    glVertexAttribFormat(7, 1, GL_FLOAT, GL_FALSE, 12 * sizeof(float)); // Model Index (int)
+    glVertexAttribFormat(8, 1, GL_FLOAT, GL_FALSE, 13 * sizeof(float)); // Instance Index (int)
     for (int i = 0; i < 9; i++) {
         glVertexAttribBinding(i, 0);
         glEnableVertexAttribArray(i);

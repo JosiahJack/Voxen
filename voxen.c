@@ -93,11 +93,10 @@ GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnable
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
-GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
+// GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
 GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
 GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1,
-      matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, textureCount_lightvol = -1,
-      debugView_lightvol = -1; // uniform locations
+      matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1; // uniform locations
 GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
 float * lightVolumeVertices[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
@@ -209,15 +208,15 @@ void CacheUniformLocationsForShaders(void) {
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     
-    lightPosXLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosX");
-    lightPosYLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosY");
-    lightPosZLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosZ");
-    lightRangeLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightRange");
-    matrix_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "matrix");
-    view_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "view");
-    projection_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "projection");
-    textureCount_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "textureCount");
-    debugView_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "debugView");
+//     lightPosXLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosX");
+//     lightPosYLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosY");
+//     lightPosZLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosZ");
+//     lightRangeLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightRange");
+    
+    matrix_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "matrix");
+    view_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "view");
+    projection_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "projection");
+    debugView_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "debugView");
 }
 
 void UpdateInstanceMatrix(int i) {
@@ -250,6 +249,148 @@ void UpdateInstanceMatrix(int i) {
     mat[12] = instances[i].posx; mat[13] = instances[i].posy; mat[14] = instances[i].posz; mat[15] = 1.0f;
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
+}
+
+void UpdateLightVolumes(void) {
+    DualLog("Updating light volume procedural meshes...\n");
+    for (uint32_t i = 0; i < MAX_VISIBLE_LIGHTS; ++i) {
+        if (lightVolumeVertices[i]) {
+            DualLog("Freeing lightVolumeVertices[%d] at %p\n", i, lightVolumeVertices[i]);
+            free(lightVolumeVertices[i]);
+            lightVolumeVertices[i] = NULL;
+        }
+    }
+
+    memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(GLuint));
+    glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs);
+    CHECK_GL_ERROR();    
+    size_t sizeOfTempVertices = largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+    float *tempVerts = (float *)malloc(sizeOfTempVertices);
+    if (!tempVerts) { DualLogError("Failed to allocate tempVerts buffer\n"); return; }
+    
+//     DualLog("Allocated tempVerts: %zu bytes (largestVertCount=%u, VERTEX_ATTRIBUTES_COUNT=%u)\n", sizeOfTempVertices, largestVertCount, VERTEX_ATTRIBUTES_COUNT);
+    for (uint32_t lightIdx = 0; lightIdx < MAX_VISIBLE_LIGHTS; ++lightIdx) lightVertexCounts[lightIdx] = 0;
+//     uint64_t iterCounter1 = 0, iterCounter2 = 0, iterCounter3 = 0;
+    double start_time = get_time();
+    for (uint32_t lightIdx = 0; lightIdx < 1; ++lightIdx) {
+        uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
+        float lit_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float lit_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float lit_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        float sqrRange = range * range;
+        uint32_t headVertIdx = 0;
+//         iterCounter1++;
+        for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
+            if (instanceIdx == 39) continue; // Skip test light. TODO: Remove once done with test light!
+            
+            int32_t modelIdx = instances[instanceIdx].modelIndex;
+            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
+
+            uint32_t vertCount = modelVertexCounts[modelIdx];
+            if (!vertexDataArrays[modelIdx]) { DualLogError("vertexDataArrays[%d] is NULL\n", modelIdx); continue; }
+//             iterCounter2++;
+
+            // Match UpdateInstanceMatrix exactly
+            float x = instances[instanceIdx].rotx, y = instances[instanceIdx].roty, z = instances[instanceIdx].rotz, w = instances[instanceIdx].rotw;
+            float rot[16];
+            mat4_identity(rot);
+            rot[0] = 1.0f - 2.0f * (y*y + z*z);
+            rot[1] = 2.0f * (x*y - w*z);
+            rot[2] = 2.0f * (x*z + w*y);
+            rot[4] = 2.0f * (x*y + w*z);
+            rot[5] = 1.0f - 2.0f * (x*x + z*z);
+            rot[6] = 2.0f * (y*z - w*x);
+            rot[8] = 2.0f * (x*z - w*y);
+            rot[9] = 2.0f * (y*z + w*x);
+            rot[10] = 1.0f - 2.0f * (x*x + y*y);
+            float sx = instances[instanceIdx].sclx > 0.0f ? instances[instanceIdx].sclx : 1.0f;
+            float sy = instances[instanceIdx].scly > 0.0f ? instances[instanceIdx].scly : 1.0f;
+            float sz = instances[instanceIdx].sclz > 0.0f ? instances[instanceIdx].sclz : 1.0f;
+            float transform[16];
+            transform[0]  = rot[0] * sx; transform[1]  = rot[1] * sy; transform[2]  = rot[2] * sz; transform[3]  = 0.0f;
+            transform[4]  = rot[4] * sx; transform[5]  = rot[5] * sy; transform[6]  = rot[6] * sz; transform[7]  = 0.0f;
+            transform[8]  = rot[8] * sx; transform[9]  = rot[9] * sy; transform[10] = rot[10] * sz; transform[11] = 0.0f;
+            transform[12] = instances[instanceIdx].posx;
+            transform[13] = instances[instanceIdx].posy;
+            transform[14] = instances[instanceIdx].posz;
+            transform[15] = 1.0f;
+            for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < maxLightVolumeMeshVerts - 2); vertIdx += 3) {
+                uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
+                float *model = vertexDataArrays[modelIdx];
+
+                float world_pos[3][3], model_pos[3][3];
+                bool anyInRange = false;
+                float min_x = 1e9, max_x = -1e9, min_y = 1e9, max_y = -1e9, min_z = 1e9, max_z = -1e9;
+                for (int i = 0; i < 3; ++i) {
+                    model_pos[i][0] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 0];
+                    model_pos[i][1] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 1];
+                    model_pos[i][2] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 2];
+                    mat4_transform_vec3(transform, model_pos[i][0], model_pos[i][1], model_pos[i][2], world_pos[i]);
+                    if (world_pos[i][0] < min_x) min_x = world_pos[i][0];
+                    if (world_pos[i][0] > max_x) max_x = world_pos[i][0];
+                    if (world_pos[i][1] < min_y) min_y = world_pos[i][1];
+                    if (world_pos[i][1] > max_y) max_y = world_pos[i][1];
+                    if (world_pos[i][2] < min_z) min_z = world_pos[i][2];
+                    if (world_pos[i][2] > max_z) max_z = world_pos[i][2];
+                    float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[i][0], world_pos[i][1], world_pos[i][2]);
+                    if (dist < sqrRange) anyInRange = true; // Can't break early, breaks tris!  Need to transform all 3 first!
+                }
+
+                if (anyInRange) {
+                    if (headVertIdx + 3 > largestVertCount) { DualLogError("headVertIdx (%u) exceeds largestVertCount (%u)\n", headVertIdx + 3, largestVertCount); break; }
+                    
+                    for (int i = 0; i < 3; ++i) {
+                        uint32_t workingIdx = (headVertIdx + i) * VERTEX_ATTRIBUTES_COUNT;
+                        tempVerts[workingIdx + 0] = world_pos[i][0];
+                        tempVerts[workingIdx + 1] = world_pos[i][1];
+                        tempVerts[workingIdx + 2] = world_pos[i][2];
+                        tempVerts[workingIdx + 3] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 3];
+                        tempVerts[workingIdx + 4] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 4];
+                        tempVerts[workingIdx + 5] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 5];
+                        tempVerts[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
+                        tempVerts[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
+                        memcpy(&tempVerts[workingIdx + 8],  &instances[instanceIdx].texIndex, sizeof(float)); // Copy exact bits
+                        memcpy(&tempVerts[workingIdx + 9],  &instances[instanceIdx].glowIndex, sizeof(float));
+                        memcpy(&tempVerts[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
+                        memcpy(&tempVerts[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
+                        memcpy(&tempVerts[workingIdx + 12], &modelIdx, sizeof(float));
+                        memcpy(&tempVerts[workingIdx + 13], &instanceIdx, sizeof(float));
+                    }
+
+                    headVertIdx += 3;
+                }
+//                 iterCounter3++;
+            }
+            lightVertexCounts[lightIdx] = headVertIdx;
+        }
+
+        if (lightVertexCounts[lightIdx] > 0) {
+            float *persistentVerts = (float *)malloc(lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            if (!persistentVerts) { DualLogError("Failed to allocate persistentVerts for light %d\n", lightIdx); continue; }
+            memcpy(persistentVerts, tempVerts, lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            lightVolumeVertices[lightIdx] = persistentVerts;
+//             DualLog("Allocated lightVolumeVertices[%d] at %p, vertices: %u\n",lightIdx, persistentVerts, lightVertexCounts[lightIdx]);
+        } else {
+            lightVolumeVertices[lightIdx] = NULL;
+            DualLog("No vertices for light %d\n", lightIdx);
+        }
+
+        if (lightVBOs[lightIdx] == 0) { DualLogError("Skipping lightVBOs[%d] due to invalid buffer ID\n", lightIdx); continue; }
+        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
+        CHECK_GL_ERROR();
+
+        size_t bufferSize = lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+        if (lightVertexCounts[lightIdx] == 0 || bufferSize > sizeOfTempVertices) { DualLogError("Invalid buffer size for lightVBOs[%d]: %zu (vertices=%u)\n", lightIdx, bufferSize, lightVertexCounts[lightIdx]); continue; }
+        glBufferData(GL_ARRAY_BUFFER, bufferSize, tempVerts, GL_DYNAMIC_DRAW);
+        CHECK_GL_ERROR();
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    free(tempVerts);
+//     DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n", iterCounter1, iterCounter2, iterCounter3);
+    double end_time = get_time();
+    DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
 }
 // ============================================================================
 
@@ -286,21 +427,18 @@ int InitializeEnvironment(void) {
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
     systemInitialized[SYS_WIN] = true;
-    DebugRAM("window init"); 
+    DebugRAM("window init");
     malloc_trim(0);
 
     gl_context = SDL_GL_CreateContext(window);
     if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return SYS_CTX + 1; }    
     systemInitialized[SYS_CTX] = true;
-    DebugRAM("GL init"); 
+    DebugRAM("GL init");
     malloc_trim(0);
 
     SDL_GL_MakeCurrent(window, gl_context);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_CTX + 1; }
-    DebugRAM("GLEW init"); 
-    malloc_trim(0);
-    CHECK_GL_ERROR();
 
     // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
@@ -406,9 +544,7 @@ int InitializeEnvironment(void) {
     lights[11 + 12] = 0.0f;
     lightDirty[1] = true;
     DebugRAM("init lights"); 
-    
-    DebugRAM("setup gbuffer start");
-    
+
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, "Unlit Raster Albedo Colors");
     CHECK_GL_ERROR();
@@ -453,23 +589,13 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    
     CHECK_GL_ERROR();
+    malloc_trim(0);
     DebugRAM("setup gbuffer end");
     Input_Init();
-    DebugRAM("input init"); 
-    
-    InitializeNetworking();
-    DebugRAM("network init"); 
-    
-    systemInitialized[SYS_NET] = true;
-    malloc_trim(0);
-
+    systemInitialized[SYS_NET] = InitializeNetworking() == 0;
     InitializeAudio();
     DebugRAM("audio init"); 
     systemInitialized[SYS_AUD] = true;
-    malloc_trim(0);
-
-    //play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
-    //play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -508,7 +634,7 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
-    if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
+//     if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
@@ -520,176 +646,6 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (systemInitialized[SYS_SDL]) SDL_Quit();
     if (console_log_file) { fclose(console_log_file); console_log_file = NULL; }
     return status;
-}
-
-void ClearGLErrors(void) {
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR) {
-        DualLogError("Cleared OpenGL error: %d\n", error);
-    }
-}
-
-void UpdateLightVolumes(void) {
-    DualLog("Updating light volume procedural meshes...\n");
-    if (SDL_GL_GetCurrentContext() != gl_context) {
-        DualLogError("No valid OpenGL context in UpdateLightVolumes\n");
-        return;
-    }
-    ClearGLErrors();
-
-    if (MAX_VISIBLE_LIGHTS <= 0) {
-        DualLogError("Invalid MAX_VISIBLE_LIGHTS: %d\n", MAX_VISIBLE_LIGHTS);
-        return;
-    }
-
-    // Free previous lightVolumeVertices
-    for (uint32_t i = 0; i < MAX_VISIBLE_LIGHTS; ++i) {
-        if (lightVolumeVertices[i]) {
-            DualLog("Freeing lightVolumeVertices[%d] at %p\n", i, lightVolumeVertices[i]);
-            free(lightVolumeVertices[i]);
-            lightVolumeVertices[i] = NULL;
-        }
-    }
-
-    memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(GLuint));
-    glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs);
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) {
-        DualLogError("glGenBuffers failed for lightVBOs with error: %d\n", error);
-        return;
-    }
-
-    if (largestVertCount <= 0) {
-        DualLogError("Invalid largestVertCount (%u)\n", largestVertCount);
-        return;
-    }
-    const uint32_t NEW_VERTEX_ATTRIBUTES_COUNT = 9; // pos:3, normal:3, texcoord:2, texIndex:1, glowIndex:1, specIndex:1, normalIndex:1, modelIndex:1, instanceIndex:1
-    size_t sizeOfTempVertices = largestVertCount * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-    float *tempVerts = (float *)malloc(sizeOfTempVertices);
-    if (!tempVerts) {
-        DualLogError("Failed to allocate tempVerts buffer\n");
-        return;
-    }
-    DualLog("Allocated tempVerts: %zu bytes (largestVertCount=%u, VERTEX_ATTRIBUTES_COUNT=%u)\n",
-            sizeOfTempVertices, largestVertCount, NEW_VERTEX_ATTRIBUTES_COUNT);
-
-    for (uint32_t lightIdx = 0; lightIdx < MAX_VISIBLE_LIGHTS; ++lightIdx) {
-        lightVertexCounts[lightIdx] = 0;
-    }
-
-    DualLog("Iterating over and getting light volume mesh vertices...\n");
-    uint64_t iterCounter1 = 0, iterCounter2 = 0, iterCounter3 = 0;
-    double start_time = get_time();
-
-    for (uint32_t lightIdx = 0; lightIdx < 1; ++lightIdx) {
-        memset(tempVerts, 0, sizeOfTempVertices);
-        uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
-        float lit_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float lit_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float lit_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float sqrRange = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        sqrRange *= sqrRange;
-        uint32_t headVertIdx = 0;
-        iterCounter1++;
-
-        for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
-            int32_t modelIdx = instances[instanceIdx].modelIndex;
-            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
-
-            uint32_t vertCount = modelVertexCounts[modelIdx];
-            if (vertCount <= 0) {
-                DualLog("Skipping model %d with zero vertices\n", modelIdx);
-                continue;
-            }
-            if (!vertexDataArrays[modelIdx]) {
-                DualLogError("vertexDataArrays[%d] is NULL\n", modelIdx);
-                continue;
-            }
-            iterCounter2++;
-
-            float transform[16];
-            mat4_compose(transform,
-                         instances[instanceIdx].posx, instances[instanceIdx].posy, instances[instanceIdx].posz,
-                         instances[instanceIdx].rotx, instances[instanceIdx].roty, instances[instanceIdx].rotz, instances[instanceIdx].rotw,
-                         instances[instanceIdx].sclx, instances[instanceIdx].scly, instances[instanceIdx].sclz);
-
-            for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < maxLightVolumeMeshVerts); ++vertIdx) {
-                uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
-                float *model = vertexDataArrays[modelIdx];
-                float vert_x = model[vertexIdx + 0];
-                float vert_y = model[vertexIdx + 1];
-                float vert_z = model[vertexIdx + 2];
-
-                float world_pos[3];
-                mat4_transform_vec3(transform, vert_x, vert_y, vert_z, world_pos);
-                float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[0], world_pos[1], world_pos[2]);
-                if (dist < sqrRange) {
-                    if (headVertIdx >= largestVertCount) { DualLogError("headVertIdx (%u) exceeds largestVertCount (%u)\n", headVertIdx, largestVertCount); break; }
-                    
-                    uint32_t workingIdx = (headVertIdx * NEW_VERTEX_ATTRIBUTES_COUNT);
-                    tempVerts[workingIdx + 0] = world_pos[0];
-                    tempVerts[workingIdx + 1] = world_pos[1];
-                    tempVerts[workingIdx + 2] = world_pos[2];
-                    DualLog("Adding vertex %d to light %d with position x %f, y %f, z %f\n",headVertIdx,lightIdx,tempVerts[workingIdx + 0],tempVerts[workingIdx + 1],tempVerts[workingIdx + 2]);
-                    tempVerts[workingIdx + 3] = model[vertexIdx + 3]; // Normal X
-                    tempVerts[workingIdx + 4] = model[vertexIdx + 4]; // Normal Y
-                    tempVerts[workingIdx + 5] = model[vertexIdx + 5]; // Normal Z
-                    tempVerts[workingIdx + 6] = model[vertexIdx + 6]; // Texcoord U
-                    tempVerts[workingIdx + 7] = model[vertexIdx + 7]; // Texcoord V
-                    tempVerts[workingIdx + 8] = (float)instances[instanceIdx].texIndex;
-                    tempVerts[workingIdx + 9] = (float)instances[instanceIdx].glowIndex;
-                    tempVerts[workingIdx + 10] = (float)instances[instanceIdx].specIndex;
-                    tempVerts[workingIdx + 11] = (float)instances[instanceIdx].normIndex;
-                    tempVerts[workingIdx + 12] = (float)modelIdx;
-                    tempVerts[workingIdx + 13] = (float)instanceIdx;
-                    headVertIdx++;
-                }
-                iterCounter3++;
-            }
-            lightVertexCounts[lightIdx] = headVertIdx;
-        }
-
-        DualLog("Light %d position: (%.2f, %.2f, %.2f)\n", lightIdx, lit_x, lit_y, lit_z);
-        if (headVertIdx > 0) {
-            DualLog("Light %d vertex 0: (%.2f, %.2f, %.2f)\n",
-                    lightIdx, tempVerts[0], tempVerts[1], tempVerts[2]);
-        }
-
-        if (lightVertexCounts[lightIdx] > 0) {
-            float *persistentVerts = (float *)malloc(lightVertexCounts[lightIdx] * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            if (!persistentVerts) {
-                DualLogError("Failed to allocate persistentVerts for light %d\n", lightIdx);
-                continue;
-            }
-            memcpy(persistentVerts, tempVerts, lightVertexCounts[lightIdx] * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            lightVolumeVertices[lightIdx] = persistentVerts;
-            DualLog("Allocated lightVolumeVertices[%d] at %p, vertices: %u\n",
-                    lightIdx, persistentVerts, lightVertexCounts[lightIdx]);
-        } else {
-            lightVolumeVertices[lightIdx] = NULL;
-            DualLog("No vertices for light %d\n", lightIdx);
-        }
-
-        if (lightVBOs[lightIdx] == 0) { DualLogError("Skipping lightVBOs[%d] due to invalid buffer ID\n", lightIdx); continue; }
-        
-        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
-        error = glGetError();
-        if (error != GL_NO_ERROR) { DualLogError("glBindBuffer failed for lightVBOs[%d] with error: %d\n", lightIdx, error); continue; }
-
-        size_t bufferSize = lightVertexCounts[lightIdx] * NEW_VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        if (lightVertexCounts[lightIdx] == 0 || bufferSize > sizeOfTempVertices) { DualLogError("Invalid buffer size for lightVBOs[%d]: %zu (vertices=%u)\n",lightIdx,bufferSize,lightVertexCounts[lightIdx]); continue; }
-            
-        glBufferData(GL_ARRAY_BUFFER, bufferSize, tempVerts, GL_DYNAMIC_DRAW);
-        error = glGetError();
-        if (error != GL_NO_ERROR) { DualLogError("glBufferData failed for lightVBOs[%d] with error: %d\n", lightIdx, error); continue; }
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    free(tempVerts);
-    ClearGLErrors();
-    DualLog("Light volume mesh generation iteration counter 1: %d, 2: %d, 3: %d\n",iterCounter1,iterCounter2,iterCounter3);
-    double end_time = get_time();
-    DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
 }
 
 // All core engine operations run through the EventExecute as an Event processed
@@ -999,19 +955,23 @@ int main(int argc, char* argv[]) {
         
         // 5. Render Light Volume Meshes
         if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
-//         glUseProgram(lightVolumeShaderProgram); // Comment out to keep using chunk shader
+        glUseProgram(lightVolumeShaderProgram); // Comment out to keep using chunk shader
         CHECK_GL_ERROR();
+//         glUniform1i(texIndexLoc_chunk, 1223);
+//         glUniform1i(glowIndexLoc_chunk, 41);
         float identity[16];
         mat4_identity(identity);
         glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
+//         glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, identity);
         CHECK_GL_ERROR();
         glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
+//         glUniformMatrix4fv(viewLoc_chunk, 1, GL_FALSE, view);
         CHECK_GL_ERROR();
         glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
-        CHECK_GL_ERROR();
-        glUniform1i(textureCount_lightvol, textureCount);
+//         glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
         CHECK_GL_ERROR();
         glUniform1i(debugView_lightvol, debugView);
+//         glUniform1i(debugViewLoc_chunk, debugView);
         CHECK_GL_ERROR();
 //         glDisable(GL_CULL_FACE); // Disable backface culling
         CHECK_GL_ERROR();
@@ -1172,140 +1132,3 @@ int main(int argc, char* argv[]) {
     // Cleanup
     return ExitCleanup(exitCode);
 }
-
-// System Architecture
-// ============================================================================
-// Order of Ops:
-// Initializes various core systems (Unified Event Queue, Client-Server, OpenGL+Window)
-// Loads data resources (textures, models, etc.)
-// Loads scripting VM
-// Parses all game/mod scripts
-// Initializes data handling systems and parsers using all above data
-// Level Load using gamedata definition to pick starting level
-// Kicks off separate CPU thread systems: VXGI, Physics Server? /*TODO*/
-// Starts game loop:
-//   Polls SDL2 input and enqueues input Events
-//   Processes input and sets key states, mouselook
-//   Iterates over all queued Server events (Physics, Game Logic scripts (VM))
-//   Client-side rendering
-// Exit with cleanup, conditionally cleaning up resources based on how we exited and when
-//
-// ----------------------------------------------------------------------------
-// Systems:
-// Unified Event Queue: All Server actions occur as events processed by the
-//                      event queue that runs on just the Server's main thread.
-//                      Journaling as it goes for debugging, doubles as a log
-//                      feature and supports playback of logs similar to Quake
-//                      demo files and uses same .dem extension but with a
-//                      different custom format.
-//
-// Client-Server Architecture: All game sessions are coop sessions using Listen
-//                             Server; singleplayer is local Listen Server with
-//                             itself as only client.  Singleplayer is the same
-//                             as starting a coop game before anyone has joined.
-//                             Only 2 player coop is currently planned (4 maybe).
-//                             Server handles all game functionality except
-//                             loading in resources, keeping track of static
-//                             level geometry and structures needed for rendering,
-//                             and rendering are all Client-side.
-// Data Resource Loading: All game assets are loaded as different types of data
-//                        via first loading a definition text file from ./Data
-//                        then populating a list from which the particular
-//                        asset type is then loaded into fixed flat buffers for
-//                        use either in CPU or GPU shaders.
-//
-//                        e.g. Textures load ./Data/textures.txt definition file
-//                        then load all specified .png images from that text
-//                        file out of the file path specified in the definition
-//                        file... ideally ./Textues folder.  Images are loaded
-//                        into a fixed buffer at the index specified by the
-//                        textures.txt definition file.  These indices are used
-//                        by all other systems that use textures (e.g. instaces).
-// Entity - Instance System: All objects/items in the game are Instances that
-//                           have an associated Entity type.  No instances exist
-//                           without a type.  Some Entity types specified by the
-//                           entities.txt file may be unused by a game/mod.
-//                           Entity definition is loaded first to populate the
-//                           types list.  The Instances are populated after as
-//                           a product of the level load system.
-// Scripting Virtual Machine (VM): Game/mod specific logic are located in
-//                                 scripts in ./Scripts folder.  Scripts are raw
-//                                 and parsed on load into the script VM engine
-//                                 that runs the logic using predefined hooks.
-//                                 Unique valid_keys list made per script for
-//                                 all variables which are all always saved in
-//                                 savegames or to level definition files.
-//
-//                                 Certain function names are reserved for
-//                                 specific functionality.  "update()" in a
-//                                 script will be called once per frame from a
-//                                 single threaded loop over all instances that
-//                                 have entity type defined that has scripts that
-//                                 have an "update()" hook in them.  "init()" is
-//                                 ran for the VM's first cycle to initialize
-//                                 variables or perform anything needed at game
-//                                 start by the game/mod scripts.
-// Level Load System: Levels are specified in sets of files for each level data
-//                    type: geometry, dynamic objects, lights.  Geometry are any
-//                    immovable static mesh based rendered objects which may be
-//                    walls, shelves, floors, ceilings, crates, windows, etc.
-//                    Dynamic objects are anything that can move or change state
-//                    and include even hidden game state tracking entity instances
-//                    because they can change their state.  Geometry is guaranteed
-//                    static after level load.  Lights are the 3rd system loaded
-//                    for a level and are a list of defined light sources with
-//                    their brightness, color, and other values (e.g. spot angle).
-//                    The gamedata definition file specifies the first level
-//                    index to load.  All level definition files are specific
-//                    and use with a number for the level index.
-//                    E.g. level3_geometery.txt, level3_lights.txt
-//                    Levels use same specification as savegames, in plain text.
-// Savegame System: All script variables are saved.  All instance states are
-//                  saved.  All physics states are saved, referenced by instance
-//                  index.  No systems rely on pointers and are indexed array
-//                  based to ensure all links are preserved in saves.  All save
-//                  data is in plaintext format using pipe delimiter | to split
-//                  each key:value pair which are colon separated.  The key is
-//                  given by the variable name, variable names pulled from the
-//                  scripts on the instance based on its entity type.
-// VXGI Lighting: Voxen wouldn't be called Voxen without Voxels.  The world is
-//                overlayed with a sparse voxel representation for storing and
-//                updating lighting information such as Global Illumination (GI)
-//                and Shadows which include Ambient Occlusion.  This is
-//                calculated on a separate thread then passed to GPU for actually
-//                applying lighting/shadows.
-// Screen Space Reflections: All specular surfaces get reflections.  There are
-//                           no specular highlight fakeries to be found here.
-//                           As this is "screenspace" it can only reflect what
-//                           the player can see elsewhere in their screen. This
-//                           may be augmented with the, albeit softer and
-//                           blurrier, voxel results.  Also called SSR.
-// Rendering System: Rendering uses a multipass system with deferred lighting.
-//                   Pass 1: Unlit Rasterization - gets albedo, normals, depth
-//                                                 world position, indices.
-//                                                 This is standard vert+frag.
-//                   Pass 2: Deferred Lighting - compute shader that determines
-//                                               many lights' contributions and
-//                                               combines with VXGI results.
-//                   Pass 3: Screen Space Reflections (SSR): Compute shader full
-//                                                           screen effect that
-//                                                           is subtle.
-//                   Pass 4: Final Blit - Takes the results of the compute
-//                                        shaders and renders image as full
-//                                        screen quad.
-//                   Rendering leverages static buffers for minimal CPU->GPU
-//                   data transfers and maximal performance with minimal state
-//                   changes.
-// Texturing System: Leveraging a unified single buffer for all texture colors,
-//                   palettized by texture, allows for completely arbitrary
-//                   unlimited texture sizes (up to VRAM) in any size with no
-//                   rebinding overhead, only passing to GPU once ever.  All
-//                   texture data is accessible GPU-side and not stored on CPU.
-//                   ALL.  Normalmaps, glow maps, specular maps, UI.  ALL.
-//                   One flat buffer of color, One flat buffer of palette
-//                   offsets, one flat buffer of palette indices, one flat
-//                   buffer of texture palette indices offsets.
-// Mesh System: Models are loaded into one unified flat vertex buffer with
-//              minimal data, just position, normal, and uv.  Tangents and
-//              bitangents are computed on the fly during unlit raster stage TODO!
-//
