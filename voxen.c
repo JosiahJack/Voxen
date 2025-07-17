@@ -103,6 +103,7 @@ GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_light
 GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
+bool firstLightVolumeGen = true;
 // ----------------------------------------------------------------------------
 
 void DualLog(const char *fmt, ...) {
@@ -254,7 +255,7 @@ void UpdateInstanceMatrix(int i) {
 }
 
 void UpdateLightVolumes(void) {
-    double start_time = get_time();
+//     double start_time = get_time();
     for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
         if (!lightDirty[lightIdx]) continue; // Skip lights that aren't dirty
 
@@ -327,8 +328,8 @@ void UpdateLightVolumes(void) {
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    double end_time = get_time();
-    DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
+//     double end_time = get_time();
+//     DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
 }
 // ============================================================================
 
@@ -824,7 +825,7 @@ int main(int argc, char* argv[]) {
         for (int i=numLightsFound;i<MAX_VISIBLE_LIGHTS;++i) {
             lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
         }
-
+        
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
         CHECK_GL_ERROR();
         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
@@ -833,6 +834,11 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         CHECK_GL_ERROR();
+        
+        if (firstLightVolumeGen && globalFrameNum > 2) {
+            for (int i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
+            firstLightVolumeGen = false;
+        }
         
         UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
         
