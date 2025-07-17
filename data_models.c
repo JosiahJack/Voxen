@@ -20,7 +20,6 @@ DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 #define NUM_MODEL_KEYS 1
 uint32_t modelVertexCounts[MODEL_COUNT];
-GLuint vao_chunk; // Vertex Array Object
 GLuint vbos[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
 GLuint modelBoundsID;
@@ -266,31 +265,7 @@ int LoadGeometry(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-
     DebugRAM("after copying to VBO Master Table");
-      
-    // VAO for Generic Chunk Rendering
-    glGenVertexArrays(1, &vao_chunk);
-    CHECK_GL_ERROR();
-    glBindVertexArray(vao_chunk);
-    CHECK_GL_ERROR();
-    
-    glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
-    glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    glVertexAttribFormat(3, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float)); // Tex Index (int)
-    glVertexAttribFormat(4, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float)); // Glow Index (int)
-    glVertexAttribFormat(5, 1, GL_FLOAT, GL_FALSE, 10 * sizeof(float)); // Spec Index (int)
-    glVertexAttribFormat(6, 1, GL_FLOAT, GL_FALSE, 11 * sizeof(float)); // Normal Index (int)
-    glVertexAttribFormat(7, 1, GL_FLOAT, GL_FALSE, 12 * sizeof(float)); // Model Index (int)
-    glVertexAttribFormat(8, 1, GL_FLOAT, GL_FALSE, 13 * sizeof(float)); // Instance Index (int)
-    for (int i = 0; i < 9; i++) {
-        glVertexAttribBinding(i, 0);
-        glEnableVertexAttribArray(i);
-    }
-
-    glBindVertexArray(0);
-    DebugRAM("after vao chunk bind");
 
     // Pass Model Type Bounds to GPU
     glGenBuffers(1, &modelBoundsID);
@@ -301,10 +276,7 @@ int LoadGeometry(void) {
     CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelBoundsID);
     CHECK_GL_ERROR();
-    DebugRAM("after model bounds bind");
-    
     malloc_trim(0);
-
     DebugRAM("after loading all models");
     double end_time = get_time();
     DualLog("Load Models took %f seconds\n", end_time - start_time);

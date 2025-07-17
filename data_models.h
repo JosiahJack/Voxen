@@ -20,7 +20,6 @@ extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint modelBoundsID;
 extern uint32_t totalVertexCount;
-extern GLuint vao_chunk;
 extern GLuint vbos[MODEL_COUNT];
 extern float * vertexDataArrays[MODEL_COUNT];
 extern GLuint vboMasterTable;

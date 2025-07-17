@@ -5,7 +5,7 @@
 #include <GL/glew.h>
 #include <stdbool.h>
 #include <stdatomic.h>
-#include "lights.h"
+#include "render.h"
 
 #define WORLDCELL_X_MAX 64
 #define WORLDCELL_Y_MAX 64

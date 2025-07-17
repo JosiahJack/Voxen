@@ -1,19 +1,23 @@
-#define MINIAUDIO_IMPLEMENTATION
-#define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
-#define MA_ENABLE_WASAPI // For windows
-#define MA_ENABLE_WINMM  // For windows
-#define MA_ENABLE_DSOUND // For windows
-#define MA_ENABLE_ALSA       // For Linux
-#define MA_ENABLE_PULSEAUDIO // For Linux
-#define MA_ENABLE_COREAUDIO  // For Mac
-#define MA_NO_ENCODING // Don't need to save out audio files.
-#define MA_NO_GENERATION // Disable waveform/noise generation (not needed for file playback)
-#define MA_NO_FLAC
-#define MA_NO_NEON
+#ifdef INCLUDE_AUDIO_LIB
+    #define MINIAUDIO_IMPLEMENTATION
+    #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
+    #define MA_ENABLE_WASAPI // For windows
+    #define MA_ENABLE_WINMM  // For windows
+    #define MA_ENABLE_DSOUND // For windows
+    #define MA_ENABLE_ALSA       // For Linux
+    #define MA_ENABLE_PULSEAUDIO // For Linux
+    #define MA_ENABLE_COREAUDIO  // For Mac
+    #define MA_NO_ENCODING // Don't need to save out audio files.
+    #define MA_NO_GENERATION // Disable waveform/noise generation (not needed for file playback)
+    #define MA_NO_FLAC
+    #define MA_NO_NEON
+#endif
 
 #include <SDL2/SDL.h>
 #include "audio.h"
 #include "debug.h"
+
+// #define INCLUDE_AUDIO_LIB // Comment out for faster builds during testing
 
 // ----------------------------------------------------------------------------
 // Usage:
@@ -31,8 +35,14 @@ ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
 int wav_count = 0;
 
+#ifndef INCLUDE_AUDIO_LIB
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 // void InitializeAudio(const char* soundfont_path) {
 int InitializeAudio() {
+#ifdef INCLUDE_AUDIO_LIB
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; // Stereo output, adjust if needed
@@ -46,7 +56,7 @@ int InitializeAudio() {
 //     fluid_settings_t* settings = new_fluid_settings();
 //     midi_synth = new_fluid_synth(settings);
 //     fluid_synth_sfopen(midi_synth, soundfont_path); // e.g., "./SoundFonts/FluidR3_GM.sf2"
-
+#endif
     return 0;
 }
 
@@ -74,6 +84,7 @@ int InitializeAudio() {
 // }
 
 void play_mp3(const char* path, float volume, int fade_in_ms) {
+#ifdef INCLUDE_AUDIO_LIB
     static int current_sound = 0;
     ma_sound_uninit(&mp3_sounds[current_sound]);
     ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &mp3_sounds[current_sound]);
@@ -82,9 +93,11 @@ void play_mp3(const char* path, float volume, int fade_in_ms) {
     ma_sound_set_fade_in_milliseconds(&mp3_sounds[current_sound], 0.0f, volume, fade_in_ms);
     ma_sound_start(&mp3_sounds[current_sound]);
     current_sound = 1 - current_sound; // Toggle for crossfade
+#endif
 }
 
 void play_wav(const char* path, float volume) {
+#ifdef INCLUDE_AUDIO_LIB
     // Try to find a free slot (either unused or finished)
     int slot = -1;
     for (int i = 0; i < wav_count; i++) {
@@ -108,11 +121,18 @@ void play_wav(const char* path, float volume) {
     
     ma_sound_set_volume(&wav_sounds[slot], volume);
     ma_sound_start(&wav_sounds[slot]);
+#endif
 }
 
 void CleanupAudio() {
+#ifdef INCLUDE_AUDIO_LIB
     for (int i = 0; i < wav_count; i++) { ma_sound_uninit(&wav_sounds[i]); }
     for (int i = 0; i < 2; i++) { ma_sound_uninit(&mp3_sounds[i]); }
     ma_engine_uninit(&audio_engine);
 //     delete_fluid_synth(midi_synth);
+#endif
 }
+
+#ifndef INCLUDE_AUDIO_LIB
+#pragma GCC diagnostic pop
+#endif

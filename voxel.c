@@ -28,7 +28,6 @@
 #include "event.h"
 #include "voxel.h"
 #include "debug.h"
-#include "lights.h"
 #include "data_models.h"
 #include "render.h"
 
