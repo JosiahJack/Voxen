@@ -49,6 +49,8 @@ extern GLuint lightVolumeShaderProgram;
 extern GLuint imageBlitShaderProgram;
 extern GLuint deferredLightingShaderProgram;
 extern GLuint lightVolumeMeshShaderProgram;
+extern bool lightDirty[MAX_VISIBLE_LIGHTS];
+
 
 void CacheUniformLocationsForShaders(void);
 // void render_debug_text(float x, float y, const char *text, SDL_Color color);

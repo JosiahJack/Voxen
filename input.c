@@ -7,6 +7,7 @@
 #include "quaternion.h"
 #include "player.h"
 #include "audio.h"
+#include "render.h"
 
 // Camera variables
 float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
@@ -150,20 +151,37 @@ void ProcessInput(void) {
         Input_MouselookApply();
     }
     
-    if (keys[SDL_SCANCODE_J]) testLight_x += finalMoveSpeed;
-    else if (keys[SDL_SCANCODE_K]) testLight_x -= finalMoveSpeed;
+    if (keys[SDL_SCANCODE_J]) {
+        testLight_x += finalMoveSpeed;
+        lightDirty[0] = true;
+    } else if (keys[SDL_SCANCODE_K]) {
+        testLight_x -= finalMoveSpeed;
+        lightDirty[0] = true;
+    }
     
-    if (keys[SDL_SCANCODE_N]) testLight_y += finalMoveSpeed;
-    else if (keys[SDL_SCANCODE_M]) testLight_y -= finalMoveSpeed;
+    if (keys[SDL_SCANCODE_N]) {
+        testLight_y += finalMoveSpeed;
+        lightDirty[0] = true;
+    } else if (keys[SDL_SCANCODE_M]) {
+        testLight_y -= finalMoveSpeed;
+        lightDirty[0] = true;
+    }
     
-    if (keys[SDL_SCANCODE_U]) testLight_z += finalMoveSpeed;
-    else if (keys[SDL_SCANCODE_I]) testLight_z -= finalMoveSpeed;
+    if (keys[SDL_SCANCODE_U]) {
+        testLight_z += finalMoveSpeed;
+        lightDirty[0] = true;
+    } else if (keys[SDL_SCANCODE_I]) {
+        testLight_z -= finalMoveSpeed;
+        lightDirty[0] = true;
+    }
     
     if (keys[SDL_SCANCODE_L]) {
         testLight_range += finalMoveSpeed;
+        lightDirty[0] = true;
     } else if (keys[SDL_SCANCODE_SEMICOLON]) {
         testLight_range -= finalMoveSpeed;
         if (testLight_range < 0.0f) testLight_range = 0.0f;
+        else lightDirty[0] = true;
     }
     
     if (keys[SDL_SCANCODE_B]) {
@@ -172,5 +190,9 @@ void ProcessInput(void) {
     } else if (keys[SDL_SCANCODE_Z]) {
         testLight_spotAng -= finalMoveSpeed * 2.0f;
         if (testLight_spotAng < 0.0f) testLight_spotAng = 0.0f;
+    }
+    
+    if (keys[SDL_SCANCODE_X]) {
+        for (int i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
     }
 }

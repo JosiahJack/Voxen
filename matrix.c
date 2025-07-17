@@ -31,48 +31,6 @@ void mat4_ortho(float* m, float left, float right, float bottom, float top, floa
     m[15] = 1.0f;
 }
 
-void mat4_from_quat(float *out, float x, float y, float z, float w) {
-    // Normalize quaternion to avoid scaling issues
-    float len = sqrtf(x * x + y * y + z * z + w * w);
-    if (len > 0.0f) {
-        x /= len;
-        y /= len;
-        z /= len;
-        w /= len;
-    }
-
-    float xx = x * x;
-    float xy = x * y;
-    float xz = x * z;
-    float xw = x * w;
-    float yy = y * y;
-    float yz = y * z;
-    float yw = y * w;
-    float zz = z * z;
-    float zw = z * w;
-
-    // Build 4x4 rotation matrix (column-major)
-    out[0]  = 1.0f - 2.0f * (yy + zz);
-    out[1]  = 2.0f * (xy + zw);
-    out[2]  = 2.0f * (xz - yw);
-    out[3]  = 0.0f;
-
-    out[4]  = 2.0f * (xy - zw);
-    out[5]  = 1.0f - 2.0f * (xx + zz);
-    out[6]  = 2.0f * (yz + xw);
-    out[7]  = 0.0f;
-
-    out[8]  = 2.0f * (xz + yw);
-    out[9]  = 2.0f * (yz - xw);
-    out[10] = 1.0f - 2.0f * (xx + yy);
-    out[11] = 0.0f;
-
-    out[12] = 0.0f;
-    out[13] = 0.0f;
-    out[14] = 0.0f;
-    out[15] = 1.0f;
-}
-
 void mat4_multiply(float* result, float* a, float* b) {
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
@@ -186,32 +144,8 @@ void mat4_translate(float *m, float x, float y, float z) {
     m[14] = z;
 }
 
-void mat4_compose(float *out, float tx, float ty, float tz, float rx, float ry, float rz, float rw, float sx, float sy, float sz) {
-    // Build translation matrix
-    float trans[16] = {
-        1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, 1.0f, 0.0f, 0.0f,
-        0.0f, 0.0f, 1.0f, 0.0f,
-        tx,   ty,   tz,   1.0f
-    };
-    // Build rotation matrix from quaternion (rx, ry, rz, rw)
-    float rot[16];
-    mat4_from_quat(rot, rx, ry, rz, rw);
-    // Build scale matrix
-    float scale[16] = {
-        sx,   0.0f, 0.0f, 0.0f,
-        0.0f, sy,   0.0f, 0.0f,
-        0.0f, 0.0f, sz,   0.0f,
-        0.0f, 0.0f, 0.0f, 1.0f
-    };
-    // Combine: out = trans * rot * scale
-    float temp[16];
-    mat4_multiply(temp, trans, rot);
-    mat4_multiply(out, temp, scale);
-}
-
 void mat4_transform_vec3(const float *mat, float x, float y, float z, float *out) {
-    out[0] = mat[0] * x + mat[4] * y + mat[8] * z + mat[12];
-    out[1] = mat[1] * x + mat[5] * y + mat[9] * z + mat[13];
+    out[0] = mat[0] * x + mat[4] * y + mat[8] *  z + mat[12];
+    out[1] = mat[1] * x + mat[5] * y + mat[9] *  z + mat[13];
     out[2] = mat[2] * x + mat[6] * y + mat[10] * z + mat[14];
 }

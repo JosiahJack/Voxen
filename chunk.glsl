@@ -66,7 +66,7 @@ const char *lightVolumeVertexShaderSource =
     "void main() {\n"
     "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
     "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"
-    "    TexCoord = floatBitsToInt(aTexCoord);\n" // Pass along data to each vertex, shared for whole tri's pixels.
+    "    TexCoord = aTexCoord;\n" // Pass along data to each vertex, shared for whole tri's pixels.
     "    TexIndex = floatBitsToInt(aTexIndex);\n"
     "    GlowIndex = floatBitsToInt(aGlowIndex);\n"
     "    SpecIndex = floatBitsToInt(aSpecIndex);\n"

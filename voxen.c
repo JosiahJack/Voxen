@@ -71,7 +71,9 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 int numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-uint32_t maxLightVolumeMeshVerts = 65535;
+#define MAX_LIGHT_VOLUME_MESH_VERTS 256000
+float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
+
 
 GLuint vao_chunk; // Vertex Array Object
 
@@ -92,7 +94,7 @@ GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnable
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
+bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
 // GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
 GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
@@ -100,7 +102,7 @@ GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_light
       matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1; // uniform locations
 GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
-float lightsInProximity[32 * LIGHT_DATA_SIZE];
+float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
 // ----------------------------------------------------------------------------
 
 void DualLog(const char *fmt, ...) {
@@ -252,99 +254,64 @@ void UpdateInstanceMatrix(int i) {
 }
 
 void UpdateLightVolumes(void) {
-    memset(lightVBOs, 0, MAX_VISIBLE_LIGHTS * sizeof(GLuint));
-    glGenBuffers(MAX_VISIBLE_LIGHTS, lightVBOs);
-    size_t sizeOfTempVertices = largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-    float *tempVerts = (float *)malloc(sizeOfTempVertices);
-    if (!tempVerts) { DualLogError("Failed to allocate tempVerts buffer\n"); return; }
-    
-    memset(lightVertexCounts, 0, MAX_VISIBLE_LIGHTS * sizeof(uint32_t));
     double start_time = get_time();
-    for (uint32_t lightIdx = 0; lightIdx < 1; ++lightIdx) {
+    for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
+        if (!lightDirty[lightIdx]) continue; // Skip lights that aren't dirty
+
         uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
-        float lit_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float lit_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float lit_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float sqrRange = lights[litIdx + LIGHT_DATA_OFFSET_RANGE]; sqrRange *= sqrRange; // Square it
+        float lit_x = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float lit_y = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float lit_z = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float sqrRange = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE]; sqrRange *= sqrRange; // Square it
         uint32_t headVertIdx = 0;
+
         for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
             if (instanceIdx == 39) continue; // Skip test light. TODO: Remove once done with test light!
-            
+
             int32_t modelIdx = instances[instanceIdx].modelIndex;
             if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
 
             uint32_t vertCount = modelVertexCounts[modelIdx];
             if (!vertexDataArrays[modelIdx]) { DualLogError("vertexDataArrays[%d] is NULL\n", modelIdx); continue; }
 
-            // Match UpdateInstanceMatrix exactly
-            float x = instances[instanceIdx].rotx, y = instances[instanceIdx].roty, z = instances[instanceIdx].rotz, w = instances[instanceIdx].rotw;
-            float rot[16];
-            mat4_identity(rot);
-            rot[0] = 1.0f - 2.0f * (y*y + z*z);
-            rot[1] = 2.0f * (x*y - w*z);
-            rot[2] = 2.0f * (x*z + w*y);
-            rot[4] = 2.0f * (x*y + w*z);
-            rot[5] = 1.0f - 2.0f * (x*x + z*z);
-            rot[6] = 2.0f * (y*z - w*x);
-            rot[8] = 2.0f * (x*z - w*y);
-            rot[9] = 2.0f * (y*z + w*x);
-            rot[10] = 1.0f - 2.0f * (x*x + y*y);
-            float sx = instances[instanceIdx].sclx > 0.0f ? instances[instanceIdx].sclx : 1.0f;
-            float sy = instances[instanceIdx].scly > 0.0f ? instances[instanceIdx].scly : 1.0f;
-            float sz = instances[instanceIdx].sclz > 0.0f ? instances[instanceIdx].sclz : 1.0f;
-            float transform[16];
-            transform[0]  = rot[0] * sx; transform[1]  = rot[1] * sy; transform[2]  = rot[2] * sz; transform[3]  = 0.0f;
-            transform[4]  = rot[4] * sx; transform[5]  = rot[5] * sy; transform[6]  = rot[6] * sz; transform[7]  = 0.0f;
-            transform[8]  = rot[8] * sx; transform[9]  = rot[9] * sy; transform[10] = rot[10] * sz; transform[11] = 0.0f;
-            transform[12] = instances[instanceIdx].posx;
-            transform[13] = instances[instanceIdx].posy;
-            transform[14] = instances[instanceIdx].posz;
-            transform[15] = 1.0f;
-            for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < maxLightVolumeMeshVerts - 2); vertIdx += 3) {
+            float *transform = &modelMatrices[instanceIdx * 16];
+            for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < MAX_LIGHT_VOLUME_MESH_VERTS - 2); vertIdx += 3) {
                 uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
                 float *model = vertexDataArrays[modelIdx];
 
                 float world_pos[3][3], model_pos[3][3];
                 bool anyInRange = false;
-                float min_x = 1e9, max_x = -1e9, min_y = 1e9, max_y = -1e9, min_z = 1e9, max_z = -1e9;
-                
+
                 #pragma GCC unroll 3
                 for (int i = 0; i < 3; ++i) {
                     model_pos[i][0] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 0];
                     model_pos[i][1] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 1];
-                    model_pos[i][2] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 2];
+                    model_pos[i][2] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 2];                    
                     mat4_transform_vec3(transform, model_pos[i][0], model_pos[i][1], model_pos[i][2], world_pos[i]);
-                    if (world_pos[i][0] < min_x) min_x = world_pos[i][0];
-                    if (world_pos[i][0] > max_x) max_x = world_pos[i][0];
-                    if (world_pos[i][1] < min_y) min_y = world_pos[i][1];
-                    if (world_pos[i][1] > max_y) max_y = world_pos[i][1];
-                    if (world_pos[i][2] < min_z) min_z = world_pos[i][2];
-                    if (world_pos[i][2] > max_z) max_z = world_pos[i][2];
                     float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[i][0], world_pos[i][1], world_pos[i][2]);
-                    if (dist < sqrRange) anyInRange = true; // Can't break early, breaks tris!  Need to transform all 3 first!
+                    if (dist < sqrRange + 0.001f) anyInRange = true; // Can't break early, breaks tris!  Need to transform all 3 first!
                 }
 
                 if (__builtin_expect(!!(!anyInRange), 0)) continue;
-                
-                if (headVertIdx + 3 > largestVertCount) { DualLogError("headVertIdx (%u) exceeds largestVertCount (%u)\n", headVertIdx + 3, largestVertCount); break; }
-                
+                if (__builtin_expect(!!(headVertIdx + 3 > MAX_LIGHT_VOLUME_MESH_VERTS), 0)) break; // Hit max, bail out
+
                 #pragma GCC unroll 3
                 for (int i = 0; i < 3; ++i) {
                     uint32_t workingIdx = (headVertIdx + i) * VERTEX_ATTRIBUTES_COUNT;
-                    tempVerts[workingIdx + 0] = world_pos[i][0];
-                    tempVerts[workingIdx + 1] = world_pos[i][1];
-                    tempVerts[workingIdx + 2] = world_pos[i][2];
-                    tempVerts[workingIdx + 3] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 3];
-                    tempVerts[workingIdx + 4] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 4];
-                    tempVerts[workingIdx + 5] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 5];
-                    tempVerts[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
-                    tempVerts[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
-                    memcpy(&tempVerts[workingIdx + 8],  &instances[instanceIdx].texIndex, sizeof(float)); // Copy exact bits
-                    memcpy(&tempVerts[workingIdx + 9],  &instances[instanceIdx].glowIndex, sizeof(float));
-                    memcpy(&tempVerts[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
-                    memcpy(&tempVerts[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
-                    memcpy(&tempVerts[workingIdx + 12], &modelIdx, sizeof(float));
-                    memcpy(&tempVerts[workingIdx + 13], &instanceIdx, sizeof(float));
+                    lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[i][0]; // x
+                    lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[i][1]; // y
+                    lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[i][2]; // z
+                    lightVolumeMeshTempVertBuffer[workingIdx + 3] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 3]; // normal x
+                    lightVolumeMeshTempVertBuffer[workingIdx + 4] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 4]; // normal y
+                    lightVolumeMeshTempVertBuffer[workingIdx + 5] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 5]; // normal z
+                    lightVolumeMeshTempVertBuffer[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6]; // u
+                    lightVolumeMeshTempVertBuffer[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7]; // v
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8],  &instances[instanceIdx].texIndex, sizeof(float)); // Copy exact bits
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9],  &instances[instanceIdx].glowIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
                 }
 
                 headVertIdx += 3;
@@ -352,14 +319,14 @@ void UpdateLightVolumes(void) {
             lightVertexCounts[lightIdx] = headVertIdx;
         }
 
-        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
-        size_t bufferSize = lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        if (lightVertexCounts[lightIdx] == 0 || bufferSize > sizeOfTempVertices) { DualLogError("Invalid buffer size for lightVBOs[%d]: %zu (vertices=%u)\n", lightIdx, bufferSize, lightVertexCounts[lightIdx]); continue; }
-        glBufferData(GL_ARRAY_BUFFER, bufferSize, tempVerts, GL_DYNAMIC_DRAW);
+        if (lightVBOs[lightIdx] == 0) glGenBuffers(1, &lightVBOs[lightIdx]); // Ensure VBO exists for this light
+        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]); // Update VBO with new data
+        size_t bufferSize = lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);        
+        glBufferData(GL_ARRAY_BUFFER, bufferSize, lightVolumeMeshTempVertBuffer, GL_DYNAMIC_DRAW);
+        lightDirty[lightIdx] = false; // Clear dirty flag
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    free(tempVerts);
     double end_time = get_time();
     DualLog("Generating light volume meshes took %f seconds\n", end_time - start_time);
 }
@@ -507,7 +474,6 @@ int InitializeEnvironment(void) {
         lights[base + 9] = 1.0f; // r
         lights[base + 10] = 1.0f; // g
         lights[base + 11] = 1.0f; // b
-        lightDirty[i] = true;
     }
     
     lights[0] = 0.0f;
@@ -522,7 +488,6 @@ int InitializeEnvironment(void) {
     lights[9] = 1.0f;
     lights[10] = 1.0f;
     lights[11] = 1.0f;
-    lightDirty[0] = true;
     
     lights[0 + 12] = 10.24f;
     lights[1 + 12] = 0.0f;
@@ -536,7 +501,6 @@ int InitializeEnvironment(void) {
     lights[9 + 12] = 1.0f;
     lights[10 + 12] = 0.0f;
     lights[11 + 12] = 0.0f;
-    lightDirty[1] = true;
     DebugRAM("init lights"); 
 
     // First pass gbuffer images
@@ -651,7 +615,7 @@ int EventExecute(Event* event) {
         case EV_LOAD_ENTITIES: return LoadEntities();
         case EV_LOAD_LEVELS: /*LoadLevels(); TODO*/ return 0;
         case EV_LOAD_VOXELS: VXGI_Init(); return 0;
-        case EV_LOAD_INSTANCES: int exitCode = SetupInstances(); UpdateLightVolumes(); return exitCode;
+        case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -817,7 +781,6 @@ int main(int argc, char* argv[]) {
         lights[lightBase + 9] = 1.0f; // r
         lights[lightBase + 10] = 1.0f; // g
         lights[lightBase + 11] = 1.0f; // b
-        lightDirty[lightBase / 6] = true;
         instances[39].posx = testLight_x;
         instances[39].posy = testLight_y;
         instances[39].posz = testLight_z;
@@ -870,6 +833,8 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         CHECK_GL_ERROR();
+        
+        UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
         
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
@@ -963,7 +928,7 @@ int main(int argc, char* argv[]) {
 //         glDisable(GL_CULL_FACE); // Disable backface culling
         CHECK_GL_ERROR();
     //     for (uint32_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
-        for (uint32_t lightIdx = 0; lightIdx < 1; lightIdx++) {
+        for (int lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
             if (lightVertexCounts[lightIdx] == 0) continue;
 
             glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
