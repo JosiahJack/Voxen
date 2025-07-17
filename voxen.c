@@ -71,7 +71,7 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 int numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-#define MAX_LIGHT_VOLUME_MESH_VERTS 768000
+#define MAX_LIGHT_VOLUME_MESH_VERTS 1500000
 float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
 
 
@@ -273,6 +273,7 @@ void UpdateLightVolumes(void) {
 
         for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
             if (instanceIdx == 39) continue; // Skip test light
+            if (squareDistance3D(lit_x, lit_y, lit_z, instances[instanceIdx].posx, instances[instanceIdx].posy, instances[instanceIdx].posz) > LIGHT_RANGE_MAX_SQUARED) continue;
 
             int32_t modelIdx = instances[instanceIdx].modelIndex;
             if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
@@ -376,7 +377,7 @@ void UpdateLightVolumes(void) {
                     };
 
                     // Write two triangles (6 vertices): (v0, v1, v1_extruded) and (v1, v1_extruded, v0_extruded)
-                    int tri_indices[6] = { 0, 1, 2, 1, 2, 3 }; // v0,v1,v1_extruded, then v1,v1_extruded,v0_extruded
+                    int tri_indices[6] = { 0, 1, 2, 0, 2, 3 }; // v0,v1,v1_extruded, then v1,v1_extruded,v0_extruded   v0, v1_extruded, v0_extruded
                     for (int i = 0; i < 6; ++i) {
                         int vert = tri_indices[i];
                         uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
