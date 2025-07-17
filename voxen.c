@@ -306,24 +306,56 @@ void UpdateLightVolumes(void) {
                 if (headVertIdx + 21 > MAX_LIGHT_VOLUME_MESH_VERTS) break;
 
                 // Original triangle (3 vertices)
-                #pragma GCC unroll 3
-                for (int i = 0; i < 3; ++i) {
-                    uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
-                    lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[i][0];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[i][1];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[i][2];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 3] = world_norm[i][0];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 4] = world_norm[i][1];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 5] = world_norm[i][2];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &instances[instanceIdx].texIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &instances[instanceIdx].glowIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
-                    headVertIdx++;
+//                 #pragma GCC unroll 3
+//                 for (int i = 0; i < 3; ++i) {
+//                     uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[i][0];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[i][1];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[i][2];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 3] = world_norm[i][0];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 4] = world_norm[i][1];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 5] = world_norm[i][2];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
+//                     lightVolumeMeshTempVertBuffer[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
+//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &instances[instanceIdx].texIndex, sizeof(float));
+//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &instances[instanceIdx].glowIndex, sizeof(float));
+//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
+//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
+//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
+//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
+//                     headVertIdx++;
+//                 }
+                
+                // Compute triangle centroid and average normal
+                float centroid[3] = {
+                    (world_pos[0][0] + world_pos[1][0] + world_pos[2][0]) / 3.0f,
+                    (world_pos[0][1] + world_pos[1][1] + world_pos[2][1]) / 3.0f,
+                    (world_pos[0][2] + world_pos[1][2] + world_pos[2][2]) / 3.0f
+                };
+                float avg_norm[3] = {
+                    (world_norm[0][0] + world_norm[1][0] + world_norm[2][0]) / 3.0f,
+                    (world_norm[0][1] + world_norm[1][1] + world_norm[2][1]) / 3.0f,
+                    (world_norm[0][2] + world_norm[1][2] + world_norm[2][2]) / 3.0f
+                };
+                float norm_len = sqrtf(avg_norm[0] * avg_norm[0] + avg_norm[1] * avg_norm[1] + avg_norm[2] * avg_norm[2]);
+                if (norm_len < 0.0001f) norm_len = 0.001f;
+                avg_norm[0] /= norm_len;
+                avg_norm[1] /= norm_len;
+                avg_norm[2] /= norm_len;
+
+                // Check if triangle is back-facing relative to light
+                float light_dir[3] = {lit_x - centroid[0], lit_y - centroid[1], lit_z - centroid[2]};
+                float light_len = sqrtf(light_dir[0] * light_dir[0] + light_dir[1] * light_dir[1] + light_dir[2] * light_dir[2]);
+                if (light_len < 0.0001f) light_len = 0.001f;
+                light_dir[0] /= light_len;
+                light_dir[1] /= light_len;
+                light_dir[2] /= light_len;
+                float dot = avg_norm[0] * light_dir[0] + avg_norm[1] * light_dir[1] + avg_norm[2] * light_dir[2];
+                if (dot <= 0.0f) {
+                    #ifdef DEBUG_SHADOW_VOLUME
+                    DualLog("Triangle %u in model %d, instance %u is back-facing (dot=%f), skipping\n", vertIdx / 3, modelIdx, instanceIdx, dot);
+                    #endif
+                    continue; // Skip back-facing triangles
                 }
 
                 // Extrude two triangles per edge (3 edges, 6 vertices each)
@@ -924,7 +956,7 @@ int main(int argc, char* argv[]) {
             firstLightVolumeGen = false;
         }
         
-        UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
+        if (debugView == 0) UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
         
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
@@ -975,7 +1007,7 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex < 0) continue; // Culled
 
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            if (i != 39) continue; // Skip everything except test light's white cube.
+//             if (i != 39) continue; // Skip everything except test light's white cube.
             
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             CHECK_GL_ERROR();
@@ -1002,36 +1034,38 @@ int main(int argc, char* argv[]) {
         }
         
         // 5. Render Light Volume Meshes
-        if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
-        glUseProgram(lightVolumeShaderProgram);
-        CHECK_GL_ERROR();
-        float identity[16];
-        mat4_identity(identity);
-        glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
-        CHECK_GL_ERROR();
-        glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
-        CHECK_GL_ERROR();
-        glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
-        CHECK_GL_ERROR();
-        glUniform1i(debugView_lightvol, debugView);
-        CHECK_GL_ERROR();
-        glDisable(GL_CULL_FACE); // Disable backface culling
-        CHECK_GL_ERROR();
-        for (int lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
-            if (lightVertexCounts[lightIdx] == 0) continue;
+//         if (debugView == 0) {
+            if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
+            glUseProgram(lightVolumeShaderProgram);
+            CHECK_GL_ERROR();
+            float identity[16];
+            mat4_identity(identity);
+            glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
+            CHECK_GL_ERROR();
+            glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
+            CHECK_GL_ERROR();
+            glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
+            CHECK_GL_ERROR();
+            glUniform1i(debugView_lightvol, debugView);
+            CHECK_GL_ERROR();
+            glDisable(GL_CULL_FACE); // Disable backface culling
+            CHECK_GL_ERROR();
+            for (int lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
+                if (lightVertexCounts[lightIdx] == 0) continue;
 
-            glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                CHECK_GL_ERROR();
+                glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
+                CHECK_GL_ERROR();
+                drawCallCount++;
+                vertexCount += lightVertexCounts[lightIdx];
+            }
+            
+            glEnable(GL_CULL_FACE); // Reenable backface culling
             CHECK_GL_ERROR();
-            glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             CHECK_GL_ERROR();
-            drawCallCount++;
-            vertexCount += lightVertexCounts[lightIdx];
-        }
-        
-        glEnable(GL_CULL_FACE); // Reenable backface culling
-        CHECK_GL_ERROR();
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        CHECK_GL_ERROR();
+//         }
 
         // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
