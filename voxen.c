@@ -71,7 +71,7 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 int numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-#define MAX_LIGHT_VOLUME_MESH_VERTS 256000
+#define MAX_LIGHT_VOLUME_MESH_VERTS 768000
 float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
 
 
@@ -259,9 +259,9 @@ void cross_product(float a[3], float b[3], float result[3]) {
     result[1] = a[2] * b[0] - a[0] * b[2]; // y = az*bx - ax*bz
     result[2] = a[0] * b[1] - a[1] * b[0]; // z = ax*by - ay*bx
 }
+
 void UpdateLightVolumes(void) {
-    for (int lightIdx = 0; lightIdx < 1; ++lightIdx) {
-//     for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
+    for (int lightIdx = 0; lightIdx < 1/*numLightsFound temp test just the one for now*/; ++lightIdx) {
         if (!lightDirty[lightIdx]) continue;
 
         uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
@@ -339,27 +339,19 @@ void UpdateLightVolumes(void) {
 
                     // Normalize edge direction
                     float edge_len = sqrtf(edge_dir[0] * edge_dir[0] + edge_dir[1] * edge_dir[1] + edge_dir[2] * edge_dir[2]);
-                    if (edge_len < 0.0001f) edge_len = 0.001f;//{
-//                         DualLogError("Light %d, Edge %d: Degenerate edge length %f\n", lightIdx, edge, edge_len);
-//                         edge_dir[0] = edge_dir[1] = edge_dir[2] = 0.0f;
-//                     } else {
-                        edge_dir[0] /= edge_len;
-                        edge_dir[1] /= edge_len;
-                        edge_dir[2] /= edge_len;
-//                     }
+                    if (edge_len < 0.0001f) edge_len = 0.001f;
+                    edge_dir[0] /= edge_len;
+                    edge_dir[1] /= edge_len;
+                    edge_dir[2] /= edge_len;
 
                     // Compute triangle normal (use v1's normal for both triangles)
                     float tri_norm[3];
                     cross_product(world_norm[v1_idx], edge_dir, tri_norm);
                     float norm_len = sqrtf(tri_norm[0] * tri_norm[0] + tri_norm[1] * tri_norm[1] + tri_norm[2] * tri_norm[2]);
-                    if (norm_len < 0.0001f) norm_len = 0.001f;//{
-//                         DualLogError("Light %d, Edge %d: Invalid triangle normal length %f\n", lightIdx, edge, norm_len);
-//                         tri_norm[0] = tri_norm[1] = tri_norm[2] = 0.0f;
-//                     } else {
-                        tri_norm[0] /= norm_len;
-                        tri_norm[1] /= norm_len;
-                        tri_norm[2] /= norm_len;
-//                     }
+                    if (norm_len < 0.0001f) norm_len = 0.001f;
+                    tri_norm[0] /= norm_len;
+                    tri_norm[1] /= norm_len;
+                    tri_norm[2] /= norm_len;
 
                     // Extrusion directions (v0 and v1 away from light)
                     float extrude_dir[2][3];
@@ -369,14 +361,10 @@ void UpdateLightVolumes(void) {
                         extrude_dir[i][1] = world_pos[idx][1] - lit_y;
                         extrude_dir[i][2] = world_pos[idx][2] - lit_z;
                         float len = sqrtf(extrude_dir[i][0] * extrude_dir[i][0] + extrude_dir[i][1] * extrude_dir[i][1] + extrude_dir[i][2] * extrude_dir[i][2]);
-                        if (len < 0.0001f) len = 0.02f;//{
-//                             DualLogError("Light %d, Edge %d, Vertex %d: Zero extrusion length\n", lightIdx, edge, idx);
-//                             extrude_dir[i][0] = extrude_dir[i][1] = extrude_dir[i][2] = 0.0f;
-//                         } else {
-                            extrude_dir[i][0] = (extrude_dir[i][0] / len) * 10.0f; // Reduced for debugging
-                            extrude_dir[i][1] = (extrude_dir[i][1] / len) * 10.0f;
-                            extrude_dir[i][2] = (extrude_dir[i][2] / len) * 10.0f;
-//                         }
+                        if (len < 0.0001f) len = 0.02f;
+                        extrude_dir[i][0] = (extrude_dir[i][0] / len) * 10.0f; // Reduced for debugging
+                        extrude_dir[i][1] = (extrude_dir[i][1] / len) * 10.0f;
+                        extrude_dir[i][2] = (extrude_dir[i][2] / len) * 10.0f;
                     }
 
                     // Triangle vertices: First triangle (v0, v1, v1_extruded), Second triangle (v1, v1_extruded, v0_extruded)
@@ -386,14 +374,6 @@ void UpdateLightVolumes(void) {
                         { world_pos[v1_idx][0] + extrude_dir[1][0], world_pos[v1_idx][1] + extrude_dir[1][1], world_pos[v1_idx][2] + extrude_dir[1][2] }, // v1_extruded
                         { world_pos[v0_idx][0] + extrude_dir[0][0], world_pos[v0_idx][1] + extrude_dir[0][1], world_pos[v0_idx][2] + extrude_dir[0][2] }  // v0_extruded
                     };
-
-                    // Debug triangle vertices
-//                     DualLog("Light %d, Edge %d: Tri verts: v0=(%f,%f,%f), v1=(%f,%f,%f), v1_extruded=(%f,%f,%f), v0_extruded=(%f,%f,%f)\n",
-//                             lightIdx, edge,
-//                             tri_verts[0][0], tri_verts[0][1], tri_verts[0][2],
-//                             tri_verts[1][0], tri_verts[1][1], tri_verts[1][2],
-//                             tri_verts[2][0], tri_verts[2][1], tri_verts[2][2],
-//                             tri_verts[3][0], tri_verts[3][1], tri_verts[3][2]);
 
                     // Write two triangles (6 vertices): (v0, v1, v1_extruded) and (v1, v1_extruded, v0_extruded)
                     int tri_indices[6] = { 0, 1, 2, 1, 2, 3 }; // v0,v1,v1_extruded, then v1,v1_extruded,v0_extruded
@@ -408,7 +388,7 @@ void UpdateLightVolumes(void) {
                         lightVolumeMeshTempVertBuffer[workingIdx + 5] = tri_norm[2];
                         lightVolumeMeshTempVertBuffer[workingIdx + 6] = 0.0f; // u
                         lightVolumeMeshTempVertBuffer[workingIdx + 7] = 0.0f; // v
-                        int texIndex = 41; // Test with known good texture
+                        int texIndex = 41; // Black texture for shadow faces for testing
                         int invalidIndex = 65535;
                         memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &texIndex, sizeof(float));
                         memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &invalidIndex, sizeof(float));
@@ -422,7 +402,7 @@ void UpdateLightVolumes(void) {
             }
 
             lightVertexCounts[lightIdx] = headVertIdx;
-//             DualLog("Light %d: Generated %u vertices\n", lightIdx, headVertIdx);
+            DualLog("Light %d: Generated %u vertices\n", lightIdx, headVertIdx);
         }
 
         if (lightVBOs[lightIdx] == 0) glGenBuffers(1, &lightVBOs[lightIdx]);
