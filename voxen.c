@@ -71,7 +71,7 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 int numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-#define MAX_LIGHT_VOLUME_MESH_VERTS 1500000
+#define MAX_LIGHT_VOLUME_MESH_VERTS 2000000
 float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
 
 
@@ -261,7 +261,7 @@ void cross_product(float a[3], float b[3], float result[3]) {
 }
 
 void UpdateLightVolumes(void) {
-    for (int lightIdx = 0; lightIdx < 1/*numLightsFound temp test just the one for now*/; ++lightIdx) {
+    for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
         if (!lightDirty[lightIdx]) continue;
 
         uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
@@ -306,25 +306,25 @@ void UpdateLightVolumes(void) {
                 if (headVertIdx + 21 > MAX_LIGHT_VOLUME_MESH_VERTS) break;
 
                 // Original triangle (3 vertices)
-//                 #pragma GCC unroll 3
-//                 for (int i = 0; i < 3; ++i) {
-//                     uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[i][0];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[i][1];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[i][2];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 3] = world_norm[i][0];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 4] = world_norm[i][1];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 5] = world_norm[i][2];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
-//                     lightVolumeMeshTempVertBuffer[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
-//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &instances[instanceIdx].texIndex, sizeof(float));
-//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &instances[instanceIdx].glowIndex, sizeof(float));
-//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
-//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
-//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
-//                     memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
-//                     headVertIdx++;
-//                 }
+                #pragma GCC unroll 3
+                for (int i = 0; i < 3; ++i) {
+                    uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
+                    lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[i][0];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[i][1];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[i][2];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 3] = world_norm[i][0];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 4] = world_norm[i][1];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 5] = world_norm[i][2];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
+                    lightVolumeMeshTempVertBuffer[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &instances[instanceIdx].texIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &instances[instanceIdx].glowIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
+                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
+                    headVertIdx++;
+                }
                 
                 // Compute triangle centroid and average normal
                 float centroid[3] = {
@@ -1007,7 +1007,7 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex < 0) continue; // Culled
 
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-//             if (i != 39) continue; // Skip everything except test light's white cube.
+            if (i != 39) continue; // Skip everything except test light's white cube.
             
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             CHECK_GL_ERROR();
