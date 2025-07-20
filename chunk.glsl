@@ -50,6 +50,7 @@ const char *lightVolumeVertexShaderSource =
     "layout(location = 6) in float aNormalIndex;\n"
     "layout(location = 7) in float aModelIndex;\n"
     "layout(location = 8) in float aInstanceIndex;\n"
+
     "uniform mat4 matrix;\n"
     "uniform mat4 view;\n"
     "uniform mat4 projection;\n"
@@ -62,7 +63,7 @@ const char *lightVolumeVertexShaderSource =
     "flat out int NormalIndex;\n"
     "flat out int InstanceIndex;\n"
     "flat out int ModelIndex;\n"
-    "\n"
+
     "void main() {\n"
     "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
     "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"

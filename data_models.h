@@ -27,6 +27,5 @@ extern GLuint modelVertexOffsetsID;
 extern uint32_t largestVertCount;
 
 int LoadGeometry(void);
-void CleanupModelLoadOnFail(void);
 
 #endif // VOXEN_DATA_MODELS_H

@@ -150,8 +150,8 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
 
     // Render quad (two triangles)
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    drawCallCount++;
-    vertexCount+=4*128;
+    drawCallsRenderedThisFrame++;
+    verticesRenderedThisFrame+=4*128;
 
     // Cleanup
     glBindVertexArray(0);

@@ -28,6 +28,7 @@
 #include "player.h"
 #include "matrix.h"
 
+#define MAX_LIGHT_VOLUME_MESH_VERTS 2000000
 // #define DEBUG_RAM_OUTPUT
 
 // Window
@@ -62,18 +63,16 @@ double lastFrameSecCountTime = 0.00;
 uint32_t lastFrameSecCount = 0;
 uint32_t framesPerLastSecond = 0;
 uint32_t worstFPS = UINT32_MAX;
-uint32_t drawCallCount = 0;
-uint32_t vertexCount = 0;
+uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
+uint32_t verticesRenderedThisFrame = 0;
 bool shadowsEnabled = false;
 uint32_t playerCellIdx = 80000;
 uint32_t playerCellIdx_x = 20000;
 uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
-int numLightsFound = 0;
+uint8_t numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-#define MAX_LIGHT_VOLUME_MESH_VERTS 2000000
 float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
-
 
 GLuint vao_chunk; // Vertex Array Object
 
@@ -96,11 +95,12 @@ GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnable
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
-// GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
+GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
 GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
-GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1,
-      matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1; // uniform locations
-GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
+GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1;
+GLint matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1, lightIdx_lightvol = -1; // uniform locations
+GLuint outVertexBuffer;
+GLuint currentLightVolumeMeshVertexCount;
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
 bool firstLightVolumeGen = true;
@@ -211,10 +211,11 @@ void CacheUniformLocationsForShaders(void) {
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     
-//     lightPosXLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosX");
-//     lightPosYLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosY");
-//     lightPosZLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosZ");
-//     lightRangeLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightRange");
+    lightPosXLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosX");
+    lightPosYLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosY");
+    lightPosZLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosZ");
+    lightRangeLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightRange");
+    lightIdx_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightIndex");
     
     matrix_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "matrix");
     view_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "view");
@@ -252,200 +253,6 @@ void UpdateInstanceMatrix(int i) {
     mat[12] = instances[i].posx; mat[13] = instances[i].posy; mat[14] = instances[i].posz; mat[15] = 1.0f;
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
-}
-
-void cross_product(float a[3], float b[3], float result[3]) {
-    result[0] = a[1] * b[2] - a[2] * b[1]; // x = ay*bz - az*by
-    result[1] = a[2] * b[0] - a[0] * b[2]; // y = az*bx - ax*bz
-    result[2] = a[0] * b[1] - a[1] * b[0]; // z = ax*by - ay*bx
-}
-
-void UpdateLightVolumes(void) {
-    for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
-        if (!lightDirty[lightIdx]) continue;
-
-        uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
-        float lit_x = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float lit_y = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float lit_z = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float sqrRange = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE]; sqrRange *= sqrRange;
-        uint32_t headVertIdx = 0;
-
-        for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
-            if (instanceIdx == 39) continue; // Skip test light
-            if (squareDistance3D(lit_x, lit_y, lit_z, instances[instanceIdx].posx, instances[instanceIdx].posy, instances[instanceIdx].posz) > LIGHT_RANGE_MAX_SQUARED) continue;
-
-            int32_t modelIdx = instances[instanceIdx].modelIndex;
-            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
-
-            uint32_t vertCount = modelVertexCounts[modelIdx];
-            if (!vertexDataArrays[modelIdx]) { DualLogError("vertexDataArrays[%d] is NULL\n", modelIdx); continue; }
-
-            float *transform = &modelMatrices[instanceIdx * 16];
-            for (uint32_t vertIdx = 0; (vertIdx < vertCount) && (headVertIdx < MAX_LIGHT_VOLUME_MESH_VERTS - 21); vertIdx += 3) {
-                uint32_t vertexIdx = (vertIdx * VERTEX_ATTRIBUTES_COUNT);
-                float *model = vertexDataArrays[modelIdx];
-
-                float world_pos[3][3], model_pos[3][3], world_norm[3][3];
-                bool anyInRange = false;
-
-                #pragma GCC unroll 3
-                for (int i = 0; i < 3; ++i) {
-                    model_pos[i][0] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 0];
-                    model_pos[i][1] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 1];
-                    model_pos[i][2] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 2];
-                    world_norm[i][0] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 3];
-                    world_norm[i][1] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 4];
-                    world_norm[i][2] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 5];
-                    mat4_transform_vec3(transform, model_pos[i][0], model_pos[i][1], model_pos[i][2], world_pos[i]);
-                    float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[i][0], world_pos[i][1], world_pos[i][2]);
-                    if (dist < sqrRange + 0.001f) anyInRange = true;
-                }
-
-                if (!anyInRange) continue;
-                if (headVertIdx + 21 > MAX_LIGHT_VOLUME_MESH_VERTS) break;
-
-                // Original triangle (3 vertices)
-                #pragma GCC unroll 3
-                for (int i = 0; i < 3; ++i) {
-                    uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
-                    lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[i][0];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[i][1];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[i][2];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 3] = world_norm[i][0];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 4] = world_norm[i][1];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 5] = world_norm[i][2];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 6] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 6];
-                    lightVolumeMeshTempVertBuffer[workingIdx + 7] = model[vertexIdx + i * VERTEX_ATTRIBUTES_COUNT + 7];
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &instances[instanceIdx].texIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &instances[instanceIdx].glowIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &instances[instanceIdx].specIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &instances[instanceIdx].normIndex, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
-                    memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
-                    headVertIdx++;
-                }
-                
-                // Compute triangle centroid and average normal
-                float centroid[3] = {
-                    (world_pos[0][0] + world_pos[1][0] + world_pos[2][0]) / 3.0f,
-                    (world_pos[0][1] + world_pos[1][1] + world_pos[2][1]) / 3.0f,
-                    (world_pos[0][2] + world_pos[1][2] + world_pos[2][2]) / 3.0f
-                };
-                float avg_norm[3] = {
-                    (world_norm[0][0] + world_norm[1][0] + world_norm[2][0]) / 3.0f,
-                    (world_norm[0][1] + world_norm[1][1] + world_norm[2][1]) / 3.0f,
-                    (world_norm[0][2] + world_norm[1][2] + world_norm[2][2]) / 3.0f
-                };
-                float norm_len = sqrtf(avg_norm[0] * avg_norm[0] + avg_norm[1] * avg_norm[1] + avg_norm[2] * avg_norm[2]);
-                if (norm_len < 0.0001f) norm_len = 0.001f;
-                avg_norm[0] /= norm_len;
-                avg_norm[1] /= norm_len;
-                avg_norm[2] /= norm_len;
-
-                // Check if triangle is back-facing relative to light
-                float light_dir[3] = {lit_x - centroid[0], lit_y - centroid[1], lit_z - centroid[2]};
-                float light_len = sqrtf(light_dir[0] * light_dir[0] + light_dir[1] * light_dir[1] + light_dir[2] * light_dir[2]);
-                if (light_len < 0.0001f) light_len = 0.001f;
-                light_dir[0] /= light_len;
-                light_dir[1] /= light_len;
-                light_dir[2] /= light_len;
-                float dot = avg_norm[0] * light_dir[0] + avg_norm[1] * light_dir[1] + avg_norm[2] * light_dir[2];
-                if (dot <= 0.0f) {
-                    #ifdef DEBUG_SHADOW_VOLUME
-                    DualLog("Triangle %u in model %d, instance %u is back-facing (dot=%f), skipping\n", vertIdx / 3, modelIdx, instanceIdx, dot);
-                    #endif
-                    continue; // Skip back-facing triangles
-                }
-
-                // Extrude two triangles per edge (3 edges, 6 vertices each)
-                for (int edge = 0; edge < 3; ++edge) {
-                    int v0_idx = edge;
-                    int v1_idx = (edge + 1) % 3;
-
-                    // Edge direction
-                    float edge_dir[3] = {
-                        world_pos[v1_idx][0] - world_pos[v0_idx][0],
-                        world_pos[v1_idx][1] - world_pos[v0_idx][1],
-                        world_pos[v1_idx][2] - world_pos[v0_idx][2]
-                    };
-
-                    // Normalize edge direction
-                    float edge_len = sqrtf(edge_dir[0] * edge_dir[0] + edge_dir[1] * edge_dir[1] + edge_dir[2] * edge_dir[2]);
-                    if (edge_len < 0.0001f) edge_len = 0.001f;
-                    edge_dir[0] /= edge_len;
-                    edge_dir[1] /= edge_len;
-                    edge_dir[2] /= edge_len;
-
-                    // Compute triangle normal (use v1's normal for both triangles)
-                    float tri_norm[3];
-                    cross_product(world_norm[v1_idx], edge_dir, tri_norm);
-                    float norm_len = sqrtf(tri_norm[0] * tri_norm[0] + tri_norm[1] * tri_norm[1] + tri_norm[2] * tri_norm[2]);
-                    if (norm_len < 0.0001f) norm_len = 0.001f;
-                    tri_norm[0] /= norm_len;
-                    tri_norm[1] /= norm_len;
-                    tri_norm[2] /= norm_len;
-
-                    // Extrusion directions (v0 and v1 away from light)
-                    float extrude_dir[2][3];
-                    for (int i = 0; i < 2; ++i) {
-                        int idx = (i == 0) ? v0_idx : v1_idx;
-                        extrude_dir[i][0] = world_pos[idx][0] - lit_x; // Correct direction: vert - light
-                        extrude_dir[i][1] = world_pos[idx][1] - lit_y;
-                        extrude_dir[i][2] = world_pos[idx][2] - lit_z;
-                        float len = sqrtf(extrude_dir[i][0] * extrude_dir[i][0] + extrude_dir[i][1] * extrude_dir[i][1] + extrude_dir[i][2] * extrude_dir[i][2]);
-                        if (len < 0.0001f) len = 0.02f;
-                        extrude_dir[i][0] = (extrude_dir[i][0] / len) * 10.0f; // Reduced for debugging
-                        extrude_dir[i][1] = (extrude_dir[i][1] / len) * 10.0f;
-                        extrude_dir[i][2] = (extrude_dir[i][2] / len) * 10.0f;
-                    }
-
-                    // Triangle vertices: First triangle (v0, v1, v1_extruded), Second triangle (v1, v1_extruded, v0_extruded)
-                    float tri_verts[4][3] = {
-                        { world_pos[v0_idx][0], world_pos[v0_idx][1], world_pos[v0_idx][2] }, // v0
-                        { world_pos[v1_idx][0], world_pos[v1_idx][1], world_pos[v1_idx][2] }, // v1
-                        { world_pos[v1_idx][0] + extrude_dir[1][0], world_pos[v1_idx][1] + extrude_dir[1][1], world_pos[v1_idx][2] + extrude_dir[1][2] }, // v1_extruded
-                        { world_pos[v0_idx][0] + extrude_dir[0][0], world_pos[v0_idx][1] + extrude_dir[0][1], world_pos[v0_idx][2] + extrude_dir[0][2] }  // v0_extruded
-                    };
-
-                    // Write two triangles (6 vertices): (v0, v1, v1_extruded) and (v1, v1_extruded, v0_extruded)
-                    int tri_indices[6] = { 0, 1, 2, 0, 2, 3 }; // v0,v1,v1_extruded, then v1,v1_extruded,v0_extruded   v0, v1_extruded, v0_extruded
-                    for (int i = 0; i < 6; ++i) {
-                        int vert = tri_indices[i];
-                        uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
-                        lightVolumeMeshTempVertBuffer[workingIdx + 0] = tri_verts[vert][0];
-                        lightVolumeMeshTempVertBuffer[workingIdx + 1] = tri_verts[vert][1];
-                        lightVolumeMeshTempVertBuffer[workingIdx + 2] = tri_verts[vert][2];
-                        lightVolumeMeshTempVertBuffer[workingIdx + 3] = tri_norm[0];
-                        lightVolumeMeshTempVertBuffer[workingIdx + 4] = tri_norm[1];
-                        lightVolumeMeshTempVertBuffer[workingIdx + 5] = tri_norm[2];
-                        lightVolumeMeshTempVertBuffer[workingIdx + 6] = 0.0f; // u
-                        lightVolumeMeshTempVertBuffer[workingIdx + 7] = 0.0f; // v
-                        int texIndex = 41; // Black texture for shadow faces for testing
-                        int invalidIndex = 65535;
-                        memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &texIndex, sizeof(float));
-                        memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &invalidIndex, sizeof(float));
-                        memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &invalidIndex, sizeof(float));
-                        memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &invalidIndex, sizeof(float));
-                        memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
-                        memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
-                        headVertIdx++;
-                    }
-                }
-            }
-
-            lightVertexCounts[lightIdx] = headVertIdx;
-            DualLog("Light %d: Generated %u vertices\n", lightIdx, headVertIdx);
-        }
-
-        if (lightVBOs[lightIdx] == 0) glGenBuffers(1, &lightVBOs[lightIdx]);
-        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
-        size_t bufferSize = lightVertexCounts[lightIdx] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        glBufferData(GL_ARRAY_BUFFER, bufferSize, lightVolumeMeshTempVertBuffer, GL_DYNAMIC_DRAW);
-        lightDirty[lightIdx] = false;
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 // ============================================================================
 
@@ -563,7 +370,7 @@ int InitializeEnvironment(void) {
     glVertexAttribFormat(6, 1, GL_FLOAT, GL_FALSE, 11 * sizeof(float)); // Normal Index (int)
     glVertexAttribFormat(7, 1, GL_FLOAT, GL_FALSE, 12 * sizeof(float)); // Model Index (int)
     glVertexAttribFormat(8, 1, GL_FLOAT, GL_FALSE, 13 * sizeof(float)); // Instance Index (int)
-    for (int i = 0; i < 9; i++) {
+    for (uint8_t i = 0; i < 9; i++) {
         glVertexAttribBinding(i, 0);
         glEnableVertexAttribArray(i);
     }
@@ -576,8 +383,8 @@ int InitializeEnvironment(void) {
     DebugRAM("setup full screen quad"); 
     
     // Initialize Lights
-    for (int i = 0; i < LIGHT_COUNT; i++) {
-        int base = i * LIGHT_DATA_SIZE; // Step by 12
+    for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
+        uint16_t base = i * LIGHT_DATA_SIZE; // Step by 12
         lights[base + 0] = base * 0.08f; // posx
         lights[base + 1] = base * 0.08f; // posy
         lights[base + 2] = 0.0f; // posz
@@ -671,6 +478,27 @@ int InitializeEnvironment(void) {
     InitializeAudio();
     DebugRAM("audio init"); 
     systemInitialized[SYS_AUD] = true;
+    
+    // Initialize buffers for light volume mesh generation
+    glGenBuffers(1, &outVertexBuffer);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, outVertexBuffer);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, outVertexBuffer);
+    CHECK_GL_ERROR();
+    
+    glGenBuffers(1, &currentLightVolumeMeshVertexCount);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,currentLightVolumeMeshVertexCount);
+    CHECK_GL_ERROR();
+    uint32_t zero = 0;
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t), &zero, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 22, currentLightVolumeMeshVertexCount);
+    CHECK_GL_ERROR();
+    
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -686,10 +514,10 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
         vbos[i] = 0;
     }
     
-    for (uint32_t i=0;i<MAX_VISIBLE_LIGHTS;i++) {
-        if (lightVBOs[i]) glDeleteBuffers(1, &lightVBOs[i]);
-        lightVBOs[i] = 0;
-    }
+//     for (uint32_t i=0;i<MAX_VISIBLE_LIGHTS;i++) {
+//         if (lightVBOs[i]) glDeleteBuffers(1, &lightVBOs[i]);
+//         lightVBOs[i] = 0;
+//     }
     
     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
@@ -708,7 +536,7 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
-//     if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
+    if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
@@ -872,8 +700,8 @@ int main(int argc, char* argv[]) {
         // ====================================================================
         // Client Render
         bool debugRenderSegfaults = false;//true;
-        drawCallCount = 0; // Reset per frame
-        vertexCount = 0;
+        drawCallsRenderedThisFrame = 0; // Reset per frame
+        verticesRenderedThisFrame = 0;
         
         // 0. Clear Frame Buffers and Depth
         if (debugRenderSegfaults) DualLog("0. Clear Frame Buffers and Depth\n");
@@ -910,8 +738,8 @@ int main(int argc, char* argv[]) {
         playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
         playerCellIdx_z = PositionToWorldCellIndexZ(cam_z);
         numLightsFound = 0;
-        for (int i=0;i<LIGHT_COUNT;++i) {
-            uint32_t litIdx = (i * LIGHT_DATA_SIZE);
+        for (uint16_t i=0;i<LIGHT_COUNT;++i) {
+            uint16_t litIdx = (i * LIGHT_DATA_SIZE);
             float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
             if (litIntensity < 0.015f) continue; // Off
             
@@ -920,7 +748,7 @@ int main(int argc, char* argv[]) {
             float litz = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
             if (squareDistance3D(cam_x, cam_y, cam_z, litx, lity, litz) < sightRangeSquared) {
                 
-                int idx = numLightsFound * LIGHT_DATA_SIZE;
+                uint16_t idx = numLightsFound * LIGHT_DATA_SIZE;
                 lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = litx;
                 lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY] = lity;
                 lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ] = litz;
@@ -938,7 +766,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        for (int i=numLightsFound;i<MAX_VISIBLE_LIGHTS;++i) {
+        for (uint8_t i=numLightsFound;i<MAX_VISIBLE_LIGHTS;++i) {
             lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
         }
         
@@ -952,18 +780,16 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         
         if (firstLightVolumeGen && globalFrameNum > 2) {
-            for (int i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
+            for (uint8_t i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
             firstLightVolumeGen = false;
         }
-        
-        if (debugView == 0) UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
-        
+                
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
         bool instanceIsCulledArray[INSTANCE_COUNT];
         memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
         float distSqrd = 0.0f;
-        for (int i=0;i<INSTANCE_COUNT;++i) {
+        for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
             
             distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
@@ -1000,14 +826,14 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
         CHECK_GL_ERROR();
-        for (int i=0;i<INSTANCE_COUNT;i++) {
+        for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
             if (instanceIsCulledArray[i]) continue;
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
 
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            if (i != 39) continue; // Skip everything except test light's white cube.
+//             if (i != 39) continue; // Skip everything except test light's white cube.
             
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             CHECK_GL_ERROR();
@@ -1029,17 +855,71 @@ int main(int argc, char* argv[]) {
             glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
             CHECK_GL_ERROR();
             if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
-            drawCallCount++;
-            vertexCount += modelVertexCounts[modelType];
+            drawCallsRenderedThisFrame++;
+            verticesRenderedThisFrame += modelVertexCounts[modelType];
         }
         
-        // 5. Render Light Volume Meshes
-//         if (debugView == 0) {
-            if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
+        // 5. Render Light Volume Meshes        
+        if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
+        float identity[16];
+        mat4_identity(identity);
+        
+        glDisable(GL_CULL_FACE); // Disable backface culling
+        CHECK_GL_ERROR();
+        for (uint8_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
+            if (lightVertexCounts[lightIdx] == 0) continue;
+
+            if (lightDirty[lightIdx]) {
+                glUseProgram(lightVolumeMeshShaderProgram);
+                CHECK_GL_ERROR();
+                
+                // Set uniforms
+                glUniform1i(lightIdx_lightvol, lightIdx);
+                CHECK_GL_ERROR();
+                uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+                glUniform1f(lightPosXLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX]);
+                CHECK_GL_ERROR();
+                glUniform1f(lightPosYLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY]);
+                CHECK_GL_ERROR();
+                glUniform1f(lightPosZLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ]);
+                CHECK_GL_ERROR();
+                glUniform1f(lightRangeLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE]);
+                CHECK_GL_ERROR();
+                glUniform1ui(glGetUniformLocation(lightVolumeMeshShaderProgram, "lightIndex"), lightIdx);
+                CHECK_GL_ERROR();
+
+                // Reset vertex count for this light
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, currentLightVolumeMeshVertexCount);
+                CHECK_GL_ERROR();
+                uint32_t zero = 0;
+                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t), &zero, GL_DYNAMIC_DRAW);
+                CHECK_GL_ERROR();
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+                CHECK_GL_ERROR();
+                glBindVertexBuffer(0, outVertexBuffer, 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                CHECK_GL_ERROR();
+                glDispatchCompute(INSTANCE_COUNT / 64, 1, 1);
+                CHECK_GL_ERROR();
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                CHECK_GL_ERROR();
+
+                // Read back vertex count
+                uint32_t vertexCountResult;
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, currentLightVolumeMeshVertexCount);
+                CHECK_GL_ERROR();
+                glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &vertexCountResult);
+                CHECK_GL_ERROR();
+                lightVertexCounts[lightIdx] = vertexCountResult / VERTEX_ATTRIBUTES_COUNT;
+                verticesRenderedThisFrame += lightVertexCounts[lightIdx];
+                lightDirty[lightIdx] = false;
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+                CHECK_GL_ERROR();
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+                CHECK_GL_ERROR();
+            }
+            
             glUseProgram(lightVolumeShaderProgram);
-            CHECK_GL_ERROR();
-            float identity[16];
-            mat4_identity(identity);
+            glBindVertexArray(vao_chunk); // Use same VAO as geometry passrq
             glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
             CHECK_GL_ERROR();
             glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
@@ -1048,24 +928,15 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glUniform1i(debugView_lightvol, debugView);
             CHECK_GL_ERROR();
-            glDisable(GL_CULL_FACE); // Disable backface culling
+            glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
             CHECK_GL_ERROR();
-            for (int lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
-                if (lightVertexCounts[lightIdx] == 0) continue;
-
-                glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                CHECK_GL_ERROR();
-                glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
-                CHECK_GL_ERROR();
-                drawCallCount++;
-                vertexCount += lightVertexCounts[lightIdx];
-            }
-            
-            glEnable(GL_CULL_FACE); // Reenable backface culling
-            CHECK_GL_ERROR();
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            CHECK_GL_ERROR();
-//         }
+            drawCallsRenderedThisFrame++;
+        }
+        
+        glEnable(GL_CULL_FACE); // Reenable backface culling
+        CHECK_GL_ERROR();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        CHECK_GL_ERROR();
 
         // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
@@ -1177,9 +1048,9 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         
         // Frame stats
-        drawCallCount++; // Add one more for this text render ;)
+        drawCallsRenderedThisFrame++; // Add one more for this text render ;)
         RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d, Worst FPS: %d",
-                            (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallCount,vertexCount,worstFPS);
+                            (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,verticesRenderedThisFrame,worstFPS);
         CHECK_GL_ERROR();
         
         double time_now = get_time();

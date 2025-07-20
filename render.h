@@ -33,16 +33,15 @@
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 32
-#define MAX_VERTS_PER_LIGHT_VOLUME 65535
 
 #define VOXEL_DATA_SIZE 1
 #define SHADOW_MAP_SIZE 512
-#define SHADOW_MAP_FARPLANE 20.0
+#define SHADOW_MAP_FARPLANE 15.36
 
 extern int screen_width;
 extern int screen_height;
-extern uint32_t drawCallCount;
-extern uint32_t vertexCount;
+extern uint32_t drawCallsRenderedThisFrame;
+extern uint32_t verticesRenderedThisFrame;
 extern GLuint matricesBuffer;
 extern GLuint chunkShaderProgram;
 extern GLuint lightVolumeShaderProgram;
@@ -50,7 +49,6 @@ extern GLuint imageBlitShaderProgram;
 extern GLuint deferredLightingShaderProgram;
 extern GLuint lightVolumeMeshShaderProgram;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
-
 
 void CacheUniformLocationsForShaders(void);
 // void render_debug_text(float x, float y, const char *text, SDL_Color color);
