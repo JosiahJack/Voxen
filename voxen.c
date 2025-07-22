@@ -61,8 +61,9 @@ uint32_t lastFrameSecCount = 0;
 uint32_t framesPerLastSecond = 0;
 uint32_t worstFPS = UINT32_MAX;
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
+uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
-bool shadowsEnabled = false;
+bool shadowsEnabled = true;
 uint32_t playerCellIdx = 80000;
 uint32_t playerCellIdx_x = 20000;
 uint32_t playerCellIdx_y = 10000;
@@ -78,13 +79,33 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
       specIndexLoc_chunk = -1; // uniform locations
 
+//    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 
+//    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, inputTexMapsID; // FBO inputs
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
       debugViewLoc_deferred = -1; // uniform locations
+
+//    Shadowmapping
+GLuint shadowFBO, shadowCubeMap;
+int shadowWidth = 512, shadowHeight = 512; // Lower resolution for performance
+GLuint shadowmappingShaderProgram;
+GLint depthViewLoc_shadowmapping = - 1, depthProjectionLoc_shadowmapping = -1, depthMatrixLoc_shadowmapping = -1,
+      depthModelIndexLoc_shadowmapping = -1; // uniform locations
+// Cube map directions and up vectors
+float cubemap_directions[6][3] = {
+    {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, // +X, -X
+    {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, // +Y, -Y
+    {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}  // +Z, -Z
+};
+float cubemap_ups[6][3] = {
+    {0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, // +X, -X
+    {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f},  // +Y, -Y
+    {0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}  // +Z, -Z
+};
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -105,42 +126,35 @@ void DualLog(const char *fmt, ...) {
 
 void DualLogError(const char *fmt, ...) {
     va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
-    fprintf(stderr, "\033[1;31mERROR: \033[0;31m"); vfprintf(stderr, fmt, args1); fprintf(stderr,"\033[0;0m"); fflush(stderr); // Print to console/terminal.
+    fprintf(stderr, "\033[1;31mERROR: \033[0;31m"); vfprintf(stderr, fmt, args1); fprintf(stderr,"\033[0;0m");
+    fflush(stderr); // Print to console/terminal.
     va_end(args1);
-    if (console_log_file) { fprintf(console_log_file, "ERROR: "); vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
+    if (console_log_file) {
+        fprintf(console_log_file, "ERROR: "); vfprintf(console_log_file, fmt, args2);
+        fflush(console_log_file); // Print to log file.
+    }
+    
     va_end(args2);
 }
 
 // Get RSS aka the total RAM reported by btop or other utilities that's allocated virtual ram for the process.
 size_t get_rss_bytes(void) {
     FILE *fp = fopen("/proc/self/stat", "r");
-    if (!fp) {
-        DualLogError("Failed to open /proc/self/stat\n");
-        return 0;
-    }
+    if (!fp) { DualLogError("Failed to open /proc/self/stat\n"); return 0; }
 
     char buffer[1024];
-    if (!fgets(buffer, sizeof(buffer), fp)) {
-        DualLogError("Failed to read /proc/self/stat\n");
-        fclose(fp);
-        return 0;
-    }
+    if (!fgets(buffer, sizeof(buffer), fp)) { DualLogError("Failed to read /proc/self/stat\n"); fclose(fp); return 0; }
+    
     fclose(fp);
-
-    // Parse the 24th field (RSS in pages)
     char *token = strtok(buffer, " ");
     int field = 0;
     size_t rss_pages = 0;
-    while (token && field < 23) {
+    while (token && field < 23) { // Parse the 24th field (RSS in pages)
         token = strtok(NULL, " ");
         field++;
     }
-    if (token) {
-        rss_pages = atol(token);
-    } else {
-        DualLogError("Failed to parse RSS from /proc/self/stat\n");
-        return 0;
-    }
+    if (token) { rss_pages = atol(token);
+    } else { DualLogError("Failed to parse RSS from /proc/self/stat\n"); return 0; }
 
     return rss_pages * sysconf(_SC_PAGESIZE);
 }
@@ -199,6 +213,11 @@ void CacheUniformLocationsForShaders(void) {
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    
+    depthViewLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "view");
+    depthProjectionLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "projection");
+    depthMatrixLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "matrix");
+    depthModelIndexLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "modelIndex");
 }
 
 void UpdateInstanceMatrix(int i) {
@@ -446,11 +465,48 @@ int InitializeEnvironment(void) {
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
     glBindImageTexture(5, inputTexMapsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
-    CHECK_GL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);    
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
+    
+    // Shadow map setup
+    glGenTextures(1, &shadowCubeMap);
+    CHECK_GL_ERROR();
+    glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
+    CHECK_GL_ERROR();
+    for (int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        CHECK_GL_ERROR();
+    }
+    
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    CHECK_GL_ERROR();
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    CHECK_GL_ERROR();
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    CHECK_GL_ERROR();
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    CHECK_GL_ERROR();
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    CHECK_GL_ERROR();
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+    CHECK_GL_ERROR();
+//     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+//     CHECK_GL_ERROR();
+//     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+//     CHECK_GL_ERROR();
+    glGenFramebuffers(1, &shadowFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+//     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubeMap, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { DualLogError("Shadow FBO incomplete\n"); }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    CHECK_GL_ERROR();
+    DebugRAM("setup shadow map");
+    
     Input_Init();
     systemInitialized[SYS_NET] = InitializeNetworking() == 0;
     InitializeAudio();
@@ -492,6 +548,9 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
+    if (shadowCubeMap) glDeleteTextures(1, &shadowCubeMap);
+    if (shadowFBO) glDeleteFramebuffers(1, &shadowFBO);
+    if (shadowmappingShaderProgram) glDeleteProgram(shadowmappingShaderProgram);
     if (systemInitialized[SYS_CTX]) SDL_GL_DeleteContext(gl_context); // Delete context after deleting buffers relevant to that context.
     if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window);
     if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font);
@@ -652,17 +711,18 @@ int main(int argc, char* argv[]) {
         // Client Render
         bool debugRenderSegfaults = false;//true;
         drawCallsRenderedThisFrame = 0; // Reset per frame
+        shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
         
         // 0. Clear Frame Buffers and Depth
         if (debugRenderSegfaults) DualLog("0. Clear Frame Buffers and Depth\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         CHECK_GL_ERROR();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO
         CHECK_GL_ERROR();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear screen
         CHECK_GL_ERROR();
         
         // Test Stuff DELETE ME LATER, Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
@@ -812,6 +872,94 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
         // ====================================================================
+        
+        // 5. Render Shadow Maps
+        glDisable(GL_CULL_FACE);
+        CHECK_GL_ERROR();
+        if (debugRenderSegfaults) DualLog("5. Render Shadow Maps\n");
+        uint16_t lightIdx = 0;
+        if (numLightsFound > 0 && lightsInProximity[LIGHT_DATA_OFFSET_INTENSITY] > 0.015f) {
+            uint16_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+            glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+            CHECK_GL_ERROR();
+            glViewport(0, 0, shadowWidth, shadowHeight);
+            CHECK_GL_ERROR();
+            glClearDepth(1.0f);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            CHECK_GL_ERROR();
+            glUseProgram(shadowmappingShaderProgram);
+            CHECK_GL_ERROR();
+            glEnable(GL_DEPTH_TEST);
+            CHECK_GL_ERROR();
+            glDepthFunc(GL_LESS);
+            CHECK_GL_ERROR();
+            glClearDepth(1.0f);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            CHECK_GL_ERROR();
+
+            // Projection matrix (90° FOV, 1:1 aspect, near=0.02, far=15.36)
+            float shadowProj[16];
+            mat4_perspective(shadowProj, 90.0f, 1.0f, 0.02f, 15.36f);
+
+            // Light position
+            float lightPos[3] = {
+                lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX],
+                lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY],
+                lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ]
+            };
+
+            // Render each cube map face
+            for (int face = 0; face < 6; ++face) {
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMap, 0);
+                CHECK_GL_ERROR();
+                glClearDepth(1.0f);
+                glClear(GL_DEPTH_BUFFER_BIT); // Clear per face
+                CHECK_GL_ERROR();
+                Quaternion q;
+                quat_lookat(&q, cubemap_directions[face][0], cubemap_directions[face][1], cubemap_directions[face][2],
+                            cubemap_ups[face][0], cubemap_ups[face][1], cubemap_ups[face][2]);
+                float view[16];
+                mat4_lookat(view, lightPos[0], lightPos[1], lightPos[2], &q);
+
+                glUniformMatrix4fv(depthProjectionLoc_shadowmapping, 1, GL_FALSE, shadowProj);
+                CHECK_GL_ERROR();
+                glUniformMatrix4fv(depthViewLoc_shadowmapping, 1, GL_FALSE, view);
+                CHECK_GL_ERROR();
+                glBindVertexArray(vao_chunk);
+                CHECK_GL_ERROR();
+
+                for (uint16_t i = 0; i < INSTANCE_COUNT; i++) {
+                    if (instanceIsCulledArray[i]) continue;
+                    if (instances[i].modelIndex >= MODEL_COUNT) continue;
+                    if (modelVertexCounts[instances[i].modelIndex] < 1) continue;
+                    if (instances[i].modelIndex < 0) continue;
+
+                    glUniformMatrix4fv(depthMatrixLoc_shadowmapping, 1, GL_FALSE, &modelMatrices[i * 16]);
+                    CHECK_GL_ERROR();
+                    int modelType = instances[i].modelIndex;
+                    glUniform1i(depthModelIndexLoc_shadowmapping, modelType);
+                    CHECK_GL_ERROR();
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    CHECK_GL_ERROR();
+                    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[instances[i].modelIndex]);
+                    CHECK_GL_ERROR();
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelVertexCounts[instances[i].modelIndex];
+                    shadowDrawCallsRenderedThisFrame++;
+                }
+            }
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, screen_width, screen_height);
+            CHECK_GL_ERROR();
+        }
+        
+//         float* depthPixels = malloc(sizeof(float) * shadowWidth * shadowHeight);
+//         glBindTexture(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_CUBE_MAP_POSITIVE_X + 0);
+//         glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + 0, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depthPixels);
+//         printf("First few values: %f %f %f %f\n", depthPixels[0], depthPixels[1], depthPixels[2], depthPixels[3]);
+        
+        glEnable(GL_CULL_FACE);
 
         // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
@@ -838,6 +986,11 @@ int main(int argc, char* argv[]) {
         float projInv[16];
         mat4_inverse(projInv,projection);
 
+        // Send shadowmaps
+        glActiveTexture(GL_TEXTURE5); // Use a free texture unit
+        glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
+        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMap"), 5);
+        
         // Dispatch compute shader
         GLuint groupX = (screen_width + 7) / 8;
         GLuint groupY = (screen_height + 7) / 8;
@@ -867,9 +1020,16 @@ int main(int argc, char* argv[]) {
         } else if (debugView == 4) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
             CHECK_GL_ERROR();
+        } else if (debugView == 5) { // Shadowmap debugging
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
         }
         
+        
         glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
+        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "shadowMap"), 1);
+        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "debugView"), debugView);
+        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "debugValue"), debugValue);
         CHECK_GL_ERROR();
         glBindVertexArray(quadVAO);
         CHECK_GL_ERROR();
@@ -885,6 +1045,8 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glUseProgram(0);
         CHECK_GL_ERROR();
+        
+        uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
         
         // 8. Render UI Images
         if (debugRenderSegfaults) DualLog("8. Render UI Images\n");
@@ -917,15 +1079,25 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         RenderFormattedText(10, 85, TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
         CHECK_GL_ERROR();
-        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d, %s", debugView, debugView == 1 ? "unlit" : "normal");
+        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugView == 1
+                                                                                       ? "unlit"
+                                                                                       : debugView == 2
+                                                                                         ? "surface normals"
+                                                                                         : debugView == 3
+                                                                                           ? "depth"
+                                                                                           : debugView == 4
+                                                                                             ? "indices"
+                                                                                             : debugView == 5
+                                                                                               ? "shadowmap"
+                                                                                               : "standard render", debugValue);
         CHECK_GL_ERROR();
         RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d   Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         CHECK_GL_ERROR();
         
         // Frame stats
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d, Vertices: %d, Worst FPS: %d",
-                            (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,verticesRenderedThisFrame,worstFPS);
+        RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Norm %d, Shadow %d, UI %d], Vertices: %d, Worst FPS: %d",
+                            (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal - shadowDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
         CHECK_GL_ERROR();
         
         double time_now = get_time();

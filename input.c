@@ -32,6 +32,7 @@ bool noclip = true;
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 int mouse_x = 0, mouse_y = 0; // Mouse position
 int debugView = 0;
+int debugValue = 0;
 
 void Input_Init(void) {
     quat_identity(&cam_rotation);
@@ -56,7 +57,12 @@ int Input_KeyDown(uint32_t scancode) {
     
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
-        if (debugView > 4) debugView = 0;
+        if (debugView > 5) debugView = 0;
+    }
+    
+    if (keys[SDL_SCANCODE_Y]) {
+        debugValue++;
+        if (debugValue > 5) debugValue = 0;
     }
     
     if (keys[SDL_SCANCODE_O]) {

@@ -6,6 +6,7 @@ extern float mouse_sensitivity;
 extern bool keys[];
 extern int mouse_x, mouse_y;
 extern int debugView;
+extern int debugValue;
 extern float cam_fov;
 
 void Input_Init(void);

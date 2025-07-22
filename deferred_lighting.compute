@@ -25,6 +25,8 @@ const char *deferredLighting_computeShader =
     "uniform int shadowsEnabled;\n"
     "uniform int debugView;\n"
 
+    "uniform samplerCube shadowMap;\n"
+
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
     "                float((color >> 16) & 0xFF) / 255.0,\n"  // g
@@ -78,7 +80,12 @@ const char *deferredLighting_computeShader =
 
     "        float shadow = 1.0;\n"
     "        if (shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
-    "            shadow = 1.0;\n"
+            "    vec3 lightToFrag = worldPos - lightPos;\n"
+            "    float closestDepth = texture(shadowMap, lightToFrag).r * 15.36;\n"
+            "    float currentDepth = length(lightToFrag) / 15.36;\n"
+            "    float bias = 0.001;\n"
+            "    currentDepth = currentDepth < closestDepth + bias ? 1.0 : 0.0;\n"
+    "            shadow = i == 0 ? currentDepth : 1.0;\n"
     "        }\n"
 
     "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"

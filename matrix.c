@@ -97,6 +97,62 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
     m[3] = 0.0f;      m[7] = 0.0f;      m[11] = 0.0f;      m[15] = 1.0f;
 }
 
+void quat_lookat(Quaternion* q, float forwardX, float forwardY, float forwardZ, float upX, float upY, float upZ) {
+    // Normalize forward vector
+    float len = sqrtf(forwardX * forwardX + forwardY * forwardY + forwardZ * forwardZ);
+    forwardX /= len; forwardY /= len; forwardZ /= len;
+
+    // Normalize up vector
+    len = sqrtf(upX * upX + upY * upY + upZ * upZ);
+    upX /= len; upY /= len; upZ /= len;
+
+    // Compute right vector (cross product: forward x up)
+    float rightX = forwardY * upZ - forwardZ * upY;
+    float rightY = forwardZ * upX - forwardX * upZ;
+    float rightZ = forwardX * upY - forwardY * upX;
+
+    // Recompute up vector to ensure orthogonality (cross product: right x forward)
+    upX = rightY * forwardZ - rightZ * forwardY;
+    upY = rightZ * forwardX - rightX * forwardZ;
+    upZ = rightX * forwardY - rightY * forwardX;
+
+    // Create rotation matrix
+    float m[16];
+    mat4_identity(m);
+    m[0] = rightX; m[4] = rightY; m[8] = rightZ;
+    m[1] = upX; m[5] = upY; m[9] = upZ;
+    m[2] = -forwardX; m[6] = -forwardY; m[10] = -forwardZ;
+    m[15] = 1.0f;
+
+    // Convert rotation matrix to quaternion
+    float trace = m[0] + m[5] + m[10];
+    if (trace > 0.0f) {
+        float s = 0.5f / sqrtf(trace + 1.0f);
+        q->w = 0.25f / s;
+        q->x = (m[9] - m[6]) * s;
+        q->y = (m[2] - m[8]) * s;
+        q->z = (m[4] - m[1]) * s;
+    } else if (m[0] > m[5] && m[0] > m[10]) {
+        float s = 2.0f * sqrtf(1.0f + m[0] - m[5] - m[10]);
+        q->w = (m[9] - m[6]) / s;
+        q->x = 0.25f * s;
+        q->y = (m[1] + m[4]) / s;
+        q->z = (m[2] + m[8]) / s;
+    } else if (m[5] > m[10]) {
+        float s = 2.0f * sqrtf(1.0f + m[5] - m[0] - m[10]);
+        q->w = (m[2] - m[8]) / s;
+        q->x = (m[1] + m[4]) / s;
+        q->y = 0.25f * s;
+        q->z = (m[6] + m[9]) / s;
+    } else {
+        float s = 2.0f * sqrtf(1.0f + m[10] - m[0] - m[5]);
+        q->w = (m[4] - m[1]) / s;
+        q->x = (m[2] + m[8]) / s;
+        q->y = (m[6] + m[9]) / s;
+        q->z = 0.25f * s;
+    }
+}
+
 void mat4_lookat_vec(float *m, float eye[3], float target[3], float up[3]) {
     float f[3] = {target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]};
     float len = sqrtf(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
