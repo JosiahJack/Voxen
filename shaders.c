@@ -6,7 +6,6 @@
 #include "chunk.glsl"
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
-#include "lightvolume.compute"
 #include "bluenoise64.cginc"
 #include "debug.h"
 
@@ -56,15 +55,6 @@ int CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");    if (!chunkShaderProgram) { return 1; }
 
-    // Light Volume Shader
-    vertShader = CompileShader(GL_VERTEX_SHADER, lightVolumeVertexShaderSource, "Light Volume Vertex Shader"); if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    lightVolumeShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Light Volume Shader Program");    if (!lightVolumeShaderProgram) { return 1; }
-    
-    // Light Volume Procedural Mesh Generation Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, createLightVolume_computeShader, "Light Volume Mesh Compute Shader"); if (!computeShader) { return 1; }
-    lightVolumeMeshShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Light Volume Mesh Shader Program");        if (!lightVolumeMeshShaderProgram) { return 1; }
-    
     // Text Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }

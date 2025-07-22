@@ -8,8 +8,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <math.h>
-#include <string.h>
 #include <unistd.h>
 #include "event.h"
 #include "constants.h"
@@ -28,7 +26,6 @@
 #include "player.h"
 #include "matrix.h"
 
-#define MAX_LIGHT_VOLUME_MESH_VERTS 2000000
 // #define DEBUG_RAM_OUTPUT
 
 // Window
@@ -72,7 +69,6 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 uint8_t numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
 
 GLuint vao_chunk; // Vertex Array Object
 
@@ -95,15 +91,8 @@ GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnable
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
-GLuint lightVolumeMeshShaderProgram; // Compute shader to make the mesh
-GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
-GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1;
-GLint matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1, lightIdx_lightvol = -1; // uniform locations
-GLuint outVertexBuffer;
-GLuint currentLightVolumeMeshVertexCount;
-uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
-bool firstLightVolumeGen = true;
+bool firstLightGen = true;
 // ----------------------------------------------------------------------------
 
 void DualLog(const char *fmt, ...) {
@@ -210,17 +199,6 @@ void CacheUniformLocationsForShaders(void) {
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
-    
-    lightPosXLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosX");
-    lightPosYLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosY");
-    lightPosZLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightPosZ");
-    lightRangeLoc_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightRange");
-    lightIdx_lightvol = glGetUniformLocation(lightVolumeMeshShaderProgram, "lightIndex");
-    
-    matrix_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "matrix");
-    view_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "view");
-    projection_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "projection");
-    debugView_lightvol = glGetUniformLocation(lightVolumeShaderProgram, "debugView");
 }
 
 void UpdateInstanceMatrix(int i) {
@@ -478,27 +456,6 @@ int InitializeEnvironment(void) {
     InitializeAudio();
     DebugRAM("audio init"); 
     systemInitialized[SYS_AUD] = true;
-    
-    // Initialize buffers for light volume mesh generation
-    glGenBuffers(1, &outVertexBuffer);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, outVertexBuffer);
-    CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    CHECK_GL_ERROR();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, outVertexBuffer);
-    CHECK_GL_ERROR();
-    
-    glGenBuffers(1, &currentLightVolumeMeshVertexCount);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,currentLightVolumeMeshVertexCount);
-    CHECK_GL_ERROR();
-    uint32_t zero = 0;
-    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t), &zero, GL_DYNAMIC_DRAW);
-    CHECK_GL_ERROR();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 22, currentLightVolumeMeshVertexCount);
-    CHECK_GL_ERROR();
-    
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -513,11 +470,6 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
         vbos[i] = 0;
     }
-    
-//     for (uint32_t i=0;i<MAX_VISIBLE_LIGHTS;i++) {
-//         if (lightVBOs[i]) glDeleteBuffers(1, &lightVBOs[i]);
-//         lightVBOs[i] = 0;
-//     }
     
     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
@@ -536,7 +488,6 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
-    if (lightVolumeMeshShaderProgram) glDeleteProgram(lightVolumeMeshShaderProgram);
     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
@@ -779,9 +730,9 @@ int main(int argc, char* argv[]) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         CHECK_GL_ERROR();
         
-        if (firstLightVolumeGen && globalFrameNum > 2) {
+        if (firstLightGen && globalFrameNum > 2) {
             for (uint8_t i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
-            firstLightVolumeGen = false;
+            firstLightGen = false;
         }
                 
         // 2. Instance Culling to only those in range of player
@@ -832,9 +783,7 @@ int main(int argc, char* argv[]) {
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
 
-            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-//             if (i != 39) continue; // Skip everything except test light's white cube.
-            
+            if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             CHECK_GL_ERROR();
             glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
@@ -850,7 +799,6 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             CHECK_GL_ERROR();
-            
             if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
             glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
             CHECK_GL_ERROR();
@@ -859,84 +807,11 @@ int main(int argc, char* argv[]) {
             verticesRenderedThisFrame += modelVertexCounts[modelType];
         }
         
-        // 5. Render Light Volume Meshes        
-        if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
-        float identity[16];
-        mat4_identity(identity);
-        
-        glDisable(GL_CULL_FACE); // Disable backface culling
-        CHECK_GL_ERROR();
-        for (uint8_t lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
-            if (lightVertexCounts[lightIdx] == 0) continue;
-
-            if (lightDirty[lightIdx]) {
-                glUseProgram(lightVolumeMeshShaderProgram);
-                CHECK_GL_ERROR();
-                
-                // Set uniforms
-                glUniform1i(lightIdx_lightvol, lightIdx);
-                CHECK_GL_ERROR();
-                uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-                glUniform1f(lightPosXLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX]);
-                CHECK_GL_ERROR();
-                glUniform1f(lightPosYLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY]);
-                CHECK_GL_ERROR();
-                glUniform1f(lightPosZLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ]);
-                CHECK_GL_ERROR();
-                glUniform1f(lightRangeLoc_lightvol, lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE]);
-                CHECK_GL_ERROR();
-                glUniform1ui(glGetUniformLocation(lightVolumeMeshShaderProgram, "lightIndex"), lightIdx);
-                CHECK_GL_ERROR();
-
-                // Reset vertex count for this light
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, currentLightVolumeMeshVertexCount);
-                CHECK_GL_ERROR();
-                uint32_t zero = 0;
-                glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(uint32_t), &zero, GL_DYNAMIC_DRAW);
-                CHECK_GL_ERROR();
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-                CHECK_GL_ERROR();
-                glBindVertexBuffer(0, outVertexBuffer, 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                CHECK_GL_ERROR();
-                glDispatchCompute(INSTANCE_COUNT / 64, 1, 1);
-                CHECK_GL_ERROR();
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-                CHECK_GL_ERROR();
-
-                // Read back vertex count
-                uint32_t vertexCountResult;
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, currentLightVolumeMeshVertexCount);
-                CHECK_GL_ERROR();
-                glGetBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeof(uint32_t), &vertexCountResult);
-                CHECK_GL_ERROR();
-                lightVertexCounts[lightIdx] = vertexCountResult / VERTEX_ATTRIBUTES_COUNT;
-                verticesRenderedThisFrame += lightVertexCounts[lightIdx];
-                lightDirty[lightIdx] = false;
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-                CHECK_GL_ERROR();
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-                CHECK_GL_ERROR();
-            }
-            
-            glUseProgram(lightVolumeShaderProgram);
-            glBindVertexArray(vao_chunk); // Use same VAO as geometry passrq
-            glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
-            CHECK_GL_ERROR();
-            glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
-            CHECK_GL_ERROR();
-            glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
-            CHECK_GL_ERROR();
-            glUniform1i(debugView_lightvol, debugView);
-            CHECK_GL_ERROR();
-            glDrawArrays(GL_TRIANGLES, 0, lightVertexCounts[lightIdx]);
-            CHECK_GL_ERROR();
-            drawCallsRenderedThisFrame++;
-        }
-        
-        glEnable(GL_CULL_FACE); // Reenable backface culling
-        CHECK_GL_ERROR();
+        // ====================================================================
+        // Ok, turn off temporary framebuffer so we can draw to screen now.
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
+        // ====================================================================
 
         // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
