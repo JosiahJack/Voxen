@@ -43,12 +43,6 @@ extern int screen_height;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern GLuint matricesBuffer;
-extern GLuint chunkShaderProgram;
-extern GLuint lightVolumeShaderProgram;
-extern GLuint imageBlitShaderProgram;
-extern GLuint deferredLightingShaderProgram;
-extern GLuint lightVolumeMeshShaderProgram;
-extern GLuint shadowmappingShaderProgram;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
 
 void CacheUniformLocationsForShaders(void);

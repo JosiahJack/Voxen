@@ -82,6 +82,7 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
+GLint texLoc_quadblit = -1, shadowMapLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -95,7 +96,7 @@ int shadowWidth = 512, shadowHeight = 512; // Lower resolution for performance
 GLuint shadowmappingShaderProgram;
 GLint depthViewLoc_shadowmapping = - 1, depthProjectionLoc_shadowmapping = -1, depthMatrixLoc_shadowmapping = -1,
       depthModelIndexLoc_shadowmapping = -1; // uniform locations
-// Cube map directions and up vectors
+
 float cubemap_directions[6][3] = {
     {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, // +X, -X
     {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, // +Y, -Y
@@ -114,6 +115,33 @@ bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
 bool firstLightGen = true;
+
+// Text
+GLuint textShaderProgram;
+TTF_Font* font = NULL;
+GLuint textVAO, textVBO;
+SDL_Color textColWhite = {255, 255, 255, 255};
+SDL_Color textColRed = {255, 0, 0, 255};
+SDL_Color textColGreen = {20, 255, 30, 255};
+SDL_Color textColors[6] = {
+    {255, 255, 255, 255}, // 0 White 1.0f, 1.0f, 1.0f
+    {227, 223,   0, 255}, // 1 Yellow 0.8902f, 0.8745f, 0f
+    {159, 156,   0, 255}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
+    { 95, 167,  43, 255}, // 3 Green 0.3725f, 0.6549f, 0.1686f
+    {234,  35,  43, 255}, // 4 Red 0.9176f, 0.1373f, 0.1686f
+    {255, 127,   0, 255}  // 5 Orange 1f, 0.498f, 0f
+};
+
+float textQuadVertices[] = { // 2 triangles, text is applied as an image from SDL TTF
+    // Positions   // Tex Coords
+    0.0f, 0.0f,    0.0f, 0.0f, // Bottom-left
+    1.0f, 0.0f,    1.0f, 0.0f, // Bottom-right
+    1.0f, 1.0f,    1.0f, 1.0f, // Top-right
+    0.0f, 1.0f,    0.0f, 1.0f  // Top-left
+};
+
+char uiTextBuffer[TEXT_BUFFER_SIZE];
+GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
 // ----------------------------------------------------------------------------
 
 void DualLog(const char *fmt, ...) {
@@ -218,6 +246,16 @@ void CacheUniformLocationsForShaders(void) {
     depthProjectionLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "projection");
     depthMatrixLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "matrix");
     depthModelIndexLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "modelIndex");
+    
+    texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
+    shadowMapLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "shadowMap");
+    debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
+    debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
+    
+    projectionLoc_text = glGetUniformLocation(textShaderProgram, "projection");
+    textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
+    textTextureLoc_text = glGetUniformLocation(textShaderProgram, "textTexture");
+    texelSizeLoc_text = glGetUniformLocation(textShaderProgram, "texelSize");
 }
 
 void UpdateInstanceMatrix(int i) {
@@ -250,6 +288,102 @@ void UpdateInstanceMatrix(int i) {
     mat[12] = instances[i].posx; mat[13] = instances[i].posy; mat[14] = instances[i].posz; mat[15] = 1.0f;
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
+}
+
+// Renders text at x,y coordinates specified using pointer to the string array.
+void RenderText(float x, float y, const char *text, int colorIdx) {
+    glDisable(GL_CULL_FACE); // Disable backface culling
+    CHECK_GL_ERROR();
+    if (!font) { DualLogError("Font is NULL\n"); return; }
+    if (!text) { DualLogError("Text is NULL\n"); return; }
+    
+    SDL_Surface *surface = TTF_RenderText_Solid(font, text, textColors[colorIdx]);
+    if (!surface) { DualLogError("TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
+    
+    SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
+    SDL_FreeSurface(surface);
+    if (!rgba_surface) { DualLogError("SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
+
+    GLuint texture;
+    glCreateTextures(GL_TEXTURE_2D, 1, &texture);
+    CHECK_GL_ERROR();
+    glTextureStorage2D(texture, 1, GL_RGBA8, rgba_surface->w, rgba_surface->h);
+    CHECK_GL_ERROR();
+    glTextureSubImage2D(texture, 0, 0, 0, rgba_surface->w, rgba_surface->h, GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
+    CHECK_GL_ERROR();
+    glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    CHECK_GL_ERROR();
+    glUseProgram(textShaderProgram);
+    CHECK_GL_ERROR();
+    float projection[16];
+    mat4_ortho(projection, 0.0f, (float)screen_width, (float)screen_height, 0.0f, -1.0f, 1.0f);
+    glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, projection);
+    float r = textColors[colorIdx].r / 255.0f;
+    float g = textColors[colorIdx].g / 255.0f;
+    float b = textColors[colorIdx].b / 255.0f;
+    float a = textColors[colorIdx].a / 255.0f;
+    glProgramUniform4f(textShaderProgram, textColorLoc_text, r, g, b, a);
+    CHECK_GL_ERROR();
+    glBindTextureUnit(0,texture);
+    CHECK_GL_ERROR();
+    glProgramUniform1i(textShaderProgram, textTextureLoc_text, 0);
+    CHECK_GL_ERROR();
+    float scaleX = (float)rgba_surface->w;
+    float scaleY = (float)rgba_surface->h;
+    glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / scaleX, 1.0f / scaleY);
+    CHECK_GL_ERROR();
+    glEnable(GL_BLEND); // Enable blending for text transparency
+    CHECK_GL_ERROR();
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    CHECK_GL_ERROR();
+    glDisable(GL_DEPTH_TEST); // Disable depth test for 2D overlay
+    CHECK_GL_ERROR();
+    glBindVertexArray(textVAO);
+    CHECK_GL_ERROR();
+    float vertices[] = {
+        x,          y,          0.0f, 0.0f, // Bottom-left
+        x + scaleX, y,          1.0f, 0.0f, // Bottom-right
+        x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
+        x,          y + scaleY, 0.0f, 1.0f  // Top-left
+    };
+    
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    CHECK_GL_ERROR();
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // Render quad (two triangles)
+    CHECK_GL_ERROR();
+    drawCallsRenderedThisFrame++;
+    verticesRenderedThisFrame+=6;
+
+    // Cleanup
+    glBindVertexArray(0);
+    CHECK_GL_ERROR();
+    glBindTextureUnit(0, 0);
+    CHECK_GL_ERROR();
+    glDisable(GL_BLEND);
+    CHECK_GL_ERROR();
+    glEnable(GL_DEPTH_TEST); // Re-enable depth test for 3D rendering
+    CHECK_GL_ERROR();
+    glUseProgram(0);
+    CHECK_GL_ERROR();
+    glDeleteTextures(1, &texture);
+    CHECK_GL_ERROR();
+    SDL_FreeSurface(rgba_surface);
+    CHECK_GL_ERROR();
+    glEnable(GL_CULL_FACE); // Reenable backface culling
+    CHECK_GL_ERROR();
+}
+
+void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
+    va_end(args);
+    RenderText(x, y, uiTextBuffer, color);
 }
 // ============================================================================
 
@@ -329,27 +463,25 @@ int InitializeEnvironment(void) {
         -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
     };
     
-    glGenVertexArrays(1, &quadVAO);
+    glCreateBuffers(1, &quadVBO);
     CHECK_GL_ERROR();
-    glGenBuffers(1, &quadVBO);
+    glNamedBufferData(quadVBO, sizeof(vertices), vertices, GL_STATIC_DRAW);
     CHECK_GL_ERROR();
-    glBindVertexArray(quadVAO);
+    glCreateVertexArrays(1, &quadVAO);
     CHECK_GL_ERROR();
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glEnableVertexArrayAttrib(quadVAO, 0);
     CHECK_GL_ERROR();
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glEnableVertexArrayAttrib(quadVAO, 1);
     CHECK_GL_ERROR();
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
     CHECK_GL_ERROR();
-    glEnableVertexAttribArray(0);
+    glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
     CHECK_GL_ERROR();
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
     CHECK_GL_ERROR();
-    glEnableVertexAttribArray(1);
+    glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
     CHECK_GL_ERROR();
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    CHECK_GL_ERROR();
-    glBindVertexArray(0);
+    glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
     CHECK_GL_ERROR();
     
     // VAO for Global Vertex Definition
@@ -374,10 +506,6 @@ int InitializeEnvironment(void) {
 
     glBindVertexArray(0);
     DebugRAM("after vao chunk bind");
-    
-    int fontInit = InitializeTextAndFonts();
-    if (fontInit) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
-    DebugRAM("setup full screen quad"); 
     
     // Initialize Lights
     for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
@@ -507,11 +635,40 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     DebugRAM("setup shadow map");
     
+    // Text Initialization
+    glCreateBuffers(1, &textVBO);
+    CHECK_GL_ERROR();
+    glCreateVertexArrays(1, &textVAO);    
+    CHECK_GL_ERROR();
+    glNamedBufferData(textVBO, sizeof(textQuadVertices), textQuadVertices, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glEnableVertexArrayAttrib(textVAO, 0); // DSA: Enable position attribute
+    CHECK_GL_ERROR();
+    glEnableVertexArrayAttrib(textVAO, 1); // DSA: Enable texture coordinate attribute
+    CHECK_GL_ERROR();
+    glVertexArrayAttribFormat(textVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Position (x, y)
+    CHECK_GL_ERROR();
+    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Texcoord (u, v)
+    CHECK_GL_ERROR();
+    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
+    CHECK_GL_ERROR();
+    glVertexArrayAttribBinding(textVAO, 0, 0); // DSA: Bind position to binding index 0
+    CHECK_GL_ERROR();
+    glVertexArrayAttribBinding(textVAO, 1, 0); // DSA: Bind texcoord to binding index 0
+    CHECK_GL_ERROR();
+    font = TTF_OpenFont("./Fonts/SystemShockText.ttf", 12);
+    if (!font) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    DebugRAM("text init");
+    
+    // Input
     Input_Init();
     systemInitialized[SYS_NET] = InitializeNetworking() == 0;
+    
+    // Audio
     InitializeAudio();
-    DebugRAM("audio init"); 
+    DebugRAM("audio init");
     systemInitialized[SYS_AUD] = true;
+    
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1006,30 +1163,31 @@ int main(int argc, char* argv[]) {
         glActiveTexture(GL_TEXTURE0);
         CHECK_GL_ERROR();
         if (debugView == 0) {
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Normal
+            glBindTextureUnit(0, inputImageID); // Normal
             CHECK_GL_ERROR();
         } else if (debugView == 1) {
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Unlit
+            glBindTextureUnit(0, inputImageID); // Unlit
             CHECK_GL_ERROR();
         } else if (debugView == 2) {
-            glBindTexture(GL_TEXTURE_2D, inputNormalsID); // Triangle Normals 
+            glBindTextureUnit(0, inputNormalsID); // Triangle Normals 
             CHECK_GL_ERROR();
         } else if (debugView == 3) {
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Depth.  Values must be decoded in shader
+            glBindTextureUnit(0, inputImageID); // Depth.  Values must be decoded in shader
             CHECK_GL_ERROR();
         } else if (debugView == 4) {
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
+            glBindTextureUnit(0, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
             CHECK_GL_ERROR();
         } else if (debugView == 5) { // Shadowmap debugging
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
+            glBindTextureUnit(0, shadowCubeMap);
         }
         
-        
-        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "tex"), 0);
-        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "shadowMap"), 1);
-        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "debugView"), debugView);
-        glUniform1i(glGetUniformLocation(imageBlitShaderProgram, "debugValue"), debugValue);
+        glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
+        CHECK_GL_ERROR();
+        glProgramUniform1i(imageBlitShaderProgram, shadowMapLoc_quadblit, 1);
+        CHECK_GL_ERROR();
+        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
+        CHECK_GL_ERROR();
+        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
         CHECK_GL_ERROR();
         glBindVertexArray(quadVAO);
         CHECK_GL_ERROR();
@@ -1041,7 +1199,7 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glEnable(GL_DEPTH_TEST);
         CHECK_GL_ERROR();
-        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindTextureUnit(0, 0);
         CHECK_GL_ERROR();
         glUseProgram(0);
         CHECK_GL_ERROR();
@@ -1096,7 +1254,7 @@ int main(int argc, char* argv[]) {
         
         // Frame stats
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Norm %d, Shadow %d, UI %d], Vertices: %d, Worst FPS: %d",
+        RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, Shdw %d, UI %d], Verts: %d, Worst FPS: %d",
                             (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal - shadowDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
         CHECK_GL_ERROR();
         

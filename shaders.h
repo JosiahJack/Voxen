@@ -3,6 +3,14 @@
 
 #include <GL/glew.h>
 
+extern GLuint chunkShaderProgram;
+extern GLuint lightVolumeShaderProgram;
+extern GLuint imageBlitShaderProgram;
+extern GLuint deferredLightingShaderProgram;
+extern GLuint lightVolumeMeshShaderProgram;
+extern GLuint shadowmappingShaderProgram;
+extern GLuint textShaderProgram;
+
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName);
 GLuint LinkProgram(GLuint *shaders, int count, const char *programName);
 int CompileShaders(void);
