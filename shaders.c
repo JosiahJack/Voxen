@@ -4,7 +4,6 @@
 #include "text.h"
 #include "text.glsl"
 #include "chunk.glsl"
-#include "shadowmapping.glsl"
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
 #include "bluenoise64.cginc"
@@ -55,11 +54,6 @@ int CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");            if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");    if (!chunkShaderProgram) { return 1; }
-    
-    // Shadowmapping Shader
-    vertShader = CompileShader(GL_VERTEX_SHADER, depthVertexShader, "Shadowmapping Vertex Shader");            if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, depthFragmentShader, "Shadowmapping Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    shadowmappingShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmapping Shader Program");    if (!shadowmappingShaderProgram) { return 1; }
 
     // Text Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }

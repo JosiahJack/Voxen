@@ -35,8 +35,6 @@
 #define MAX_VISIBLE_LIGHTS 32
 
 #define VOXEL_DATA_SIZE 1
-#define SHADOW_MAP_SIZE 512
-#define SHADOW_MAP_FARPLANE 15.36
 
 extern int screen_width;
 extern int screen_height;

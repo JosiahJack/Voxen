@@ -82,34 +82,13 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
-GLint texLoc_quadblit = -1, shadowMapLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
+GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, inputTexMapsID; // FBO inputs
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
       debugViewLoc_deferred = -1; // uniform locations
-
-//    Shadowmapping
-GLuint shadowFBO, shadowCubeMapXPos, shadowCubeMapXNeg, shadowCubeMapYPos, shadowCubeMapYNeg, shadowCubeMapZPos, shadowCubeMapZNeg;
-int shadowWidth = 512, shadowHeight = 512; // Lower resolution for performance
-GLuint shadowmappingShaderProgram;
-GLint debugViewLoc_shadowmapping = - 1, shadowFaceLoc_shadowmapping = -1, viewLoc_shadowmapping = -1, 
-      projectionLoc_shadowmapping = -1, matrixLoc_shadowmapping = -1; // uniform locations
-
-// float cubemap_directions[6][3] = {
-//     {1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, // +X, -X
-//     {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, // +Y, -Y
-//     {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}  // +Z, -Z
-// };
-// float cubemap_ups[6][3] = {
-//     {0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, // +X, -X
-//     {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f, -1.0f},  // +Y, -Y
-//     {0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}  // +Z, -Z
-// };
-
-float cubemap_directions_yaw[6]   = {90.0f, 270.0f, 180.0f, 0.0f, 180.0f, 180.0f};
-float cubemap_directions_pitch[6] = {90.0f, 90.0f, 90.0f, 90.0f, 0.00001f, 179.99999f};
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -232,10 +211,6 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int he
         CHECK_GL_ERROR();
         glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         CHECK_GL_ERROR();
-//         glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-//         CHECK_GL_ERROR();
-//         glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
-//         CHECK_GL_ERROR()
     }
     glBindTexture(target, 0);
     GLenum error = glGetError();
@@ -259,14 +234,7 @@ void CacheUniformLocationsForShaders(void) {
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     
-    shadowFaceLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "shadowFace");
-    viewLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "view");
-    projectionLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "projection");
-    matrixLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "matrix");
-    debugViewLoc_shadowmapping = glGetUniformLocation(shadowmappingShaderProgram, "debugView");
-    
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
-    shadowMapLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "shadowMap");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
     debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
     
@@ -616,31 +584,6 @@ int InitializeEnvironment(void) {
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
     
-    // Shadow map setup
-    GenerateAndBindTexture(&shadowCubeMapXPos,  GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_TEXTURE_2D, "Shadowmap Cubemap X+");
-    GenerateAndBindTexture(&shadowCubeMapXNeg, GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_TEXTURE_2D, "Shadowmap Cubemap X-");
-    GenerateAndBindTexture(&shadowCubeMapYPos,  GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_TEXTURE_2D, "Shadowmap Cubemap Y+");
-    GenerateAndBindTexture(&shadowCubeMapYNeg, GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_TEXTURE_2D, "Shadowmap Cubemap Y-");
-    GenerateAndBindTexture(&shadowCubeMapZPos,  GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_TEXTURE_2D, "Shadowmap Cubemap Z+");
-    GenerateAndBindTexture(&shadowCubeMapZNeg, GL_DEPTH_COMPONENT24, shadowWidth, shadowHeight, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_TEXTURE_2D, "Shadowmap Cubemap Z-");
-    CHECK_GL_ERROR();
-    glGenFramebuffers(1, &shadowFBO);
-    CHECK_GL_ERROR();
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-    CHECK_GL_ERROR();
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, shadowCubeMapXPos, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, shadowCubeMapXNeg, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, shadowCubeMapYPos, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, shadowCubeMapYNeg, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, shadowCubeMapZPos, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT5, GL_TEXTURE_2D, shadowCubeMapZNeg, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { DualLogError("Shadow FBO incomplete\n"); }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); 
-    CHECK_GL_ERROR();
-    DebugRAM("setup shadow map");
-    
     // Text Initialization
     glCreateBuffers(1, &textVBO);
     CHECK_GL_ERROR();
@@ -711,14 +654,6 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
-    if (shadowCubeMapXPos) glDeleteTextures(1, &shadowCubeMapXPos);
-    if (shadowCubeMapXNeg) glDeleteTextures(1, &shadowCubeMapXNeg);
-    if (shadowCubeMapYPos) glDeleteTextures(1, &shadowCubeMapYPos);
-    if (shadowCubeMapYNeg) glDeleteTextures(1, &shadowCubeMapYNeg);
-    if (shadowCubeMapZPos) glDeleteTextures(1, &shadowCubeMapZPos);
-    if (shadowCubeMapZNeg) glDeleteTextures(1, &shadowCubeMapZNeg);
-    if (shadowFBO) glDeleteFramebuffers(1, &shadowFBO);
-    if (shadowmappingShaderProgram) glDeleteProgram(shadowmappingShaderProgram);
     if (systemInitialized[SYS_CTX]) SDL_GL_DeleteContext(gl_context); // Delete context after deleting buffers relevant to that context.
     if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window);
     if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font);
@@ -1040,90 +975,6 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
         // ====================================================================
-
-        // 5. Render Shadow Maps
-        if (debugRenderSegfaults) DualLog("5. Render Shadow Maps\n");
-        glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-        CHECK_GL_ERROR();
-        glViewport(0, 0, shadowWidth, shadowHeight);
-        CHECK_GL_ERROR();
-        glDisable(GL_CULL_FACE);
-        CHECK_GL_ERROR();
-        uint16_t lightIdx = 0;
-        if (numLightsFound > 0) {
-        // for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
-            uint16_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-            glClearDepth(1.0f);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            CHECK_GL_ERROR();
-            glUseProgram(shadowmappingShaderProgram);
-            CHECK_GL_ERROR();
-            glEnable(GL_DEPTH_TEST);
-            CHECK_GL_ERROR();
-            float fov = 90.0f;
-            mat4_perspective(projection, fov, 1.0f, 0.02f, 15.36f);
-            glUniformMatrix4fv(projectionLoc_shadowmapping, 1, GL_FALSE, projection);
-            CHECK_GL_ERROR();
-            glUniform1i(debugViewLoc_shadowmapping, debugView);
-            CHECK_GL_ERROR();
-            glBindVertexArray(vao_chunk);
-            CHECK_GL_ERROR();;
-
-            // Light position
-            float lightPos[3] = {
-                lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX],
-                lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY],
-                lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ]
-            };
-
-            // Render each cube map face
-            for (int face = 0; face < 6; ++face) {
-                switch(face) {
-                    case 0: glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMapXPos, 0); break;
-                    case 1: glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMapXNeg, 0); break;
-                    case 2: glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMapYPos, 0); break;
-                    case 3: glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMapYNeg, 0); break;
-                    case 4: glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMapZPos, 0); break;
-                    case 5: glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMapZNeg, 0); break;
-                    default: continue;
-                }
-                CHECK_GL_ERROR();
-                glClearDepth(1.0f);
-                glClear(GL_DEPTH_BUFFER_BIT); // Clear per face
-                CHECK_GL_ERROR();
-                Quaternion q;
-                quat_from_yaw_pitch_roll(&q,cubemap_directions_yaw[face],cam_pitch,0.0f);
-                mat4_lookat(view, lightPos[0], lightPos[1], lightPos[2], &q);
-                glUniformMatrix4fv(viewLoc_shadowmapping, 1, GL_FALSE, view);
-                CHECK_GL_ERROR();
-                for (uint16_t i = 0; i < INSTANCE_COUNT; i++) {
-                    if (instanceIsCulledArray[i]) continue;
-                    if (instances[i].modelIndex >= MODEL_COUNT) continue;
-                    if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
-                    if (instances[i].modelIndex < 0) continue; // Culled
-
-                    int modelType = instances[i].modelIndex;
-                    glUniformMatrix4fv(matrixLoc_shadowmapping, 1, GL_FALSE, &modelMatrices[i * 16]);
-                    CHECK_GL_ERROR();
-                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                    CHECK_GL_ERROR();
-                    if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
-                    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
-                    CHECK_GL_ERROR();
-                    if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
-                    drawCallsRenderedThisFrame++;
-                    shadowDrawCallsRenderedThisFrame++;
-                    verticesRenderedThisFrame += modelVertexCounts[modelType];
-                }
-            }
-        }
-        
-        glEnable(GL_CULL_FACE);
-        CHECK_GL_ERROR();
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        CHECK_GL_ERROR();
-        glViewport(0, 0, screen_width, screen_height);
-        CHECK_GL_ERROR();
         
         // 6. Deferred Lighting + Shadow Calculations
         //        Apply deferred lighting with compute shader.  All lights are
@@ -1149,27 +1000,6 @@ int main(int argc, char* argv[]) {
         mat4_inverse(viewInv,view);
         float projInv[16];
         mat4_inverse(projInv,projection);
-
-        // Send shadowmaps
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, shadowCubeMapXPos);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMapXPos"), 0);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, shadowCubeMapXNeg);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMapXNeg"), 1);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, shadowCubeMapYPos);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMapYPos"), 2);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, shadowCubeMapYNeg);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMapYNeg"), 3);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, shadowCubeMapZPos);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMapZPos"), 4);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, shadowCubeMapZNeg);
-        glUniform1i(glGetUniformLocation(deferredLightingShaderProgram, "shadowMapZNeg"), 5);
-        glBindTexture(GL_TEXTURE_2D, 0);
         
         // Dispatch compute shader
         GLuint groupX = (screen_width + 7) / 8;
@@ -1200,13 +1030,11 @@ int main(int argc, char* argv[]) {
         } else if (debugView == 4) {
             glBindTextureUnit(0, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
             CHECK_GL_ERROR();
-        } else if (debugView == 5) { // Shadowmap debugging
-            glBindTextureUnit(0, shadowCubeMapYPos);
+        } else if (debugView == 5) { // Shadow debugging
+            glBindTextureUnit(0, inputImageID);
         }
         
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
-        CHECK_GL_ERROR();
-        glProgramUniform1i(imageBlitShaderProgram, shadowMapLoc_quadblit, 1);
         CHECK_GL_ERROR();
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
         CHECK_GL_ERROR();
@@ -1269,7 +1097,7 @@ int main(int argc, char* argv[]) {
                                                                                            : debugView == 4
                                                                                              ? "indices"
                                                                                              : debugView == 5
-                                                                                               ? "shadowmap"
+                                                                                               ? "shadows"
                                                                                                : "standard render", debugValue);
         CHECK_GL_ERROR();
         RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d   Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
