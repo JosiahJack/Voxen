@@ -2,10 +2,11 @@
 // enemies, doors, etc., without transparency for first pass prior to lighting.
 const char *vertexShaderSource =
     "#version 450 core\n"
-    "\n"
+
     "layout(location = 0) in vec3 aPos;\n"
     "layout(location = 1) in vec3 aNormal;\n"
     "layout(location = 2) in vec2 aTexCoord;\n"
+
     "uniform int texIndex;\n"
     "uniform int glowIndex;\n"
     "uniform int specIndex;\n"
@@ -15,16 +16,18 @@ const char *vertexShaderSource =
     "uniform mat4 matrix;\n"
     "uniform mat4 view;\n"
     "uniform mat4 projection;\n"
+
     "out vec3 FragPos;\n"
     "out vec3 Normal;\n"
     "out vec2 TexCoord;\n"
+
     "flat out int TexIndex;\n"
     "flat out int GlowIndex;\n"
     "flat out int SpecIndex;\n"
     "flat out int NormalIndex;\n"
     "flat out int InstanceIndex;\n"
     "flat out int ModelIndex;\n"
-    "\n"
+
     "void main() {\n"
     "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
     "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"
@@ -40,17 +43,18 @@ const char *vertexShaderSource =
 
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
-    "\n"
+
     "in vec2 TexCoord;\n"
+    "in vec3 Normal;\n"
+    "in vec3 FragPos;\n"
+
     "flat in int TexIndex;\n"
     "flat in int GlowIndex;\n"
     "flat in int SpecIndex;\n"
     "flat in int NormalIndex;\n"
     "flat in int InstanceIndex;\n"
     "flat in int ModelIndex;\n"
-    "in vec3 Normal;\n"
-    "in vec3 FragPos;\n"
-    "\n"
+
     "layout(std430, binding = 12) buffer ColorBuffer {\n"
     "    uint colors[];\n" // 1D color array (RGBA)
     "};\n"
