@@ -8,8 +8,8 @@ const char *deferredLighting_computeShader =
     // G-buffer inputs
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1) uniform image2D inputNormals;\n"
+    "layout(rgba8,   binding = 2) uniform image2D inputShadowStencil;\n"
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
-//     "layout(rgba32i, binding = 5) uniform iimage2D inputTexMaps;\n"
     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
 
@@ -25,14 +25,6 @@ const char *deferredLighting_computeShader =
     "                float((color >>  8) & 0xFF) / 255.0,\n"  // b
     "                float((color      ) & 0xFF) / 255.0);\n" // a
     "}\n"
-    
-//     "vec2 unpackHalf2(float packet) {\n"
-//     "    return unpackHalf2x16(floatBitsToUint(packet));\n"
-// //     "    uint packetU = floatBitsToUint(packet);\n"
-// //     "    float fx = uintBitsToFloat((packetU >> 16) & 0xFFFF);\n" // Normal X (high 16 bits)
-// //     "    float fy = uintBitsToFloat((packetU      ) & 0xFFFF);\n" // Normal Y (low 16 bits)
-// //     "    return vec2(fx,fy);\n"
-//     "}\n"
     
     // --- Main Compute Shader ---
     "void main() {\n"
@@ -50,11 +42,7 @@ const char *deferredLighting_computeShader =
     "    vec3 normal = normalize(vec3(normalXY.x,normalXY.y,normalZ0.x) * 2.0 - 1.0);\n"
     "    vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));\n"
     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
-    
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
-
-//     "    ivec4 indicesPack = imageLoad(inputTexMaps, ivec2(pixel));\n"
-
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
     "    uint lightIdx = 0;\n"
     "    for (int i = 0; i < 32; i++) {\n"
@@ -84,7 +72,8 @@ const char *deferredLighting_computeShader =
 
     "        float shadow = 1.0;\n"
     "        if (shadowsEnabled > 0) {\n"
-    // TODO
+    "           uint shadowStencil = packUnorm4x8(imageLoad(inputShadowStencil, ivec2(pixel)));\n"
+    "           if ((shadowStencil & (1u << i)) > 0) shadow = 0.0;\n"
     "        }\n"
 
     "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"

@@ -86,8 +86,7 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
-GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO; // FBO inputs
-// GLuint inputTexMapsID;
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBufferFBO; // FBO inputs
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
       debugViewLoc_deferred = -1, sphoxelCountLoc_deferred = -1; // uniform locations
 
@@ -543,14 +542,14 @@ int InitializeEnvironment(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Unlit Raster Albedo Colors");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster Normals");
+    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster Normals and Glow and Spec Indices");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Unlit Raster Depth");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster World Positions");
     CHECK_GL_ERROR();
-//     GenerateAndBindTexture(&inputTexMapsID,         GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, GL_TEXTURE_2D, "Unlit Raster Glow and Specular Map Indices");
-//     CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputShadowStencilID,     GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Shadow Stencil Bitmask");
+    CHECK_GL_ERROR();
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -560,7 +559,7 @@ int InitializeEnvironment(void) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
-//     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputTexMapsID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputShadowStencilID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
     glDrawBuffers(4, drawBuffers);
@@ -578,10 +577,9 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
-    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
     CHECK_GL_ERROR();
-/*    glBindImageTexture(5, inputTexMapsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); */   
+    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
@@ -650,7 +648,6 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
-//     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
@@ -923,43 +920,7 @@ int main(int argc, char* argv[]) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         CHECK_GL_ERROR();
         
-        // 4. Generate Sphoxels around Player
-//         if (debugRenderSegfaults) DualLog("4. Generate Sphoxels around Player\n");
-//         uint32_t sphoxelBufferSize = 0;
-//         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
-//             if (instanceIsCulledArray[i]) continue; // Not a visible mesh, skip it.
-//             
-//             sphoxelBufferSize += modelVertexCounts[instances[i].modelIndex];
-//             if (sphoxelBufferSize >= 10000) break; // cap it
-//         }
-//         
-//         float * sphoxels = (float *)malloc(sphoxelBufferSize * 4 * sizeof(float)); // x,y,z,radius... flatpacked
-//         uint32_t headIdx = 0;
-//         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
-//             if (instanceIsCulledArray[i]) continue; // Not a visible mesh, skip it.
-// 
-//             uint16_t modelIdx = instances[i].modelIndex;
-//             uint32_t vertCount = modelVertexCounts[modelIdx];
-//             for (uint32_t vertIdx = 0; vertIdx < vertCount; ++vertIdx) {
-//                 sphoxels[headIdx * 4 + 0] = vertexDataArrays[modelIdx][i * VERTEX_ATTRIBUTES_COUNT + 0];
-//                 sphoxels[headIdx * 4 + 1] = vertexDataArrays[modelIdx][i * VERTEX_ATTRIBUTES_COUNT + 1];
-//                 sphoxels[headIdx * 4 + 2] = vertexDataArrays[modelIdx][i * VERTEX_ATTRIBUTES_COUNT + 2];
-//                 sphoxels[headIdx * 4 + 3] = 0.16f; // Fixed sphoxel radius for now
-//                 headIdx++;
-//                 if (headIdx >= sphoxelBufferSize) break;
-//             }
-//             
-//             if (headIdx >= sphoxelBufferSize) break;
-//         }
-//             
-//         glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphoxelsID);
-//         CHECK_GL_ERROR();
-//         glBufferData(GL_SHADER_STORAGE_BUFFER, sphoxelBufferSize * 4 * sizeof(float), sphoxels, GL_DYNAMIC_DRAW);
-//         CHECK_GL_ERROR();
-//         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 18, sphoxelsID);
-//         CHECK_GL_ERROR();
-//         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-//         CHECK_GL_ERROR();
+        // 4. Generate Shadow Data
         
         // 5. Unlit Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1038,7 +999,6 @@ int main(int argc, char* argv[]) {
             glUniform1i(debugViewLoc_deferred, debugView);
             CHECK_GL_ERROR();
             glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
-    //         glUniform1i(sphoxelCountLoc_deferred, INSTANCE_COUNT);
             CHECK_GL_ERROR();
             float viewInv[16];
             mat4_inverse(viewInv,view);
@@ -1060,25 +1020,8 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glActiveTexture(GL_TEXTURE0);
         CHECK_GL_ERROR();
-//         if (debugView == 0) {
-            glBindTextureUnit(0, inputImageID); // Normal
-            CHECK_GL_ERROR();
-//         } else if (debugView == 1) {
-//             glBindTextureUnit(0, inputImageID); // Unlit
-//             CHECK_GL_ERROR();
-//         } else if (debugView == 2) {
-//             glBindTextureUnit(0, inputImageID); // Triangle Normals 
-//             CHECK_GL_ERROR();
-//         } else if (debugView == 3) {
-//             glBindTextureUnit(0, inputImageID); // Depth.  Values must be decoded in shader
-//             CHECK_GL_ERROR();
-//         } else if (debugView == 4) {
-//             glBindTextureUnit(0, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
-//             CHECK_GL_ERROR();
-//         } else if (debugView == 5) { // Shadow debugging
-//             glBindTextureUnit(0, inputImageID);
-//         }
-        
+        glBindTextureUnit(0, inputImageID); // Normal
+        CHECK_GL_ERROR();
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         CHECK_GL_ERROR();
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
@@ -1099,7 +1042,6 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glUseProgram(0);
         CHECK_GL_ERROR();
-        
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
         
         // 8. Render UI Images
@@ -1133,17 +1075,11 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         RenderFormattedText(10, 85, TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
         CHECK_GL_ERROR();
-        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugView == 1
-                                                                                       ? "unlit"
-                                                                                       : debugView == 2
-                                                                                         ? "surface normals"
-                                                                                         : debugView == 3
-                                                                                           ? "depth"
-                                                                                           : debugView == 4
-                                                                                             ? "indices"
-                                                                                             : debugView == 5
-                                                                                               ? "shadows"
-                                                                                               : "standard render", debugValue);
+        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugView == 1 ? "unlit"
+                                                                                                : debugView == 2 ? "surface normals"
+                                                                                                : debugView == 3 ? "depth"
+                                                                                                : debugView == 4 ? "indices"
+                                                                                                :(debugView == 5 ? "shadows" : "standard render"), debugValue);
         CHECK_GL_ERROR();
         RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d, Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         CHECK_GL_ERROR();
