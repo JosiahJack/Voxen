@@ -43,7 +43,7 @@ const char *vertexShaderSource =
 
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
-
+    "#extension GL_ARB_shading_language_packing : require\n"
     "in vec2 TexCoord;\n"
     "in vec3 Normal;\n"
     "in vec3 FragPos;\n"
@@ -100,7 +100,6 @@ const char *fragmentShaderTraditional =
     "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
     "layout(location = 1) out vec4 outNormal;\n"   // GL_COLOR_ATTACHMENT1
     "layout(location = 2) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT2
-    "layout(location = 3) out ivec4 outTexMaps;\n" // GL_COLOR_ATTACHMENT3
     "\n"
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
@@ -122,21 +121,28 @@ const char *fragmentShaderTraditional =
 
     "    vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));\n"
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
-    "    outTexMaps = ivec4(packColor(glowColor),packColor(specColor),0,0);\n"
     "    if (debugView == 3) {\n"
     "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
     "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
     "        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);\n"
     "        outAlbedo = vec4(vec3(linearDepth), 1.0);\n"
+    "    } else if (debugView == 2) {\n"
+    "        outAlbedo.r = adjustedNormal.x;\n"
+    "        outAlbedo.g = adjustedNormal.y;\n"
+    "        outAlbedo.b = adjustedNormal.z;\n"
+    "        outAlbedo.a = 1.0;\n"
     "    } else if (debugView == 4) {\n"
     "        outAlbedo.r = float(InstanceIndex) / 5500.0;\n"
-    "        outAlbedo.g = float(ModelIndex) / 1024.0;\n"
-    "        outAlbedo.b = float(texIndexChecked) / 1282.0;\n"
+    "        outAlbedo.g = float(ModelIndex) / 668.0;\n"
+    "        outAlbedo.b = float(texIndexChecked) / 1231.0;\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else {\n"
     "        outAlbedo = albedoColor;\n"
-    "        if (outAlbedo.a < 0.01) outAlbedo = vec4(0.0,1.0,1.0,outAlbedo.a);\n"
     "    }\n"
-    "    outNormal = vec4(normalize(adjustedNormal) * 0.5 + 0.5, 1.0);\n"
+
+    "    outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));\n"
+    "    outNormal.g = uintBitsToFloat(packHalf2x16(vec2(adjustedNormal.z,0.0)));\n"
+    "    outNormal.b = uintBitsToFloat(packColor(glowColor));\n"
+    "    outNormal.a = uintBitsToFloat(packColor(specColor));\n"
     "    outWorldPos = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
     "}\n";

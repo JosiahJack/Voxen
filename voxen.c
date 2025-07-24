@@ -30,7 +30,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 1920, screen_height = 1080;
+int screen_width = 800, screen_height = 600;
 bool window_has_focus = false;
 static FILE *console_log_file = NULL;
 
@@ -86,7 +86,8 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
-GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, inputTexMapsID; // FBO inputs
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO; // FBO inputs
+// GLuint inputTexMapsID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
       debugViewLoc_deferred = -1, sphoxelCountLoc_deferred = -1; // uniform locations
 
@@ -542,14 +543,14 @@ int InitializeEnvironment(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Unlit Raster Albedo Colors");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Unlit Raster Normals");
+    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster Normals");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Unlit Raster Depth");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster World Positions");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputTexMapsID,         GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, GL_TEXTURE_2D, "Unlit Raster Glow and Specular Map Indices");
-    CHECK_GL_ERROR();
+//     GenerateAndBindTexture(&inputTexMapsID,         GL_RGBA32I, screen_width, screen_height,    GL_RGBA_INTEGER,                     GL_INT, GL_TEXTURE_2D, "Unlit Raster Glow and Specular Map Indices");
+//     CHECK_GL_ERROR();
 
     // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
@@ -559,7 +560,7 @@ int InitializeEnvironment(void) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputTexMapsID, 0);
+//     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputTexMapsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
     glDrawBuffers(4, drawBuffers);
@@ -575,12 +576,12 @@ int InitializeEnvironment(void) {
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
     CHECK_GL_ERROR();
-    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
     glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
-    glBindImageTexture(5, inputTexMapsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);    
+/*    glBindImageTexture(5, inputTexMapsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32I);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); */   
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
@@ -649,7 +650,7 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
-    if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
+//     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
@@ -1023,33 +1024,35 @@ int main(int argc, char* argv[]) {
         //        move, change color, get marked as "culled" so shader can skip it,
         //        etc.).
         if (debugRenderSegfaults) DualLog("6. Deferred Lighting + Shadow Calculations\n");
-        glUseProgram(deferredLightingShaderProgram);
-        CHECK_GL_ERROR();
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-        CHECK_GL_ERROR();
+        if (debugView != 2) {
+            glUseProgram(deferredLightingShaderProgram);
+            CHECK_GL_ERROR();
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            CHECK_GL_ERROR();
 
-        // These should be static but cause issues if not...
-        glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
-        CHECK_GL_ERROR();
-        glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
-        CHECK_GL_ERROR();
-        glUniform1i(debugViewLoc_deferred, debugView);
-        CHECK_GL_ERROR();
-        glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
-//         glUniform1i(sphoxelCountLoc_deferred, INSTANCE_COUNT);
-        CHECK_GL_ERROR();
-        float viewInv[16];
-        mat4_inverse(viewInv,view);
-        float projInv[16];
-        mat4_inverse(projInv,projection);
-        
-        // Dispatch compute shader
-        GLuint groupX = (screen_width + 31) / 32;
-        GLuint groupY = (screen_height + 31) / 32;
-        glDispatchCompute(groupX, groupY, 1);
-        CHECK_GL_ERROR();
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
-        CHECK_GL_ERROR();
+            // These should be static but cause issues if not...
+            glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
+            CHECK_GL_ERROR();
+            glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
+            CHECK_GL_ERROR();
+            glUniform1i(debugViewLoc_deferred, debugView);
+            CHECK_GL_ERROR();
+            glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
+    //         glUniform1i(sphoxelCountLoc_deferred, INSTANCE_COUNT);
+            CHECK_GL_ERROR();
+            float viewInv[16];
+            mat4_inverse(viewInv,view);
+            float projInv[16];
+            mat4_inverse(projInv,projection);
+            
+            // Dispatch compute shader
+            GLuint groupX = (screen_width + 31) / 32;
+            GLuint groupY = (screen_height + 31) / 32;
+            glDispatchCompute(groupX, groupY, 1);
+            CHECK_GL_ERROR();
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+            CHECK_GL_ERROR();
+        }
         
         // 7. Render final meshes' results with full screen quad
         if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");
@@ -1057,24 +1060,24 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glActiveTexture(GL_TEXTURE0);
         CHECK_GL_ERROR();
-        if (debugView == 0) {
+//         if (debugView == 0) {
             glBindTextureUnit(0, inputImageID); // Normal
             CHECK_GL_ERROR();
-        } else if (debugView == 1) {
-            glBindTextureUnit(0, inputImageID); // Unlit
-            CHECK_GL_ERROR();
-        } else if (debugView == 2) {
-            glBindTextureUnit(0, inputNormalsID); // Triangle Normals 
-            CHECK_GL_ERROR();
-        } else if (debugView == 3) {
-            glBindTextureUnit(0, inputImageID); // Depth.  Values must be decoded in shader
-            CHECK_GL_ERROR();
-        } else if (debugView == 4) {
-            glBindTextureUnit(0, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
-            CHECK_GL_ERROR();
-        } else if (debugView == 5) { // Shadow debugging
-            glBindTextureUnit(0, inputImageID);
-        }
+//         } else if (debugView == 1) {
+//             glBindTextureUnit(0, inputImageID); // Unlit
+//             CHECK_GL_ERROR();
+//         } else if (debugView == 2) {
+//             glBindTextureUnit(0, inputImageID); // Triangle Normals 
+//             CHECK_GL_ERROR();
+//         } else if (debugView == 3) {
+//             glBindTextureUnit(0, inputImageID); // Depth.  Values must be decoded in shader
+//             CHECK_GL_ERROR();
+//         } else if (debugView == 4) {
+//             glBindTextureUnit(0, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
+//             CHECK_GL_ERROR();
+//         } else if (debugView == 5) { // Shadow debugging
+//             glBindTextureUnit(0, inputImageID);
+//         }
         
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         CHECK_GL_ERROR();

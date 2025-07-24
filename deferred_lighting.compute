@@ -7,9 +7,9 @@ const char *deferredLighting_computeShader =
 
     // G-buffer inputs
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
-    "layout(rgba16f, binding = 1) uniform image2D inputNormals;\n"
+    "layout(rgba32f, binding = 1) uniform image2D inputNormals;\n"
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
-    "layout(rgba32i, binding = 5) uniform iimage2D inputTexMaps;\n"
+//     "layout(rgba32i, binding = 5) uniform iimage2D inputTexMaps;\n"
     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
 
@@ -26,6 +26,14 @@ const char *deferredLighting_computeShader =
     "                float((color      ) & 0xFF) / 255.0);\n" // a
     "}\n"
     
+//     "vec2 unpackHalf2(float packet) {\n"
+//     "    return unpackHalf2x16(floatBitsToUint(packet));\n"
+// //     "    uint packetU = floatBitsToUint(packet);\n"
+// //     "    float fx = uintBitsToFloat((packetU >> 16) & 0xFFFF);\n" // Normal X (high 16 bits)
+// //     "    float fy = uintBitsToFloat((packetU      ) & 0xFFFF);\n" // Normal Y (low 16 bits)
+// //     "    return vec2(fx,fy);\n"
+//     "}\n"
+    
     // --- Main Compute Shader ---
     "void main() {\n"
     "    uvec2 pixel = gl_GlobalInvocationID.xy;\n"
@@ -36,18 +44,22 @@ const char *deferredLighting_computeShader =
     "    vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
     "    if (debugView == 1 || color.a < 1.0) return;\n"
 
-    "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
+    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"
+    "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
+    "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
+    "    vec3 normal = normalize(vec3(normalXY.x,normalXY.y,normalZ0.x) * 2.0 - 1.0);\n"
+    "    vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));\n"
+    "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
+    
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
 
-    "    ivec4 indicesPack = imageLoad(inputTexMaps, ivec2(pixel));\n"
-    "    vec4 glowColor = unpackColor32(indicesPack.r);\n"
-    "    vec4 specColor = unpackColor32(indicesPack.g);\n"
+//     "    ivec4 indicesPack = imageLoad(inputTexMaps, ivec2(pixel));\n"
+
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
     "    uint lightIdx = 0;\n"
     "    for (int i = 0; i < 32; i++) {\n"
     "        uint lightIdx = i * 12;\n" // LIGHT_DATA_SIZE
     "        float intensity = lightInPVS[lightIdx + 3];\n"
-    "        if (intensity < 0.015) continue;\n"
 
     "        float range = lightInPVS[lightIdx + 4];\n"
     "        vec3 lightPos = vec3(lightInPVS[lightIdx + 0], lightInPVS[lightIdx + 1], lightInPVS[lightIdx + 2]);\n"
@@ -57,10 +69,10 @@ const char *deferredLighting_computeShader =
 
     "        vec3 lightDir = normalize(toLight);\n"
     "        float spotAng = lightInPVS[lightIdx + 5];\n"
-    "        vec3 spotDir = vec3(lightInPVS[lightIdx + 6], lightInPVS[lightIdx + 7], lightInPVS[lightIdx + 8]);\n"
     "        vec3 lightColor = vec3(lightInPVS[lightIdx + 9], lightInPVS[lightIdx + 10], lightInPVS[lightIdx + 11]);\n"
     "        float spotFalloff = 1.0;\n"
     "        if (spotAng > 0.0) {\n"
+    "            vec3 spotDir = vec3(lightInPVS[lightIdx + 6], lightInPVS[lightIdx + 7], lightInPVS[lightIdx + 8]);\n"
     "            float spotdot = dot(spotDir, -lightDir);\n"
     "            float cosAngle = cos(radians(spotAng / 2.0));\n"
     "            if (spotdot < cosAngle) continue;\n"
