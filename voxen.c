@@ -30,7 +30,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 800, screen_height = 600;
+int screen_width = 1920, screen_height = 1080;
 bool window_has_focus = false;
 static FILE *console_log_file = NULL;
 
@@ -63,7 +63,7 @@ uint32_t worstFPS = UINT32_MAX;
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
-bool shadowsEnabled = true;
+bool shadowsEnabled = false;
 uint32_t playerCellIdx = 80000;
 uint32_t playerCellIdx_x = 20000;
 uint32_t playerCellIdx_y = 10000;
@@ -88,7 +88,7 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, inputTexMapsID; // FBO inputs
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
-      debugViewLoc_deferred = -1; // uniform locations
+      debugViewLoc_deferred = -1, sphoxelCountLoc_deferred = -1; // uniform locations
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -233,6 +233,7 @@ void CacheUniformLocationsForShaders(void) {
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    sphoxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sphoxelCount");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -633,8 +634,9 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
         vbos[i] = 0;
     }
     
-    if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
-    if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
+//     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
+//     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
+//     if (modelVertexCountsID) glDeleteBuffers(1, &modelVertexCountsID);
     if (vao_chunk) glDeleteVertexArrays(1, &vao_chunk);
     if (chunkShaderProgram) glDeleteProgram(chunkShaderProgram);
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
@@ -650,7 +652,8 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (inputTexMapsID) glDeleteTextures(1,&inputTexMapsID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
-    if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
+    if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
+//     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
@@ -919,9 +922,47 @@ int main(int argc, char* argv[]) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         CHECK_GL_ERROR();
         
-        // 4. Unlit Raterized Geometry
+        // 4. Generate Sphoxels around Player
+//         if (debugRenderSegfaults) DualLog("4. Generate Sphoxels around Player\n");
+//         uint32_t sphoxelBufferSize = 0;
+//         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
+//             if (instanceIsCulledArray[i]) continue; // Not a visible mesh, skip it.
+//             
+//             sphoxelBufferSize += modelVertexCounts[instances[i].modelIndex];
+//             if (sphoxelBufferSize >= 10000) break; // cap it
+//         }
+//         
+//         float * sphoxels = (float *)malloc(sphoxelBufferSize * 4 * sizeof(float)); // x,y,z,radius... flatpacked
+//         uint32_t headIdx = 0;
+//         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
+//             if (instanceIsCulledArray[i]) continue; // Not a visible mesh, skip it.
+// 
+//             uint16_t modelIdx = instances[i].modelIndex;
+//             uint32_t vertCount = modelVertexCounts[modelIdx];
+//             for (uint32_t vertIdx = 0; vertIdx < vertCount; ++vertIdx) {
+//                 sphoxels[headIdx * 4 + 0] = vertexDataArrays[modelIdx][i * VERTEX_ATTRIBUTES_COUNT + 0];
+//                 sphoxels[headIdx * 4 + 1] = vertexDataArrays[modelIdx][i * VERTEX_ATTRIBUTES_COUNT + 1];
+//                 sphoxels[headIdx * 4 + 2] = vertexDataArrays[modelIdx][i * VERTEX_ATTRIBUTES_COUNT + 2];
+//                 sphoxels[headIdx * 4 + 3] = 0.16f; // Fixed sphoxel radius for now
+//                 headIdx++;
+//                 if (headIdx >= sphoxelBufferSize) break;
+//             }
+//             
+//             if (headIdx >= sphoxelBufferSize) break;
+//         }
+//             
+//         glBindBuffer(GL_SHADER_STORAGE_BUFFER, sphoxelsID);
+//         CHECK_GL_ERROR();
+//         glBufferData(GL_SHADER_STORAGE_BUFFER, sphoxelBufferSize * 4 * sizeof(float), sphoxels, GL_DYNAMIC_DRAW);
+//         CHECK_GL_ERROR();
+//         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 18, sphoxelsID);
+//         CHECK_GL_ERROR();
+//         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//         CHECK_GL_ERROR();
+        
+        // 5. Unlit Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-        if (debugRenderSegfaults) DualLog("4. Unlit Raterized Geometry\n");
+        if (debugRenderSegfaults) DualLog("5. Unlit Raterized Geometry\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         CHECK_GL_ERROR();
         glUseProgram(chunkShaderProgram);
@@ -995,6 +1036,7 @@ int main(int argc, char* argv[]) {
         glUniform1i(debugViewLoc_deferred, debugView);
         CHECK_GL_ERROR();
         glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
+//         glUniform1i(sphoxelCountLoc_deferred, INSTANCE_COUNT);
         CHECK_GL_ERROR();
         float viewInv[16];
         mat4_inverse(viewInv,view);
@@ -1002,8 +1044,8 @@ int main(int argc, char* argv[]) {
         mat4_inverse(projInv,projection);
         
         // Dispatch compute shader
-        GLuint groupX = (screen_width + 7) / 8;
-        GLuint groupY = (screen_height + 7) / 8;
+        GLuint groupX = (screen_width + 31) / 32;
+        GLuint groupY = (screen_height + 31) / 32;
         glDispatchCompute(groupX, groupY, 1);
         CHECK_GL_ERROR();
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
@@ -1100,7 +1142,7 @@ int main(int argc, char* argv[]) {
                                                                                                ? "shadows"
                                                                                                : "standard render", debugValue);
         CHECK_GL_ERROR();
-        RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d   Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d, Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         CHECK_GL_ERROR();
         
         // Frame stats

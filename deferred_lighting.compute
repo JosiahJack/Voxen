@@ -3,21 +3,15 @@
 const char *deferredLighting_computeShader =
     "#version 450 core\n"
 
-    "layout(local_size_x = 8, local_size_y = 8) in;\n"
+    "layout(local_size_x = 32, local_size_y = 32) in;\n"
 
     // G-buffer inputs
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba16f, binding = 1) uniform image2D inputNormals;\n"
     "layout(rgba32f, binding = 3) uniform image2D inputWorldPos;\n"
     "layout(rgba32i, binding = 5) uniform iimage2D inputTexMaps;\n"
-
-    "layout(std430, binding = 13) buffer BlueNoise {\n"
-    "    float blueNoiseColors[];\n"
-    "};\n"
-
-    "layout(std430, binding = 19) buffer LightIndices {\n"
-    "    float lightInPVS[];\n"
-    "};\n"
+    "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
+    "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
 
     // Uniforms, why must we all wear these ridiculous types!
     "uniform uint screenWidth;\n"
@@ -77,8 +71,8 @@ const char *deferredLighting_computeShader =
     "        }\n"
 
     "        float shadow = 1.0;\n"
-    "        if (shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
-    "            shadow = 1.0;\n"
+    "        if (shadowsEnabled > 0) {\n"
+    // TODO
     "        }\n"
 
     "        float attenuation = (1.0 - (dist / range)) * max(dot(normal, lightDir), 0.0);\n"

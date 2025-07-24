@@ -17,14 +17,15 @@
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 
 extern uint32_t modelVertexCounts[MODEL_COUNT];
-extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
-extern GLuint modelBoundsID;
+// extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+// extern GLuint modelBoundsID;
 extern uint32_t totalVertexCount;
 extern GLuint vbos[MODEL_COUNT];
 extern float * vertexDataArrays[MODEL_COUNT];
 extern GLuint vboMasterTable;
 extern GLuint modelVertexOffsetsID;
 extern uint32_t largestVertCount;
+extern GLuint sphoxelsID;
 
 int LoadGeometry(void);
 
