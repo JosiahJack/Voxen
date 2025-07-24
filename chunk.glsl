@@ -59,6 +59,8 @@ const char *fragmentShaderTraditional =
     "    uint colors[];\n" // 1D color array (RGBA)
     "};\n"
 
+    "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
+
     "layout(std430, binding = 14) buffer TextureOffsets {\n"
     "    uint textureOffsets[];\n" // Starting index in colors for each texture
     "};\n"
@@ -74,6 +76,8 @@ const char *fragmentShaderTraditional =
     "layout(std430, binding = 17) buffer TexturePaletteOffsets {\n"
     "    uint texturePaletteOffsets[];\n"  // Palette starting indices for each texture
     "};\n"
+
+    "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
 
     "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
     "    if (texIndex >= 65535) return vec4(0.0);\n"
@@ -98,8 +102,6 @@ const char *fragmentShaderTraditional =
     "uniform int debugView;\n"
     "\n"
     "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
-    "layout(location = 1) out vec4 outNormal;\n"   // GL_COLOR_ATTACHMENT1
-    "layout(location = 2) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT2
     "\n"
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
@@ -121,6 +123,8 @@ const char *fragmentShaderTraditional =
 
     "    vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));\n"
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
+    "    vec4 worldPosPack = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
+    "    vec3 worldPos = worldPosPack.xyz;\n"
     "    if (debugView == 3) {\n"
     "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
     "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
@@ -137,12 +141,52 @@ const char *fragmentShaderTraditional =
     "        outAlbedo.b = float(texIndexChecked) / 1231.0;\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else {\n"
-    "        outAlbedo = albedoColor;\n"
-    "    }\n"
+        "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
+        "    uint lightIdx = 0;\n"
+        "    for (int i = 0; i < 32; i++) {\n"
+        "        uint lightIdx = i * 12;\n" // LIGHT_DATA_SIZE
+        "        float intensity = lightInPVS[lightIdx + 3];\n"
 
-    "    outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));\n"
-    "    outNormal.g = uintBitsToFloat(packHalf2x16(vec2(adjustedNormal.z,0.0)));\n"
-    "    outNormal.b = uintBitsToFloat(packColor(glowColor));\n"
-    "    outNormal.a = uintBitsToFloat(packColor(specColor));\n"
-    "    outWorldPos = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
+        "        float range = lightInPVS[lightIdx + 4];\n"
+        "        vec3 lightPos = vec3(lightInPVS[lightIdx + 0], lightInPVS[lightIdx + 1], lightInPVS[lightIdx + 2]);\n"
+        "        vec3 toLight = lightPos - worldPos;\n"
+        "        float dist = length(toLight);\n"
+        "        if (dist > range) continue;\n"
+
+        "        vec3 lightDir = normalize(toLight);\n"
+        "        float spotAng = lightInPVS[lightIdx + 5];\n"
+        "        vec3 lightColor = vec3(lightInPVS[lightIdx + 9], lightInPVS[lightIdx + 10], lightInPVS[lightIdx + 11]);\n"
+        "        float spotFalloff = 1.0;\n"
+        "        if (spotAng > 0.0) {\n"
+        "            vec3 spotDir = vec3(lightInPVS[lightIdx + 6], lightInPVS[lightIdx + 7], lightInPVS[lightIdx + 8]);\n"
+        "            float spotdot = dot(spotDir, -lightDir);\n"
+        "            float cosAngle = cos(radians(spotAng / 2.0));\n"
+        "            if (spotdot < cosAngle) continue;\n"
+        "            float cosOuterAngle = cos(radians(spotAng / 2.0));\n"
+        "            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));\n"
+        "            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);\n"
+        "            if (spotFalloff <= 0.0) continue;\n"
+        "        }\n"
+
+        "        float shadow = 1.0;\n"
+//         "        if (shadowsEnabled > 0) {\n"
+//         "           uint shadowStencil = packUnorm4x8(imageLoad(inputShadowStencil, ivec2(pixel)));\n"
+//         "           if ((shadowStencil & (1u << i)) > 0) shadow = 0.0;\n"
+//         "        }\n"
+
+        "        float attenuation = (1.0 - (dist / range)) * max(dot(adjustedNormal, lightDir), 0.0);\n"
+        "        attenuation *= shadow;\n"
+
+        "        lighting += albedoColor.rgb * intensity * attenuation * lightColor * spotFalloff;\n"
+        "    }\n"
+
+        "    lighting += glowColor.rgb;\n"
+
+        // Dither
+        "    int pixelIndex = int(((int(gl_FragCoord.y) % 64) * 64 + (int(gl_FragCoord.x) % 64))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
+        "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
+        "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
+
+    "        outAlbedo = vec4(lighting,1.0);\n"
+    "    }\n"
     "}\n";

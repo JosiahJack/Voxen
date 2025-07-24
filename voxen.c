@@ -84,11 +84,8 @@ GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
 
-//    Deferred Lighting Compute Shader
-GLuint deferredLightingShaderProgram;
-GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBufferFBO; // FBO inputs
-GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, shadowsEnabledLoc_deferred = -1,
-      debugViewLoc_deferred = -1, sphoxelCountLoc_deferred = -1; // uniform locations
+//    FBO
+GLuint inputImageID, inputDepthID, gBufferFBO; // FBO inputs
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -228,13 +225,7 @@ void CacheUniformLocationsForShaders(void) {
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
-    
-    screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
-    screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    shadowsEnabledLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "shadowsEnabled");
-    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
-    sphoxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sphoxelCount");
-    
+
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
     debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
@@ -542,13 +533,7 @@ int InitializeEnvironment(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Unlit Raster Albedo Colors");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster Normals and Glow and Spec Indices");
-    CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Unlit Raster Depth");
-    CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Unlit Raster World Positions");
-    CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputShadowStencilID,     GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Shadow Stencil Bitmask");
     CHECK_GL_ERROR();
 
     // Create framebuffer
@@ -557,12 +542,9 @@ int InitializeEnvironment(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     CHECK_GL_ERROR();
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputNormalsID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, inputShadowStencilID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
-    glDrawBuffers(4, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
+    glDrawBuffers(1, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         switch (status) {
@@ -574,12 +556,6 @@ int InitializeEnvironment(void) {
     }
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-    CHECK_GL_ERROR();
-    glBindImageTexture(1, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-    CHECK_GL_ERROR();
-    glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8);
-    CHECK_GL_ERROR();
-    glBindImageTexture(3, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
@@ -632,10 +608,7 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
         vbos[i] = 0;
     }
-    
-//     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
-//     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
-//     if (modelVertexCountsID) glDeleteBuffers(1, &modelVertexCountsID);
+
     if (vao_chunk) glDeleteVertexArrays(1, &vao_chunk);
     if (chunkShaderProgram) glDeleteProgram(chunkShaderProgram);
     if (textVAO) glDeleteVertexArrays(1, &textVAO);
@@ -645,13 +618,9 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
     if (inputImageID) glDeleteTextures(1,&inputImageID);
-    if (inputNormalsID) glDeleteTextures(1,&inputNormalsID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
-    if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
-    if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
-//     if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
@@ -979,42 +948,7 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         // ====================================================================
         
-        // 6. Deferred Lighting + Shadow Calculations
-        //        Apply deferred lighting with compute shader.  All lights are
-        //        dynamic and can be updated at any time (flicker, light switches,
-        //        move, change color, get marked as "culled" so shader can skip it,
-        //        etc.).
-        if (debugRenderSegfaults) DualLog("6. Deferred Lighting + Shadow Calculations\n");
-        if (debugView != 2) {
-            glUseProgram(deferredLightingShaderProgram);
-            CHECK_GL_ERROR();
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-            CHECK_GL_ERROR();
-
-            // These should be static but cause issues if not...
-            glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
-            CHECK_GL_ERROR();
-            glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
-            CHECK_GL_ERROR();
-            glUniform1i(debugViewLoc_deferred, debugView);
-            CHECK_GL_ERROR();
-            glUniform1i(shadowsEnabledLoc_deferred, shadowsEnabled);
-            CHECK_GL_ERROR();
-            float viewInv[16];
-            mat4_inverse(viewInv,view);
-            float projInv[16];
-            mat4_inverse(projInv,projection);
-            
-            // Dispatch compute shader
-            GLuint groupX = (screen_width + 31) / 32;
-            GLuint groupY = (screen_height + 31) / 32;
-            glDispatchCompute(groupX, groupY, 1);
-            CHECK_GL_ERROR();
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
-            CHECK_GL_ERROR();
-        }
-        
-        // 7. Render final meshes' results with full screen quad
+        // 6. Render final meshes' results with full screen quad
         if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");
         glUseProgram(imageBlitShaderProgram);
         CHECK_GL_ERROR();
@@ -1044,10 +978,10 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
         
-        // 8. Render UI Images
+        // 7. Render UI Images
         if (debugRenderSegfaults) DualLog("8. Render UI Images\n");
  
-        // 9. Render UI Text
+        // 8. Render UI Text
         if (debugRenderSegfaults) DualLog("9. Render UI Text\n");
         glEnable(GL_STENCIL_TEST);
         CHECK_GL_ERROR();
