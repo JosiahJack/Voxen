@@ -977,9 +977,9 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uShadowBias"), 0.01f);
         CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uMaxRaySteps"), 32.0f);
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uMaxRaySteps"), 1024.0f);
         CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uStepSize"), 0.1f);
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uStepSize"), 0.001f);
         CHECK_GL_ERROR();
         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosX"), 0.1f);
         CHECK_GL_ERROR();

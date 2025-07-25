@@ -22,40 +22,36 @@ const char *computeShadowShader =
     "}\n"
 
     "bool traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, ivec2 startPixel, vec3 camPos) {\n"
-    "    float startDepth = length(startPos - camPos);\n"
     "    vec3 toLight = lightPos - startPos;\n"
-    "    float dist = length(toLight);\n"
-    "    if (dist <= 0.001) return false;\n"
+    "    float totalDist = length(toLight);\n"
+    "    if (totalDist <= 0.08) return true;\n" // Lights have at least this much volume
 
-    "    vec4 lightProj = uViewProjMatrix * vec4(lightPos, 1.0);\n"
-    "    lightProj /= lightProj.w;\n"
-    "    vec2 lightUV = lightProj.xy * 0.5 + 0.5;\n"
-//     "    if (lightUV.x < 0.0 || lightUV.x > 1.0 || lightUV.y < 0.0 || lightUV.y > 1.0) return false;\n"
-
-    "    vec2 lightPixel = lightUV * uScreenSize;\n"
-    "    vec2 rayDir = lightPixel - vec2(startPixel);\n"
-    "    float pixelDist = length(rayDir);\n"
-    "    if (pixelDist < 1.0) return false;\n"
-
-    "    rayDir = normalize(rayDir);\n"
-    "    int maxSteps = int(min(pixelDist, uMaxRaySteps));\n"
-    "    float t = 1.0; // Start one pixel away to avoid self-occlusion\n"
-    "    vec2 rayPos = vec2(startPixel) + rayDir * t;\n"
-    "    for (int i = 0; i < maxSteps && t < pixelDist; ++i) {\n"
-    "        vec3 worldPos = imageLoad(inputWorldPos, ivec2(rayPos)).xyz;\n"
-    "        if (length(worldPos - lightPos) < 0.001) {\n"
-    "            t++;\n"
-    "            rayPos = vec2(startPixel) + rayDir * t;\n"
+    "    vec3 rayDir = normalize(toLight);\n"
+    "    float stepSize = uStepSize;\n"
+    "    int maxSteps = int(min(uMaxRaySteps, totalDist / stepSize));\n"
+    "    vec3 rayPos = startPos + rayDir * stepSize; // Avoid self-shadowing\n"
+    "    for (int i = 0; i < maxSteps; ++i) {\n"
+    "        vec3 samplePos = rayPos;\n"
+    "        vec4 proj = uViewProjMatrix * vec4(samplePos, 1.0);\n"
+    "        proj /= proj.w;\n"
+    "        vec2 uv = proj.xy * 0.5 + 0.5;\n"
+    "        ivec2 pixel = ivec2(uv * uScreenSize);\n"
+    "        if (pixel.x < 0 || pixel.y < 0 || pixel.x >= int(uScreenSize.x) || pixel.y >= int(uScreenSize.y)) {\n"
+    "            rayPos += rayDir * stepSize;\n"
     "            continue;\n"
     "        }\n"
 
-    "        float depthToWorld = length(worldPos - camPos);\n"
-    "        if (depthToWorld > (startDepth + uShadowBias)) return true; // Occluder found\n"
+    "        vec3 checkPoint = imageLoad(inputWorldPos, pixel).xyz;\n"
+    "        float distToCheckPoint = length(checkPoint - startPos);\n"
+    "        float distToStartPosFromLight = length(lightPos - startPos);\n"
+    "        float distToCam = length(checkPoint - camPos);\n"
+    "        if (distToCheckPoint < distToStartPosFromLight) return false; // Occluded\n"
 
-    "        t++;\n"
-    "        rayPos = vec2(startPixel) + rayDir * t;\n"
+    "        rayPos += rayDir * stepSize;\n"
+    "        if (length(rayPos - startPos) > distToStartPosFromLight) break;\n"
     "    }\n"
-    "    return false;\n"
+
+    "    return true;\n"
     "}\n"
 
     "void main() {\n"
@@ -90,7 +86,7 @@ const char *computeShadowShader =
     "            if (spotFalloff <= 0.0) continue;\n"
     "        }\n"
             
-    "        if (traceShadowRay(worldPos, lightPos, range, pixel, playerPos)) shadowBits[i] = 1;\n"
+    "        if (traceShadowRay(worldPos, lightPos, range, pixel, playerPos)) shadowBits[i] = 1;\n" // Light can see the point
     "    }\n"
         
     "    imageStore(outputShadowStencil, pixel, vec4(packShadowBits(shadowBits) / 255.0));\n"
