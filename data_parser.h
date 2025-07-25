@@ -17,12 +17,13 @@ typedef struct {
     uint16_t index; // Unique index (0–65535)
     
     // Entity specific fields
+    uint16_t modelIndex;
+    uint16_t texIndex;
+    uint16_t glowIndex;
+    uint16_t specIndex;
+    uint16_t normIndex;
+    bool cardchunk;
     bool doublesided;
-    uint32_t modelIndex;
-    uint32_t texIndex;
-    uint32_t glowIndex;
-    uint32_t specIndex;
-    uint32_t normIndex;
 } DataEntry;
 
 typedef struct {

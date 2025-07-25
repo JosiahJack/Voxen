@@ -5,7 +5,7 @@
 #include <SDL2/SDL.h>
 #include <stdbool.h>
 
-// #define DEBUG_OPENGL
+#define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 #define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #else

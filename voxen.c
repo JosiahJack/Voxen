@@ -78,6 +78,8 @@ GLuint chunkShaderProgram;
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
       specIndexLoc_chunk = -1; // uniform locations
+      
+GLuint screenSpaceShadowsComputeShader;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -85,7 +87,7 @@ GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
 
 //    FBO
-GLuint inputImageID, inputDepthID, gBufferFBO; // FBO inputs
+GLuint inputImageID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBufferFBO; // FBO inputs
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -531,9 +533,13 @@ int InitializeEnvironment(void) {
     DebugRAM("init lights"); 
 
     // First pass gbuffer images
-    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Unlit Raster Albedo Colors");
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Primary Lit Raster");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Unlit Raster Depth");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Primary Raster Depth");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "GBuffer World Position At Each Pixel");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputShadowStencilID,        GL_R8, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "GBuffer Bitmask for What Lights See Pixel");
     CHECK_GL_ERROR();
 
     // Create framebuffer
@@ -542,9 +548,10 @@ int InitializeEnvironment(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     CHECK_GL_ERROR();
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
-    glDrawBuffers(1, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         switch (status) {
@@ -556,6 +563,10 @@ int InitializeEnvironment(void) {
     }
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    CHECK_GL_ERROR();
+    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    CHECK_GL_ERROR();
+    glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
@@ -617,8 +628,10 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
+    if (screenSpaceShadowsComputeShader) glDeleteProgram(screenSpaceShadowsComputeShader);
     if (inputImageID) glDeleteTextures(1,&inputImageID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
+    if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
@@ -947,6 +960,41 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
         // ====================================================================
+        
+        // 6. Screenspace Shadows (SSS) Compute Shader
+        if (debugRenderSegfaults) DualLog("7. Screenspace Shadows (SSS) Compute Shader\n");
+        glBindTexture(GL_TEXTURE_2D, inputShadowStencilID);
+        glClearTexImage(inputShadowStencilID, 0, GL_RED, GL_FLOAT, (float[]){0.0f});
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glUseProgram(screenSpaceShadowsComputeShader);
+        CHECK_GL_ERROR();
+        glUniform2f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
+        CHECK_GL_ERROR();
+        float viewProj[16];
+        mat4_multiply(viewProj, projection, view); // viewProj = projection * view
+        glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "uViewProjMatrix"), 1, GL_FALSE, viewProj);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uShadowBias"), 0.01f);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uMaxRaySteps"), 32.0f);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uStepSize"), 0.1f);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosX"), 0.1f);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosY"), 0.1f);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosZ"), 0.1f);
+        CHECK_GL_ERROR();
+        GLuint groupX = (screen_width + 31) / 32;
+        GLuint groupY = (screen_height + 31) / 32;
+        glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
+        CHECK_GL_ERROR();
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+        CHECK_GL_ERROR();
+        glUseProgram(0);
+        CHECK_GL_ERROR();
         
         // 6. Render final meshes' results with full screen quad
         if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");

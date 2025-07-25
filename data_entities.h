@@ -9,11 +9,12 @@
 // Ordered with name last since it is accessed infrequently so doesn't need to
 // hit cache much.
 typedef struct {
-    int32_t modelIndex;
-    int32_t texIndex;
-    int32_t glowIndex;
-    int32_t specIndex;
-    int32_t normIndex;
+    uint16_t modelIndex;
+    uint16_t texIndex;
+    uint16_t glowIndex;
+    uint16_t specIndex;
+    uint16_t normIndex;
+    bool cardchunk;
     char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, nice even multiple of 4 bytes
 } Entity;
 

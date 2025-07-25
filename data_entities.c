@@ -10,8 +10,8 @@
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 int entityCount = 0;            // Number of entities loaded
 DataParser entity_parser;
-const char *valid_entity_keys[] = {"index", "model", "texture", "glowtexture", "spectexture", "normtexture"};
-#define NUM_ENTITY_KEYS 6
+const char *valid_entity_keys[] = {"index", "model", "texture", "glowtexture", "spectexture", "normtexture", "cardchunk"};
+#define NUM_ENTITY_KEYS 7
 bool entity_parser_initialized = false;
 
 typedef enum {

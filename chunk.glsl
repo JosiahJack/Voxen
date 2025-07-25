@@ -102,6 +102,8 @@ const char *fragmentShaderTraditional =
     "uniform int debugView;\n"
     "\n"
     "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
+    "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
+    "layout(r8, binding = 2) uniform image2D inputShadowStencil;\n"
     "\n"
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
@@ -125,11 +127,14 @@ const char *fragmentShaderTraditional =
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
     "    vec4 worldPosPack = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
     "    vec3 worldPos = worldPosPack.xyz;\n"
+    "    uint shadowStencil = uint(imageLoad(inputShadowStencil, ivec2(gl_FragCoord.xy)).r * 255.0);\n"
     "    if (debugView == 3) {\n"
     "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
     "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
     "        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);\n"
     "        outAlbedo = vec4(vec3(linearDepth), 1.0);\n"
+    "    } else if (debugView == 1) {\n"
+    "        outAlbedo = albedoColor;\n"
     "    } else if (debugView == 2) {\n"
     "        outAlbedo.r = adjustedNormal.x;\n"
     "        outAlbedo.g = adjustedNormal.y;\n"
@@ -140,6 +145,9 @@ const char *fragmentShaderTraditional =
     "        outAlbedo.g = float(ModelIndex) / 668.0;\n"
     "        outAlbedo.b = float(texIndexChecked) / 1231.0;\n"
     "        outAlbedo.a = 1.0;\n"
+    "    } else if (debugView == 5) {\n" // Shadows debug
+    "        float shadowStencil = imageLoad(inputShadowStencil, ivec2(gl_FragCoord.xy)).r;\n"
+    "        outAlbedo = vec4(shadowStencil,shadowStencil,shadowStencil,1.0);\n"
     "    } else {\n"
         "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
         "    uint lightIdx = 0;\n"
@@ -169,10 +177,7 @@ const char *fragmentShaderTraditional =
         "        }\n"
 
         "        float shadow = 1.0;\n"
-//         "        if (shadowsEnabled > 0) {\n"
-//         "           uint shadowStencil = packUnorm4x8(imageLoad(inputShadowStencil, ivec2(pixel)));\n"
-//         "           if ((shadowStencil & (1u << i)) > 0) shadow = 0.0;\n"
-//         "        }\n"
+        "        if ((shadowStencil & (1u << i)) < 1) shadow = 0.0;\n"
 
         "        float attenuation = (1.0 - (dist / range)) * max(dot(adjustedNormal, lightDir), 0.0);\n"
         "        attenuation *= shadow;\n"
@@ -189,4 +194,5 @@ const char *fragmentShaderTraditional =
 
     "        outAlbedo = vec4(lighting,1.0);\n"
     "    }\n"
+    "    outWorldPos = worldPosPack;\n"
     "}\n";

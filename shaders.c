@@ -5,7 +5,7 @@
 #include "text.glsl"
 #include "chunk.glsl"
 #include "imageblit.glsl"
-#include "deferred_lighting.compute"
+#include "screenSpaceShadows.compute"
 #include "bluenoise64.cginc"
 #include "debug.h"
 
@@ -48,7 +48,7 @@ GLuint LinkProgram(GLuint *shaders, int count, const char *programName) {
 }
 
 int CompileShaders(void) {
-    GLuint vertShader, fragShader;//, computeShader;
+    GLuint vertShader, fragShader, computeShader;
     
     // Chunk Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");            if (!vertShader) { return 1; }
@@ -60,6 +60,10 @@ int CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
 
+    // Screen Space Shadows Compute Shader Program
+    computeShader = CompileShader(GL_COMPUTE_SHADER, computeShadowShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
+    screenSpaceShadowsComputeShader = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program"); if (!screenSpaceShadowsComputeShader) { return 1; }
+    
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }

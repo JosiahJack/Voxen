@@ -1,6 +1,8 @@
 #include <SDL2/SDL.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <errno.h>
 #include "data_parser.h"
 #include "debug.h"
 
@@ -11,6 +13,35 @@ void parser_init(DataParser *parser, const char **valid_keys, int num_keys, Pars
     parser->valid_keys = valid_keys;
     parser->num_keys = num_keys;
     parser->parser_type = partype;
+}
+
+uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
+    if (str == NULL || *str == '\0') { fprintf(stderr, "Invalid input blank string, from line[%d]: %s\n", lineNum, line); return 0; }
+    
+    while (isspace((unsigned char)*str)) str++; // Trim leading whitespace so we can trivially check for negative (in spite of strtoul trimming leading whitespace itself)
+    if (*str == '-') { fprintf(stderr, "Invalid input, negative not allowed (%s), from line: %s\n", str, line); return 0; }
+    
+    char* endptr;
+    errno = 0;
+    unsigned long val = strtoul(str, &endptr, 10); // Base 10 for decimal.
+    if (errno != 0 || val > UINT32_MAX) { fprintf(stderr, "Invalid input %s, from line[%d]: %s\n", str, lineNum, line); return 0; }
+    return (uint32_t)val;
+}
+
+uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT16_MAX) { fprintf(stderr, "Value out of range for uint16_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
+    return (uint16_t)retval;
+}
+
+uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT16_MAX) { fprintf(stderr, "Value out of range for uint8_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
+    return (uint8_t)retval;
+}
+
+bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
+    return (parse_numberu32(str,line,lineNum) > 0);
 }
 
 bool parse_data_file(DataParser *parser, const char *filename) {
@@ -62,14 +93,12 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     rewind(file);
     DataEntry entry = {0};
     entry.index = UINT16_MAX;
+    uint32_t lineNum = 0;
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = 0;
         if (line[0] == '#') {
-            if (entry.path[0] && entry.index < MAX_ENTRIES) {
-                parser->entries[entry.index] = entry;
-            }
+            if (entry.path[0] && entry.index < MAX_ENTRIES) parser->entries[entry.index] = entry;
             strncpy(entry.path, line + 1, sizeof(entry.path) - 1);
-//             DualLog("Parsing %s...\n", entry.path);
             entry.index = UINT16_MAX;
             entry.modelIndex = UINT16_MAX;
             entry.texIndex = UINT16_MAX;
@@ -86,22 +115,24 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 if (strncmp(line, parser->valid_keys[i], key_len) == 0 && line[key_len] == ':') {
                     const char *value = line + key_len + 1;
                     while (*value == ' ') value++; // Skip the space after :
-                         if (strcmp(parser->valid_keys[i], "index") == 0)       entry.index       = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "model") == 0)       entry.modelIndex  = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "texture") == 0)     entry.texIndex    = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "glowtexture") == 0) entry.glowIndex   = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "spectexture") == 0) entry.specIndex   = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "normtexture") == 0) entry.normIndex   = atoi(value);
-                    else if (strcmp(parser->valid_keys[i], "doublesided") == 0) entry.doublesided = (atoi(value) > 0);
+                         if (strcmp(parser->valid_keys[i], "index") == 0)       entry.index       = parse_numberu16(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "model") == 0)       entry.modelIndex  = parse_numberu16(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "texture") == 0)     entry.texIndex    = parse_numberu16(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "glowtexture") == 0) entry.glowIndex   = parse_numberu16(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "spectexture") == 0) entry.specIndex   = parse_numberu16(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "normtexture") == 0) entry.normIndex   = parse_numberu16(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "doublesided") == 0) entry.doublesided = parse_bool(value,line,lineNum);
+                    else if (strcmp(parser->valid_keys[i], "cardchunk") == 0)   entry.cardchunk   = parse_bool(value,line,lineNum);
 
                     break;
                 }
             }
         }
+        
+        lineNum++;
     }
-    if (entry.path[0] && entry.index < MAX_ENTRIES) {
-        parser->entries[entry.index] = entry;
-    }
+
+    if (entry.path[0] && entry.index < MAX_ENTRIES) parser->entries[entry.index] = entry;
     fclose(file);
     return true;
 }

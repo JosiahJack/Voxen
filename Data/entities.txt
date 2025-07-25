@@ -24,6 +24,7 @@
 #chunk_black
 index: 0
 model: 178
+cardchunk: 1
 texture: 41
 #chunk_blocker
 index: 1
