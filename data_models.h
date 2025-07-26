@@ -17,8 +17,9 @@
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 
 extern uint32_t modelVertexCounts[MODEL_COUNT];
-// extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
-// extern GLuint modelBoundsID;
+extern GLuint modelVertexCountsID;
+extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+extern GLuint modelBoundsID;
 extern uint32_t totalVertexCount;
 extern GLuint vbos[MODEL_COUNT];
 extern float * vertexDataArrays[MODEL_COUNT];

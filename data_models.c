@@ -22,13 +22,13 @@ const char *valid_mdldata_keys[] = {"index"};
 uint32_t modelVertexCounts[MODEL_COUNT];
 GLuint vbos[MODEL_COUNT];
 uint32_t totalVertexCount = 0;
-// GLuint modelBoundsID;
-// float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+GLuint modelBoundsID;
+float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 float * vertexDataArrays[MODEL_COUNT];
 uint32_t largestVertCount = 0;
-// GLuint vboMasterTable;
-// GLuint modelVertexOffsetsID;
-// GLuint modelVertexCountsID;
+GLuint vboMasterTable;
+GLuint modelVertexOffsetsID;
+GLuint modelVertexCountsID;
 GLuint sphoxelsID;
 
 // Loads all 3D meshes
@@ -47,7 +47,7 @@ int LoadGeometry(void) {
 
     DualLog("Parsing %d models...\n",model_parser.count);
     int totalVertCount = 0;
-//     int totalBounds = 0;
+    int totalBounds = 0;
     largestVertCount = 0;
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
@@ -93,12 +93,12 @@ int LoadGeometry(void) {
 
         // Extract vertex data
         uint32_t vertexIndex = 0;
-//         float minx = 1E9f;
-//         float miny = 1E9f;
-//         float minz = 1E9f;
-//         float maxx = -1E9f;
-//         float maxy = -1E9f;
-//         float maxz = -1E9f;
+        float minx = 1E9f;
+        float miny = 1E9f;
+        float minz = 1E9f;
+        float maxx = -1E9f;
+        float maxy = -1E9f;
+        float maxz = -1E9f;
 
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
@@ -119,32 +119,32 @@ int LoadGeometry(void) {
                 tempVertices[vertexIndex++] = 0; // Normal Index
                 tempVertices[vertexIndex++] = 0; // Model Index
                 tempVertices[vertexIndex++] = 0; // Instance Index
-//                 if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
-//                 if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
-//                 if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
-//                 if (mesh->mVertices[v].y > maxy) maxy = mesh->mVertices[v].y;
-//                 if (mesh->mVertices[v].z < minz) minz = mesh->mVertices[v].z;
-//                 if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
+                if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
+                if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
+                if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
+                if (mesh->mVertices[v].y > maxy) maxy = mesh->mVertices[v].y;
+                if (mesh->mVertices[v].z < minz) minz = mesh->mVertices[v].z;
+                if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
             }
         }
 
-//         DebugRAM("after vertices and edges for %s",model_parser.entries[matchedParserIdx].path);
-//         float minx_pos = fabs(minx);
-//         float miny_pos = fabs(miny);
-//         float minz_pos = fabs(minz);
-//         float boundradius = minx_pos > miny_pos ? minx_pos : miny_pos;
-//         boundradius = boundradius > minz_pos ? boundradius : minz_pos;
-//         boundradius = boundradius > maxx ? boundradius : maxx;
-//         boundradius = boundradius > maxy ? boundradius : maxy;
-//         boundradius = boundradius > maxz ? boundradius : maxz;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-//         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
-//         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
+        DebugRAM("after vertices and edges for %s",model_parser.entries[matchedParserIdx].path);
+        float minx_pos = fabs(minx);
+        float miny_pos = fabs(miny);
+        float minz_pos = fabs(minz);
+        float boundradius = minx_pos > miny_pos ? minx_pos : miny_pos;
+        boundradius = boundradius > minz_pos ? boundradius : minz_pos;
+        boundradius = boundradius > maxx ? boundradius : maxx;
+        boundradius = boundradius > maxy ? boundradius : maxy;
+        boundradius = boundradius > maxz ? boundradius : maxz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
+        totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         vertexDataArrays[i] = tempVertices;
         aiReleaseImport(scene);
         malloc_trim(0);
@@ -216,61 +216,61 @@ int LoadGeometry(void) {
     DebugRAM("after model staging buffer clear");
 
     // Upload modelVertexOffsets
-//     uint32_t modelVertexOffsets[MODEL_COUNT];
-//     uint32_t offset = 0;
-//     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
-//         modelVertexOffsets[i] = offset;
-//         offset += modelVertexCounts[i];
-//     }
-//     
-//     glGenBuffers(1, &modelVertexOffsetsID);
-//     CHECK_GL_ERROR();
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
-//     CHECK_GL_ERROR();
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
-//     CHECK_GL_ERROR();
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
-//     CHECK_GL_ERROR();
+    uint32_t modelVertexOffsets[MODEL_COUNT];
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
+        modelVertexOffsets[i] = offset;
+        offset += modelVertexCounts[i];
+    }
+    
+    glGenBuffers(1, &modelVertexOffsetsID);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
     
     // Pass Model Type Bounds to GPU
-//     glGenBuffers(1, &modelBoundsID);
-//     CHECK_GL_ERROR();
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
-//     CHECK_GL_ERROR();
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-//     CHECK_GL_ERROR();
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
-//     CHECK_GL_ERROR();
+    glGenBuffers(1, &modelBoundsID);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
+    CHECK_GL_ERROR();
     malloc_trim(0);
     
     // Pass Model Vertex Counts to GPU
-//     glGenBuffers(1, &modelVertexCountsID);
-//     CHECK_GL_ERROR();
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexCountsID);
-//     CHECK_GL_ERROR();
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
-//     CHECK_GL_ERROR();
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, modelVertexCountsID);
-//     CHECK_GL_ERROR();
+    glGenBuffers(1, &modelVertexCountsID);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexCountsID);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, modelVertexCountsID);
+    CHECK_GL_ERROR();
     
     // Create duplicate of all mesh data in one flat buffer in VRAM without using RAM
-//     glGenBuffers(1, &vboMasterTable);
-//     CHECK_GL_ERROR();
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
-//     CHECK_GL_ERROR();
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-//     CHECK_GL_ERROR();
-//     for (int i = 0; i < MODEL_COUNT; ++i) {
-//         glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
-//         CHECK_GL_ERROR();
-//         glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
-//         CHECK_GL_ERROR();
-//         glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-//         CHECK_GL_ERROR();
-//     }
-// 
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
-//     CHECK_GL_ERROR();
+    glGenBuffers(1, &vboMasterTable);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    for (int i = 0; i < MODEL_COUNT; ++i) {
+        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
+        CHECK_GL_ERROR();
+        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
+        CHECK_GL_ERROR();
+        glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        CHECK_GL_ERROR();
+    }
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
+    CHECK_GL_ERROR();
     
     // Create sphoxel buffer
     glGenBuffers(1,&sphoxelsID);

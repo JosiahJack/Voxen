@@ -14,6 +14,7 @@ Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 GLuint instancesBuffer;
+GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
 
 int SetupInstances(void) {    
@@ -87,6 +88,18 @@ int SetupInstances(void) {
     CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
+    
+    glGenBuffers(1, &instancesInPVSBuffer);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    CHECK_GL_ERROR();
+    
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     glGenBuffers(1, &matricesBuffer);
     CHECK_GL_ERROR();

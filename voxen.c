@@ -63,7 +63,7 @@ uint32_t worstFPS = UINT32_MAX;
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
-bool shadowsEnabled = false;
+bool shadowsEnabled = true;
 uint32_t playerCellIdx = 80000;
 uint32_t playerCellIdx_x = 20000;
 uint32_t playerCellIdx_y = 10000;
@@ -77,7 +77,7 @@ GLuint vao_chunk; // Vertex Array Object
 GLuint chunkShaderProgram;
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
-      specIndexLoc_chunk = -1; // uniform locations
+      specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, shadowsEnabledLoc_chunk = -1; // uniform locations
       
 GLuint screenSpaceShadowsComputeShader;
 
@@ -300,7 +300,9 @@ void CacheUniformLocationsForShaders(void) {
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
-
+    instancesInPVSCount_chunk = glGetUniformLocation(chunkShaderProgram, "instancesInPVSCount");
+    shadowsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowsEnabled");
+    
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
     debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
@@ -709,7 +711,13 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
+    if (instancesInPVSBuffer) glDeleteBuffers(1, &instancesInPVSBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
+    if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
+    if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
+    if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
+    if (modelVertexCountsID) glDeleteBuffers(1, &modelVertexCountsID);
+    if (modelBoundsID) glDeleteBuffers(1, &modelBoundsID);
     if (systemInitialized[SYS_CTX]) SDL_GL_DeleteContext(gl_context); // Delete context after deleting buffers relevant to that context.
     if (systemInitialized[SYS_WIN]) SDL_DestroyWindow(window);
     if (font && systemInitialized[SYS_TTF]) TTF_CloseFont(font);
@@ -965,6 +973,21 @@ int main(int argc, char* argv[]) {
             distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
             if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
         }
+        
+        uint16_t instancesInPVSCount = 0;
+        for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
+            if (!instanceIsCulledArray[i]) instancesInPVSCount++;
+            if (instancesInPVSCount >= INSTANCE_COUNT - 1) break;
+        }
+        
+        uint32_t instancesInPVS[instancesInPVSCount];
+        uint32_t curIdx = 0;
+        for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
+            if (!instanceIsCulledArray[i]) {
+                instancesInPVS[curIdx] = i;
+                curIdx++;
+            }
+        }
 
         // 3. Pass all instance matrices to GPU
         if (debugRenderSegfaults) DualLog("3. Pass all instance matrices to GPU\n");
@@ -973,6 +996,13 @@ int main(int argc, char* argv[]) {
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
         CHECK_GL_ERROR();
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+        CHECK_GL_ERROR();
+        
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
+        CHECK_GL_ERROR();
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instancesInPVSCount * sizeof(uint32_t), instancesInPVS); // * 16 because matrix4x4
+        CHECK_GL_ERROR();
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
         CHECK_GL_ERROR();
         
         // 4. Generate Shadow Data
@@ -995,6 +1025,10 @@ int main(int argc, char* argv[]) {
         glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
         CHECK_GL_ERROR();
         glUniform1i(debugViewLoc_chunk, debugView);
+        CHECK_GL_ERROR();
+        glUniform1i(instancesInPVSCount_chunk, instancesInPVSCount);
+        CHECK_GL_ERROR();
+        glUniform1i(shadowsEnabledLoc_chunk, shadowsEnabled);
         CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
         CHECK_GL_ERROR();
@@ -1128,11 +1162,11 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         RenderFormattedText(10, 85, TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
         CHECK_GL_ERROR();
-        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugView == 1 ? "unlit"
+        RenderFormattedText(10, 100, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugView == 1 ? "unlit"
                                                                                                 : debugView == 2 ? "surface normals"
                                                                                                 : debugView == 3 ? "depth"
                                                                                                 : debugView == 4 ? "indices"
-                                                                                                :(debugView == 5 ? "shadows" : "standard render"), debugValue);
+                                                                                                :(debugView == 5 ? "shadows" : "standard render"), debugValue, instancesInPVSCount);
         CHECK_GL_ERROR();
         RenderFormattedText(10, 115, TEXT_WHITE, "Num lights: %d, Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         CHECK_GL_ERROR();

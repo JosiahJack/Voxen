@@ -44,9 +44,14 @@ const char *vertexShaderSource =
 const char *fragmentShaderTraditional =
     "#version 450 core\n"
     "#extension GL_ARB_shading_language_packing : require\n"
+
     "in vec2 TexCoord;\n"
     "in vec3 Normal;\n"
     "in vec3 FragPos;\n"
+
+    "uniform int debugView;\n"
+    "uniform int shadowsEnabled;\n"
+    "uniform int instancesInPVSCount;\n"
 
     "flat in int TexIndex;\n"
     "flat in int GlowIndex;\n"
@@ -55,29 +60,43 @@ const char *fragmentShaderTraditional =
     "flat in int InstanceIndex;\n"
     "flat in int ModelIndex;\n"
 
-    "layout(std430, binding = 12) buffer ColorBuffer {\n"
-    "    uint colors[];\n" // 1D color array (RGBA)
+    "struct Instance {\n"
+    "    int modelIndex;\n"
+    "    int texIndex;\n"
+    "    int glowIndex;\n"
+    "    int specIndex;\n"
+    "    int normIndex;\n"
+    "    float posx;\n"
+    "    float posy;\n"
+    "    float posz;\n"
+    "    float sclx;\n"
+    "    float scly;\n"
+    "    float sclz;\n"
+    "    float rotx;\n"
+    "    float roty;\n"
+    "    float rotz;\n"
+    "    float rotw;\n"
     "};\n"
 
+    "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
+    "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
+    "layout(r8, binding = 2) uniform image2D inputShadowStencil;\n"
+
+    "layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };\n"
+    "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
+    "layout(std430, binding = 8) readonly buffer ModelVertexCounts { uint modelVertexCounts[]; };\n"
+    "layout(std430, binding = 9) readonly buffer InstancesInPVS { uint instancesIndices[]; };\n"
+    "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
+    "layout(std430, binding = 11) readonly buffer InstancesMatricesBuffer { mat4 instanceMatrices[]; };\n"
+    "layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; };\n" // 1D color array (RGBA)
     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
-
-    "layout(std430, binding = 14) buffer TextureOffsets {\n"
-    "    uint textureOffsets[];\n" // Starting index in colors for each texture
-    "};\n"
-
-    "layout(std430, binding = 15) buffer TextureSizes {\n"
-    "    ivec2 textureSizes[];\n" // x,y pairs for width and height of textures
-    "};\n"
-
-    "layout(std430, binding = 16) buffer TexturePalettes {\n"
-    "    uint texturePalettes[];\n"  // Palette colors
-    "};\n"
-
-    "layout(std430, binding = 17) buffer TexturePaletteOffsets {\n"
-    "    uint texturePaletteOffsets[];\n"  // Palette starting indices for each texture
-    "};\n"
+    "layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; };\n" // Starting index in colors for each texture
+    "layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; };\n" // x,y pairs for width and height of textures
+    "layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; };\n" // Palette colors
+    "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
 
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
+    "layout(std430, binding = 20) readonly buffer MasterVertexBuffer { float vertexData[]; };\n"
 
     "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
     "    if (texIndex >= 65535) return vec4(0.0);\n"
@@ -99,12 +118,66 @@ const char *fragmentShaderTraditional =
     "    return (c.r << 24) | (c.g << 16) | (c.b << 8) | c.a;\n"
     "}\n"
 
-    "uniform int debugView;\n"
-    "\n"
-    "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
-    "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
-    "layout(r8, binding = 2) uniform image2D inputShadowStencil;\n"
-    "\n"
+    // --- Ray-Triangle Intersection (Möller-Trumbore) ---
+    "bool RayTriangle(vec3 origin, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t) {\n"
+    "    vec3 edge1 = v1 - v0;\n"
+    "    vec3 edge2 = v2 - v0;\n"
+    "    vec3 h = cross(dir, edge2);\n"
+    "    float a = dot(edge1, h);\n"
+    "    if (abs(a) < 1e-6) return false;\n"
+
+    "    float f = 1.0 / a;\n"
+    "    vec3 s = origin - v0;\n"
+    "    float u = f * dot(s, h);\n"
+    "    if (u < 0.0 || u > 1.0) return false;\n"
+
+    "    vec3 q = cross(s, edge1);\n"
+    "    float v = f * dot(dir, q);\n"
+    "    if (v < 0.0 || u + v > 1.0) return false;\n"
+
+    "    t = f * dot(edge2, q);\n"
+    "    return t > 0.001;\n"
+    "}\n"
+
+    // --- Trace Ray for Shadow ---
+    "const uint VERTEX_ATTRIBUTES_COUNT = 14;\n"
+    "const uint BOUNDS_ATTRIBUTES_COUNT = 7;\n"
+    "float TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
+    "    for (int i = 0; i < instancesInPVSCount; i++) {\n"
+    "        uint instanceIdx = instancesIndices[i];\n"
+    "        Instance inst = instances[instanceIdx];\n"
+    "        if (inst.texIndex == 881) continue;\n" // Fullbright light
+
+    "        mat4 invModel = inverse(instanceMatrices[instanceIdx]);\n"
+    "        vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;\n"
+    "        float instanceRadius = bounds[instanceIdx * BOUNDS_ATTRIBUTES_COUNT + 6];\n" // first 6 are the mins,maxs xyz
+    "        if (length(localOrigin - origin) > (maxDist + instanceRadius)) continue;\n"
+
+    "        vec3 localDir = ((invModel * vec4(dir, 0.0)).xyz);\n"
+    "        uint modelIndex = inst.modelIndex;\n"
+    "        uint vertCount = modelVertexCounts[modelIndex];\n"
+    "        if (vertCount > 1000) continue;\n"
+
+    "        uint triCount = vertCount / 3;\n"
+    "        mat4 matrix = instanceMatrices[instanceIdx];\n"
+    "        uint j = 0;\n"
+    "        uint vertexIdx;\n"
+    "        vec3 v0, v1, v2;\n"
+    "        for (uint tri = 0; tri < triCount; tri++) {\n"
+    "            vertexIdx = (vertexOffsets[modelIndex] * VERTEX_ATTRIBUTES_COUNT) + (tri * VERTEX_ATTRIBUTES_COUNT);\n"
+    "            j = 0;\n"
+    "            v0 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
+    "            j++;\n"
+    "            v1 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
+    "            j++;\n"
+    "            v2 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
+    "            float t;\n" // Output result
+    "            if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && (t < maxDist)) return 0.0;\n"
+    "        }\n"
+    "    }\n"
+    "    return 1.0;\n"
+    "}\n"
+
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
     "    if (TexIndex >= 0) texIndexChecked = TexIndex;\n"
@@ -177,7 +250,9 @@ const char *fragmentShaderTraditional =
         "        }\n"
 
         "        float shadow = 1.0;\n"
-//         "        if ((shadowStencil & (1u << i)) < 1) shadow = 0.0;\n"
+        "        if (i == 0 && shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
+        "            shadow = TraceRay(worldPos + adjustedNormal * 0.01, lightDir, range);\n"
+        "        }\n"
 
         "        float attenuation = (1.0 - (dist / range)) * max(dot(adjustedNormal, lightDir), 0.0);\n"
         "        attenuation *= shadow;\n"

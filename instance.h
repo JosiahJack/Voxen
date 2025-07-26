@@ -30,6 +30,7 @@ extern Instance instances[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern GLuint instancesBuffer;
+extern GLuint instancesInPVSBuffer;
 extern GLuint matricesBuffer;
 
 int SetupInstances(void);

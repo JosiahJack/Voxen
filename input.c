@@ -157,10 +157,10 @@ void ProcessInput(void) {
         Input_MouselookApply();
     }
     
-    if (keys[SDL_SCANCODE_J]) {
+    if (keys[SDL_SCANCODE_K]) {
         testLight_x += finalMoveSpeed;
         lightDirty[0] = true;
-    } else if (keys[SDL_SCANCODE_K]) {
+    } else if (keys[SDL_SCANCODE_J]) {
         testLight_x -= finalMoveSpeed;
         lightDirty[0] = true;
     }
