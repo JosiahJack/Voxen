@@ -962,39 +962,37 @@ int main(int argc, char* argv[]) {
         // ====================================================================
         
         // 6. Screenspace Shadows (SSS) Compute Shader
-        if (debugRenderSegfaults) DualLog("7. Screenspace Shadows (SSS) Compute Shader\n");
-        glBindTexture(GL_TEXTURE_2D, inputShadowStencilID);
-        glClearTexImage(inputShadowStencilID, 0, GL_RED, GL_FLOAT, (float[]){0.0f});
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        glUseProgram(screenSpaceShadowsComputeShader);
-        CHECK_GL_ERROR();
-        glUniform2f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
-        CHECK_GL_ERROR();
-        float viewProj[16];
-        mat4_multiply(viewProj, projection, view); // viewProj = projection * view
-        glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "uViewProjMatrix"), 1, GL_FALSE, viewProj);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uShadowBias"), 0.01f);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uMaxRaySteps"), 1024.0f);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uStepSize"), 0.001f);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosX"), 0.1f);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosY"), 0.1f);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosZ"), 0.1f);
-        CHECK_GL_ERROR();
-        GLuint groupX = (screen_width + 31) / 32;
-        GLuint groupY = (screen_height + 31) / 32;
-        glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
-        CHECK_GL_ERROR();
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
-        CHECK_GL_ERROR();
-        glUseProgram(0);
-        CHECK_GL_ERROR();
+//         if (debugRenderSegfaults) DualLog("7. Screenspace Shadows (SSS) Compute Shader\n");
+//         glBindTexture(GL_TEXTURE_2D, inputShadowStencilID);
+//         glClearTexImage(inputShadowStencilID, 0, GL_RED, GL_FLOAT, (float[]){0.0f});
+//         glBindTexture(GL_TEXTURE_2D, 0);
+// 
+//         glUseProgram(screenSpaceShadowsComputeShader);
+//         CHECK_GL_ERROR();
+//         glUniform2f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
+//         CHECK_GL_ERROR();
+//         float viewProj[16];
+//         mat4_identity(viewProj);
+//         glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "projection"), 1, GL_FALSE, projection);
+//         CHECK_GL_ERROR();
+//         glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "matrix"), 1, GL_FALSE, viewProj);
+//         CHECK_GL_ERROR();
+//         glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "view"), 1, GL_FALSE, view);
+//         CHECK_GL_ERROR();
+//         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosX"), 0.1f);
+//         CHECK_GL_ERROR();
+//         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosY"), 0.1f);
+//         CHECK_GL_ERROR();
+//         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosZ"), 0.1f);
+//         CHECK_GL_ERROR();
+//         GLuint groupX = (screen_width + 31) / 32;
+//         GLuint groupY = (screen_height + 31) / 32;
+//         glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
+//         CHECK_GL_ERROR();
+//         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+//         CHECK_GL_ERROR();
+//         glUseProgram(0);
+//         CHECK_GL_ERROR();
         
         // 6. Render final meshes' results with full screen quad
         if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");

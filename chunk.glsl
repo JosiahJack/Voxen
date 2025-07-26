@@ -177,7 +177,7 @@ const char *fragmentShaderTraditional =
         "        }\n"
 
         "        float shadow = 1.0;\n"
-        "        if ((shadowStencil & (1u << i)) < 1) shadow = 0.0;\n"
+//         "        if ((shadowStencil & (1u << i)) < 1) shadow = 0.0;\n"
 
         "        float attenuation = (1.0 - (dist / range)) * max(dot(adjustedNormal, lightDir), 0.0);\n"
         "        attenuation *= shadow;\n"
