@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
+// #include <string.h>
 #include "event.h"
 #include "constants.h"
 #include "input.h"
@@ -24,7 +25,6 @@
 #include "voxel.h"
 #include "data_entities.h"
 #include "player.h"
-#include "matrix.h"
 
 // #define DEBUG_RAM_OUTPUT
 
@@ -195,6 +195,79 @@ void print_bytes_no_newline(int count) {
 
 // ============================================================================
 // OpenGL / Rendering Helper Functions
+
+void mat4_identity(float* m) {
+    for (int i = 0; i < 16; i++) m[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+}
+
+// Generates Projection Matrix4x4 for Geometry Rasterizer Pass.
+void mat4_perspective(float* m, float fov, float aspect, float near, float far) {
+    float f = 1.0f / tan(fov * M_PI / 360.0f);
+    mat4_identity(m);
+    m[0] = f / aspect;
+    m[5] = f;
+    m[10] = -(far + near) / (far - near); // Fixed: Negative for correct depth
+    m[11] = -1.0f;
+    m[14] = -2.0f * far * near / (far - near);
+    m[15] = 0.0f;
+}
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass
+void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orientation) {
+    // Convert quaternion to rotation matrix
+    float rotation[16];
+    quat_to_matrix(orientation, rotation);
+
+    // Extract forward, right, and up vectors from rotation matrix
+    float right[3] = { -rotation[0], -rotation[1], -rotation[2] };
+    float up[3] = { rotation[4], rotation[5], rotation[6] };
+    float forward[3] = { rotation[8], rotation[9], rotation[10] };
+
+    // Build view matrix
+    mat4_identity(m);
+    m[0] = right[0];  m[4] = right[1];  m[8]  = right[2];  m[12] = -(right[0] * eyeX + right[1] * eyeY + right[2] * eyeZ);
+    m[1] = up[0];     m[5] = up[1];     m[9]  = up[2];     m[13] = -(up[0] * eyeX + up[1] * eyeY + up[2] * eyeZ);
+    m[2] = -forward[0]; m[6] = -forward[1]; m[10] = -forward[2]; m[14] = -(-forward[0] * eyeX + -forward[1] * eyeY + -forward[2] * eyeZ);
+    m[3] = 0.0f;      m[7] = 0.0f;      m[11] = 0.0f;      m[15] = 1.0f;
+}
+
+// Matrix helper for 2D orthographic projection for text/UI
+void mat4_ortho(float* m, float left, float right, float bottom, float top, float near, float far) {
+    mat4_identity(m);
+    m[0] = 2.0f / (right - left);
+    m[5] = 2.0f / (top - bottom);
+    m[10] = -2.0f / (far - near);
+    m[12] = -(right + left) / (right - left);
+    m[13] = -(top + bottom) / (top - bottom);
+    m[14] = -(far + near) / (far - near);
+    m[15] = 1.0f;
+}
+
+// Convert quaternion to a 4x4 matrix
+void quat_to_matrix(Quaternion* q, float* m) {
+    float xx = q->x * q->x;
+    float xy = q->x * q->y;
+    float xz = q->x * q->z;
+    float xw = q->x * q->w;
+    float yy = q->y * q->y;
+    float yz = q->y * q->z;
+    float yw = q->y * q->w;
+    float zz = q->z * q->z;
+    float zw = q->z * q->w;
+
+    mat4_identity(m);
+    m[0] = 1.0f - 2.0f * (yy + zz);  // Right X
+    m[1] = 2.0f * (xy + zw);          // Right Y
+    m[2] = 2.0f * (xz - yw);          // Right Z
+    m[4] = 2.0f * (xy - zw);          // Up X
+    m[5] = 1.0f - 2.0f * (xx + zz);  // Up Y
+    m[6] = 2.0f * (yz + xw);          // Up Z
+    m[8] = 2.0f * (xz + yw);          // Forward X
+    m[9] = 2.0f * (yz - xw);          // Forward Y
+    m[10] = 1.0f - 2.0f * (xx + yy); // Forward Z
+    m[3] = 0.0f; m[7] = 0.0f; m[11] = 0.0f; m[15] = 1.0f;
+}
+
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, GLenum target, const char *name) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
@@ -490,8 +563,8 @@ int InitializeEnvironment(void) {
     // Initialize Lights
     for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
         uint16_t base = i * LIGHT_DATA_SIZE; // Step by 12
-        lights[base + 0] = base * 0.08f; // posx
-        lights[base + 1] = base * 0.08f; // posy
+        lights[base + 0] = base * 0.64f; // posx
+        lights[base + 1] = base * 0.64f; // posy
         lights[base + 2] = 0.0f; // posz
         lights[base + 3] = 5.0f; // intensity
         lights[base + 4] = 5.24f; // radius

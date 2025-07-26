@@ -600,35 +600,37 @@ texture: 117
 #chunk_med1_1
 index: 149
 model: 249
-texture: 118
+texture: 486
 #chunk_med1_1_half_top
 index: 150
 model: 250
-texture: 118
+texture: 486
 #chunk_med1_1_slice128high
 index: 151
 model: 251
-texture: 118
+texture: 486
 #chunk_med1_1_slice192RH
 index: 152
 model: 252
-texture: 118
+texture: 486
 #chunk_med1_1_slice256
 index: 153
 model: 253
-texture: 118
+texture: 486
 #chunk_med1_1d
 index: 154
 model: 248
-texture: 119
+texture: 485
+glowtexture: 484
 #chunk_med1_2
 index: 155
 model: 255
-texture: 120
+texture: 489
 #chunk_med1_2d
 index: 156
 model: 254
-texture: 121
+texture: 487
+glowtexture: 488
 #chunk_med1_3
 index: 157
 model: 257

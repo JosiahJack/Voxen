@@ -85,7 +85,7 @@ int Input_KeyUp(uint32_t scancode) {
 }
 
 int Input_MouseMove(float xrel, float yrel) {
-    cam_yaw += xrel * mouse_sensitivity;
+    cam_yaw -= xrel * mouse_sensitivity;
     cam_pitch += yrel * mouse_sensitivity;
     if (cam_pitch > 179.0f) cam_pitch = 179.0f;
     if (cam_pitch < 1.0f) cam_pitch = 1.0f;
@@ -135,13 +135,13 @@ void ProcessInput(void) {
     }
 
     if (keys[SDL_SCANCODE_A]) {
-        cam_x -= finalMoveSpeed * strafe_x; // Strafe left
-        cam_y -= finalMoveSpeed * strafe_y;
-        cam_z -= finalMoveSpeed * strafe_z;
-    } else if (keys[SDL_SCANCODE_D]) {
-        cam_x += finalMoveSpeed * strafe_x; // Strafe right
+        cam_x += finalMoveSpeed * strafe_x; // Strafe left
         cam_y += finalMoveSpeed * strafe_y;
         cam_z += finalMoveSpeed * strafe_z;
+    } else if (keys[SDL_SCANCODE_D]) {
+        cam_x -= finalMoveSpeed * strafe_x; // Strafe right
+        cam_y -= finalMoveSpeed * strafe_y;
+        cam_z -= finalMoveSpeed * strafe_z;
     }
 
     if (noclip) {

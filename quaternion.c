@@ -1,6 +1,5 @@
 #include <math.h>
 #include "constants.h"
-#include "matrix.h"
 #include "quaternion.h"
 
 float deg2rad(float degrees) {
@@ -52,31 +51,6 @@ void quat_from_axis_angle(Quaternion* q, float x, float y, float z, float angle)
     q->y = y * s;
     q->z = z * s;
     quat_normalize(q);
-}
-
-// Convert quaternion to a 4x4 matrix
-void quat_to_matrix(Quaternion* q, float* m) {
-    float xx = q->x * q->x;
-    float xy = q->x * q->y;
-    float xz = q->x * q->z;
-    float xw = q->x * q->w;
-    float yy = q->y * q->y;
-    float yz = q->y * q->z;
-    float yw = q->y * q->w;
-    float zz = q->z * q->z;
-    float zw = q->z * q->w;
-
-    mat4_identity(m);
-    m[0] = 1.0f - 2.0f * (yy + zz);  // Right X
-    m[1] = 2.0f * (xy + zw);          // Right Y
-    m[2] = 2.0f * (xz - yw);          // Right Z
-    m[4] = 2.0f * (xy - zw);          // Up X
-    m[5] = 1.0f - 2.0f * (xx + zz);  // Up Y
-    m[6] = 2.0f * (yz + xw);          // Up Z
-    m[8] = 2.0f * (xz + yw);          // Forward X
-    m[9] = 2.0f * (yz - xw);          // Forward Y
-    m[10] = 1.0f - 2.0f * (xx + yy); // Forward Z
-    m[3] = 0.0f; m[7] = 0.0f; m[11] = 0.0f; m[15] = 1.0f;
 }
 
 void quat_to_euler(Quaternion* q, float* yaw, float* pitch, float* roll) {

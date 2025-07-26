@@ -9,7 +9,6 @@
 #include "debug.h"
 #include "data_entities.h"
 #include "voxel.h"
-#include "matrix.h"
 
 Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -53,6 +52,30 @@ int SetupInstances(void) {
         
         dirtyInstances[idx] = true;        
     }
+    
+    instances[149].posx = 0.0f;
+    instances[149].posy = 2.56f;
+    instances[149].posz = 0.0f;
+    instances[149].rotx = 0.0f;
+    instances[149].roty = 0.0f;
+    instances[149].rotz = 0.707f;
+    instances[149].rotw = 0.707f;
+    
+    instances[154].posx = 0.0f;
+    instances[154].posy = 2.56f;
+    instances[154].posz = 0.0f;
+    instances[154].rotx = 0.5f;
+    instances[154].roty = 0.5f;
+    instances[154].rotz = 0.5f;
+    instances[154].rotw = 0.5f;
+ 
+    instances[155].posx = 0.0f;
+    instances[155].posy = 2.56f;
+    instances[155].posz = 0.0f;
+    instances[155].rotx = 0.707f;
+    instances[155].roty = 0.0f;
+    instances[155].rotz = 0.707f;
+    instances[155].rotw = 0.0f;
     
     glGenBuffers(1, &instancesBuffer);
     CHECK_GL_ERROR();

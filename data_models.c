@@ -103,10 +103,10 @@ int LoadGeometry(void) {
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
-                tempVertices[vertexIndex++] = -mesh->mVertices[v].x; // Position
+                tempVertices[vertexIndex++] = mesh->mVertices[v].x; // Position
                 tempVertices[vertexIndex++] = mesh->mVertices[v].y;
                 tempVertices[vertexIndex++] = mesh->mVertices[v].z;
-                tempVertices[vertexIndex++] = -mesh->mNormals[v].x; // Normal (actually y, huh).
+                tempVertices[vertexIndex++] = mesh->mNormals[v].x; // Normal (actually y, huh).
                 tempVertices[vertexIndex++] = mesh->mNormals[v].y; // Actually X normal.  weird
                 tempVertices[vertexIndex++] = mesh->mNormals[v].z;
                 float tempU = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].x : 0.0f;
