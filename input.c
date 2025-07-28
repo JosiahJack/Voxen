@@ -76,6 +76,7 @@ int Input_KeyDown(uint32_t scancode) {
     if (keys[SDL_SCANCODE_E]) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
     }
+    
     return 0;
 }
 

@@ -1,5 +1,7 @@
 // File: voxen.c
 // Description: A realtime OpenGL based application for experimenting with voxel lighting techniques to derive new methods of high speed accurate lighting in resource constrained environements (e.g. embedded).
+#define VERSION_STRING "v0.3.0"
+
 #include <malloc.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -9,7 +11,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
-// #include <string.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include "event.h"
 #include "constants.h"
 #include "input.h"
@@ -25,6 +29,8 @@
 #include "voxel.h"
 #include "data_entities.h"
 #include "player.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 // #define DEBUG_RAM_OUTPUT
 
@@ -51,7 +57,8 @@ const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
 double start_frame_time = 0.0;
-         
+double screenshotTimeout = 0.0;
+
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering
 SDL_GLContext gl_context;
@@ -89,6 +96,11 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 
 //    FBO
 GLuint inputImageID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBufferFBO; // FBO inputs
+
+//    Cubemap
+bool generatedCubemapProbes = false;
+GLuint inputCubemapImageID, inputCubemapDepthID, inputCubemapWorldPosID, gBufferCubemapFBO;
+int cubemapTexSize = 256;
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -442,6 +454,32 @@ void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...) 
     va_end(args);
     RenderText(x, y, uiTextBuffer, color);
 }
+
+void Screenshot() {
+    struct stat st = {0};
+    if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
+        if (mkdir("Screenshots", 0755) != 0) { DualLog("Failed to create Screenshots folder: %s\n", strerror(errno)); return; }
+    }
+    
+    unsigned char* pixels = (unsigned char*)malloc(screen_width * screen_height * 4);
+    if (!pixels) { DualLog("Failed to allocate memory for screenshot pixels\n"); return; }
+
+    glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    CHECK_GL_ERROR();
+    char timestamp[32];
+    char filename[96];
+    time_t now = time(NULL);
+    struct tm *utc_time = localtime(&now);
+    if (!utc_time) { DualLog("Failed to get current time for screenshot!\n"); free(pixels); return; }
+    
+    strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s.png", timestamp, VERSION_STRING);
+    int success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
+    if (!success) DualLog("Failed to save screenshot\n");
+    else DualLog("Saved screenshot %s\n", filename);
+
+    free(pixels);
+}
 // ============================================================================
 
 typedef enum {
@@ -485,6 +523,8 @@ int InitializeEnvironment(void) {
     systemInitialized[SYS_CTX] = true;
     DebugRAM("GL init");
     malloc_trim(0);
+    
+    stbi_flip_vertically_on_write(1);
 
     SDL_GL_MakeCurrent(window, gl_context);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
@@ -609,6 +649,7 @@ int InitializeEnvironment(void) {
     lights[11 + 12] = 0.0f;
     DebugRAM("init lights"); 
 
+    // Create Framebuffer
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Primary Lit Raster");
     CHECK_GL_ERROR();
@@ -619,7 +660,6 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputShadowStencilID,        GL_R8, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "GBuffer Bitmask for What Lights See Pixel");
     CHECK_GL_ERROR();
 
-    // Create framebuffer
     glGenFramebuffers(1, &gBufferFBO);
     CHECK_GL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
@@ -644,6 +684,41 @@ int InitializeEnvironment(void) {
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
     glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+    CHECK_GL_ERROR();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    CHECK_GL_ERROR();
+    malloc_trim(0);
+    
+    // Cubemap FBO duplicate
+    GenerateAndBindTexture(&inputCubemapImageID,             GL_RGBA8, cubemapTexSize, cubemapTexSize,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Cubemap Lit Raster");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputCubemapDepthID, GL_DEPTH_COMPONENT24, cubemapTexSize, cubemapTexSize, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Cubemap Raster Depth");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputCubemapWorldPosID,        GL_RGBA32F, cubemapTexSize, cubemapTexSize,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Cubemap World Position At Each Pixel");
+    CHECK_GL_ERROR();
+    
+    glGenFramebuffers(1, &gBufferCubemapFBO);
+    CHECK_GL_ERROR();
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferCubemapFBO);
+    CHECK_GL_ERROR();
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputCubemapImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputCubemapWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputCubemapDepthID, 0);
+    GLenum drawCubemapBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+    glDrawBuffers(2, drawCubemapBuffers);
+    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        switch (status) {
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
+            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
+            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
+        }
+    }
+    
+    // Don't bother binding image textures for cubemap here, done in render pass.
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
@@ -1010,7 +1085,179 @@ int main(int argc, char* argv[]) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
         CHECK_GL_ERROR();
         
-        // 4. Generate Shadow Data
+        // 4. Generate Shadow Data - Render all meshes as black + glow, render all lights as spheres with their color and scaled for intensity
+        if (globalFrameNum >= 2 && !generatedCubemapProbes) {
+            Quaternion orientations[6];
+            
+            quat_identity(&orientations[0]);
+            quat_identity(&orientations[1]);
+            quat_identity(&orientations[2]);
+            quat_identity(&orientations[3]);
+            quat_identity(&orientations[4]);
+            quat_identity(&orientations[5]);
+            quat_from_yaw_pitch(&orientations[0], 180.0f,  90.0f); // Front Z+ (actually Y+) As looking along axis specified, value gets more this if going into screen.
+            quat_from_yaw_pitch(&orientations[1],   0.0f,  90.0f); //  Back Z- (actually Y-)
+            quat_from_yaw_pitch(&orientations[2],  90.0f,  90.0f); // Right X+ (actually X+)
+            quat_from_yaw_pitch(&orientations[3], 270.0f,  90.0f); //  Left X- (actually X-)
+            quat_from_yaw_pitch(&orientations[4], 180.0f,   0.0f); //    Up Y+ (actually Z+)
+            quat_from_yaw_pitch(&orientations[5], 180.0f, 180.0f); //  Down Y- (actually Z-)
+            glBindFramebuffer(GL_FRAMEBUFFER, gBufferCubemapFBO);
+            CHECK_GL_ERROR();
+            glViewport(0, 0, cubemapTexSize, cubemapTexSize);
+            CHECK_GL_ERROR();
+            glUseProgram(chunkShaderProgram);
+            CHECK_GL_ERROR();
+            glEnable(GL_DEPTH_TEST);
+            CHECK_GL_ERROR();
+            glBindImageTexture(0, inputCubemapImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+            CHECK_GL_ERROR();
+            glBindImageTexture(1, inputCubemapWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            CHECK_GL_ERROR();
+            for (int i=0; i < 6; ++i) {
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear color and depth
+                CHECK_GL_ERROR();
+                float view[16], projection[16]; // Set up view and projection matrices
+                float fov = 65.0f;
+                mat4_perspective(projection, fov, (float)cubemapTexSize / cubemapTexSize, 0.02f, 15.36f);
+                mat4_lookat(view, 0.0f, 0.0f, 0.0f, &orientations[i]);
+                glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+                CHECK_GL_ERROR();
+                glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
+                CHECK_GL_ERROR();
+                glUniform1i(debugViewLoc_chunk, 6); // Force all to render as black + glow
+                CHECK_GL_ERROR();
+                glUniform1i(instancesInPVSCount_chunk, instancesInPVSCount);
+                CHECK_GL_ERROR();
+                glUniform1i(shadowsEnabledLoc_chunk, true);
+                CHECK_GL_ERROR();
+                glBindVertexArray(vao_chunk);
+                CHECK_GL_ERROR();
+                glUniform1f(overrideGlowRLoc_chunk, 0.0f);
+                CHECK_GL_ERROR();
+                glUniform1f(overrideGlowGLoc_chunk, 0.0f);
+                CHECK_GL_ERROR();
+                glUniform1f(overrideGlowBLoc_chunk, 0.0f);
+                CHECK_GL_ERROR();
+                for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
+                    if (instanceIsCulledArray[i]) continue;
+                    if (instances[i].modelIndex >= MODEL_COUNT) continue;
+                    if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+                    if (instances[i].modelIndex < 0) continue; // Culled
+                    if (i == 39) continue; // TODO delete me
+                    
+                    if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
+                    glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+                    CHECK_GL_ERROR();
+                    glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
+                    CHECK_GL_ERROR();
+                    glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+                    CHECK_GL_ERROR();
+                    glUniform1i(instanceIndexLoc_chunk, i);
+                    CHECK_GL_ERROR();
+                    int modelType = instances[i].modelIndex;
+                    glUniform1i(modelIndexLoc_chunk, modelType);
+                    CHECK_GL_ERROR();
+                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+                    CHECK_GL_ERROR();
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    CHECK_GL_ERROR();
+                    if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
+                    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+                    CHECK_GL_ERROR();
+                    if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelVertexCounts[modelType];
+                }
+                
+                glEnable(GL_CULL_FACE); // Reenable backface culling
+                glEnable(GL_DEPTH_TEST);
+                for (uint16_t i=1;i<numLightsFound;++i) { // skip self, start at 1 TODO: Use cubemap array index
+                    float mat[16]; // 4x4 matrix
+                    uint16_t idx = i * LIGHT_DATA_SIZE;
+                    float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
+                    if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
+                    SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ], 0.0f, 0.0f, 0.0f, 1.0f, sphoxelSize, sphoxelSize, sphoxelSize);
+                    glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                    CHECK_GL_ERROR();
+                    glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                    CHECK_GL_ERROR();
+                    glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                    CHECK_GL_ERROR();
+                    glUniform1i(texIndexLoc_chunk, 41);
+                    CHECK_GL_ERROR();
+                    glUniform1i(glowIndexLoc_chunk, 41);
+                    CHECK_GL_ERROR();
+                    glUniform1i(specIndexLoc_chunk, 41);
+                    CHECK_GL_ERROR();
+                    glUniform1i(instanceIndexLoc_chunk, i);
+                    CHECK_GL_ERROR();
+                    int modelType = 621; // Test light icosphere
+                    glUniform1i(modelIndexLoc_chunk, modelType);
+                    CHECK_GL_ERROR();
+                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
+                    CHECK_GL_ERROR();
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    CHECK_GL_ERROR();
+                    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+                    CHECK_GL_ERROR();
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelVertexCounts[modelType];
+                }
+                
+                // Write to file
+                // Allocate buffer for pixel data (RGBA, 8 bits per channel)
+                unsigned char* pixels = (unsigned char*)malloc(cubemapTexSize * cubemapTexSize * 4);
+                if (!pixels) {
+                    DualLog("Failed to allocate memory for cubemap pixels\n");
+                    continue;
+                }
+
+                // Read pixels from the framebuffer
+                glReadPixels(0, 0, cubemapTexSize, cubemapTexSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+                CHECK_GL_ERROR();
+
+                // Generate filename (e.g., probe0_face0.png, probe0_face1.png, etc.)
+                char filename[64];
+                switch(i) {
+                    case 0: snprintf(filename, sizeof(filename), "cubemap_%d_front.png", i); break;
+                    case 1: snprintf(filename, sizeof(filename), "cubemap_%d_back.png", i); break;
+                    case 2: snprintf(filename, sizeof(filename), "cubemap_%d_right.png", i); break;
+                    case 3: snprintf(filename, sizeof(filename), "cubemap_%d_left.png", i); break;
+                    case 4: snprintf(filename, sizeof(filename), "cubemap_%d_up.png", i); break;
+                    case 5: snprintf(filename, sizeof(filename), "cubemap_%d_front.png", i); break;
+                }
+
+                // Save to PNG using stb_image_write
+                int success = stbi_write_png(filename, cubemapTexSize, cubemapTexSize, 4, pixels, cubemapTexSize * 4);
+                if (!success) {
+                    DualLog("Failed to save cubemap face %d to %s\n", i, filename);
+                } else {
+                    DualLog("Saved cubemap face %d to %s\n", i, filename);
+                }
+
+                // Free pixel buffer
+                free(pixels);
+            }
+            
+            generatedCubemapProbes = true;
+
+            // Restore state
+            glUniform1i(debugViewLoc_chunk, debugView);
+            CHECK_GL_ERROR();
+            glViewport(0, 0, screen_width, screen_height);
+            CHECK_GL_ERROR();
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO
+            CHECK_GL_ERROR();
+            glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Put normal textures back
+            CHECK_GL_ERROR();
+            glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+            CHECK_GL_ERROR();
+            glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+            CHECK_GL_ERROR();
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            CHECK_GL_ERROR();
+            malloc_trim(0);
+        }
         
         // 5. Unlit Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1048,8 +1295,7 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
-
-            if (debugView == 6 && i == 39) continue;
+            if (debugView == 6 && i == 39) continue; // TODO: Delete me
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
@@ -1084,8 +1330,6 @@ int main(int argc, char* argv[]) {
                 float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
                 if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
                 SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ], 0.0f, 0.0f, 0.0f, 1.0f, sphoxelSize, sphoxelSize, sphoxelSize);
-    
-                
                 glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
                 CHECK_GL_ERROR();
                 glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
@@ -1224,17 +1468,24 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         
         // Frame stats
+        double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
         RenderFormattedText(10, 10, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, Shdw %d, UI %d], Verts: %d, Worst FPS: %d",
-                            (get_time() - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal - shadowDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
+                            (time_now - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal - shadowDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
+        last_time = time_now;
         CHECK_GL_ERROR();
-        
-        double time_now = get_time();
         if ((time_now - lastFrameSecCountTime) >= 1.00) {
             lastFrameSecCountTime = time_now;
             framesPerLastSecond = globalFrameNum - lastFrameSecCount;
             if (framesPerLastSecond < worstFPS && globalFrameNum > 10) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
             lastFrameSecCount = globalFrameNum;
+        }
+        
+        if (keys[SDL_SCANCODE_F12]) {
+            if (time_now > screenshotTimeout) {
+                Screenshot();
+                screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
+            }
         }
 
         glDisable(GL_STENCIL_TEST);
@@ -1243,7 +1494,6 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
-        last_time = current_time;
         globalFrameNum++;
     }
 
