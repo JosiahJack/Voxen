@@ -100,7 +100,7 @@ GLuint inputImageID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBuffe
 //    Cubemap
 bool generatedCubemapProbes = false;
 GLuint inputCubemapImageID, inputCubemapDepthID, inputCubemapWorldPosID, gBufferCubemapFBO;
-int cubemapTexSize = 256;
+int cubemapTexSize = 512;
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -478,6 +478,39 @@ void Screenshot() {
     if (!success) DualLog("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
+    free(pixels);
+}
+
+void ScreenshotCubemapFace(int face) {
+    // Write to file
+    // Allocate buffer for pixel data (RGBA, 8 bits per channel)
+    unsigned char* pixels = (unsigned char*)malloc(cubemapTexSize * cubemapTexSize * 4);
+    if (!pixels) { DualLog("Failed to allocate memory for cubemap pixels\n"); return; }
+
+    // Read pixels from the current framebuffer
+    glReadPixels(0, 0, cubemapTexSize, cubemapTexSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    CHECK_GL_ERROR();
+
+    // Generate filename (e.g., probe0_face0.png, probe0_face1.png, etc.)
+    char filename[64];
+    switch(face) {
+        case 0: snprintf(filename, sizeof(filename), "cubemap_%d_ft.png", face); break;
+        case 1: snprintf(filename, sizeof(filename), "cubemap_%d_bk.png", face); break;
+        case 2: snprintf(filename, sizeof(filename), "cubemap_%d_rt.png", face); break;
+        case 3: snprintf(filename, sizeof(filename), "cubemap_%d_lf.png", face); break;
+        case 4: snprintf(filename, sizeof(filename), "cubemap_%d_up.png", face); break;
+        case 5: snprintf(filename, sizeof(filename), "cubemap_%d_dn.png", face); break;
+    }
+
+    // Save to PNG using stb_image_write
+    int success = stbi_write_png(filename, cubemapTexSize, cubemapTexSize, 4, pixels, cubemapTexSize * 4);
+    if (!success) {
+        DualLog("Failed to save cubemap face %d to %s\n", face, filename);
+    } else {
+        DualLog("Saved cubemap face %d to %s\n", face, filename);
+    }
+
+    // Free pixel buffer
     free(pixels);
 }
 // ============================================================================
@@ -1119,7 +1152,7 @@ int main(int argc, char* argv[]) {
                 float view[16], projection[16]; // Set up view and projection matrices
                 float fov = 65.0f;
                 mat4_perspective(projection, fov, (float)cubemapTexSize / cubemapTexSize, 0.02f, 15.36f);
-                mat4_lookat(view, 0.0f, 0.0f, 0.0f, &orientations[i]);
+                mat4_lookat(view, 0.0f, 0.0f, 2.0f, &orientations[i]);
                 glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
                 CHECK_GL_ERROR();
                 glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
@@ -1204,39 +1237,7 @@ int main(int argc, char* argv[]) {
                     verticesRenderedThisFrame += modelVertexCounts[modelType];
                 }
                 
-                // Write to file
-                // Allocate buffer for pixel data (RGBA, 8 bits per channel)
-                unsigned char* pixels = (unsigned char*)malloc(cubemapTexSize * cubemapTexSize * 4);
-                if (!pixels) {
-                    DualLog("Failed to allocate memory for cubemap pixels\n");
-                    continue;
-                }
-
-                // Read pixels from the framebuffer
-                glReadPixels(0, 0, cubemapTexSize, cubemapTexSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-                CHECK_GL_ERROR();
-
-                // Generate filename (e.g., probe0_face0.png, probe0_face1.png, etc.)
-                char filename[64];
-                switch(i) {
-                    case 0: snprintf(filename, sizeof(filename), "cubemap_%d_front.png", i); break;
-                    case 1: snprintf(filename, sizeof(filename), "cubemap_%d_back.png", i); break;
-                    case 2: snprintf(filename, sizeof(filename), "cubemap_%d_right.png", i); break;
-                    case 3: snprintf(filename, sizeof(filename), "cubemap_%d_left.png", i); break;
-                    case 4: snprintf(filename, sizeof(filename), "cubemap_%d_up.png", i); break;
-                    case 5: snprintf(filename, sizeof(filename), "cubemap_%d_front.png", i); break;
-                }
-
-                // Save to PNG using stb_image_write
-                int success = stbi_write_png(filename, cubemapTexSize, cubemapTexSize, 4, pixels, cubemapTexSize * 4);
-                if (!success) {
-                    DualLog("Failed to save cubemap face %d to %s\n", i, filename);
-                } else {
-                    DualLog("Saved cubemap face %d to %s\n", i, filename);
-                }
-
-                // Free pixel buffer
-                free(pixels);
+                ScreenshotCubemapFace(i);
             }
             
             generatedCubemapProbes = true;
