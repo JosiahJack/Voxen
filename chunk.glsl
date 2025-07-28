@@ -221,6 +221,8 @@ const char *fragmentShaderTraditional =
     "    } else if (debugView == 5) {\n" // Shadows debug
     "        float shadowStencil = imageLoad(inputShadowStencil, ivec2(gl_FragCoord.xy)).r;\n"
     "        outAlbedo = vec4(shadowStencil,shadowStencil,shadowStencil,1.0);\n"
+    "    } else if (debugView == 6) {\n" // Lightview Mode
+    "        outAlbedo = vec4(glowColor.rgb,1.0);\n"
     "    } else {\n"
         "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
         "    uint lightIdx = 0;\n"
@@ -250,9 +252,9 @@ const char *fragmentShaderTraditional =
         "        }\n"
 
         "        float shadow = 1.0;\n"
-        "        if (i == 0 && shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
-        "            shadow = TraceRay(worldPos + adjustedNormal * 0.01, lightDir, range);\n"
-        "        }\n"
+//         "        if (i == 0 && shadowsEnabled > 0 && intensity > 0.5 && range > 1.5) {\n"
+//         "            shadow = TraceRay(worldPos + adjustedNormal * 0.01, lightDir, range);\n"
+//         "        }\n"
 
         "        float attenuation = (1.0 - (dist / range)) * max(dot(adjustedNormal, lightDir), 0.0);\n"
         "        attenuation *= shadow;\n"

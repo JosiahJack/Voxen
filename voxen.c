@@ -313,12 +313,8 @@ void CacheUniformLocationsForShaders(void) {
     texelSizeLoc_text = glGetUniformLocation(textShaderProgram, "texelSize");
 }
 
-void UpdateInstanceMatrix(int i) {
-    if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; }
-    if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
-    if (instances[i].modelIndex < 0) return; // Culled
-    
-    float x = instances[i].rotx, y = instances[i].roty, z = instances[i].rotz, w = instances[i].rotw;
+void SetUpdatedMatrix(float * mat, float posx, float posy, float posz, float rotx, float roty, float rotz, float rotw, float sclx, float scly, float sclz) {
+    float x = rotx, y = roty, z = rotz, w = rotw;
     float rot[16];
     mat4_identity(rot);
     rot[0] = 1.0f - 2.0f * (y*y + z*z);
@@ -330,17 +326,19 @@ void UpdateInstanceMatrix(int i) {
     rot[8] = 2.0f * (x*z - w*y);
     rot[9] = 2.0f * (y*z + w*x);
     rot[10] = 1.0f - 2.0f * (x*x + y*y);
-    
-    // Account for bad scale.  If instance is in the list, it should be visible!
-    float sx = instances[i].sclx > 0.0f ? instances[i].sclx : 1.0f;
-    float sy = instances[i].scly > 0.0f ? instances[i].scly : 1.0f;
-    float sz = instances[i].sclz > 0.0f ? instances[i].sclz : 1.0f;
+    mat[0]  = rot[0] * sclx; mat[1]  = rot[1] * scly; mat[2]  = rot[2]  * sclz; mat[3]  = 0.0f;
+    mat[4]  = rot[4] * sclx; mat[5]  = rot[5] * scly; mat[6]  = rot[6]  * sclz; mat[7]  = 0.0f;
+    mat[8]  = rot[8] * sclx; mat[9]  = rot[9] * scly; mat[10] = rot[10] * sclz; mat[11] = 0.0f;
+    mat[12] =          posx; mat[13] =          posy; mat[14] =           posz; mat[15] = 1.0f;
+}
+
+void UpdateInstanceMatrix(int i) {
+    if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; }
+    if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
+    if (instances[i].modelIndex < 0) return; // Culled
     
     float mat[16]; // 4x4 matrix
-    mat[0]  =       rot[0] * sx; mat[1]  =       rot[1] * sy; mat[2] =       rot[2]  * sz; mat[3]  = 0.0f;
-    mat[4]  =       rot[4] * sx; mat[5]  =       rot[5] * sy; mat[6]  =      rot[6]  * sz; mat[7]  = 0.0f;
-    mat[8]  =       rot[8] * sx; mat[9]  =       rot[9] * sy; mat[10] =      rot[10] * sz; mat[11] = 0.0f;
-    mat[12] = instances[i].posx; mat[13] = instances[i].posy; mat[14] = instances[i].posz; mat[15] = 1.0f;
+    SetUpdatedMatrix(mat, instances[i].posx, instances[i].posy, instances[i].posz, instances[i].rotx, instances[i].roty, instances[i].rotz, instances[i].rotw, instances[i].sclx, instances[i].scly, instances[i].sclz);
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
 }
@@ -1061,6 +1059,33 @@ int main(int argc, char* argv[]) {
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelVertexCounts[modelType];
         }
+        
+//         if (debugView == 6) { // Render Light Spheres
+//            for (uint16_t i=0;i<numLightsFound;++i) {
+//                 if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
+//                 glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
+//                 CHECK_GL_ERROR();
+//                 glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
+//                 CHECK_GL_ERROR();
+//                 glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+//                 CHECK_GL_ERROR();
+//                 glUniform1i(instanceIndexLoc_chunk, i);
+//                 CHECK_GL_ERROR();
+//                 int modelType = instances[i].modelIndex;
+//                 glUniform1i(modelIndexLoc_chunk, modelType);
+//                 CHECK_GL_ERROR();
+//                 glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+//                 CHECK_GL_ERROR();
+//                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//                 CHECK_GL_ERROR();
+//                 if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
+//                 glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+//                 CHECK_GL_ERROR();
+//                 if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
+//                 drawCallsRenderedThisFrame++;
+//                 verticesRenderedThisFrame += modelVertexCounts[modelType];
+//            }
+//         }
         
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.

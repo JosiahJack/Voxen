@@ -57,7 +57,7 @@ int Input_KeyDown(uint32_t scancode) {
     
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
-        if (debugView > 5) debugView = 0;
+        if (debugView > 6) debugView = 0;
     }
     
     if (keys[SDL_SCANCODE_Y]) {
@@ -149,10 +149,10 @@ void ProcessInput(void) {
         else if (keys[SDL_SCANCODE_C]) cam_z -= finalMoveSpeed; // Move down
     }
     
-    if (keys[SDL_SCANCODE_T]) {
+    if (keys[SDL_SCANCODE_Q]) {
         cam_roll += move_speed * 5.0f; // Move up
         Input_MouselookApply();
-    } else if (keys[SDL_SCANCODE_Q]) {
+    } else if (keys[SDL_SCANCODE_T]) {
         cam_roll -= move_speed * 5.0f; // Move down
         Input_MouselookApply();
     }
