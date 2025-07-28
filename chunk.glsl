@@ -52,6 +52,9 @@ const char *fragmentShaderTraditional =
     "uniform int debugView;\n"
     "uniform int shadowsEnabled;\n"
     "uniform int instancesInPVSCount;\n"
+    "uniform float overrideGlowR = 0.0;\n"
+    "uniform float overrideGlowG = 0.0;\n"
+    "uniform float overrideGlowB = 0.0;\n"
 
     "flat in int TexIndex;\n"
     "flat in int GlowIndex;\n"
@@ -222,7 +225,7 @@ const char *fragmentShaderTraditional =
     "        float shadowStencil = imageLoad(inputShadowStencil, ivec2(gl_FragCoord.xy)).r;\n"
     "        outAlbedo = vec4(shadowStencil,shadowStencil,shadowStencil,1.0);\n"
     "    } else if (debugView == 6) {\n" // Lightview Mode
-    "        outAlbedo = vec4(glowColor.rgb,1.0);\n"
+    "        outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);\n"
     "    } else {\n"
         "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
         "    uint lightIdx = 0;\n"

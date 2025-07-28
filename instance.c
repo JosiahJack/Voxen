@@ -43,12 +43,12 @@ int SetupInstances(void) {
         }
         
         if (idx == 39) { // Test light representative, not actually the light, moves with it
-            instances[idx].modelIndex = 620; // Test Light cube
+            instances[idx].modelIndex = 621; // Test Light Sphere
             instances[idx].texIndex = 881; // white light
             instances[idx].glowIndex = 881; // white light
-            instances[idx].sclx = 0.16f;
-            instances[idx].scly = 0.16f;
-            instances[idx].sclz = 0.16f;
+            instances[idx].sclx = 0.4f;
+            instances[idx].scly = 0.4f;
+            instances[idx].sclz = 0.4f;
         }
         
         dirtyInstances[idx] = true;        

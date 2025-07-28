@@ -77,7 +77,8 @@ GLuint vao_chunk; // Vertex Array Object
 GLuint chunkShaderProgram;
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
-      specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, shadowsEnabledLoc_chunk = -1; // uniform locations
+      specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, shadowsEnabledLoc_chunk = -1,
+      overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1; // uniform locations
       
 GLuint screenSpaceShadowsComputeShader;
 
@@ -302,6 +303,9 @@ void CacheUniformLocationsForShaders(void) {
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
     instancesInPVSCount_chunk = glGetUniformLocation(chunkShaderProgram, "instancesInPVSCount");
     shadowsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowsEnabled");
+    overrideGlowRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowR");
+    overrideGlowGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowG");
+    overrideGlowBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowB");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -905,6 +909,9 @@ int main(int argc, char* argv[]) {
         instances[39].posx = testLight_x;
         instances[39].posy = testLight_y;
         instances[39].posz = testLight_z;
+        instances[39].sclx = testLight_range * 0.04f;
+        instances[39].scly = testLight_range * 0.04f;
+        instances[39].sclz = testLight_range * 0.04f;
         dirtyInstances[39] = true;
         
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
@@ -1030,12 +1037,20 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
         CHECK_GL_ERROR();
+        glUniform1f(overrideGlowRLoc_chunk, 0.0f);
+        CHECK_GL_ERROR();
+        glUniform1f(overrideGlowGLoc_chunk, 0.0f);
+        CHECK_GL_ERROR();
+        glUniform1f(overrideGlowBLoc_chunk, 0.0f);
+        CHECK_GL_ERROR();
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
             if (instanceIsCulledArray[i]) continue;
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
 
+            if (debugView == 6 && i == 39) continue;
+            
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             CHECK_GL_ERROR();
@@ -1060,32 +1075,44 @@ int main(int argc, char* argv[]) {
             verticesRenderedThisFrame += modelVertexCounts[modelType];
         }
         
-//         if (debugView == 6) { // Render Light Spheres
-//            for (uint16_t i=0;i<numLightsFound;++i) {
-//                 if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
-//                 glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
-//                 CHECK_GL_ERROR();
-//                 glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
-//                 CHECK_GL_ERROR();
-//                 glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
-//                 CHECK_GL_ERROR();
-//                 glUniform1i(instanceIndexLoc_chunk, i);
-//                 CHECK_GL_ERROR();
-//                 int modelType = instances[i].modelIndex;
-//                 glUniform1i(modelIndexLoc_chunk, modelType);
-//                 CHECK_GL_ERROR();
-//                 glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
-//                 CHECK_GL_ERROR();
-//                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-//                 CHECK_GL_ERROR();
-//                 if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
-//                 glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
-//                 CHECK_GL_ERROR();
-//                 if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
-//                 drawCallsRenderedThisFrame++;
-//                 verticesRenderedThisFrame += modelVertexCounts[modelType];
-//            }
-//         }
+        glEnable(GL_CULL_FACE); // Reenable backface culling
+        glEnable(GL_DEPTH_TEST);
+        if (debugView == 6) { // Render Light Spheres
+           for (uint16_t i=0;i<numLightsFound;++i) {
+                float mat[16]; // 4x4 matrix
+                uint16_t idx = i * LIGHT_DATA_SIZE;
+                float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
+                if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
+                SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ], 0.0f, 0.0f, 0.0f, 1.0f, sphoxelSize, sphoxelSize, sphoxelSize);
+    
+                
+                glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                CHECK_GL_ERROR();
+                glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                CHECK_GL_ERROR();
+                glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                CHECK_GL_ERROR();
+                glUniform1i(texIndexLoc_chunk, 41);
+                CHECK_GL_ERROR();
+                glUniform1i(glowIndexLoc_chunk, 41);
+                CHECK_GL_ERROR();
+                glUniform1i(specIndexLoc_chunk, 41);
+                CHECK_GL_ERROR();
+                glUniform1i(instanceIndexLoc_chunk, i);
+                CHECK_GL_ERROR();
+                int modelType = 621; // Test light icosphere
+                glUniform1i(modelIndexLoc_chunk, modelType);
+                CHECK_GL_ERROR();
+                glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
+                CHECK_GL_ERROR();
+                glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                CHECK_GL_ERROR();
+                glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+                CHECK_GL_ERROR();
+                drawCallsRenderedThisFrame++;
+                verticesRenderedThisFrame += modelVertexCounts[modelType];
+           }
+        }
         
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
