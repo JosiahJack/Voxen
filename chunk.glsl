@@ -190,9 +190,9 @@ const char *fragmentShaderTraditional =
     "    int x = int(uv.x * float(texSize.x));\n"
     "    int y = int(uv.y * float(texSize.y));\n"
     "    vec4 albedoColor = getTextureColor(texIndexChecked,ivec2(x,y));\n"
-    "    if (albedoColor.a < 0.05) {\n" // Alpha cutout threshold
-    "        discard;\n" // And we're outta here!
-    "    }\n"
+//     "    if (albedoColor.a < 0.05) {\n" // Alpha cutout threshold
+//     "        discard;\n" // And we're outta here!
+//     "    }\n"
 
     "    vec3 adjustedNormal = Normal;\n"
     "    if (!gl_FrontFacing) {\n"
@@ -272,7 +272,7 @@ const char *fragmentShaderTraditional =
         "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
         "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
 
-    "        outAlbedo = vec4(lighting,1.0);\n"
+    "        outAlbedo = vec4(lighting,albedoColor.a);\n"
     "    }\n"
     "    outWorldPos = worldPosPack;\n"
     "}\n";

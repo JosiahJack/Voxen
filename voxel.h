@@ -22,6 +22,7 @@
 // #define TOTAL_VOXEL_BITS (TOTAL_VOXELS / 8)
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define MAX_LIGHTS_VISIBLE_PER_CELL 32
+#define NUM_CUBEMAPS 25
 
 extern uint32_t cellOccupancy[]; // Stores flat array of indices for each lightSubset 131072 * 64 * 4byte = 33MB
 extern GLuint visibleLightsID;

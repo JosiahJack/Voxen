@@ -100,7 +100,9 @@ GLuint inputImageID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBuffe
 //    Cubemap
 bool generatedCubemapProbes = false;
 GLuint inputCubemapImageID, inputCubemapDepthID, inputCubemapWorldPosID, gBufferCubemapFBO;
-int cubemapTexSize = 512;
+int cubemapTexSize = 128;
+GLuint cubemapTextures[NUM_CUBEMAPS] = {0};
+float cubemapPositions[NUM_CUBEMAPS * 3];
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -680,7 +682,7 @@ int InitializeEnvironment(void) {
     lights[9 + 12] = 1.0f;
     lights[10 + 12] = 0.0f;
     lights[11 + 12] = 0.0f;
-    DebugRAM("init lights"); 
+    DebugRAM("init lights");
 
     // Create Framebuffer
     // First pass gbuffer images
@@ -755,6 +757,31 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
+    
+    // Initialize Cubemap Textures
+    glGenTextures(NUM_CUBEMAPS, cubemapTextures);
+    CHECK_GL_ERROR();
+    for (int i = 0; i < NUM_CUBEMAPS; ++i) {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTextures[i]);
+        CHECK_GL_ERROR();
+        for (int face = 0; face < 6; ++face) {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_RGBA8, cubemapTexSize, cubemapTexSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            CHECK_GL_ERROR();
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        CHECK_GL_ERROR();
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        CHECK_GL_ERROR();
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        CHECK_GL_ERROR();
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        CHECK_GL_ERROR();
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        CHECK_GL_ERROR();
+    }
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    CHECK_GL_ERROR();
+    DebugRAM("cubemap textures init");
     
     // Text Initialization
     glCreateBuffers(1, &textVBO);
@@ -1118,6 +1145,11 @@ int main(int argc, char* argv[]) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
         CHECK_GL_ERROR();
         
+        glEnable(GL_BLEND);
+        CHECK_GL_ERROR();
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        CHECK_GL_ERROR();
+    
         // 4. Generate Shadow Data - Render all meshes as black + glow, render all lights as spheres with their color and scaled for intensity
         if (globalFrameNum >= 2 && !generatedCubemapProbes) {
             Quaternion orientations[6];
@@ -1269,6 +1301,10 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glEnable(GL_DEPTH_TEST);
         CHECK_GL_ERROR();
+        glEnable(GL_BLEND);
+        CHECK_GL_ERROR();
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        CHECK_GL_ERROR();
         float view[16], projection[16]; // Set up view and projection matrices
         float fov = 65.0f;
         mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
@@ -1358,6 +1394,9 @@ int main(int argc, char* argv[]) {
                 verticesRenderedThisFrame += modelVertexCounts[modelType];
            }
         }
+        
+        glDisable(GL_BLEND);
+        CHECK_GL_ERROR();
         
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
