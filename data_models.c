@@ -272,29 +272,43 @@ int LoadGeometry(void) {
         modelEdgeCounts[i] = edgeCount;
         totalEdgeCount += edgeCount;
         if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
-
-        // Allocate and populate edge buffer
-        uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t)); // 2 verts + 2 tris per edge
-        if (!tempEdgeData) { DualLogError("Failed to allocate edge buffer for %s\n", model_parser.entries[matchedParserIdx].path); CleanupModelLoad(true); return 1; }
-
-        for (uint32_t j = 0; j < edgeCount; j++) {
-            tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
-            tempEdgeData[j * 4 + 1] = tempEdges[j].v1;
-            tempEdgeData[j * 4 + 2] = tempEdges[j].tri0;
-            tempEdgeData[j * 4 + 3] = tempEdges[j].tri1;
+        
+        // Generate and upload to GPU immediately
+        if (vertexCount > 0) {
+            glGenBuffers(1, &vbos[i]);
+            glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
+            glBufferData(GL_ARRAY_BUFFER, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), tempVertices, GL_STATIC_DRAW);
+            CHECK_GL_ERROR();
         }
 
-        vertexDataArrays[i] = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t));
-        triEdgeDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t));
-        edgeDataArrays[i] = tempEdgeData;
-        if (!vertexDataArrays[i] || !triangleDataArrays[i] || !triEdgeDataArrays[i]) { DualLogError("Failed to allocate storage arrays for %s\n", model_parser.entries[matchedParserIdx].path); CleanupModelLoad(true); return 1; }
+        if (triCount > 0) {
+            glGenBuffers(1, &tbos[i]);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, triCount * 3 * sizeof(uint32_t), tempTriangles, GL_STATIC_DRAW);
+            CHECK_GL_ERROR();
 
-        DebugRAM("temp buffers malloc for model %s", model_parser.entries[matchedParserIdx].path);
-        memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
-        memcpy(triEdgeDataArrays[i], tempTriEdges, triCount * 3 * sizeof(uint32_t));
-        
+            glGenBuffers(1, &tebos[i]);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tebos[i]);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, triCount * 3 * sizeof(uint32_t), tempTriEdges, GL_STATIC_DRAW);
+            CHECK_GL_ERROR();
+        }
+
+        if (edgeCount > 0) {
+            uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t));
+            if (!tempEdgeData) { DualLogError("Failed to allocate edge buffer for %s\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); CleanupModelLoad(true); return 1; }
+            for (uint32_t j = 0; j < edgeCount; j++) {
+                tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
+                tempEdgeData[j * 4 + 1] = tempEdges[j].v1;
+                tempEdgeData[j * 4 + 2] = tempEdges[j].tri0;
+                tempEdgeData[j * 4 + 3] = tempEdges[j].tri1;
+            }
+            glGenBuffers(1, &ebos[i]);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebos[i]);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, edgeCount * 4 * sizeof(uint32_t), tempEdgeData, GL_STATIC_DRAW);
+            CHECK_GL_ERROR();
+            free(tempEdgeData);
+        }
+
         float minx_pos = fabs(minx);
         float miny_pos = fabs(miny);
         float minz_pos = fabs(minz);
@@ -311,6 +325,9 @@ int LoadGeometry(void) {
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
+
+        malloc_trim(0);
+        DebugRAM("post GPU upload for model %s", model_parser.entries[matchedParserIdx].path);
     }
 
 #ifdef DEBUG_MODEL_LOAD_DATA
@@ -330,62 +347,6 @@ int LoadGeometry(void) {
     
     DebugRAM("post model load");
 
-    // Generate VBOs, TBOs, and EBOs
-    memset(vbos, 0, MODEL_COUNT * sizeof(GLuint));
-    memset(tbos, 0, MODEL_COUNT * sizeof(GLuint));
-    memset(tebos, 0, MODEL_COUNT * sizeof(GLuint));
-    memset(ebos, 0, MODEL_COUNT * sizeof(GLuint));
-    glGenBuffers(MODEL_COUNT, vbos);
-    CHECK_GL_ERROR();
-    glGenBuffers(MODEL_COUNT, tbos);
-    CHECK_GL_ERROR();
-    glGenBuffers(MODEL_COUNT, tebos);
-    CHECK_GL_ERROR();
-    glGenBuffers(MODEL_COUNT, ebos);
-    CHECK_GL_ERROR();
-
-    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
-        if (modelVertexCounts[i] == 0 || vertexDataArrays[i] == NULL ||
-            triangleDataArrays[i] == NULL || triEdgeDataArrays[i] == NULL || edgeDataArrays[i] == NULL) {
-            if (modelVertexCounts[i] != 0 || modelTriangleCounts[i] != 0 || modelEdgeCounts[i] != 0) {
-                DualLog("\033[33mWARNING: model %d has invalid data (verts=%u, tris=%u, edges=%u, vert_ptr=%p, tri_ptr=%p, triEdge_ptr=%p, edge_ptr=%p)\033[0m\n",
-                        i, modelVertexCounts[i], modelTriangleCounts[i], modelEdgeCounts[i],
-                        (void*)vertexDataArrays[i], (void*)triangleDataArrays[i], (void*)triEdgeDataArrays[i], (void*)edgeDataArrays[i]);
-            }
-            continue;
-        }
-
-        // Load vertices
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), vertexDataArrays[i], GL_STATIC_DRAW);
-        CHECK_GL_ERROR();
-
-        // Load triangle vertex indices
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, modelTriangleCounts[i] * 3 * sizeof(uint32_t), triangleDataArrays[i], GL_STATIC_DRAW);
-        CHECK_GL_ERROR();
-
-        // Load triangle edge indices
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tebos[i]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, modelTriangleCounts[i] * 3 * sizeof(uint32_t), triEdgeDataArrays[i], GL_STATIC_DRAW);
-        CHECK_GL_ERROR();
-
-        // Load edges
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebos[i]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, modelEdgeCounts[i] * 4 * sizeof(uint32_t), edgeDataArrays[i], GL_STATIC_DRAW);
-        CHECK_GL_ERROR();
-
-        // Free temporary buffers
-        free(vertexDataArrays[i]);
-        free(triangleDataArrays[i]);
-        free(triEdgeDataArrays[i]);
-        free(edgeDataArrays[i]);
-        vertexDataArrays[i] = NULL;
-        triangleDataArrays[i] = NULL;
-        triEdgeDataArrays[i] = NULL;
-        edgeDataArrays[i] = NULL;
-    }
-
     // Clean up
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -393,7 +354,19 @@ int LoadGeometry(void) {
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
     DebugRAM("post model GPU data transfer");
-
+    
+    // Pass Model Type Bounds to GPU
+    glGenBuffers(1, &modelBoundsID);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
+    CHECK_GL_ERROR();
+    malloc_trim(0);
+    DebugRAM("post model model bounds data transfer");
+    
     // Upload modelVertexOffsets
 //     uint32_t modelVertexOffsets[MODEL_COUNT];
 //     uint32_t offset = 0;
@@ -410,18 +383,6 @@ int LoadGeometry(void) {
 //     CHECK_GL_ERROR();
 //     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
 //     CHECK_GL_ERROR();
-    
-    // Pass Model Type Bounds to GPU
-    glGenBuffers(1, &modelBoundsID);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
-    CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
-    CHECK_GL_ERROR();
-    malloc_trim(0);
-    DebugRAM("post model model bounds data transfer");
     
     // Pass Model Vertex Counts to GPU
 //     glGenBuffers(1, &modelVertexCountsID);
@@ -471,25 +432,20 @@ void CleanupModelLoad(bool isBad) {
         if (tempTriEdges) { free(tempTriEdges); tempTriEdges = NULL; }
         if (tempEdges) { free(tempEdges); tempEdges = NULL; }
         if (edgeHash) { free(edgeHash); edgeHash = NULL; }
+        if (vertexDataArrays) { free(vertexDataArrays); vertexDataArrays = NULL; }
+        if (triangleDataArrays) { free(triangleDataArrays); triangleDataArrays = NULL; }
+        if (triEdgeDataArrays) { free(triEdgeDataArrays); triEdgeDataArrays = NULL; }
+        if (edgeDataArrays) { free(edgeDataArrays); edgeDataArrays = NULL; }
     } else {
-        // Free only what's allocated
         if (tempVertices) { free(tempVertices); tempVertices = NULL; }
         if (tempTriangles) { free(tempTriangles); tempTriangles = NULL; }
         if (tempTriEdges) { free(tempTriEdges); tempTriEdges = NULL; }
         if (tempEdges) { free(tempEdges); tempEdges = NULL; }
         if (edgeHash) { free(edgeHash); edgeHash = NULL; }
-        if (vertexDataArrays) {
-            for (uint32_t i = 0; i < MODEL_COUNT; i++) {
-                if (vertexDataArrays[i]) { free(vertexDataArrays[i]); vertexDataArrays[i] = NULL; }
-                if (triangleDataArrays[i]) { free(triangleDataArrays[i]); triangleDataArrays[i] = NULL; }
-                if (triEdgeDataArrays[i]) { free(triEdgeDataArrays[i]); triEdgeDataArrays[i] = NULL; }
-                if (edgeDataArrays[i]) { free(edgeDataArrays[i]); edgeDataArrays[i] = NULL; }
-            }
-            free(vertexDataArrays); vertexDataArrays = NULL;
-            free(triangleDataArrays); triangleDataArrays = NULL;
-            free(triEdgeDataArrays); triEdgeDataArrays = NULL;
-            free(edgeDataArrays); edgeDataArrays = NULL;
-        }
+        if (vertexDataArrays) { free(vertexDataArrays); vertexDataArrays = NULL; }
+        if (triangleDataArrays) { free(triangleDataArrays); triangleDataArrays = NULL; }
+        if (triEdgeDataArrays) { free(triEdgeDataArrays); triEdgeDataArrays = NULL; }
+        if (edgeDataArrays) { free(edgeDataArrays); edgeDataArrays = NULL; }
     }
     malloc_trim(0);
 }
