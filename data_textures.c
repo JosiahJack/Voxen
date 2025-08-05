@@ -15,7 +15,7 @@
 #include "render.h"
 #include "event.h"
 
-#define DEBUG_TEXTURE_LOAD_DATA 1
+// #define DEBUG_TEXTURE_LOAD_DATA 1
 
 #define MAX_PALETTE_SIZE 65535u
 

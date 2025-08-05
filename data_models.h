@@ -16,13 +16,24 @@
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 
+// Structure to represent an edge for building edge list
+typedef struct {
+    uint32_t v0, v1; // Vertex indices (sorted: v0 < v1)
+    uint32_t tri0, tri1; // Triangle indices (tri1 = UINT32_MAX if unshared)
+} Edge;
+
+// Simple hash table for edge lookup
+typedef struct {
+    uint32_t v0, v1;
+    uint32_t edgeIndex;
+} EdgeHashEntry;
+
 extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern uint32_t modelTriangleCounts[MODEL_COUNT];
 extern uint32_t modelEdgeCounts[MODEL_COUNT];
 extern GLuint modelVertexCountsID;
 extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint modelBoundsID;
-extern uint32_t totalVertexCount;
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
 extern GLuint tebos[MODEL_COUNT];
@@ -33,5 +44,6 @@ extern uint32_t largestVertCount;
 extern GLuint sphoxelsID;
 
 int LoadGeometry(void);
+void CleanupModelLoad(bool isBad);
 
 #endif // VOXEN_DATA_MODELS_H
