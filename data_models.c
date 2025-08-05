@@ -16,7 +16,7 @@
 #include "voxel.h"
 #include "event.h"
 
-#define DEBUG_MODEL_LOAD_DATA 1U
+// #define DEBUG_MODEL_LOAD_DATA 1U
 
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
@@ -79,31 +79,39 @@ int LoadGeometry(void) {
     // Allocate persistent temporary buffers
     tempVertices = (float *)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     if (!tempVertices) { DualLogError("Failed to allocate tempVertices buffer\n"); return 1; }
+    DebugRAM("tempVertices buffer");
     
     tempTriangles = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
     if (!tempTriangles) { DualLogError("Failed to allocate tempTriangles temporary buffer\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("tempTriangles buffer");
 
     tempTriEdges = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
     if (!tempTriEdges) { DualLogError("Failed to allocate tempTriEdges temporary buffer\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("tempTriEdges buffer");
     
     tempEdges = (Edge *)calloc(MAX_EDGE_COUNT, sizeof(Edge));
     if (!tempEdges) { DualLogError("Failed to allocate tempEdges temporary buffer\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("tempEdges buffer");
     
     edgeHash = (EdgeHashEntry *)calloc(HASH_SIZE, sizeof(EdgeHashEntry));
     if (!edgeHash) { DualLogError("Failed to allocate edgeHash temporary buffer\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("edgeHash buffer");
 
     vertexDataArrays = (float **)calloc(MODEL_COUNT, sizeof(float *));
     if (!vertexDataArrays) { DualLogError("Failed to allocate vertexDataArrays\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("vertexDataArrays buffer");
 
     triangleDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
     if (!triangleDataArrays) { DualLogError("Failed to allocate triangleDataArrays\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("triangleDataArrays buffer");
     
     triEdgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
     if (!triEdgeDataArrays) { DualLogError("Failed to allocate triEdgeDataArrays\n"); CleanupModelLoad(true); return 1; }
+    DebugRAM("triEdgeDataArrays buffer");
     
     edgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
     if (!edgeDataArrays) { DualLogError("Failed to allocate edgeDataArrays\n"); CleanupModelLoad(true); return 1; }
-
+    DebugRAM("edgeDataArrays buffer");
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<model_parser.count;k++) {
@@ -113,7 +121,21 @@ int LoadGeometry(void) {
         if (matchedParserIdx < 0) continue;
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
 
-        const struct aiScene *scene = aiImportFile(model_parser.entries[matchedParserIdx].path,aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices);
+        struct aiPropertyStore* props = aiCreatePropertyStore(); // Disable non-essential FBX components
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 0); // Disable animations
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0); // Disable materials
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0); // Disable textures
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0); // Disable lights
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0); // Disable cameras
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1); // Drop empty animations
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 1); // Disable skeleton meshes
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_MATERIALS | aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS); // Remove non-mesh components
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT); // Skip non-triangular primitives
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 12); // Optimize vertex cache
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4); // Limit bone weights
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1); // Remove degenerate primitives
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0); // Disable hierarchy preservation
+        const struct aiScene *scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices, NULL, props);
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); CleanupModelLoad(true); return 1; }
 
         // Count vertices, triangles, and estimate edges
@@ -133,11 +155,11 @@ int LoadGeometry(void) {
         if (triCount > largestTriangleCount) largestTriangleCount = triCount;
 
 #ifdef DEBUG_MODEL_LOAD_DATA
-//         if (vertexCount > 1000U) {
-//             DualLog("Model %s loaded with \033[1;33m%d\033[0;0m vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
-//         } else {
-//             DualLog("Model %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
-//         }
+        if (triCount > 5000U) {
+            DualLog("Model %s loaded with %d vertices, \033[1;33m%d\033[0;0m triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        } else {
+            //DualLog("Model %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        }
 #endif
         totalVertCount += vertexCount;
         totalTriCount += triCount;
@@ -243,14 +265,17 @@ int LoadGeometry(void) {
             }
             globalVertexOffset += mesh->mNumVertices;
         }
-
+        
+        aiReleaseImport(scene);
+        malloc_trim(0);
+        
         modelEdgeCounts[i] = edgeCount;
-        if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
         totalEdgeCount += edgeCount;
+        if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
 
         // Allocate and populate edge buffer
         uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t)); // 2 verts + 2 tris per edge
-        if (!tempEdgeData) { DualLogError("Failed to allocate edge buffer for %s\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); CleanupModelLoad(true); return 1; }
+        if (!tempEdgeData) { DualLogError("Failed to allocate edge buffer for %s\n", model_parser.entries[matchedParserIdx].path); CleanupModelLoad(true); return 1; }
 
         for (uint32_t j = 0; j < edgeCount; j++) {
             tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
@@ -263,8 +288,9 @@ int LoadGeometry(void) {
         triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t));
         triEdgeDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t));
         edgeDataArrays[i] = tempEdgeData;
-        if (!vertexDataArrays[i] || !triangleDataArrays[i] || !triEdgeDataArrays[i]) { DualLogError("Failed to allocate storage arrays for %s\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); CleanupModelLoad(true); return 1; }
+        if (!vertexDataArrays[i] || !triangleDataArrays[i] || !triEdgeDataArrays[i]) { DualLogError("Failed to allocate storage arrays for %s\n", model_parser.entries[matchedParserIdx].path); CleanupModelLoad(true); return 1; }
 
+        DebugRAM("temp buffers malloc for model %s", model_parser.entries[matchedParserIdx].path);
         memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
         memcpy(triEdgeDataArrays[i], tempTriEdges, triCount * 3 * sizeof(uint32_t));
@@ -285,8 +311,6 @@ int LoadGeometry(void) {
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
-        aiReleaseImport(scene);
-        malloc_trim(0);
     }
 
 #ifdef DEBUG_MODEL_LOAD_DATA
@@ -303,6 +327,8 @@ int LoadGeometry(void) {
     print_bytes_no_newline(totalBounds * sizeof(float));
     DualLog(")\n");
 #endif
+    
+    DebugRAM("post model load");
 
     // Generate VBOs, TBOs, and EBOs
     memset(vbos, 0, MODEL_COUNT * sizeof(GLuint));
@@ -366,6 +392,8 @@ int LoadGeometry(void) {
     CHECK_GL_ERROR();
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
+    DebugRAM("post model GPU data transfer");
+
     // Upload modelVertexOffsets
 //     uint32_t modelVertexOffsets[MODEL_COUNT];
 //     uint32_t offset = 0;
@@ -393,6 +421,7 @@ int LoadGeometry(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     CHECK_GL_ERROR();
     malloc_trim(0);
+    DebugRAM("post model model bounds data transfer");
     
     // Pass Model Vertex Counts to GPU
 //     glGenBuffers(1, &modelVertexCountsID);
@@ -430,6 +459,7 @@ int LoadGeometry(void) {
     CleanupModelLoad(false);
     double end_time = get_time();
     DualLog("Load Models took %f seconds\n", end_time - start_time);
+    DebugRAM("After full LoadModels completed");
     return 0;
 }
 
