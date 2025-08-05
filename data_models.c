@@ -16,7 +16,7 @@
 #include "voxel.h"
 #include "event.h"
 
-// #define DEBUG_MODEL_LOAD_DATA 1U
+#define DEBUG_MODEL_LOAD_DATA 1U
 
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
@@ -50,9 +50,9 @@ uint32_t ** edgeDataArrays;
 
 #define HASH_SIZE 65536 // Power of 2 for fast modulo
 #define HASH(v0, v1) (((v0 * 31 + v1) ^ (v1 * 17)) & (HASH_SIZE - 1))
-#define MAX_VERT_COUNT 25000
-#define MAX_TRI_COUNT 32767
-#define MAX_EDGE_COUNT 100000
+#define MAX_VERT_COUNT 21444
+#define MAX_TRI_COUNT 32449
+#define MAX_EDGE_COUNT 97345
 
 // Loads all 3D meshes
 int LoadGeometry(void) {
