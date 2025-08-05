@@ -83,8 +83,8 @@ index: 29
 index: 30
 #Textures/barrel_explosive.png
 index: 31
-// #Textures/barrel_specular.png
-// index: 32
+#Textures/barrel_specular.png
+index: 32
 #Textures/barrel_toxic.png
 index: 33
 #Textures/battery_icad.png

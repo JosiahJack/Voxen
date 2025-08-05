@@ -105,7 +105,9 @@ const char *fragmentShaderTraditional =
     "    if (texIndex >= 65535) return vec4(0.0);\n"
 
     "    uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;\n"
-    "    uint paletteIndex = colors[pixelOffset];\n"
+    "    uint slotIndex = pixelOffset / 2;\n"
+    "    uint packedIdx = colors[slotIndex];\n"
+    "    uint paletteIndex = (pixelOffset % 2 == 0) ? (packedIdx & 0xFFFF) : (packedIdx >> 16);\n"
     "    uint paletteOffset = texturePaletteOffsets[texIndex];\n"
     "    uint color = texturePalettes[paletteOffset + paletteIndex];\n"
     "    return vec4(\n"

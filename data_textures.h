@@ -2,9 +2,11 @@
 #define VOXEN_DATA_TEXTURES_H
 
 #include <GL/glew.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 extern GLuint colorBufferID;
-extern int32_t textureCount;
+extern uint16_t textureCount;
 
 bool isDoubleSided(uint32_t texIndexToCheck);
 int LoadTextures(void);

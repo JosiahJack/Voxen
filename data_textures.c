@@ -15,7 +15,7 @@
 #include "render.h"
 #include "event.h"
 
-// #define DEBUG_TEXTURE_LOAD_DATA 0
+#define DEBUG_TEXTURE_LOAD_DATA 1
 
 #define MAX_PALETTE_SIZE 65535u
 
@@ -31,20 +31,17 @@ uint32_t *texturePalettes = NULL; // Concatenated palette colors
 uint32_t totalPixels = 0; // Total pixels across all textures
 uint32_t totalPaletteColors = 0; // Total colors across all palettes
 int * textureSizes = NULL; // Needs to be textureCount * 2
-int textureCount;
+uint16_t textureCount;
 const char *valid_texdata_keys[] = {"index","doublesided"};
 #define NUM_TEX_KEYS 2
 
 bool *doubleSidedTexture = NULL;
 
-bool isDoubleSided(uint32_t texIndexToCheck) {
-//     return texIndexToCheck == 151 || texIndexToCheck == 152;
-    return (doubleSidedTexture[texIndexToCheck]);
-}
+bool isDoubleSided(uint32_t texIndexToCheck) { return (doubleSidedTexture[texIndexToCheck]); }
 
 typedef struct {
-    uint32_t color; // RGBA color (packed)
-    int index;      // Palette index
+    uint32_t color;    // RGBA color (packed)
+    uint16_t index;    // Palette index
     UT_hash_handle hh;
 } ColorEntry;
 
@@ -65,7 +62,7 @@ int LoadTextures(void) {
     CHECK_GL_ERROR();
     double start_time = get_time();
     DebugRAM("before LoadTextures");
-    textureCount = 0;
+    textureCount = 0u;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
     parser_init(&texture_parser, valid_texdata_keys, NUM_TEX_KEYS, PARSER_DATA);
@@ -77,7 +74,7 @@ int LoadTextures(void) {
         if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) {maxIndex = texture_parser.entries[k].index; }
     }
     
-    textureCount = texture_parser.count;
+    textureCount = (uint16_t)texture_parser.count;
     if (textureCount > 4096) { DualLogError("Too many textures in parser count %d, greater than 4096!\n", textureCount); CleanupLoad(true); return 1; } 
     if (textureCount == 0) { DualLog("No textures found in textures.txt\n"); parser_free(&texture_parser); return 1; }
     
@@ -153,7 +150,7 @@ int LoadTextures(void) {
                 
                 entry = malloc(sizeof(ColorEntry));
                 entry->color = color;
-                entry->index = palette_size++;
+                entry->index = (uint16_t)palette_size++;
                 HASH_ADD_INT(color_table, color, entry);
             }
         }
@@ -189,7 +186,8 @@ int LoadTextures(void) {
     CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
     CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    int colorBufferSize = ((totalPixels + 1) / 2) * sizeof(uint32_t);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, colorBufferSize, NULL, GL_STATIC_DRAW);
     CHECK_GL_ERROR();
     loadTextureItemInitialized[TEX_SSBOS] = true;
     DebugRAM("after glGenBuffers colorBufferID");
@@ -198,9 +196,8 @@ int LoadTextures(void) {
     uint32_t pixel_offset = 0;
     uint32_t palette_offset = 0;
     uint32_t maxPalletSize = 0;
-    uint32_t *indices = malloc(4096 * 2048 * sizeof(uint32_t));
+    uint16_t *indices = malloc(4096 * 4096 * sizeof(uint16_t));
     if (!indices) { DualLogError("Failed to allocate indices buffer\n"); CleanupLoad(true); return 1; }
-    
     DebugRAM("after indices malloc");
     
     GLuint stagingBuffer;
@@ -208,14 +205,13 @@ int LoadTextures(void) {
     CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
     CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 4096 * 2048 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY); // Max texture size
+    glBufferData(GL_SHADER_STORAGE_BUFFER, (((4096 * 4096) + 1) / 2) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY); // Max texture size
     CHECK_GL_ERROR();
     DebugRAM("after glGenBuffers stagingBuffer");
-    
-    for (int i = 0; i < textureCount; i++) {
+    for (uint16_t i = 0; i < textureCount; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<texture_parser.count;k++) { // Find matching index to i that was parsed from file
-            if (texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }
+            if ((uint16_t)texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }
         }
         
         if (matchedParserIdx < 0) continue;
@@ -237,11 +233,11 @@ int LoadTextures(void) {
         unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
         if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
         
-//         DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
+        DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
         
         // Populate palette and indices
         ColorEntry *color_table = NULL, *entry, *tmp;
-        uint32_t palette_size = 0;
+        uint16_t palette_size = 0;
         for (int j = 0; j < width * height * 4; j += 4) {
             uint8_t rval = image_data[j];
             uint8_t gval = image_data[j + 1];
@@ -271,23 +267,28 @@ int LoadTextures(void) {
         // just let VRAM alone store the texture data.
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
         CHECK_GL_ERROR();
-        void *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, width * height * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        uint32_t *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,((width * height + 1) / 2) * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         if (!mapped_buffer) { DualLogError("Failed to map stagingBuffer for %s\n", texture_parser.entries[matchedParserIdx].path); free(indices); glDeleteBuffers(1, &stagingBuffer); CleanupLoad(true); return 1; }
         
-        memcpy(mapped_buffer, indices, width * height * sizeof(uint32_t));
+//         memcpy(mapped_buffer, indices, width * height * sizeof(uint16_t));
+        for (int j = 0; j < width * height; j += 2) {
+            uint32_t packed = (uint32_t)indices[j]; // Lower 16 bits
+            if (j + 1 < width * height) packed |= (uint32_t)indices[j + 1] << 16; // Upper 16 bits
+            mapped_buffer[j / 2] = packed;
+        }
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
         glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
         CHECK_GL_ERROR();
         glBindBuffer(GL_COPY_WRITE_BUFFER, colorBufferID);
         CHECK_GL_ERROR();
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, pixel_offset * sizeof(uint32_t), width * height * sizeof(uint32_t));
+        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, ((pixel_offset + 1) / 2) * sizeof(uint32_t), ((width * height + 1) / 2) * sizeof(uint32_t));
         glFlush();
         glFinish();
         CHECK_GL_ERROR();
         pixel_offset += width * height;
         palette_offset += palette_size;
 #ifdef DEBUG_TEXTURE_LOAD_DATA
-        if (palette_size > 2048U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
+        if (palette_size > 1000U) DualLog("Loaded %s with large palette size of \033[33m%d!\033[0m\n", texture_parser.entries[matchedParserIdx].path, palette_size);
 #endif
         if (palette_size > maxPalletSize) maxPalletSize = palette_size; // Keep track of which had the largest.
         
@@ -330,7 +331,7 @@ int LoadTextures(void) {
     
 #ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Total pixels in buffer %d (", totalPixels);
-    print_bytes_no_newline(totalPixels * 4);
+    print_bytes_no_newline(colorBufferSize);
     DualLog("), total palette colors %d (", totalPaletteColors);
     print_bytes_no_newline(totalPaletteColors * 4);
     DualLog(")\n");
