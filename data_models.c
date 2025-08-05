@@ -112,6 +112,24 @@ int LoadGeometry(void) {
     edgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
     if (!edgeDataArrays) { DualLogError("Failed to allocate edgeDataArrays\n"); CleanupModelLoad(true); return 1; }
     DebugRAM("edgeDataArrays buffer");
+    
+    // Generate staging buffers
+    GLuint stagingVBO, stagingTBO, stagingTEBO, stagingEBO;
+    glGenBuffers(1, &stagingVBO);
+    glGenBuffers(1, &stagingTBO);
+    glGenBuffers(1, &stagingTEBO);
+    glGenBuffers(1, &stagingEBO);
+    glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
+    glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_EDGE_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    CHECK_GL_ERROR();
+    DebugRAM("after staging buffers allocation");
+    
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<model_parser.count;k++) {
@@ -273,38 +291,62 @@ int LoadGeometry(void) {
         totalEdgeCount += edgeCount;
         if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
         
-        // Generate and upload to GPU immediately
+        // Copy to staging buffers
         if (vertexCount > 0) {
+            glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
+            void *mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            if (!mapped_buffer) { DualLogError("Failed to map stagingVBO for model %d\n", i); CleanupModelLoad(true); return 1; }
+            memcpy(mapped_buffer, tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glUnmapBuffer(GL_ARRAY_BUFFER);
             glGenBuffers(1, &vbos[i]);
-            glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-            glBufferData(GL_ARRAY_BUFFER, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), tempVertices, GL_STATIC_DRAW);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
+            glBufferData(GL_COPY_WRITE_BUFFER, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             CHECK_GL_ERROR();
         }
 
         if (triCount > 0) {
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
+            void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCount * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            if (!mapped_buffer) { DualLogError("Failed to map stagingTBO for model %d\n", i); CleanupModelLoad(true); return 1; }
+            memcpy(mapped_buffer, tempTriangles, triCount * 3 * sizeof(uint32_t));
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             glGenBuffers(1, &tbos[i]);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, triCount * 3 * sizeof(uint32_t), tempTriangles, GL_STATIC_DRAW);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
+            glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
             CHECK_GL_ERROR();
 
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
+            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCount * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            if (!mapped_buffer) { DualLogError("Failed to map stagingTEBO for model %d\n", i); CleanupModelLoad(true); return 1; }
+            memcpy(mapped_buffer, tempTriEdges, triCount * 3 * sizeof(uint32_t));
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             glGenBuffers(1, &tebos[i]);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tebos[i]);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, triCount * 3 * sizeof(uint32_t), tempTriEdges, GL_STATIC_DRAW);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, tebos[i]);
+            glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
             CHECK_GL_ERROR();
         }
 
         if (edgeCount > 0) {
             uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t));
-            if (!tempEdgeData) { DualLogError("Failed to allocate edge buffer for %s\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); CleanupModelLoad(true); return 1; }
+            if (!tempEdgeData) { DualLogError("Failed to allocate edge buffer for %s\n", model_parser.entries[matchedParserIdx].path); CleanupModelLoad(true); return 1; }
             for (uint32_t j = 0; j < edgeCount; j++) {
                 tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
                 tempEdgeData[j * 4 + 1] = tempEdges[j].v1;
                 tempEdgeData[j * 4 + 2] = tempEdges[j].tri0;
                 tempEdgeData[j * 4 + 3] = tempEdges[j].tri1;
             }
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
+            void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, edgeCount * 4 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            if (!mapped_buffer) { DualLogError("Failed to map stagingEBO for model %d\n", i); CleanupModelLoad(true); return 1; }
+            memcpy(mapped_buffer, tempEdgeData, edgeCount * 4 * sizeof(uint32_t));
+            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             glGenBuffers(1, &ebos[i]);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebos[i]);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, edgeCount * 4 * sizeof(uint32_t), tempEdgeData, GL_STATIC_DRAW);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, ebos[i]);
+            glBufferData(GL_COPY_WRITE_BUFFER, edgeCount * 4 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, edgeCount * 4 * sizeof(uint32_t));
             CHECK_GL_ERROR();
             free(tempEdgeData);
         }
@@ -329,6 +371,17 @@ int LoadGeometry(void) {
         malloc_trim(0);
         DebugRAM("post GPU upload for model %s", model_parser.entries[matchedParserIdx].path);
     }
+    
+    // Delete staging buffers
+    glDeleteBuffers(1, &stagingVBO);
+    glDeleteBuffers(1, &stagingTBO);
+    glDeleteBuffers(1, &stagingTEBO);
+    glDeleteBuffers(1, &stagingEBO);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+    CHECK_GL_ERROR();
+    DebugRAM("after staging buffers deleted");
 
 #ifdef DEBUG_MODEL_LOAD_DATA
     DualLog("Largest vertex count: %d, triangle count: %d, edge count: %d\n", largestVertCount, largestTriangleCount, largestEdgeCount);

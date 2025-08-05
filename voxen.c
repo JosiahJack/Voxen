@@ -32,7 +32,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#define DEBUG_RAM_OUTPUT
+// #define DEBUG_RAM_OUTPUT
 
 // Window
 SDL_Window *window;
