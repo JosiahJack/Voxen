@@ -25,6 +25,7 @@ extern GLuint modelBoundsID;
 extern uint32_t totalVertexCount;
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
+extern GLuint tebos[MODEL_COUNT];
 extern GLuint ebos[MODEL_COUNT];
 extern GLuint vboMasterTable;
 extern GLuint modelVertexOffsetsID;
