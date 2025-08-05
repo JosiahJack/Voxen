@@ -32,7 +32,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#define DEBUG_RAM_OUTPUT
+// #define DEBUG_RAM_OUTPUT
 
 // Window
 SDL_Window *window;
@@ -826,10 +826,13 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (systemInitialized[SYS_NET]) CleanupNetworking();
     if (activeLogFile) fclose(activeLogFile); // Close log playback file.
     if (colorBufferID) glDeleteBuffers(1, &colorBufferID);
-    for (uint32_t i=0;i<MODEL_COUNT;i++) {
-        if (vertexDataArrays[i]) free(vertexDataArrays[i]);
+    for (uint32_t i=0;i<MODEL_COUNT;i++) {        
         if (vbos[i]) glDeleteBuffers(1, &vbos[i]);
+        if (tbos[i]) glDeleteBuffers(1, &tbos[i]);
+        if (ebos[i]) glDeleteBuffers(1, &ebos[i]);
         vbos[i] = 0;
+        tbos[i] = 0;
+        ebos[i] = 0;
     }
 
     if (vao_chunk) glDeleteVertexArrays(1, &vao_chunk);
@@ -850,7 +853,6 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (instancesBuffer) glDeleteBuffers(1, &instancesBuffer);
     if (instancesInPVSBuffer) glDeleteBuffers(1, &instancesInPVSBuffer);
     if (matricesBuffer) glDeleteBuffers(1, &matricesBuffer);
-    if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
     if (vboMasterTable) glDeleteBuffers(1, &vboMasterTable);
     if (modelVertexOffsetsID) glDeleteBuffers(1, &modelVertexOffsetsID);
     if (modelVertexCountsID) glDeleteBuffers(1, &modelVertexCountsID);
@@ -1350,12 +1352,15 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             CHECK_GL_ERROR();
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+            CHECK_GL_ERROR();
             if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
-            glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+//             glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+            glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             CHECK_GL_ERROR();
             if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
             drawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += modelVertexCounts[modelType];
+            verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
         
         glEnable(GL_CULL_FACE); // Reenable backface culling
@@ -1388,10 +1393,13 @@ int main(int argc, char* argv[]) {
                 CHECK_GL_ERROR();
                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                 CHECK_GL_ERROR();
-                glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                CHECK_GL_ERROR();
+//                 glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
+                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
                 CHECK_GL_ERROR();
                 drawCallsRenderedThisFrame++;
-                verticesRenderedThisFrame += modelVertexCounts[modelType];
+                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
            }
         }
         
