@@ -85,9 +85,9 @@ const char *fragmentShaderTraditional =
     "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
     "layout(r8, binding = 2) uniform image2D inputShadowStencil;\n"
 
-    "layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };\n"
+//     "layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
-    "layout(std430, binding = 8) readonly buffer ModelVertexCounts { uint modelVertexCounts[]; };\n"
+//     "layout(std430, binding = 8) readonly buffer ModelVertexCounts { uint modelVertexCounts[]; };\n"
     "layout(std430, binding = 9) readonly buffer InstancesInPVS { uint instancesIndices[]; };\n"
     "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
     "layout(std430, binding = 11) readonly buffer InstancesMatricesBuffer { mat4 instanceMatrices[]; };\n"
@@ -99,7 +99,7 @@ const char *fragmentShaderTraditional =
     "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
 
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
-    "layout(std430, binding = 20) readonly buffer MasterVertexBuffer { float vertexData[]; };\n"
+//     "layout(std430, binding = 20) readonly buffer MasterVertexBuffer { float vertexData[]; };\n"
 
     "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
     "    if (texIndex >= 65535) return vec4(0.0);\n"
@@ -147,41 +147,41 @@ const char *fragmentShaderTraditional =
     // --- Trace Ray for Shadow ---
     "const uint VERTEX_ATTRIBUTES_COUNT = 14;\n"
     "const uint BOUNDS_ATTRIBUTES_COUNT = 7;\n"
-    "float TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
-    "    for (int i = 0; i < instancesInPVSCount; i++) {\n"
-    "        uint instanceIdx = instancesIndices[i];\n"
-    "        Instance inst = instances[instanceIdx];\n"
-    "        if (inst.texIndex == 881) continue;\n" // Fullbright light
-
-    "        mat4 invModel = inverse(instanceMatrices[instanceIdx]);\n"
-    "        vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;\n"
-    "        float instanceRadius = bounds[instanceIdx * BOUNDS_ATTRIBUTES_COUNT + 6];\n" // first 6 are the mins,maxs xyz
-    "        if (length(localOrigin - origin) > (maxDist + instanceRadius)) continue;\n"
-
-    "        vec3 localDir = ((invModel * vec4(dir, 0.0)).xyz);\n"
-    "        uint modelIndex = inst.modelIndex;\n"
-    "        uint vertCount = modelVertexCounts[modelIndex];\n"
-    "        if (vertCount > 1000) continue;\n"
-
-    "        uint triCount = vertCount / 3;\n"
-    "        mat4 matrix = instanceMatrices[instanceIdx];\n"
-    "        uint j = 0;\n"
-    "        uint vertexIdx;\n"
-    "        vec3 v0, v1, v2;\n"
-    "        for (uint tri = 0; tri < triCount; tri++) {\n"
-    "            vertexIdx = (vertexOffsets[modelIndex] * VERTEX_ATTRIBUTES_COUNT) + (tri * VERTEX_ATTRIBUTES_COUNT);\n"
-    "            j = 0;\n"
-    "            v0 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
-    "            j++;\n"
-    "            v1 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
-    "            j++;\n"
-    "            v2 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
-    "            float t;\n" // Output result
-    "            if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && (t < maxDist)) return 0.0;\n"
-    "        }\n"
-    "    }\n"
-    "    return 1.0;\n"
-    "}\n"
+//     "float TraceRay(vec3 origin, vec3 dir, float maxDist) {\n"
+//     "    for (int i = 0; i < instancesInPVSCount; i++) {\n"
+//     "        uint instanceIdx = instancesIndices[i];\n"
+//     "        Instance inst = instances[instanceIdx];\n"
+//     "        if (inst.texIndex == 881) continue;\n" // Fullbright light
+// 
+//     "        mat4 invModel = inverse(instanceMatrices[instanceIdx]);\n"
+//     "        vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;\n"
+//     "        float instanceRadius = bounds[instanceIdx * BOUNDS_ATTRIBUTES_COUNT + 6];\n" // first 6 are the mins,maxs xyz
+//     "        if (length(localOrigin - origin) > (maxDist + instanceRadius)) continue;\n"
+// 
+//     "        vec3 localDir = ((invModel * vec4(dir, 0.0)).xyz);\n"
+//     "        uint modelIndex = inst.modelIndex;\n"
+//     "        uint vertCount = modelVertexCounts[modelIndex];\n"
+//     "        if (vertCount > 1000) continue;\n"
+// 
+//     "        uint triCount = vertCount / 3;\n"
+//     "        mat4 matrix = instanceMatrices[instanceIdx];\n"
+//     "        uint j = 0;\n"
+//     "        uint vertexIdx;\n"
+//     "        vec3 v0, v1, v2;\n"
+//     "        for (uint tri = 0; tri < triCount; tri++) {\n"
+//     "            vertexIdx = (vertexOffsets[modelIndex] * VERTEX_ATTRIBUTES_COUNT) + (tri * VERTEX_ATTRIBUTES_COUNT);\n"
+//     "            j = 0;\n"
+//     "            v0 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
+//     "            j++;\n"
+//     "            v1 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
+//     "            j++;\n"
+//     "            v2 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);\n"
+//     "            float t;\n" // Output result
+//     "            if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && (t < maxDist)) return 0.0;\n"
+//     "        }\n"
+//     "    }\n"
+//     "    return 1.0;\n"
+//     "}\n"
 
     "void main() {\n"
     "    int texIndexChecked = 0;\n"

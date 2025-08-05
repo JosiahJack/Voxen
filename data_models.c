@@ -216,21 +216,21 @@ int LoadGeometry(void) {
     DebugRAM("after model staging buffer clear");
 
     // Upload modelVertexOffsets
-    uint32_t modelVertexOffsets[MODEL_COUNT];
-    uint32_t offset = 0;
-    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
-        modelVertexOffsets[i] = offset;
-        offset += modelVertexCounts[i];
-    }
-    
-    glGenBuffers(1, &modelVertexOffsetsID);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
-    CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
-    CHECK_GL_ERROR();
+//     uint32_t modelVertexOffsets[MODEL_COUNT];
+//     uint32_t offset = 0;
+//     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
+//         modelVertexOffsets[i] = offset;
+//         offset += modelVertexCounts[i];
+//     }
+//     
+//     glGenBuffers(1, &modelVertexOffsetsID);
+//     CHECK_GL_ERROR();
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
+//     CHECK_GL_ERROR();
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
+//     CHECK_GL_ERROR();
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, modelVertexOffsetsID);
+//     CHECK_GL_ERROR();
     
     // Pass Model Type Bounds to GPU
     glGenBuffers(1, &modelBoundsID);
@@ -244,37 +244,37 @@ int LoadGeometry(void) {
     malloc_trim(0);
     
     // Pass Model Vertex Counts to GPU
-    glGenBuffers(1, &modelVertexCountsID);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexCountsID);
-    CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, modelVertexCountsID);
-    CHECK_GL_ERROR();
+//     glGenBuffers(1, &modelVertexCountsID);
+//     CHECK_GL_ERROR();
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexCountsID);
+//     CHECK_GL_ERROR();
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
+//     CHECK_GL_ERROR();
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, modelVertexCountsID);
+//     CHECK_GL_ERROR();
     
     // Create duplicate of all mesh data in one flat buffer in VRAM without using RAM
-    glGenBuffers(1, &vboMasterTable);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
-    CHECK_GL_ERROR();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    for (int i = 0; i < MODEL_COUNT; ++i) {
-        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
-        CHECK_GL_ERROR();
-        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
-        CHECK_GL_ERROR();
-        glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        CHECK_GL_ERROR();
-    }
-
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
-    CHECK_GL_ERROR();
+//     glGenBuffers(1, &vboMasterTable);
+//     CHECK_GL_ERROR();
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
+//     CHECK_GL_ERROR();
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+//     CHECK_GL_ERROR();
+//     for (int i = 0; i < MODEL_COUNT; ++i) {
+//         glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
+//         CHECK_GL_ERROR();
+//         glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
+//         CHECK_GL_ERROR();
+//         glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//         CHECK_GL_ERROR();
+//     }
+// 
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, vboMasterTable);
+//     CHECK_GL_ERROR();
     
     // Create sphoxel buffer
-    glGenBuffers(1,&sphoxelsID);
-    CHECK_GL_ERROR();
+//     glGenBuffers(1,&sphoxelsID);
+//     CHECK_GL_ERROR();
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
