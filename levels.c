@@ -1,11 +1,10 @@
 #include <stdio.h>
+#include <stdint.h>
 #include "levels.h"
 #include "data_parser.h"
 #include "debug.h"
 
-int numLevels = 14; // Can be set by gamedata.txt
-
-int LoadLevelGeometry(int curlevel) {
+int LoadLevelGeometry(uint8_t curlevel) {
     DualLog("Loading start level: %d...\n",curlevel);
 //     if (curlevel < 0 || curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 //     

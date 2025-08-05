@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <errno.h>
 #include "data_parser.h"
 #include "debug.h"
@@ -44,9 +45,29 @@ bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
     return (parse_numberu32(str,line,lineNum) > 0);
 }
 
+float parse_float(const char* str, const char* line, uint32_t lineNum) {
+    if (str == NULL || *str == '\0') { fprintf(stderr, "Invalid float input blank string, from line[%d]: %s\n", lineNum, line); return 0.0f; }
+
+    char* endptr;
+    errno = 0;
+    float val = strtof(str, &endptr);
+    if (errno != 0 || endptr == str || *endptr != '\0') { fprintf(stderr, "Invalid float input %s, from line[%d]: %s\n", str, lineNum, line); return 0.0f; }
+    return val;
+}
+
+int count_pipes(char *str) {
+    int count = 0;
+    int len = strlen(str);
+    for (int i = 0; i < len; i++) {
+        if (str[i] == '|') count++;
+    }
+    
+    return count;
+}
+
 bool parse_data_file(DataParser *parser, const char *filename) {
     FILE *file = fopen(filename, "r");
-    if (!file) { SDL_Log("Error: Cannot open %s", filename); return false; }
+    if (!file) { DualLogError("Cannot open %s", filename); return false; }
 
     // First pass: Count entries and max index
     int max_index = -1;
@@ -54,6 +75,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     char line[MAX_PATH];
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = 0;
+        if (line[0] == '\0' || (line[0] == '/' && line[1] == '/')) continue;
         if (line[0] == '#') {
             entry_count++;
         } else if (strncmp(line, "index: ", 7) == 0) {
@@ -64,14 +86,14 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     
     entry_count = max_index >= entry_count ? max_index + 1 : entry_count;
     if (entry_count > MAX_ENTRIES) {
-        SDL_Log("Error: Entry count %d exceeds %d", entry_count, MAX_ENTRIES);
+        DualLogError("Entry count %d exceeds %d", entry_count, MAX_ENTRIES);
         entry_count = MAX_ENTRIES;
     }
 
     // Resize entries array
     if (entry_count > parser->capacity) {
         DataEntry *new_entries = realloc(parser->entries, entry_count * sizeof(DataEntry));
-        if (!new_entries) { SDL_Log("Error: realloc failed for %d entries", entry_count); fclose(file); return false; }
+        if (!new_entries) { DualLogError("realloc failed for %d entries", entry_count); fclose(file); return false; }
         
         parser->entries = new_entries;
         for (int i = parser->capacity; i < entry_count; i++) {
@@ -94,9 +116,12 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     DataEntry entry = {0};
     entry.index = UINT16_MAX;
     uint32_t lineNum = 0;
+    printf("Made it to here 1\n");
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = 0;
-        if (line[0] == '#') {
+        printf("Made it to here 2\n");
+        bool is_pipe_delimited = (line[0] != '#');
+        if (!is_pipe_delimited) {
             if (entry.path[0] && entry.index < MAX_ENTRIES) parser->entries[entry.index] = entry;
             strncpy(entry.path, line + 1, sizeof(entry.path) - 1);
             entry.index = UINT16_MAX;
@@ -106,31 +131,60 @@ bool parse_data_file(DataParser *parser, const char *filename) {
             entry.specIndex = UINT16_MAX;
             entry.normIndex = UINT16_MAX;
             entry.doublesided = false;
+            entry.constIndex = 0;
+            entry.localPosition.x = 0.0f;
+            entry.localPosition.y = 0.0f;
+            entry.localPosition.z = 0.0f;
+            entry.localRotation.x = 0.0f;
+            entry.localRotation.y = 0.0f;
+            entry.localRotation.z = 0.0f;
+            entry.localRotation.w = 1.0f;
+            entry.localScale.x = 1.0f;
+            entry.localScale.y = 1.0f;
+            entry.localScale.z = 1.0f;
         } else if ((line[0] == '/' && line[1] == '/') || (line[0] == '\\' && line[1] == 'n')) {
             continue; // Skip comments and empty lines
-        } else {
-            // Check valid keys
-            for (int i = 0; i < parser->num_keys; i++) {
-                size_t key_len = strlen(parser->valid_keys[i]);
-                if (strncmp(line, parser->valid_keys[i], key_len) == 0 && line[key_len] == ':') {
-                    const char *value = line + key_len + 1;
-                    while (*value == ' ') value++; // Skip the space after :
-                         if (strcmp(parser->valid_keys[i], "index") == 0)       entry.index       = parse_numberu16(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "model") == 0)       entry.modelIndex  = parse_numberu16(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "texture") == 0)     entry.texIndex    = parse_numberu16(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "glowtexture") == 0) entry.glowIndex   = parse_numberu16(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "spectexture") == 0) entry.specIndex   = parse_numberu16(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "normtexture") == 0) entry.normIndex   = parse_numberu16(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "doublesided") == 0) entry.doublesided = parse_bool(value,line,lineNum);
-                    else if (strcmp(parser->valid_keys[i], "cardchunk") == 0)   entry.cardchunk   = parse_bool(value,line,lineNum);
-
-                    break;
+        } else { // Pipe Delimited key:value pairs that are colon separated.  E.g. key:value|key:value|key:value
+            printf("Made it to here 3\n");
+            int numKVPairs = count_pipes(line);
+            do { // Check valid keys
+                for (int i = 0; i < parser->num_keys; i++) {
+                    size_t key_len = strlen(parser->valid_keys[i]);
+                    if (strncmp(line, parser->valid_keys[i], key_len) == 0 && line[key_len] == ':') {
+                        const char *value = line + key_len + 1;
+                        while (*value == ' ') value++; // Skip the space after :
+                             if (strcmp(parser->valid_keys[i], "index") == 0)           entry.index           = parse_numberu16(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "model") == 0)           entry.modelIndex      = parse_numberu16(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "texture") == 0)         entry.texIndex        = parse_numberu16(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "glowtexture") == 0)     entry.glowIndex       = parse_numberu16(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "spectexture") == 0)     entry.specIndex       = parse_numberu16(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "normtexture") == 0)     entry.normIndex       = parse_numberu16(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "doublesided") == 0)     entry.doublesided     = parse_bool(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "cardchunk") == 0)       entry.cardchunk       = parse_bool(value,line,lineNum);
+                        else if (strcmp(parser->valid_keys[i], "constIndex") == 0)      entry.constIndex      = parse_numberu32(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localPosition.x") == 0) entry.localPosition.x = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localPosition.y") == 0) entry.localPosition.y = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localPosition.z") == 0) entry.localPosition.z = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localRotation.x") == 0) entry.localRotation.x = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localRotation.y") == 0) entry.localRotation.y = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localRotation.z") == 0) entry.localRotation.z = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localRotation.w") == 0) entry.localRotation.w = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localScale.x") == 0)    entry.localScale.x    = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localScale.y") == 0)    entry.localScale.y    = parse_float(value, line, lineNum);
+                        else if (strcmp(parser->valid_keys[i], "localScale.z") == 0)    entry.localScale.z    = parse_float(value, line, lineNum);
+                        
+                        break;
+                    }
                 }
-            }
+                
+                numKVPairs--;
+            } while (numKVPairs > 0);
         }
         
         lineNum++;
     }
+    
+    printf("Made it to here 4\n");
 
     if (entry.path[0] && entry.index < MAX_ENTRIES) parser->entries[entry.index] = entry;
     fclose(file);

@@ -27,6 +27,7 @@
 #include "audio.h"
 #include "instance.h"
 #include "voxel.h"
+#include "data_parser.h"
 #include "data_entities.h"
 #include "player.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -36,9 +37,16 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 800, screen_height = 600;
+int screen_width = 1920, screen_height = 1080;
 bool window_has_focus = false;
 static FILE *console_log_file = NULL;
+
+// Game/Mod Definition
+DataParser gamedata_parser;
+uint8_t numLevels = 2;
+uint8_t startLevel = 0;
+const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
+#define NUM_GAMDAT_KEYS 2
 
 // Event System states
 int maxEventCount_debug = 0;
@@ -816,6 +824,18 @@ int InitializeEnvironment(void) {
     InitializeAudio();
     DebugRAM("audio init");
     systemInitialized[SYS_AUD] = true;
+    
+    // Load Game/Mod Definitio
+    DualLog("Loading game definition from ./Data/gamedata.txt...\n");
+    parser_init(&gamedata_parser, valid_gamedata_keys, NUM_GAMDAT_KEYS, PARSER_DATA);
+    if (!parse_data_file(&gamedata_parser, "./Data/gamedata.txt")) { DualLogError("Could not parse ./Data/gamedata.txt!\n"); parser_free(&gamedata_parser); return 1; }
+    printf("Made it to here after parse 1\n");
+    numLevels = gamedata_parser.entries[0].levelCount;
+    printf("Made it to here after parse 2\n");
+    startLevel = gamedata_parser.entries[0].startLevel;
+    printf("Made it to here after parse 3\n");
+    DualLog("Game Definition:: num levels: %d, start level=%d",numLevels,startLevel);
+    parser_free(&gamedata_parser);
     
     DebugRAM("InitializeEnvironment end");
     return 0;
