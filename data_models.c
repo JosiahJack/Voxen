@@ -16,7 +16,7 @@
 #include "voxel.h"
 #include "event.h"
 
-#define DEBUG_MODEL_LOAD_DATA 1U
+// #define DEBUG_MODEL_LOAD_DATA 1U
 
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
@@ -302,6 +302,8 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glFlush();
+            glFinish();
             CHECK_GL_ERROR();
         }
 
@@ -315,6 +317,8 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
+            glFlush();
+            glFinish();
             CHECK_GL_ERROR();
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
@@ -326,6 +330,8 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, tebos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
+            glFlush();
+            glFinish();
             CHECK_GL_ERROR();
         }
 
@@ -347,6 +353,8 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, ebos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, edgeCount * 4 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, edgeCount * 4 * sizeof(uint32_t));
+            glFlush();
+            glFinish();
             CHECK_GL_ERROR();
             free(tempEdgeData);
         }
