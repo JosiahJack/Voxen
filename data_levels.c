@@ -48,8 +48,15 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].specIndex = entities[entIdx].specIndex;
         instances[idx].normIndex = entities[entIdx].normIndex;
         instances[idx].posx = level_parser.entries[idx].localPosition.x;
-        instances[idx].posy = level_parser.entries[idx].localPosition.y;
-        instances[idx].posz = level_parser.entries[idx].localPosition.z;
+        instances[idx].posy = level_parser.entries[idx].localPosition.z;
+        instances[idx].posz = level_parser.entries[idx].localPosition.y;
+        instances[idx].rotx = level_parser.entries[idx].localRotation.x;
+        instances[idx].roty = level_parser.entries[idx].localRotation.y;
+        instances[idx].rotz = level_parser.entries[idx].localRotation.z;
+        instances[idx].rotw = level_parser.entries[idx].localRotation.w;
+        instances[idx].sclx = level_parser.entries[idx].localScale.x;
+        instances[idx].scly = level_parser.entries[idx].localScale.y;
+        instances[idx].sclz = level_parser.entries[idx].localScale.z;
         DualLog("Loaded game object named %s with constIndex %d, at x: %f, y: %f, z: %f\n",
                 level_parser.entries[idx].path,level_parser.entries[idx].constIndex,
                 level_parser.entries[idx].localPosition.x,

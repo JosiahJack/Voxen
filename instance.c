@@ -17,7 +17,8 @@ GLuint instancesBuffer;
 GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
 
-int SetupInstances(void) {    
+int SetupInstances(void) {
+    DualLog("Initializing instances\n");
     CHECK_GL_ERROR();
     int x = 0;
     int y = 0;

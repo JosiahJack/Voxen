@@ -10,7 +10,8 @@
 #include "render.h"
 
 // Camera variables
-float cam_x = 0.0f, cam_y = -4.0f, cam_z = 0.0f; // Camera position
+// Start Actual: Puts player on Medical Level in actual game start position
+float cam_x = -20.40001f, cam_y = -43.52f, cam_z = 10.2f; // Camera position
 Quaternion cam_rotation;
 float cam_yaw = 180.0f;
 float cam_pitch = 90.0f;

@@ -828,10 +828,10 @@ int InitializeEnvironment(void) {
     
     // Load Game/Mod Definitio
     DualLog("Loading game definition from ./Data/gamedata.txt...\n");
-    parser_init(&gamedata_parser, valid_gamedata_keys, NUM_GAMDAT_KEYS, PARSER_DATA);
+    parser_init(&gamedata_parser, valid_gamedata_keys, NUM_GAMDAT_KEYS, PARSER_GAME);
     if (!parse_data_file(&gamedata_parser, "./Data/gamedata.txt")) { DualLogError("Could not parse ./Data/gamedata.txt!\n"); parser_free(&gamedata_parser); return 1; }
     numLevels = gamedata_parser.entries[0].levelCount;
-    startLevel = gamedata_parser.entries[1].startLevel;
+    startLevel = gamedata_parser.entries[0].startLevel;
     DualLog("Game Definition:: num levels: %d, start level=%d\n",numLevels,startLevel);
     parser_free(&gamedata_parser);
     
@@ -949,9 +949,8 @@ int main(int argc, char* argv[]) {
     EnqueueEvent_Simple(EV_LOAD_MODELS);
     EnqueueEvent_Simple(EV_LOAD_ENTITIES); // Must be after models and textures
                                            // else entity types can't be validated.
-    EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities or else 
-                                         // instances can't know what to do.
     EnqueueEvent_Simple(EV_LOAD_INSTANCES);
+    EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities!
     EnqueueEvent_Simple(EV_LOAD_VOXELS); // Must be after models! Needed for 
                                          // generating voxels), entities (lets 
                                          // instances know what models), and
