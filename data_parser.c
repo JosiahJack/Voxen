@@ -67,45 +67,72 @@ int count_pipes(char *str) {
 
 bool parse_data_file(DataParser *parser, const char *filename) {
     FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s", filename); return false; }
+    if (!file) {
+        DualLogError("Cannot open %s\n", filename);
+        return false;
+    }
 
     // First pass: Count entries and max index
     int max_index = -1;
     int entry_count = 0;
-    char line[MAX_PATH];
+    char line[MAX_LINE_LENGTH];
+    bool is_texture_or_model = (strstr(filename, "textures.txt") != NULL || strstr(filename, "models.txt") != NULL || strstr(filename, "entities.txt") != NULL);
+//     bool isGameData = (strstr(filename,"gamedata.txt") != NULL);
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = 0;
         if (line[0] == '\0' || (line[0] == '/' && line[1] == '/')) continue;
-        if (line[0] == '#') {
-            entry_count++;
-        } else if (strncmp(line, "index: ", 7) == 0) {
-            int idx = atoi(line + 7);
-            if (idx > max_index) max_index = idx;
+        if (is_texture_or_model) {
+            if (line[0] == '#') {
+                entry_count++;
+            } else if (strncmp(line, "index: ", 7) == 0) {
+                int idx = atoi(line + 7);
+                if (idx > max_index) max_index = idx;
+            }
+        } else {
+            entry_count++; // For gamedata.txt and level data, count non-comment lines
         }
     }
-    
-    entry_count = max_index >= entry_count ? max_index + 1 : entry_count;
+
+    // Adjust entry count for textures/models
+    if (is_texture_or_model) {
+        entry_count = max_index >= entry_count ? max_index + 1 : entry_count;
+    }
     if (entry_count > MAX_ENTRIES) {
-        DualLogError("Entry count %d exceeds %d", entry_count, MAX_ENTRIES);
+        DualLogError("Entry count %d exceeds %d\n", entry_count, MAX_ENTRIES);
         entry_count = MAX_ENTRIES;
     }
 
-    // Resize entries array
+    // Allocate memory
     if (entry_count > parser->capacity) {
         DataEntry *new_entries = realloc(parser->entries, entry_count * sizeof(DataEntry));
-        if (!new_entries) { DualLogError("realloc failed for %d entries", entry_count); fclose(file); return false; }
-        
+        if (!new_entries) {
+            DualLogError("realloc failed for %d entries\n", entry_count);
+            fclose(file);
+            return false;
+        }
         parser->entries = new_entries;
         for (int i = parser->capacity; i < entry_count; i++) {
             parser->entries[i].path[0] = 0;
-            parser->entries[i].index = UINT16_MAX; // Mark unused
+            parser->entries[i].index = UINT16_MAX;
             parser->entries[i].modelIndex = UINT16_MAX;
             parser->entries[i].texIndex = UINT16_MAX;
             parser->entries[i].glowIndex = UINT16_MAX;
             parser->entries[i].specIndex = UINT16_MAX;
             parser->entries[i].normIndex = UINT16_MAX;
+            parser->entries[i].doublesided = false;
+            parser->entries[i].cardchunk = false;
+            parser->entries[i].constIndex = 0;
+            parser->entries[i].localPosition.x = 0.0f;
+            parser->entries[i].localPosition.y = 0.0f;
+            parser->entries[i].localPosition.z = 0.0f;
+            parser->entries[i].localRotation.x = 0.0f;
+            parser->entries[i].localRotation.y = 0.0f;
+            parser->entries[i].localRotation.z = 0.0f;
+            parser->entries[i].localRotation.w = 1.0f;
+            parser->entries[i].localScale.x = 1.0f;
+            parser->entries[i].localScale.y = 1.0f;
+            parser->entries[i].localScale.z = 1.0f;
         }
-        
         parser->capacity = entry_count;
     }
     
@@ -115,15 +142,26 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     rewind(file);
     DataEntry entry = {0};
     entry.index = UINT16_MAX;
+    entry.localRotation.w = 1.0f;
+    entry.localScale.x = 1.0f;
+    entry.localScale.y = 1.0f;
+    entry.localScale.z = 1.0f;
     uint32_t lineNum = 0;
-    printf("Made it to here 1\n");
+    int current_index = 0;
     while (fgets(line, sizeof(line), file)) {
         line[strcspn(line, "\n")] = 0;
-        printf("Made it to here 2\n");
-        bool is_pipe_delimited = (line[0] != '#');
-        if (!is_pipe_delimited) {
-            if (entry.path[0] && entry.index < MAX_ENTRIES) parser->entries[entry.index] = entry;
-            strncpy(entry.path, line + 1, sizeof(entry.path) - 1);
+        if (line[0] == '\0' || (line[0] == '/' && line[1] == '/')) continue;
+
+        bool is_valid_entry = false;
+        if (line[0] == '#') {
+            bool is_pipe_delimited = (strchr(line, '|') != NULL);
+            char *token = strtok(line, is_pipe_delimited ? "|" : "\n");
+
+            // Handle # lines for textures/models
+            if (entry.path[0] && entry.index < MAX_ENTRIES) {
+                parser->entries[entry.index] = entry;
+            }
+            strncpy(entry.path, token + 1, sizeof(entry.path) - 1);
             entry.index = UINT16_MAX;
             entry.modelIndex = UINT16_MAX;
             entry.texIndex = UINT16_MAX;
@@ -131,6 +169,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
             entry.specIndex = UINT16_MAX;
             entry.normIndex = UINT16_MAX;
             entry.doublesided = false;
+            entry.cardchunk = false;
             entry.constIndex = 0;
             entry.localPosition.x = 0.0f;
             entry.localPosition.y = 0.0f;
@@ -142,51 +181,80 @@ bool parse_data_file(DataParser *parser, const char *filename) {
             entry.localScale.x = 1.0f;
             entry.localScale.y = 1.0f;
             entry.localScale.z = 1.0f;
-        } else if ((line[0] == '/' && line[1] == '/') || (line[0] == '\\' && line[1] == 'n')) {
-            continue; // Skip comments and empty lines
-        } else { // Pipe Delimited key:value pairs that are colon separated.  E.g. key:value|key:value|key:value
-            printf("Made it to here 3\n");
-            int numKVPairs = count_pipes(line);
-            do { // Check valid keys
-                for (int i = 0; i < parser->num_keys; i++) {
-                    size_t key_len = strlen(parser->valid_keys[i]);
-                    if (strncmp(line, parser->valid_keys[i], key_len) == 0 && line[key_len] == ':') {
-                        const char *value = line + key_len + 1;
-                        while (*value == ' ') value++; // Skip the space after :
-                             if (strcmp(parser->valid_keys[i], "index") == 0)           entry.index           = parse_numberu16(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "model") == 0)           entry.modelIndex      = parse_numberu16(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "texture") == 0)         entry.texIndex        = parse_numberu16(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "glowtexture") == 0)     entry.glowIndex       = parse_numberu16(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "spectexture") == 0)     entry.specIndex       = parse_numberu16(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "normtexture") == 0)     entry.normIndex       = parse_numberu16(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "doublesided") == 0)     entry.doublesided     = parse_bool(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "cardchunk") == 0)       entry.cardchunk       = parse_bool(value,line,lineNum);
-                        else if (strcmp(parser->valid_keys[i], "constIndex") == 0)      entry.constIndex      = parse_numberu32(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localPosition.x") == 0) entry.localPosition.x = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localPosition.y") == 0) entry.localPosition.y = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localPosition.z") == 0) entry.localPosition.z = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localRotation.x") == 0) entry.localRotation.x = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localRotation.y") == 0) entry.localRotation.y = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localRotation.z") == 0) entry.localRotation.z = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localRotation.w") == 0) entry.localRotation.w = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localScale.x") == 0)    entry.localScale.x    = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localScale.y") == 0)    entry.localScale.y    = parse_float(value, line, lineNum);
-                        else if (strcmp(parser->valid_keys[i], "localScale.z") == 0)    entry.localScale.z    = parse_float(value, line, lineNum);
-                        
-                        break;
+            lineNum++;
+            continue;
+        }
+
+        // Process key-value pairs
+        char *pipe_token = strtok(line, "|");
+        while (pipe_token != NULL) {
+            char *key = strtok(pipe_token, ":");
+            char *value = strtok(NULL, ":");
+
+            if (key && value) {
+                while (*value == ' ') value++; // Trim leading spaces
+                if (strncmp(key, "chunk_", 6) == 0) {
+                    strncpy(entry.path, key, sizeof(entry.path) - 1);
+                } else {
+                    for (int i = 0; i < parser->num_keys; i++) {
+                        if (strcmp(key, parser->valid_keys[i]) == 0) {
+                            is_valid_entry = true;
+                            DualLog("Parsing line %d with Key: %s Value: %s\n", lineNum, key, value);
+                                 if (strcmp(key, "index") == 0)            entry.index = parse_numberu16(value, line, lineNum);
+                            else if (strcmp(key, "model") == 0)           entry.modelIndex = parse_numberu16(value, line, lineNum);
+                            else if (strcmp(key, "texture") == 0)         entry.texIndex = parse_numberu16(value, line, lineNum);
+                            else if (strcmp(key, "glowtexture") == 0)     entry.glowIndex = parse_numberu16(value, line, lineNum);
+                            else if (strcmp(key, "spectexture") == 0)     entry.specIndex = parse_numberu16(value, line, lineNum);
+                            else if (strcmp(key, "normtexture") == 0)     entry.normIndex = parse_numberu16(value, line, lineNum);
+                            else if (strcmp(key, "doublesided") == 0)     entry.doublesided = parse_bool(value, line, lineNum);
+                            else if (strcmp(key, "cardchunk") == 0)       entry.cardchunk = parse_bool(value, line, lineNum);
+                            else if (strcmp(key, "levelcount") == 0) {    entry.levelCount = parse_numberu16(value, line, lineNum); entry.index = 0; }
+                            else if (strcmp(key, "startlevel") == 0) {    entry.startLevel = parse_numberu16(value, line, lineNum); entry.index = 0; }
+                            else if (strcmp(key, "constIndex") == 0)      entry.constIndex = parse_numberu32(value, line, lineNum);
+                            else if (strcmp(key, "localPosition.x") == 0) entry.localPosition.x = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localPosition.y") == 0) entry.localPosition.y = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localPosition.z") == 0) entry.localPosition.z = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localRotation.x") == 0) entry.localRotation.x = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localRotation.y") == 0) entry.localRotation.y = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localRotation.z") == 0) entry.localRotation.z = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localRotation.w") == 0) entry.localRotation.w = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localScale.x") == 0)    entry.localScale.x = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localScale.y") == 0)    entry.localScale.y = parse_float(value, line, lineNum);
+                            else if (strcmp(key, "localScale.z") == 0)    entry.localScale.z = parse_float(value, line, lineNum);
+                            break;
+                        }
                     }
                 }
-                
-                numKVPairs--;
-            } while (numKVPairs > 0);
+            } else {
+                DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line);
+            }
+
+            pipe_token = strtok(NULL, "|");
         }
-        
+
+        // Store entry for non-texture/model files
+        if (!is_texture_or_model && is_valid_entry) {
+            if (current_index < parser->count) {
+                parser->entries[current_index++] = entry;
+            }
+            entry = (DataEntry){0};
+            entry.index = UINT16_MAX;
+            entry.localRotation.w = 1.0f;
+            entry.localScale.x = 1.0f;
+            entry.localScale.y = 1.0f;
+            entry.localScale.z = 1.0f;
+        }
+
         lineNum++;
     }
-    
-    printf("Made it to here 4\n");
 
-    if (entry.path[0] && entry.index < MAX_ENTRIES) parser->entries[entry.index] = entry;
+    if (is_texture_or_model && entry.path[0] && (entry.constIndex != 0 || entry.levelCount != 0 || entry.startLevel != 0) && current_index < parser->count) {
+        parser->entries[current_index] = entry;
+    }
+    if (!is_texture_or_model) {
+        parser->count = current_index; // Update with valid entries for gamedata.txt and level data
+    }
+    
     fclose(file);
     return true;
 }

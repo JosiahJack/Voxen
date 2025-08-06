@@ -29,14 +29,14 @@ int LoadEntities(void) {
     
     // Initialize parser with entity-specific keys
     parser_init(&entity_parser, valid_entity_keys, NUM_ENTITY_KEYS, PARSER_DATA);
-    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!"); parser_free(&entity_parser); return 1; }
+    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); parser_free(&entity_parser); return 1; }
     
     loadEntityItemInitialized[ENT_PARSER] = true;
     entity_parser_initialized = true;
 
     entityCount = entity_parser.count;
-    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!", entityCount, MAX_ENTITIES); CleanupEntities(true); return 1; }
-    if (entityCount == 0) { DualLogError("No entities found in entities.txt"); CleanupEntities(true); return 1; }
+    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); CleanupEntities(true); return 1; }
+    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); CleanupEntities(true); return 1; }
 
     DualLog("Parsing %d entities...\n", entityCount);
 

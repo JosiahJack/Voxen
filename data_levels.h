@@ -6,6 +6,7 @@
 extern uint8_t startLevel;
 extern uint8_t numLevels; // Can be set by gamedata.txt
 
+int LoadLevels();
 int LoadLevelGeometry(uint8_t curlevel);
 
 #endif // VOXEN_LEVELS_H

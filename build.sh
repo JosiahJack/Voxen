@@ -5,7 +5,8 @@ CFLAGS="-std=c11 -Wall -Wextra -O3 -g -D_POSIX_C_SOURCE=199309L"
 MINIAUDIO_CFLAGS="-std=c11 -Wall -Wextra -O2 -g -D_POSIX_C_SOURCE=199309L -DNDEBUG"
 LDFLAGS="-lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lassimp -lenet -lpthread -s"
 SOURCES="voxen.c cli_args.c event.c quaternion.c input.c data_models.c data_entities.c \
-         data_textures.c network.c shaders.c voxel.c data_parser.c levels.c instance.c audio.c"
+         data_textures.c network.c shaders.c voxel.c data_parser.c data_levels.c \
+         instance.c audio.c"
 #         miniaudio.c"
 
 TEMP_DIR=temp_build

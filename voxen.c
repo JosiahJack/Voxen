@@ -17,6 +17,7 @@
 #include "event.h"
 #include "constants.h"
 #include "input.h"
+#include "data_levels.h"
 #include "data_textures.h"
 #include "data_models.h"
 #include "render.h"
@@ -37,14 +38,14 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 1920, screen_height = 1080;
+int screen_width = 800, screen_height = 600;
 bool window_has_focus = false;
 static FILE *console_log_file = NULL;
 
 // Game/Mod Definition
 DataParser gamedata_parser;
 uint8_t numLevels = 2;
-uint8_t startLevel = 0;
+uint8_t startLevel = 3;
 const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
 #define NUM_GAMDAT_KEYS 2
 
@@ -829,12 +830,9 @@ int InitializeEnvironment(void) {
     DualLog("Loading game definition from ./Data/gamedata.txt...\n");
     parser_init(&gamedata_parser, valid_gamedata_keys, NUM_GAMDAT_KEYS, PARSER_DATA);
     if (!parse_data_file(&gamedata_parser, "./Data/gamedata.txt")) { DualLogError("Could not parse ./Data/gamedata.txt!\n"); parser_free(&gamedata_parser); return 1; }
-    printf("Made it to here after parse 1\n");
     numLevels = gamedata_parser.entries[0].levelCount;
-    printf("Made it to here after parse 2\n");
-    startLevel = gamedata_parser.entries[0].startLevel;
-    printf("Made it to here after parse 3\n");
-    DualLog("Game Definition:: num levels: %d, start level=%d",numLevels,startLevel);
+    startLevel = gamedata_parser.entries[1].startLevel;
+    DualLog("Game Definition:: num levels: %d, start level=%d\n",numLevels,startLevel);
     parser_free(&gamedata_parser);
     
     DebugRAM("InitializeEnvironment end");
@@ -894,7 +892,7 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS: /*LoadLevels(); TODO*/ return 0;
+        case EV_LOAD_LEVELS: LoadLevels(); return 0;
         case EV_LOAD_VOXELS: VXGI_Init(); return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
@@ -1063,13 +1061,14 @@ int main(int argc, char* argv[]) {
         lights[lightBase + 9] = 1.0f; // r
         lights[lightBase + 10] = 1.0f; // g
         lights[lightBase + 11] = 1.0f; // b
-        instances[39].posx = testLight_x;
-        instances[39].posy = testLight_y;
-        instances[39].posz = testLight_z;
-        instances[39].sclx = testLight_range * 0.04f;
-        instances[39].scly = testLight_range * 0.04f;
-        instances[39].sclz = testLight_range * 0.04f;
-        dirtyInstances[39] = true;
+        int testLightInstanceIdx = 5455;
+        instances[testLightInstanceIdx].posx = testLight_x;
+        instances[testLightInstanceIdx].posy = testLight_y;
+        instances[testLightInstanceIdx].posz = testLight_z;
+        instances[testLightInstanceIdx].sclx = testLight_range * 0.04f;
+        instances[testLightInstanceIdx].scly = testLight_range * 0.04f;
+        instances[testLightInstanceIdx].sclz = testLight_range * 0.04f;
+        dirtyInstances[testLightInstanceIdx] = true;
         
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
         if (debugRenderSegfaults) DualLog("1. Light Culling to limit of MAX_VISIBLE_LIGHTS\n");
@@ -1230,7 +1229,7 @@ int main(int argc, char* argv[]) {
                     if (instances[i].modelIndex >= MODEL_COUNT) continue;
                     if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
                     if (instances[i].modelIndex < 0) continue; // Culled
-                    if (i == 39) continue; // TODO delete me
+                    if (i == testLightInstanceIdx) continue; // TODO delete me
                     
                     if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
                     glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
@@ -1354,7 +1353,7 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
-            if (debugView == 6 && i == 39) continue; // TODO: Delete me
+            if (debugView == 6 && i == testLightInstanceIdx) continue; // TODO: Delete me
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);

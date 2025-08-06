@@ -42,7 +42,7 @@ int SetupInstances(void) {
             y++;
         }
         
-        if (idx == 39) { // Test light representative, not actually the light, moves with it
+        if (idx == 5455) { // Test light representative, not actually the light, moves with it
             instances[idx].modelIndex = 621; // Test Light Sphere
             instances[idx].texIndex = 881; // white light
             instances[idx].glowIndex = 881; // white light
