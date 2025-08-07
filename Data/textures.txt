@@ -1044,8 +1044,7 @@ index: 508
 index: 509
 #Textures/med2_1d.png
 index: 510
-#Textures/med2_1_edge.png
-index: 511
+
 #Textures/med2_1_norm.png
 index: 512
 #Textures/med2_1.png

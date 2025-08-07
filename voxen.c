@@ -220,10 +220,6 @@ void print_bytes_no_newline(int count) {
 // ============================================================================
 // OpenGL / Rendering Helper Functions
 
-void mat4_identity(float* m) {
-    for (int i = 0; i < 16; i++) m[i] = (i % 5 == 0) ? 1.0f : 0.0f;
-}
-
 // Generates Projection Matrix4x4 for Geometry Rasterizer Pass.
 void mat4_perspective(float* m, float fov, float aspect, float near, float far) {
     float f = 1.0f / tan(fov * M_PI / 360.0f);
@@ -265,31 +261,6 @@ void mat4_ortho(float* m, float left, float right, float bottom, float top, floa
     m[13] = -(top + bottom) / (top - bottom);
     m[14] = -(far + near) / (far - near);
     m[15] = 1.0f;
-}
-
-// Convert quaternion to a 4x4 matrix
-void quat_to_matrix(Quaternion* q, float* m) {
-    float xx = q->x * q->x;
-    float xy = q->x * q->y;
-    float xz = q->x * q->z;
-    float xw = q->x * q->w;
-    float yy = q->y * q->y;
-    float yz = q->y * q->z;
-    float yw = q->y * q->w;
-    float zz = q->z * q->z;
-    float zw = q->z * q->w;
-
-    mat4_identity(m);
-    m[0] = 1.0f - 2.0f * (yy + zz);  // Right X
-    m[1] = 2.0f * (xy + zw);          // Right Y
-    m[2] = 2.0f * (xz - yw);          // Right Z
-    m[4] = 2.0f * (xy - zw);          // Up X
-    m[5] = 1.0f - 2.0f * (xx + zz);  // Up Y
-    m[6] = 2.0f * (yz + xw);          // Up Z
-    m[8] = 2.0f * (xz + yw);          // Forward X
-    m[9] = 2.0f * (yz - xw);          // Forward Y
-    m[10] = 1.0f - 2.0f * (xx + yy); // Forward Z
-    m[3] = 0.0f; m[7] = 0.0f; m[11] = 0.0f; m[15] = 1.0f;
 }
 
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, GLenum target, const char *name) {
@@ -1312,9 +1283,9 @@ int main(int argc, char* argv[]) {
             malloc_trim(0);
         }
         
-        // 5. Unlit Raterized Geometry
+        // 5. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-        if (debugRenderSegfaults) DualLog("5. Unlit Raterized Geometry\n");
+        if (debugRenderSegfaults) DualLog("5. Raterized Geometry\n");
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         CHECK_GL_ERROR();
         glUseProgram(chunkShaderProgram);
@@ -1327,7 +1298,7 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         float view[16], projection[16]; // Set up view and projection matrices
         float fov = 65.0f;
-        mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 100.0f);
+        mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 72.0f);
         mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
         glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
         CHECK_GL_ERROR();

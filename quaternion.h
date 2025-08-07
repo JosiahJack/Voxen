@@ -21,10 +21,11 @@ void quat_multiply(Quaternion* result, Quaternion* q1, Quaternion* q2);
 // Create a quaternion from an axis and angle (in radians)
 void quat_from_axis_angle(Quaternion* q, float x, float y, float z, float angle);
 
-// Convert quaternion to a 4x4 matrix
-void quat_to_matrix(Quaternion* q, float* m);
-
 void quat_to_euler(Quaternion* q, float* yaw, float* pitch, float* roll);
+
+void mat4_identity(float* m);
+void quat_to_matrix(Quaternion* q, float* m); // Convert quaternion to a 4x4 matrix
+void quat_to_matrix3x3(float m[3][3], Quaternion* q); // Convert quaternion to a 3x3 rotation matrix
 
 void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg);
 void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg);

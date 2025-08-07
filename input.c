@@ -11,9 +11,10 @@
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
-float cam_x = -20.40001f, cam_y = -43.52f, cam_z = 10.2f; // Camera position
+// float cam_x = -20.40001f, cam_y = -43.52f, cam_z = 10.2f; // Camera position Unity
+float cam_x = -15.65f, cam_y = 25.54f, cam_z = 5.85f; // Camera position Voxen
 Quaternion cam_rotation;
-float cam_yaw = 180.0f;
+float cam_yaw = 90.0f;
 float cam_pitch = 90.0f;
 float cam_roll = 0.0f;
 float cam_fov = 65.0f;

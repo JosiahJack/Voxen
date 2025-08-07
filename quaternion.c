@@ -69,6 +69,52 @@ void quat_to_euler(Quaternion* q, float* yaw, float* pitch, float* roll) {
     *roll = asin(sinr) * 180.0f / M_PI;
 }
 
+void mat4_identity(float* m) {
+    for (int i = 0; i < 16; i++) m[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+}
+
+// Convert quaternion to a 4x4 matrix
+void quat_to_matrix(Quaternion* q, float* m) {
+    float xx = q->x * q->x;
+    float xy = q->x * q->y;
+    float xz = q->x * q->z;
+    float xw = q->x * q->w;
+    float yy = q->y * q->y;
+    float yz = q->y * q->z;
+    float yw = q->y * q->w;
+    float zz = q->z * q->z;
+    float zw = q->z * q->w;
+
+    mat4_identity(m);
+    m[0] = 1.0f - 2.0f * (yy + zz);  // Right X
+    m[1] = 2.0f * (xy + zw);          // Right Y
+    m[2] = 2.0f * (xz - yw);          // Right Z
+    m[4] = 2.0f * (xy - zw);          // Up X
+    m[5] = 1.0f - 2.0f * (xx + zz);  // Up Y
+    m[6] = 2.0f * (yz + xw);          // Up Z
+    m[8] = 2.0f * (xz + yw);          // Forward X
+    m[9] = 2.0f * (yz - xw);          // Forward Y
+    m[10] = 1.0f - 2.0f * (xx + yy); // Forward Z
+    m[3] = 0.0f; m[7] = 0.0f; m[11] = 0.0f; m[15] = 1.0f;
+}
+
+void quat_to_matrix3x3(float m[3][3], Quaternion* q) {
+    float x = q->x, y = q->y, z = q->z, w = q->w;
+    float xx = x * x, yy = y * y, zz = z * z;
+    float xy = x * y, xz = x * z, yz = y * z;
+    float wx = w * x, wy = w * y, wz = w * z;
+
+    m[0][0] = 1.0f - 2.0f * (yy + zz); // m11
+    m[0][1] = 2.0f * (xy - wz);        // m12
+    m[0][2] = 2.0f * (xz + wy);        // m13
+    m[1][0] = 2.0f * (xy + wz);        // m21
+    m[1][1] = 1.0f - 2.0f * (xx + zz); // m22
+    m[1][2] = 2.0f * (yz - wx);        // m23
+    m[2][0] = 2.0f * (xz - wy);        // m31
+    m[2][1] = 2.0f * (yz + wx);        // m32
+    m[2][2] = 1.0f - 2.0f * (xx + yy); // m33
+}
+
 // Create a quaternion from yaw (around Z) and pitch (around X) in degrees
 void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg) {
     // Convert yaw and pitch from degrees to radians

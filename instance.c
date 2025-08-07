@@ -9,6 +9,8 @@
 #include "debug.h"
 #include "data_entities.h"
 #include "voxel.h"
+#include "quaternion.h"
+#include "constants.h"
 
 Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -55,30 +57,85 @@ int SetupInstances(void) {
         dirtyInstances[idx] = true;        
     }
     
-    instances[149].posx = 0.0f;
-    instances[149].posy = 2.56f;
-    instances[149].posz = 0.0f;
-    instances[149].rotx = 0.0f;
-    instances[149].roty = 0.0f;
-    instances[149].rotz = 0.707f;
-    instances[149].rotw = 0.707f;
-    
-    instances[154].posx = 0.0f;
-    instances[154].posy = 2.56f;
-    instances[154].posz = 0.0f;
-    instances[154].rotx = 0.5f;
-    instances[154].roty = 0.5f;
-    instances[154].rotz = 0.5f;
-    instances[154].rotw = 0.5f;
- 
-    instances[155].posx = 0.0f;
-    instances[155].posy = 2.56f;
-    instances[155].posz = 0.0f;
-    instances[155].rotx = 0.707f;
-    instances[155].roty = 0.0f;
-    instances[155].rotz = 0.707f;
-    instances[155].rotw = 0.0f;
-    
+//     // Test orienteering capability of existing quaternion code
+//     for (int i = 0; i < 6; ++i) {
+//         instances[i].posx = -2.56f;
+//         instances[i].posy = -2.56f;
+//         instances[i].posz = 0.0f;
+//         instances[i].modelIndex = 178; // generic lod card chunk
+//     }
+//     
+//     
+//     instances[0].texIndex = 513; // North med2_1
+//     instances[1].texIndex = 515; // South med2_1d
+//     instances[2].texIndex = 483; // East maint3_1
+//     instances[3].texIndex = 482; // West maint3_1d 
+//     instances[4].texIndex = 499; // down med1_9 bright teal light
+//     instances[5].texIndex = 507; // up med1_7 medical tile floor
+//     
+//     
+//     // 0: Identity rotation (cell North side Y+ from cell center)
+//     Quaternion q;
+//     quat_identity(&q);
+//     instances[0].rotx = q.x;
+//     instances[0].roty = q.y;
+//     instances[0].rotz = q.z;
+//     instances[0].rotw = q.w;
+//     printf("North cell side Y+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     // Equates to Unity localRotation:
+//     // Inspector rotation -90, 0, 180, quaternion x: 0 y: 0.70711 z:0.70711 w: 0
+// 
+//     // 1: 180° around Z (cell South side Y- from cell center)
+//     quat_from_axis_angle(&q, 0.0f, 0.0f, 1.0f, M_PI);
+//     instances[1].rotx = q.x;
+//     instances[1].roty = q.y;
+//     instances[1].rotz = q.z;
+//     instances[1].rotw = q.w;
+//     printf("South cell side Y- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     // Equates to Unity localRotation:
+//     // Inspector rotation -90, 0, 0, quaternion x: -0.70711, y: 0, z: 0, w: 0.70711
+//     
+//     // 2: +90° around Z (cell East side X+ from cell center)
+//     quat_from_axis_angle(&q, 0.0f, 0.0f, 1.0f, M_PI / 2.0f);
+//     instances[2].rotx = q.x;
+//     instances[2].roty = q.y;
+//     instances[2].rotz = q.z;
+//     instances[2].rotw = q.w;
+//     printf("East cell side X+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+// 
+//     // 3: −90° around Z (cell West side X− from cell center)
+//     quat_from_axis_angle(&q, 0.0f, 0.0f, 1.0f, -M_PI / 2.0f);
+//     instances[3].rotx = q.x;
+//     instances[3].roty = q.y;
+//     instances[3].rotz = q.z;
+//     instances[3].rotw = q.w;
+//     printf("West cell side X- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+// 
+//     // 4: +90° around X (cell Down Z− from cell center)
+//     quat_from_axis_angle(&q, 1.0f, 0.0f, 0.0f, -M_PI / 2.0f);
+//     instances[4].rotx = q.x;
+//     instances[4].roty = q.y;
+//     instances[4].rotz = q.z;
+//     instances[4].rotw = q.w;
+//     printf("Down Z- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     
+//     // 5: −90° around X (cell Up Z+ from cell center)
+//     quat_from_axis_angle(&q, 1.0f, 0.0f, 0.0f, M_PI / 2.0f);
+//     instances[5].rotx = q.x;
+//     instances[5].roty = q.y;
+//     instances[5].rotz = q.z;
+//     instances[5].rotw = q.w;
+//     printf("Up Z+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     // Equates to Unity localRotation:
+//     // Inspector rotation -180, 0, 0, quaternion x: 1, y: 0, z: 0, w: 0
+
+// North cell side Y+ from cell center quat:: x: 0.000000, y: 0.000000, z: 0.000000, w: 1.000000  = Unity X+, backtick toward Y+ (0deg roll?)
+// South cell side Y- from cell center quat:: x: 0.000000, y: 0.000000, z: 1.000000, w: -0.000000 = Unity X-, backtick toward Y- (0deg roll?)
+// East cell side X+ from cell center quat:: x: 0.000000, y: 0.000000, z: 0.707107, w: 0.707107   = Unity
+// West cell side X- from cell center quat:: x: -0.000000, y: -0.000000, z: -0.707107, w: 0.707107= Unity
+// Down Z- from cell center quat:: x: -0.707107, y: -0.000000, z: -0.000000, w: 0.707107          = Unity
+// Up Z+ from cell center quat:: x: 0.707107, y: 0.000000, z: 0.000000, w: 0.707107               = Unity X+, backtick toward Z+ (-90deg roll??)
+
     glGenBuffers(1, &instancesBuffer);
     CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);

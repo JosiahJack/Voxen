@@ -514,27 +514,29 @@ texture: 100
 #chunk_maint2_1b
 index: 127
 model: 228
-texture: 101
+texture: 451
 #chunk_maint2_1d
 index: 128
 model: 229
-texture: 102
+texture: 453
+glowtexture: 452
 #chunk_maint2_2
 index: 129
 model: 230
-texture: 103
+texture: 457
 #chunk_maint2_3
 index: 130
 model: 232
-texture: 104
+texture: 460
 #chunk_maint2_3d
 index: 131
 model: 231
-texture: 105
+texture: 459
 #chunk_maint2_4
 index: 132
 model: 233
-texture: 106
+texture: 464
+glowtexture: 463
 #chunk_maint2_4d
 index: 133
 texture: 107
@@ -568,19 +570,22 @@ texture: 114
 #chunk_maint2_9
 index: 141
 model: 240
-texture: 115
+texture: 480
+glowtexture: 479
 #chunk_maint2_9_slice45RH
 index: 142
 model: 242
-texture: 115
+texture: 480
+glowtexture: 479
 #chunk_maint2_9_slice128_top
 index: 143
 model: 241
-texture: 115
+texture: 480
+glowtexture: 479
 #chunk_maint3_1
 index: 144
 model: 244
-texture: 116
+texture: 483
 #chunk_maint3_1_slice32_lh
 index: 145
 model: 246
@@ -634,298 +639,315 @@ glowtexture: 488
 #chunk_med1_3
 index: 157
 model: 257
-texture: 122
+texture: 493
 #chunk_med1_3d
 index: 158
 model: 256
-texture: 123
+texture: 491
 #chunk_med1_4
 index: 159
 model: 258
-texture: 124
+texture: 494
 #chunk_med1_5
 index: 160
-texture: 125
+texture: 495
 #chunk_med1_6
 index: 161
 model: 259
-texture: 126
+texture: 496
 #chunk_med1_7
 index: 162
 model: 262
-texture: 127
+texture: 499
 #chunk_med1_7_slice14_64
 index: 163
 model: 263
-texture: 127
+texture: 499
 #chunk_med1_7_slice45_320lh
 index: 164
 model: 264
-texture: 127
+texture: 499
 #chunk_med1_7_slice45_320rh
 index: 165
 model: 265
-texture: 127
+texture: 499
 #chunk_med1_7_slice96high
 index: 166
 model: 266
-texture: 127
+texture: 499
 #chunk_med1_7d
 index: 167
 model: 260
-texture: 128
+texture: 497
 #chunk_med 1_7d_slice128
 index: 168
 model: 261
-texture: 128
+texture: 497
 #chunk_med1_8
 index: 169
 model: 268
-texture: 129
+texture: 503
 #chunk_med1_8d
 index: 170
 model: 267
-texture: 130
+texture: 501
 #chunk_med1_9
 index: 171
 model: 278
-texture: 131
+texture: 507
 #chunk_med1_9d
 index: 174
 model: 269
-texture: 132
+texture: 505
 #chunk_med1_9d_ofs112_90
 index: 176
 model: 270
-texture: 132
+texture: 505
 #chunk_med1_9d_ofs144_90
 index: 177
 model: 272
-texture: 132
+texture: 505
 #chunk_med2_1
 index: 178
 model: 280
-texture: 133
+texture: 513
+normtexture: 512
 #chunk_med2_1_slice32RH
 index: 179
 model: 281
-texture: 133
+texture: 513
+normtexture: 512
 #chunk_med2_1d
 index: 180
 model: 279
-texture: 134
+texture: 510
 #chunk_med2_2
 index: 181
 model: 283
-texture: 135
+texture: 517
 #chunk_med2_2_half_bottom
 index: 182
 model: 284
-texture: 135
+texture: 517
 #chunk_med2_2d
 index: 183
 model: 282
-texture: 136
+texture: 515
+glowtexture: 516
 #chunk_med2_3
 index: 184
 model: 286
-texture: 137
+texture: 521
 #chunk_med2_3d
 index: 185
 model: 285
-texture: 138
+texture: 519
 #chunk_med2_4
 index: 186
 model: 287
-texture: 139
+texture: 523
+glowtexture: 522
 #chunk_med2_5
 index: 187
 model: 288
-texture: 140
+texture: 527
 #chunk_med2_6
 index: 188
 model: 289
-texture: 141
+texture: 528
 #chunk_med2_7
 index: 189
 model: 290
-texture: 142
+texture: 530
 #chunk_med2_8
 index: 190
 model: 291
-texture: 143
+texture: 531
 #chunk_med2_8_half_top
 index: 191
 model: 292
-texture: 143
+texture: 531
 #chunk_med2_8_slice32RH
 index: 192
 model: 293
-texture: 143
+texture: 531
 #chunk_med2_8_slice45
 index: 193
 model: 294
-texture: 143
+texture: 531
 #chunk_med2_9
 index: 194
 model: 296
-texture: 144
+texture: 535
+glowtexture: 534
 #chunk_med2_9d
 index: 195
 model: 295
-texture: 145
+texture: 533
 #chunk_med3_1
 index: 196
 model: 297
-texture: 146
+texture: 536
 #chunk_rad1_1
 index: 197
 model: 501
-texture: 147
+texture: 660
+glowtexture: 659
 #chunk_rad1_2
 index: 198
-texture: 148
+texture: 662
+glowtexture: 661
 #chunk_reac1_1
 index: 199
 model: 502
-texture: 149
+texture: 664
 #chunk_reac1_1_slice45
 index: 200
-texture: 149
+texture: 664
 #chunk_reac1_2
 index: 201
 model: 503
-texture: 150
+texture: 665
 #chunk_reac1_3
 index: 202
 model: 504
-texture: 151
+texture: 666
 #chunk_reac1_4
 index: 203
 model: 505
-texture: 152
+texture: 668
+glowtexture: 667
+spectexture: 669
 #chunk_reac1_5
 index: 204
 model: 506
-texture: 153
+texture: 671
+glowtexture: 670
 #chunk_reac1_6
 index: 205
 model: 507
-texture: 154
+texture: 673
 #chunk_reac1_7
 index: 206
-texture: 155
+texture: 676
 #chunk_reac1_8
 index: 207
 model: 508
-texture: 156
+texture: 678
 #chunk_reac1_9
 index: 208
 model: 509
-texture: 157
+texture: 680
 #chunk_reac2_1
 index: 209
 model: 512
-texture: 158
+texture: 682
 #chunk_reac2_1_slice45LH
 index: 210
 model: 514
-texture: 158
+texture: 682
 #chunk_reac2_1_slice45LH_up
 index: 211
 model: 515
-texture: 158
+texture: 682
 #chunk_reac2_1_slice45RH
 index: 212
 model: 516
-texture: 158
+texture: 682
 #chunk_reac2_1_slice45RH_up
 index: 213
 model: 517
-texture: 158
+texture: 682
 #chunk_reac2_1b
 index: 214
 model: 510
-texture: 159
+texture: 681
 #chunk_reac2_1bmirror
 index: 215
 model: 511
-texture: 159
+texture: 681
 #chunk_reac2_1mirror
 index: 216
 model: 513
-texture: 158
+texture: 682
 #chunk_reac2_2
 index: 217
 model: 518
-texture: 160
+texture: 684
 #chunk_reac2_4
 index: 218
 model: 519
-texture: 161
+texture: 685
 #chunk_reac2_4_slice128lower
 index: 219
-texture: 161
+texture: 685
 #chunk_reac2_5
 index: 220
 model: 520
-texture: 162
+texture: 687
 #chunk_reac2_6
 index: 221
 model: 521
-texture: 163
+texture: 689
+glowtexture: 688
 #chunk_reac2_7
 index: 222
 model: 522
-texture: 164
+texture: 691
+glowtexture: 690
 #chunk_reac2_8
 index: 223
 model: 523
-texture: 165
+texture: 693
+glowtexture: 692
 #chunk_reac2_9
 index: 224
 model: 524
-texture: 166
+texture: 694
 #chunk_reac3_1
 index: 225
 model: 525
-texture: 167
+texture: 696
 #chunk_reac3_2
 index: 226
 model: 526
-texture: 168
+texture: 697
 #chunk_reac3_3
 index: 227
 model: 527
-texture: 169
+texture: 698
 #chunk_reac3_4
 index: 228
 model: 528
-texture: 170
+texture: 699
 #chunk_reac3_5
 index: 229
 model: 529
-texture: 171
+texture: 701
+glowtexture: 700
 #chunk_reac3_6
 index: 230
 model: 530
-texture: 172
+texture: 703
+glowtexture: 702
 #chunk_reac3_7
 index: 231
 model: 531
-texture: 173
+texture: 704
+spectexture: 705
 #chunk_reac4_1
 index: 232
 model: 532
-texture: 174
+texture: 707
+glowtexture: 706
 #chunk_reac4_1_slice45lh
 index: 233
 model: 533
-texture: 174
+texture: 707
 #chunk_reac4_2
 index: 234
 model: 534
-texture: 175
+texture: 709
 #chunk_reac5_1
 index: 235
 model: 535
@@ -1102,6 +1124,7 @@ model: 576
 texture: 210
 #chunk_screen
 index: 279
+texture: 29
 #chunk_sec1_1
 index: 280
 texture: 211
@@ -1410,6 +1433,7 @@ model: 5
 #item_ammo_slug
 index: 378
 model: 3
+glowtexture: 22
 #item_ammo_magnesium
 index: 379
 model: 3
@@ -1646,6 +1670,7 @@ model: 624
 #se_briefcase
 index: 464
 model: 34
+glowtexture: 65
 #se_corpse_blueshirt
 index: 465
 model: 51
@@ -1685,9 +1710,13 @@ model: 60
 #sec_camera
 index: 477
 model: 589
+texture: 73
+glowtexture: 72
 #sec_cpunode
 index: 478
 model: 587
+texture: 85
+glowtexture: 84
 #sec_cpunode_small
 index: 479
 model: 588
@@ -1737,15 +1766,21 @@ model: 68
 #doorA
 index: 496
 model: 79
+texture: 185
+glowtexture: 186
 #doorB
 index: 497
 model: 80
+texture: 189
+glowtexture: 188
 #doorC
 index: 498
 model: 81
+texture: 184
 #doorD
 index: 499
 model: 82
+texture: 196
 #doorE
 index: 500
 #doorF
@@ -1780,6 +1815,9 @@ index: 514
 index: 515
 #prop_lift2
 index: 516
+model: 215
+texture: 155
+glowtexture: 154
 #func_wall
 index: 517
 #BulletHoleLarge
@@ -1840,6 +1878,9 @@ index: 544
 index: 545
 #prop_charge_station
 index: 546
+model: 44
+texture: 77
+glowtexture: 76
 #prop_clothes
 index: 547
 #prop_computer
@@ -1860,12 +1901,19 @@ index: 554
 index: 555
 #prop_cyberport
 index: 556
+model: 62
+texture: 117
+glowtexture: 116
 #prop_desk01
 index: 557
 #prop_desk02
 index: 558
 #prop_dexmissile
 index: 559
+model: 76
+texture: 164
+glowtexture: 162
+normtexture: 163
 #prop_foliage_fernpoison
 index: 560
 #prop_foliage_bush
