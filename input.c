@@ -12,7 +12,8 @@
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
 // float cam_x = -20.40001f, cam_y = -43.52f, cam_z = 10.2f; // Camera position Unity
-float cam_x = -15.65f, cam_y = 25.54f, cam_z = 5.85f; // Camera position Voxen
+float cam_x = -6.44f, cam_y = -2.56f, cam_z = 0.0f; // Camera position Voxen
+// float cam_x = -15.65f, cam_y = 25.54f, cam_z = 5.85f; // Camera position Voxen
 Quaternion cam_rotation;
 float cam_yaw = 90.0f;
 float cam_pitch = 90.0f;
@@ -23,11 +24,11 @@ float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 
-float testLight_x = 0.0f;
-float testLight_y = -0.64f;
+float testLight_x = -2.56f;
+float testLight_y = -2.56f;
 float testLight_z = 1.12f;
-float testLight_intensity = 4.0f;
-float testLight_range = 16.0f;
+float testLight_intensity = 2.5f;
+float testLight_range = 3.0f;
 float testLight_spotAng = 0.0f;
 bool noclip = true;
 

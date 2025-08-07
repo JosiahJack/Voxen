@@ -1653,11 +1653,16 @@ index: 456
 index: 457
 #prop_phys_barrel_chemical
 index: 458
+model: 12
+texture: 30
 #prop_phys_barrel_radiation
 index: 459
+model: 12
+texture: 31
 #prop_phys_barrel_toxic
 index: 460
 model: 12
+texture: 33
 #prop_phys_cart
 index: 461
 model: 40

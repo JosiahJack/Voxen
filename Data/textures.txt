@@ -2458,3 +2458,33 @@ index: 1228
 index: 1229
 #Textures/col8.png
 index: 1230
+#Textures/a111spec.png
+index: 1231
+#Textures/a210spec.png
+index: 1232
+#Textures/a222spec.png
+index: 1233
+#Textures/a0225spec.png
+index: 1234
+#Textures/a300spec.png
+index: 1235
+#Textures/a337spec.png
+index: 1236
+#Textures/a543spec.png
+index: 1237
+#Textures/a555spec.png
+index: 1238
+#Textures/a715spec.png
+index: 1239
+#Textures/a730spec.png
+index: 1240
+#Textures/a999spec.png
+index: 1241
+#Textures/a01010spec.png
+index: 1242
+#Textures/a1030spec.png
+index: 1243
+#Textures/a171310spec.png
+index: 1244
+#Textures/a544643spec.png
+index: 1245

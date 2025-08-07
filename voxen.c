@@ -863,7 +863,7 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS: LoadLevels(); return 0;
+        case EV_LOAD_LEVELS: /*LoadLevels();*/ return 0;
         case EV_LOAD_VOXELS: VXGI_Init(); return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
