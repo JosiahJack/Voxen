@@ -1,0 +1,27 @@
+// SSDIL compute shader for Indirect Lighting GI in screen space
+const char* ssgiComputeShader = 
+    "#version 450\n"
+    "layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;\n"
+
+    "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
+    "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
+    "layout(rgba16f, binding = 2) uniform image2D inputNormals;\n"
+
+    "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
+
+    "uniform vec2 uScreenSize;\n"
+    "uniform float playerPosX = 0.0;\n"
+    "uniform float playerPosY = 0.0;\n"
+    "uniform float playerPosZ = 0.0;\n"
+
+    "void main() {\n"
+    "    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);\n"
+    "    if (pixel.x >= uScreenSize.x || pixel.y >= uScreenSize.y) return;\n"
+
+    "    vec4 albedo = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
+    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
+    "    vec3 worldPos = worldPosPack.xyz;\n"
+    "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
+    "    vec3 finalColor = albedo.rgb;\n" // TODO multiplied by something er other to ya know, do the GI thing
+    "    imageStore(inputImage, pixel, vec4(finalColor, albedo.a));\n" // Guaranteed write once per pixel so safe to write back after read
+    "}\n";

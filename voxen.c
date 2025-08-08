@@ -97,6 +97,7 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
       overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1; // uniform locations
       
 GLuint screenSpaceShadowsComputeShader;
+GLuint screenSpaceGIComputeShader;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -104,7 +105,7 @@ GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
 
 //    FBO
-GLuint inputImageID, inputDepthID, inputWorldPosID, inputShadowStencilID, gBufferFBO; // FBO inputs
+GLuint inputImageID, inputDepthID, inputWorldPosID, inputNormalsID, inputShadowStencilID, gBufferFBO; // FBO inputs
 
 //    Cubemap
 bool generatedCubemapProbes = false;
@@ -666,13 +667,15 @@ int InitializeEnvironment(void) {
 
     // Create Framebuffer
     // First pass gbuffer images
-    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Primary Lit Raster");
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Primary Raster Depth");
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "GBuffer World Position At Each Pixel");
+    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputShadowStencilID,        GL_R8, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "GBuffer Bitmask for What Lights See Pixel");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputShadowStencilID,        GL_R8, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Visibilit Bitmask for What Lights See Pixel");
     CHECK_GL_ERROR();
 
     glGenFramebuffers(1, &gBufferFBO);
@@ -681,9 +684,10 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+    glDrawBuffers(3, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         switch (status) {
@@ -698,7 +702,9 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
-    glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+    glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+    CHECK_GL_ERROR();
+    glBindImageTexture(3, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
     CHECK_GL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     CHECK_GL_ERROR();
@@ -706,6 +712,8 @@ int InitializeEnvironment(void) {
     
     // Cubemap FBO duplicate
     GenerateAndBindTexture(&inputCubemapImageID,             GL_RGBA8, cubemapTexSize, cubemapTexSize,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Cubemap Lit Raster");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputNormalsID,                GL_RGBA16F, screen_width, screen_height,               GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputCubemapDepthID, GL_DEPTH_COMPONENT24, cubemapTexSize, cubemapTexSize, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Cubemap Raster Depth");
     CHECK_GL_ERROR();
@@ -833,6 +841,7 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
     if (screenSpaceShadowsComputeShader) glDeleteProgram(screenSpaceShadowsComputeShader);
+    if (screenSpaceGIComputeShader) glDeleteProgram(screenSpaceGIComputeShader);
     if (inputImageID) glDeleteTextures(1,&inputImageID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
@@ -1276,7 +1285,9 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
             CHECK_GL_ERROR();
-            glBindImageTexture(2, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+            glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
+            CHECK_GL_ERROR();
+            glBindImageTexture(3, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
             CHECK_GL_ERROR();
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             CHECK_GL_ERROR();
@@ -1400,6 +1411,27 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
         // ====================================================================
+        
+        // 6. Screenspace GI Compute Shader
+        if (debugRenderSegfaults) DualLog("7. Screenspace GI (SSDIL) Compute Shader\n");
+        glUseProgram(screenSpaceGIComputeShader);
+        CHECK_GL_ERROR();
+        glUniform2f(glGetUniformLocation(screenSpaceGIComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosX"), cam_x);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosY"), cam_y);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosZ"), cam_z);
+        CHECK_GL_ERROR();
+        GLuint groupX = (screen_width + 31) / 32;
+        GLuint groupY = (screen_height + 31) / 32;
+        glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
+        CHECK_GL_ERROR();
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+        CHECK_GL_ERROR();
+        glUseProgram(0);
+        CHECK_GL_ERROR();
         
         // 6. Screenspace Shadows (SSS) Compute Shader
 //         if (debugRenderSegfaults) DualLog("7. Screenspace Shadows (SSS) Compute Shader\n");

@@ -7,6 +7,7 @@ extern GLuint chunkShaderProgram;
 extern GLuint lightVolumeShaderProgram;
 extern GLuint imageBlitShaderProgram;
 extern GLuint screenSpaceShadowsComputeShader;
+extern GLuint screenSpaceGIComputeShader;
 extern GLuint textShaderProgram;
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName);

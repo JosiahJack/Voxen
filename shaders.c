@@ -6,6 +6,7 @@
 #include "chunk.glsl"
 #include "imageblit.glsl"
 #include "screenSpaceShadows.compute"
+#include "screenspace_gi.compute"
 #include "bluenoise64.cginc"
 #include "debug.h"
 
@@ -60,9 +61,13 @@ int CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
 
-    // Screen Space Shadows Compute Shader Program
+    // Screen Space Shadows Compute Shader
     computeShader = CompileShader(GL_COMPUTE_SHADER, computeShadowShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
     screenSpaceShadowsComputeShader = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program"); if (!screenSpaceShadowsComputeShader) { return 1; }
+    
+    // Screen Space GI Compute Shader
+    computeShader = CompileShader(GL_COMPUTE_SHADER, ssgiComputeShader, "Screen Space GI Compute Shader"); if (!computeShader) { return 1; }
+    screenSpaceGIComputeShader = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space GI Compute Shader Program"); if (!screenSpaceGIComputeShader) { return 1; }
     
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }

@@ -55,6 +55,8 @@ const char *fragmentShaderTraditional =
     "uniform float overrideGlowR = 0.0;\n"
     "uniform float overrideGlowG = 0.0;\n"
     "uniform float overrideGlowB = 0.0;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
 
     "flat in int TexIndex;\n"
     "flat in int GlowIndex;\n"
@@ -83,7 +85,8 @@ const char *fragmentShaderTraditional =
 
     "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
     "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
-    "layout(r8, binding = 2) uniform image2D inputShadowStencil;\n"
+    "layout(location = 2) out vec4 outNormal;\n"   // GL_COLOR_ATTACHMENT2
+    "layout(r8, binding = 3) uniform image2D inputShadowStencil;\n"
 
 //     "layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
@@ -183,6 +186,12 @@ const char *fragmentShaderTraditional =
 //     "    return 1.0;\n"
 //     "}\n"
 
+    "vec3 screenToView(vec2 uv, float depth) {\n"
+    "    vec4 clip = vec4(uv * 2.0 - 1.0, depth, 1.0);\n"
+    "    vec4 viewPos = inverse(projection) * clip;\n"
+    "    return viewPos.xyz / viewPos.w;\n"
+    "}\n"
+
     "void main() {\n"
     "    int texIndexChecked = 0;\n"
     "    if (TexIndex >= 0) texIndexChecked = TexIndex;\n"
@@ -229,8 +238,12 @@ const char *fragmentShaderTraditional =
     "    } else if (debugView == 6) {\n" // Lightview Mode
     "        outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);\n"
     "    } else {\n"
+
+        // Direct Lighting
         "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
         "    uint lightIdx = 0;\n"
+        "    vec3 viewPos = (view * vec4(worldPos, 1.0)).xyz;\n"
+        "    vec3 viewDir = normalize(-viewPos);\n" // From fragment to camera
         "    for (int i = 0; i < 32; i++) {\n"
         "        uint lightIdx = i * 12;\n" // LIGHT_DATA_SIZE
         "        float intensity = lightInPVS[lightIdx + 3];\n"
@@ -261,12 +274,65 @@ const char *fragmentShaderTraditional =
 //         "            shadow = TraceRay(worldPos + adjustedNormal * 0.01, lightDir, range);\n"
 //         "        }\n"
 
+        // Specular (Blinn-Phong)
+//         "        vec3 specular = vec3(0.0);\n"
+//         "        if (SpecIndex < 65535) {\n"
+//             "        vec4 specColor = getTextureColor(SpecIndex, ivec2(x, y));\n"
+//             "        if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {\n" // Only for reflective surfaces
+//             "            vec3 halfwayDir = normalize(lightDir + viewDir);\n"
+//             "            float spec = pow(max(dot(adjustedNormal, halfwayDir), 0.0), 32.0);\n" // Shininess = 32
+//             "            specular = specColor.rgb * spec * intensity * lightColor * spotFalloff;\n"
+//             "            specular += vec3(1.0, 0.0, 0.0) * spec;\n"
+//             "        }\n"
+//         "        }\n"
+
         "        float attenuation = (1.0 - (dist / range)) * max(dot(adjustedNormal, lightDir), 0.0);\n"
         "        attenuation *= shadow;\n"
 
+//         "        lighting += specular.rgb;\n"
         "        lighting += albedoColor.rgb * intensity * attenuation * lightColor * spotFalloff;\n"
         "    }\n"
 
+        // SSRT
+
+//         "if (specColor.a > 0.1) {\n" // Only reflective surfaces
+//         "    vec3 viewPos = (view * vec4(worldPos, 1.0)).xyz;\n"
+//         "    vec3 viewNormal = normalize((inverse(view) * vec4(adjustedNormal, 0.0)).xyz);\n"
+//         "    vec3 viewDir = normalize(viewPos);\n"
+//         "    vec3 reflectDir = reflect(viewDir, viewNormal);\n"
+// 
+//         "    vec2 hitUV;\n"
+//         "    float hitDist;\n"
+//         "    bool hit = false;\n"
+//         "    vec3 pos = viewPos;\n"
+//         "    float totalDist = 0.0;\n"
+//         "    for (int i = 0; i < 16; ++i) {\n" // Reduced steps for performance
+//         "        totalDist += 0.1;\n"
+//         "        if (totalDist > 5.0) break;\n"
+// 
+//         "        pos += reflectDir * 0.1;\n"
+//         "        vec4 clipPos = projection * vec4(pos, 1.0);\n"
+//         "        clipPos /= clipPos.w;\n"
+//         "        vec2 uv = clipPos.xy * 0.5 + 0.5;\n"
+//         "        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;\n"
+// 
+//         "        float depth = length(worldPos - viewPos);\n"
+//         "        vec3 samplePos = screenToView(uv, depth);\n"
+//         "        if (samplePos.z > pos.z && abs(samplePos.z - pos.z) < 0.2) {\n"
+//         "            hitUV = uv;\n"
+//         "            hitDist = totalDist;\n"
+//         "            hit = true;\n"
+//         "            break;\n"
+//         "        }\n"
+//         "    }\n"
+// 
+//         "    if (hit) {\n"
+//         "        vec4 reflectColor = vec4(1.0,0.0,0.0,1.0);\n"
+//         "        lighting += reflectColor.rgb * specColor.a * (1.0 - clamp(hitDist / 5.0, 0.0, 1.0));\n"
+//         "    }\n"
+//         "}\n"
+
+        // GLow Map
         "    lighting += glowColor.rgb;\n"
 
         // Dither
@@ -276,5 +342,6 @@ const char *fragmentShaderTraditional =
 
     "        outAlbedo = vec4(lighting,albedoColor.a);\n"
     "    }\n"
+    "    outNormal = vec4(normalize(adjustedNormal) * 0.5 + 0.5, 1.0);\n"
     "    outWorldPos = worldPosPack;\n"
     "}\n";
