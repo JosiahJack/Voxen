@@ -86,7 +86,7 @@ const char *fragmentShaderTraditional =
     "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
     "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
     "layout(location = 2) out vec4 outNormal;\n"   // GL_COLOR_ATTACHMENT2
-    "layout(r8, binding = 3) uniform image2D inputShadowStencil;\n"
+    "layout(r8, binding = 5) uniform image2D inputShadowStencil;\n"
 
 //     "layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
@@ -233,8 +233,10 @@ const char *fragmentShaderTraditional =
     "        outAlbedo.b = float(texIndexChecked) / 1231.0;\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else if (debugView == 5) {\n" // Shadows debug
-    "        float shadowStencil = imageLoad(inputShadowStencil, ivec2(gl_FragCoord.xy)).r;\n"
-    "        outAlbedo = vec4(shadowStencil,shadowStencil,shadowStencil,1.0);\n"
+    "        outAlbedo.rgb = worldPos / 100.0;\n"
+    "        outAlbedo.a = 1.0;\n"
+//     "        float shadowStencil = imageLoad(inputShadowStencil, ivec2(gl_FragCoord.xy)).r;\n"
+//     "        outAlbedo = vec4(shadowStencil,shadowStencil,shadowStencil,1.0);\n"
     "    } else if (debugView == 6) {\n" // Lightview Mode
     "        outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);\n"
     "    } else {\n"

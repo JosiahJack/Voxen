@@ -3,7 +3,7 @@ const char *computeShadowShader =
     "layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;\n"
 
     "layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;\n"
-    "layout(r8, binding = 3) uniform image2D outputShadowStencil;\n"
+    "layout(r8, binding = 5) uniform image2D outputShadowStencil;\n"
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
 
     "uniform vec2 uScreenSize;\n"

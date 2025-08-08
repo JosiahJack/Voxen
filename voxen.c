@@ -86,6 +86,7 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 uint8_t numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
+float viewLast[16];
 
 GLuint vao_chunk; // Vertex Array Object
 
@@ -106,10 +107,11 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 
 //    FBO
 GLuint inputImageID, inputDepthID, inputWorldPosID, inputNormalsID, inputShadowStencilID, gBufferFBO; // FBO inputs
+GLuint outputImageID;
 
 //    Cubemap
 bool generatedCubemapProbes = false;
-GLuint inputCubemapImageID, inputCubemapDepthID, inputCubemapWorldPosID, gBufferCubemapFBO;
+GLuint inputCubemapImageID, inputCubemapDepthID, inputCubemapWorldPosID, inputCubemapNormalsID, gBufferCubemapFBO;
 int cubemapTexSize = 128;
 GLuint cubemapTextures[NUM_CUBEMAPS] = {0};
 float cubemapPositions[NUM_CUBEMAPS * 3];
@@ -677,6 +679,8 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputShadowStencilID,        GL_R8, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Visibilit Bitmask for What Lights See Pixel");
     CHECK_GL_ERROR();
+    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
+    CHECK_GL_ERROR();
 
     glGenFramebuffers(1, &gBufferFBO);
     CHECK_GL_ERROR();
@@ -704,7 +708,13 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
     CHECK_GL_ERROR();
-    glBindImageTexture(3, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+    //                 3 = depth
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+    CHECK_GL_ERROR();
+    glBindImageTexture(5, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
+    CHECK_GL_ERROR();
+    glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
+    glBindTexture(GL_TEXTURE_2D, inputDepthID);
     CHECK_GL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     CHECK_GL_ERROR();
@@ -713,11 +723,11 @@ int InitializeEnvironment(void) {
     // Cubemap FBO duplicate
     GenerateAndBindTexture(&inputCubemapImageID,             GL_RGBA8, cubemapTexSize, cubemapTexSize,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Cubemap Lit Raster");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputNormalsID,                GL_RGBA16F, screen_width, screen_height,               GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Raster Normals");
-    CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputCubemapDepthID, GL_DEPTH_COMPONENT24, cubemapTexSize, cubemapTexSize, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Cubemap Raster Depth");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputCubemapWorldPosID,        GL_RGBA32F, cubemapTexSize, cubemapTexSize,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Cubemap World Position At Each Pixel");
+    CHECK_GL_ERROR();
+    GenerateAndBindTexture(&inputCubemapNormalsID,                GL_RGBA16F, screen_width, screen_height,               GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     CHECK_GL_ERROR();
     
     glGenFramebuffers(1, &gBufferCubemapFBO);
@@ -726,9 +736,10 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputCubemapImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputCubemapWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputCubemapNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputCubemapDepthID, 0);
-    GLenum drawCubemapBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-    glDrawBuffers(2, drawCubemapBuffers);
+    GLenum drawCubemapBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+    glDrawBuffers(3, drawCubemapBuffers);
     status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         switch (status) {
@@ -1178,6 +1189,8 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glBindImageTexture(1, inputCubemapWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
             CHECK_GL_ERROR();
+            glBindImageTexture(2, inputCubemapNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+            CHECK_GL_ERROR();
             for (int i=0; i < 6; ++i) {
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear color and depth
                 CHECK_GL_ERROR();
@@ -1418,11 +1431,20 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glUniform2f(glGetUniformLocation(screenSpaceGIComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
         CHECK_GL_ERROR();
+        glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "view"),1, GL_FALSE,view);
+        CHECK_GL_ERROR();
+        glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "projection"),1, GL_FALSE,projection);
+        CHECK_GL_ERROR();
+        glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "viewLast"),1, GL_FALSE,viewLast);
+        CHECK_GL_ERROR();
+        for (int i=0;i<16;++i) viewLast[i] = view[i];
         glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosX"), cam_x);
         CHECK_GL_ERROR();
         glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosY"), cam_y);
         CHECK_GL_ERROR();
         glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosZ"), cam_z);
+        CHECK_GL_ERROR();
+        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "uTime"), current_time);
         CHECK_GL_ERROR();
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
@@ -1472,8 +1494,19 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glActiveTexture(GL_TEXTURE0);
         CHECK_GL_ERROR();
-        glBindTextureUnit(0, inputImageID); // Normal
-        CHECK_GL_ERROR();
+        if (debugView == 0) {
+            glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
+        } else if (debugView == 1) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward Pass only
+        } else if (debugView == 2) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Triangle Normals 
+        } else if (debugView == 3) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Depth.  Values must be decoded in shader
+        } else if (debugView == 4) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
+        } else if (debugView == 5) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // World Position
+        }
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         CHECK_GL_ERROR();
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);

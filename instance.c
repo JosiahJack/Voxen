@@ -99,9 +99,9 @@ int SetupInstances(void) {
     instances[1].specIndex = 1242;
     instances[2].texIndex = 483; // East maint3_1
     instances[3].texIndex = 482; // West maint3_1d 
-    instances[4].texIndex = 499; // down med1_9 bright teal light
+    instances[4].texIndex = 499; // floor med1_9 bright teal light
     instances[4].specIndex = 1242;
-    instances[5].texIndex = 507; // up med1_7 medical tile floor
+    instances[5].texIndex = 507; // ceil med1_7 medical tile floor
     instances[5].specIndex = 1236;
     
     
@@ -142,7 +142,7 @@ int SetupInstances(void) {
     instances[3].rotw = q.w;
     printf("West cell side X- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
 
-    // 4: +90° around X (cell Down Z− from cell center)
+    // 4: +90° around X (cell Floor Z− from cell center)
     quat_from_axis_angle(&q, 1.0f, 0.0f, 0.0f, -M_PI / 2.0f);
     instances[4].rotx = q.x;
     instances[4].roty = q.y;
@@ -150,7 +150,7 @@ int SetupInstances(void) {
     instances[4].rotw = q.w;
     printf("Down Z- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
     
-    // 5: −90° around X (cell Up Z+ from cell center)
+    // 5: −90° around X (cell Ceil Z+ from cell center)
     quat_from_axis_angle(&q, 1.0f, 0.0f, 0.0f, M_PI / 2.0f);
     instances[5].rotx = q.x;
     instances[5].roty = q.y;

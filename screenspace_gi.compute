@@ -6,6 +6,8 @@ const char* ssgiComputeShader =
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
     "layout(rgba16f, binding = 2) uniform image2D inputNormals;\n"
+    "layout(binding = 3) uniform sampler2D inputDepth;\n"
+    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
 
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
 
@@ -13,15 +15,127 @@ const char* ssgiComputeShader =
     "uniform float playerPosX = 0.0;\n"
     "uniform float playerPosY = 0.0;\n"
     "uniform float playerPosZ = 0.0;\n"
+    "uniform mat4 view;\n"
+    "uniform mat4 projection;\n"
+    "uniform mat4 viewLast;\n"
+    "uniform float uTime;\n"
+
+//     // Noise function for dithering
+//     "float hash(vec2 p) {\n"
+//     "    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);\n"
+//     "}\n"
+// 
+//     "float sampleDepth(vec2 uv) {\n"
+//     "    return texelFetch(inputDepth, ivec2(uv * uScreenSize), 0).r;\n"
+//     "}\n"
+// 
+//     // Sample G-buffer at a given UV coordinate
+//     "vec3 sampleAlbedo(vec2 uv) {\n"
+//     "    return vec4(imageLoad(inputImage, ivec2(uv))).rgb;\n"
+//     "}\n"
+//     "vec3 sampleWorldPos(vec2 uv) {\n"
+//     "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(uv));\n"
+//     "    return worldPosPack.xyz;\n"
+//     "}\n"
+// 
+//     "vec3 sampleNormal(vec2 uv) {\n"
+//     "    return normalize(imageLoad(inputNormals, ivec2(uv)).xyz * 2.0 - 1.0);\n"
+//     "}\n"
+// 
+//     // Reproject pixel to previous frame
+//     "vec2 reproject(vec3 worldPos) {\n"
+//     "    vec4 clip = projection * viewLast * vec4(worldPos, 1.0);\n"
+//     "    vec2 uv = (clip.xy / clip.w) * 0.5 + 0.5;\n"
+//     "    return uv;\n"
+//     "}\n"
+// 
+//     // Reconstruct world-space position from screen-space UV and depth.  Can't use worldpos because pixels with far depth are invalid.
+//     "vec3 reconstructWorldPos(vec2 uv, float depth) {\n"
+//          // NDC coords [-1, 1]
+//     "    float ndcDepth = depth * 2.0 - 1.0;\n"
+//     "    vec4 ndc = vec4(uv * 2.0 - 1.0, ndcDepth, 1.0);\n"
+//         
+//          // View space
+//     "    vec4 viewPos = inverse(projection) * ndc;\n"
+//     "    viewPos /= viewPos.w;\n"
+// 
+//          // World space
+//     "    vec4 worldPos = inverse(view) * viewPos;\n"
+//     "    return worldPos.xyz;\n"
+//     "}\n"
 
     "void main() {\n"
     "    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);\n"
     "    if (pixel.x >= uScreenSize.x || pixel.y >= uScreenSize.y) return;\n"
 
+//     "    vec2 uv = vec2(pixel) / uScreenSize;\n"
     "    vec4 albedo = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
-    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
-    "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
-    "    vec3 finalColor = albedo.rgb;\n" // TODO multiplied by something er other to ya know, do the GI thing
-    "    imageStore(inputImage, pixel, vec4(finalColor, albedo.a));\n" // Guaranteed write once per pixel so safe to write back after read
+//     "    float depth = sampleDepth(ivec2(pixel));\n"
+//     "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
+//     "    vec3 worldPos = worldPosPack.xyz;\n"
+//     "    vec3 normal = normalize(imageLoad(inputNormals, ivec2(pixel)).xyz * 2.0 - 1.0);\n"
+// 
+//     // Random seed for dithering
+//     "    float seed = hash(uv + pixel);\n"//uTime);\n"
+// 
+//     // SSGI parameters
+//     "    const int numSamples = 4;\n"
+//     "    const float maxDistance = 100.0;\n"
+//     "    const float stepSize = 0.04;\n"
+//     "    vec3 giColor = vec3(0.0);\n"
+//     "    float giWeight = 0.0;\n"
+// 
+//     // Hemisphere sampling
+//     "    for (int i = 0; i < numSamples; i++) {\n"
+//     "        float t = float(i) + seed;\n"
+//     "        float phi = 2.0 * 3.14159 * fract(t * 0.618);\n"
+//     "        float cosTheta = 1.0 - 2.0 * fract(t * 0.465);\n"
+//     "        float sinTheta = sqrt(1.0 - cosTheta * cosTheta);\n"
+//     "        vec3 dir = normalize(vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta));\n"
+//     "        dir = normalize(dir + normal * 0.1);\n" // Bias towards normal
+//     "        if (dot(dir, normal) < 0.0) dir = -dir;\n" // Ensure hemisphere
+// 
+//     // Ray march
+//     "        vec3 rayPos = worldPos + normal * 0.01;\n" // Small offset to avoid self-intersection
+//     "        for (float t = 0.0; t < maxDistance; t += stepSize) {\n"
+//     "            vec3 samplePos = rayPos + dir * t;\n"
+//     "            vec4 clip = projection * view * vec4(samplePos, 1.0);\n"
+//     "            if (clip.w <= 0.0) break;\n"
+// 
+//     "            vec2 sampleUV = (clip.xy / clip.w) * 0.5 + 0.5;\n"
+//     "            if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0) break;\n"
+// 
+//     "            float sampledDepth = sampleDepth(sampleUV);\n"
+//     "            float sampleNDCDepth = (projection * view * vec4(samplePos, 1.0)).z / clip.w;\n"
+// 
+//                  // Check if the sampled depth is close to the ray's depth (within a threshold)
+//     "            if (abs(sampledDepth - sampleNDCDepth) < 0.2) {\n" // Adjust threshold as needed
+//     "                vec3 sampleNormal = sampleNormal(sampleUV);\n"
+//     "                if (dot(sampleNormal, -dir) > 0.0) {\n"
+//     "                    vec3 sampleAlbedo = sampleAlbedo(sampleUV);\n"
+//     "                    float weight = max(0.0, dot(normal, dir)) * max(0.0, dot(sampleNormal, -dir));\n"
+//     "                    giColor += sampleAlbedo * weight;\n"
+//     "                    giWeight += weight;\n"
+//     "                    break;\n"
+//     "                }\n"
+//     "            }\n"
+//     "        }\n"
+//     "    }\n"
+// 
+//     // Normalize GI contribution
+//     "    if (giWeight > 0.001) giColor /= (1.0 - giWeight);\n"
+//     "    giColor *= 0.5;\n" // Scale down for subtle effect
+
+    // Temporal accumulation (basic)
+//     "    vec2 prevUV = reproject(worldPos);\n"
+//     "    if (prevUV.x >= 0.0 && prevUV.x <= 1.0 && prevUV.y >= 0.0 && prevUV.y <= 1.0) {\n"
+//     "        vec3 prevColor = sampleAlbedo(prevUV);\n"
+//     "        giColor = mix(giColor, prevColor, 0.9);\n" // Blend with previous frame
+//     "    }\n"
+
+    // Combine with albedo
+//     "    vec3 finalColor = albedo.rgb + giColor;\n"
+//     "    imageStore(outputImage, pixel, vec4(giWeight,giWeight,giWeight, albedo.a));\n"
+//     "    imageStore(outputImage, pixel, vec4(giColor, albedo.a));\n"
+    "    imageStore(outputImage, pixel, albedo);\n"
     "}\n";
