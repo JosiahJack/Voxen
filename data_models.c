@@ -284,6 +284,52 @@ int LoadGeometry(void) {
             globalVertexOffset += mesh->mNumVertices;
         }
         
+        // Store vertex data in vertexDataArrays
+        vertexDataArrays[i] = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        if (!vertexDataArrays[i]) {
+            DualLogError("Failed to allocate vertexDataArrays[%u]\n", i);
+            CleanupModelLoad(true);
+            return 1;
+        }
+        memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+
+        // Store triangle data in triangleDataArrays
+        triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t));
+        if (!triangleDataArrays[i]) {
+            DualLogError("Failed to allocate triangleDataArrays[%u]\n", i);
+            CleanupModelLoad(true);
+            return 1;
+        }
+        memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
+
+        // Store triangle-edge data in triEdgeDataArrays
+        triEdgeDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t));
+        if (!triEdgeDataArrays[i]) {
+            DualLogError("Failed to allocate triEdgeDataArrays[%u]\n", i);
+            CleanupModelLoad(true);
+            return 1;
+        }
+        memcpy(triEdgeDataArrays[i], tempTriEdges, triCount * 3 * sizeof(uint32_t));
+
+        // Store edge data in edgeDataArrays
+        edgeDataArrays[i] = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t));
+        if (!edgeDataArrays[i]) {
+            DualLogError("Failed to allocate edgeDataArrays[%u]\n", i);
+            CleanupModelLoad(true);
+            return 1;
+        }
+        for (uint32_t j = 0; j < edgeCount; j++) {
+            edgeDataArrays[i][j * 4 + 0] = tempEdges[j].v0;
+            edgeDataArrays[i][j * 4 + 1] = tempEdges[j].v1;
+            edgeDataArrays[i][j * 4 + 2] = tempEdges[j].tri0;
+            edgeDataArrays[i][j * 4 + 3] = tempEdges[j].tri1;
+        }
+
+        // Update modelEdgeCounts
+        modelEdgeCounts[i] = edgeCount;
+        totalEdgeCount += edgeCount;
+        if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
+        
         aiReleaseImport(scene);
         malloc_trim(0);
         
@@ -493,10 +539,10 @@ void CleanupModelLoad(bool isBad) {
         if (tempTriEdges) { free(tempTriEdges); tempTriEdges = NULL; }
         if (tempEdges) { free(tempEdges); tempEdges = NULL; }
         if (edgeHash) { free(edgeHash); edgeHash = NULL; }
-        if (vertexDataArrays) { free(vertexDataArrays); vertexDataArrays = NULL; }
-        if (triangleDataArrays) { free(triangleDataArrays); triangleDataArrays = NULL; }
-        if (triEdgeDataArrays) { free(triEdgeDataArrays); triEdgeDataArrays = NULL; }
-        if (edgeDataArrays) { free(edgeDataArrays); edgeDataArrays = NULL; }
+//         if (vertexDataArrays) { free(vertexDataArrays); vertexDataArrays = NULL; }
+//         if (triangleDataArrays) { free(triangleDataArrays); triangleDataArrays = NULL; }
+//         if (triEdgeDataArrays) { free(triEdgeDataArrays); triEdgeDataArrays = NULL; }
+//         if (edgeDataArrays) { free(edgeDataArrays); edgeDataArrays = NULL; }
     } else {
         if (tempVertices) { free(tempVertices); tempVertices = NULL; }
         if (tempTriangles) { free(tempTriangles); tempTriangles = NULL; }

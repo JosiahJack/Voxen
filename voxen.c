@@ -86,7 +86,9 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 uint8_t numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-float viewLast[16];
+#define MAX_LIGHT_VOLUME_MESH_VERTS 2000000
+float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
+
 
 GLuint vao_chunk; // Vertex Array Object
 
@@ -121,6 +123,13 @@ float cubemapPositions[NUM_CUBEMAPS * 3];
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
+GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
+GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1,
+      matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1; // uniform locations
+GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
+GLuint lightIBOs[MAX_VISIBLE_LIGHTS];
+uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
+uint32_t lightIndexCounts[MAX_VISIBLE_LIGHTS];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
 bool firstLightGen = true;
 
@@ -342,6 +351,296 @@ void UpdateInstanceMatrix(int i) {
     SetUpdatedMatrix(mat, instances[i].posx, instances[i].posy, instances[i].posz, instances[i].rotx, instances[i].roty, instances[i].rotz, instances[i].rotw, instances[i].sclx, instances[i].scly, instances[i].sclz);
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
+}
+
+void cross_product(float a[3], float b[3], float result[3]) {
+    result[0] = a[1] * b[2] - a[2] * b[1]; // x = ay*bz - az*by
+    result[1] = a[2] * b[0] - a[0] * b[2]; // y = az*bx - ax*bz
+    result[2] = a[0] * b[1] - a[1] * b[0]; // z = ax*by - ay*bx
+}
+
+void mat4_transform_vec3(const float *mat, float x, float y, float z, float *out) {
+    out[0] = mat[0] * x + mat[4] * y + mat[8] *  z + mat[12];
+    out[1] = mat[1] * x + mat[5] * y + mat[9] *  z + mat[13];
+    out[2] = mat[2] * x + mat[6] * y + mat[10] * z + mat[14];
+}
+
+void UpdateLightVolumes(void) {
+    for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
+        if (!lightDirty[lightIdx]) continue;
+        
+        DualLog("Regenerating light shadow volume meshes for light %d\n",lightIdx);
+
+        uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
+        float lit_x = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float lit_y = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float lit_z = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float sqrRange = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        sqrRange *= sqrRange;
+        uint32_t headVertIdx = 0;
+        uint32_t headIndexIdx = 0;
+
+        // Temporary buffers for vertices and indices
+        float *lightVolumeMeshTempVertBuffer = (float *)malloc(MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        uint32_t *lightVolumeMeshTempIndexBuffer = (uint32_t *)malloc(MAX_LIGHT_VOLUME_MESH_VERTS * sizeof(uint32_t)); // 6 indices per quad
+        if (!lightVolumeMeshTempVertBuffer || !lightVolumeMeshTempIndexBuffer) {
+            DualLogError("Failed to allocate temporary buffers for light %d\n", lightIdx);
+            if (lightVolumeMeshTempVertBuffer) free(lightVolumeMeshTempVertBuffer);
+            if (lightVolumeMeshTempIndexBuffer) free(lightVolumeMeshTempIndexBuffer);
+            continue;
+        }
+
+        for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
+            if (instanceIdx == 5455) continue; // Skip test light
+            
+            if (squareDistance3D(lit_x, lit_y, lit_z, instances[instanceIdx].posx, instances[instanceIdx].posy, instances[instanceIdx].posz) > LIGHT_RANGE_MAX_SQUARED) continue;
+
+            int32_t modelIdx = instances[instanceIdx].modelIndex;
+            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
+
+            uint32_t vertCount = modelVertexCounts[modelIdx];
+            uint32_t edgeCount = modelEdgeCounts[modelIdx];
+            if (!vertexDataArrays[modelIdx] || !edgeDataArrays[modelIdx] || !triangleDataArrays[modelIdx]) {
+                DualLogError("vertexDataArrays[%d], edgeDataArrays[%d], or triangleDataArrays[%d] is NULL\n", modelIdx, modelIdx, modelIdx);
+                continue;
+            }
+
+            float *transform = &modelMatrices[instanceIdx * 16];
+            float *vertices = vertexDataArrays[modelIdx];
+            uint32_t *edges = edgeDataArrays[modelIdx];
+            uint32_t *triangles = triangleDataArrays[modelIdx];
+
+            // Transform all vertices to world space once
+            float *world_pos = (float *)malloc(vertCount * 3 * sizeof(float));
+            if (!world_pos) {
+                DualLogError("Failed to allocate world_pos buffer\n");
+                continue;
+            }
+            bool anyInRange = false;
+            for (uint32_t vertIdx = 0; vertIdx < vertCount; ++vertIdx) {
+                uint32_t vertexIdx = vertIdx * VERTEX_ATTRIBUTES_COUNT;
+                float model_pos[3] = { vertices[vertexIdx + 0], vertices[vertexIdx + 1], vertices[vertexIdx + 2] };
+                mat4_transform_vec3(transform, model_pos[0], model_pos[1], model_pos[2], &world_pos[vertIdx * 3]);
+                float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[vertIdx * 3], world_pos[vertIdx * 3 + 1], world_pos[vertIdx * 3 + 2]);
+                if (dist < sqrRange + 0.001f) anyInRange = true;
+            }
+
+            if (!anyInRange) {
+                free(world_pos);
+                continue;
+            }
+
+            // Track vertex indices for silhouette edges (original and extruded)
+            uint32_t *vertexIndexMap = (uint32_t *)malloc(vertCount * 2 * sizeof(uint32_t)); // Original + extruded
+            memset(vertexIndexMap, 0xFF, vertCount * 2 * sizeof(uint32_t)); // Initialize to invalid index (0xFFFFFFFF)
+            if (!vertexIndexMap) {
+                DualLogError("Failed to allocate vertexIndexMap\n");
+                free(world_pos);
+                continue;
+            }
+
+            // Process edges for silhouette detection
+            for (uint32_t edgeIdx = 0; edgeIdx < edgeCount && headVertIdx < MAX_LIGHT_VOLUME_MESH_VERTS - 4 && headIndexIdx < MAX_LIGHT_VOLUME_MESH_VERTS - 6; ++edgeIdx) {
+                uint32_t v0_idx = edges[edgeIdx * 4 + 0];
+                uint32_t v1_idx = edges[edgeIdx * 4 + 1];
+                uint32_t tri0_idx = edges[edgeIdx * 4 + 2];
+                uint32_t tri1_idx = edges[edgeIdx * 4 + 3];
+
+                // Skip edges with only one triangle (boundary edges, optional)
+                if (tri1_idx == UINT32_MAX) continue;
+
+                // Get triangle vertices
+                uint32_t tri0_v[3] = { triangles[tri0_idx * 3 + 0], triangles[tri0_idx * 3 + 1], triangles[tri0_idx * 3 + 2] };
+                uint32_t tri1_v[3] = { triangles[tri1_idx * 3 + 0], triangles[tri1_idx * 3 + 1], triangles[tri1_idx * 3 + 2] };
+
+                // Compute triangle centroids
+                float tri0_centroid[3] = {0, 0, 0};
+                float tri1_centroid[3] = {0, 0, 0};
+                for (int i = 0; i < 3; ++i) {
+                    tri0_centroid[0] += world_pos[tri0_v[i] * 3 + 0];
+                    tri0_centroid[1] += world_pos[tri0_v[i] * 3 + 1];
+                    tri0_centroid[2] += world_pos[tri0_v[i] * 3 + 2];
+                    tri1_centroid[0] += world_pos[tri1_v[i] * 3 + 0];
+                    tri1_centroid[1] += world_pos[tri1_v[i] * 3 + 1];
+                    tri1_centroid[2] += world_pos[tri1_v[i] * 3 + 2];
+                }
+                for (int i = 0; i < 3; ++i) {
+                    tri0_centroid[i] /= 3.0f;
+                    tri1_centroid[i] /= 3.0f;
+                }
+
+                // Compute triangle normals
+                float tri0_norm[3], tri1_norm[3];
+                float edge_dir[3] = {
+                    world_pos[tri0_v[1] * 3 + 0] - world_pos[tri0_v[0] * 3 + 0],
+                    world_pos[tri0_v[1] * 3 + 1] - world_pos[tri0_v[0] * 3 + 1],
+                    world_pos[tri0_v[1] * 3 + 2] - world_pos[tri0_v[0] * 3 + 2]
+                };
+                float edge2_dir[3] = {
+                    world_pos[tri0_v[2] * 3 + 0] - world_pos[tri0_v[0] * 3 + 0],
+                    world_pos[tri0_v[2] * 3 + 1] - world_pos[tri0_v[0] * 3 + 1],
+                    world_pos[tri0_v[2] * 3 + 2] - world_pos[tri0_v[0] * 3 + 2]
+                };
+                cross_product(edge_dir, edge2_dir, tri0_norm);
+                float norm_len = sqrtf(tri0_norm[0] * tri0_norm[0] + tri0_norm[1] * tri0_norm[1] + tri0_norm[2] * tri0_norm[2]);
+                if (norm_len < 0.0001f) norm_len = 0.001f;
+                tri0_norm[0] /= norm_len;
+                tri0_norm[1] /= norm_len;
+                tri0_norm[2] /= norm_len;
+
+                edge_dir[0] = world_pos[tri1_v[1] * 3 + 0] - world_pos[tri1_v[0] * 3 + 0];
+                edge_dir[1] = world_pos[tri1_v[1] * 3 + 1] - world_pos[tri1_v[0] * 3 + 1];
+                edge_dir[2] = world_pos[tri1_v[1] * 3 + 2] - world_pos[tri1_v[0] * 3 + 2];
+                edge2_dir[0] = world_pos[tri1_v[2] * 3 + 0] - world_pos[tri1_v[0] * 3 + 0];
+                edge2_dir[1] = world_pos[tri1_v[2] * 3 + 1] - world_pos[tri1_v[0] * 3 + 1];
+                edge2_dir[2] = world_pos[tri1_v[2] * 3 + 2] - world_pos[tri1_v[0] * 3 + 2];
+                cross_product(edge_dir, edge2_dir, tri1_norm);
+                norm_len = sqrtf(tri1_norm[0] * tri1_norm[0] + tri1_norm[1] * tri1_norm[1] + tri1_norm[2] * tri1_norm[2]);
+                if (norm_len < 0.0001f) norm_len = 0.001f;
+                tri1_norm[0] /= norm_len;
+                tri1_norm[1] /= norm_len;
+                tri1_norm[2] /= norm_len;
+
+                // Compute light directions to centroids
+                float light_dir0[3] = { lit_x - tri0_centroid[0], lit_y - tri0_centroid[1], lit_z - tri0_centroid[2] };
+                float light_dir1[3] = { lit_x - tri1_centroid[0], lit_y - tri1_centroid[1], lit_z - tri1_centroid[2] };
+                float light_len0 = sqrtf(light_dir0[0] * light_dir0[0] + light_dir0[1] * light_dir0[1] + light_dir0[2] * light_dir0[2]);
+                float light_len1 = sqrtf(light_dir1[0] * light_dir1[0] + light_dir1[1] * light_dir1[1] + light_dir1[2] * light_dir1[2]);
+                if (light_len0 < 0.0001f) light_len0 = 0.001f;
+                if (light_len1 < 0.0001f) light_len1 = 0.001f;
+                light_dir0[0] /= light_len0;
+                light_dir0[1] /= light_len0;
+                light_dir0[2] /= light_len0;
+                light_dir1[0] /= light_len1;
+                light_dir1[1] /= light_len1;
+                light_dir1[2] /= light_len1;
+
+                // Check if edge is a silhouette edge
+                float dot0 = tri0_norm[0] * light_dir0[0] + tri0_norm[1] * light_dir0[1] + tri0_norm[2] * light_dir0[2];
+                float dot1 = tri1_norm[0] * light_dir1[0] + tri1_norm[1] * light_dir1[1] + tri1_norm[2] * light_dir1[2];
+                if ((dot0 > 0.0f && dot1 <= 0.0f) || (dot0 <= 0.0f && dot1 > 0.0f)) {
+                    // Silhouette edge found, create vertices and indices for quad
+                    float extrude_dir[2][3];
+                    for (int i = 0; i < 2; ++i) {
+                        uint32_t idx = (i == 0) ? v0_idx : v1_idx;
+                        extrude_dir[i][0] = world_pos[idx * 3 + 0] - lit_x;
+                        extrude_dir[i][1] = world_pos[idx * 3 + 1] - lit_y;
+                        extrude_dir[i][2] = world_pos[idx * 3 + 2] - lit_z;
+                        float len = sqrtf(extrude_dir[i][0] * extrude_dir[i][0] + extrude_dir[i][1] * extrude_dir[i][1] + extrude_dir[i][2] * extrude_dir[i][2]);
+                        if (len < 0.0001f) len = 0.02f;
+                        extrude_dir[i][0] = (extrude_dir[i][0] / len) * 10.0f;
+                        extrude_dir[i][1] = (extrude_dir[i][1] / len) * 10.0f;
+                        extrude_dir[i][2] = (extrude_dir[i][2] / len) * 10.0f;
+                    }
+
+                    // Compute quad normal
+                    float edge_vec[3] = {
+                        world_pos[v1_idx * 3 + 0] - world_pos[v0_idx * 3 + 0],
+                        world_pos[v1_idx * 3 + 1] - world_pos[v0_idx * 3 + 1],
+                        world_pos[v1_idx * 3 + 2] - world_pos[v0_idx * 3 + 2]
+                    };
+                    float quad_norm[3];
+                    cross_product(edge_vec, extrude_dir[0], quad_norm);
+                    norm_len = sqrtf(quad_norm[0] * quad_norm[0] + quad_norm[1] * quad_norm[1] + quad_norm[2] * quad_norm[2]);
+                    if (norm_len < 0.0001f) norm_len = 0.001f;
+                    quad_norm[0] /= norm_len;
+                    quad_norm[1] /= norm_len;
+                    quad_norm[2] /= norm_len;
+
+                    // Add vertices if not already added
+                    uint32_t vert_indices[4]; // v0, v1, v0_extruded, v1_extruded
+                    for (int i = 0; i < 2; ++i) {
+                        uint32_t orig_idx = (i == 0) ? v0_idx : v1_idx;
+                        uint32_t map_idx = orig_idx; // Original vertex
+                        if (vertexIndexMap[map_idx] == 0xFFFFFFFF) {
+                            uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
+                            lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[orig_idx * 3 + 0];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[orig_idx * 3 + 1];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[orig_idx * 3 + 2];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 3] = quad_norm[0];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 4] = quad_norm[1];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 5] = quad_norm[2];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 6] = 0.0f; // u
+                            lightVolumeMeshTempVertBuffer[workingIdx + 7] = 0.0f; // v
+                            int texIndex = 41; // Black texture for shadow faces
+                            int invalidIndex = 65535;
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &texIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &invalidIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &invalidIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &invalidIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
+                            vertexIndexMap[map_idx] = headVertIdx;
+                            vert_indices[i] = headVertIdx++;
+                        } else {
+                            vert_indices[i] = vertexIndexMap[map_idx];
+                        }
+
+                        // Extruded vertex
+                        map_idx = orig_idx + vertCount; // Offset for extruded vertices
+                        if (vertexIndexMap[map_idx] == 0xFFFFFFFF) {
+                            uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
+                            lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[orig_idx * 3 + 0] + extrude_dir[i][0];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[orig_idx * 3 + 1] + extrude_dir[i][1];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[orig_idx * 3 + 2] + extrude_dir[i][2];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 3] = quad_norm[0];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 4] = quad_norm[1];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 5] = quad_norm[2];
+                            lightVolumeMeshTempVertBuffer[workingIdx + 6] = 0.0f; // u
+                            lightVolumeMeshTempVertBuffer[workingIdx + 7] = 0.0f; // v
+                            int texIndex = 41;
+                            int invalidIndex = 65535;
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &texIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &invalidIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &invalidIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &invalidIndex, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
+                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
+                            vertexIndexMap[map_idx] = headVertIdx;
+                            vert_indices[i + 2] = headVertIdx++; // v0_extruded, v1_extruded
+                        } else {
+                            vert_indices[i + 2] = vertexIndexMap[map_idx];
+                        }
+                    }
+
+                    // Add indices for two triangles: v0, v1, v1_extruded, then v0, v1_extruded, v0_extruded
+                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[0];
+                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[1];
+                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[3];
+                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[0];
+                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[3];
+                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[2];
+                }
+            }
+
+            free(vertexIndexMap);
+            free(world_pos);
+        }
+
+        lightVertexCounts[lightIdx] = headVertIdx;
+        lightIndexCounts[lightIdx] = headIndexIdx;
+        DualLog("Light %d: Generated %u vertices, %u indices\n", lightIdx, headVertIdx, headIndexIdx);
+
+        // Upload vertex buffer
+        if (lightVBOs[lightIdx] == 0) glGenBuffers(1, &lightVBOs[lightIdx]);
+        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
+        size_t bufferSize = headVertIdx * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+        glBufferData(GL_ARRAY_BUFFER, bufferSize, lightVolumeMeshTempVertBuffer, GL_DYNAMIC_DRAW);
+
+        // Upload index buffer
+        if (lightIBOs[lightIdx] == 0) glGenBuffers(1, &lightIBOs[lightIdx]);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lightIBOs[lightIdx]);
+        size_t indexBufferSize = headIndexIdx * sizeof(uint32_t);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferSize, lightVolumeMeshTempIndexBuffer, GL_DYNAMIC_DRAW);
+
+        lightDirty[lightIdx] = false;
+
+        free(lightVolumeMeshTempVertBuffer);
+        free(lightVolumeMeshTempIndexBuffer);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 // Renders text at x,y coordinates specified using pointer to the string array.
@@ -1112,6 +1411,8 @@ int main(int argc, char* argv[]) {
             for (uint8_t i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
             firstLightGen = false;
         }
+        
+        if (debugView == 0) UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
                 
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
@@ -1419,6 +1720,39 @@ int main(int argc, char* argv[]) {
         glDisable(GL_BLEND);
         CHECK_GL_ERROR();
         
+        // 5. Render Light Volume Meshes
+        if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
+        glUseProgram(lightVolumeShaderProgram);
+        CHECK_GL_ERROR();
+        float identity[16];
+        mat4_identity(identity);
+        glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
+        CHECK_GL_ERROR();
+        glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
+        CHECK_GL_ERROR();
+        glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
+        CHECK_GL_ERROR();
+        glUniform1i(debugView_lightvol, debugView);
+        CHECK_GL_ERROR();
+        glDisable(GL_CULL_FACE); // Disable backface culling
+        CHECK_GL_ERROR();
+        for (int lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
+            if (lightVertexCounts[lightIdx] == 0) continue;
+
+            glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            CHECK_GL_ERROR();
+            glDrawElements(GL_TRIANGLES, lightIndexCounts[lightIdx] * 3, GL_UNSIGNED_INT, 0);
+            CHECK_GL_ERROR();
+            drawCallsRenderedThisFrame++;
+            shadowDrawCallsRenderedThisFrame++;
+            verticesRenderedThisFrame += lightVertexCounts[lightIdx];
+        }
+        
+        glEnable(GL_CULL_FACE); // Reenable backface culling
+        CHECK_GL_ERROR();
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        CHECK_GL_ERROR();
+
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1435,9 +1769,6 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "projection"),1, GL_FALSE,projection);
         CHECK_GL_ERROR();
-        glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "viewLast"),1, GL_FALSE,viewLast);
-        CHECK_GL_ERROR();
-        for (int i=0;i<16;++i) viewLast[i] = view[i];
         glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosX"), cam_x);
         CHECK_GL_ERROR();
         glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosY"), cam_y);

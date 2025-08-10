@@ -42,6 +42,10 @@ extern GLuint vboMasterTable;
 extern GLuint modelVertexOffsetsID;
 extern uint32_t largestVertCount;
 extern GLuint sphoxelsID;
+extern float ** vertexDataArrays;
+extern uint32_t ** triangleDataArrays;
+extern uint32_t ** triEdgeDataArrays;
+extern uint32_t ** edgeDataArrays;
 
 int LoadGeometry(void);
 void CleanupModelLoad(bool isBad);
