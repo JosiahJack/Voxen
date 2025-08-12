@@ -86,14 +86,10 @@ uint32_t playerCellIdx_y = 10000;
 uint32_t playerCellIdx_z = 451;
 uint8_t numLightsFound = 0;
 float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
-#define MAX_LIGHT_VOLUME_MESH_VERTS 2000000
-float lightVolumeMeshTempVertBuffer[MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT];
-
-
-GLuint vao_chunk; // Vertex Array Object
 
 // Shaders
 GLuint chunkShaderProgram;
+GLuint vao_chunk; // Vertex Array Object
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
       specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, shadowsEnabledLoc_chunk = -1,
@@ -102,36 +98,27 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
 GLuint screenSpaceShadowsComputeShader;
 GLuint screenSpaceGIComputeShader;
 
+//    Deferred Lighting Compute Shader
+GLuint deferredLightingShaderProgram;
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO; // FBO inputs
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, sphoxelCountLoc_deferred = -1; // uniform locations
+GLuint outputImageID;
+
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
-
-//    FBO
-GLuint inputImageID, inputDepthID, inputWorldPosID, inputNormalsID, inputShadowStencilID, gBufferFBO; // FBO inputs
-GLuint outputImageID;
-
-//    Cubemap
-bool generatedCubemapProbes = false;
-GLuint inputCubemapImageID, inputCubemapDepthID, inputCubemapWorldPosID, inputCubemapNormalsID, gBufferCubemapFBO;
-int cubemapTexSize = 128;
-GLuint cubemapTextures[NUM_CUBEMAPS] = {0};
-float cubemapPositions[NUM_CUBEMAPS * 3];
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 float lightsRangeSquared[LIGHT_COUNT];
-GLuint lightVolumeShaderProgram;     // vert + frag shader to render it
-GLint lightPosXLoc_lightvol = -1, lightPosYLoc_lightvol = -1, lightPosZLoc_lightvol = -1, lightRangeLoc_lightvol = -1,
-      matrix_lightvol = -1, view_lightvol = -1, projection_lightvol = -1, debugView_lightvol = -1; // uniform locations
 GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
 GLuint lightIBOs[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
 uint32_t lightIndexCounts[MAX_VISIBLE_LIGHTS];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
-bool firstLightGen = true;
 
 // Text
 GLuint textShaderProgram;
@@ -275,6 +262,35 @@ void mat4_ortho(float* m, float left, float right, float bottom, float top, floa
     m[15] = 1.0f;
 }
 
+void mat4_inverse(float *out, float *m) {
+    float tmp[16];
+    tmp[0]  =  m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
+    tmp[4]  = -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
+    tmp[8]  =  m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
+    tmp[12] = -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
+    tmp[1]  = -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
+    tmp[5]  =  m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
+    tmp[9]  = -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
+    tmp[13] =  m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
+    tmp[2]  =  m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
+    tmp[6]  = -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
+    tmp[10] =  m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
+    tmp[14] = -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
+    tmp[3]  = -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
+    tmp[7]  =  m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
+    tmp[11] = -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
+    tmp[15] =  m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
+
+    float det = m[0] * tmp[0] + m[1] * tmp[4] + m[2] * tmp[8] + m[3] * tmp[12];
+    if (fabs(det) < 1e-10) {
+        for (int i = 0; i < 16; i++) out[i] = (i % 5 == 0) ? 1.0f : 0.0f;
+        return;
+    }
+
+    det = 1.0f / det;
+    for (int i = 0; i < 16; i++) out[i] = tmp[i] * det;
+}
+
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, GLenum target, const char *name) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
@@ -307,11 +323,15 @@ void CacheUniformLocationsForShaders(void) {
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
-    instancesInPVSCount_chunk = glGetUniformLocation(chunkShaderProgram, "instancesInPVSCount");
-    shadowsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowsEnabled");
+//     instancesInPVSCount_chunk = glGetUniformLocation(chunkShaderProgram, "instancesInPVSCount");
     overrideGlowRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowR");
     overrideGlowGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowG");
     overrideGlowBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowB");
+
+    screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
+    screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
+    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    sphoxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sphoxelCount");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -351,296 +371,6 @@ void UpdateInstanceMatrix(int i) {
     SetUpdatedMatrix(mat, instances[i].posx, instances[i].posy, instances[i].posz, instances[i].rotx, instances[i].roty, instances[i].rotz, instances[i].rotw, instances[i].sclx, instances[i].scly, instances[i].sclz);
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
-}
-
-void cross_product(float a[3], float b[3], float result[3]) {
-    result[0] = a[1] * b[2] - a[2] * b[1]; // x = ay*bz - az*by
-    result[1] = a[2] * b[0] - a[0] * b[2]; // y = az*bx - ax*bz
-    result[2] = a[0] * b[1] - a[1] * b[0]; // z = ax*by - ay*bx
-}
-
-void mat4_transform_vec3(const float *mat, float x, float y, float z, float *out) {
-    out[0] = mat[0] * x + mat[4] * y + mat[8] *  z + mat[12];
-    out[1] = mat[1] * x + mat[5] * y + mat[9] *  z + mat[13];
-    out[2] = mat[2] * x + mat[6] * y + mat[10] * z + mat[14];
-}
-
-void UpdateLightVolumes(void) {
-    for (int lightIdx = 0; lightIdx < numLightsFound; ++lightIdx) {
-        if (!lightDirty[lightIdx]) continue;
-        
-        DualLog("Regenerating light shadow volume meshes for light %d\n",lightIdx);
-
-        uint32_t litIdx = (lightIdx * LIGHT_DATA_SIZE);
-        float lit_x = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float lit_y = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float lit_z = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float sqrRange = lightsInProximity[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        sqrRange *= sqrRange;
-        uint32_t headVertIdx = 0;
-        uint32_t headIndexIdx = 0;
-
-        // Temporary buffers for vertices and indices
-        float *lightVolumeMeshTempVertBuffer = (float *)malloc(MAX_LIGHT_VOLUME_MESH_VERTS * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        uint32_t *lightVolumeMeshTempIndexBuffer = (uint32_t *)malloc(MAX_LIGHT_VOLUME_MESH_VERTS * sizeof(uint32_t)); // 6 indices per quad
-        if (!lightVolumeMeshTempVertBuffer || !lightVolumeMeshTempIndexBuffer) {
-            DualLogError("Failed to allocate temporary buffers for light %d\n", lightIdx);
-            if (lightVolumeMeshTempVertBuffer) free(lightVolumeMeshTempVertBuffer);
-            if (lightVolumeMeshTempIndexBuffer) free(lightVolumeMeshTempIndexBuffer);
-            continue;
-        }
-
-        for (uint32_t instanceIdx = 0; instanceIdx < INSTANCE_COUNT; ++instanceIdx) {
-            if (instanceIdx == 5455) continue; // Skip test light
-            
-            if (squareDistance3D(lit_x, lit_y, lit_z, instances[instanceIdx].posx, instances[instanceIdx].posy, instances[instanceIdx].posz) > LIGHT_RANGE_MAX_SQUARED) continue;
-
-            int32_t modelIdx = instances[instanceIdx].modelIndex;
-            if (modelIdx < 0 || modelIdx >= MODEL_COUNT) continue;
-
-            uint32_t vertCount = modelVertexCounts[modelIdx];
-            uint32_t edgeCount = modelEdgeCounts[modelIdx];
-            if (!vertexDataArrays[modelIdx] || !edgeDataArrays[modelIdx] || !triangleDataArrays[modelIdx]) {
-                DualLogError("vertexDataArrays[%d], edgeDataArrays[%d], or triangleDataArrays[%d] is NULL\n", modelIdx, modelIdx, modelIdx);
-                continue;
-            }
-
-            float *transform = &modelMatrices[instanceIdx * 16];
-            float *vertices = vertexDataArrays[modelIdx];
-            uint32_t *edges = edgeDataArrays[modelIdx];
-            uint32_t *triangles = triangleDataArrays[modelIdx];
-
-            // Transform all vertices to world space once
-            float *world_pos = (float *)malloc(vertCount * 3 * sizeof(float));
-            if (!world_pos) {
-                DualLogError("Failed to allocate world_pos buffer\n");
-                continue;
-            }
-            bool anyInRange = false;
-            for (uint32_t vertIdx = 0; vertIdx < vertCount; ++vertIdx) {
-                uint32_t vertexIdx = vertIdx * VERTEX_ATTRIBUTES_COUNT;
-                float model_pos[3] = { vertices[vertexIdx + 0], vertices[vertexIdx + 1], vertices[vertexIdx + 2] };
-                mat4_transform_vec3(transform, model_pos[0], model_pos[1], model_pos[2], &world_pos[vertIdx * 3]);
-                float dist = squareDistance3D(lit_x, lit_y, lit_z, world_pos[vertIdx * 3], world_pos[vertIdx * 3 + 1], world_pos[vertIdx * 3 + 2]);
-                if (dist < sqrRange + 0.001f) anyInRange = true;
-            }
-
-            if (!anyInRange) {
-                free(world_pos);
-                continue;
-            }
-
-            // Track vertex indices for silhouette edges (original and extruded)
-            uint32_t *vertexIndexMap = (uint32_t *)malloc(vertCount * 2 * sizeof(uint32_t)); // Original + extruded
-            memset(vertexIndexMap, 0xFF, vertCount * 2 * sizeof(uint32_t)); // Initialize to invalid index (0xFFFFFFFF)
-            if (!vertexIndexMap) {
-                DualLogError("Failed to allocate vertexIndexMap\n");
-                free(world_pos);
-                continue;
-            }
-
-            // Process edges for silhouette detection
-            for (uint32_t edgeIdx = 0; edgeIdx < edgeCount && headVertIdx < MAX_LIGHT_VOLUME_MESH_VERTS - 4 && headIndexIdx < MAX_LIGHT_VOLUME_MESH_VERTS - 6; ++edgeIdx) {
-                uint32_t v0_idx = edges[edgeIdx * 4 + 0];
-                uint32_t v1_idx = edges[edgeIdx * 4 + 1];
-                uint32_t tri0_idx = edges[edgeIdx * 4 + 2];
-                uint32_t tri1_idx = edges[edgeIdx * 4 + 3];
-
-                // Skip edges with only one triangle (boundary edges, optional)
-                if (tri1_idx == UINT32_MAX) continue;
-
-                // Get triangle vertices
-                uint32_t tri0_v[3] = { triangles[tri0_idx * 3 + 0], triangles[tri0_idx * 3 + 1], triangles[tri0_idx * 3 + 2] };
-                uint32_t tri1_v[3] = { triangles[tri1_idx * 3 + 0], triangles[tri1_idx * 3 + 1], triangles[tri1_idx * 3 + 2] };
-
-                // Compute triangle centroids
-                float tri0_centroid[3] = {0, 0, 0};
-                float tri1_centroid[3] = {0, 0, 0};
-                for (int i = 0; i < 3; ++i) {
-                    tri0_centroid[0] += world_pos[tri0_v[i] * 3 + 0];
-                    tri0_centroid[1] += world_pos[tri0_v[i] * 3 + 1];
-                    tri0_centroid[2] += world_pos[tri0_v[i] * 3 + 2];
-                    tri1_centroid[0] += world_pos[tri1_v[i] * 3 + 0];
-                    tri1_centroid[1] += world_pos[tri1_v[i] * 3 + 1];
-                    tri1_centroid[2] += world_pos[tri1_v[i] * 3 + 2];
-                }
-                for (int i = 0; i < 3; ++i) {
-                    tri0_centroid[i] /= 3.0f;
-                    tri1_centroid[i] /= 3.0f;
-                }
-
-                // Compute triangle normals
-                float tri0_norm[3], tri1_norm[3];
-                float edge_dir[3] = {
-                    world_pos[tri0_v[1] * 3 + 0] - world_pos[tri0_v[0] * 3 + 0],
-                    world_pos[tri0_v[1] * 3 + 1] - world_pos[tri0_v[0] * 3 + 1],
-                    world_pos[tri0_v[1] * 3 + 2] - world_pos[tri0_v[0] * 3 + 2]
-                };
-                float edge2_dir[3] = {
-                    world_pos[tri0_v[2] * 3 + 0] - world_pos[tri0_v[0] * 3 + 0],
-                    world_pos[tri0_v[2] * 3 + 1] - world_pos[tri0_v[0] * 3 + 1],
-                    world_pos[tri0_v[2] * 3 + 2] - world_pos[tri0_v[0] * 3 + 2]
-                };
-                cross_product(edge_dir, edge2_dir, tri0_norm);
-                float norm_len = sqrtf(tri0_norm[0] * tri0_norm[0] + tri0_norm[1] * tri0_norm[1] + tri0_norm[2] * tri0_norm[2]);
-                if (norm_len < 0.0001f) norm_len = 0.001f;
-                tri0_norm[0] /= norm_len;
-                tri0_norm[1] /= norm_len;
-                tri0_norm[2] /= norm_len;
-
-                edge_dir[0] = world_pos[tri1_v[1] * 3 + 0] - world_pos[tri1_v[0] * 3 + 0];
-                edge_dir[1] = world_pos[tri1_v[1] * 3 + 1] - world_pos[tri1_v[0] * 3 + 1];
-                edge_dir[2] = world_pos[tri1_v[1] * 3 + 2] - world_pos[tri1_v[0] * 3 + 2];
-                edge2_dir[0] = world_pos[tri1_v[2] * 3 + 0] - world_pos[tri1_v[0] * 3 + 0];
-                edge2_dir[1] = world_pos[tri1_v[2] * 3 + 1] - world_pos[tri1_v[0] * 3 + 1];
-                edge2_dir[2] = world_pos[tri1_v[2] * 3 + 2] - world_pos[tri1_v[0] * 3 + 2];
-                cross_product(edge_dir, edge2_dir, tri1_norm);
-                norm_len = sqrtf(tri1_norm[0] * tri1_norm[0] + tri1_norm[1] * tri1_norm[1] + tri1_norm[2] * tri1_norm[2]);
-                if (norm_len < 0.0001f) norm_len = 0.001f;
-                tri1_norm[0] /= norm_len;
-                tri1_norm[1] /= norm_len;
-                tri1_norm[2] /= norm_len;
-
-                // Compute light directions to centroids
-                float light_dir0[3] = { lit_x - tri0_centroid[0], lit_y - tri0_centroid[1], lit_z - tri0_centroid[2] };
-                float light_dir1[3] = { lit_x - tri1_centroid[0], lit_y - tri1_centroid[1], lit_z - tri1_centroid[2] };
-                float light_len0 = sqrtf(light_dir0[0] * light_dir0[0] + light_dir0[1] * light_dir0[1] + light_dir0[2] * light_dir0[2]);
-                float light_len1 = sqrtf(light_dir1[0] * light_dir1[0] + light_dir1[1] * light_dir1[1] + light_dir1[2] * light_dir1[2]);
-                if (light_len0 < 0.0001f) light_len0 = 0.001f;
-                if (light_len1 < 0.0001f) light_len1 = 0.001f;
-                light_dir0[0] /= light_len0;
-                light_dir0[1] /= light_len0;
-                light_dir0[2] /= light_len0;
-                light_dir1[0] /= light_len1;
-                light_dir1[1] /= light_len1;
-                light_dir1[2] /= light_len1;
-
-                // Check if edge is a silhouette edge
-                float dot0 = tri0_norm[0] * light_dir0[0] + tri0_norm[1] * light_dir0[1] + tri0_norm[2] * light_dir0[2];
-                float dot1 = tri1_norm[0] * light_dir1[0] + tri1_norm[1] * light_dir1[1] + tri1_norm[2] * light_dir1[2];
-                if ((dot0 > 0.0f && dot1 <= 0.0f) || (dot0 <= 0.0f && dot1 > 0.0f)) {
-                    // Silhouette edge found, create vertices and indices for quad
-                    float extrude_dir[2][3];
-                    for (int i = 0; i < 2; ++i) {
-                        uint32_t idx = (i == 0) ? v0_idx : v1_idx;
-                        extrude_dir[i][0] = world_pos[idx * 3 + 0] - lit_x;
-                        extrude_dir[i][1] = world_pos[idx * 3 + 1] - lit_y;
-                        extrude_dir[i][2] = world_pos[idx * 3 + 2] - lit_z;
-                        float len = sqrtf(extrude_dir[i][0] * extrude_dir[i][0] + extrude_dir[i][1] * extrude_dir[i][1] + extrude_dir[i][2] * extrude_dir[i][2]);
-                        if (len < 0.0001f) len = 0.02f;
-                        extrude_dir[i][0] = (extrude_dir[i][0] / len) * 10.0f;
-                        extrude_dir[i][1] = (extrude_dir[i][1] / len) * 10.0f;
-                        extrude_dir[i][2] = (extrude_dir[i][2] / len) * 10.0f;
-                    }
-
-                    // Compute quad normal
-                    float edge_vec[3] = {
-                        world_pos[v1_idx * 3 + 0] - world_pos[v0_idx * 3 + 0],
-                        world_pos[v1_idx * 3 + 1] - world_pos[v0_idx * 3 + 1],
-                        world_pos[v1_idx * 3 + 2] - world_pos[v0_idx * 3 + 2]
-                    };
-                    float quad_norm[3];
-                    cross_product(edge_vec, extrude_dir[0], quad_norm);
-                    norm_len = sqrtf(quad_norm[0] * quad_norm[0] + quad_norm[1] * quad_norm[1] + quad_norm[2] * quad_norm[2]);
-                    if (norm_len < 0.0001f) norm_len = 0.001f;
-                    quad_norm[0] /= norm_len;
-                    quad_norm[1] /= norm_len;
-                    quad_norm[2] /= norm_len;
-
-                    // Add vertices if not already added
-                    uint32_t vert_indices[4]; // v0, v1, v0_extruded, v1_extruded
-                    for (int i = 0; i < 2; ++i) {
-                        uint32_t orig_idx = (i == 0) ? v0_idx : v1_idx;
-                        uint32_t map_idx = orig_idx; // Original vertex
-                        if (vertexIndexMap[map_idx] == 0xFFFFFFFF) {
-                            uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
-                            lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[orig_idx * 3 + 0];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[orig_idx * 3 + 1];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[orig_idx * 3 + 2];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 3] = quad_norm[0];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 4] = quad_norm[1];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 5] = quad_norm[2];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 6] = 0.0f; // u
-                            lightVolumeMeshTempVertBuffer[workingIdx + 7] = 0.0f; // v
-                            int texIndex = 41; // Black texture for shadow faces
-                            int invalidIndex = 65535;
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &texIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &invalidIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &invalidIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &invalidIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
-                            vertexIndexMap[map_idx] = headVertIdx;
-                            vert_indices[i] = headVertIdx++;
-                        } else {
-                            vert_indices[i] = vertexIndexMap[map_idx];
-                        }
-
-                        // Extruded vertex
-                        map_idx = orig_idx + vertCount; // Offset for extruded vertices
-                        if (vertexIndexMap[map_idx] == 0xFFFFFFFF) {
-                            uint32_t workingIdx = headVertIdx * VERTEX_ATTRIBUTES_COUNT;
-                            lightVolumeMeshTempVertBuffer[workingIdx + 0] = world_pos[orig_idx * 3 + 0] + extrude_dir[i][0];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 1] = world_pos[orig_idx * 3 + 1] + extrude_dir[i][1];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 2] = world_pos[orig_idx * 3 + 2] + extrude_dir[i][2];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 3] = quad_norm[0];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 4] = quad_norm[1];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 5] = quad_norm[2];
-                            lightVolumeMeshTempVertBuffer[workingIdx + 6] = 0.0f; // u
-                            lightVolumeMeshTempVertBuffer[workingIdx + 7] = 0.0f; // v
-                            int texIndex = 41;
-                            int invalidIndex = 65535;
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 8], &texIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 9], &invalidIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 10], &invalidIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 11], &invalidIndex, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 12], &modelIdx, sizeof(float));
-                            memcpy(&lightVolumeMeshTempVertBuffer[workingIdx + 13], &instanceIdx, sizeof(float));
-                            vertexIndexMap[map_idx] = headVertIdx;
-                            vert_indices[i + 2] = headVertIdx++; // v0_extruded, v1_extruded
-                        } else {
-                            vert_indices[i + 2] = vertexIndexMap[map_idx];
-                        }
-                    }
-
-                    // Add indices for two triangles: v0, v1, v1_extruded, then v0, v1_extruded, v0_extruded
-                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[0];
-                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[1];
-                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[3];
-                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[0];
-                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[3];
-                    lightVolumeMeshTempIndexBuffer[headIndexIdx++] = vert_indices[2];
-                }
-            }
-
-            free(vertexIndexMap);
-            free(world_pos);
-        }
-
-        lightVertexCounts[lightIdx] = headVertIdx;
-        lightIndexCounts[lightIdx] = headIndexIdx;
-        DualLog("Light %d: Generated %u vertices, %u indices\n", lightIdx, headVertIdx, headIndexIdx);
-
-        // Upload vertex buffer
-        if (lightVBOs[lightIdx] == 0) glGenBuffers(1, &lightVBOs[lightIdx]);
-        glBindBuffer(GL_ARRAY_BUFFER, lightVBOs[lightIdx]);
-        size_t bufferSize = headVertIdx * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        glBufferData(GL_ARRAY_BUFFER, bufferSize, lightVolumeMeshTempVertBuffer, GL_DYNAMIC_DRAW);
-
-        // Upload index buffer
-        if (lightIBOs[lightIdx] == 0) glGenBuffers(1, &lightIBOs[lightIdx]);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lightIBOs[lightIdx]);
-        size_t indexBufferSize = headIndexIdx * sizeof(uint32_t);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferSize, lightVolumeMeshTempIndexBuffer, GL_DYNAMIC_DRAW);
-
-        lightDirty[lightIdx] = false;
-
-        free(lightVolumeMeshTempVertBuffer);
-        free(lightVolumeMeshTempIndexBuffer);
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 
 // Renders text at x,y coordinates specified using pointer to the string array.
@@ -762,39 +492,6 @@ void Screenshot() {
     if (!success) DualLog("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
-    free(pixels);
-}
-
-void ScreenshotCubemapFace(int face) {
-    // Write to file
-    // Allocate buffer for pixel data (RGBA, 8 bits per channel)
-    unsigned char* pixels = (unsigned char*)malloc(cubemapTexSize * cubemapTexSize * 4);
-    if (!pixels) { DualLog("Failed to allocate memory for cubemap pixels\n"); return; }
-
-    // Read pixels from the current framebuffer
-    glReadPixels(0, 0, cubemapTexSize, cubemapTexSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    CHECK_GL_ERROR();
-
-    // Generate filename (e.g., probe0_face0.png, probe0_face1.png, etc.)
-    char filename[64];
-    switch(face) {
-        case 0: snprintf(filename, sizeof(filename), "cubemap_%d_ft.png", face); break;
-        case 1: snprintf(filename, sizeof(filename), "cubemap_%d_bk.png", face); break;
-        case 2: snprintf(filename, sizeof(filename), "cubemap_%d_rt.png", face); break;
-        case 3: snprintf(filename, sizeof(filename), "cubemap_%d_lf.png", face); break;
-        case 4: snprintf(filename, sizeof(filename), "cubemap_%d_up.png", face); break;
-        case 5: snprintf(filename, sizeof(filename), "cubemap_%d_dn.png", face); break;
-    }
-
-    // Save to PNG using stb_image_write
-    int success = stbi_write_png(filename, cubemapTexSize, cubemapTexSize, 4, pixels, cubemapTexSize * 4);
-    if (!success) {
-        DualLog("Failed to save cubemap face %d to %s\n", face, filename);
-    } else {
-        DualLog("Saved cubemap face %d to %s\n", face, filename);
-    }
-
-    // Free pixel buffer
     free(pixels);
 }
 // ============================================================================
@@ -972,11 +669,9 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA16F, screen_width, screen_height,            GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Raster Normals");
+    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-    CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputShadowStencilID,        GL_R8, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Visibilit Bitmask for What Lights See Pixel");
     CHECK_GL_ERROR();
     GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
     CHECK_GL_ERROR();
@@ -1005,12 +700,10 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
-    glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+    glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     CHECK_GL_ERROR();
     //                 3 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
-    CHECK_GL_ERROR();
-    glBindImageTexture(5, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
     CHECK_GL_ERROR();
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
@@ -1018,68 +711,10 @@ int InitializeEnvironment(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     CHECK_GL_ERROR();
     malloc_trim(0);
-    
-    // Cubemap FBO duplicate
-    GenerateAndBindTexture(&inputCubemapImageID,             GL_RGBA8, cubemapTexSize, cubemapTexSize,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Cubemap Lit Raster");
-    CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputCubemapDepthID, GL_DEPTH_COMPONENT24, cubemapTexSize, cubemapTexSize, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Cubemap Raster Depth");
-    CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputCubemapWorldPosID,        GL_RGBA32F, cubemapTexSize, cubemapTexSize,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Cubemap World Position At Each Pixel");
-    CHECK_GL_ERROR();
-    GenerateAndBindTexture(&inputCubemapNormalsID,                GL_RGBA16F, screen_width, screen_height,               GL_RGBA,              GL_HALF_FLOAT, GL_TEXTURE_2D, "Raster Normals");
-    CHECK_GL_ERROR();
-    
-    glGenFramebuffers(1, &gBufferCubemapFBO);
-    CHECK_GL_ERROR();
-    glBindFramebuffer(GL_FRAMEBUFFER, gBufferCubemapFBO);
-    CHECK_GL_ERROR();
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputCubemapImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputCubemapWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputCubemapNormalsID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputCubemapDepthID, 0);
-    GLenum drawCubemapBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-    glDrawBuffers(3, drawCubemapBuffers);
-    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) {
-        switch (status) {
-            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
-            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
-            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
-            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
-        }
-    }
-    
-    // Don't bother binding image textures for cubemap here, done in render pass.
-    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
-    
-    // Initialize Cubemap Textures
-    glGenTextures(NUM_CUBEMAPS, cubemapTextures);
-    CHECK_GL_ERROR();
-    for (int i = 0; i < NUM_CUBEMAPS; ++i) {
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTextures[i]);
-        CHECK_GL_ERROR();
-        for (int face = 0; face < 6; ++face) {
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_RGBA8, cubemapTexSize, cubemapTexSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-            CHECK_GL_ERROR();
-        }
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        CHECK_GL_ERROR();
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        CHECK_GL_ERROR();
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        CHECK_GL_ERROR();
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        CHECK_GL_ERROR();
-        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        CHECK_GL_ERROR();
-    }
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    CHECK_GL_ERROR();
-    DebugRAM("cubemap textures init");
     
     // Text Initialization
     glCreateBuffers(1, &textVBO);
@@ -1150,11 +785,12 @@ int ExitCleanup(int status) { // Ifs allow deinit from anywhere, only as needed.
     if (quadVAO) glDeleteVertexArrays(1, &quadVAO);
     if (quadVBO) glDeleteBuffers(1, &quadVBO);
     if (imageBlitShaderProgram) glDeleteProgram(imageBlitShaderProgram);
-    if (screenSpaceShadowsComputeShader) glDeleteProgram(screenSpaceShadowsComputeShader);
-    if (screenSpaceGIComputeShader) glDeleteProgram(screenSpaceGIComputeShader);
+//     if (screenSpaceShadowsComputeShader) glDeleteProgram(screenSpaceShadowsComputeShader);
+//     if (screenSpaceGIComputeShader) glDeleteProgram(screenSpaceGIComputeShader);
     if (inputImageID) glDeleteTextures(1,&inputImageID);
     if (inputDepthID) glDeleteTextures(1,&inputDepthID);
     if (inputWorldPosID) glDeleteTextures(1,&inputWorldPosID);
+    if (deferredLightingShaderProgram) glDeleteProgram(deferredLightingShaderProgram);
     if (gBufferFBO) glDeleteFramebuffers(1, &gBufferFBO);
     if (sphoxelsID) glDeleteBuffers(1, &sphoxelsID);
     if (visibleLightsID) glDeleteBuffers(1, &visibleLightsID);
@@ -1406,14 +1042,7 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         CHECK_GL_ERROR();
-        
-        if (firstLightGen && globalFrameNum > 2) {
-            for (uint8_t i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
-            firstLightGen = false;
-        }
-        
-        if (debugView == 0) UpdateLightVolumes(); // Regenerate light volume meshes for any dirty lights.
-                
+
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
         bool instanceIsCulledArray[INSTANCE_COUNT];
@@ -1449,164 +1078,12 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         CHECK_GL_ERROR();
-        
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
         CHECK_GL_ERROR();
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instancesInPVSCount * sizeof(uint32_t), instancesInPVS); // * 16 because matrix4x4
         CHECK_GL_ERROR();
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
         CHECK_GL_ERROR();
-        
-        glEnable(GL_BLEND);
-        CHECK_GL_ERROR();
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        CHECK_GL_ERROR();
-    
-        // 4. Generate Shadow Data - Render all meshes as black + glow, render all lights as spheres with their color and scaled for intensity
-        if (globalFrameNum >= 2 && !generatedCubemapProbes) {
-            Quaternion orientations[6];
-            
-            quat_identity(&orientations[0]);
-            quat_identity(&orientations[1]);
-            quat_identity(&orientations[2]);
-            quat_identity(&orientations[3]);
-            quat_identity(&orientations[4]);
-            quat_identity(&orientations[5]);
-            quat_from_yaw_pitch(&orientations[0], 180.0f,  90.0f); // Front Z+ (actually Y+) As looking along axis specified, value gets more this if going into screen.
-            quat_from_yaw_pitch(&orientations[1],   0.0f,  90.0f); //  Back Z- (actually Y-)
-            quat_from_yaw_pitch(&orientations[2],  90.0f,  90.0f); // Right X+ (actually X+)
-            quat_from_yaw_pitch(&orientations[3], 270.0f,  90.0f); //  Left X- (actually X-)
-            quat_from_yaw_pitch(&orientations[4], 180.0f,   0.0f); //    Up Y+ (actually Z+)
-            quat_from_yaw_pitch(&orientations[5], 180.0f, 180.0f); //  Down Y- (actually Z-)
-            glBindFramebuffer(GL_FRAMEBUFFER, gBufferCubemapFBO);
-            CHECK_GL_ERROR();
-            glViewport(0, 0, cubemapTexSize, cubemapTexSize);
-            CHECK_GL_ERROR();
-            glUseProgram(chunkShaderProgram);
-            CHECK_GL_ERROR();
-            glEnable(GL_DEPTH_TEST);
-            CHECK_GL_ERROR();
-            glBindImageTexture(0, inputCubemapImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-            CHECK_GL_ERROR();
-            glBindImageTexture(1, inputCubemapWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-            CHECK_GL_ERROR();
-            glBindImageTexture(2, inputCubemapNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
-            CHECK_GL_ERROR();
-            for (int i=0; i < 6; ++i) {
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear color and depth
-                CHECK_GL_ERROR();
-                float view[16], projection[16]; // Set up view and projection matrices
-                float fov = 65.0f;
-                mat4_perspective(projection, fov, (float)cubemapTexSize / cubemapTexSize, 0.02f, 15.36f);
-                mat4_lookat(view, 0.0f, 0.0f, 2.0f, &orientations[i]);
-                glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
-                CHECK_GL_ERROR();
-                glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
-                CHECK_GL_ERROR();
-                glUniform1i(debugViewLoc_chunk, 6); // Force all to render as black + glow
-                CHECK_GL_ERROR();
-                glUniform1i(instancesInPVSCount_chunk, instancesInPVSCount);
-                CHECK_GL_ERROR();
-                glUniform1i(shadowsEnabledLoc_chunk, true);
-                CHECK_GL_ERROR();
-                glBindVertexArray(vao_chunk);
-                CHECK_GL_ERROR();
-                glUniform1f(overrideGlowRLoc_chunk, 0.0f);
-                CHECK_GL_ERROR();
-                glUniform1f(overrideGlowGLoc_chunk, 0.0f);
-                CHECK_GL_ERROR();
-                glUniform1f(overrideGlowBLoc_chunk, 0.0f);
-                CHECK_GL_ERROR();
-                for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
-                    if (instanceIsCulledArray[i]) continue;
-                    if (instances[i].modelIndex >= MODEL_COUNT) continue;
-                    if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
-                    if (instances[i].modelIndex < 0) continue; // Culled
-                    if (i == testLightInstanceIdx) continue; // TODO delete me
-                    
-                    if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
-                    glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
-                    CHECK_GL_ERROR();
-                    glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
-                    CHECK_GL_ERROR();
-                    glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
-                    CHECK_GL_ERROR();
-                    glUniform1i(instanceIndexLoc_chunk, i);
-                    CHECK_GL_ERROR();
-                    int modelType = instances[i].modelIndex;
-                    glUniform1i(modelIndexLoc_chunk, modelType);
-                    CHECK_GL_ERROR();
-                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
-                    CHECK_GL_ERROR();
-                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                    CHECK_GL_ERROR();
-                    if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
-                    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
-                    CHECK_GL_ERROR();
-                    if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
-                    drawCallsRenderedThisFrame++;
-                    verticesRenderedThisFrame += modelVertexCounts[modelType];
-                }
-                
-                glEnable(GL_CULL_FACE); // Reenable backface culling
-                glEnable(GL_DEPTH_TEST);
-                for (uint16_t i=1;i<numLightsFound;++i) { // skip self, start at 1 TODO: Use cubemap array index
-                    float mat[16]; // 4x4 matrix
-                    uint16_t idx = i * LIGHT_DATA_SIZE;
-                    float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
-                    if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
-                    SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ], 0.0f, 0.0f, 0.0f, 1.0f, sphoxelSize, sphoxelSize, sphoxelSize);
-                    glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                    CHECK_GL_ERROR();
-                    glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                    CHECK_GL_ERROR();
-                    glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                    CHECK_GL_ERROR();
-                    glUniform1i(texIndexLoc_chunk, 41);
-                    CHECK_GL_ERROR();
-                    glUniform1i(glowIndexLoc_chunk, 41);
-                    CHECK_GL_ERROR();
-                    glUniform1i(specIndexLoc_chunk, 41);
-                    CHECK_GL_ERROR();
-                    glUniform1i(instanceIndexLoc_chunk, i);
-                    CHECK_GL_ERROR();
-                    int modelType = 621; // Test light icosphere
-                    glUniform1i(modelIndexLoc_chunk, modelType);
-                    CHECK_GL_ERROR();
-                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
-                    CHECK_GL_ERROR();
-                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                    CHECK_GL_ERROR();
-                    glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
-                    CHECK_GL_ERROR();
-                    drawCallsRenderedThisFrame++;
-                    verticesRenderedThisFrame += modelVertexCounts[modelType];
-                }
-                
-                ScreenshotCubemapFace(i);
-            }
-            
-            generatedCubemapProbes = true;
-
-            // Restore state
-            glUniform1i(debugViewLoc_chunk, debugView);
-            CHECK_GL_ERROR();
-            glViewport(0, 0, screen_width, screen_height);
-            CHECK_GL_ERROR();
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO
-            CHECK_GL_ERROR();
-            glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Put normal textures back
-            CHECK_GL_ERROR();
-            glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-            CHECK_GL_ERROR();
-            glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
-            CHECK_GL_ERROR();
-            glBindImageTexture(3, inputShadowStencilID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R8);
-            CHECK_GL_ERROR();
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            CHECK_GL_ERROR();
-            malloc_trim(0);
-        }
         
         // 5. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1617,23 +1094,17 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         glEnable(GL_DEPTH_TEST);
         CHECK_GL_ERROR();
-        glEnable(GL_BLEND);
-        CHECK_GL_ERROR();
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        CHECK_GL_ERROR();
         float view[16], projection[16]; // Set up view and projection matrices
         float fov = 65.0f;
-        mat4_perspective(projection, fov, (float)screen_width / screen_height, 0.02f, 72.0f);
+        float nearPlane = 0.02f;
+        float farPlane = 71.68f;
+        mat4_perspective(projection, fov, (float)screen_width / screen_height, nearPlane, farPlane);
         mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
         glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
         CHECK_GL_ERROR();
         glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, projection);
         CHECK_GL_ERROR();
         glUniform1i(debugViewLoc_chunk, debugView);
-        CHECK_GL_ERROR();
-        glUniform1i(instancesInPVSCount_chunk, instancesInPVSCount);
-        CHECK_GL_ERROR();
-        glUniform1i(shadowsEnabledLoc_chunk, shadowsEnabled);
         CHECK_GL_ERROR();
         glBindVertexArray(vao_chunk);
         CHECK_GL_ERROR();
@@ -1669,7 +1140,6 @@ int main(int argc, char* argv[]) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             CHECK_GL_ERROR();
             if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
-//             glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             CHECK_GL_ERROR();
             if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
@@ -1709,7 +1179,6 @@ int main(int argc, char* argv[]) {
                 CHECK_GL_ERROR();
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
                 CHECK_GL_ERROR();
-//                 glDrawArrays(GL_TRIANGLES, 0, modelVertexCounts[modelType]);
                 glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
                 CHECK_GL_ERROR();
                 drawCallsRenderedThisFrame++;
@@ -1719,37 +1188,7 @@ int main(int argc, char* argv[]) {
         
         glDisable(GL_BLEND);
         CHECK_GL_ERROR();
-        
-        // 5. Render Light Volume Meshes
-        if (debugRenderSegfaults) DualLog("5. Render Light Volume Meshes\n");
-        glUseProgram(lightVolumeShaderProgram);
-        CHECK_GL_ERROR();
-        float identity[16];
-        mat4_identity(identity);
-        glUniformMatrix4fv(matrix_lightvol, 1, GL_FALSE, identity);
-        CHECK_GL_ERROR();
-        glUniformMatrix4fv(view_lightvol, 1, GL_FALSE, view);
-        CHECK_GL_ERROR();
-        glUniformMatrix4fv(projection_lightvol, 1, GL_FALSE, projection);
-        CHECK_GL_ERROR();
-        glUniform1i(debugView_lightvol, debugView);
-        CHECK_GL_ERROR();
-        glDisable(GL_CULL_FACE); // Disable backface culling
-        CHECK_GL_ERROR();
-        for (int lightIdx = 0; lightIdx < numLightsFound; lightIdx++) {
-            if (lightVertexCounts[lightIdx] == 0) continue;
 
-            glBindVertexBuffer(0, lightVBOs[lightIdx], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            CHECK_GL_ERROR();
-            glDrawElements(GL_TRIANGLES, lightIndexCounts[lightIdx] * 3, GL_UNSIGNED_INT, 0);
-            CHECK_GL_ERROR();
-            drawCallsRenderedThisFrame++;
-            shadowDrawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += lightVertexCounts[lightIdx];
-        }
-        
-        glEnable(GL_CULL_FACE); // Reenable backface culling
-        CHECK_GL_ERROR();
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         CHECK_GL_ERROR();
 
@@ -1759,65 +1198,38 @@ int main(int argc, char* argv[]) {
         CHECK_GL_ERROR();
         // ====================================================================
         
-        // 6. Screenspace GI Compute Shader
-        if (debugRenderSegfaults) DualLog("7. Screenspace GI (SSDIL) Compute Shader\n");
-        glUseProgram(screenSpaceGIComputeShader);
-        CHECK_GL_ERROR();
-        glUniform2f(glGetUniformLocation(screenSpaceGIComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
-        CHECK_GL_ERROR();
-        glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "view"),1, GL_FALSE,view);
-        CHECK_GL_ERROR();
-        glUniformMatrix4fv(glGetUniformLocation(screenSpaceGIComputeShader, "projection"),1, GL_FALSE,projection);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosX"), cam_x);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosY"), cam_y);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "playerPosZ"), cam_z);
-        CHECK_GL_ERROR();
-        glUniform1f(glGetUniformLocation(screenSpaceGIComputeShader, "uTime"), current_time);
-        CHECK_GL_ERROR();
-        GLuint groupX = (screen_width + 31) / 32;
-        GLuint groupY = (screen_height + 31) / 32;
-        glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
-        CHECK_GL_ERROR();
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
-        CHECK_GL_ERROR();
-        glUseProgram(0);
-        CHECK_GL_ERROR();
-        
-        // 6. Screenspace Shadows (SSS) Compute Shader
-//         if (debugRenderSegfaults) DualLog("7. Screenspace Shadows (SSS) Compute Shader\n");
-//         glBindTexture(GL_TEXTURE_2D, inputShadowStencilID);
-//         glClearTexImage(inputShadowStencilID, 0, GL_RED, GL_FLOAT, (float[]){0.0f});
-//         glBindTexture(GL_TEXTURE_2D, 0);
-// 
-//         glUseProgram(screenSpaceShadowsComputeShader);
-//         CHECK_GL_ERROR();
-//         glUniform2f(glGetUniformLocation(screenSpaceShadowsComputeShader, "uScreenSize"), (float)screen_width, (float)screen_height);
-//         CHECK_GL_ERROR();
-//         float viewProj[16];
-//         mat4_identity(viewProj);
-//         glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "projection"), 1, GL_FALSE, projection);
-//         CHECK_GL_ERROR();
-//         glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "matrix"), 1, GL_FALSE, viewProj);
-//         CHECK_GL_ERROR();
-//         glUniformMatrix4fv(glGetUniformLocation(screenSpaceShadowsComputeShader, "view"), 1, GL_FALSE, view);
-//         CHECK_GL_ERROR();
-//         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosX"), 0.1f);
-//         CHECK_GL_ERROR();
-//         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosY"), 0.1f);
-//         CHECK_GL_ERROR();
-//         glUniform1f(glGetUniformLocation(screenSpaceShadowsComputeShader, "playerPosZ"), 0.1f);
-//         CHECK_GL_ERROR();
-//         GLuint groupX = (screen_width + 31) / 32;
-//         GLuint groupY = (screen_height + 31) / 32;
-//         glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
-//         CHECK_GL_ERROR();
-//         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
-//         CHECK_GL_ERROR();
-//         glUseProgram(0);
-//         CHECK_GL_ERROR();
+        // 6. Deferred Lighting + Shadow Calculations
+        //        Apply deferred lighting with compute shader.  All lights are
+        //        dynamic and can be updated at any time (flicker, light switches,
+        //        move, change color, get marked as "culled" so shader can skip it,
+        //        etc.).
+        if (debugRenderSegfaults) DualLog("6. Deferred Lighting + Shadow Calculations\n");
+        if (debugView != 2) {
+            glUseProgram(deferredLightingShaderProgram);
+            CHECK_GL_ERROR();
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            CHECK_GL_ERROR();
+
+            // These should be static but cause issues if not...
+            glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
+            CHECK_GL_ERROR();
+            glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
+            CHECK_GL_ERROR();
+            glUniform1i(debugViewLoc_deferred, debugView);
+            CHECK_GL_ERROR();
+            float viewInv[16];
+            mat4_inverse(viewInv,view);
+            float projInv[16];
+            mat4_inverse(projInv,projection);
+
+            // Dispatch compute shader
+            GLuint groupX = (screen_width + 31) / 32;
+            GLuint groupY = (screen_height + 31) / 32;
+            glDispatchCompute(groupX, groupY, 1);
+            CHECK_GL_ERROR();
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+            CHECK_GL_ERROR();
+        }
         
         // 6. Render final meshes' results with full screen quad
         if (debugRenderSegfaults) DualLog("7. Render final meshes' results with full screen quad\n");
@@ -1837,6 +1249,8 @@ int main(int argc, char* argv[]) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Instance, Model, Texture indices as rgb. Values must be decoded in shader divided by counts.
         } else if (debugView == 5) {
             glBindTexture(GL_TEXTURE_2D, inputImageID); // World Position
+        } else if (debugView == 6) {
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Light view
         }
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         CHECK_GL_ERROR();

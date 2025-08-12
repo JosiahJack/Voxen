@@ -112,7 +112,7 @@ int SetupInstances(void) {
     instances[0].roty = q.y;
     instances[0].rotz = q.z;
     instances[0].rotw = q.w;
-    printf("North cell side Y+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     printf("North cell side Y+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
     // Equates to Unity localRotation:
     // Inspector rotation -90, 0, 180, quaternion x: 0 y: 0.70711 z:0.70711 w: 0
 
@@ -122,7 +122,7 @@ int SetupInstances(void) {
     instances[1].roty = q.y;
     instances[1].rotz = q.z;
     instances[1].rotw = q.w;
-    printf("South cell side Y- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     printf("South cell side Y- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
     // Equates to Unity localRotation:
     // Inspector rotation -90, 0, 0, quaternion x: -0.70711, y: 0, z: 0, w: 0.70711
     
@@ -132,7 +132,7 @@ int SetupInstances(void) {
     instances[2].roty = q.y;
     instances[2].rotz = q.z;
     instances[2].rotw = q.w;
-    printf("East cell side X+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     printf("East cell side X+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
 
     // 3: −90° around Z (cell West side X− from cell center)
     quat_from_axis_angle(&q, 0.0f, 0.0f, 1.0f, -M_PI / 2.0f);
@@ -140,7 +140,7 @@ int SetupInstances(void) {
     instances[3].roty = q.y;
     instances[3].rotz = q.z;
     instances[3].rotw = q.w;
-    printf("West cell side X- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     printf("West cell side X- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
 
     // 4: +90° around X (cell Floor Z− from cell center)
     quat_from_axis_angle(&q, 1.0f, 0.0f, 0.0f, -M_PI / 2.0f);
@@ -148,7 +148,7 @@ int SetupInstances(void) {
     instances[4].roty = q.y;
     instances[4].rotz = q.z;
     instances[4].rotw = q.w;
-    printf("Down Z- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     printf("Down Z- from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
     
     // 5: −90° around X (cell Ceil Z+ from cell center)
     quat_from_axis_angle(&q, 1.0f, 0.0f, 0.0f, M_PI / 2.0f);
@@ -156,7 +156,7 @@ int SetupInstances(void) {
     instances[5].roty = q.y;
     instances[5].rotz = q.z;
     instances[5].rotw = q.w;
-    printf("Up Z+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
+//     printf("Up Z+ from cell center quat:: x: %f, y: %f, z: %f, w: %f\n",q.x,q.y,q.z,q.w);
     // Equates to Unity localRotation:
     // Inspector rotation -180, 0, 0, quaternion x: 1, y: 0, z: 0, w: 0
 
