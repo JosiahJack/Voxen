@@ -5,11 +5,37 @@ const char *deferredLighting_computeShader =
 
     "layout(local_size_x = 32, local_size_y = 32) in;\n"
 
+    "struct Instance {\n"
+    "    int modelIndex;\n"
+    "    int texIndex;\n"
+    "    int glowIndex;\n"
+    "    int specIndex;\n"
+    "    int normIndex;\n"
+    "    float posx;\n"
+    "    float posy;\n"
+    "    float posz;\n"
+    "    float sclx;\n"
+    "    float scly;\n"
+    "    float sclz;\n"
+    "    float rotx;\n"
+    "    float roty;\n"
+    "    float rotz;\n"
+    "    float rotw;\n"
+    "};\n"
+
     // G-buffer inputs
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2) uniform image2D inputNormals;\n"
+    "layout(std430, binding = 9) readonly buffer InstancesInPVS { uint instancesIndices[]; };\n"
+    "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
+    "layout(std430, binding = 11) readonly buffer InstancesMatricesBuffer { mat4 instanceMatrices[]; };\n"
+    "layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; };\n" // 1D color array (RGBA)
     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
+    "layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; };\n" // Starting index in colors for each texture
+    "layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; };\n" // x,y pairs for width and height of textures
+    "layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; };\n" // Palette colors
+    "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
     "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
 
@@ -23,6 +49,27 @@ const char *deferredLighting_computeShader =
     "                float((color >> 16) & 0xFF) / 255.0,\n"  // g
     "                float((color >>  8) & 0xFF) / 255.0,\n"  // b
     "                float((color      ) & 0xFF) / 255.0);\n" // a
+    "}\n"
+
+     // --- Ray-Triangle Intersection (Möller-Trumbore) ---
+    "bool RayTriangle(vec3 origin, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t) {\n"
+    "    vec3 edge1 = v1 - v0;\n"
+    "    vec3 edge2 = v2 - v0;\n"
+    "    vec3 h = cross(dir, edge2);\n"
+    "    float a = dot(edge1, h);\n"
+    "    if (abs(a) < 1e-6) return false;\n"
+
+    "    float f = 1.0 / a;\n"
+    "    vec3 s = origin - v0;\n"
+    "    float u = f * dot(s, h);\n"
+    "    if (u < 0.0 || u > 1.0) return false;\n"
+
+    "    vec3 q = cross(s, edge1);\n"
+    "    float v = f * dot(dir, q);\n"
+    "    if (v < 0.0 || u + v > 1.0) return false;\n"
+
+    "    t = f * dot(edge2, q);\n"
+    "    return t > 0.001;\n"
     "}\n"
     
     // --- Main Compute Shader ---

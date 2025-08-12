@@ -26,11 +26,11 @@ int SetupInstances(void) {
     int y = 0;
     for (int idx=0;idx<INSTANCE_COUNT;idx++) {
         int entIdx = idx < MAX_ENTITIES ? idx : 0;
-        instances[idx].modelIndex = entities[entIdx].modelIndex;
-        instances[idx].texIndex = entities[entIdx].texIndex;
+        instances[idx].modelIndex = 65535;//entities[entIdx].modelIndex;
+        instances[idx].texIndex = 881;//entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
-        instances[idx].specIndex = entities[entIdx].specIndex;
-        instances[idx].normIndex = entities[entIdx].normIndex;
+        instances[idx].specIndex = 881;//entities[entIdx].specIndex;
+        instances[idx].normIndex = 881;//entities[entIdx].normIndex;
         instances[idx].posx = ((float)x * 2.56f); // Position in grid with gaps for shadow testing.
         instances[idx].posy = ((float)y * 5.12f);
         instances[idx].posz = 0.0f;
