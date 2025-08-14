@@ -61,6 +61,7 @@ static void init_data_entry(DataEntry *entry) {
     entry->glowIndex = UINT16_MAX;
     entry->specIndex = UINT16_MAX;
     entry->normIndex = UINT16_MAX;
+    entry->lodIndex = UINT16_MAX;
     entry->doublesided = false;
     entry->cardchunk = false;
     entry->constIndex = 0;
@@ -137,6 +138,7 @@ static bool process_key_value(DataParser *parser, DataEntry *entry, const char *
             else if (strcmp(trimmed_key, "levelcount") == 0)      { entry->levelCount = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
             else if (strcmp(trimmed_key, "startlevel") == 0)      { entry->startLevel = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
             else if (strcmp(trimmed_key, "constIndex") == 0)      entry->constIndex = parse_numberu16(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "lod") == 0)             entry->lodIndex = parse_numberu16(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->localPosition.x = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->localPosition.y = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localPosition.z") == 0) entry->localPosition.z = parse_float(trimmed_value, line, lineNum);
@@ -151,7 +153,7 @@ static bool process_key_value(DataParser *parser, DataEntry *entry, const char *
         }
     }
     
-    DualLogError("Unknown key %s at line %u: %s\n", trimmed_key, lineNum, line);
+//     DualLogError("Unknown key %s at line %u: %s\n", trimmed_key, lineNum, line);
     return false;
 }
 

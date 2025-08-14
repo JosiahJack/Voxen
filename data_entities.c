@@ -10,8 +10,8 @@
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 int entityCount = 0;            // Number of entities loaded
 DataParser entity_parser;
-const char *valid_entity_keys[] = {"index", "model", "texture", "glowtexture", "spectexture", "normtexture", "cardchunk"};
-#define NUM_ENTITY_KEYS 7
+const char *valid_entity_keys[] = {"index", "model", "texture", "glowtexture", "spectexture", "normtexture", "cardchunk", "lod"};
+#define NUM_ENTITY_KEYS 8
 bool entity_parser_initialized = false;
 
 typedef enum {
@@ -51,7 +51,8 @@ int LoadEntities(void) {
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
-        
+        entities[i].lodIndex = entity_parser.entries[i].cardchunk ? 178: entity_parser.entries[i].lodIndex; // Generic LOD card
+
 //         DualLog("Added entity type: %s, modelIndex: %d, texIndex: %d, "
 //                 "glowIndex: %d, specIndex: %d, normIndex: %d\n",
 //                 entities[i].name, entities[i].modelIndex, entities[i].texIndex,

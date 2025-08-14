@@ -11,6 +11,7 @@ const char *deferredLighting_computeShader =
     "    int glowIndex;\n"
     "    int specIndex;\n"
     "    int normIndex;\n"
+    "    int lodIndex;\n"
     "    float posx;\n"
     "    float posy;\n"
     "    float posz;\n"

@@ -14,6 +14,7 @@ typedef struct {
     uint16_t glowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
+    uint16_t lodIndex;
     bool cardchunk;
     char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, nice even multiple of 4 bytes
 } Entity;

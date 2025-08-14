@@ -818,7 +818,7 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS: /*LoadLevels();*/ return 0;
+        case EV_LOAD_LEVELS: LoadLevels(); return 0;
         case EV_LOAD_VOXELS: VXGI_Init(); return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
@@ -1046,13 +1046,16 @@ int main(int argc, char* argv[]) {
         // 2. Instance Culling to only those in range of player
         if (debugRenderSegfaults) DualLog("2. Instance Culling to only those in range of player\n");
         bool instanceIsCulledArray[INSTANCE_COUNT];
+        bool instanceIsLODArray[INSTANCE_COUNT];
         memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
+        memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         float distSqrd = 0.0f;
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
             
             distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
             if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
+            if (distSqrd < 20.48f) instanceIsLODArray[i] = false; // Use full detail up close.
         }
         
         uint16_t instancesInPVSCount = 0;
@@ -1130,7 +1133,8 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glUniform1i(instanceIndexLoc_chunk, i);
             CHECK_GL_ERROR();
-            int modelType = instances[i].modelIndex;
+
+            int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
             glUniform1i(modelIndexLoc_chunk, modelType);
             CHECK_GL_ERROR();
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);

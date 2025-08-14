@@ -2489,3 +2489,11 @@ index: 1243
 index: 1244
 #Textures/a544643spec.png
 index: 1245
+#Textures/lift1.png
+index: 1246
+#Textures/lift1_glow.png
+index: 1247
+#Textures/lift1d.png
+index: 1248
+#Textures/lift1d_glow.png
+index: 1249

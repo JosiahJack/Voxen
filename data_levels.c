@@ -37,124 +37,10 @@ bool floatEquivalent(float val1, float val2) {
 }
 
 void unity_to_engine_quat(Quaternion* out, Quaternion* in) {
-//     if (floatEquivalent(in->x, 0.0f) && floatEquivalent(in->y, 0.70711f) && floatEquivalent(in->z, 0.70711f) && floatEquivalent(in->w, 0.0f)) {
-//         // North (Y+): Unity (0, 0.70711, 0.70711, 0) -> Engine (0, 0, 0, 1)
-//         out->x = 0.0f; out->y = 0.0f; out->z = 0.0f; out->w = 1.0f;
-//         return;
-//     } else if (floatEquivalent(in->x, -0.70711f) && floatEquivalent(in->y, 0.0f) && floatEquivalent(in->z, 0.0f) && floatEquivalent(in->w, 0.70711f)) {
-//         // South (Y-): Unity (-0.70711, 0, 0, 0.70711) -> Engine (0, 0, 1, 0)
-//         out->x = 0.0f; out->y = 0.0f; out->z = 1.0f; out->w = 0.0f;
-//         return;
-//     } else if (floatEquivalent(in->x, 0.0f) && floatEquivalent(in->y, 0.70711f) && floatEquivalent(in->z, 0.0f) && floatEquivalent(in->w, 0.70711f)) {
-//         // East (X+): Unity (0, 0.70711, 0, 0.70711) -> Engine (0, 0, 0.707107, 0.707107)
-//         out->x = 0.0f; out->y = 0.0f; out->z = 0.707107f; out->w = 0.707107f;
-//         return;
-//     } else if (floatEquivalent(in->x, 0.0f) && floatEquivalent(in->y, -0.70711f) &&  floatEquivalent(in->z, 0.0f) && floatEquivalent(in->w, 0.70711f)) {
-//         // West (X-): Unity (0, -0.70711, 0, 0.70711) -> Engine (0, 0, -0.707107, 0.707107)
-//         out->x = 0.0f; out->y = 0.0f; out->z = -0.707107f; out->w = 0.707107f;
-//         return;
-//     } else if (floatEquivalent(in->x, 0.0f) && floatEquivalent(in->y, 0.0f) && floatEquivalent(in->z, -0.70711f) && floatEquivalent(in->w, 0.70711f)) {
-//         // Down (Z-): Unity (0, 0, -0.70711, 0.70711) -> Engine (-0.707107, 0, 0, 0.707107)
-//         out->x = -0.707107f; out->y = 0.0f; out->z = 0.0f; out->w = 0.707107f;
-//         return;
-//     }  else if (floatEquivalent(in->x, 1.0f) && floatEquivalent(in->y, 0.0f) && floatEquivalent(in->z, 0.0f) && floatEquivalent(in->w, 0.0f)) {
-//         // Up (Z+): Unity (1, 0, 0, 0) -> Engine (0.707107, 0, 0, 0.707107)
-//         out->x = 0.707107f; out->y = 0.0f; out->z = 0.0f; out->w = 0.707107f;
-//         return;
-//     } else {
-//         // Fallback for unknown quaternions
-//         // TODO: Implement a general transformation if needed
-//         // For now, copy input to indicate unhandled case
-//         out->x = in->x; out->y = in->y; out->z = in->z; out->w = in->w;
-//         // Optional: Log a warning for debugging
-//         // printf("Unhandled Unity quaternion: x: %f, y: %f, z: %f, w: %f\n", in->x, in->y, in->z, in->w);
-//     }
-   
-    // Step 1: Invert Unity quaternion
-//     Quaternion qInverse = {
-//         .x = -in->x,
-//         .y = -in->y,
-//         .z = -in->z,
-//         .w = in->w
-//     };
-// 
-//     // Step 2: Convert to matrix
-//     float m[3][3];
-//     quat_to_matrix3x3(m, &qInverse);
-// 
-//     // Step 3: Coordinate transformation
-//     float T[3][3] = {
-//         { 1, 0, 0 },
-//         { 0, 0, 1 },
-//         { 0, 1, 0 }
-//     };
-// 
-//     // Step 4: Apply T * m
-//     float m_temp[3][3];
-//     for (int i = 0; i < 3; i++) {
-//         for (int j = 0; j < 3; j++) {
-//             m_temp[i][j] = T[i][0] * m[0][j] + T[i][1] * m[1][j] + T[i][2] * m[2][j];
-//         }
-//     }
-// 
-//     // Step 5: Corrective rotation
-//     float C[3][3] = {
-//         { -1,  0,  0 },
-//         {  0,  0,  1 },
-//         {  0,  1,  0 }
-//     };
-//     float m_final[3][3];
-//     for (int i = 0; i < 3; i++) {
-//         for (int j = 0; j < 3; j++) {
-//             m_final[i][j] = C[i][0] * m_temp[0][j] + C[i][1] * m_temp[1][j] + C[i][2] * m_temp[2][j];
-//         }
-//     }
-// 
-//     // Step 6: Convert back to quaternion
-//     float trace = m_final[0][0] + m_final[1][1] + m_final[2][2];
-//     if (trace > 0) {
-//         float s = 0.5f / sqrtf(trace + 1.0f);
-//         out->w = 0.25f / s;
-//         out->x = (m_final[2][1] - m_final[1][2]) * s;
-//         out->y = (m_final[0][2] - m_final[2][0]) * s;
-//         out->z = (m_final[1][0] - m_final[0][1]) * s;
-//     } else if (m_final[0][0] > m_final[1][1] && m_final[0][0] > m_final[2][2]) {
-//         float s = 2.0f * sqrtf(1.0f + m_final[0][0] - m_final[1][1] - m_final[2][2]);
-//         out->x = 0.25f * s;
-//         out->y = (m_final[0][1] + m_final[1][0]) / s;
-//         out->z = (m_final[0][2] + m_final[2][0]) / s;
-//         out->w = (m_final[2][1] - m_final[1][2]) / s;
-//     } else if (m_final[1][1] > m_final[2][2]) {
-//         float s = 2.0f * sqrtf(1.0f + m_final[1][1] - m_final[0][0] - m_final[2][2]);
-//         out->x = (m_final[0][1] + m_final[1][0]) / s;
-//         out->y = 0.25f * s;
-//         out->z = (m_final[1][2] + m_final[2][1]) / s;
-//         out->w = (m_final[0][2] - m_final[2][0]) / s;
-//     } else {
-//         float s = 2.0f * sqrtf(1.0f + m_final[2][2] - m_final[0][0] - m_final[1][1]);
-//         out->x = (m_final[0][2] + m_final[2][0]) / s;
-//         out->y = (m_final[1][2] + m_final[2][1]) / s;
-//         out->z = 0.25f * s;
-//         out->w = (m_final[1][0] - m_final[0][1]) / s;
-//     }
-// 
-//     // Normalize
-//     float mag = sqrtf(out->x * out->x + out->y * out->y + out->z * out->z + out->w * out->w);
-//     if (mag > 0) {
-//         out->x /= mag;
-//         out->y /= mag;
-//         out->z /= mag;
-//         out->w /= mag;
-//     }
-//     
-//     if (floatEquivalent(in->x,0.0F) && floatEquivalent(in->y,0.70711F) && floatEquivalent(in->z,0.70711F) && floatEquivalent(in->w,0.0F)) {
-//         printf("Rotation for North cell chunk (faces south) resulted in x %f y %f z %f w %f\n",out->x,out->y,out->z,out->w);
-//     }
-    
     // Flip handedness: invert x, y, z
     out->x = -in->x;
-    out->y = -in->y;
-    out->z = -in->z;
+    out->y = in->z;
+    out->z = in->y;
     out->w = in->w;
 
     // Normalize
@@ -166,17 +52,12 @@ void unity_to_engine_quat(Quaternion* out, Quaternion* in) {
         out->w /= mag;
     }
 
-    // Debug
-    if (floatEquivalent(in->x, 0.0f) && floatEquivalent(in->y, 0.70711f) && 
-        floatEquivalent(in->z, 0.70711f) && floatEquivalent(in->w, 0.0f)) {
-        printf("North: x %f y %f z %f w %f\n", out->x, out->y, out->z, out->w);
-    } else if (floatEquivalent(in->x, -0.70711f) && floatEquivalent(in->y, 0.0f) && 
-               floatEquivalent(in->z, 0.0f) && floatEquivalent(in->w, 0.70711f)) {
-        printf("South: x %f y %f z %f w %f\n", out->x, out->y, out->z, out->w);
-    } else if (floatEquivalent(in->x, 1.0f) && floatEquivalent(in->y, 0.0f) && 
-               floatEquivalent(in->z, 0.0f) && floatEquivalent(in->w, 0.0f)) {
-        printf("Up: x %f y %f z %f w %f\n", out->x, out->y, out->z, out->w);
-    }
+    Quaternion correqtion;
+    correqtion.x = 0.5f;
+    correqtion.y = -0.5f;
+    correqtion.z = 0.5f;
+    correqtion.w = 0.5f;
+    quat_multiply(out, &correqtion, out);
 }
 
 int LoadLevelGeometry(uint8_t curlevel) {
@@ -197,6 +78,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].glowIndex = entities[entIdx].glowIndex;
         instances[idx].specIndex = entities[entIdx].specIndex;
         instances[idx].normIndex = entities[entIdx].normIndex;
+        instances[idx].lodIndex = entities[entIdx].lodIndex;
         instances[idx].posx = level_parser.entries[idx].localPosition.x;
         instances[idx].posy = level_parser.entries[idx].localPosition.z;
         instances[idx].posz = level_parser.entries[idx].localPosition.y;

@@ -26,6 +26,7 @@ typedef struct {
     bool cardchunk;
     bool doublesided;
     uint16_t constIndex; // Changed to uint16_t to align with MAX_ENTRIES
+    uint16_t lodIndex; // Model index for LOD to use when far away
     struct { float x, y, z; } localPosition;
     struct { float x, y, z, w; } localRotation;
     struct { float x, y, z; } localScale;
