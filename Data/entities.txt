@@ -711,6 +711,7 @@ texture: 505
 index: 178
 model: 280
 texture: 513
+glowtexture: 511
 normtexture: 512
 #chunk_med2_1_slice32RH
 index: 179
@@ -720,6 +721,7 @@ normtexture: 512
 #chunk_med2_1d
 index: 180
 model: 279
+glowtexture: 508
 texture: 510
 #chunk_med2_2
 index: 181

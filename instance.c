@@ -93,16 +93,30 @@ int SetupInstances(void) {
     instances[472].sclz = 1.0f;
     
     // Cornell Box
+    instances[0].modelIndex = 280;
     instances[0].texIndex = 513; // North med2_1
+    instances[0].glowIndex = 511;
     instances[0].specIndex = 1242;
-    instances[1].texIndex = 515; // South med2_1d
+
+    instances[1].modelIndex = 282;
+    instances[1].texIndex = 515; // South med2_2d
+    instances[1].glowIndex = 508;
     instances[1].specIndex = 1242;
+
+    instances[2].modelIndex = 244;
     instances[2].texIndex = 483; // East maint3_1
-    instances[3].texIndex = 482; // West maint3_1d 
-    instances[4].texIndex = 499; // floor med1_9 bright teal light
-    instances[4].specIndex = 1242;
-    instances[5].texIndex = 507; // ceil med1_7 medical tile floor
-    instances[5].specIndex = 1236;
+
+    instances[3].modelIndex = 243;
+    instances[3].texIndex = 482; // West maint3_1d
+    instances[3].glowIndex = 481;
+
+    instances[5].modelIndex = 262;
+    instances[5].texIndex = 499; // floor med1_9 bright teal light
+    instances[5].specIndex = 1242;
+
+    instances[4].modelIndex = 278;
+    instances[4].texIndex = 507; // ceil med1_7 medical tile floor
+    instances[4].specIndex = 1236;
     
     
     // 0: Identity rotation (cell North side Y+ from cell center)
