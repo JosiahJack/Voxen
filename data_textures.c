@@ -93,7 +93,7 @@ int LoadTextures(void) {
     if (!texturePaletteOffsets) { DualLogError("Failed to allocate textureOffsets buffer\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_PALOFFSETS] = true;
     DebugRAM("after texturePaletteOffsets mallocn");
-    
+
     doubleSidedTexture = malloc(textureCount * sizeof(bool));
     if (!doubleSidedTexture) { DualLogError("Failed to allocate doubleSidedTexture buffer\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_DOUBLESIDES] = true;

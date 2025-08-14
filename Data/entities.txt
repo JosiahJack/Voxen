@@ -55,7 +55,6 @@ texture: 47
 #chunk_bridg1_3_slice45
 index: 6
 model: 21
-cardchunk: 1
 texture: 47
 #chunk_bridg1_3flipx
 index: 7
@@ -70,12 +69,10 @@ texture: 48
 #chunk_bridg1_4_slice32
 index: 9
 model: 23
-cardchunk: 1
 texture: 48
 #chunk_bridg1_4_slice32flipx
 index: 10
 model: 24
-cardchunk: 1
 texture: 48
 #chunk_bridg1_5
 index: 11
@@ -130,7 +127,6 @@ glowtexture: 63
 #chunk_crate_impenetrable
 index: 20
 model: 61
-cardchunk: 1
 texture: 150
 #chunk_cyberpanel
 index: 21
@@ -141,7 +137,6 @@ glowtexture: 151
 #chunk_cyberpanel_slice45
 index: 22
 model: 180
-cardchunk: 1
 texture: 152
 glowtexture: 152
 #chunk_eng1_1
@@ -188,12 +183,10 @@ texture: 262
 #chunk_eng1_5_slice45lh
 index: 31
 model: 104
-cardchunk: 1
 texture: 262
 #chunk_eng1_5_slice45rh
 index: 32
 model: 105
-cardchunk: 1
 texture: 262
 #chunk_eng1_5d
 index: 33
@@ -246,17 +239,14 @@ texture: 30
 #chunk_eng2_1_slice45
 index: 42
 model: 116
-cardchunk: 1
 texture: 30
 #chunk_eng2_1_slice384high
 index: 43
 model: 114
-cardchunk: 1
 texture: 30
 #chunk_eng2_1_slice384highrh
 index: 44
 model: 115
-cardchunk: 1
 texture: 30
 #chunk_eng2_1d
 index: 45
@@ -296,7 +286,6 @@ texture: 37
 #chunk_eng2_5_slice45
 index: 52
 model: 121
-cardchunk: 1
 texture: 37
 #chunk_eng2_6
 index: 53
@@ -350,7 +339,6 @@ texture: 46
 #chunk_exec2_4_slice45
 index: 63
 model: 132
-cardchunk: 1
 texture: 46
 #chunk_exec2_5
 index: 64
@@ -388,7 +376,8 @@ index: 71
 model: 136
 cardchunk: 1
 texture: 54
-#chunkappdata: 72
+#chunk_exec4_2
+index: 72
 model: 137
 cardchunk: 1
 texture: 55
@@ -443,7 +432,6 @@ texture: 320
 #chunk_flight1_2_slice45rh
 index: 83
 model: 149
-cardchunk: 1
 texture: 320
 #chunk_flight1_3
 index: 84
@@ -462,7 +450,6 @@ texture: 323
 #chunk_flight1_5_slice45lh
 index: 87
 model: 148
-cardchunk: 1
 texture: 323
 #chunk_flight1_6
 index: 88
@@ -482,7 +469,6 @@ texture: 327
 #chunk_flight2_2_slice45
 index: 91
 model: 155
-cardchunk: 1
 texture: 327
 #chunk_flight2_3
 index: 92
@@ -500,7 +486,6 @@ cardchunk: 1
 texture: 363
 #chunk_grove1_2_slice45
 index: 95
-cardchunk: 1
 texture: 363
 #chunk_grove1_3
 index: 96
@@ -697,31 +682,41 @@ glowtexture: 467
 index: 135
 model: 234
 cardchunk: 1
-texture: 109
+texture: 466
+glowtexture: 465
 #chunk_maint2_6
 index: 136
 model: 236
 cardchunk: 1
-texture: 110
+texture: 472
+glowtexture: 471
 #chunk_maint2_6d
 index: 137
 cardchunk: 1
-texture: 111
+texture: 470
+glowtexture: 470
 #chunk_maint2_7
 index: 138
 model: 238
-texture: 112
+cardchunk: 1
+texture: 476
+glowtexture: 475
 #chunk_maint2_7d
 index: 139
 model: 237
-texture: 113
+cardchunk: 1
+texture: 474
+glowtexture: 473
 #chunk_maint2_8
 index: 140
 model: 239
-texture: 114
+cardchunk: 1
+texture: 478
+glowtexture: 477
 #chunk_maint2_9
 index: 141
 model: 240
+cardchunk: 1
 texture: 480
 glowtexture: 479
 #chunk_maint2_9_slice45RH
@@ -737,26 +732,30 @@ glowtexture: 479
 #chunk_maint3_1
 index: 144
 model: 244
+cardchunk: 1
 texture: 483
 #chunk_maint3_1_slice32_lh
 index: 145
 model: 246
-texture: 116
+texture: 483
 #chunk_maint3_1_slice32_rh
 index: 146
 model: 245
-texture: 116
+texture: 483
 #chunk_maint3_1_slice45
 index: 147
 model: 247
-texture: 116
+texture: 483
 #chunk_maint3_1d
 index: 148
 model: 243
-texture: 117
+cardchunk: 1
+texture: 482
+glowtexture: 481
 #chunk_med1_1
 index: 149
 model: 249
+cardchunk: 1
 texture: 486
 #chunk_med1_1_half_top
 index: 150
@@ -777,39 +776,50 @@ texture: 486
 #chunk_med1_1d
 index: 154
 model: 248
+cardchunk: 1
 texture: 485
 glowtexture: 484
 #chunk_med1_2
 index: 155
 model: 255
+cardchunk: 1
 texture: 489
+glowtexture: 488
 #chunk_med1_2d
 index: 156
 model: 254
+cardchunk: 1
 texture: 487
-glowtexture: 488
 #chunk_med1_3
 index: 157
 model: 257
+cardchunk: 1
 texture: 493
+glowtexture: 492
 #chunk_med1_3d
 index: 158
 model: 256
+cardchunk: 1
 texture: 491
+glowtexture: 490
 #chunk_med1_4
 index: 159
 model: 258
+cardchunk: 1
 texture: 494
 #chunk_med1_5
 index: 160
+cardchunk: 1
 texture: 495
 #chunk_med1_6
 index: 161
 model: 259
+cardchunk: 1
 texture: 496
 #chunk_med1_7
 index: 162
 model: 262
+cardchunk: 1
 texture: 499
 #chunk_med1_7_slice14_64
 index: 163
@@ -830,6 +840,7 @@ texture: 499
 #chunk_med1_7d
 index: 167
 model: 260
+cardchunk: 1
 texture: 497
 #chunk_med 1_7d_slice128
 index: 168
@@ -838,18 +849,22 @@ texture: 497
 #chunk_med1_8
 index: 169
 model: 268
+cardchunk: 1
 texture: 503
 #chunk_med1_8d
 index: 170
 model: 267
+cardchunk: 1
 texture: 501
 #chunk_med1_9
 index: 171
 model: 278
+cardchunk: 1
 texture: 507
 #chunk_med1_9d
 index: 174
 model: 269
+cardchunk: 1
 texture: 505
 #chunk_med1_9d_ofs112_90
 index: 176
@@ -862,6 +877,7 @@ texture: 505
 #chunk_med2_1
 index: 178
 model: 280
+cardchunk: 1
 texture: 513
 glowtexture: 511
 normtexture: 512
@@ -878,44 +894,59 @@ texture: 510
 #chunk_med2_2
 index: 181
 model: 283
+cardchunk: 1
 texture: 517
+glowtexture: 516
 #chunk_med2_2_half_bottom
 index: 182
 model: 284
 texture: 517
+glowtexture: 516
 #chunk_med2_2d
 index: 183
 model: 282
+cardchunk: 1
 texture: 515
 glowtexture: 516
 #chunk_med2_3
 index: 184
 model: 286
+cardchunk: 1
 texture: 521
+glowtexture: 520
 #chunk_med2_3d
 index: 185
 model: 285
+cardchunk: 1
 texture: 519
+glowtexture: 518
 #chunk_med2_4
 index: 186
 model: 287
+cardchunk: 1
 texture: 523
 glowtexture: 522
 #chunk_med2_5
 index: 187
 model: 288
+cardchunk: 1
 texture: 527
+glowtexture: 526
 #chunk_med2_6
 index: 188
 model: 289
+cardchunk: 1
 texture: 528
 #chunk_med2_7
 index: 189
 model: 290
+cardchunk: 1
 texture: 530
+glowtexture: 529
 #chunk_med2_8
 index: 190
 model: 291
+cardchunk: 1
 texture: 531
 #chunk_med2_8_half_top
 index: 191
@@ -932,28 +963,35 @@ texture: 531
 #chunk_med2_9
 index: 194
 model: 296
+cardchunk: 1
 texture: 535
 glowtexture: 534
 #chunk_med2_9d
 index: 195
 model: 295
+cardchunk: 1
 texture: 533
+glowtexture: 532
 #chunk_med3_1
 index: 196
 model: 297
+cardchunk: 1
 texture: 536
 #chunk_rad1_1
 index: 197
 model: 501
+cardchunk: 1
 texture: 660
 glowtexture: 659
 #chunk_rad1_2
 index: 198
+cardchunk: 1
 texture: 662
 glowtexture: 661
 #chunk_reac1_1
 index: 199
 model: 502
+cardchunk: 1
 texture: 664
 #chunk_reac1_1_slice45
 index: 200
@@ -961,40 +999,53 @@ texture: 664
 #chunk_reac1_2
 index: 201
 model: 503
+cardchunk: 1
 texture: 665
 #chunk_reac1_3
 index: 202
 model: 504
+cardchunk: 1
 texture: 666
 #chunk_reac1_4
 index: 203
 model: 505
+cardchunk: 1
 texture: 668
 glowtexture: 667
 spectexture: 669
 #chunk_reac1_5
 index: 204
 model: 506
+cardchunk: 1
 texture: 671
 glowtexture: 670
 #chunk_reac1_6
 index: 205
 model: 507
+cardchunk: 1
 texture: 673
+glowtexture: 672
 #chunk_reac1_7
 index: 206
+cardchunk: 1
 texture: 676
+glowtexture: 675
 #chunk_reac1_8
 index: 207
 model: 508
+cardchunk: 1
 texture: 678
+glowtexture: 678
 #chunk_reac1_9
 index: 208
 model: 509
+cardchunk: 1
 texture: 680
+glowtexture: 680
 #chunk_reac2_1
 index: 209
 model: 512
+cardchunk: 1
 texture: 682
 #chunk_reac2_1_slice45LH
 index: 210
@@ -1015,22 +1066,28 @@ texture: 682
 #chunk_reac2_1b
 index: 214
 model: 510
+cardchunk: 1
 texture: 681
 #chunk_reac2_1bmirror
 index: 215
 model: 511
+cardchunk: 1
 texture: 681
 #chunk_reac2_1mirror
 index: 216
 model: 513
+cardchunk: 1
 texture: 682
 #chunk_reac2_2
 index: 217
 model: 518
+cardchunk: 1
 texture: 684
+glowtexture: 683
 #chunk_reac2_4
 index: 218
 model: 519
+cardchunk: 1
 texture: 685
 #chunk_reac2_4_slice128lower
 index: 219
@@ -1038,60 +1095,75 @@ texture: 685
 #chunk_reac2_5
 index: 220
 model: 520
+cardchunk: 1
 texture: 687
+glowtexture: 686
 #chunk_reac2_6
 index: 221
 model: 521
+cardchunk: 1
 texture: 689
 glowtexture: 688
 #chunk_reac2_7
 index: 222
 model: 522
+cardchunk: 1
 texture: 691
 glowtexture: 690
 #chunk_reac2_8
 index: 223
 model: 523
+cardchunk: 1
 texture: 693
 glowtexture: 692
 #chunk_reac2_9
 index: 224
 model: 524
+cardchunk: 1
 texture: 694
 #chunk_reac3_1
 index: 225
 model: 525
+cardchunk: 1
 texture: 696
+glowtexture: 695
 #chunk_reac3_2
 index: 226
 model: 526
+cardchunk: 1
 texture: 697
 #chunk_reac3_3
 index: 227
 model: 527
+cardchunk: 1
 texture: 698
 #chunk_reac3_4
 index: 228
 model: 528
+cardchunk: 1
 texture: 699
 #chunk_reac3_5
 index: 229
 model: 529
+cardchunk: 1
 texture: 701
 glowtexture: 700
 #chunk_reac3_6
 index: 230
 model: 530
+cardchunk: 1
 texture: 703
 glowtexture: 702
 #chunk_reac3_7
 index: 231
 model: 531
+cardchunk: 1
 texture: 704
 spectexture: 705
 #chunk_reac4_1
 index: 232
 model: 532
+cardchunk: 1
 texture: 707
 glowtexture: 706
 #chunk_reac4_1_slice45lh
@@ -1101,282 +1173,364 @@ texture: 707
 #chunk_reac4_2
 index: 234
 model: 534
+cardchunk: 1
 texture: 709
+glowtexture: 708
 #chunk_reac5_1
 index: 235
 model: 535
-texture: 176
+cardchunk: 1
+texture: 711
+glowtexture: 710
 #chunk_reac5_2
 index: 236
 model: 536
-texture: 177
+cardchunk: 1
+texture: 713
+glowtexture: 712
 #chunk_reac5_3
 index: 237
 model: 537
-texture: 178
+cardchunk: 1
+texture: 715
+glowtexture: 714
 #chunk_reac6_1
 index: 238
 model: 538
-texture: 179
+cardchunk: 1
+texture: 716
 #chunk_reac6_2
 index: 239
-texture: 180
+cardchunk: 1
+texture: 717
 #chunk_reac6_3
 index: 240
 model: 539
-texture: 181
+cardchunk: 1
+texture: 719
+glowtexture: 718
 #chunk_sci1_1
 index: 241
 model: 545
-texture: 182
+cardchunk: 1
+texture: 722
 #chunk_sci1_1_slice45_toplh
 index: 242
 model: 542
-texture: 182
+texture: 722
 #chunk_sci1_1_slice45_toprh
 index: 243
 model: 543
-texture: 182
+texture: 722
 #chunk_sci1_1d
 index: 244
 model: 541
-texture: 183
+cardchunk: 1
+texture: 721
 #chunk_sci1_2
 index: 245
 model: 545
-texture: 184
+cardchunk: 1
+texture: 724
 #chunk_sci1_2_slice45lh
 index: 246
 model: 546
-texture: 184
+cardchunk: 1
+texture: 724
 #chunk_sci1_2_slice45lh_up
 index: 247
 model: 547
-texture: 184
+texture: 724
 #chunk_sci1_2_slice45rh
 index: 248
 model: 548
-texture: 184
+texture: 724
 #chunk_sci1_2_slice45rh_up
 index: 249
 model: 549
-texture: 184
+texture: 724
 #chunk_sci1_2d
 index: 250
 model: 544
-texture: 185
+cardchunk: 1
+texture: 723
 #chunk_sci1_3
 index: 251
 model: 550
-texture: 186
+cardchunk: 1
+texture: 726
+glowtexture: 725
 #chunk_sci1_4
 index: 252
-texture: 187
+cardchunk: 1
+texture: 727
 #chunk_sci1_5
 index: 253
 model: 551
-texture: 188
+cardchunk: 1
+texture: 728
 #chunk_sci1_6
 index: 254
 model: 552
-texture: 189
+cardchunk: 1
+texture: 729
 #chunk_sci1_6_slice45
 index: 255
 model: 553
-texture: 189
+texture: 729
 #chunk_sci1_7
 index: 256
 model: 555
-texture: 190
+cardchunk: 1
+texture: 731
 #chunk_sci1_7d
 index: 257
 model: 554
-texture: 191
+cardchunk: 1
+texture: 730
 #chunk_sci1_8
 index: 258
 model: 557
-texture: 192
+cardchunk: 1
+texture: 734
 #chunk_sci1_8d
 index: 259
 model: 556
-texture: 193
+cardchunk: 1
+texture: 733
 #chunk_sci1_9
 index: 260
 model: 559
-texture: 194
+cardchunk: 1
+texture: 737
 #chunk_sci1_9d
 index: 261
 model: 558
-texture: 195
+cardchunk: 1
+texture: 736
+glowtexture: 735
 #chunk_sci2_1
 index: 262
 model: 561
-texture: 196
+cardchunk: 1
+texture: 739
 #chunk_sci2_1_slice45lh
 index: 263
 model: 563
-texture: 196
+cardchunk: 1
+texture: 739
 #chunk_sci2_1_slice45rh
 index: 264
 model: 562
-texture: 196
+texture: 739
 #chunk_sci2_1d
 index: 265
 model: 560
-texture: 197
+cardchunk: 1
+texture: 738
 #chunk_sci2_2
 index: 266
 model: 565
-texture: 198
+cardchunk: 1
+texture: 742
+glowtexture: 741
 #chunk_sci2_2d
 index: 267
 model: 564
-texture: 199
+cardchunk: 1
+texture: 740
 #chunk_sci2_3
 index: 268
 model: 566
-texture: 200
+cardchunk: 1
+texture: 744
+glowtexture: 743
 #chunk_sci2_4
 index: 269
 model: 567
-texture: 201
+cardchunk: 1
+texture: 745
 #chunk_sci2_5
 index: 270
 model: 569
-texture: 202
+cardchunk: 1
+texture: 747
 #chunk_sci2_5d
 index: 271
 model: 568
-texture: 203
+cardchunk: 1
+texture: 746
 #chunk_sci3_1
 index: 272
 model: 571
-texture: 204
+cardchunk: 1
+texture: 749
 #chunk_sci3_1d
 index: 273
 model: 570
-texture: 205
+cardchunk: 1
+texture: 748
 #chunk_sci3_2
 index: 274
 model: 572
-texture: 206
+cardchunk: 1
+texture: 750
 #chunk_sci3_3
 index: 275
 model: 573
-texture: 207
+cardchunk: 1
+texture: 752
+glowtexture: 751
 #chunk_sci3_4
 index: 276
 model: 574
-texture: 208
+cardchunk: 1
+texture: 754
 #chunk_sci3_5
 index: 277
 model: 575
-texture: 209
+cardchunk: 1
+texture: 756
+glowtexture: 755
 #chunk_sci3_6
 index: 278
 model: 576
-texture: 210
+cardchunk: 1
+texture: 758
+glowtexture: 757
 #chunk_screen
 index: 279
+cardchunk: 1
 texture: 29
+glowtexture: 29
 #chunk_sec1_1
 index: 280
-texture: 211
+cardchunk: 1
+texture: 787
 #chunk_sec1_1b
 index: 281
-texture: 212
+cardchunk: 1
+texture: 785
 #chunk_sec1_1c
 index: 282
 model: 577
-texture: 213
+cardchunk: 1
+texture: 786
 #chunk_sec1_1c_slice45
 index: 283
 model: 580
-texture: 213
+texture: 786
 #chunk_sec1_1c_slice64highlh
 index: 284
 model: 581
-texture: 213
+texture: 786
 #chunk_sec1_1c_slice64highrh
 index: 285
 model: 582
-texture: 213
+texture: 786
 #chunk_sec1_2
 index: 288
 model: 584
-texture: 214
+cardchunk: 1
+texture: 789
 #chunk_sec1_2b
 index: 289
 model: 583
-texture: 215
+cardchunk: 1
+texture: 788
 #chunk_sec1_3
 index: 290
 model: 585
-texture: 216
+cardchunk: 1
+texture: 790
 #chunk_sec1_3_slice45
 index: 291
 model: 586
-texture: 216
+texture: 790
 #chunk_stor1_1
 index: 292
 model: 597
-texture: 217
+cardchunk: 1
+texture: 824
+glowtexture: 823
 #chunk_stor1_2
 index: 293
-texture: 218
+cardchunk: 1
+texture: 825
 #chunk_stor1_3
 index: 294
 model: 598
-texture: 219
+cardchunk: 1
+texture: 826
 #chunk_stor1_4
 index: 295
 model: 599
-texture: 220
+cardchunk: 1
+texture: 827
 #chunk_stor1_5
 index: 296
 model: 600
-texture: 221
+cardchunk: 1
+texture: 828
 #chunk_stor1_6
 index: 297
 model: 601
-texture: 222
+cardchunk: 1
+texture: 829
 #chunk_stor1_6_slice128_up_lh
 index: 298
 model: 602
-texture: 222
+texture: 829
 #chunk_stor1_6_slice128_up_rh
 index: 299
 model: 603
-texture: 222
+texture: 829
 #chunk_stor1_6_slice192lh
 index: 300
 model: 604
-texture: 222
+texture: 829
 #chunk_stor1_6_slice192rh
 index: 301
 model: 605
-texture: 222
+texture: 829
 #chunk_stor1_7
 index: 302
 model: 606
-texture: 223
+cardchunk: 1
+texture: 833
+spectexture: 834
+normtexture: 832
 #chunk_stor1_7_slice45
 index: 303
 model: 607
-texture: 223
+texture: 833
+spectexture: 834
+normtexture: 832
 #chunk_stor1_7d
 index: 304
-texture: 224
+cardchunk: 1
+texture: 831
+glowtexture: 830
+normtexture: 832
+spectexture: 834
 #chunk_teleporter
 index: 305
+model: 178
+cardchunk: 1
+texture: 1166
 #chunk_white
 index: 306
+model: 178
+cardchunk: 1
+texture: 881
 #item_paper_wad
 index: 307
 model: 487
+texture: 1250
 #item_warecasing
 index: 308
 model: 637
+texture: 1251
 #item_beaker
 index: 309
 model: 14

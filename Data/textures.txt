@@ -2497,3 +2497,7 @@ index: 1247
 index: 1248
 #Textures/lift1d_glow.png
 index: 1249
+#Textures/deb_wad.png
+index: 1250
+#Textures/deb_warecasing.png
+index: 1251

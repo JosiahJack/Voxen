@@ -1050,12 +1050,13 @@ int main(int argc, char* argv[]) {
         memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
         memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         float distSqrd = 0.0f;
+        float lodRangeSqrd = 20.48f * 20.48f;
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
             
             distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
             if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
-            if (distSqrd < 20.48f) instanceIsLODArray[i] = false; // Use full detail up close.
+            if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
         }
         
         uint16_t instancesInPVSCount = 0;
