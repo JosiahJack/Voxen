@@ -63,8 +63,8 @@ const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
+float cam_x = -6.44f, cam_y = 0.0f, cam_z = -2.56f; // Camera position Cornell box
 // float cam_x = -20.40001f, cam_y = -43.52f, cam_z = 10.2f; // Camera position Unity
-float cam_x = -6.44f, cam_y = 0.0f, cam_z = -2.56f; // Camera position Voxen
 // float cam_x = -15.65f, cam_z = 25.54f, cam_y = 5.85f; // Camera position Voxen
 Quaternion cam_rotation;
 float cam_yaw = 0.0f;
@@ -72,7 +72,7 @@ float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
 float cam_fov = 65.0f;
 float move_speed = 0.1f;
-float mouse_sensitivity = 0.1f;                 // Mouse look sensitivity
+float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 

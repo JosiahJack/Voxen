@@ -49,17 +49,11 @@ void quat_multiply(Quaternion* result, Quaternion* q1, Quaternion* q2) {
 
 // Create a quaternion from an axis and angle (in radians)
 void quat_from_axis_angle(Quaternion* q, float x, float y, float z, float angle) {
-    // Remap axis: original (x, y, z) → Unity (x, z, y)
-    float unity_x = x;  // X (right) stays X
-    float unity_y = z;  // Z (up) → Y (up)
-    float unity_z = y;  // Y (forward) → Z (forward)
-
-    // Negate angle for left-handed rotation
     float half_angle = (-angle) * 0.5f;  // Negate for left-handed
     float s = sinf(half_angle);
-    q->x = unity_x * s;  // X-axis (right)
-    q->y = unity_y * s;  // Y-axis (up)
-    q->z = unity_z * s;  // Z-axis (forward)
+    q->x = x * s;  // X-axis (right)
+    q->y = y * s;  // Y-axis (up)
+    q->z = z * s;  // Z-axis (forward)
     q->w = cosf(half_angle);
     quat_normalize(q);
 }
@@ -97,17 +91,17 @@ void quat_to_matrix(Quaternion* q, float* m) {
     float zw = q->z * q->w;
 
     mat4_identity(m);
-    // Unity X (right) = Current X (right), negate Z component for left-handed
+    // X (right) = Current X (right), negate Z component for left-handed
     m[0]  = 1.0f - 2.0f * (yy + zz); // Xx
     m[1]  = 2.0f * (xy + zw);        // Xy
     m[2]  = -2.0f * (xz - yw);       // Xz (negated for left-handed)
 
-    // Unity Y (up) = Current Z (up)
+    // Y (up) = Current Z (up)
     m[4]  = 2.0f * (xz + yw);        // Zx
     m[5]  = 2.0f * (yz - xw);        // Zy
     m[6]  = 1.0f - 2.0f * (xx + yy); // Zz
 
-    // Unity Z (forward) = Current Y (forward), negate X component for left-handed
+    // Z (forward) = Current Y (forward), negate X component for left-handed
     m[8]  = -2.0f * (xy - zw);       // Yx (negated for left-handed)
     m[9]  = 1.0f - 2.0f * (xx + zz); // Yy
     m[10] = -2.0f * (yz + xw);       // Yz (negated for consistency)
@@ -132,7 +126,7 @@ void quat_from_yaw_pitch(Quaternion* q, float yaw_deg, float pitch_deg) {
     float sp = sin(half_pitch);
 
     // Compute quaternion for Y-X order (yaw around Y, pitch around X)
-    // Unity: yaw (Y), pitch (X), no roll
+    // yaw (Y), pitch (X), no roll
     q->w = cy * cp;
     q->x = cy * sp;  // X-axis (pitch)
     q->y = sy * cp;  // Y-axis (yaw)
@@ -195,14 +189,8 @@ void mat4_perspective(float* m, float fov, float aspect, float near, float far) 
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass
 void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orientation) {
-    // Remap eye position: (X, Y, Z) → (X, Z, Y) for Y+ up
-    float unity_eyeX = eyeX;  // X stays X
-    float unity_eyeY = eyeZ;  // Z → Y (up)
-    float unity_eyeZ = eyeY;  // Y → Z (forward)
-
-    // Get rotation matrix (Y+ up, left-handed)
     float rotation[16];
-    quat_to_matrix(orientation, rotation);
+    quat_to_matrix(orientation, rotation); // Get rotation matrix (Y+ up, left-handed)
 
     // Extract right, up, forward vectors
     float right[3] = { rotation[0], rotation[1], rotation[2] };   // X-axis (right)
@@ -214,11 +202,11 @@ void mat4_lookat(float* m, float eyeX, float eyeY, float eyeZ, Quaternion* orien
     normalize_vector(&up[0], &up[1], &up[2]);
     normalize_vector(&forward[0], &forward[1], &forward[2]);
 
-    // Build view matrix (right-handed view space: Z- forward)
+    // Build view matrix (view space: Z- forward)
     mat4_identity(m);
-    m[0] = right[0];   m[4] = right[1];   m[8]  = right[2];   m[12] = -(right[0] * unity_eyeX + right[1] * unity_eyeY + right[2] * unity_eyeZ);
-    m[1] = up[0];      m[5] = up[1];      m[9]  = up[2];      m[13] = -(up[0] * unity_eyeX + up[1] * unity_eyeY + up[2] * unity_eyeZ);
-    m[2] = -forward[0]; m[6] = -forward[1]; m[10] = -forward[2]; m[14] = (forward[0] * unity_eyeX + forward[1] * unity_eyeY + forward[2] * unity_eyeZ);
+    m[0] = right[0];   m[4] = right[1];   m[8]  = right[2];   m[12] = -(right[0] * eyeX + right[1] * eyeY + right[2] * eyeZ);
+    m[1] = up[0];      m[5] = up[1];      m[9]  = up[2];      m[13] = -(up[0] * eyeX + up[1] * eyeY + up[2] * eyeZ);
+    m[2] = -forward[0]; m[6] = -forward[1]; m[10] = -forward[2]; m[14] = -(forward[0] * eyeX + forward[1] * eyeY + forward[2] * eyeZ);
     m[3] = 0.0f;       m[7] = 0.0f;       m[11] = 0.0f;       m[15] = 1.0f;
 }
 
@@ -285,17 +273,17 @@ void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx
 
     float rot[16];
     mat4_identity(rot);
-    // Unity X (right) = Original X (right), negate Z component for left-handed
+    // X (right) = Original X (right), negate Z component for left-handed
     rot[0] = 1.0f - 2.0f * (yy + zz); // Xx
     rot[1] = 2.0f * (xy + zw);        // Xy
     rot[2] = -2.0f * (xz - yw);       // Xz (negated)
 
-    // Unity Y (up) = Original Z (up)
+    // Y (up) = Original Z (up)
     rot[4] = 2.0f * (xz + yw);        // Zx
     rot[5] = 2.0f * (yz - xw);        // Zy
     rot[6] = 1.0f - 2.0f * (xx + yy); // Zz
 
-    // Unity Z (forward) = Original Y (forward), negate X and Z components
+    // Z (forward) = Original Y (forward), negate X and Z components
     rot[8] = -2.0f * (xy - zw);       // Yx (negated)
     rot[9] = 1.0f - 2.0f * (xx + zz); // Yy
     rot[10] = -2.0f * (yz + xw);      // Yz (negated)
