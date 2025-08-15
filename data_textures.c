@@ -5,12 +5,11 @@
 #define STBI_NO_STDIO
 #define STBI_ONLY_PNG
 #define STBI_MAX_DIMENSIONS 4096
-#include "stb_image.h"
+#include "External/stb_image.h"
 #include <GL/glew.h>
 #include <uthash.h>
 #include "data_parser.h"
 #include "data_textures.h"
-#include "constants.h"
 #include "debug.h"
 #include "render.h"
 #include "event.h"
@@ -59,7 +58,6 @@ typedef enum {
 bool loadTextureItemInitialized[TEX_COUNT] = { [0 ... TEX_COUNT - 1] = false };
 
 int LoadTextures(void) {
-    CHECK_GL_ERROR();
     double start_time = get_time();
     DebugRAM("before LoadTextures");
     textureCount = 0u;
@@ -174,21 +172,15 @@ int LoadTextures(void) {
 
     // Create SSBO for texture palettes
     glGenBuffers(1, &texturePalettesID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
-    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColors * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     DebugRAM("after glGenBuffers texturePalettesID");
     
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    CHECK_GL_ERROR();
     int colorBufferSize = ((totalPixels + 1) / 2) * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, colorBufferSize, NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     loadTextureItemInitialized[TEX_SSBOS] = true;
     DebugRAM("after glGenBuffers colorBufferID");
 
@@ -202,11 +194,8 @@ int LoadTextures(void) {
     
     GLuint stagingBuffer;
     glGenBuffers(1, &stagingBuffer);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
-    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, (((4096 * 4096) + 1) / 2) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY); // Max texture size
-    CHECK_GL_ERROR();
     DebugRAM("after glGenBuffers stagingBuffer");
     for (uint16_t i = 0; i < textureCount; i++) {
         int matchedParserIdx = -1;
@@ -266,7 +255,6 @@ int LoadTextures(void) {
         // letting the OpenGL driver delete the copy in RAM for CPU side and
         // just let VRAM alone store the texture data.
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
-        CHECK_GL_ERROR();
         uint32_t *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,((width * height + 1) / 2) * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         if (!mapped_buffer) { DualLogError("Failed to map stagingBuffer for %s\n", texture_parser.entries[matchedParserIdx].path); free(indices); glDeleteBuffers(1, &stagingBuffer); CleanupLoad(true); return 1; }
         
@@ -278,13 +266,10 @@ int LoadTextures(void) {
         }
         glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
         glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
-        CHECK_GL_ERROR();
         glBindBuffer(GL_COPY_WRITE_BUFFER, colorBufferID);
-        CHECK_GL_ERROR();
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, ((pixel_offset + 1) / 2) * sizeof(uint32_t), ((width * height + 1) / 2) * sizeof(uint32_t));
         glFlush();
         glFinish();
-        CHECK_GL_ERROR();
         pixel_offset += width * height;
         palette_offset += palette_size;
 #ifdef DEBUG_TEXTURE_LOAD_DATA
@@ -310,24 +295,16 @@ int LoadTextures(void) {
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     glFlush();
     glFinish();
-    CHECK_GL_ERROR();
     DebugRAM("after SSBO upload");
 #ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Largest palette size of %d\n", maxPalletSize);
 #endif
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID); // Set static buffer once for all shaders
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
-    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
-    CHECK_GL_ERROR();
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, totalPaletteColors * sizeof(uint32_t), texturePalettes);
-    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 16, texturePalettesID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
     
 #ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Total pixels in buffer %d (", totalPixels);
@@ -341,35 +318,21 @@ int LoadTextures(void) {
     
     // Send static uniforms to chunk shader
     glGenBuffers(1, &textureOffsetsID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureOffsetsID);
-    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, textureOffsetsID); // Set static buffer once for all shaders
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
     
     glGenBuffers(1, &textureSizesID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureSizesID);
-    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, textureSizesID); // Set static buffer once for all shaders
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
     
     glGenBuffers(1, &texturePaletteOffsetsID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePaletteOffsetsID);
-    CHECK_GL_ERROR();
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 17, texturePaletteOffsetsID);
-    CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
     CleanupLoad(false);

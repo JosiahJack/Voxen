@@ -2,7 +2,7 @@
 #define VOXEN_AUDIO_H
 
 #include <SDL2/SDL.h>
-#include "miniaudio.h"
+#include "External/miniaudio.h"
 // #include <fluidlite.h>
 // #include <libxmi.h>
 

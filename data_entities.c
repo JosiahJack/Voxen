@@ -3,7 +3,6 @@
 #include <SDL2/SDL.h>
 #include "data_entities.h"
 #include "data_parser.h"
-#include "constants.h"
 #include "debug.h"
 #include "event.h"
 
