@@ -599,11 +599,11 @@ void ProcessInput(void) {
     normalize_vector(&facing_x, &facing_y, &facing_z); // Normalize forward
     normalize_vector(&strafe_x, &strafe_y, &strafe_z); // Normalize strafe
     float finalMoveSpeed = (move_speed + (sprinting * move_speed));
-    if (keys[SDL_SCANCODE_F]) {
+    if (keys[SDL_SCANCODE_S]) {
         cam_x += finalMoveSpeed * facing_x; // Move forward
         cam_y += finalMoveSpeed * facing_y;
         cam_z += finalMoveSpeed * facing_z;
-    } else if (keys[SDL_SCANCODE_S]) {
+    } else if (keys[SDL_SCANCODE_F]) {
         cam_x -= finalMoveSpeed * facing_x; // Move backward
         cam_y -= finalMoveSpeed * facing_y;
         cam_z -= finalMoveSpeed * facing_z;
