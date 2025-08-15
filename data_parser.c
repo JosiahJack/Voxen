@@ -326,10 +326,7 @@ static bool parse_type3(DataParser *parser, const char *filename) {
     DualLog("startLevel: %d\n",startLevel);
     DualLog("Parsing file of type 3, save/level data, named: %s\n", filename);
     FILE *file = fopen(filename, "r");
-    if (!file) {
-        DualLogError("Cannot open %s\n", filename);
-        return false;
-    }
+    if (!file) { DualLogError("Cannot open %s\n", filename); return false; }
 
     int entry_count = 0;
     bool is_comment, is_eof, is_newline;
@@ -341,6 +338,7 @@ static bool parse_type3(DataParser *parser, const char *filename) {
             while ((c = fgetc(file)) != EOF && c != '\n');
             continue;
         }
+
         entry_count++;
         while ((c = fgetc(file)) != EOF && c != '\n');
     }

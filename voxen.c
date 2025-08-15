@@ -1101,7 +1101,7 @@ int main(int argc, char* argv[]) {
         float view[16], projection[16]; // Set up view and projection matrices
         float fov = 65.0f;
         float nearPlane = 0.02f;
-        float farPlane = 71.68f;
+        float farPlane = 25.0f;//71.68f;
         mat4_perspective(projection, fov, (float)screen_width / screen_height, nearPlane, farPlane);
         mat4_lookat(view, cam_x, cam_y, cam_z, &cam_rotation);
         glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
