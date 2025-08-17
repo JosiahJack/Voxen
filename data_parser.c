@@ -1078,24 +1078,24 @@ int LoadLevelGeometry(uint8_t curlevel) {
 
     // Barrel
     instances[458].posx = -2.2f;
-    instances[458].posy = -2.0f;
-    instances[458].posz = -1.28f;
+    instances[458].posz = -2.0f;
+    instances[458].posy = -1.28f;
     instances[458].rotx = 0.0f;
-    instances[458].roty = -0.357f; // -42deg around Y (yaw), to put glow pixel near wall for GI testing
-    instances[458].rotz = 0.0f;
-    instances[458].rotw = 0.934f;
+    instances[458].roty = 0.0f; // -42deg around Y (yaw), to put glow pixel near wall for GI testing
+    instances[458].rotz = -0.707106781f;
+    instances[458].rotw = 0.707106781f;
     instances[458].modelIndex = 12;
     instances[458].texIndex = 30;
     instances[458].specIndex = 32;
 
     // Crate
     instances[472].posx = -2.2f;
-    instances[472].posy = -3.4f;
-    instances[472].posz = -1.28f;
+    instances[472].posz = -3.4f;
+    instances[472].posy = -1.28f;
     instances[472].rotx = 0.0f;
-    instances[472].roty = 0.199f; // 23deg around Y (yaw), to put crate at fun angle for shadows/GI testing
+    instances[472].roty = 0.0f; // 23deg around Y (yaw), to put crate at fun angle for shadows/GI testing
     instances[472].rotz = 0.0f;
-    instances[472].rotw = 0.980f;
+    instances[472].rotw = 1.0f;
     instances[472].modelIndex = 60;
     instances[472].texIndex = 145;
     instances[472].glowIndex = 65535;
@@ -1121,39 +1121,20 @@ int LoadLevelGeometry(uint8_t curlevel) {
     instances[3].texIndex = 482; // West maint3_1d
     instances[3].glowIndex = 481;
 
-    instances[5].modelIndex = 262;
-    instances[5].texIndex = 499; // floor med1_9 bright teal light
-    instances[5].specIndex = 1242;
+    instances[4].modelIndex = 262;
+    instances[4].texIndex = 499; // floor med1_7 medical tile floor
+    instances[4].specIndex = 1242;
 
-    instances[4].modelIndex = 278;
-    instances[4].texIndex = 507; // ceil med1_7 medical tile floor
-    instances[4].specIndex = 1236;
-    instances[1].modelIndex = 282;
-    instances[1].texIndex = 515; // South med2_2d
-    instances[1].glowIndex = 508;
-    instances[1].specIndex = 1242;
+    instances[5].modelIndex = 278;
+    instances[5].texIndex = 507; // ceil med1_9 bright teal light
+    instances[5].specIndex = 1236;
 
-    instances[2].modelIndex = 244;
-    instances[2].texIndex = 483; // East maint3_1
-
-    instances[3].modelIndex = 243;
-    instances[3].texIndex = 482; // West maint3_1d
-    instances[3].glowIndex = 481;
-
-    instances[5].modelIndex = 262;
-    instances[5].texIndex = 499; // floor med1_9 bright teal light
-    instances[5].specIndex = 1242;
-
-    instances[4].modelIndex = 278;
-    instances[4].texIndex = 507; // ceil med1_7 medical tile floor
-    instances[4].specIndex = 1236;
-
-    instances[0].rotx = 0.0f; instances[0].roty = 0.0f; instances[0].rotz = 0.0f; instances[0].rotw = 1.0f; // 0: Identity rotation (cell North side Y+ from cell center)
-    instances[1].rotx = 0.0f; instances[1].roty = 1.0f; instances[1].rotz = 0.0f; instances[1].rotw = 0.0f; // 1: 180° around Z (cell South side Y- from cell center)
-    instances[2].rotx = 0.0f; instances[2].roty =  0.707106781f; instances[2].rotz = 0.0f; instances[2].rotw = 0.707106781f; // 2: +90° around Z (cell East side X+ from cell center)
-    instances[3].rotx = 0.0f; instances[3].roty = -0.707106781f; instances[3].rotz = 0.0f; instances[3].rotw = 0.707106781f;  // 3: −90° around Z (cell West side X− from cell center)
-    instances[4].rotx =  0.707106781f; instances[4].roty = 0.0f; instances[4].rotz = 0.0f; instances[4].rotw = 0.707106781f; // 4: +90° around X (cell Floor Z− from cell center)
-    instances[5].rotx = -0.707106781f; instances[5].roty = 0.0f; instances[5].rotz = 0.0f; instances[5].rotw = 0.707106781f; // 5: −90° around X (cell Ceil Z+ from cell center)
+    instances[0].rotx = 0.0f; instances[0].roty = 0.707106781f; instances[0].rotz = 0.707106781f; instances[0].rotw = 0.0; // 0: Identity rotation (cell North side Z+ from cell center)
+    instances[1].rotx = -0.707106781f; instances[1].roty = 0.0f; instances[1].rotz = 0.0f; instances[1].rotw = 0.707106781f; // 1: 180° around Y (cell South side Z- from cell center)
+    instances[2].rotx = 0.5f; instances[2].roty =  0.5f; instances[2].rotz = -0.5f; instances[2].rotw = 0.5f; // 2: +90° around Y (cell East side X+ from cell center)
+    instances[3].rotx = -0.5f; instances[3].roty = 0.5f; instances[3].rotz = 0.5f; instances[3].rotw = 0.5f;  // 3: −90° around Y (cell West side X− from cell center)
+    instances[4].rotx = 0.0f; instances[4].roty = 0.0f; instances[4].rotz = -1.0f; instances[4].rotw = 0.0f; // 4: +90° around X (cell Floor Y− from cell center)
+    instances[5].rotx = 0.0f; instances[5].roty = 1.0f; instances[5].rotz = 0.0f; instances[5].rotw = 0.0f; // 5: −90° around X (cell Ceil Y+ from cell center)
     parser_free(&level_parser);
     return 0;
 }

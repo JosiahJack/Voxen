@@ -88,8 +88,8 @@ bool in_cyberspace = true;
 float sprinting = 0.0f;
 
 float testLight_x = -2.56f;
-float testLight_y = -2.56f;
-float testLight_z = 1.12f;
+float testLight_z = -2.56f;
+float testLight_y = 1.12f;
 float testLight_intensity = 2.5f;
 float testLight_range = 3.0f;
 float testLight_spotAng = 0.0f;
@@ -748,27 +748,34 @@ float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z
 // ============================================================================
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx, float roty, float rotz, float rotw, float sclx, float scly, float sclz) {
     float x = rotx, y = roty, z = rotz, w = rotw;
+    float x2 = x * x, y2 = y * y, z2 = z * z;
+    float xy = x * y, xz = x * z, yz = y * z;
+    float wx = w * x, wy = w * y, wz = w * z;
+
+    // Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
     float rot[16];
-    rot[0] = 1.0f - 2.0f * (y*y + z*z); // Xx
-    rot[1] = 2.0f * (x * y + w * z);    // Xy
-    rot[2] = 2.0f * (x * z - w * y);    // Xz
-    rot[3] = 0.0f;
-    rot[4] = 2.0f * (x * z + w * z);    // Zx
-    rot[5] = 2.0f * (y * z - w * x);    // Zy
-    rot[6] = 1.0f - 2.0f * (x * x + y * y); // Zz
-    rot[7] = 0.0f;
-    rot[8] = 2.0f * (x * y - w * z);       // Yx
-    rot[9] = 1.0f - 2.0f * (x * x + z * z); // Yy
-    rot[10]= 2.0f * (y * z + w * x);      // Yz
-    rot[11]= 0.0f;
-    rot[12]= 0.0f;
-    rot[13]= 0.0f;
-    rot[14]= 0.0f;
-    rot[15]= 1.0f;
-    mat[0]  = rot[0] * sclx; mat[1]  = rot[1] * scly; mat[2]  = rot[2]  * sclz; mat[3]  = 0.0f;
-    mat[4]  = rot[4] * sclx; mat[5]  = rot[5] * scly; mat[6]  = rot[6]  * sclz; mat[7]  = 0.0f;
-    mat[8]  = rot[8] * sclx; mat[9]  = rot[9] * scly; mat[10] = rot[10] * sclz; mat[11] = 0.0f;
-    mat[12] =          posx; mat[13] =          posy; mat[14] =           posz; mat[15] = 1.0f;
+    rot[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
+    rot[1]  = 2.0f * (xy + wz);        // Right Y
+    rot[2]  = 2.0f * (xz - wy);        // Right Z
+    rot[3]  = 0.0f;
+    rot[4]  = 2.0f * (xy - wz);        // Up X
+    rot[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
+    rot[6]  = 2.0f * (yz + wx);        // Up Z
+    rot[7]  = 0.0f;
+    rot[8]  = 2.0f * (xz + wy);        // Forward X
+    rot[9]  = 2.0f * (yz - wx);        // Forward Y
+    rot[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
+    rot[11] = 0.0f;
+    rot[12] = 0.0f;
+    rot[13] = 0.0f;
+    rot[14] = 0.0f;
+    rot[15] = 1.0f;
+
+    // Apply uniform scaling to rotation matrix
+    mat[0]  = rot[0] * -sclx; mat[1]  = rot[1] * -sclx; mat[2]  = rot[2] * -sclx; mat[3]  = 0.0f;
+    mat[4]  = rot[4] * scly; mat[5]  = rot[5] * scly; mat[6]  = rot[6] * scly; mat[7]  = 0.0f;
+    mat[8]  = rot[8] * sclz; mat[9]  = rot[9] * sclz; mat[10] = rot[10] * sclz; mat[11] = 0.0f;
+    mat[12] = posx;          mat[13] = posy;          mat[14] = posz;          mat[15] = 1.0f;
 }
 
 void UpdateInstanceMatrix(int i) {
@@ -919,7 +926,7 @@ int InitializeEnvironment(void) {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
-    glFrontFace(GL_CCW); // Flip triangle sorting order
+    glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glViewport(0, 0, screen_width, screen_height);
     CHECK_GL_ERROR();
 
