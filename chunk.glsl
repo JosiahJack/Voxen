@@ -1,6 +1,6 @@
 // chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
 // enemies, doors, etc., without transparency for first pass prior to lighting.
-const char *vertexShaderSource =
+const char* vertexShaderSource =
     "#version 450 core\n"
 
     "layout(location = 0) in vec3 aPos;\n"
@@ -41,7 +41,7 @@ const char *vertexShaderSource =
     "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
     "}\n";
 
-const char *fragmentShaderTraditional =
+const char* fragmentShaderTraditional =
     "#version 450 core\n"
     "#extension GL_ARB_shading_language_packing : require\n"
 
@@ -109,18 +109,18 @@ const char *fragmentShaderTraditional =
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
     "    vec4 worldPosPack = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"
     "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    if (debugView == 3) {\n"
-    "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
-    "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
-    "        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);\n"
-    "        outAlbedo = vec4(vec3(linearDepth), 1.0);\n"
-    "    } else if (debugView == 1) {\n"
+    "    if (debugView == 1) {\n"
     "        outAlbedo = albedoColor;\n"
     "    } else if (debugView == 2) {\n"
     "        outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;\n"
     "        outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;\n"
     "        outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;\n"
     "        outAlbedo.a = 1.0;\n"
+    "    } else if (debugView == 3) {\n"
+    "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
+    "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
+    "        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);\n"
+    "        outAlbedo = vec4(vec3(linearDepth), 1.0);\n"
     "    } else if (debugView == 4) {\n"
     "        outAlbedo.r = float(InstanceIndex) / 5500.0;\n"
     "        outAlbedo.g = float(ModelIndex) / 668.0;\n"
