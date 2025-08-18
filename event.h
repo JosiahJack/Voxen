@@ -71,7 +71,6 @@ extern int maxEventCount_debug;
 extern uint32_t globalFrameNum;
 extern double last_time;
 extern double current_time;
-extern double start_frame_time;
 
 int EventExecute(Event* event);
 int EventInit(void);

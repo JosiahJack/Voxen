@@ -80,11 +80,11 @@ float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 
-float testLight_x = -2.56f;
-float testLight_z = -2.56f;
-float testLight_y = 1.12f;
-float testLight_intensity = 2.5f;
-float testLight_range = 3.0f;
+float testLight_x = -10.24f;
+float testLight_z = 28.16f;
+float testLight_y = 5.5f;
+float testLight_intensity = 3.0f;
+float testLight_range = 4.4f;
 float testLight_spotAng = 0.0f;
 bool noclip = true;
 
@@ -110,7 +110,6 @@ int eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
-double start_frame_time = 0.0;
 double screenshotTimeout = 0.0;
 
 // Networking
@@ -1249,8 +1248,9 @@ int main(int argc, char* argv[]) {
     lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
     while(1) {
-        start_frame_time = get_time();
-
+        current_time = get_time();
+        double frame_time = current_time - last_time;
+        
         // Enqueue input events
         SDL_Event event;
         float mouse_xrel = 0.0f, mouse_yrel = 0.0f;
@@ -1292,8 +1292,6 @@ int main(int argc, char* argv[]) {
             EnqueueEvent_FloatFloat(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
         }
         
-        current_time = get_time();
-        double frame_time = current_time - last_time;
         accumulator += frame_time;
         while (accumulator >= time_step) {
             if (window_has_focus) ProcessInput();
