@@ -9,7 +9,6 @@
 #include <GL/glew.h>
 #include <uthash.h>
 #include "data_parser.h"
-#include "data_textures.h"
 #include "debug.h"
 #include "render.h"
 #include "event.h"
@@ -63,8 +62,8 @@ int LoadTextures(void) {
     textureCount = 0u;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    parser_init(&texture_parser, valid_texdata_keys, NUM_TEX_KEYS, PARSER_DATA);
-    if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); parser_free(&texture_parser); return 1; }
+    parser_init(&texture_parser, valid_texdata_keys, NUM_TEX_KEYS);
+    if (!parse_data_file(&texture_parser, "./Data/textures.txt",0)) { DualLogError("Could not parse ./Data/textures.txt!\n"); return 1; }
     loadTextureItemInitialized[TEX_PARSER] = true;
     
     int maxIndex = -1;
@@ -73,34 +72,28 @@ int LoadTextures(void) {
     }
     
     textureCount = (uint16_t)texture_parser.count;
-    if (textureCount > 4096) { DualLogError("Too many textures in parser count %d, greater than 4096!\n", textureCount); CleanupLoad(true); return 1; } 
-    if (textureCount == 0) { DualLog("No textures found in textures.txt\n"); parser_free(&texture_parser); return 1; }
+    if (textureCount > 4096) { DualLogError("Too many textures in parser count %d, greater than 4096!\n", textureCount); return 1; } 
+    if (textureCount == 0) { DualLog("No textures found in textures.txt\n"); return 1; }
     
     DualLog("Parsing %d textures...\n",textureCount);
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
-    if (!textureOffsets) { DualLogError("Failed to allocate textureOffsets buffer\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_OFFSETS] = true;
     DebugRAM("after textureOffsets malloc");
     
     textureSizes = malloc(textureCount * 2 * sizeof(int)); // Times 2 for x and y pairs flat packed (e.g. x,y,x,y,x,y for 3 textures)
-    if (!textureSizes) { DualLogError("Failed to allocate textureSizes buffer\n"); free(textureOffsets); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_SIZES] = true;
     DebugRAM("after textureSizes malloc");
 
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
-    if (!texturePaletteOffsets) { DualLogError("Failed to allocate textureOffsets buffer\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_PALOFFSETS] = true;
     DebugRAM("after texturePaletteOffsets mallocn");
 
     doubleSidedTexture = malloc(textureCount * sizeof(bool));
-    if (!doubleSidedTexture) { DualLogError("Failed to allocate doubleSidedTexture buffer\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_DOUBLESIDES] = true;
     DebugRAM("after doubleSidedTexture malloc");
     
     size_t maxFileSize = 10000000; // 10MB
-    uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.
-    if (!file_buffer) { DualLogError("Failed to allocate file buffer for loading png files\n"); CleanupLoad(true); return 1; }
-    
+    uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
     DebugRAM("after file_buffer malloc");
 
     // First Pass: Calculate total pixels and offsets
@@ -117,24 +110,23 @@ int LoadTextures(void) {
         if (matchedParserIdx < 0) continue;
         
         FILE* fp = fopen(texture_parser.entries[matchedParserIdx].path, "rb");
-        if (!fp) { DualLogError("Failed to open %s\n", texture_parser.entries[matchedParserIdx].path); CleanupLoad(true); return 1; }
+        if (!fp) { DualLogError("Failed to open %s\n", texture_parser.entries[matchedParserIdx].path); return 1; }
         
         fseek(fp, 0, SEEK_END);
         size_t file_size = ftell(fp);
-        if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdx].path, file_size); fclose(fp); CleanupLoad(true); return 1; }
+        if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdx].path, file_size); return 1; }
         
         fseek(fp, 0, SEEK_SET);
         size_t read_size = fread(file_buffer, 1, file_size, fp);
         fclose(fp);
-        if (read_size != file_size) { DualLogError("Failed to read %s\n", texture_parser.entries[matchedParserIdx].path); CleanupLoad(true);  return 1; }
+        if (read_size != file_size) { DualLogError("Failed to read %s\n", texture_parser.entries[matchedParserIdx].path); return 1; }
 
         // Decode PNG from shared buffer
         int width, height, channels;
         unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
-        if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
+        if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); return 1; }
         
         doubleSidedTexture[i] = texture_parser.entries[matchedParserIdx].doublesided;
-//         if (doubleSidedTexture[i]) DualLog("Loaded doublesided texture %s\n",texture_parser.entries[matchedParserIdx].path);
         
         // Build palette for this texture using uthash
         ColorEntry *color_table = NULL, *entry, *tmp;
@@ -166,7 +158,6 @@ int LoadTextures(void) {
     }
     
     texturePalettes = malloc(totalPaletteColors * sizeof(uint32_t));
-    if (!texturePalettes) { DualLogError("Failed to allocate texturePalettes\n"); CleanupLoad(true); return 1; }
     loadTextureItemInitialized[TEX_PALETS] = true;
     DebugRAM("after texturePalettes malloc");
 
@@ -189,7 +180,6 @@ int LoadTextures(void) {
     uint32_t palette_offset = 0;
     uint32_t maxPalletSize = 0;
     uint16_t *indices = malloc(4096 * 4096 * sizeof(uint16_t));
-    if (!indices) { DualLogError("Failed to allocate indices buffer\n"); CleanupLoad(true); return 1; }
     DebugRAM("after indices malloc");
     
     GLuint stagingBuffer;
@@ -206,21 +196,21 @@ int LoadTextures(void) {
         if (matchedParserIdx < 0) continue;
 
         FILE* fp = fopen(texture_parser.entries[matchedParserIdx].path, "rb");
-        if (!fp) { DualLogError("Failed to open %s\n", texture_parser.entries[matchedParserIdx].path); CleanupLoad(true); return 1; }
+        if (!fp) { DualLogError("Failed to open %s\n", texture_parser.entries[matchedParserIdx].path); return 1; }
         
         fseek(fp, 0, SEEK_END);
         size_t file_size = ftell(fp);
-        if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdx].path, file_size); fclose(fp); CleanupLoad(true); return 1; }
+        if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdx].path, file_size); fclose(fp); return 1; }
         
         fseek(fp, 0, SEEK_SET);
         size_t read_size = fread(file_buffer, 1, file_size, fp);
         fclose(fp);
-        if (read_size != file_size) { DualLogError("Failed to read %s\n", texture_parser.entries[matchedParserIdx].path); CleanupLoad(true);  return 1; }
+        if (read_size != file_size) { DualLogError("Failed to read %s\n", texture_parser.entries[matchedParserIdx].path); return 1; }
 
         // Decode PNG from shared buffer
         int width, height, channels;
         unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
-        if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); CleanupLoad(true); return 1; }
+        if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); return 1; }
         
         DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
         
@@ -256,9 +246,6 @@ int LoadTextures(void) {
         // just let VRAM alone store the texture data.
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
         uint32_t *mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,((width * height + 1) / 2) * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        if (!mapped_buffer) { DualLogError("Failed to map stagingBuffer for %s\n", texture_parser.entries[matchedParserIdx].path); free(indices); glDeleteBuffers(1, &stagingBuffer); CleanupLoad(true); return 1; }
-        
-//         memcpy(mapped_buffer, indices, width * height * sizeof(uint16_t));
         for (int j = 0; j < width * height; j += 2) {
             uint32_t packed = (uint32_t)indices[j]; // Lower 16 bits
             if (j + 1 < width * height) packed |= (uint32_t)indices[j + 1] << 16; // Upper 16 bits
@@ -305,6 +292,7 @@ int LoadTextures(void) {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, totalPaletteColors * sizeof(uint32_t), texturePalettes);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 16, texturePalettesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    free(texturePalettes);
     
 #ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Total pixels in buffer %d (", totalPixels);
@@ -322,38 +310,25 @@ int LoadTextures(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, textureOffsetsID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    free(textureOffsets);
     
     glGenBuffers(1, &textureSizesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureSizesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, textureSizesID); // Set static buffer once for all shaders
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    free(textureSizes);
     
     glGenBuffers(1, &texturePaletteOffsetsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePaletteOffsetsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 17, texturePaletteOffsetsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    free(texturePaletteOffsets);
+    
     CHECK_GL_ERROR();
-    CleanupLoad(false);
-    DebugRAM("CleanupLoad for LoadTextures");
+    DebugRAM("After LoadTextures");
     double end_time = get_time();
     DualLog("Load Textures took %f seconds\n", end_time - start_time);
     return 0;
-}
-
-void CleanupLoad(bool isBad) {
-    if (loadTextureItemInitialized[TEX_OFFSETS]) free(textureOffsets);
-    if (loadTextureItemInitialized[TEX_SIZES]) free(textureSizes);
-    if (loadTextureItemInitialized[TEX_PALOFFSETS]) free(texturePaletteOffsets);
-    if (loadTextureItemInitialized[TEX_PALETS]) free(texturePalettes);
-    if (loadTextureItemInitialized[TEX_PARSER]) parser_free(&texture_parser);
-    
-    if (isBad) { // Also free GPU resources if we are handling exit conditions.
-        if (loadTextureItemInitialized[TEX_DOUBLESIDES]) free(doubleSidedTexture);
-        if (loadTextureItemInitialized[TEX_SSBOS]) {
-            glDeleteBuffers(1, &colorBufferID);
-            glDeleteBuffers(1, &texturePalettesID);
-        }
-    }
 }

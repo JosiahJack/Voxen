@@ -1,12 +1,13 @@
+// #define INCLUDE_AUDIO_LIB // Comment out for faster builds during testing
 #ifdef INCLUDE_AUDIO_LIB
     #define MINIAUDIO_IMPLEMENTATION
     #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
-    #define MA_ENABLE_WASAPI // For windows
-    #define MA_ENABLE_WINMM  // For windows
-    #define MA_ENABLE_DSOUND // For windows
+//     #define MA_ENABLE_WASAPI // For windows
+//     #define MA_ENABLE_WINMM  // For windows
+//     #define MA_ENABLE_DSOUND // For windows
     #define MA_ENABLE_ALSA       // For Linux
     #define MA_ENABLE_PULSEAUDIO // For Linux
-    #define MA_ENABLE_COREAUDIO  // For Mac
+//     #define MA_ENABLE_COREAUDIO  // For Mac
     #define MA_NO_ENCODING // Don't need to save out audio files.
     #define MA_NO_GENERATION // Disable waveform/noise generation (not needed for file playback)
     #define MA_NO_FLAC
@@ -16,8 +17,6 @@
 #include <SDL2/SDL.h>
 #include "audio.h"
 #include "debug.h"
-
-// #define INCLUDE_AUDIO_LIB // Comment out for faster builds during testing
 
 // ----------------------------------------------------------------------------
 // Usage:

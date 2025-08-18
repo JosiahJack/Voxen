@@ -17,10 +17,6 @@
 #include <errno.h>
 #include "event.h"
 #include "data_parser.h"
-#include "data_textures.h"
-#include "data_models.h"
-#include "data_entities.h"
-#include "data_levels.h"
 #include "render.h"
 #include "text.glsl"
 #include "chunk.glsl"
@@ -52,7 +48,6 @@ GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
 
 // Game/Mod Definition
-DataParser gamedata_parser;
 uint8_t numLevels = 2;
 uint8_t startLevel = 3;
 const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
@@ -60,19 +55,17 @@ const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
-float cam_x = -6.44f, cam_y = 0.0f, cam_z = -2.56f; // Camera position Cornell box
-// float cam_x = -20.40001f, cam_y = -43.52f, cam_z = 10.2f; // Camera position Unity
-// float cam_x = -15.65f, cam_z = 25.54f, cam_y = 5.85f; // Camera position Voxen
+float cam_x = -15.36f, cam_y = 5.6f, cam_z = 25.60f; // Camera position Cornell box
+float cam_yaw = 90.0f;
+float cam_pitch = 0.0f;
+float cam_roll = 0.0f;
+float cam_fov = 65.0f;
 
 typedef struct {
     float w, x, y, z;
 } Quaternion;
 
 Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
-float cam_yaw = 0.0f;
-float cam_pitch = 0.0f;
-float cam_roll = 0.0f;
-float cam_fov = 65.0f;
 
 float deg2rad(float degrees) {
     return degrees * (M_PI / 180.0f);
@@ -219,26 +212,23 @@ float textQuadVertices[] = { // 2 triangles, text is applied as an image from SD
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
 
-void DualLog(const char *fmt, ...) {
-    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
-    vfprintf(stdout, fmt, args1); // Print to console/terminal.
-    va_end(args1);
-    if (console_log_file) { vfprintf(console_log_file, fmt, args2); fflush(console_log_file); } // Print to log file.
-    va_end(args2);
-}
-
-void DualLogError(const char *fmt, ...) {
-    va_list args1, args2; va_start(args1, fmt); va_copy(args2, args1);
-    fprintf(stderr, "\033[1;31mERROR: \033[0;31m"); vfprintf(stderr, fmt, args1); fprintf(stderr,"\033[0;0m");
-    fflush(stderr); // Print to console/terminal.
-    va_end(args1);
+static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
+    va_list copy; va_copy(copy, args);
+    if (prefix) fprintf(stream, "%s\033[0m", prefix);
+    vfprintf(stream, fmt, args);
+    fprintf(stream, "\033[0m"); fflush(stream);
     if (console_log_file) {
-        fprintf(console_log_file, "ERROR: "); vfprintf(console_log_file, fmt, args2);
-        fflush(console_log_file); // Print to log file.
+        if (prefix) fprintf(console_log_file, "%s ", prefix);
+        vfprintf(console_log_file, fmt, copy);
+        fflush(console_log_file);
     }
-
-    va_end(args2);
+    va_end(copy);
 }
+
+void DualLog(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+void DualLogWarn(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
+void DualLogError(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+
 
 // Get RSS aka the total RAM reported by btop or other utilities that's allocated virtual ram for the process.
 size_t get_rss_bytes(void) {
@@ -479,8 +469,6 @@ void Screenshot() {
     }
     
     unsigned char* pixels = (unsigned char*)malloc(screen_width * screen_height * 4);
-    if (!pixels) { DualLog("Failed to allocate memory for screenshot pixels\n"); return; }
-
     glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     CHECK_GL_ERROR();
     char timestamp[32];
@@ -1114,15 +1102,28 @@ int InitializeEnvironment(void) {
     DebugRAM("audio init");
     systemInitialized[SYS_AUD] = true;
     
-    // Load Game/Mod Definitio
-    DualLog("Loading game definition from ./Data/gamedata.txt...\n");
-    parser_init(&gamedata_parser, valid_gamedata_keys, NUM_GAMDAT_KEYS, PARSER_GAME);
-    if (!parse_data_file(&gamedata_parser, "./Data/gamedata.txt")) { DualLogError("Could not parse ./Data/gamedata.txt!\n"); parser_free(&gamedata_parser); return 1; }
-    numLevels = gamedata_parser.entries[0].levelCount;
-    startLevel = gamedata_parser.entries[0].startLevel;
-    DualLog("Game Definition:: num levels: %d, start level=%d\n",numLevels,startLevel);
-    parser_free(&gamedata_parser);
+    // Load Game/Mod Definition
+    const char* filename = "./Data/gamedata.txt";
+    DualLog("Loading game definition from %s...\n",filename);    
+    DataParser gamedata_parser;
+    DataEntry entry;
+    init_data_entry(&entry);
+    gamedata_parser.entries = &entry;
+    gamedata_parser.valid_keys = valid_gamedata_keys;
+    gamedata_parser.num_keys = NUM_GAMDAT_KEYS;
+    FILE *gamedatfile = fopen(filename, "r");
+    if (!gamedatfile) { DualLogError("Cannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); return 1; }
     
+    uint32_t lineNum = 0;
+    bool is_eof;
+    while (!feof(gamedatfile)) {
+        read_key_value(gamedatfile,&gamedata_parser, &entry, &lineNum, &is_eof);
+    }
+    
+    fclose(gamedatfile);
+    numLevels = entry.levelCount;
+    startLevel = entry.startLevel;
+    DualLog("Game Definition:: num levels: %d, start level: %d\n",numLevels,startLevel);
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1135,7 +1136,7 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS: LoadLevels(); return 0;
+        case EV_LOAD_LEVELS: LoadLevelGeometry(startLevel); return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);

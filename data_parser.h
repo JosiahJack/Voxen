@@ -3,15 +3,11 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <GL/glew.h>
 
+// Generic Parser
 #define MAX_ENTRIES 65535 // uint16_t limit
 #define MAX_PATH 256
-
-typedef enum {
-    PARSER_DATA,      // For textures.txt, models.txt, entities.txt
-    PARSER_GAME,      // For gamedata.txt
-    PARSER_LEVEL      // For sav##.txt, Citadel_${dataset}_level#.txt
-} ParserType;
 
 typedef struct {
     uint8_t levelCount;
@@ -38,11 +34,63 @@ typedef struct {
     int capacity;
     const char** valid_keys;
     int num_keys;
-    ParserType parser_type;
 } DataParser;
 
-void parser_init(DataParser *parser, const char **valid_keys, int num_keys, ParserType partype);
-bool parse_data_file(DataParser *parser, const char *filename);
-void parser_free(DataParser *parser);
+void init_data_entry(DataEntry *entry);
+bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *lineNum, bool *is_eof);
+void parser_init(DataParser *parser, const char **valid_keys, int num_keys);
+bool parse_data_file(DataParser *parser, const char *filename, int type);
+
+// Textures
+extern GLuint colorBufferID;
+extern uint16_t textureCount;
+
+bool isDoubleSided(uint32_t texIndexToCheck);
+int LoadTextures(void);
+
+// Models
+#define MODEL_COUNT 1024
+#define VERTEX_ATTRIBUTES_COUNT 14 // x,y,z,nx,ny,nz,u,v,texIdx,glowIdx,specIdx,normIdx,modelIdx,instanceIdx
+
+extern uint32_t modelVertexCounts[MODEL_COUNT];
+extern uint32_t modelTriangleCounts[MODEL_COUNT];
+extern GLuint modelBoundsID;
+extern GLuint vbos[MODEL_COUNT];
+extern GLuint tbos[MODEL_COUNT];
+extern GLuint tebos[MODEL_COUNT];
+extern GLuint ebos[MODEL_COUNT];
+extern float ** vertexDataArrays;
+extern uint32_t ** triangleDataArrays;
+extern uint32_t ** triEdgeDataArrays;
+extern uint32_t ** edgeDataArrays;
+
+int LoadGeometry(void);
+
+// Entities
+#define MAX_ENTITIES 1024 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
+#define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
+
+// Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
+typedef struct {
+    uint16_t modelIndex;
+    uint16_t texIndex;
+    uint16_t glowIndex;
+    uint16_t specIndex;
+    uint16_t normIndex;
+    uint16_t lodIndex;
+    bool cardchunk;
+    char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, nice even multiple of 4 bytes
+} Entity;
+
+extern Entity entities[MAX_ENTITIES];
+
+int LoadEntities(void);
+
+// Levels
+extern uint8_t startLevel;
+extern uint8_t numLevels; // Can be set by gamedata.txt
+
+int LoadLevels();
+int LoadLevelGeometry(uint8_t curlevel);
 
 #endif // VOXEN_DATA_PARSER_H

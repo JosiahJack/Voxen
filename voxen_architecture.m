@@ -7,7 +7,6 @@
 // Parses all game/mod scripts
 // Initializes data handling systems and parsers using all above data
 // Level Load using gamedata definition to pick starting level
-// Kicks off separate CPU thread systems: VXGI, Physics Server? /*TODO*/
 // Starts game loop:
 //   Polls SDL2 input and enqueues input Events
 //   Processes input and sets key states, mouselook
@@ -131,6 +130,5 @@
 //                   offsets, one flat buffer of palette indices, one flat
 //                   buffer of texture palette indices offsets.
 // Mesh System: Models are loaded into one unified flat vertex buffer with
-//              minimal data, just position, normal, and uv.  Tangents and
-//              bitangents are computed on the fly during unlit raster stage TODO!
+//              minimal data, just position, normal, and uv.
 //
