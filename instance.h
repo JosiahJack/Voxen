@@ -7,7 +7,7 @@
 
 #define INSTANCE_COUNT 5500 // Max 5454 for Citadel level 7
 
-typedef struct {
+typedef struct { // Ensure deferred_lighting.compute struct matches!
     int32_t modelIndex; // offset 0, size 4b
     int32_t texIndex;
     int32_t glowIndex;

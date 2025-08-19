@@ -12,20 +12,25 @@
 typedef struct {
     uint8_t levelCount;
     uint8_t startLevel;
-    char path[MAX_PATH];
+    uint8_t type;
+    bool cardchunk;
+    bool doublesided;
     uint16_t index;
     uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t glowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
-    bool cardchunk;
-    bool doublesided;
     uint16_t constIndex; // Changed to uint16_t to align with MAX_ENTRIES
     uint16_t lodIndex; // Model index for LOD to use when far away
+    char path[MAX_PATH];
     struct { float x, y, z; } localPosition;
     struct { float x, y, z, w; } localRotation;
     struct { float x, y, z; } localScale;
+    float intensity;
+    float range;
+    float spotAngle;
+    struct { float r, g, b; } color;
 } DataEntry;
 
 typedef struct {
@@ -92,5 +97,6 @@ extern uint8_t numLevels; // Can be set by gamedata.txt
 
 int LoadLevels();
 int LoadLevelGeometry(uint8_t curlevel);
+int LoadLevelLights(uint8_t curlevel);
 
 #endif // VOXEN_DATA_PARSER_H

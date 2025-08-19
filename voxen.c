@@ -25,11 +25,11 @@
 #include "bluenoise64.cginc"
 #include "audio.h"
 #include "instance.h"
-#include "voxel.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #include <enet/enet.h>
 #include "constants.h"
+#include "dynamic_culling.h"
 
 // #define DEBUG_RAM_OUTPUT
 
@@ -55,7 +55,8 @@ const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
-float cam_x = -15.36f, cam_y = 5.6f, cam_z = 25.60f; // Camera position Cornell box
+float cam_x = -20.4f, cam_y = -43.792f + 0.84f, cam_z = 10.2f; // Camera position Cornell box, added 0.84f for cam
+                                                               // offset from player capsule center.
 float cam_yaw = 90.0f;
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
@@ -153,12 +154,13 @@ GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
-      specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1; // uniform locations
+      specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
+      overrideGlowBLoc_chunk = -1; // uniform locations
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
-GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, sphoxelCountLoc_deferred = -1; // uniform locations
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1; // uniform locations
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -167,9 +169,9 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
-float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
+float lightsRangeSquared[LIGHT_COUNT] = {0};
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
-float lightsRangeSquared[LIGHT_COUNT];
 GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
 GLuint lightIBOs[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
@@ -377,7 +379,6 @@ int CompileShaders(void) {
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
-    sphoxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sphoxelCount");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -692,27 +693,27 @@ uint32_t Flatten3DIndex(int x, int y, int z, int xMax, int yMax) {
 }
 
 void WorldCellIndexToPosition(uint32_t worldIdx, float * x, float * z, float * y) { // Swapped to reflect Unity coordinate system
-    *x = (worldIdx % WORLDCELL_X_MAX) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
-    *y = ((worldIdx / WORLDCELL_X_MAX) % WORLDCELL_Y_MAX) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
-    *z = (worldIdx / (WORLDCELL_X_MAX * WORLDCELL_Y_MAX)) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
+    *x = (worldIdx % WORLDX) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
+    *y = ((worldIdx / WORLDX) % WORLDY) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
+    *z = (worldIdx / (WORLDX * WORLDY)) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
 }
 
 uint32_t PositionToWorldCellIndexX(float x) {
     float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
     int xi = (int)floorf((x + cellHalf) / WORLDCELL_WIDTH_F);
-    return (xi < 0 ? 0 : (xi >= WORLDCELL_X_MAX ? WORLDCELL_X_MAX - 1 : xi));
+    return (xi < 0 ? 0 : (xi >= WORLDX ? WORLDX - 1 : xi));
 }
 
 uint32_t PositionToWorldCellIndexY(float y) {
     float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
     int yi = (int)floorf((y + cellHalf) / WORLDCELL_WIDTH_F);
-    return (yi < 0 ? 0 : (yi >= WORLDCELL_Y_MAX ? WORLDCELL_Y_MAX - 1 : yi));
+    return (yi < 0 ? 0 : (yi >= WORLDY ? WORLDY - 1 : yi));
 }
 
 uint32_t PositionToWorldCellIndexZ(float z) {
     float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
     int zi = (int)floorf((z + cellHalf) / WORLDCELL_WIDTH_F);
-    return (zi < 0 ? 0 : (zi >= WORLDCELL_Z_MAX ? WORLDCELL_Z_MAX - 1 : zi));
+    return (zi < 0 ? 0 : (zi >= WORLDZ ? WORLDZ - 1 : zi));
 }
 
 uint32_t PositionToWorldCellIndex(float x, float y, float z) {
@@ -720,10 +721,10 @@ uint32_t PositionToWorldCellIndex(float x, float y, float z) {
     int xi = (int)floorf((x + cellHalf) / WORLDCELL_WIDTH_F);
     int yi = (int)floorf((y + cellHalf) / WORLDCELL_WIDTH_F);
     int zi = (int)floorf((z + cellHalf) / WORLDCELL_WIDTH_F);
-    xi = xi < 0 ? 0 : (xi >= WORLDCELL_X_MAX ? WORLDCELL_X_MAX - 1 : xi);
-    yi = yi < 0 ? 0 : (yi >= WORLDCELL_Y_MAX ? WORLDCELL_Y_MAX - 1 : yi);
-    zi = zi < 0 ? 0 : (zi >= WORLDCELL_Z_MAX ? WORLDCELL_Z_MAX - 1 : zi);
-    return Flatten3DIndex(xi, yi, zi, WORLDCELL_X_MAX, WORLDCELL_Y_MAX);
+    xi = xi < 0 ? 0 : (xi >= WORLDX ? WORLDX - 1 : xi);
+    yi = yi < 0 ? 0 : (yi >= WORLDY ? WORLDY - 1 : yi);
+    zi = zi < 0 ? 0 : (zi >= WORLDZ ? WORLDZ - 1 : zi);
+    return Flatten3DIndex(xi, yi, zi, WORLDX, WORLDY);
 }
 
 float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
@@ -972,51 +973,6 @@ int InitializeEnvironment(void) {
 
     glBindVertexArray(0);
     DebugRAM("after vao chunk bind");
-    
-    // Initialize Lights
-    for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
-        uint16_t base = i * LIGHT_DATA_SIZE; // Step by 12
-        lights[base + 0] = base * 0.64f; // posx
-        lights[base + 1] = 0.0f; // posy
-        lights[base + 2] = base * 0.64f; // posz
-        lights[base + 3] = 5.0f; // intensity
-        lights[base + 4] = 5.24f; // radius
-        lightsRangeSquared[i] = 5.24f * 5.24f;
-        lights[base + 5] = 0.0f; // spotAng
-        lights[base + 6] = 0.0f; // spotDirx
-        lights[base + 7] = 0.0f; // spotDiry
-        lights[base + 8] = -1.0f; // spotDirz
-        lights[base + 9] = 1.0f; // r
-        lights[base + 10] = 1.0f; // g
-        lights[base + 11] = 1.0f; // b
-    }
-    
-    lights[0] = 0.0f;
-    lights[1] = -1.28f;
-    lights[2] = 0.0f;
-    lights[3] = 2.0f; // Default intensity
-    lights[4] = 10.0f; // Default radius
-    lightsRangeSquared[0] = 10.0f * 10.0f;
-    lights[6] = 0.0f;
-    lights[7] = 0.0f;
-    lights[8] = -1.0f;
-    lights[9] = 1.0f;
-    lights[10] = 1.0f;
-    lights[11] = 1.0f;
-    
-    lights[0 + 12] = 10.24f;
-    lights[1 + 12] = 0.0f; // Fixed Y height
-    lights[2 + 12] = 0.0f;
-    lights[3 + 12] = 2.0f; // Default intensity
-    lights[4 + 12] = 10.0f; // Default radius
-    lightsRangeSquared[1] = 10.0f * 10.0f;
-    lights[6 + 12] = 0.0f;
-    lights[7 + 12] = 0.0f;
-    lights[8 + 12] = -1.0f;
-    lights[9 + 12] = 1.0f;
-    lights[10 + 12] = 0.0f;
-    lights[11 + 12] = 0.0f;
-    DebugRAM("init lights");
 
     // Create Framebuffer
     // First pass gbuffer images
@@ -1135,8 +1091,12 @@ int EventExecute(Event* event) {
         case EV_LOAD_TEXTURES: return LoadTextures();
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS: LoadLevelGeometry(startLevel); return 0;
+        case EV_LOAD_LEVELS:
+            LoadLevelGeometry(startLevel);
+            LoadLevelLights(startLevel);
+            return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
+        case EV_CULL_INIT: return Cull_Init();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -1179,6 +1139,12 @@ void mat4_lookat(float* m) {
     m[14] = dot(forward[0], forward[1], forward[2], cam_x, cam_y, cam_z);  // dot(forward, eye)
     m[15] = 1.0f;
 }
+
+typedef struct {
+    uint16_t index; // Original index in lights array
+    float distanceSquared; // Distance to camera squared
+    float score; // Priority score (lower distance, higher intensity = higher priority)
+} LightCandidate;
 
 int main(int argc, char* argv[]) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1354,35 +1320,72 @@ int main(int argc, char* argv[]) {
         playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
         playerCellIdx_z = PositionToWorldCellIndexZ(cam_z);
         numLightsFound = 0;
-        for (uint16_t i=0;i<LIGHT_COUNT;++i) {
+        LightCandidate candidates[LIGHT_COUNT];
+        uint16_t numCandidates = 0;
+
+        // Step 1: Collect valid lights within sightRangeSquared
+        for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
             uint16_t litIdx = (i * LIGHT_DATA_SIZE);
             float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-            if (litIntensity < 0.015f) continue; // Off
-            
+            if (litIntensity < 0.015f) continue; // Skip if light is off
+
             float litx = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
             float lity = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
             float litz = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-            if (squareDistance3D(cam_x, cam_y, cam_z, litx, lity, litz) < sightRangeSquared) {
-                
-                uint16_t idx = numLightsFound * LIGHT_DATA_SIZE;
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = litx;
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY] = lity;
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ] = litz;
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY] = litIntensity;
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_R] = lights[litIdx + LIGHT_DATA_OFFSET_R];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_G] = lights[litIdx + LIGHT_DATA_OFFSET_G];
-                lightsInProximity[idx + LIGHT_DATA_OFFSET_B] = lights[litIdx + LIGHT_DATA_OFFSET_B];
-                numLightsFound++;
-                if (numLightsFound >= MAX_VISIBLE_LIGHTS) break; // Ok found 32 lights, cap it there.
+            float distSqrd = squareDistance3D(cam_x, cam_y, cam_z, litx, lity, litz);
+
+            if (distSqrd < sightRangeSquared) {
+                candidates[numCandidates].index = i;
+                candidates[numCandidates].distanceSquared = distSqrd;
+                // Score prioritizes closer and brighter lights
+                // Example: score = intensity / (distanceSquared + epsilon) to avoid division by zero
+                candidates[numCandidates].score = litIntensity / (distSqrd + 0.01f);
+                numCandidates++;
             }
         }
-        
-        for (uint8_t i=numLightsFound;i<MAX_VISIBLE_LIGHTS;++i) {
+
+        // Step 2: Sort candidates by score (descending) to get top MAX_VISIBLE_LIGHTS
+        // Using a simple partial sort or selection sort for simplicity
+        // Alternatively, use std::sort for better performance on large arrays
+        for (uint16_t i = 0; i < numCandidates && i < MAX_VISIBLE_LIGHTS; ++i) {
+            uint16_t bestIdx = i;
+            float bestScore = candidates[i].score;
+            for (uint16_t j = i + 1; j < numCandidates; ++j) {
+                if (candidates[j].score > bestScore) {
+                    bestScore = candidates[j].score;
+                    bestIdx = j;
+                }
+            }
+            // Swap to put the best candidate at position i
+            if (bestIdx != i) {
+                LightCandidate temp = candidates[i];
+                candidates[i] = candidates[bestIdx];
+                candidates[bestIdx] = temp;
+            }
+        }
+
+        // Step 3: Copy the top MAX_VISIBLE_LIGHTS to lightsInProximity
+        numLightsFound = numCandidates < MAX_VISIBLE_LIGHTS ? numCandidates : MAX_VISIBLE_LIGHTS;
+        for (uint16_t i = 0; i < numLightsFound; ++i) {
+            uint16_t litIdx = candidates[i].index * LIGHT_DATA_SIZE;
+            uint16_t idx = i * LIGHT_DATA_SIZE;
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY] = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ] = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRW] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_R] = lights[litIdx + LIGHT_DATA_OFFSET_R];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_G] = lights[litIdx + LIGHT_DATA_OFFSET_G];
+            lightsInProximity[idx + LIGHT_DATA_OFFSET_B] = lights[litIdx + LIGHT_DATA_OFFSET_B];
+        }
+
+        // Step 4: Clear remaining slots in lightsInProximity
+        for (uint8_t i = numLightsFound; i < MAX_VISIBLE_LIGHTS; ++i) {
             lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
         }
         
@@ -1475,7 +1478,10 @@ int main(int argc, char* argv[]) {
                 uint16_t idx = i * LIGHT_DATA_SIZE;
                 float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
                 if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
-                SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ], 0.0f, 0.0f, 0.0f, 1.0f, sphoxelSize, sphoxelSize, sphoxelSize);
+                SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ],
+                                 0.0f, 0.0f, 0.0f, 1.0f, // Quaternion identity
+                                 sphoxelSize, sphoxelSize, sphoxelSize); // Uniform scale
+                
                 glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
                 glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
                 glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);

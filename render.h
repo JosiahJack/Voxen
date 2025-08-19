@@ -11,8 +11,8 @@
 #else
 #define CHECK_GL_ERROR() do {} while(0)
 #endif
-                           //    0     1     2          3       4        5         6         7         8  9 10 11
-#define LIGHT_DATA_SIZE 12 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, r, g, b
+                           //    0     1     2          3       4        5         6         7         8         9 10 11 12
+#define LIGHT_DATA_SIZE 13 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, spotDirw, r, g, b
       // Make sure this^^^^ matches in deferredLighting_computeShader!
 
 #define LIGHT_DATA_OFFSET_POSX 0
@@ -24,17 +24,30 @@
 #define LIGHT_DATA_OFFSET_SPOTDIRX 6
 #define LIGHT_DATA_OFFSET_SPOTDIRY 7
 #define LIGHT_DATA_OFFSET_SPOTDIRZ 8
-#define LIGHT_DATA_OFFSET_R 9
-#define LIGHT_DATA_OFFSET_G 10
-#define LIGHT_DATA_OFFSET_B 11
+#define LIGHT_DATA_OFFSET_SPOTDIRW 9
+#define LIGHT_DATA_OFFSET_R 10
+#define LIGHT_DATA_OFFSET_G 11
+#define LIGHT_DATA_OFFSET_B 12
+// Make sure these match in deferredLighting_computeShader!
                    
-#define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7
+#define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-#define MAX_VISIBLE_LIGHTS 32
+#define MAX_VISIBLE_LIGHTS 128
 
-#define VOXEL_DATA_SIZE 1
+#define WORLDX 64
+#define WORLDZ WORLDX
+#define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
+#define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
+#define ARRSIZE (WORLDX * WORLDX)
+#define WORLDCELL_WIDTH_F 2.56f
+#define CELLXHALF 1.28f
+#define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
+#define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
+
+extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+extern float lightsRangeSquared[LIGHT_COUNT];
 
 extern int screen_width;
 extern int screen_height;

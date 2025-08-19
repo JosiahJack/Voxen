@@ -15,7 +15,6 @@
 #include "data_parser.h"
 #include "debug.h"
 #include "render.h"
-#include "voxel.h"
 #include "event.h"
 
 //-----------------------------------------------------------------------------
@@ -78,11 +77,17 @@ uint32_t ** edgeDataArrays;
 //-----------------------------------------------------------------------------
 // Level Data Parsing
 DataParser level_parser;
-const char *valid_leveldata_keys[] = {
-    "constIndex","localPosition.x","localPosition.y","localPosition.z",
-    "localRotation.x","localRotation.y","localRotation.z","localRotation.w",
-    "localScale.x","localScale.y","localScale.z"};
+const char *valid_leveldata_keys[] = {"constIndex","localPosition.x","localPosition.y","localPosition.z",
+                                      "localRotation.x","localRotation.y","localRotation.z","localRotation.w",
+                                      "localScale.x","localScale.y","localScale.z"};
 #define NUM_LEVDAT_KEYS 11
+    
+// Level Lights Parsing
+DataParser lights_parser;
+const char *valid_lightdata_keys[] = {"localPosition.x","localPosition.y","localPosition.z","intensity","range","type",
+                                      "localRotation.x","localRotation.y","localRotation.z","localRotation.w",
+                                      "color.r","color.g","color.b","spotAngle"};
+#define NUM_LIGHTDAT_KEYS 14
 //-----------------------------------------------------------------------------
 
 void parser_init(DataParser *parser, const char **valid_keys, int num_keys) {
@@ -130,29 +135,27 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
 }
 
 void init_data_entry(DataEntry *entry) {
-    entry->path[0] = '\0';
+    entry->levelCount = 0;
+    entry->startLevel = 0;
+    entry->type = 0;
+    entry->cardchunk = false;
+    entry->doublesided = false;
     entry->index = UINT16_MAX;
     entry->modelIndex = UINT16_MAX;
     entry->texIndex = UINT16_MAX;
     entry->glowIndex = UINT16_MAX;
     entry->specIndex = UINT16_MAX;
     entry->normIndex = UINT16_MAX;
-    entry->lodIndex = UINT16_MAX;
-    entry->doublesided = false;
-    entry->cardchunk = false;
     entry->constIndex = 0;
-    entry->levelCount = 0;
-    entry->startLevel = 0;
-    entry->localPosition.x = 0.0f;
-    entry->localPosition.y = 0.0f;
-    entry->localPosition.z = 0.0f;
-    entry->localRotation.x = 0.0f;
-    entry->localRotation.y = 0.0f;
-    entry->localRotation.z = 0.0f;
-    entry->localRotation.w = 1.0f;
-    entry->localScale.x = 1.0f;
-    entry->localScale.y = 1.0f;
-    entry->localScale.z = 1.0f;
+    entry->lodIndex = UINT16_MAX;
+    entry->path[0] = '\0';
+    entry->localPosition.x = 0.0f; entry->localPosition.y = 0.0f; entry->localPosition.z = 0.0f;
+    entry->localRotation.x = 0.0f; entry->localRotation.y = 0.0f; entry->localRotation.z = 0.0f; entry->localRotation.w = 1.0f;
+    entry->localScale.x = 1.0f; entry->localScale.y = 1.0f; entry->localScale.z = 1.0f;
+    entry->intensity = 0.0f;
+    entry->range = 0.0f;
+    entry->spotAngle = 0.0f;
+    entry->color.r = 0.0f; entry->color.g = 0.0f; entry->color.b = 0.0f;
 }
 
 void allocate_entries(DataParser *parser, int entry_count) {
@@ -218,6 +221,13 @@ static bool process_key_value(DataParser *parser, DataEntry *entry, const char *
             else if (strcmp(trimmed_key, "localScale.x") == 0)    entry->localScale.x = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localScale.y") == 0)    entry->localScale.y = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localScale.z") == 0)    entry->localScale.z = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "range") == 0)           entry->range = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "type") == 0)            entry->type = (strcmp(trimmed_value, "Spot") == 0) ? 1u : 0u;
+            else if (strcmp(trimmed_key, "color.r") == 0)         entry->color.r = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "color.g") == 0)         entry->color.g = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "color.b") == 0)         entry->color.b = parse_float(trimmed_value, line, lineNum);
             return true;
         }
     }
@@ -231,32 +241,20 @@ static bool read_token(FILE *file, char *token, size_t max_len, char delimiter, 
     *is_newline = false;
     size_t pos = 0;
     int c;
-
     while ((c = fgetc(file)) != EOF && isspace(c) && c != '\n');
-    if (c == EOF) {
-        *is_eof = true;
-        return false;
-    }
-    if (c == '\n') {
-        *is_newline = true;
-        return false;
-    }
+    if (c == EOF) { *is_eof = true; return false; }
+    if (c == '\n') { *is_newline = true; return false; }
+    
     if (c == '/' && (c = fgetc(file)) == '/') {
         *is_comment = true;
         while ((c = fgetc(file)) != EOF && c != '\n');
         return false;
     }
-    if (c != EOF) {
-        token[pos++] = c;
-    }
-
-    while ((c = fgetc(file)) != EOF && c != delimiter && c != '\n' && pos < max_len - 1) {
-        token[pos++] = c;
-    }
+    
+    if (c != EOF) token[pos++] = c;
+    while ((c = fgetc(file)) != EOF && c != delimiter && c != '\n' && pos < max_len - 1) { token[pos++] = c; }
     token[pos] = '\0';
-    if (pos >= max_len - 1) {
-        DualLogError("Token truncated at line %u\n", *lineNum);
-    }
+    if (pos >= max_len - 1) DualLogError("Token truncated at line %u\n", *lineNum);
     if (c == EOF) *is_eof = true;
     if (c == '\n') *is_newline = true;
     return pos > 0;
@@ -267,7 +265,7 @@ bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *
     bool is_comment, is_newline;
     if (!read_token(file, token, sizeof(token), ':', &is_comment, is_eof, &is_newline, lineNum)) {
         if (is_comment || is_newline) {
-            if (is_newline) (*lineNum)++;
+            if (is_newline) *lineNum += 1;
             return false;
         }
     }
@@ -278,7 +276,7 @@ bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *
     if (!read_token(file, token, sizeof(token), '\n', &is_comment, is_eof, &is_newline, lineNum))return false;
     
     process_key_value(parser, entry, key, token, key, *lineNum);
-    (*lineNum)++;
+    *lineNum += 1;
     return true;
 }
 
@@ -295,10 +293,8 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
     // First pass: count entries and find max index
     while (fgets(line, sizeof(line), file)) {
         lineNum++;
-        if (line[0] == '#') {
-            entry_count++;
-            continue;
-        }
+        if (line[0] == '#') { entry_count++; continue; }
+        
         char *start = line;
         while (isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
@@ -314,11 +310,7 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
         }
     }
 
-    if (entry_count == 0) {
-        DualLogWarn("No entries found in %s\n", filename);
-        fclose(file);
-        return true;
-    }
+    if (entry_count == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
 
     // Allocate enough space for max_index + 1
     allocate_entries(parser, max_index + 1);
@@ -429,14 +421,12 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
         if (!read_token(file, token, sizeof(token), '|', &is_comment, &is_eof, &is_newline, &lineNum)) {
             if (is_comment) { lineNum++; continue; }
             
-            if (is_newline && entry.path[0]) {
+            if (is_newline) {
                 if (current_index < parser->count) {
                     parser->entries[current_index++] = entry;
-//                     DualLog("Loaded entry %d for save/level data %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n  localRotation: %f %f %f %f\n  localScale: %f %f %f\n\n",
+//                     DualLog("Loaded entry %d for save/level data %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n\n",
 //                             current_index, entry.path, entry.constIndex,
-//                             entry.localPosition.x, entry.localPosition.y, entry.localPosition.z,
-//                             entry.localRotation.x, entry.localRotation.y, entry.localRotation.z, entry.localRotation.w,
-//                             entry.localScale.x, entry.localScale.y, entry.localScale.z);
+//                             entry.localPosition.x, entry.localPosition.y, entry.localPosition.z);
                 }
                 init_data_entry(&entry);
                 lineNum++;
@@ -457,14 +447,12 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
             entry.path[sizeof(entry.path) - 1] = '\0';
         }
 
-        if (is_newline && entry.path[0]) {
+        if (is_newline) {
             if (current_index < parser->count) {
                 parser->entries[current_index++] = entry;
-//                 DualLog("Loaded entry %d for %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n  localRotation: %f %f %f %f\n  localScale: %f %f %f\n\n",
+//                 DualLog("Loaded entry %d for %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n\n",
 //                         current_index, entry.path, entry.constIndex,
-//                         entry.localPosition.x, entry.localPosition.y, entry.localPosition.z,
-//                         entry.localRotation.x, entry.localRotation.y, entry.localRotation.z, entry.localRotation.w,
-//                         entry.localScale.x, entry.localScale.y, entry.localScale.z);
+//                         entry.localPosition.x, entry.localPosition.y, entry.localPosition.z);
             }
             init_data_entry(&entry);
             lineNum++;
@@ -920,6 +908,190 @@ int LoadEntities(void) {
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning
 
+// TODO: If game name == Citadel
+void GetLevel_Transform_Offsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
+        case 0:  *ofsx = 3.6f; *ofsy = -4.10195f; *ofsz = 1.0f; break;
+        case 1:  *ofsx = -5.12f; *ofsy = -48.64f; *ofsz = -5.2f; break;
+//         case 1:  *ofsx = 25.56f; *ofsy = -48.64f; *ofsz = -5.2f; break;
+        case 2:  *ofsx = -2.6f; *ofsy = 0.0f; *ofsz = -7.7f; break;
+        case 3:  *ofsx = -45.12f; *ofsy = -0.700374f; *ofsz = -16.32f; break;
+        case 4:  *ofsx = -20.4f; *ofsy = 0.0f; *ofsz = 11.48f; break;
+        case 5:  *ofsx = -10.14f; *ofsy = 0.065f; *ofsz = -0.0383f; break;
+        case 6:  *ofsx = -0.6728f; *ofsy = 0.1725f; *ofsz = 3.76f; break;
+        case 7: *ofsx = -6.7f; *ofsy = 0.24443f; *ofsz = 1.16f; break;
+        case 8:  *ofsx = 1.08f; *ofsy = -0.935f; *ofsz = 0.8f; break;
+        case 9:  *ofsx = 3.6f; *ofsy = 0.0f; *ofsz = -1.28f; break;
+        case 10: *ofsx = 107.37f; *ofsy = 101.2f; *ofsz = 35.48f; break;
+        case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
+        case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
+        case 13: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_Geometry_Offsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.Geometry
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 50.174f; *ofsy = 0.78982f; *ofsz = 13.714f; break;
+        case 4:  *ofsx = 1.178f; *ofsy = 1.28f; *ofsz = 1.292799f; break;
+        case 5:  *ofsx = 1.1778f; *ofsy = -0.065f; *ofsz = -1.2417f; break;
+        case 6:  *ofsx = 1.2928f; *ofsy = -0.1725f; *ofsz = -1.2033f; break;
+        case 7:  *ofsx = 1.2411f; *ofsy = -0.24443f; *ofsz = -1.2544f; break;
+        case 8:  *ofsx = -1.3056f; *ofsy = 0.935f; *ofsz = 1.2928f; break;
+        case 9:  *ofsx = -1.3439f; *ofsy = -0.54305f; *ofsz = -1.1906f; break;
+        case 10: *ofsx = -0.90945f; *ofsy = 1.7156f; *ofsz = -1.0372f; break;
+        case 11: *ofsx = -1.2672f; *ofsy = 0.46112f; *ofsz = 0.96056f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_DynamicObjectsSaveableInstantiated_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DynamicObjectsSaveableInstantiated
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.84f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.07f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.04f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.16f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.08f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.32f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.2f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_LightsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticSaveable
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_LightsStaticImmutable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = -7.243; *ofsy = -48.37571f; *ofsz = -15.391001f; break;
+//         case 1:  *ofsx = 25.56008f; *ofsy = -48.64f; *ofsz = -5.2f; break; // Position offset once unparented from 1.MedicalLevel
+//         case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = -14.528f; *ofsy = 48.269f; *ofsz = -26.836f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_DoorsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DoorsStaticSaveable
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_StaticObjectsSaveable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsSaveable
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_StaticObjectsImmutable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsImmutable
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.NPCsSaveableInstantiated
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = -33.28f; *ofsy = 48.64f; *ofsz = 7.679996f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
 //----------------------------------- Level -----------------------------------
 int LoadLevelGeometry(uint8_t curlevel) {
     if (curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
@@ -931,6 +1103,11 @@ int LoadLevelGeometry(uint8_t curlevel) {
 
     int gameObjectCount = level_parser.count;
     DualLog("Loading %d objects for Level %d...\n",gameObjectCount,curlevel);
+    float correctionX, correctionY, correctionZ;
+    float correctionGeoX, correctionGeoY, correctionGeoZ;
+    GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
+    GetLevel_Geometry_Offsets(curlevel,&correctionGeoX,&correctionGeoY,&correctionGeoZ);
+    correctionX += correctionGeoX; correctionY += correctionGeoY; correctionZ += correctionGeoZ;
     for (int idx=0;idx<gameObjectCount;++idx) {
         int entIdx = level_parser.entries[idx].constIndex;
         instances[idx].modelIndex = entities[entIdx].modelIndex;
@@ -939,9 +1116,9 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].specIndex = entities[entIdx].specIndex;
         instances[idx].normIndex = entities[entIdx].normIndex;
         instances[idx].lodIndex = entities[entIdx].lodIndex;
-        instances[idx].posx = level_parser.entries[idx].localPosition.x;
-        instances[idx].posy = level_parser.entries[idx].localPosition.y;
-        instances[idx].posz = level_parser.entries[idx].localPosition.z;
+        instances[idx].posx = level_parser.entries[idx].localPosition.x + -5.12f;// + correctionX;
+        instances[idx].posy = level_parser.entries[idx].localPosition.y + -48.64f;// + correctionY;
+        instances[idx].posz = level_parser.entries[idx].localPosition.z + -15.36f;// + correctionZ;
         instances[idx].rotx = level_parser.entries[idx].localRotation.x;
         instances[idx].roty = level_parser.entries[idx].localRotation.y;
         instances[idx].rotz = level_parser.entries[idx].localRotation.z;
@@ -949,6 +1126,42 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].sclx = level_parser.entries[idx].localScale.x;
         instances[idx].scly = level_parser.entries[idx].localScale.y;
         instances[idx].sclz = level_parser.entries[idx].localScale.z;
+    }
+    
+    return 0;
+}
+
+int LoadLevelLights(uint8_t curlevel) {
+    if (curlevel >= numLevels) { DualLogError("Cannot load level lights %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+
+    char filename[64];
+    snprintf(filename, sizeof(filename), "./Data/CitadelScene_lights_level%d.txt", curlevel);
+    parser_init(&lights_parser, valid_lightdata_keys, NUM_LIGHTDAT_KEYS);
+    if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
+
+    int lightsCount = lights_parser.count;
+    DualLog("Loading %d lights for Level %d...\n",lightsCount,curlevel);
+    float correctionX = 0.0f, correctionY = 0.0f, correctionZ = 0.0f;
+    float correctionLightX, correctionLightY, correctionLightZ;
+//     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
+    GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
+    correctionX += correctionLightX; correctionY += correctionLightY; correctionZ += correctionLightZ;
+    for (int i=0;i<lightsCount;++i) {
+        uint16_t idx = (i * LIGHT_DATA_SIZE);
+        lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].localPosition.x + correctionX;
+        lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].localPosition.y + correctionY;
+        lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].localPosition.z + correctionZ;
+        lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
+        lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
+        lightsRangeSquared[i] = lights_parser.entries[i].range * lights_parser.entries[i].range;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f;//lights_parser.entries[i].type == 1 ? 0.0f : lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].localRotation.x;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights_parser.entries[i].localRotation.y;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights_parser.entries[i].localRotation.z;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRW] = lights_parser.entries[i].localRotation.w;
+        lights[idx + LIGHT_DATA_OFFSET_R] = lights_parser.entries[i].color.r;
+        lights[idx + LIGHT_DATA_OFFSET_G] = lights_parser.entries[i].color.g;
+        lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
     }
     
     return 0;
