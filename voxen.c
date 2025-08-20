@@ -1164,6 +1164,7 @@ int main(int argc, char* argv[]) {
     EnqueueEvent_Simple(EV_LOAD_ENTITIES); // Must be after models and textures else entity types can't be validated.
     EnqueueEvent_Simple(EV_LOAD_INSTANCES);
     EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities!
+    EnqueueEvent_Simple(EV_CULL_INIT); // Must be after level!
     double accumulator = 0.0;
     last_time = get_time();
     lastJournalWriteTime = get_time();
@@ -1375,7 +1376,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        Cull(false);
+        Cull();
 
         // 3. Pass all instance matrices to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
@@ -1404,6 +1405,11 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
+            
+            int instCellIdx = cellIndexForInstance[i];
+            if (instCellIdx < ARRSIZE && instCellIdx >= 0) {
+                if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; 
+            }
 //             if (debugView == 6 && i == testLightInstanceIdx) continue; // TODO: Delete me
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
@@ -1511,7 +1517,7 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell:: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         
         // Frame stats
         double time_now = get_time();

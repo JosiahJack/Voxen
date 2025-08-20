@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #define STB_IMAGE_IMPLEMENTATION // Indicate to stb_image to compile it in.
-#define STBI_NO_STDIO
 #define STBI_ONLY_PNG
 #define STBI_MAX_DIMENSIONS 4096
 #include "External/stb_image.h"

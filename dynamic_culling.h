@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include "render.h"
+#include "instance.h"
 
 #define CELL_VISIBLE       1
 #define CELL_OPEN          2
@@ -13,18 +14,19 @@
 #define CELL_SEES_SUN     64
 #define CELL_SEES_SKYBOX 128
 
-extern uint32_t playerCellIdx;
-extern uint32_t playerCellIdx_x;
-extern uint32_t playerCellIdx_y;
-extern uint32_t playerCellIdx_z;
+extern uint16_t playerCellIdx;
+extern uint16_t playerCellIdx_x;
+extern uint16_t playerCellIdx_y;
+extern uint16_t playerCellIdx_z;
 extern float cam_x;
 extern float cam_y;
 extern float cam_z;
 extern uint16_t numCellsVisible;
-extern uint8_t worldCellStates[ARRSIZE];
+extern uint8_t gridCellStates[ARRSIZE];
+extern uint16_t cellIndexForInstance[INSTANCE_COUNT];
 
 int Cull_Init(void);
 void CullCore(void);
-void Cull(bool force);
+void Cull();
 
 #endif // VOXEN_DYNAMIC_CULLING_H

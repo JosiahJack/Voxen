@@ -369,7 +369,6 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
         entries_stored++;
     }
 
-    DualLog("Total entries stored for %s: %d\n", filename, entries_stored);
     fclose(file);
     return true;
 }
@@ -383,7 +382,6 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
         DualLogError("Cannot open %s: %s\n", filename, strerror(errno));
         return false;
     }
-    DualLog("File %s opened successfully\n", filename);
 
     // First pass: count entries
     int entry_count = 0;
@@ -399,7 +397,6 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
         entry_count++;
         while ((c = fgetc(file)) != EOF && c != '\n');
     }
-    DualLog("Counted %d entries in first pass\n", entry_count);
     
     if (entry_count == 0) {
         DualLogWarn("No entries found in %s\n", filename);
@@ -408,7 +405,6 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
     }
 
     allocate_entries(parser, entry_count);
-    DualLog("Allocated %d entries for parser\n", entry_count);
 
     // Second pass: parse entries
     rewind(file);
@@ -463,14 +459,13 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
     if (entry.path[0] && current_index < parser->count) {
         parser->entries[current_index] = entry;
         current_index++;
-        DualLog("Loaded final entry %d for save/level data %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n  localRotation: %f %f %f %f\n  localScale: %f %f %f\n",
-                current_index, entry.path, entry.constIndex,
-                entry.localPosition.x, entry.localPosition.y, entry.localPosition.z,
-                entry.localRotation.x, entry.localRotation.y, entry.localRotation.z, entry.localRotation.w,
-                entry.localScale.x, entry.localScale.y, entry.localScale.z);
+//         DualLog("Loaded final entry %d for save/level data %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n  localRotation: %f %f %f %f\n  localScale: %f %f %f\n",
+//                 current_index, entry.path, entry.constIndex,
+//                 entry.localPosition.x, entry.localPosition.y, entry.localPosition.z,
+//                 entry.localRotation.x, entry.localRotation.y, entry.localRotation.z, entry.localRotation.w,
+//                 entry.localScale.x, entry.localScale.y, entry.localScale.z);
     }
 
-    DualLog("Total entries stored for %s: %d\n", filename, current_index);
     fclose(file);
     return true;
 }
@@ -1141,7 +1136,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
         float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
         bool pointsUp = angle <= 30.0f;
         instances[idx].floorHeight = pointsUp && currentLevel <= 12 ? 0.0f : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
-        if (pointsUp) DualLog("Found floor named %s from quat x %f, y %f, z %f, w %f\n",level_parser.entries[idx].path,quat.x,quat.y,quat.z,quat.w);
+//         if (pointsUp) DualLog("Found floor named %s from quat x %f, y %f, z %f, w %f\n",level_parser.entries[idx].path,quat.x,quat.y,quat.z,quat.w);
     }
     
     return 0;
