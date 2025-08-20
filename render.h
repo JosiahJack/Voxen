@@ -40,21 +40,30 @@
 #define WORLDZ WORLDX
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
 #define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
-#define ARRSIZE (WORLDX * WORLDX)
+#define ARRSIZE (WORLDX * WORLDZ)
 #define WORLDCELL_WIDTH_F 2.56f
-#define CELLXHALF 1.28f
+#define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
 #define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
+#define INVALID_FLOOR_HEIGHT -1300.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
 
+extern uint8_t numLevels;
+extern uint8_t currentLevel;
+extern bool gamePaused;
+extern bool menuActive;
 extern int screen_width;
 extern int screen_height;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern GLuint matricesBuffer;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
+
+typedef struct {
+    float x, y, z, w;
+} Quaternion;
 
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);

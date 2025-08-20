@@ -50,23 +50,20 @@ GLuint matricesBuffer;
 // Game/Mod Definition
 uint8_t numLevels = 2;
 uint8_t startLevel = 3;
+uint8_t currentLevel = 0;
+bool gamePaused = false;
+bool menuActive = false;
 const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
 #define NUM_GAMDAT_KEYS 2
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
 float cam_x = -20.4f, cam_y = -43.792f + 0.84f, cam_z = 10.2f; // Camera position Cornell box, added 0.84f for cam
-                                                               // offset from player capsule center.
-float cam_yaw = 90.0f;
+float cam_yaw = 90.0f;                                         // offset from player capsule center.
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
-float cam_fov = 65.0f;
-
-typedef struct {
-    float w, x, y, z;
-} Quaternion;
-
 Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
+float cam_fov = 65.0f;
 
 float deg2rad(float degrees) {
     return degrees * (M_PI / 180.0f);
@@ -81,12 +78,12 @@ float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
 float sprinting = 0.0f;
 
-float testLight_x = -10.24f;
-float testLight_z = 28.16f;
-float testLight_y = 5.5f;
-float testLight_intensity = 3.0f;
-float testLight_range = 4.4f;
-float testLight_spotAng = 0.0f;
+// float testLight_x = -10.24f;
+// float testLight_z = 28.16f;
+// float testLight_y = 5.5f;
+// float testLight_intensity = 3.0f;
+// float testLight_range = 4.4f;
+// float testLight_spotAng = 0.0f;
 bool noclip = true;
 
 // Input
@@ -143,10 +140,6 @@ uint32_t framesPerLastSecond = 0;
 uint32_t worstFPS = UINT32_MAX;
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
-uint32_t playerCellIdx = 80000;
-uint32_t playerCellIdx_x = 20000;
-uint32_t playerCellIdx_y = 10000;
-uint32_t playerCellIdx_z = 451;
 uint8_t numLightsFound = 0;
 
 // Shaders
@@ -532,13 +525,13 @@ int Input_KeyDown(uint32_t scancode) {
         if (debugValue > 5) debugValue = 0;
     }
 
-    if (keys[SDL_SCANCODE_O]) {
-        testLight_intensity += 8.0f / 256.0f;
-        if (testLight_intensity > 8.0f) testLight_intensity = 8.0f;
-    } else if (keys[SDL_SCANCODE_P]) {
-        testLight_intensity -= 8.0f / 256.0f;
-        if (testLight_intensity < 0.01f) testLight_intensity = 0.01f;
-    }
+//     if (keys[SDL_SCANCODE_O]) {
+//         testLight_intensity += 8.0f / 256.0f;
+//         if (testLight_intensity > 8.0f) testLight_intensity = 8.0f;
+//     } else if (keys[SDL_SCANCODE_P]) {
+//         testLight_intensity -= 8.0f / 256.0f;
+//         if (testLight_intensity < 0.01f) testLight_intensity = 0.01f;
+//     }
 
     if (keys[SDL_SCANCODE_E]) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
@@ -641,92 +634,53 @@ void ProcessInput(void) {
         Input_MouselookApply();
     }
 
-    if (keys[SDL_SCANCODE_K]) {
-        testLight_x += finalMoveSpeed;
-        lightDirty[0] = true;
-    } else if (keys[SDL_SCANCODE_J]) {
-        testLight_x -= finalMoveSpeed;
-        lightDirty[0] = true;
-    }
-
-    if (keys[SDL_SCANCODE_N]) {
-        testLight_y += finalMoveSpeed;
-        lightDirty[0] = true;
-    } else if (keys[SDL_SCANCODE_M]) {
-        testLight_y -= finalMoveSpeed;
-        lightDirty[0] = true;
-    }
-
-    if (keys[SDL_SCANCODE_U]) {
-        testLight_z += finalMoveSpeed;
-        lightDirty[0] = true;
-    } else if (keys[SDL_SCANCODE_I]) {
-        testLight_z -= finalMoveSpeed;
-        lightDirty[0] = true;
-    }
-
-    if (keys[SDL_SCANCODE_L]) {
-        testLight_range += finalMoveSpeed;
-        lightDirty[0] = true;
-    } else if (keys[SDL_SCANCODE_SEMICOLON]) {
-        testLight_range -= finalMoveSpeed;
-        if (testLight_range < 0.0f) testLight_range = 0.0f;
-        else lightDirty[0] = true;
-    }
-
-    if (keys[SDL_SCANCODE_B]) {
-        testLight_spotAng += finalMoveSpeed * 2.0f;
-        if (testLight_spotAng > 180.0f) testLight_spotAng = 180.0f;
-    } else if (keys[SDL_SCANCODE_Z]) {
-        testLight_spotAng -= finalMoveSpeed * 2.0f;
-        if (testLight_spotAng < 0.0f) testLight_spotAng = 0.0f;
-    }
-
-    if (keys[SDL_SCANCODE_X]) {
-        for (int i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
-    }
+//     if (keys[SDL_SCANCODE_K]) {
+//         testLight_x += finalMoveSpeed;
+//         lightDirty[0] = true;
+//     } else if (keys[SDL_SCANCODE_J]) {
+//         testLight_x -= finalMoveSpeed;
+//         lightDirty[0] = true;
+//     }
+// 
+//     if (keys[SDL_SCANCODE_N]) {
+//         testLight_y += finalMoveSpeed;
+//         lightDirty[0] = true;
+//     } else if (keys[SDL_SCANCODE_M]) {
+//         testLight_y -= finalMoveSpeed;
+//         lightDirty[0] = true;
+//     }
+// 
+//     if (keys[SDL_SCANCODE_U]) {
+//         testLight_z += finalMoveSpeed;
+//         lightDirty[0] = true;
+//     } else if (keys[SDL_SCANCODE_I]) {
+//         testLight_z -= finalMoveSpeed;
+//         lightDirty[0] = true;
+//     }
+// 
+//     if (keys[SDL_SCANCODE_L]) {
+//         testLight_range += finalMoveSpeed;
+//         lightDirty[0] = true;
+//     } else if (keys[SDL_SCANCODE_SEMICOLON]) {
+//         testLight_range -= finalMoveSpeed;
+//         if (testLight_range < 0.0f) testLight_range = 0.0f;
+//         else lightDirty[0] = true;
+//     }
+// 
+//     if (keys[SDL_SCANCODE_B]) {
+//         testLight_spotAng += finalMoveSpeed * 2.0f;
+//         if (testLight_spotAng > 180.0f) testLight_spotAng = 180.0f;
+//     } else if (keys[SDL_SCANCODE_Z]) {
+//         testLight_spotAng -= finalMoveSpeed * 2.0f;
+//         if (testLight_spotAng < 0.0f) testLight_spotAng = 0.0f;
+//     }
+//
+//     if (keys[SDL_SCANCODE_X]) {
+//         for (int i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
+//     }
 }
 
 // ============================================================================
-uint32_t Flatten3DIndex(int x, int y, int z, int xMax, int yMax) {
-    return (uint32_t)(x + (y * xMax) + (z * xMax * yMax));
-}
-
-void WorldCellIndexToPosition(uint32_t worldIdx, float * x, float * z, float * y) { // Swapped to reflect Unity coordinate system
-    *x = (worldIdx % WORLDX) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
-    *y = ((worldIdx / WORLDX) % WORLDY) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
-    *z = (worldIdx / (WORLDX * WORLDY)) * WORLDCELL_WIDTH_F + WORLDCELL_WIDTH_F / 2.0f;
-}
-
-uint32_t PositionToWorldCellIndexX(float x) {
-    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
-    int xi = (int)floorf((x + cellHalf) / WORLDCELL_WIDTH_F);
-    return (xi < 0 ? 0 : (xi >= WORLDX ? WORLDX - 1 : xi));
-}
-
-uint32_t PositionToWorldCellIndexY(float y) {
-    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
-    int yi = (int)floorf((y + cellHalf) / WORLDCELL_WIDTH_F);
-    return (yi < 0 ? 0 : (yi >= WORLDY ? WORLDY - 1 : yi));
-}
-
-uint32_t PositionToWorldCellIndexZ(float z) {
-    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
-    int zi = (int)floorf((z + cellHalf) / WORLDCELL_WIDTH_F);
-    return (zi < 0 ? 0 : (zi >= WORLDZ ? WORLDZ - 1 : zi));
-}
-
-uint32_t PositionToWorldCellIndex(float x, float y, float z) {
-    float cellHalf = WORLDCELL_WIDTH_F / 2.0f;
-    int xi = (int)floorf((x + cellHalf) / WORLDCELL_WIDTH_F);
-    int yi = (int)floorf((y + cellHalf) / WORLDCELL_WIDTH_F);
-    int zi = (int)floorf((z + cellHalf) / WORLDCELL_WIDTH_F);
-    xi = xi < 0 ? 0 : (xi >= WORLDX ? WORLDX - 1 : xi);
-    yi = yi < 0 ? 0 : (yi >= WORLDY ? WORLDY - 1 : yi);
-    zi = zi < 0 ? 0 : (zi >= WORLDZ ? WORLDZ - 1 : zi);
-    return Flatten3DIndex(xi, yi, zi, WORLDX, WORLDY);
-}
-
 float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
     float dx = x2 - x1;
     float dy = y2 - y1;
@@ -1078,6 +1032,7 @@ int InitializeEnvironment(void) {
     fclose(gamedatfile);
     numLevels = entry.levelCount;
     startLevel = entry.startLevel;
+    currentLevel = startLevel;
     DualLog("Game Definition:: num levels: %d, start level: %d\n",numLevels,startLevel);
     DebugRAM("InitializeEnvironment end");
     return 0;
@@ -1092,8 +1047,8 @@ int EventExecute(Event* event) {
         case EV_LOAD_MODELS: return LoadGeometry();
         case EV_LOAD_ENTITIES: return LoadEntities();
         case EV_LOAD_LEVELS:
-            LoadLevelGeometry(startLevel);
-            LoadLevelLights(startLevel);
+            LoadLevelGeometry(currentLevel);
+            LoadLevelLights(currentLevel);
             return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_CULL_INIT: return Cull_Init();
@@ -1294,31 +1249,27 @@ int main(int argc, char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear screen
         
         // Test Stuff DELETE ME LATER, Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
-        int lightBase = 0;
-        lights[lightBase + 0] = testLight_x;
-        lights[lightBase + 1] = testLight_y;
-        lights[lightBase + 2] = testLight_z;
-        lights[lightBase + 3] = testLight_intensity;
-        lights[lightBase + 4] = testLight_range;
-        lightsRangeSquared[lightBase] = testLight_range * testLight_range;
-        lights[lightBase + 5] = testLight_spotAng;
-        lights[lightBase + 9] = 1.0f; // r
-        lights[lightBase + 10] = 1.0f; // g
-        lights[lightBase + 11] = 1.0f; // b
-        int testLightInstanceIdx = 5455;
-        instances[testLightInstanceIdx].posx = testLight_x;
-        instances[testLightInstanceIdx].posy = testLight_y;
-        instances[testLightInstanceIdx].posz = testLight_z;
-        instances[testLightInstanceIdx].sclx = testLight_range * 0.04f;
-        instances[testLightInstanceIdx].scly = testLight_range * 0.04f;
-        instances[testLightInstanceIdx].sclz = testLight_range * 0.04f;
-        dirtyInstances[testLightInstanceIdx] = true;
+//         int lightBase = 0;
+//         lights[lightBase + 0] = testLight_x;
+//         lights[lightBase + 1] = testLight_y;
+//         lights[lightBase + 2] = testLight_z;
+//         lights[lightBase + 3] = testLight_intensity;
+//         lights[lightBase + 4] = testLight_range;
+//         lightsRangeSquared[lightBase] = testLight_range * testLight_range;
+//         lights[lightBase + 5] = testLight_spotAng;
+//         lights[lightBase + 9] = 1.0f; // r
+//         lights[lightBase + 10] = 1.0f; // g
+//         lights[lightBase + 11] = 1.0f; // b
+//         int testLightInstanceIdx = INSTANCE_COUNT - 1;
+//         instances[testLightInstanceIdx].posx = testLight_x;
+//         instances[testLightInstanceIdx].posy = testLight_y;
+//         instances[testLightInstanceIdx].posz = testLight_z;
+//         instances[testLightInstanceIdx].sclx = testLight_range * 0.04f;
+//         instances[testLightInstanceIdx].scly = testLight_range * 0.04f;
+//         instances[testLightInstanceIdx].sclz = testLight_range * 0.04f;
+//         dirtyInstances[testLightInstanceIdx] = true;
         
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
-        playerCellIdx = PositionToWorldCellIndex(cam_x, cam_y, cam_z);
-        playerCellIdx_x = PositionToWorldCellIndexX(cam_x);
-        playerCellIdx_y = PositionToWorldCellIndexY(cam_y);
-        playerCellIdx_z = PositionToWorldCellIndexZ(cam_z);
         numLightsFound = 0;
         LightCandidate candidates[LIGHT_COUNT];
         uint16_t numCandidates = 0;
@@ -1423,6 +1374,8 @@ int main(int argc, char* argv[]) {
                 curIdx++;
             }
         }
+        
+        Cull(false);
 
         // 3. Pass all instance matrices to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
@@ -1451,7 +1404,7 @@ int main(int argc, char* argv[]) {
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Culled
-            if (debugView == 6 && i == testLightInstanceIdx) continue; // TODO: Delete me
+//             if (debugView == 6 && i == testLightInstanceIdx) continue; // TODO: Delete me
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
@@ -1556,9 +1509,9 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-        RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
+//         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Num lights: %d, Player cell:: x: %d, y: %d, z: %d", numLightsFound, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell:: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         
         // Frame stats
         double time_now = get_time();

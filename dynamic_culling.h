@@ -4,56 +4,27 @@
 #include <stdbool.h>
 #include "render.h"
 
-typedef struct {
-//     MeshRenderer meshRenderer;
-//     MeshFilter meshFilter;
-//     Mesh meshUsual;
-//     Mesh meshLOD;
-//     Material materialUsual;
-//     Material materialLOD;
-//     ShadowCastingMode shadCastModeUsual;
-    int constIndex;
-//     void SetMesh(bool useLOD) {
-//         meshFilter.sharedMesh = useLOD ? meshLOD : meshUsual;
-//         meshRenderer.sharedMaterial = useLOD ? materialLOD : materialUsual;
-//         meshRenderer.receiveShadows = true;
-//     }
-} Meshenderer;
+#define CELL_VISIBLE       1
+#define CELL_OPEN          2
+#define CELL_CLOSEDNORTH   4
+#define CELL_CLOSEDEAST    8
+#define CELL_CLOSEDSOUTH  16
+#define CELL_CLOSEDWEST   32
+#define CELL_SEES_SUN     64
+#define CELL_SEES_SKYBOX 128
 
-typedef struct {
-    int x;
-    int y;
-    int constIndex;
-//     GameObject go;
-    Meshenderer* meshenderers;
-} ChunkPrefab;
-
-typedef struct {
-    int x;
-    int y;
-    int constIndex;
-//     GameObject go;
-    Meshenderer* meshenderers;
-} DynamicObject;
-
-typedef struct {
-    int x;
-    int y;
-    int skyVisible;
-    bool open;
-    bool visible;
-    bool closedNorth; // For when chunk configurations are such that
-    bool closedEast;  // the immediately adjacent cell at this edge
-    bool closedSouth; // is not visible, consider edge as closed to
-    bool closedWest;  // be able to further reduce visible cells.
-    float floorHeight;
-    bool visibleCellsFromHere[WORLDX * WORLDZ];
-    ChunkPrefab* chunkPrefabs;
-    DynamicObject* dynamicObjects;
-} GridCell;
-
-extern bool cullEnabled;
+extern uint32_t playerCellIdx;
+extern uint32_t playerCellIdx_x;
+extern uint32_t playerCellIdx_y;
+extern uint32_t playerCellIdx_z;
+extern float cam_x;
+extern float cam_y;
+extern float cam_z;
+extern uint16_t numCellsVisible;
+extern uint8_t worldCellStates[ARRSIZE];
 
 int Cull_Init(void);
+void CullCore(void);
+void Cull(bool force);
 
 #endif // VOXEN_DYNAMIC_CULLING_H

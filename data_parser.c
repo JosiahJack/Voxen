@@ -1092,6 +1092,16 @@ void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int curlevel, float* ofs
     }
 }
 
+static inline float quat_dot(Quaternion a, Quaternion b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+}
+
+float quat_angle_deg(Quaternion a, Quaternion b) {
+    float d = fabsf(quat_dot(a, b));
+    if (d > 1.0f) d = 1.0f;
+    return acosf(d) * 2.0f * (180.0f / (float)M_PI);
+}
+
 //----------------------------------- Level -----------------------------------
 int LoadLevelGeometry(uint8_t curlevel) {
     if (curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
@@ -1126,6 +1136,12 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].sclx = level_parser.entries[idx].localScale.x;
         instances[idx].scly = level_parser.entries[idx].localScale.y;
         instances[idx].sclz = level_parser.entries[idx].localScale.z;
+        Quaternion quat = {instances[idx].rotx, instances[idx].roty, instances[idx].rotz, instances[idx].rotw};
+        Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
+        float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
+        bool pointsUp = angle <= 30.0f;
+        instances[idx].floorHeight = pointsUp && currentLevel <= 12 ? 0.0f : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
+        if (pointsUp) DualLog("Found floor named %s from quat x %f, y %f, z %f, w %f\n",level_parser.entries[idx].path,quat.x,quat.y,quat.z,quat.w);
     }
     
     return 0;

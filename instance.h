@@ -5,25 +5,26 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define INSTANCE_COUNT 5500 // Max 5454 for Citadel level 7
+#define INSTANCE_COUNT 5750 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects
 
 typedef struct { // Ensure deferred_lighting.compute struct matches!
-    int32_t modelIndex; // offset 0, size 4b
+    int32_t modelIndex;
     int32_t texIndex;
     int32_t glowIndex;
     int32_t specIndex;
     int32_t normIndex;
     int32_t lodIndex;
-    float posx; // offset 4, size 4b
-    float posy; // offset 8, size 4b
-    float posz; // offset 12, size 4b
-    float sclx; // offset 16, size 4b
-    float scly; // offset 20, size 4b
-    float sclz; // offset 24, size 4b
-    float rotx; // offset 28, size 4b
-    float roty; // offset 32, size 4b
-    float rotz; // offset 36, size 4b
-    float rotw; // offset 40, size 4b
+    float posx;
+    float posy;
+    float posz;
+    float sclx;
+    float scly;
+    float sclz;
+    float rotx;
+    float roty;
+    float rotz;
+    float rotw;
+    float floorHeight;
 } Instance;
 
 extern bool instanceInPVS[INSTANCE_COUNT];

@@ -22,6 +22,7 @@ const char* deferredLighting_computeShader =
     "    float roty;\n"
     "    float rotz;\n"
     "    float rotw;\n"
+    "    float floorHeight;\n"
     "};\n"
 
     // G-buffer inputs
@@ -179,7 +180,8 @@ const char* deferredLighting_computeShader =
     "    lighting += glowColor.rgb;\n"
 
     // Dither
-    "    int pixelIndex = int(((int(pixel.y) % 64) * 64 + (int(pixel.x) % 64))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
+    "    int blueNoiseTextureWidth = 64;\n"
+    "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
     "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
     "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
     
