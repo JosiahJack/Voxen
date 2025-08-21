@@ -63,27 +63,17 @@ float cam_yaw = 90.0f;                                         // offset from pl
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
 Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
+float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
+float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
 float cam_fov = 65.0f;
 
-float deg2rad(float degrees) {
-    return degrees * (M_PI / 180.0f);
-}
-
-float rad2deg(float radians) {
-    return radians * (180.0f / M_PI);
-}
+float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
+float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 
 float move_speed = 0.1f;
 float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
 float sprinting = 0.0f;
-
-// float testLight_x = -10.24f;
-// float testLight_z = 28.16f;
-// float testLight_y = 5.5f;
-// float testLight_intensity = 3.0f;
-// float testLight_range = 4.4f;
-// float testLight_spotAng = 0.0f;
 bool noclip = true;
 
 // Input
@@ -525,14 +515,6 @@ int Input_KeyDown(uint32_t scancode) {
         if (debugValue > 5) debugValue = 0;
     }
 
-//     if (keys[SDL_SCANCODE_O]) {
-//         testLight_intensity += 8.0f / 256.0f;
-//         if (testLight_intensity > 8.0f) testLight_intensity = 8.0f;
-//     } else if (keys[SDL_SCANCODE_P]) {
-//         testLight_intensity -= 8.0f / 256.0f;
-//         if (testLight_intensity < 0.01f) testLight_intensity = 0.01f;
-//     }
-
     if (keys[SDL_SCANCODE_E]) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
     }
@@ -585,40 +567,43 @@ void quat_to_matrix(Quaternion* q, float* m) {
     m[15] = 1.0f;
 }
 
+void UpdatePlayerFacingAngles() {
+    float rotation[16]; // Extract forward and right vectors from quaternion
+    quat_to_matrix(&cam_rotation, rotation);
+    cam_forwardx = rotation[8];  // Forward X
+    cam_forwardy = rotation[9];  // Forward Y
+    cam_forwardz = rotation[10]; // Forward Z
+    cam_rightx = rotation[0];  // Right X
+    cam_righty = rotation[1];  // Right Y
+    cam_rightz = rotation[2];  // Right Z
+    normalize_vector(&cam_forwardx, &cam_forwardy, &cam_forwardz); // Normalize forward
+    normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
+}
+
 // Update camera position based on input
 void ProcessInput(void) {
     if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 1.0f;
     else sprinting = 0.0f;
 
-    float rotation[16]; // Extract forward and right vectors from quaternion
-    quat_to_matrix(&cam_rotation, rotation);
-    float facing_x = rotation[8];  // Forward X
-    float facing_y = rotation[9];  // Forward Y
-    float facing_z = rotation[10]; // Forward Z
-    float strafe_x = rotation[0];  // Right X
-    float strafe_y = rotation[1];  // Right Y
-    float strafe_z = rotation[2];  // Right Z
-    normalize_vector(&facing_x, &facing_y, &facing_z); // Normalize forward
-    normalize_vector(&strafe_x, &strafe_y, &strafe_z); // Normalize strafe
     float finalMoveSpeed = (move_speed + (sprinting * move_speed));
     if (keys[SDL_SCANCODE_F]) {
-        cam_x += finalMoveSpeed * facing_x; // Move forward
-        cam_y += finalMoveSpeed * facing_y;
-        cam_z += finalMoveSpeed * facing_z;
+        cam_x += finalMoveSpeed * cam_forwardx; // Move forward
+        cam_y += finalMoveSpeed * cam_forwardy;
+        cam_z += finalMoveSpeed * cam_forwardz;
     } else if (keys[SDL_SCANCODE_S]) {
-        cam_x -= finalMoveSpeed * facing_x; // Move backward
-        cam_y -= finalMoveSpeed * facing_y;
-        cam_z -= finalMoveSpeed * facing_z;
+        cam_x -= finalMoveSpeed * cam_forwardx; // Move backward
+        cam_y -= finalMoveSpeed * cam_forwardy;
+        cam_z -= finalMoveSpeed * cam_forwardz;
     }
 
     if (keys[SDL_SCANCODE_D]) {
-        cam_x += finalMoveSpeed * strafe_x; // Strafe right
-        cam_y += finalMoveSpeed * strafe_y;
-        cam_z += finalMoveSpeed * strafe_z;
+        cam_x += finalMoveSpeed * cam_rightx; // Strafe right
+        cam_y += finalMoveSpeed * cam_righty;
+        cam_z += finalMoveSpeed * cam_rightz;
     } else if (keys[SDL_SCANCODE_A]) {
-        cam_x -= finalMoveSpeed * strafe_x; // Strafe left
-        cam_y -= finalMoveSpeed * strafe_y;
-        cam_z -= finalMoveSpeed * strafe_z;
+        cam_x -= finalMoveSpeed * cam_rightx; // Strafe left
+        cam_y -= finalMoveSpeed * cam_righty;
+        cam_z -= finalMoveSpeed * cam_rightz;
     }
 
     if (noclip) {
@@ -633,51 +618,6 @@ void ProcessInput(void) {
         cam_roll -= move_speed * 5.0f; // Move down
         Input_MouselookApply();
     }
-
-//     if (keys[SDL_SCANCODE_K]) {
-//         testLight_x += finalMoveSpeed;
-//         lightDirty[0] = true;
-//     } else if (keys[SDL_SCANCODE_J]) {
-//         testLight_x -= finalMoveSpeed;
-//         lightDirty[0] = true;
-//     }
-// 
-//     if (keys[SDL_SCANCODE_N]) {
-//         testLight_y += finalMoveSpeed;
-//         lightDirty[0] = true;
-//     } else if (keys[SDL_SCANCODE_M]) {
-//         testLight_y -= finalMoveSpeed;
-//         lightDirty[0] = true;
-//     }
-// 
-//     if (keys[SDL_SCANCODE_U]) {
-//         testLight_z += finalMoveSpeed;
-//         lightDirty[0] = true;
-//     } else if (keys[SDL_SCANCODE_I]) {
-//         testLight_z -= finalMoveSpeed;
-//         lightDirty[0] = true;
-//     }
-// 
-//     if (keys[SDL_SCANCODE_L]) {
-//         testLight_range += finalMoveSpeed;
-//         lightDirty[0] = true;
-//     } else if (keys[SDL_SCANCODE_SEMICOLON]) {
-//         testLight_range -= finalMoveSpeed;
-//         if (testLight_range < 0.0f) testLight_range = 0.0f;
-//         else lightDirty[0] = true;
-//     }
-// 
-//     if (keys[SDL_SCANCODE_B]) {
-//         testLight_spotAng += finalMoveSpeed * 2.0f;
-//         if (testLight_spotAng > 180.0f) testLight_spotAng = 180.0f;
-//     } else if (keys[SDL_SCANCODE_Z]) {
-//         testLight_spotAng -= finalMoveSpeed * 2.0f;
-//         if (testLight_spotAng < 0.0f) testLight_spotAng = 0.0f;
-//     }
-//
-//     if (keys[SDL_SCANCODE_X]) {
-//         for (int i=0;i<MAX_VISIBLE_LIGHTS;++i) lightDirty[i] = true;
-//     }
 }
 
 // ============================================================================
@@ -1101,6 +1041,30 @@ typedef struct {
     float score; // Priority score (lower distance, higher intensity = higher priority)
 } LightCandidate;
 
+bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
+    float to_inst_x = inst_x - cam_x; // Vector from camera to instance
+    float to_inst_y = inst_y - cam_y;
+    float to_inst_z = inst_z - cam_z;
+    float distance = sqrtf(to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z);
+    if (distance < 0.0001f) return true; // Avoid division by zero.  Instance is at camera position, consider it in view
+
+    to_inst_x /= distance; // Normalize direction to instance
+    to_inst_y /= distance;
+    to_inst_z /= distance;
+    float dotFac = dot(cam_forwardx,cam_forwardy,cam_forwardz, to_inst_x,to_inst_y,to_inst_z);
+    float fovAdjusted = cam_fov * 2.0f;
+    float half_fov_rad = deg2rad(fovAdjusted * 0.5f); // Compare against cosine of half the FOV (cam_fov is in degrees, convert to radians)
+    float cos_half_fov = cosf(half_fov_rad);
+    if (dotFac >= cos_half_fov) return true; // Center is within FOV cone
+
+    if (radius > 0.0f && distance > radius) {
+        float adjusted_dot = dotFac - (radius / distance); // Approximate sphere extent
+        if (adjusted_dot >= cos_half_fov) return true; // Part of sphere may be in view
+    }
+
+    return false; // Outside FOV cone
+}
+
 int main(int argc, char* argv[]) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
@@ -1215,6 +1179,7 @@ int main(int argc, char* argv[]) {
         }
         
         accumulator += frame_time;
+        UpdatePlayerFacingAngles();
         while (accumulator >= time_step) {
             if (window_has_focus) ProcessInput();
             accumulator -= time_step;
@@ -1249,27 +1214,6 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear screen
         
-        // Test Stuff DELETE ME LATER, Update the test light to be "attached" to the testLight point moved by j,k,u,i,n,m
-//         int lightBase = 0;
-//         lights[lightBase + 0] = testLight_x;
-//         lights[lightBase + 1] = testLight_y;
-//         lights[lightBase + 2] = testLight_z;
-//         lights[lightBase + 3] = testLight_intensity;
-//         lights[lightBase + 4] = testLight_range;
-//         lightsRangeSquared[lightBase] = testLight_range * testLight_range;
-//         lights[lightBase + 5] = testLight_spotAng;
-//         lights[lightBase + 9] = 1.0f; // r
-//         lights[lightBase + 10] = 1.0f; // g
-//         lights[lightBase + 11] = 1.0f; // b
-//         int testLightInstanceIdx = INSTANCE_COUNT - 1;
-//         instances[testLightInstanceIdx].posx = testLight_x;
-//         instances[testLightInstanceIdx].posy = testLight_y;
-//         instances[testLightInstanceIdx].posz = testLight_z;
-//         instances[testLightInstanceIdx].sclx = testLight_range * 0.04f;
-//         instances[testLightInstanceIdx].scly = testLight_range * 0.04f;
-//         instances[testLightInstanceIdx].sclz = testLight_range * 0.04f;
-//         dirtyInstances[testLightInstanceIdx] = true;
-        
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
         numLightsFound = 0;
         LightCandidate candidates[LIGHT_COUNT];
@@ -1285,12 +1229,38 @@ int main(int argc, char* argv[]) {
             float lity = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
             float litz = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
             float distSqrd = squareDistance3D(cam_x, cam_y, cam_z, litx, lity, litz);
+            int lightCellIdx = cellIndexForLight[i];
+            int x = lightCellIdx % WORLDX;
+            int y = lightCellIdx / WORLDX;
+            int range = floor(lights[litIdx + LIGHT_DATA_OFFSET_RANGE] / 2.56f);
+            int xMin = x - range; int xMax = x + range;
+            int yMin = y - range; int yMax = y + range;
+            bool inPVS = false;
+            if ((gridCellStates[lightCellIdx] & CELL_VISIBLE)) {// || !(gridCellStates[lightCellIdx] & CELL_OPEN)) {
+                inPVS = true; // Allow lights outside windows (and thus in non open cells) to still be applicable.
+            } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
+                bool breakout = false;
+                for (int ix = xMin;ix <= xMax; ix++) {
+                    for (int iy = yMin;iy <= yMax; iy++) {
+                        if (!XZPairInBounds(ix,iy)) continue;
 
-            if (distSqrd < sightRangeSquared) {
+                        int subIdx = (iy * WORLDX) + ix;
+                        if ((gridCellStates[subIdx] & CELL_VISIBLE) // Player can see cell in light's range.
+                            && precomputedVisibleCellsFromHere[(lightCellIdx * ARRSIZE) + subIdx]) { // Light's cell can see the cell in light's range.
+                            
+                            inPVS = true;
+                            breakout = true;
+                            break; // Avoid checking any more.  One is enough to justify turning on light.
+                        }
+                    }
+                    
+                    if (breakout) break;
+                }
+            }
+            
+            if (distSqrd < sightRangeSquared && inPVS) {
                 candidates[numCandidates].index = i;
                 candidates[numCandidates].distanceSquared = distSqrd;
-                // Score prioritizes closer and brighter lights
-                // Example: score = intensity / (distanceSquared + epsilon) to avoid division by zero
                 candidates[numCandidates].score = litIntensity / (distSqrd + 0.01f);
                 numCandidates++;
             }
@@ -1376,7 +1346,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        Cull();
+        Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
 
         // 3. Pass all instance matrices to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
@@ -1401,16 +1371,18 @@ int main(int argc, char* argv[]) {
         glUniform1f(overrideGlowGLoc_chunk, 0.0f);
         glUniform1f(overrideGlowBLoc_chunk, 0.0f);
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
-            if (instanceIsCulledArray[i]) continue;
+            if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
-            if (instances[i].modelIndex < 0) continue; // Culled
+            if (instances[i].modelIndex < 0) continue; // Invalid or hidden
             
             int instCellIdx = cellIndexForInstance[i];
             if (instCellIdx < ARRSIZE && instCellIdx >= 0) {
-                if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; 
+                if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
             }
-//             if (debugView == 6 && i == testLightInstanceIdx) continue; // TODO: Delete me
+            
+            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+            if (!IsSphereInFOVCone(instances[i].posx, instances[i].posy, instances[i].posz, radius)) continue; // Cone Frustum Culling
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
@@ -1515,9 +1487,8 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-//         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "testLight intensity: %.4f, range: %.4f, spotAng: %.4f, x: %.3f, y: %.3f, z: %.3f", testLight_intensity,testLight_range,testLight_spotAng,testLight_x,testLight_y,testLight_z);
-        RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
+        RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
         
         // Frame stats
         double time_now = get_time();

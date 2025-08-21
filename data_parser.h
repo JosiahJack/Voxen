@@ -8,6 +8,14 @@
 // Generic Parser
 #define MAX_ENTRIES 65535 // uint16_t limit
 #define MAX_PATH 256
+#define BOUNDS_ATTRIBUTES_COUNT 7
+#define BOUNDS_DATA_OFFSET_MINX 0
+#define BOUNDS_DATA_OFFSET_MINY 1
+#define BOUNDS_DATA_OFFSET_MINZ 2
+#define BOUNDS_DATA_OFFSET_MAXX 3
+#define BOUNDS_DATA_OFFSET_MAXY 4
+#define BOUNDS_DATA_OFFSET_MAXZ 5
+#define BOUNDS_DATA_OFFSET_RADIUS 6
 
 typedef struct {
     uint8_t levelCount;
@@ -60,6 +68,7 @@ int LoadTextures(void);
 extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern uint32_t modelTriangleCounts[MODEL_COUNT];
 extern GLuint modelBoundsID;
+extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
 extern GLuint tebos[MODEL_COUNT];

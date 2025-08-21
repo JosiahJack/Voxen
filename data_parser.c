@@ -29,15 +29,6 @@ const char *valid_mdldata_keys[] = {"index"};
 #define MAX_TRI_COUNT 32449
 #define MAX_EDGE_COUNT 97345
 
-#define BOUNDS_ATTRIBUTES_COUNT 7
-#define BOUNDS_DATA_OFFSET_MINX 0
-#define BOUNDS_DATA_OFFSET_MINY 1
-#define BOUNDS_DATA_OFFSET_MINZ 2
-#define BOUNDS_DATA_OFFSET_MAXX 3
-#define BOUNDS_DATA_OFFSET_MAXY 4
-#define BOUNDS_DATA_OFFSET_MAXZ 5
-#define BOUNDS_DATA_OFFSET_RADIUS 6
-
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
 uint32_t modelEdgeCounts[MODEL_COUNT];

@@ -8,21 +8,15 @@
 #include "instance.h"
 #include "debug.h"
 
-uint8_t gridCellStates[ARRSIZE]; // 4kb
-float gridCellFloorHeight[ARRSIZE]; // 16kb
-bool precomputedVisibleCellsFromHere[ARRSIZE * ARRSIZE]; // 16mb
-uint16_t cellIndexForInstance[INSTANCE_COUNT]; // 11.5kb
-
+uint8_t gridCellStates[ARRSIZE];
+float gridCellFloorHeight[ARRSIZE];
+bool precomputedVisibleCellsFromHere[ARRSIZE * ARRSIZE];
+uint16_t cellIndexForInstance[INSTANCE_COUNT];
+uint16_t cellIndexForLight[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
-uint16_t playerCellIdx_x = 0u;
-uint16_t playerCellIdx_y = 0u;
-uint16_t playerCellIdx_z = 0u;
+uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
 uint16_t numCellsVisible = 0u;
-float worldMin_x = 0.0f;
-float worldMin_y = 0.0f;
-float worldMin_z = 0.0f;
-int numStraightCasts = 0;
-int numRayCasts = 0;
+float worldMin_x = 0.0f; float worldMin_z = 0.0f;
 
 void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
     int max = WORLDX - 1; // 63
@@ -35,8 +29,6 @@ void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
     if (zval > max) zval = max;
     if (zval < 0) zval = 0;
     *z = (uint16_t)zval;
-    
-//     DualLog("PosToCellCoords for x: %f, z: %f resulted in cell x: %d, z: %d. minx: %f, minz: %f\n",pos_x,pos_z,*x,*z,worldMin_x,worldMin_z);
 }
 
 void PutChunksInCells() {
@@ -52,43 +44,52 @@ void PutChunksInCells() {
     }
 }
 
-void DetermineClosedEdges() {
+void PutMeshesInCells(int type) {
+    int count = 0;
+    switch(type) {
+        case 5: count = LIGHT_COUNT; break; // Lights
+    }
+    for (int index=0;index<count;index++) {
+        uint16_t x,z;
+        switch(type) {
+            case 5: // Lights
+                int lightIdx = (index * LIGHT_DATA_SIZE);
+                PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
+                cellIndexForLight[index] = (z * WORLDX) + x;
+                break;
+        }
+    }
+}
+
+int DetermineClosedEdges() {
     char filename[256];
     sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
     int wpng, hpng, channels;
     unsigned char* edgePixels = stbi_load(filename,&wpng,&hpng,&channels,STBI_rgb_alpha); // I handmade them, well what can ya do
-    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return; }
+    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return 1; }
     
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
     for (int x=0;x<WORLDX;x++) {
         for (int z=0;z<WORLDZ;z++) {
             int cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
-            
-            
             int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
             int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
-//             int pixelIdx = cellIdx * 4; // 4 channels
             closedData_r = edgePixels[pixelIdx + 0];
             closedData_g = edgePixels[pixelIdx + 1];
             closedData_b = edgePixels[pixelIdx + 2];
             closedData_a = edgePixels[pixelIdx + 3];
-            if (closedData_r > 127) {
-                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
-            }
-            
-            if (closedData_g > 127) {
-                gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
-            }
-            
-            if (closedData_b > 127) {
-                gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH;
-            }
-            
+            if (closedData_r > 127) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
+            if (closedData_g > 127) gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
+            if (closedData_b > 127) gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH;
             if (   (closedData_r < 255 && closedData_r > 0)
                 || (closedData_g < 255 && closedData_g > 0)
                 || (closedData_b < 255 && closedData_b > 0)) {
                 
+                // Anything that has closed west edge will be not at full 255 on at least one channel.
+                // Typical for all other edge conditions is to use full brightness 255 on the channel(s).
+                // All 4 closed would be 128 128 128 but this doesn't ever happen.
+                // None closed is 0 0 0
                 gridCellStates[cellIdx] |= CELL_CLOSEDWEST;
             }
             
@@ -100,11 +101,11 @@ void DetermineClosedEdges() {
     
     stbi_image_free(edgePixels);
     malloc_trim(0);
-    
+
     char filename2[256];
     sprintf(filename2,"./Data/worldcellopen_%d.png",currentLevel);
     unsigned char* openPixels = stbi_load(filename2,&wpng,&hpng,&channels,STBI_rgb_alpha); // I handmade them, well what can ya do
-	if (!openPixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return; }
+	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); return 1; }
     
     unsigned char openData_r, openData_g, openData_b;
     for (int x=0;x<WORLDX;++x) {
@@ -113,7 +114,6 @@ void DetermineClosedEdges() {
             gridCellStates[cellIdx] &= ~CELL_OPEN;
             int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
             int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
-//             int pixelIdx = cellIdx * 4; // 4 channels
             openData_r = openPixels[pixelIdx + 0];
             openData_g = openPixels[pixelIdx + 1];
             openData_b = openPixels[pixelIdx + 2];
@@ -125,13 +125,14 @@ void DetermineClosedEdges() {
         }
     }
     
+    gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
     stbi_image_free(openPixels);
     malloc_trim(0);
     
     char filename3[256];
     sprintf(filename3,"./Data/worldcellskyvis_%d.png",currentLevel);
     unsigned char* skyPixels = stbi_load(filename3,&wpng,&hpng,&channels,STBI_rgb_alpha); // I handmade them, well what can ya do
-	if (!skyPixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return; }
+    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); return 1; }
 
     unsigned char skyData_r, skyData_g, skyData_b;
     for (int x=0;x<WORLDX;++x) {
@@ -139,7 +140,6 @@ void DetermineClosedEdges() {
             int cellIdx = (z * WORLDX) + x;
             int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
             int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
-//             int pixelIdx = cellIdx * 4; // 4 channels
             skyData_r = skyPixels[pixelIdx + 0];
             skyData_g = skyPixels[pixelIdx + 1];
             skyData_b = skyPixels[pixelIdx + 2];
@@ -151,6 +151,7 @@ void DetermineClosedEdges() {
     
     stbi_image_free(skyPixels);
     malloc_trim(0);
+    return 0;
 }
 
 bool UpdatedPlayerCell() {
@@ -190,9 +191,13 @@ int CastRayCellCheck(int x, int z, int lastX, int lastZ) {
             // Diagonals
             if (lastZ != z && lastX != x) {
                 int cellIdx_neighborNorth = ((lastZ + 1) * WORLDX) + lastX;
+                cellIdx_neighborNorth = cellIdx_neighborNorth > ARRSIZE ? ARRSIZE : cellIdx_neighborNorth;
                 int cellIdx_neighborSouth = ((lastZ - 1) * WORLDX) + lastX;
+                cellIdx_neighborSouth = cellIdx_neighborSouth > ARRSIZE ? ARRSIZE : cellIdx_neighborSouth;
                 int cellIdx_neighborEast = (lastZ * WORLDX) + lastX + 1;
+                cellIdx_neighborEast = cellIdx_neighborEast > ARRSIZE ? ARRSIZE : cellIdx_neighborEast;
                 int cellIdx_neighborWest = (lastZ * WORLDX) + lastX - 1;
+                cellIdx_neighborWest = cellIdx_neighborWest > ARRSIZE ? ARRSIZE : cellIdx_neighborWest;
                 
                 if (lastZ > z && lastX > x) { // [Nb][ 1]
                                               // [ 2][Na]
@@ -259,7 +264,6 @@ int CastStraightZ(int px, int pz, int signz) {
     int cellIdx = (pz * WORLDX) + px;
     if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) return pz;
     
-    numStraightCasts++;
     bool currentVisible = true;
     int x = px;
     int z = pz + signz;
@@ -317,7 +321,6 @@ int CastStraightX(int px, int pz, int signx) {
     if (!XZPairInBounds(px,pz)) return px;
     if (!gridCellStates[(pz * WORLDX) + px] & CELL_VISIBLE) return px;
 
-    numStraightCasts++;
     int x = px + signx;
     int z = pz;
     bool currentVisible = true;
@@ -376,7 +379,6 @@ void CastRay(int x0, int z0, int x1, int z1) {
     int lastX = x;               int lastZ = z;
     int err = dx - dz;
     int iter = dx > dz ? dx : dz;
-    numRayCasts++;
     while (iter >= 0) {
         if (!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)) continue;
         if (CastRayCellCheck(x,z,lastX,lastZ) == -1) return;
@@ -390,12 +392,9 @@ void CastRay(int x0, int z0, int x1, int z1) {
     }
 }
 
-// CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
-void CircleFanRays(int x0, int z0) {
+void CircleFanRays(int x0, int z0) { // CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
     if (!XZPairInBounds(x0,z0)) return;
-    
-    int cellIdx = (z0 * WORLDX) + x0;
-    if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) return;
+    if (!(gridCellStates[(z0 * WORLDX) + x0] & CELL_VISIBLE)) return;
 
     int x,z;     
     int max = WORLDX; // Reduce work slightly by not casting towards 
@@ -409,8 +408,6 @@ void CircleFanRays(int x0, int z0) {
 void DetermineVisibleCells(int startX, int startZ) {
     if (!XZPairInBounds(startX,startZ)) return;
 
-    numStraightCasts = 0;
-    numRayCasts = 0;
     for (int x=0;x<WORLDX;x++) {
         for (int z=0;z<WORLDZ;z++) {
             int subCellIdx = (z * WORLDX) + x;
@@ -561,13 +558,9 @@ void DetermineVisibleCells(int startX, int startZ) {
             if (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE) numVisible++;
         }
     }
-    
-//     int cellIdxStart = (startZ * WORLDX) + startX;
-//     DualLog("Determine Visible Cells finished cell %d finding %d visible cells from %d straight casts and %d ray casts\n",cellIdxStart,numVisible,numStraightCasts, numRayCasts);
 }
 
 int Cull_Init(void) {
-//     DualLog("Cull_Init start with currentLevel: %d\n",currentLevel);
     for (int cellIdx = 0; cellIdx < ARRSIZE; ++cellIdx) {
         gridCellStates[cellIdx] = 0u;
         gridCellFloorHeight[cellIdx] = INVALID_FLOOR_HEIGHT;
@@ -576,28 +569,27 @@ int Cull_Init(void) {
         }
     }
     
-    switch(currentLevel) { // PosToCellCoords -1 on just x
-        // chunk.x + (Geometry.x + Level.x),0,chunk.z + (Geometry.z + Level.z)     Sometimes just doing something by hand is the most straightforward...
-        case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_y = 0.0f; worldMin_z = -51.20f + (0.0f + 1.0f); break;
-        case 1: worldMin_x = -81.92f; worldMin_y = 0.0f; worldMin_z = -71.68f; break;
-//         case 1: worldMin_x = -76.80f + ( 0.00000f +   25.5600f); worldMin_y = 0.0f; worldMin_z = -56.32f + (0.0f + -5.2f); break;
-        case 2: worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); worldMin_y = 0.0f; worldMin_z = -46.08f + (0.0f + -7.7f); break;
-        case 3: worldMin_x = -53.76f + (50.17400f +  -45.1200f); worldMin_y = 0.0f; worldMin_z = -46.08f + (13.714f + -16.32f); break;
-        case 4: worldMin_x =  -7.68f + ( 1.17800f +  -20.4000f); worldMin_y = 0.0f; worldMin_z = -64.00f + (1.292799f + 11.48f); break;
-        case 5: worldMin_x = -35.84f + ( 1.17780f +  -10.1400f); worldMin_y = 0.0f; worldMin_z = -51.20f + (-1.2417f + -0.0383f); break;
-        case 6: worldMin_x = -64.00f + ( 1.29280f +   -0.6728f); worldMin_y = 0.0f; worldMin_z = -71.68f + (-1.2033f + 3.76f); break;
-        case 7: worldMin_x = -58.88f + ( 1.24110f +   -6.7000f); worldMin_y = 0.0f; worldMin_z = -79.36f + (-1.2544f + 1.16f); break;
-        case 8: worldMin_x = -40.96f + (-1.30560f +    1.0800f); worldMin_y = 0.0f; worldMin_z = -43.52f + (1.2928f + 0.8f); break;
-        case 9: worldMin_x = -51.20f + (-1.34390f +    3.6000f); worldMin_y = 0.0f; worldMin_z = -64.0f + (-1.1906f + -1.28f); break;
-        case 10:worldMin_x =-128.00f + (-0.90945f +  107.3700f); worldMin_y = 0.0f; worldMin_z = -71.68f + (-1.0372f + 35.48f); break;
-        case 11:worldMin_x = -38.40f + (-1.26720f +   15.0500f); worldMin_y = 0.0f; worldMin_z =  51.2f + (0.96056f + -77.94f); break;
-        case 12:worldMin_x = -34.53f + ( 0.00000f +   19.0400f); worldMin_y = 0.0f; worldMin_z = -123.74f + (0.0f + 95.8f); break;
+    switch(currentLevel) {
+        case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
+        case 1: worldMin_x = -81.92f; worldMin_z = -71.68f; break;
+        case 2: worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); worldMin_z = -46.08f + (0.0f + -7.7f); break;
+        case 3: worldMin_x = -53.76f + (50.17400f +  -45.1200f); worldMin_z = -46.08f + (13.714f + -16.32f); break;
+        case 4: worldMin_x =  -7.68f + ( 1.17800f +  -20.4000f); worldMin_z = -64.00f + (1.292799f + 11.48f); break;
+        case 5: worldMin_x = -35.84f + ( 1.17780f +  -10.1400f); worldMin_z = -51.20f + (-1.2417f + -0.0383f); break;
+        case 6: worldMin_x = -64.00f + ( 1.29280f +   -0.6728f); worldMin_z = -71.68f + (-1.2033f + 3.76f); break;
+        case 7: worldMin_x = -58.88f + ( 1.24110f +   -6.7000f); worldMin_z = -79.36f + (-1.2544f + 1.16f); break;
+        case 8: worldMin_x = -40.96f + (-1.30560f +    1.0800f); worldMin_z = -43.52f + (1.2928f + 0.8f); break;
+        case 9: worldMin_x = -51.20f + (-1.34390f +    3.6000f); worldMin_z = -64.0f + (-1.1906f + -1.28f); break;
+        case 10:worldMin_x =-128.00f + (-0.90945f +  107.3700f); worldMin_z = -71.68f + (-1.0372f + 35.48f); break;
+        case 11:worldMin_x = -38.40f + (-1.26720f +   15.0500f); worldMin_z =  51.2f + (0.96056f + -77.94f); break;
+        case 12:worldMin_x = -34.53f + ( 0.00000f +   19.0400f); worldMin_z = -123.74f + (0.0f + 95.8f); break;
     }
     
     worldMin_x -= 2.56f; // Add one cell gap around edges
     worldMin_z -= 2.56f;
     PutChunksInCells();
-    DetermineClosedEdges();
+    if (DetermineClosedEdges()) return 1;
+    
     // For each cell, get the visibility as though player were there and put into gridCellStates
     // Then store the visibility of gridCellStates into the table of all visible cells for that cell
     // at the appropriate offset for looking up later when actually re-assigning gridCellStates
@@ -626,14 +618,6 @@ int Cull_Init(void) {
         }
     }
     
-//     DualLog("Cull Init found %d precomputed visible cells total for all cells\n",numPrecomputedVisibleCells);
-// 
-// //     FindMeshRenderers(0); // Static Immutable
-// //     FindMeshRenderers(1); // Dynamic
-// //     FindMeshRenderers(2); // Doors
-// //     FindMeshRenderers(3); // NPCs
-// //     FindMeshRenderers(4); // Static Saveable
-// //     FindMeshRenderers(5); // Lights
     UpdatedPlayerCell();
     int cellToCellIdx = playerCellIdx * ARRSIZE;
     int numFoundVisibleCellsForPlayerStart = 0;
@@ -643,12 +627,9 @@ int Cull_Init(void) {
             if (precomputedVisibleCellsFromHere[cellToCellIdx + cellIdx]) {
                 numFoundVisibleCellsForPlayerStart++;
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
-                gridCellStates[cellIdx] |= CELL_OPEN; // Force visible cells open if for some reason they weren't.
             }
         }
     }
-    
-//     DualLog("Cull Init found %d visible cells for player starting cell %d\n",numFoundVisibleCellsForPlayerStart,playerCellIdx);
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
 //     PutMeshesInCells(0); // Static Immutable
@@ -656,7 +637,7 @@ int Cull_Init(void) {
 //     PutMeshesInCells(2); // Doors
 //     PutMeshesInCells(3); // NPCs
 //     PutMeshesInCells(4); // Static Saveable
-//     PutMeshesInCells(5); // Lights
+    PutMeshesInCells(5); // Lights
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     return 0;
 }
@@ -669,33 +650,21 @@ void CullCore(void) {
     for (int z=0;z<WORLDZ;++z) {
         for (int x=0;x<WORLDX;++x) {
             int cellIdx = (z * WORLDX) + x;
+            if (cellIdx == 0) { gridCellStates[0] |= CELL_VISIBLE; continue; } // Errors default here so draw them anyways.  Don't count it though.
+            if (cellIdx == playerCellIdx) { gridCellStates[playerCellIdx] |= CELL_VISIBLE; numCellsVisible++; continue; } // Always at least set player's cell.
+
             if (precomputedVisibleCellsFromHere[cellToCellIdx + cellIdx]) {
                 numCellsVisible++;
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
-                gridCellStates[cellIdx] |= CELL_OPEN; // Force visible cells open if for some reason they weren't.
             } else {
                 gridCellStates[cellIdx] &= ~CELL_VISIBLE;
             }
         }
     }
 
-    // Force cell 0 and player cell to visible and open
-    gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
-    gridCellStates[0] |= CELL_OPEN;
-    numCellsVisible++; // Only count player's cell.
-    gridCellStates[playerCellIdx] |= CELL_VISIBLE; // Errors default here so draw them anyways.
-    gridCellStates[playerCellIdx] |= CELL_OPEN;
 //     CameraViewUnculling(playerCellX,playerCellY);
-//     ToggleVisibility(); // Update all geometry for cells marked as dirty.
-//     ToggleStaticMeshesImmutableVisibility();
-//     ToggleStaticImmutableParticlesVisibility();
-//     ToggleStaticMeshesSaveableVisibility();
-//     ToggleDoorsVisibility();
-//     ToggleLightsVisibility();
 //     UpdateNPCPVS();
 //     ToggleNPCPVS();
-//     SetSkyVisible(skyVisType);
-//     DualLog("CullCore ran for cell %d and found %d visible cells\n", playerCellIdx, numCellsVisible);
 }
 
 void Cull() {
