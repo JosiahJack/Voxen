@@ -1046,7 +1046,7 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     float to_inst_y = inst_y - cam_y;
     float to_inst_z = inst_z - cam_z;
     float distance = sqrtf(to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z);
-    if (distance < 0.0001f) return true; // Avoid division by zero.  Instance is at camera position, consider it in view
+    if (distance < 3.62038672f) return true; // Avoid division by zero.  Closer than corner of a cell (sqrt(2) * 2.56f)
 
     to_inst_x /= distance; // Normalize direction to instance
     to_inst_y /= distance;
