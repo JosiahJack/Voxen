@@ -71,12 +71,12 @@ extern GLuint modelBoundsID;
 extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
-extern GLuint tebos[MODEL_COUNT];
-extern GLuint ebos[MODEL_COUNT];
+// extern GLuint tebos[MODEL_COUNT];
+// extern GLuint ebos[MODEL_COUNT];
 extern float ** vertexDataArrays;
 extern uint32_t ** triangleDataArrays;
-extern uint32_t ** triEdgeDataArrays;
-extern uint32_t ** edgeDataArrays;
+// extern uint32_t ** triEdgeDataArrays;
+// extern uint32_t ** edgeDataArrays;
 
 int LoadGeometry(void);
 

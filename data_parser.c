@@ -31,40 +31,40 @@ const char *valid_mdldata_keys[] = {"index"};
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
-uint32_t modelEdgeCounts[MODEL_COUNT];
+// uint32_t modelEdgeCounts[MODEL_COUNT];
 GLuint vbos[MODEL_COUNT];
 GLuint tbos[MODEL_COUNT]; // Triangle index buffers
-GLuint tebos[MODEL_COUNT]; // Triangle's edge indices buffers
+// GLuint tebos[MODEL_COUNT]; // Triangle's edge indices buffers
 GLuint ebos[MODEL_COUNT]; // Edge index buffers
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
-uint32_t largestEdgeCount = 0;
+// uint32_t largestEdgeCount = 0;
 float * tempVertices;
 uint32_t * tempTriangles;
-uint32_t * tempTriEdges;
+// uint32_t * tempTriEdges;
 
 // Structure to represent an edge for building edge list
-typedef struct {
-    uint32_t v0, v1; // Vertex indices (sorted: v0 < v1)
-    uint32_t tri0, tri1; // Triangle indices (tri1 = UINT32_MAX if unshared)
-} Edge;
-
-Edge * tempEdges;
+// typedef struct {
+//     uint32_t v0, v1; // Vertex indices (sorted: v0 < v1)
+//     uint32_t tri0, tri1; // Triangle indices (tri1 = UINT32_MAX if unshared)
+// } Edge;
+// 
+// Edge * tempEdges;
 
 // Simple hash table for edge lookup
-typedef struct {
-    uint32_t v0, v1;
-    uint32_t edgeIndex;
-} EdgeHashEntry;
-
-EdgeHashEntry * edgeHash;
+// typedef struct {
+//     uint32_t v0, v1;
+//     uint32_t edgeIndex;
+// } EdgeHashEntry;
+// 
+// EdgeHashEntry * edgeHash;
 
 float ** vertexDataArrays;
 uint32_t ** triangleDataArrays;
 uint32_t ** triEdgeDataArrays;
-uint32_t ** edgeDataArrays;
+// uint32_t ** edgeDataArrays;
 //-----------------------------------------------------------------------------
 // Level Data Parsing
 DataParser level_parser;
@@ -482,10 +482,10 @@ int LoadGeometry(void) {
     int totalVertCount = 0;
     int totalBounds = 0;
     int totalTriCount = 0;
-    int totalEdgeCount = 0;
+//     int totalEdgeCount = 0;
     largestVertCount = 0;
     largestTriangleCount = 0;
-    largestEdgeCount = 0;
+//     largestEdgeCount = 0;
 
     // Allocate persistent temporary buffers
     tempVertices = (float *)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -494,14 +494,14 @@ int LoadGeometry(void) {
     tempTriangles = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
     DebugRAM("tempTriangles buffer");
 
-    tempTriEdges = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
-    DebugRAM("tempTriEdges buffer");
+//     tempTriEdges = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
+//     DebugRAM("tempTriEdges buffer");
 
-    tempEdges = (Edge *)calloc(MAX_EDGE_COUNT, sizeof(Edge));
-    DebugRAM("tempEdges buffer");
+//     tempEdges = (Edge *)calloc(MAX_EDGE_COUNT, sizeof(Edge));
+//     DebugRAM("tempEdges buffer");
 
-    edgeHash = (EdgeHashEntry *)calloc(HASH_SIZE, sizeof(EdgeHashEntry));
-    DebugRAM("edgeHash buffer");
+//     edgeHash = (EdgeHashEntry *)calloc(HASH_SIZE, sizeof(EdgeHashEntry));
+//     DebugRAM("edgeHash buffer");
 
     vertexDataArrays = (float **)calloc(MODEL_COUNT, sizeof(float *));
     DebugRAM("vertexDataArrays buffer");
@@ -509,26 +509,26 @@ int LoadGeometry(void) {
     triangleDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
     DebugRAM("triangleDataArrays buffer");
 
-    triEdgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
-    DebugRAM("triEdgeDataArrays buffer");
+//     triEdgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
+//     DebugRAM("triEdgeDataArrays buffer");
 
-    edgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
-    DebugRAM("edgeDataArrays buffer");
+//     edgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
+//     DebugRAM("edgeDataArrays buffer");
 
     // Generate staging buffers
-    GLuint stagingVBO, stagingTBO, stagingTEBO, stagingEBO;
+    GLuint stagingVBO, stagingTBO;//, stagingTEBO, stagingEBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
-    glGenBuffers(1, &stagingTEBO);
-    glGenBuffers(1, &stagingEBO);
+//     glGenBuffers(1, &stagingTEBO);
+//     glGenBuffers(1, &stagingEBO);
     glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
     glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_EDGE_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
+//     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
+//     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_EDGE_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
     DebugRAM("after staging buffers allocation");
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
@@ -568,7 +568,7 @@ int LoadGeometry(void) {
 
         modelVertexCounts[i] = vertexCount;
         modelTriangleCounts[i] = triCount;
-        uint32_t edgeCount = 0; // Will be updated after edge processing
+//         uint32_t edgeCount = 0; // Will be updated after edge processing
         if (vertexCount > largestVertCount) largestVertCount = vertexCount;
         if (triCount > largestTriangleCount) largestTriangleCount = triCount;
 
@@ -583,7 +583,7 @@ int LoadGeometry(void) {
         totalTriCount += triCount;
 
         // Clear hash table
-        memset(edgeHash, 0, HASH_SIZE * sizeof(EdgeHashEntry));
+//         memset(edgeHash, 0, HASH_SIZE * sizeof(EdgeHashEntry));
 
         // Extract vertex and triangle data, build edge list
         uint32_t vertexIndex = 0;
@@ -594,7 +594,7 @@ int LoadGeometry(void) {
         float maxy = -1E9f;
         float maxz = -1E9f;
         uint32_t triangleIndex = 0;
-        uint32_t triEdgeIndex = 0;
+//         uint32_t triEdgeIndex = 0;
         uint32_t globalVertexOffset = 0;
 
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
@@ -631,8 +631,8 @@ int LoadGeometry(void) {
                 if (face->mNumIndices != 3) { DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); return 1; }
 
                 uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
-                uint32_t triangleIdx = triangleIndex / 3;
-                uint32_t edgeIndices[3];
+//                 uint32_t triangleIdx = triangleIndex / 3;
+//                 uint32_t edgeIndices[3];
 
                 // Validate vertex indices
                 if (v[0] >= vertexCount || v[1] >= vertexCount || v[2] >= vertexCount) { DualLogError("Invalid vertex index in %s, face %u: v0=%u, v1=%u, v2=%u, vertexCount=%u\n", model_parser.entries[matchedParserIdx].path, f, v[0], v[1], v[2], vertexCount);return 1; }
@@ -643,68 +643,74 @@ int LoadGeometry(void) {
                 tempTriangles[triangleIndex++] = v[2];
 
                 // Process edges with hash table
-                for (int e = 0; e < 3; e++) {
-                    uint32_t v0 = v[e];
-                    uint32_t v1 = v[(e + 1) % 3];
-                    if (v0 > v1) { uint32_t temp = v0; v0 = v1; v1 = temp; }
-
-                    uint32_t hash = HASH(v0, v1);
-                    while (edgeHash[hash].edgeIndex != 0 && (edgeHash[hash].v0 != v0 || edgeHash[hash].v1 != v1)) {
-                        hash = (hash + 1) & (HASH_SIZE - 1); // Linear probing
-                    }
-
-                    int edgeFound = -1;
-                    if (edgeHash[hash].edgeIndex != 0) {
-                        edgeFound = edgeHash[hash].edgeIndex - 1;
-                        tempEdges[edgeFound].tri1 = triangleIdx;
-                    } else {
-                        if (edgeCount < MAX_EDGE_COUNT) {
-                            tempEdges[edgeCount].v0 = v0;
-                            tempEdges[edgeCount].v1 = v1;
-                            tempEdges[edgeCount].tri0 = triangleIdx;
-                            tempEdges[edgeCount].tri1 = UINT32_MAX;
-                            edgeHash[hash].v0 = v0;
-                            edgeHash[hash].v1 = v1;
-                            edgeHash[hash].edgeIndex = edgeCount + 1;
-                            edgeFound = edgeCount++;
-                        } else DualLogError("Edge count exceeds estimate for %s: %u >= %u\n", model_parser.entries[matchedParserIdx].path, edgeCount, MAX_EDGE_COUNT);
-                    }
-
-                    edgeIndices[e] = edgeFound;
-                }
+//                 for (int e = 0; e < 3; e++) {
+//                     uint32_t v0 = v[e];
+//                     uint32_t v1 = v[(e + 1) % 3];
+//                     if (v0 > v1) { uint32_t temp = v0; v0 = v1; v1 = temp; }
+// 
+//                     uint32_t hash = HASH(v0, v1);
+//                     while (edgeHash[hash].edgeIndex != 0 && (edgeHash[hash].v0 != v0 || edgeHash[hash].v1 != v1)) {
+//                         hash = (hash + 1) & (HASH_SIZE - 1); // Linear probing
+//                     }
+// 
+//                     int edgeFound = -1;
+//                     if (edgeHash[hash].edgeIndex != 0) {
+//                         edgeFound = edgeHash[hash].edgeIndex - 1;
+//                         tempEdges[edgeFound].tri1 = triangleIdx;
+//                     } else {
+//                         if (edgeCount < MAX_EDGE_COUNT) {
+//                             tempEdges[edgeCount].v0 = v0;
+//                             tempEdges[edgeCount].v1 = v1;
+//                             tempEdges[edgeCount].tri0 = triangleIdx;
+//                             tempEdges[edgeCount].tri1 = UINT32_MAX;
+//                             edgeHash[hash].v0 = v0;
+//                             edgeHash[hash].v1 = v1;
+//                             edgeHash[hash].edgeIndex = edgeCount + 1;
+//                             edgeFound = edgeCount++;
+//                         } else DualLogError("Edge count exceeds estimate for %s: %u >= %u\n", model_parser.entries[matchedParserIdx].path, edgeCount, MAX_EDGE_COUNT);
+//                     }
+// 
+//                     edgeIndices[e] = edgeFound;
+//                 }
 
                 // Store edge indices
-                tempTriEdges[triEdgeIndex++] = edgeIndices[0];
-                tempTriEdges[triEdgeIndex++] = edgeIndices[1];
-                tempTriEdges[triEdgeIndex++] = edgeIndices[2];
+//                 tempTriEdges[triEdgeIndex++] = edgeIndices[0];
+//                 tempTriEdges[triEdgeIndex++] = edgeIndices[1];
+//                 tempTriEdges[triEdgeIndex++] = edgeIndices[2];
             }
             
             globalVertexOffset += mesh->mNumVertices;
         }
 
+        DebugRAM("Prior to index %d allocations for model %s",i, model_parser.entries[matchedParserIdx].path);
         vertexDataArrays[i] = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); // Store vertex data in vertexDataArrays
         memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        DebugRAM("vertexDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
 
         triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle data in triangleDataArrays
         memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
+        DebugRAM("triangleDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
 
-        triEdgeDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle-edge data in triEdgeDataArrays
-        memcpy(triEdgeDataArrays[i], tempTriEdges, triCount * 3 * sizeof(uint32_t));
-
-        edgeDataArrays[i] = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t)); // Store edge data in edgeDataArrays
-        for (uint32_t j = 0; j < edgeCount; j++) {
-            edgeDataArrays[i][j * 4 + 0] = tempEdges[j].v0;
-            edgeDataArrays[i][j * 4 + 1] = tempEdges[j].v1;
-            edgeDataArrays[i][j * 4 + 2] = tempEdges[j].tri0;
-            edgeDataArrays[i][j * 4 + 3] = tempEdges[j].tri1;
-        }
+//         triEdgeDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle-edge data in triEdgeDataArrays
+//         memcpy(triEdgeDataArrays[i], tempTriEdges, triCount * 3 * sizeof(uint32_t));
+//         DebugRAM("triEdgeDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
+// 
+//         edgeDataArrays[i] = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t)); // Store edge data in edgeDataArrays
+//         DebugRAM("edgeDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
+//         for (uint32_t j = 0; j < edgeCount; j++) {
+//             edgeDataArrays[i][j * 4 + 0] = tempEdges[j].v0;
+//             edgeDataArrays[i][j * 4 + 1] = tempEdges[j].v1;
+//             edgeDataArrays[i][j * 4 + 2] = tempEdges[j].tri0;
+//             edgeDataArrays[i][j * 4 + 3] = tempEdges[j].tri1;
+//         }
         
-        modelEdgeCounts[i] = edgeCount;
-        totalEdgeCount += edgeCount;
-        if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
+//         modelEdgeCounts[i] = edgeCount;
+//         totalEdgeCount += edgeCount;
+//         if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
 
         aiReleaseImport(scene);
         malloc_trim(0);
+        DebugRAM("post aiReleaseImport for model %s", model_parser.entries[matchedParserIdx].path);
 
         // Copy to staging buffers
         if (vertexCount > 0) {
@@ -718,6 +724,7 @@ int LoadGeometry(void) {
             glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glFlush();
             glFinish();
+            DebugRAM("post vertex buffer vbos upload for model %s", model_parser.entries[matchedParserIdx].path);
         }
 
         if (triCount > 0) {
@@ -732,8 +739,9 @@ int LoadGeometry(void) {
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
             glFlush();
             glFinish();
+            DebugRAM("post tri buffer tbos upload for model %s", model_parser.entries[matchedParserIdx].path);
             
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
+/*            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
             mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCount * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
             memcpy(mapped_buffer, tempTriEdges, triCount * 3 * sizeof(uint32_t));
             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
@@ -744,29 +752,31 @@ int LoadGeometry(void) {
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
             glFlush();
             glFinish();
+            DebugRAM("post tri buffer tebos upload for model %s", model_parser.entries[matchedParserIdx].path)*/;
         }
 
-        if (edgeCount > 0) {
-            uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t));
-            for (uint32_t j = 0; j < edgeCount; j++) {
-                tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
-                tempEdgeData[j * 4 + 1] = tempEdges[j].v1;
-                tempEdgeData[j * 4 + 2] = tempEdges[j].tri0;
-                tempEdgeData[j * 4 + 3] = tempEdges[j].tri1;
-            }
-
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
-            void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, edgeCount * 4 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, tempEdgeData, edgeCount * 4 * sizeof(uint32_t));
-            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-            glGenBuffers(1, &ebos[i]);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, ebos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, edgeCount * 4 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, edgeCount * 4 * sizeof(uint32_t));
-            glFlush();
-            glFinish();
-            free(tempEdgeData);
-        }
+//         if (edgeCount > 0) {
+//             uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t));
+//             for (uint32_t j = 0; j < edgeCount; j++) {
+//                 tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
+//                 tempEdgeData[j * 4 + 1] = tempEdges[j].v1;
+//                 tempEdgeData[j * 4 + 2] = tempEdges[j].tri0;
+//                 tempEdgeData[j * 4 + 3] = tempEdges[j].tri1;
+//             }
+// 
+//             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
+//             void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, edgeCount * 4 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+//             memcpy(mapped_buffer, tempEdgeData, edgeCount * 4 * sizeof(uint32_t));
+//             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+//             glGenBuffers(1, &ebos[i]);
+//             glBindBuffer(GL_COPY_WRITE_BUFFER, ebos[i]);
+//             glBufferData(GL_COPY_WRITE_BUFFER, edgeCount * 4 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+//             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, edgeCount * 4 * sizeof(uint32_t));
+//             glFlush();
+//             glFinish();
+//             free(tempEdgeData);
+//             DebugRAM("post edge data free for model %s", model_parser.entries[matchedParserIdx].path);
+//         }
 
         float minx_pos = fabs(minx);
         float miny_pos = fabs(miny);
@@ -792,23 +802,24 @@ int LoadGeometry(void) {
     // Delete staging buffers
     glDeleteBuffers(1, &stagingVBO);
     glDeleteBuffers(1, &stagingTBO);
-    glDeleteBuffers(1, &stagingTEBO);
-    glDeleteBuffers(1, &stagingEBO);
+//     glDeleteBuffers(1, &stagingTEBO);
+//     glDeleteBuffers(1, &stagingEBO);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     DebugRAM("after staging buffers deleted");
 
 #ifdef DEBUG_MODEL_LOAD_DATA
-    DualLog("Largest vertex count: %d, triangle count: %d, edge count: %d\n", largestVertCount, largestTriangleCount, largestEdgeCount);
+    DualLog("Largest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
+//     DualLog("Largest vertex count: %d, triangle count: %d, edge count: %d\n", largestVertCount, largestTriangleCount, largestEdgeCount);
     DualLog("Total vertices: %d (", totalVertCount);
     print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     DualLog(")\nTotal triangles: %d (", totalTriCount);
     print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
-    DualLog(")\nTotal tri-edges: %d (", totalTriCount);
-    print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
-    DualLog(")\nTotal edges: %d (", totalEdgeCount);
-    print_bytes_no_newline(totalEdgeCount * 4 * sizeof(uint32_t));
+//     DualLog(")\nTotal tri-edges: %d (", totalTriCount);
+//     print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
+//     DualLog(")\nTotal edges: %d (", totalEdgeCount);
+//     print_bytes_no_newline(totalEdgeCount * 4 * sizeof(uint32_t));
     DualLog(")\nBounds (");
     print_bytes_no_newline(totalBounds * sizeof(float));
     DualLog(")\n");
@@ -832,9 +843,9 @@ int LoadGeometry(void) {
     DebugRAM("post model model bounds data transfer");
     free(tempVertices);
     free(tempTriangles);
-    free(tempTriEdges);
-    free(tempEdges);
-    free(edgeHash);
+//     free(tempTriEdges);
+//     free(tempEdges);
+//     free(edgeHash);
     malloc_trim(0);
     double end_time = get_time();
     DualLog("Load Models took %f seconds\n", end_time - start_time);
@@ -979,7 +990,7 @@ void GetLevel_LightsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, f
 void GetLevel_LightsStaticImmutable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
         case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = -7.243; *ofsy = -48.37571f; *ofsz = -15.391001f; break;
+        case 1:  *ofsx = -5.12f; *ofsy = -48.37571f; *ofsz = -15.391001f; break;
 //         case 1:  *ofsx = 25.56008f; *ofsy = -48.64f; *ofsz = -5.2f; break; // Position offset once unparented from 1.MedicalLevel
 //         case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
@@ -1092,6 +1103,7 @@ float quat_angle_deg(Quaternion a, Quaternion b) {
 int LoadLevelGeometry(uint8_t curlevel) {
     if (curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
+    DebugRAM("start of LoadLevelGeometry");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_geometry_level%d.txt", curlevel);
     parser_init(&level_parser, valid_leveldata_keys, NUM_LEVDAT_KEYS);
@@ -1129,13 +1141,16 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].floorHeight = pointsUp && currentLevel <= 12 ? 0.0f : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
 //         if (pointsUp) DualLog("Found floor named %s from quat x %f, y %f, z %f, w %f\n",level_parser.entries[idx].path,quat.x,quat.y,quat.z,quat.w);
     }
-    
+
+    malloc_trim(0);
+    DebugRAM("end of LoadLevelGeometry");
     return 0;
 }
 
 int LoadLevelLights(uint8_t curlevel) {
     if (curlevel >= numLevels) { DualLogError("Cannot load level lights %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
+    DebugRAM("start of LoadLevelLights");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_lights_level%d.txt", curlevel);
     parser_init(&lights_parser, valid_lightdata_keys, NUM_LIGHTDAT_KEYS);
@@ -1165,6 +1180,8 @@ int LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_G] = lights_parser.entries[i].color.g;
         lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
     }
-    
+
+    malloc_trim(0);
+    DebugRAM("end of LoadLevelLights");
     return 0;
 }

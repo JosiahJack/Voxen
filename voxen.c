@@ -214,33 +214,9 @@ void DualLogWarn(const char *fmt, ...) { va_list args; va_start(args, fmt); Dual
 void DualLogError(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
 
 
-// Get RSS aka the total RAM reported by btop or other utilities that's allocated virtual ram for the process.
-size_t get_rss_bytes(void) {
-    FILE *fp = fopen("/proc/self/stat", "r");
-    if (!fp) { DualLogError("Failed to open /proc/self/stat\n"); return 0; }
-
-    char buffer[1024];
-    if (!fgets(buffer, sizeof(buffer), fp)) { DualLogError("Failed to read /proc/self/stat\n"); fclose(fp); return 0; }
-
-    fclose(fp);
-    char *token = strtok(buffer, " ");
-    int field = 0;
-    size_t rss_pages = 0;
-    while (token && field < 23) { // Parse the 24th field (RSS in pages)
-        token = strtok(NULL, " ");
-        field++;
-    }
-    if (token) { rss_pages = atol(token);
-    } else { DualLogError("Failed to parse RSS from /proc/self/stat\n"); return 0; }
-
-    return rss_pages * sysconf(_SC_PAGESIZE);
-}
-
+// Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 void DebugRAM(const char *context, ...) {
-    // Buffer to hold formatted context string
     char formatted_context[1024];
-
-    // Process variable arguments
     va_list args;
     va_start(args, context);
     vsnprintf(formatted_context, sizeof(formatted_context), context, args);
@@ -248,14 +224,27 @@ void DebugRAM(const char *context, ...) {
 
 #ifdef DEBUG_RAM_OUTPUT
     struct mallinfo2 info = mallinfo2();
-    size_t rss_bytes = get_rss_bytes();
-    // Log heap and RSS usage with formatted context
-    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), RSS %zu bytes (%zu KB | %.2f MB)\n",
+    size_t uss_bytes = 0;
+    FILE *fp = fopen("/proc/self/smaps_rollup", "r");
+    if (fp) {
+        char line[256];
+        size_t val;
+        while (fgets(line, sizeof(line), fp)) {
+            if (sscanf(line, "Private_Clean: %zu kB", &val) == 1)      uss_bytes += val * 1024;
+            else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
+        }
+        fclose(fp);
+    } else {
+        DualLogError("Failed to open /proc/self/smaps_rollup\n");
+    }
+
+    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
             formatted_context,
             info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
-            rss_bytes, rss_bytes / 1024, rss_bytes / 1024.0 / 1024.0);
+            uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
 #endif
 }
+
 
 void print_bytes_no_newline(int count) {
     DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
@@ -672,6 +661,7 @@ void UpdateInstanceMatrix(int i) {
 }
 
 int SetupInstances(void) {
+    DebugRAM("start of SetupInstances");
     DualLog("Initializing instances\n");
     CHECK_GL_ERROR();
     int x,z,idx;
@@ -725,6 +715,7 @@ int SetupInstances(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     CHECK_GL_ERROR();
     malloc_trim(0);
+    DebugRAM("end of SetupInstances");
     return 0;
 }
 // ============================================================================
