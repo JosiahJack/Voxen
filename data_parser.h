@@ -62,7 +62,7 @@ bool isDoubleSided(uint32_t texIndexToCheck);
 int LoadTextures(void);
 
 // Models
-#define MODEL_COUNT 1024
+#define MODEL_COUNT 768
 #define VERTEX_ATTRIBUTES_COUNT 14 // x,y,z,nx,ny,nz,u,v,texIdx,glowIdx,specIdx,normIdx,modelIdx,instanceIdx
 
 extern uint32_t modelVertexCounts[MODEL_COUNT];

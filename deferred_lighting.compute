@@ -174,7 +174,7 @@ const char* deferredLighting_computeShader =
 
     "        float distOverRange = dist / range;\n"
     "        float attenuation = (1.0 - (distOverRange * distOverRange)) * max(dot(normal, lightDir), 0.0);\n"
-    "        lighting += color.rgb * (intensity * (1 / 2.2)) * attenuation * lightColor * spotFalloff;\n"
+    "        lighting += color.rgb * (intensity * 0.3) * attenuation * lightColor * spotFalloff;\n"
     "    }\n"
 
     "    lighting += glowColor.rgb;\n"

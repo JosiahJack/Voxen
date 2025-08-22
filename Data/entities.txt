@@ -220,39 +220,41 @@ texture: 267
 index: 38
 model: 109
 cardchunk: 1
-texture: 21
+glowtexture: 270
+texture: 271
 #chunk_eng1_9
 index: 39
 model: 111
 cardchunk: 1
-texture: 28
+texture: 273
 #chunk_eng1_9d
 index: 40
 model: 110
 cardchunk: 1
-texture: 29
+texture: 272
 #chunk_eng2_1
 index: 41
 model: 113
 cardchunk: 1
-texture: 30
+texture: 276
 #chunk_eng2_1_slice45
 index: 42
 model: 116
-texture: 30
+texture: 276
 #chunk_eng2_1_slice384high
 index: 43
 model: 114
-texture: 30
+texture: 276
 #chunk_eng2_1_slice384highrh
 index: 44
 model: 115
-texture: 30
+texture: 276
 #chunk_eng2_1d
 index: 45
 model: 112
 cardchunk: 1
-texture: 31
+glowtexture: 274
+texture: 275
 #chunk_eng2_2
 index: 46
 model: 117
@@ -262,150 +264,159 @@ texture: 32
 index: 47
 model: 666
 cardchunk: 1
-texture: 33
+texture: 277
 #chunk_eng2_3
 index: 48
 model: 119
 cardchunk: 1
-texture: 34
+texture: 282
 #chunk_eng2_3d
 index: 49
 model: 118
 cardchunk: 1
-texture: 35
+texture: 281
 #chunk_eng2_4
 index: 50
 model: 178
 cardchunk: 1
-texture: 36
+texture: 283
 #chunk_eng2_5
 index: 51
 model: 120
 cardchunk: 1
-texture: 37
+normtexture: 284
+texture: 285
 #chunk_eng2_5_slice45
 index: 52
 model: 121
-texture: 37
+normtexture: 284
+texture: 285
 #chunk_eng2_6
 index: 53
 model: 122
+texture: 1252
 // eng_wallpump
 #chunk_exec1_1
 index: 54
 model: 124
 cardchunk: 1
-texture: 38
+texture: 287
 #chunk_exec1_1d
 index: 55
 model: 123
 cardchunk: 1
-texture: 39
+texture: 286
 #chunk_exec1_2
 index: 56
 model: 126
 cardchunk: 1
-texture: 40
+glowtexture: 290
+texture: 291
 #chunk_exec1_2d
 index: 57
 model: 125
 cardchunk: 1
-texture: 41
+glowtexture: 288
+texture: 289
 #chunk_exec2_1
 index: 58
 model: 127
 cardchunk: 1
-texture: 42
+texture: 292
 #chunk_exec2_2
 index: 59
 model: 129
 cardchunk: 1
-texture: 43
+texture: 295
 #chunk_exec2_2d
 index: 60
 model: 128
 cardchunk: 1
-texture: 44
+glowtexture: 293
+texture: 294
 #chunk_exec2_3
 index: 61
 model: 130
 cardchunk: 1
-texture: 45
+texture: 296
 #chunk_exec2_4
 index: 62
 model: 131
 cardchunk: 1
-texture: 46
+texture: 297
 #chunk_exec2_4_slice45
 index: 63
 model: 132
-texture: 46
+texture: 297
 #chunk_exec2_5
 index: 64
 model: 133
 cardchunk: 1
-texture: 47
+texture: 298
 #chunk_exec2_6
 index: 65
 model: 134
 cardchunk: 1
-texture: 48
+texture: 299
 #chunk_exec2_7
 index: 66
 cardchunk: 1
-texture: 49
+texture: 300
 #chunk_exec3_1
 index: 67 
 cardchunk: 1
-texture: 50
+texture: 303
 #chunk_exec3_1d
 index: 68
 model: 135
 cardchunk: 1
-texture: 51
+glowtexture: 301
+texture: 302
 #chunk_exec3_2
 index: 69
 cardchunk: 1
-texture: 52
+texture: 304
 #chunk_exec3_4
 index: 70
 cardchunk: 1
-texture: 53
+texture: 305
 #chunk_exec4_1
 index: 71
 model: 136
 cardchunk: 1
-texture: 54
+glowtexture: 306
+texture: 307
 #chunk_exec4_2
 index: 72
 model: 137
 cardchunk: 1
-texture: 55
+texture: 308
 #chunk_exec4_3
 index: 73
 model: 138
 cardchunk: 1
-texture: 56
+texture: 309
 #chunk_exec4_4
 index: 74
 model: 139
 cardchunk: 1
-texture: 57
+texture: 311
 #chunk_exec4_5
 index: 75
 model: 140
 cardchunk: 1
-texture: 58
+texture: 312
 #chunk_exec4_6
 index: 76
 model: 141
 cardchunk: 1
-texture: 59
+texture: 313
 #chunk_exec6_1
 index: 77
 model: 142
 cardchunk: 1
-texture: 60
+glowtexture: 314
+texture: 315
 #chunk_exteriorpanel1
 index: 78
 model: 143
@@ -415,6 +426,7 @@ texture: 1228
 index: 79
 model: 157
 cardchunk: 1
+texture: 96
 #chunk_flight1_1
 index: 80
 model: 146
@@ -809,6 +821,7 @@ cardchunk: 1
 texture: 494
 #chunk_med1_5
 index: 160
+model: 669
 cardchunk: 1
 texture: 495
 #chunk_med1_6
@@ -1400,9 +1413,10 @@ texture: 758
 glowtexture: 757
 #chunk_screen
 index: 279
+model: 178
 cardchunk: 1
-texture: 29
-glowtexture: 29
+texture: 881
+glowtexture: 881
 #chunk_sec1_1
 index: 280
 cardchunk: 1
@@ -2607,6 +2621,8 @@ index: 747
 index: 748
 #generic_transform
 index: 749
+// Last one from Citadel Unity version!
+
 #chunk_crate_impenetrable2
 index: 750
 model: 61
@@ -2619,3 +2635,14 @@ texture: 148
 index: 752
 model: 61
 texture: 149
+#chunk_eng2_6rods
+index: 753
+model: 671
+glowtexture: 1122
+texture: 1253
+// eng_wallpump rods
+#chunk_eng2_6_eng1_5
+index: 754
+model: 670
+texture: 262
+// eng_wallpump surrounding walls

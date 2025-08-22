@@ -70,7 +70,7 @@ float cam_fov = 65.0f;
 float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 
-float move_speed = 0.1f;
+float move_speed = 0.15f;
 float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
 float sprinting = 0.0f;
@@ -571,7 +571,7 @@ void UpdatePlayerFacingAngles() {
 
 // Update camera position based on input
 void ProcessInput(void) {
-    if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 1.0f;
+    if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 2.0f;
     else sprinting = 0.0f;
 
     float finalMoveSpeed = (move_speed + (sprinting * move_speed));
@@ -662,7 +662,7 @@ void UpdateInstanceMatrix(int i) {
 
 int SetupInstances(void) {
     DebugRAM("start of SetupInstances");
-    DualLog("Initializing instances\n");
+    DualLog("Initializing instances...\n");
     CHECK_GL_ERROR();
     int x,z,idx;
     for (idx = 0, x = 0, z = 0;idx<INSTANCE_COUNT;idx++) {
@@ -1043,7 +1043,7 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     to_inst_y /= distance;
     to_inst_z /= distance;
     float dotFac = dot(cam_forwardx,cam_forwardy,cam_forwardz, to_inst_x,to_inst_y,to_inst_z);
-    float fovAdjusted = cam_fov * 2.0f;
+    float fovAdjusted = cam_fov * 2.5f;
     float half_fov_rad = deg2rad(fovAdjusted * 0.5f); // Compare against cosine of half the FOV (cam_fov is in degrees, convert to radians)
     float cos_half_fov = cosf(half_fov_rad);
     if (dotFac >= cos_half_fov) return true; // Center is within FOV cone
@@ -1385,7 +1385,7 @@ int main(int argc, char* argv[]) {
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-            if (isDoubleSided(instances[i].texIndex)) glDisable(GL_CULL_FACE); // Disable backface culling
+            if (isDoubleSided(instances[i].texIndex) || instances[i].sclx < 0.0f || instances[i].scly < 0.0f || instances[i].sclz < 0.0f) glDisable(GL_CULL_FACE); // Disable backface culling
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
             drawCallsRenderedThisFrame++;

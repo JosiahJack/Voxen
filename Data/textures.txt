@@ -203,7 +203,8 @@ index: 93
 index: 94
 #Textures/citmat2_4.png
 index: 95
-
+#Textures/fan1.png
+index: 96
 #Textures/clothes.png
 index: 97
 #Textures/console1_1.png
@@ -2501,3 +2502,7 @@ index: 1249
 index: 1250
 #Textures/deb_warecasing.png
 index: 1251
+#Textures/sequences/engpump_00.png
+index: 1252
+#Textures/sequences/engpump_03.png
+index: 1253

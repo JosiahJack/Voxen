@@ -272,7 +272,7 @@ bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *
 }
 
 static bool ParseResourceData(DataParser *parser, const char *filename) {
-    DualLog("Starting ParseResourceData for file: %s\n", filename);
+//     DualLog("Starting ParseResourceData for file: %s\n", filename);
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
 
@@ -365,7 +365,7 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
 }
 
 static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
-    DualLog("Starting ParseSaveLevelData for file: %s\n", filename);
+//     DualLog("Starting ParseSaveLevelData for file: %s\n", filename);
     
     // Check if file exists and is readable
     FILE *file = fopen(filename, "r");
