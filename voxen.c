@@ -1056,6 +1056,33 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     return false; // Outside FOV cone
 }
 
+float playerVelocity_y = 0.0f;
+void Physics(void) {
+    DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);
+    float floorHeightForPlayer = INVALID_FLOOR_HEIGHT;
+    for (int i=0;i<INSTANCE_COUNT;i++) {
+        if (cellIndexForInstance[i] == playerCellIdx) {
+            if (instances[i].floorHeight > INVALID_FLOOR_HEIGHT) {
+                floorHeightForPlayer = instances[i].floorHeight;
+            }
+        }
+    }
+    
+    float stopHeight = floorHeightForPlayer + 0.84f;
+    if (stopHeight < (INVALID_FLOOR_HEIGHT + 1.0f)) stopHeight = -45.5f;
+    if (cam_y <= stopHeight) {
+        DualLog("Player hit floor at %f\n",stopHeight);
+        cam_y = stopHeight;
+        playerVelocity_y = 0.0f;
+        return;
+    }
+    
+    playerVelocity_y += 0.02f;
+    if (playerVelocity_y > 1.0f) playerVelocity_y = 1.0f; // Terminal velocity
+    cam_y -= (0.16f * playerVelocity_y);
+    DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
+}
+
 int main(int argc, char* argv[]) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
@@ -1121,6 +1148,7 @@ int main(int argc, char* argv[]) {
     EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities!
     EnqueueEvent_Simple(EV_CULL_INIT); // Must be after level!
     double accumulator = 0.0;
+    double last_physics_time = get_time();
     last_time = get_time();
     lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
@@ -1174,6 +1202,12 @@ int main(int argc, char* argv[]) {
         while (accumulator >= time_step) {
             if (window_has_focus) ProcessInput();
             accumulator -= time_step;
+        }
+        
+        double timeSinceLastPhysicsTick = current_time - last_physics_time;
+        if (timeSinceLastPhysicsTick > 0.016666666f) { // 60fps fixed tick rate
+            last_physics_time = current_time;
+            Physics();
         }
 
         // Enqueue all logged events for the current frame.

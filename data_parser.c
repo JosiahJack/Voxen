@@ -1138,7 +1138,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
         Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
         float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
         bool pointsUp = angle <= 30.0f;
-        instances[idx].floorHeight = pointsUp && currentLevel <= 12 ? 0.0f : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
+        instances[idx].floorHeight = pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
 //         if (pointsUp) DualLog("Found floor named %s from quat x %f, y %f, z %f, w %f\n",level_parser.entries[idx].path,quat.x,quat.y,quat.z,quat.w);
     }
 
