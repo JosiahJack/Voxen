@@ -716,6 +716,7 @@ int Cull_Init(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
+
     CHECK_GL_ERROR();
     free(bitPackedHandoffBuffer);
     malloc_trim(0);

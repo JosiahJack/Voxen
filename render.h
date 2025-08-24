@@ -61,7 +61,8 @@ extern uint32_t verticesRenderedThisFrame;
 extern GLuint matricesBuffer;
 extern GLuint precomputedVisibleCellsFromHereID;
 extern GLuint cellIndexForInstanceID;
-extern GLuint cellIndexForLight;
+extern GLuint cellIndexForLightID;
+extern GLuint masterIndexForLightsInPVSID;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
 
 typedef struct {
