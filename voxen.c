@@ -871,7 +871,7 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
+//     GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -894,7 +894,7 @@ int InitializeEnvironment(void) {
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     //                 3 = depth
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+//     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1240,14 +1240,14 @@ int main(int argc, char* argv[]) {
         verticesRenderedThisFrame = 0;
         
         // 0. Clear Frame Buffers and Depth
-        double ft0 = get_time() - current_time;
+//         double ft0 = get_time() - current_time;
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear screen
         
         Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
-        double ft1 = get_time() - current_time - (ft0);
+//         double ft1 = get_time() - current_time - (ft0);
 
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
         numLightsFound = 0;
@@ -1350,7 +1350,7 @@ int main(int argc, char* argv[]) {
         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-        double ft2 = get_time() - current_time - (ft0 + ft1);
+//         double ft2 = get_time() - current_time - (ft0 + ft1);
 
         // 2. Instance Culling to only those in range of player
         bool instanceIsCulledArray[INSTANCE_COUNT];
@@ -1381,7 +1381,7 @@ int main(int argc, char* argv[]) {
                 curIdx++;
             }
         }
-        double ft3 = get_time() - current_time - (ft0 + ft1 + ft2);
+//         double ft3 = get_time() - current_time - (ft0 + ft1 + ft2);
         
         // 3. Pass all instance matrices to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
@@ -1391,7 +1391,7 @@ int main(int argc, char* argv[]) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-        double ft4 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3);
+//         double ft4 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3);
         
         // 4. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1469,7 +1469,7 @@ int main(int argc, char* argv[]) {
         }
         
         glDisable(GL_BLEND);
-        double ft5 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4);
+//         double ft5 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4);
 
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
@@ -1503,13 +1503,14 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
         }
-        double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
+//         double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
         
         // 6. Render final meshes' results with full screen quad
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         if (debugView == 0) {
-            glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
+//             glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward + GI
         } else { // 1,2,3,4,5,6
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward Pass Debug Views
         }
@@ -1525,7 +1526,7 @@ int main(int argc, char* argv[]) {
         glBindTextureUnit(0, 0);
         glUseProgram(0);
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
-        double ft7 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6);
+//         double ft7 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6);
         
         // 7. Render UI Images
  
@@ -1536,8 +1537,8 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        double ft8 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Frame Timings: 0. %.3f | 1. %.3f | 2. %.3f | 3. %.3f | 4. %.3f | 5. %.3f | 6. %.3f | 7. %.3f | 8. %.3f",ft0 * 1000.0f,ft1 * 1000.0f,ft2 * 1000.0f,ft3 * 1000.0f,ft4 * 1000.0f,ft5 * 1000.0f,ft6 * 1000.0f,ft7 * 1000.0f,ft8 * 1000.0f);
+//         double ft8 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7);
+//         RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Frame Timings: 0. %.3f | 1. %.3f | 2. %.3f | 3. %.3f | 4. %.3f | 5. %.3f | 6. %.3f | 7. %.3f | 8. %.3f",ft0 * 1000.0f,ft1 * 1000.0f,ft2 * 1000.0f,ft3 * 1000.0f,ft4 * 1000.0f,ft5 * 1000.0f,ft6 * 1000.0f,ft7 * 1000.0f,ft8 * 1000.0f);
 //         DualLog("ft0: %f, ft1: %f, ft2: %f, ft3: %f, ft4: %f, ft5: %f, ft6: %f, ft7: %f, ft8: %f\n",ft0,ft1,ft2,ft3,ft4,ft5,ft6,ft7,ft8);
         
         // Frame stats
@@ -1563,7 +1564,7 @@ int main(int argc, char* argv[]) {
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
-        double ft8_to_end = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7 + ft8);
+//         double ft8_to_end = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7 + ft8);
 //         DualLog("ft8_to_end time chunk: %f\n",ft8_to_end);
     }
 

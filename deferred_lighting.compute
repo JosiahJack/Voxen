@@ -29,7 +29,7 @@ const char* deferredLighting_computeShader =
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2) uniform image2D inputNormals;\n"
-    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
+//     "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
     "layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };\n"
     "layout(std430, binding = 9) readonly buffer InstancesInPVS { uint instancesIndices[]; };\n"
@@ -124,13 +124,9 @@ const char* deferredLighting_computeShader =
     "uvec2 PosToCellCoords(float pos_x, float pos_z) {\n"
     "    uvec2 retval;\n"
     "    int xval = int((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);\n"
-    "    if (xval > 63) xval = 63;\n"
-    "    if (xval < 0) xval = 0;\n"
     "    retval.x = uint(xval);\n"
         
     "    int zval = int((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);\n"
-    "    if (zval > 63) zval = 63;\n"
-    "    if (zval < 0) zval = 0;\n"
     "    retval.y = uint(zval);\n"
     "    return retval;\n"
     "}\n"
@@ -214,5 +210,5 @@ const char* deferredLighting_computeShader =
     "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
     "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
     
-    "    imageStore(outputImage, ivec2(pixel), vec4(lighting, color.a));\n"
+    "    imageStore(inputImage, ivec2(pixel), vec4(lighting, color.a));\n"
     "}\n";
