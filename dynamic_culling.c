@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <GL/glew.h>
 #include "External/stb_image.h"
 #include "dynamic_culling.h"
 #include "render.h"
@@ -11,7 +12,7 @@
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
 bool precomputedVisibleCellsFromHere[ARRSIZE * ARRSIZE];
-uint16_t cellIndexForInstance[INSTANCE_COUNT];
+uint32_t cellIndexForInstance[INSTANCE_COUNT];
 uint16_t cellIndexForLight[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
 uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
@@ -37,7 +38,7 @@ void PutChunksInCells() {
     for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
         PosToCellCoords(instances[c].posx, instances[c].posz, &x, &z);
         cellIdx = (z * WORLDX) + x;
-        cellIndexForInstance[c] = cellIdx;
+        cellIndexForInstance[c] = (uint32_t)cellIdx;
         if (instances[c].floorHeight > INVALID_FLOOR_HEIGHT && instances[c].floorHeight > gridCellFloorHeight[cellIdx]) {
             gridCellFloorHeight[cellIdx] = instances[c].floorHeight; // Raise floor up until highest one is selected.
         }
@@ -695,6 +696,29 @@ int Cull_Init(void) {
 //     PutMeshesInCells(4); // Static Saveable
     PutMeshesInCells(5); // Lights
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
+    uint32_t numBits = ARRSIZE * ARRSIZE;          // 4096 * 4096
+    uint32_t numUint32s = (numBits + 31) / 32;    // ceil(bits/32)
+    uint32_t numBytes = numUint32s * sizeof(uint32_t);
+    uint32_t* bitPackedHandoffBuffer = malloc(numBytes); // 2097152 (~2MB)
+    memset(bitPackedHandoffBuffer,0,numBytes);
+    for (size_t i = 0; i < numBits; i++) {
+        size_t wordIdx = i / 32;
+        size_t bitIdx  = i % 32;
+        if (precomputedVisibleCellsFromHere[i]) bitPackedHandoffBuffer[wordIdx] |= (1u << bitIdx);
+    }
+    
+    glGenBuffers(1, &precomputedVisibleCellsFromHereID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, precomputedVisibleCellsFromHereID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numBytes, bitPackedHandoffBuffer, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, precomputedVisibleCellsFromHereID);
+    
+    glGenBuffers(1, &cellIndexForInstanceID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
+    CHECK_GL_ERROR();
+    free(bitPackedHandoffBuffer);
+    malloc_trim(0);
     DebugRAM("end of Cull_Init");
     return 0;
 }

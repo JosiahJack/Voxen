@@ -143,7 +143,9 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
-GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1; // uniform locations
+GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID;
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
+      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1; // uniform locations
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -351,6 +353,9 @@ int CompileShaders(void) {
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
+    worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -411,6 +416,7 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // Render quad (two triangles)
+    CHECK_GL_ERROR();
     drawCallsRenderedThisFrame++;
     verticesRenderedThisFrame+=6;
 
@@ -1058,10 +1064,10 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
 
 float playerVelocity_y = 0.0f;
 void Physics(void) {
-    DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);
+//     DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);
     float floorHeightForPlayer = INVALID_FLOOR_HEIGHT;
     for (int i=0;i<INSTANCE_COUNT;i++) {
-        if (cellIndexForInstance[i] == playerCellIdx) {
+        if ((uint16_t)cellIndexForInstance[i] == playerCellIdx) {
             if (instances[i].floorHeight > INVALID_FLOOR_HEIGHT) {
                 floorHeightForPlayer = instances[i].floorHeight;
             }
@@ -1071,7 +1077,7 @@ void Physics(void) {
     float stopHeight = floorHeightForPlayer + 0.84f;
     if (stopHeight < (INVALID_FLOOR_HEIGHT + 1.0f)) stopHeight = -45.5f;
     if (cam_y <= stopHeight) {
-        DualLog("Player hit floor at %f\n",stopHeight);
+//         DualLog("Player hit floor at %f\n",stopHeight);
         cam_y = stopHeight;
         playerVelocity_y = 0.0f;
         return;
@@ -1080,7 +1086,7 @@ void Physics(void) {
     playerVelocity_y += 0.02f;
     if (playerVelocity_y > 1.0f) playerVelocity_y = 1.0f; // Terminal velocity
     cam_y -= (0.16f * playerVelocity_y);
-    DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
+//     DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
 }
 
 int main(int argc, char* argv[]) {
@@ -1275,7 +1281,7 @@ int main(int argc, char* argv[]) {
                             
                             inPVS = true;
                             breakout = true;
-                            break; // Avoid checking any more.  One is enough to justify turning on light.
+                            break; // Avoid checking any more.  One is enough to count.
                         }
                     }
                     
@@ -1374,12 +1380,13 @@ int main(int argc, char* argv[]) {
         Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
 
         // 3. Pass all instance matrices to GPU
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instancesInPVSCount * sizeof(uint32_t), instancesInPVS); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
+        
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         
         // 4. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1401,8 +1408,8 @@ int main(int argc, char* argv[]) {
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             if (instances[i].modelIndex < 0) continue; // Invalid or hidden
             
-            int instCellIdx = cellIndexForInstance[i];
-            if (instCellIdx < ARRSIZE && instCellIdx >= 0) {
+            uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
+            if (instCellIdx < ARRSIZE) {
                 if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
             }
             
@@ -1469,6 +1476,10 @@ int main(int argc, char* argv[]) {
         //        move, change color, get marked as "culled" so shader can skip it,
         //        etc.).
         if (debugView != 2) {
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
+            
             glUseProgram(deferredLightingShaderProgram);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
@@ -1476,11 +1487,14 @@ int main(int argc, char* argv[]) {
             glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
             glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
             glUniform1i(debugViewLoc_deferred, debugView);
-
+            glUniform1f(worldMin_xLoc_deferred, worldMin_x);
+            glUniform1f(worldMin_zLoc_deferred, worldMin_z);
+            
             // Dispatch compute shader
             GLuint groupX = (screen_width + 31) / 32;
             GLuint groupY = (screen_height + 31) / 32;
             glDispatchCompute(groupX, groupY, 1);
+            CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
         }
         

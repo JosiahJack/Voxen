@@ -24,8 +24,10 @@ extern float cam_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
 extern bool precomputedVisibleCellsFromHere[ARRSIZE * ARRSIZE];
-extern uint16_t cellIndexForInstance[INSTANCE_COUNT];
+extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
+extern float worldMin_x;
+extern float worldMin_z;
 
 bool XZPairInBounds(int x, int z);
 int Cull_Init(void);

@@ -59,6 +59,9 @@ extern int screen_height;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern GLuint matricesBuffer;
+extern GLuint precomputedVisibleCellsFromHereID;
+extern GLuint cellIndexForInstanceID;
+extern GLuint cellIndexForLight;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
 
 typedef struct {

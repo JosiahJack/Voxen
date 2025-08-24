@@ -29,7 +29,9 @@ const char* deferredLighting_computeShader =
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2) uniform image2D inputNormals;\n"
+    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
+    "layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };\n"
     "layout(std430, binding = 9) readonly buffer InstancesInPVS { uint instancesIndices[]; };\n"
     "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
     "layout(std430, binding = 11) readonly buffer InstancesMatricesBuffer { mat4 instanceMatrices[]; };\n"
@@ -40,12 +42,14 @@ const char* deferredLighting_computeShader =
     "layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; };\n" // Palette colors
     "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
-    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
+    "layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };\n"
 
     // Uniforms, why must we all wear these ridiculous types!
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
     "uniform int debugView;\n"
+    "uniform float worldMin_x;\n"
+    "uniform float worldMin_z;\n"
     
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -114,6 +118,30 @@ const char* deferredLighting_computeShader =
     "const int LIGHT_DATA_OFFSET_R = 10;\n"
     "const int LIGHT_DATA_OFFSET_G = 11;\n"
     "const int LIGHT_DATA_OFFSET_B = 12;\n"
+    "const float WORLDCELL_WIDTH_F = 2.56;\n"
+    "const float CELLXHALF = 1.28;\n"
+    
+    "uvec2 PosToCellCoords(float pos_x, float pos_z) {\n"
+    "    uvec2 retval;\n"
+    "    int xval = int((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);\n"
+    "    if (xval > 63) xval = 63;\n"
+    "    if (xval < 0) xval = 0;\n"
+    "    retval.x = uint(xval);\n"
+        
+    "    int zval = int((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);\n"
+    "    if (zval > 63) zval = 63;\n"
+    "    if (zval < 0) zval = 0;\n"
+    "    retval.y = uint(zval);\n"
+    "    return retval;\n"
+    "}\n"
+    
+    "bool LightCanSeeCell(uvec2 lightCellIdx, uint checkCellIdx) {\n"
+    "    uint lightCellIdx1D = (lightCellIdx.y * 64) + lightCellIdx.x;\n"
+    "    uint bitIndex = lightCellIdx1D * 4096 + checkCellIdx;\n"
+    "    uint wordIdx = bitIndex / 32;\n"
+    "    uint bitPos  = bitIndex % 32;\n"
+    "    return (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;\n"
+    "}\n"
     
     // --- Main Compute Shader ---
     "void main() {\n"
@@ -134,8 +162,11 @@ const char* deferredLighting_computeShader =
     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
+//     "    uvec2 pixelCell = PosToCellCoords(worldPos.x, worldPos.z);\n"
+//     "    uint pixelCell1D = (pixelCell.y * 64) + pixelCell.x;\n"
+    "    uint pixelCell1D = cellIndexForInstance[pixelInstance];\n"
     "    uint lightIdx = 0;\n"
-    "    for (int i = 0; i < MAX_VISIBLE_LIGHTS; i++) {\n"
+    "    for (uint i = 0; i < MAX_VISIBLE_LIGHTS; i++) {\n"
     "        uint lightIdx = i * LIGHT_DATA_SIZE;\n" // LIGHT_DATA_SIZE
     "        float intensity = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];\n"
 
@@ -143,6 +174,9 @@ const char* deferredLighting_computeShader =
     "        vec3 lightPos = vec3(lightInPVS[lightIdx + LIGHT_DATA_OFFSET_POSX],\n"
     "                             lightInPVS[lightIdx + LIGHT_DATA_OFFSET_POSY],\n"
     "                             lightInPVS[lightIdx + LIGHT_DATA_OFFSET_POSZ]);\n"
+    
+    "        uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);\n"
+    "        if (!LightCanSeeCell(lightCell, pixelCell1D)) continue;\n" // Skip lights that can't see the pixel's cell
     
     "        vec3 toLight = lightPos - worldPos;\n"
     "        float dist = length(toLight);\n"
