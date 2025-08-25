@@ -155,7 +155,7 @@ GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr =
       cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1; // uniform locations
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
-float ssr_StepSize = 0.16f;
+float ssr_StepSize = 0.185f;
 float fogLuminanceFac = 1.0f;
 float fogColorR = 0.13f;
 float fogColorG = 0.19f;
