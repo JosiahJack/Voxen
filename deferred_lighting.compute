@@ -144,7 +144,7 @@ const char* deferredLighting_computeShader =
     "    vec3 normal = normalize(vec3(normalXY.x,normalXY.y,normalZ0.x));\n"
 
     "    vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));\n"
-    "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
+//     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
     "    uint lightIdx = 0;\n"

@@ -150,8 +150,11 @@ GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_
       
 //    SSR (Screen Space Reflections)
 GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1,
+GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, stepCountLoc_ssr = -1,
       cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1; // uniform locations
+int ssr_StepCount = 128;
+float ssr_MaxDist = 71.68f;
+float ssr_StepSize = 0.18f;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -374,6 +377,9 @@ int CompileShaders(void) {
     cam_xLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_x");
     cam_yLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_y");
     cam_zLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_z");
+    stepCountLoc_ssr = glGetUniformLocation(ssrShaderProgram, "maxSteps");
+    stepSizeLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepSize");
+    maxDistLoc_ssr = glGetUniformLocation(ssrShaderProgram, "maxDistance");
     CHECK_GL_ERROR();
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
@@ -549,6 +555,24 @@ int Input_KeyDown(uint32_t scancode) {
 
     if (keys[SDL_SCANCODE_E]) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
+    }
+    
+    if (keys[SDL_SCANCODE_O]) {
+        ssr_StepCount++;
+    } else if (keys[SDL_SCANCODE_P]) {
+        ssr_StepCount--;
+    }
+    
+    if (keys[SDL_SCANCODE_K]) {
+        ssr_MaxDist += 0.32f;
+    } else if (keys[SDL_SCANCODE_L]) {
+        ssr_MaxDist -= 0.32f;
+    }
+    
+    if (keys[SDL_SCANCODE_N]) {
+        ssr_StepSize += 0.01f;
+    } else if (keys[SDL_SCANCODE_M]) {
+        ssr_StepSize -= 0.01f;
     }
 
     return 0;
@@ -1466,6 +1490,7 @@ int main(int argc, char* argv[]) {
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
             glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+//             DualLog("Using specIndex of %d for instance[%d]\n",instances[i].specIndex,i); 
             glUniform1i(instanceIndexLoc_chunk, i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
             glUniform1i(modelIndexLoc_chunk, modelType);
@@ -1548,17 +1573,31 @@ int main(int argc, char* argv[]) {
 
         // 6. SSR (Screen Space Reflections)
             glUseProgram(ssrShaderProgram);
+            CHECK_GL_ERROR();
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+            CHECK_GL_ERROR();
 
             // These should be static but cause issues if not...
             glUniform1ui(screenWidthLoc_ssr, screen_width); // Makes screen all black if not sent every frame.
+            CHECK_GL_ERROR();
             glUniform1ui(screenHeightLoc_ssr, screen_height); // Makes screen all black if not sent every frame.
+            CHECK_GL_ERROR();
             float viewProj[16];
             mul_mat4(viewProj, rasterPerspectiveProjection, view);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+            CHECK_GL_ERROR();
             glUniform1f(cam_xLoc_ssr, cam_x);
+            CHECK_GL_ERROR();
             glUniform1f(cam_yLoc_ssr, cam_y);
+            CHECK_GL_ERROR();
             glUniform1f(cam_zLoc_ssr, cam_z);
+            CHECK_GL_ERROR();
+            glUniform1i(stepCountLoc_ssr, ssr_StepCount);
+            CHECK_GL_ERROR();
+            glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
+            CHECK_GL_ERROR();
+            glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
+            CHECK_GL_ERROR();
             
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
@@ -1598,6 +1637,7 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_YELLOW, "SSR steps: %d, SSR step size: %f, SSR max dist: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist);
 //         double ft8 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7);
 //         RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Frame Timings: 0. %.3f | 1. %.3f | 2. %.3f | 3. %.3f | 4. %.3f | 5. %.3f | 6. %.3f | 7. %.3f | 8. %.3f",ft0 * 1000.0f,ft1 * 1000.0f,ft2 * 1000.0f,ft3 * 1000.0f,ft4 * 1000.0f,ft5 * 1000.0f,ft6 * 1000.0f,ft7 * 1000.0f,ft8 * 1000.0f);
 //         DualLog("ft0: %f, ft1: %f, ft2: %f, ft3: %f, ft4: %f, ft5: %f, ft6: %f, ft7: %f, ft8: %f\n",ft0,ft1,ft2,ft3,ft4,ft5,ft6,ft7,ft8);

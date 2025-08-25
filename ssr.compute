@@ -1,7 +1,5 @@
 // ssr.compute
 // Compute shader for processing 
-// ssr.compute
-// ssr.compute
 const char* ssr_computeShader =
     "#version 450 core\n"
     "layout(local_size_x = 32, local_size_y = 32) in;\n"
@@ -16,15 +14,15 @@ const char* ssr_computeShader =
     "uniform float cam_x;\n"
     "uniform float cam_y;\n"
     "uniform float cam_z;\n"
-    "const int   maxSteps    = 1024;\n"
-    "const float stepSize    = 0.01;\n"
-    "const float maxDistance = 20.48;\n"
+    "uniform int   maxSteps;\n"
+    "uniform float stepSize;\n"
+    "uniform float maxDistance;\n"
 
     "vec4 unpackColor32(uint color) {\n"
-    "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"
-    "                float((color >> 16) & 0xFF) / 255.0,\n"
-    "                float((color >>  8) & 0xFF) / 255.0,\n"
-    "                float((color      ) & 0xFF) / 255.0);\n"
+    "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
+    "                float((color >> 16) & 0xFF) / 255.0,\n"  // g
+    "                float((color >>  8) & 0xFF) / 255.0,\n"  // b
+    "                float((color      ) & 0xFF) / 255.0);\n" // a
     "}\n"
 
     "void main() {\n"
@@ -33,7 +31,7 @@ const char* ssr_computeShader =
 
     "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
     "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    vec4 color = imageLoad(inputImage, ivec2(pixel));\n"
+    "    vec4 baseColor = imageLoad(inputImage, ivec2(pixel));\n"
     "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
     "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
@@ -42,7 +40,10 @@ const char* ssr_computeShader =
     "    vec3 camPos = vec3(cam_x, cam_y, cam_z);\n"
     "    vec3 viewDir = normalize(worldPos - camPos);\n"
     "    vec3 reflectDir = normalize(reflect(viewDir, normal));\n"
-    "    if (any(isnan(reflectDir)) || any(isinf(reflectDir))) { imageStore(outputImage, ivec2(pixel), color); return; }\n"
+    "    if (any(isnan(reflectDir)) || any(isinf(reflectDir))) {\n"
+    "        imageStore(outputImage, ivec2(pixel), baseColor);\n"
+    "        return;\n"
+    "    }\n"
 
     "    vec2 hitUV = vec2(0.0);\n"
     "    bool hit = false;\n"
@@ -56,7 +57,7 @@ const char* ssr_computeShader =
     "        vec4 clipPos = viewProjection * vec4(marchPos, 1.0);\n"
     "        if (clipPos.w <= 0.0) break;\n"
 
-    "        vec2 ndc = (clipPos.xy / clipPos.w);\n"
+    "        vec2 ndc = clipPos.xy / clipPos.w;\n"
     "        vec2 uv = ndc * 0.5 + 0.5;\n"
     "        if (uv.x <= 0.0 || uv.x >= 1.0 || uv.y <= 0.0 || uv.y >= 1.0) break;\n"
 
@@ -69,8 +70,12 @@ const char* ssr_computeShader =
     "    }\n"
 
     "    if (hit) {\n"
-    "        imageStore(outputImage, ivec2(pixel), vec4(1.0, 0.0, 0.0, 1.0));\n"
+    "        ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
+    "        hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
+    "        vec4 reflectionColor = imageLoad(inputImage, hitPixel);\n"
+    "        vec3 combined = mix(baseColor.rgb, reflectionColor.rgb, specColor.rgb);\n"
+    "        imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));\n"
     "    } else {\n"
-    "        imageStore(outputImage, ivec2(pixel), color);\n"
+    "        imageStore(outputImage, ivec2(pixel), baseColor);\n"
     "    }\n"
     "}\n";

@@ -66,15 +66,17 @@ int LoadTextures(void) {
     loadTextureItemInitialized[TEX_PARSER] = true;
     
     int maxIndex = -1;
+//     DualLog("Getting max index from list of %d textures\n",texture_parser.count);
     for (int k=0;k<texture_parser.count;k++) {
         if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) {maxIndex = texture_parser.entries[k].index; }
+//         DualLog("texture_parser.entries[k].index > maxIndex: %d > %d", texture_parser.entries[k].index, maxIndex);
     }
     
     textureCount = (uint16_t)texture_parser.count;
     if (textureCount > 4096) { DualLogError("Too many textures in parser count %d, greater than 4096!\n", textureCount); return 1; } 
     if (textureCount == 0) { DualLog("No textures found in textures.txt\n"); return 1; }
     
-    DualLog("Parsing %d textures...\n",textureCount);
+    DualLog("Parsing %d textures with max index %d...\n",textureCount,maxIndex);
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
     loadTextureItemInitialized[TEX_OFFSETS] = true;
     DebugRAM("after textureOffsets malloc");

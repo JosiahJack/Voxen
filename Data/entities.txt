@@ -769,71 +769,85 @@ index: 149
 model: 249
 cardchunk: 1
 texture: 486
+spectexture: 1236
 #chunk_med1_1_half_top
 index: 150
 model: 250
 texture: 486
+spectexture: 1236
 #chunk_med1_1_slice128high
 index: 151
 model: 251
 texture: 486
+spectexture: 1236
 #chunk_med1_1_slice192RH
 index: 152
 model: 252
 texture: 486
+spectexture: 1236
 #chunk_med1_1_slice256
 index: 153
 model: 253
 texture: 486
+spectexture: 1236
 #chunk_med1_1d
 index: 154
 model: 248
 cardchunk: 1
 texture: 485
 glowtexture: 484
+spectexture: 1236
 #chunk_med1_2
 index: 155
 model: 255
 cardchunk: 1
 texture: 489
 glowtexture: 488
+spectexture: 1236
 #chunk_med1_2d
 index: 156
 model: 254
 cardchunk: 1
 texture: 487
+spectexture: 1236
 #chunk_med1_3
 index: 157
 model: 257
 cardchunk: 1
 texture: 493
 glowtexture: 492
+spectexture: 1236
 #chunk_med1_3d
 index: 158
 model: 256
 cardchunk: 1
 texture: 491
 glowtexture: 490
+spectexture: 1236
 #chunk_med1_4
 index: 159
 model: 258
 cardchunk: 1
 texture: 494
+spectexture: 1236
 #chunk_med1_5
 index: 160
 model: 669
 cardchunk: 1
 texture: 495
+spectexture: 1236
 #chunk_med1_6
 index: 161
 model: 259
 cardchunk: 1
 texture: 496
+spectexture: 1236
 #chunk_med1_7
 index: 162
 model: 262
 cardchunk: 1
 texture: 499
+spectexture: 1236
 #chunk_med1_7_slice14_64
 index: 163
 model: 263
@@ -842,56 +856,68 @@ texture: 499
 index: 164
 model: 264
 texture: 499
+spectexture: 1236
 #chunk_med1_7_slice45_320rh
 index: 165
 model: 265
 texture: 499
+spectexture: 1236
 #chunk_med1_7_slice96high
 index: 166
 model: 266
 texture: 499
+spectexture: 1236
 #chunk_med1_7d
 index: 167
 model: 260
 cardchunk: 1
 texture: 497
+spectexture: 1236
 #chunk_med 1_7d_slice128
 index: 168
 model: 261
 texture: 497
+spectexture: 1236
 #chunk_med1_8
 index: 169
 model: 268
 cardchunk: 1
 texture: 503
+spectexture: 1242
 #chunk_med1_8d
 index: 170
 model: 267
 cardchunk: 1
 texture: 501
+spectexture: 1242
 #chunk_med1_9
 index: 171
 model: 278
 cardchunk: 1
 texture: 507
+spectexture: 1242
 #chunk_med1_9d
 index: 174
 model: 269
 cardchunk: 1
 texture: 505
+spectexture: 1242
 #chunk_med1_9d_ofs112_90
 index: 176
 model: 270
 texture: 505
+spectexture: 1242
 #chunk_med1_9d_ofs144_90
 index: 177
 model: 272
 texture: 505
+spectexture: 1242
 #chunk_med2_1
 index: 178
 model: 280
 cardchunk: 1
 texture: 513
+spectexture: 1242
 glowtexture: 511
 normtexture: 512
 #chunk_med2_1_slice32RH
@@ -899,126 +925,151 @@ index: 179
 model: 281
 texture: 513
 normtexture: 512
+spectexture: 1242
 #chunk_med2_1d
 index: 180
 model: 279
 glowtexture: 508
 texture: 510
+spectexture: 1242
 #chunk_med2_2
 index: 181
 model: 283
 cardchunk: 1
 texture: 517
 glowtexture: 516
+spectexture: 1242
 #chunk_med2_2_half_bottom
 index: 182
 model: 284
 texture: 517
 glowtexture: 516
+spectexture: 1242
 #chunk_med2_2d
 index: 183
 model: 282
 cardchunk: 1
 texture: 515
 glowtexture: 516
+spectexture: 1242
 #chunk_med2_3
 index: 184
 model: 286
 cardchunk: 1
 texture: 521
 glowtexture: 520
+spectexture: 1242
 #chunk_med2_3d
 index: 185
 model: 285
 cardchunk: 1
 texture: 519
 glowtexture: 518
+spectexture: 1242
 #chunk_med2_4
 index: 186
 model: 287
 cardchunk: 1
 texture: 523
 glowtexture: 522
+spectexture: 1242
 #chunk_med2_5
 index: 187
 model: 288
 cardchunk: 1
 texture: 527
 glowtexture: 526
+spectexture: 1242
 #chunk_med2_6
 index: 188
 model: 289
 cardchunk: 1
 texture: 528
+spectexture: 1242
 #chunk_med2_7
 index: 189
 model: 290
 cardchunk: 1
 texture: 530
 glowtexture: 529
+spectexture: 1245
 #chunk_med2_8
 index: 190
 model: 291
+spectexture: 1242
 cardchunk: 1
 texture: 531
+spectexture: 1242
 #chunk_med2_8_half_top
 index: 191
 model: 292
 texture: 531
+spectexture: 1242
 #chunk_med2_8_slice32RH
 index: 192
 model: 293
 texture: 531
+spectexture: 1242
 #chunk_med2_8_slice45
 index: 193
 model: 294
 texture: 531
+spectexture: 1242
 #chunk_med2_9
 index: 194
 model: 296
 cardchunk: 1
 texture: 535
 glowtexture: 534
+spectexture: 1242
 #chunk_med2_9d
 index: 195
 model: 295
 cardchunk: 1
 texture: 533
 glowtexture: 532
+spectexture: 1242
 #chunk_med3_1
 index: 196
 model: 297
 cardchunk: 1
 texture: 536
+spectexture: 1236
 #chunk_rad1_1
 index: 197
 model: 501
 cardchunk: 1
 texture: 660
 glowtexture: 659
+spectexture: 1231
 #chunk_rad1_2
 index: 198
 cardchunk: 1
 texture: 662
 glowtexture: 661
+spectexture: 1231
 #chunk_reac1_1
 index: 199
 model: 502
 cardchunk: 1
 texture: 664
+spectexture: 1243
 #chunk_reac1_1_slice45
 index: 200
 texture: 664
+spectexture: 1243
 #chunk_reac1_2
 index: 201
 model: 503
 cardchunk: 1
 texture: 665
+spectexture: 1243
 #chunk_reac1_3
 index: 202
 model: 504
 cardchunk: 1
 texture: 666
+spectexture: 1243
 #chunk_reac1_4
 index: 203
 model: 505
@@ -1032,76 +1083,91 @@ model: 506
 cardchunk: 1
 texture: 671
 glowtexture: 670
+spectexture: 1239
 #chunk_reac1_6
 index: 205
 model: 507
 cardchunk: 1
 texture: 673
 glowtexture: 672
+spectexture: 1243
 #chunk_reac1_7
 index: 206
 cardchunk: 1
 texture: 676
 glowtexture: 675
+spectexture: 1243
 #chunk_reac1_8
 index: 207
 model: 508
 cardchunk: 1
 texture: 678
 glowtexture: 678
+spectexture: 1243
 #chunk_reac1_9
 index: 208
 model: 509
 cardchunk: 1
 texture: 680
 glowtexture: 680
+spectexture: 1243
 #chunk_reac2_1
 index: 209
 model: 512
 cardchunk: 1
 texture: 682
+spectexture: 1235
 #chunk_reac2_1_slice45LH
 index: 210
 model: 514
 texture: 682
+spectexture: 1235
 #chunk_reac2_1_slice45LH_up
 index: 211
 model: 515
 texture: 682
+spectexture: 1235
 #chunk_reac2_1_slice45RH
 index: 212
 model: 516
 texture: 682
+spectexture: 1235
 #chunk_reac2_1_slice45RH_up
 index: 213
 model: 517
 texture: 682
+spectexture: 1235
 #chunk_reac2_1b
 index: 214
 model: 510
 cardchunk: 1
 texture: 681
+spectexture: 1235
 #chunk_reac2_1bmirror
 index: 215
 model: 511
 cardchunk: 1
 texture: 681
+spectexture: 1235
 #chunk_reac2_1mirror
 index: 216
 model: 513
 cardchunk: 1
 texture: 682
+spectexture: 1235
 #chunk_reac2_2
 index: 217
 model: 518
 cardchunk: 1
 texture: 684
 glowtexture: 683
+spectexture: 1235
 #chunk_reac2_4
 index: 218
 model: 519
 cardchunk: 1
 texture: 685
+spectexture: 1235
 #chunk_reac2_4_slice128lower
 index: 219
 texture: 685

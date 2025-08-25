@@ -294,18 +294,20 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
 
         char *colon = strchr(start, ':');
         if (colon && strncmp(start, "index", colon - start) == 0) {
+//             if (strcmp(filename, "./Data/textures.txt") == 0) DualLog("Parsing index from line: %s, ",line);
             char *value = colon + 1;
             while (isspace((unsigned char)*value)) value++;
             uint32_t idx = parse_numberu32(value, line, lineNum);
             if (idx > max_index) max_index = idx;
-        }
+//             if (strcmp(filename, "./Data/textures.txt") == 0) DualLog("New max index: %d, Idx as parsed: %d\n",max_index,idx);
+       }
     }
 
     if (entry_count == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
 
     // Allocate enough space for max_index + 1
     allocate_entries(parser, max_index + 1);
-    parser->count = entry_count; // Track actual number of valid entries
+//     parser->count = entry_count; // Track actual number of valid entries
 
     // Second pass: parse entries
     rewind(file);
