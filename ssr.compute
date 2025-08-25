@@ -53,7 +53,7 @@ const char* ssr_computeShader =
 
     "    vec2 hitUV = vec2(0.0);\n"
     "    bool hit = false;\n"
-    "    vec3 marchPos = worldPos + normal * 0.02;\n"
+    "    vec3 marchPos = worldPos + normal * 0.005;\n"
     "    float traveled = 0.0;\n"
     "    for (int i = 0; i < maxSteps; ++i) {\n"
     "        marchPos += reflectDir * stepSize;\n"
@@ -79,7 +79,6 @@ const char* ssr_computeShader =
     "        ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
     "        hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
     "        vec4 reflectionColor = imageLoad(inputImage, hitPixel * 2);\n"
-//     "        vec3 combined = mix(baseColor.rgb, reflectionColor.rgb, specColor.rgb);\n"
     "        vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor.rgb, specColor.rgb);\n"
 
     // Dither

@@ -1,4 +1,4 @@
-#define INCLUDE_AUDIO_LIB // Comment out for faster builds during testing
+// #define INCLUDE_AUDIO_LIB // Comment out for faster builds during testing
 #ifdef INCLUDE_AUDIO_LIB
     #define MINIAUDIO_IMPLEMENTATION
     #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
