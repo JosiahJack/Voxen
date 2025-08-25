@@ -110,7 +110,7 @@ const char* deferredLighting_computeShader =
     "    );\n"
     "}\n"
     
-    "const int MAX_VISIBLE_LIGHTS = 128;\n"
+    "const int MAX_VISIBLE_LIGHTS = 64;\n"
     "const int LIGHT_DATA_SIZE = 13;\n"
     "const int LIGHT_DATA_OFFSET_POSX = 0;\n"
     "const int LIGHT_DATA_OFFSET_POSY = 1;\n"

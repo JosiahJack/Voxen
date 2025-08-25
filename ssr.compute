@@ -30,25 +30,30 @@ const char* ssr_computeShader =
     "    uvec2 pixel = gl_GlobalInvocationID.xy;\n"
     "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
 
-    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
+    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * 2));\n"
     "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    vec4 baseColor = imageLoad(inputImage, ivec2(pixel));\n"
-    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"
+    "    vec4 baseColor = imageLoad(inputImage, ivec2(pixel * 2));\n" // Need to index by half?
+    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * 2));\n" // Need to index by half?
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
     "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
     "    vec3 normal = normalize(vec3(normalXY.x, normalXY.y, normalZ0.x));\n"
     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
+    "    if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) {\n"
+    "        imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));\n"
+    "        return;\n"
+    "    }\n"
+
     "    vec3 camPos = vec3(cam_x, cam_y, cam_z);\n"
     "    vec3 viewDir = normalize(worldPos - camPos);\n"
     "    vec3 reflectDir = normalize(reflect(viewDir, normal));\n"
     "    if (any(isnan(reflectDir)) || any(isinf(reflectDir))) {\n"
-    "        imageStore(outputImage, ivec2(pixel), baseColor);\n"
+    "        imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));\n"
     "        return;\n"
     "    }\n"
 
     "    vec2 hitUV = vec2(0.0);\n"
     "    bool hit = false;\n"
-    "    vec3 marchPos = worldPos + normal * 0.01;\n"
+    "    vec3 marchPos = worldPos + normal * 0.02;\n"
     "    float traveled = 0.0;\n"
     "    for (int i = 0; i < maxSteps; ++i) {\n"
     "        marchPos += reflectDir * stepSize;\n"
@@ -64,17 +69,18 @@ const char* ssr_computeShader =
 
     "        ivec2 samplePixel = ivec2(floor(uv * vec2(screenWidth, screenHeight)));\n"
     "        samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
-    "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel);\n"
+    "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * 2);\n" // Need to index by half?
     "        vec3 sampledWorldPos = sampledWorldPosPack.xyz;\n"
-    "        float distToSampled = length(marchPos - sampledWorldPos);\n"
+    "        float distToSampled = abs(length(marchPos - sampledWorldPos));\n"
     "        if (distToSampled < 0.16) { hitUV = uv; hit = true; break; }\n"
     "    }\n"
 
     "    if (hit) {\n"
     "        ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
     "        hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
-    "        vec4 reflectionColor = imageLoad(inputImage, hitPixel);\n"
-    "        vec3 combined = mix(baseColor.rgb, reflectionColor.rgb, specColor.rgb);\n"
+    "        vec4 reflectionColor = imageLoad(inputImage, hitPixel * 2);\n"
+//     "        vec3 combined = mix(baseColor.rgb, reflectionColor.rgb, specColor.rgb);\n"
+    "        vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor.rgb, specColor.rgb);\n"
 
     // Dither
     "        int blueNoiseTextureWidth = 64;\n"
@@ -84,6 +90,6 @@ const char* ssr_computeShader =
 
     "        imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));\n"
     "    } else {\n"
-    "        imageStore(outputImage, ivec2(pixel), baseColor);\n"
+    "        imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));\n"
     "    }\n"
     "}\n";

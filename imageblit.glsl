@@ -18,7 +18,12 @@ const char *quadFragmentShaderSource =
     "uniform sampler2D tex;\n"
     "uniform int debugView;\n"
     "uniform int debugValue;\n"
+    "uniform uint screenWidth;\n"
+    "uniform uint screenHeight;\n"
+    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
 
     "void main() {\n"
     "    FragColor = texture(tex, TexCoord);\n"
+    "    vec4 reflectionColor = imageLoad(outputImage, ivec2(TexCoord * vec2(screenWidth/2, screenHeight/2)));\n"
+    "    FragColor += reflectionColor;\n"
     "}\n";

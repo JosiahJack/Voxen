@@ -164,7 +164,8 @@ float fogColorB = 0.36f;
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
-GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1; // uniform locations
+GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1,
+      screenWidthLoc_imageBlit = -1, screenHeightLoc_imageBlit = -1; // uniform locations
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -397,6 +398,8 @@ int CompileShaders(void) {
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
     debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
+    screenWidthLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "screenWidth");
+    screenHeightLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "screenHeight");
     
     projectionLoc_text = glGetUniformLocation(textShaderProgram, "projection");
     textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
@@ -968,7 +971,7 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width / 2, screen_height / 2,    GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -1619,8 +1622,8 @@ int main(int argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
             // These should be static but cause issues if not...
-            glUniform1ui(screenWidthLoc_ssr, screen_width); // Makes screen all black if not sent every frame.
-            glUniform1ui(screenHeightLoc_ssr, screen_height); // Makes screen all black if not sent every frame.
+            glUniform1ui(screenWidthLoc_ssr, screen_width / 2); // Makes screen all black if not sent every frame.
+            glUniform1ui(screenHeightLoc_ssr, screen_height / 2); // Makes screen all black if not sent every frame.
             float viewProj[16];
             mul_mat4(viewProj, rasterPerspectiveProjection, view);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
@@ -1641,8 +1644,8 @@ int main(int argc, char* argv[]) {
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         if (debugView == 0) {
-            glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
-//             glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward + GI
+//             glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
+            glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward + GI
         } else { // 1,2,3,4,5,6
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward Pass Debug Views
         }
@@ -1650,6 +1653,8 @@ int main(int argc, char* argv[]) {
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
+        glUniform1ui(screenWidthLoc_imageBlit, screen_width); // Makes screen all black if not sent every frame.
+        glUniform1ui(screenHeightLoc_imageBlit, screen_height);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
