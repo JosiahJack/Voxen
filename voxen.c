@@ -146,7 +146,8 @@ GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
-      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1; // uniform locations
+      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
+      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1; // uniform locations
       
 //    SSR (Screen Space Reflections)
 GLuint ssrShaderProgram;
@@ -154,7 +155,11 @@ GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr =
       cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1; // uniform locations
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
-float ssr_StepSize = 0.18f;
+float ssr_StepSize = 0.16f;
+float fogLuminanceFac = 1.0f;
+float fogColorR = 0.13f;
+float fogColorG = 0.19f;
+float fogColorB = 0.36f;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -373,7 +378,11 @@ int CompileShaders(void) {
     cam_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_x");
     cam_yLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_y");
     cam_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_z");
-    
+    luminanceFogFacLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "luminanceFac");
+    fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
+    fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
+    fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
+
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
@@ -576,6 +585,30 @@ int Input_KeyDown(uint32_t scancode) {
         ssr_StepSize += 0.01f;
     } else if (keys[SDL_SCANCODE_M]) {
         ssr_StepSize -= 0.01f;
+    }
+    
+    if (keys[SDL_SCANCODE_G]) {
+        fogLuminanceFac += 0.01f;
+    } else if (keys[SDL_SCANCODE_B]) {
+        fogLuminanceFac -= 0.01f;
+    }
+    
+    if (keys[SDL_SCANCODE_1]) {
+        fogColorR += 0.01f;
+    } else if (keys[SDL_SCANCODE_2]) {
+        fogColorR -= 0.01f;
+    }
+    
+    if (keys[SDL_SCANCODE_3]) {
+        fogColorG += 0.01f;
+    } else if (keys[SDL_SCANCODE_4]) {
+        fogColorG -= 0.01f;
+    }
+    
+    if (keys[SDL_SCANCODE_5]) {
+        fogColorB += 0.01f;
+    } else if (keys[SDL_SCANCODE_6]) {
+        fogColorB -= 0.01f;
     }
 
     return 0;
@@ -1568,6 +1601,10 @@ int main(int argc, char* argv[]) {
             glUniform1f(cam_xLoc_deferred, cam_x);
             glUniform1f(cam_yLoc_deferred, cam_y);
             glUniform1f(cam_zLoc_deferred, cam_z);
+            glUniform1f(luminanceFogFacLoc_deferred, fogLuminanceFac);
+            glUniform1f(fogColorRLoc_deferred, fogColorR);
+            glUniform1f(fogColorGLoc_deferred, fogColorG);
+            glUniform1f(fogColorBLoc_deferred, fogColorB);
             
             // Dispatch compute shader
             GLuint groupX = (screen_width + 31) / 32;
@@ -1632,7 +1669,8 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_YELLOW, "SSR steps: %d, SSR step size: %f, SSR max dist: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist);
+        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_YELLOW, "SSR steps: %d, SSR step size: %f, SSR max dist: %f, Lum: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist, fogLuminanceFac);
+        RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
 //         double ft8 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7);
 //         RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Frame Timings: 0. %.3f | 1. %.3f | 2. %.3f | 3. %.3f | 4. %.3f | 5. %.3f | 6. %.3f | 7. %.3f | 8. %.3f",ft0 * 1000.0f,ft1 * 1000.0f,ft2 * 1000.0f,ft3 * 1000.0f,ft4 * 1000.0f,ft5 * 1000.0f,ft6 * 1000.0f,ft7 * 1000.0f,ft8 * 1000.0f);
 //         DualLog("ft0: %f, ft1: %f, ft2: %f, ft3: %f, ft4: %f, ft5: %f, ft6: %f, ft7: %f, ft8: %f\n",ft0,ft1,ft2,ft3,ft4,ft5,ft6,ft7,ft8);

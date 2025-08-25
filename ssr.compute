@@ -8,6 +8,7 @@ const char* ssr_computeShader =
     "layout(rgba32f, binding = 1)  readonly uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2)  readonly uniform image2D inputNormals;\n"
     "layout(rgba32f, binding = 4)  writeonly uniform image2D outputImage;\n"
+    "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
     "uniform mat4 viewProjection;\n"
@@ -74,6 +75,13 @@ const char* ssr_computeShader =
     "        hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
     "        vec4 reflectionColor = imageLoad(inputImage, hitPixel);\n"
     "        vec3 combined = mix(baseColor.rgb, reflectionColor.rgb, specColor.rgb);\n"
+
+    // Dither
+    "        int blueNoiseTextureWidth = 64;\n"
+    "        int pixelIndex = int(((int(hitUV.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(hitUV.x) % blueNoiseTextureWidth))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
+    "        vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
+    "        combined += ((bluenoise.rgb * 2.0/255.0) - (1.0/255.0));\n"
+
     "        imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));\n"
     "    } else {\n"
     "        imageStore(outputImage, ivec2(pixel), baseColor);\n"
