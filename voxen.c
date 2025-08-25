@@ -22,6 +22,7 @@
 #include "chunk.glsl"
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
+#include "ssr.compute"
 #include "bluenoise64.cginc"
 #include "audio.h"
 #include "instance.h"
@@ -146,6 +147,11 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1; // uniform locations
+      
+//    SSR (Screen Space Reflections)
+GLuint ssrShaderProgram;
+GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1,
+      cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1; // uniform locations
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -325,6 +331,11 @@ int CompileShaders(void) {
     computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
     deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program");        if (!deferredLightingShaderProgram) { return 1; }
 
+    // Screen Space Reflections Compute Shader Program
+    computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader"); if (!computeShader) { return 1; }
+    ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");        if (!ssrShaderProgram) { return 1; }
+    CHECK_GL_ERROR();
+    
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
@@ -356,6 +367,14 @@ int CompileShaders(void) {
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
     worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
+    
+    screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
+    screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
+    viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
+    cam_xLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_x");
+    cam_yLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_y");
+    cam_zLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_z");
+    CHECK_GL_ERROR();
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -463,6 +482,24 @@ void Screenshot() {
 
     free(pixels);
 }
+
+// out = a * b
+static inline void mul_mat4(float *out, const float *a, const float *b) {
+    float result[16];
+    for (int col = 0; col < 4; ++col) {
+        for (int row = 0; row < 4; ++row) {
+            result[col*4 + row] =
+                a[0*4 + row] * b[col*4 + 0] +
+                a[1*4 + row] * b[col*4 + 1] +
+                a[2*4 + row] * b[col*4 + 2] +
+                a[3*4 + row] * b[col*4 + 3];
+        }
+    }
+    // copy back
+    for (int i = 0; i < 16; i++)
+        out[i] = result[i];
+}
+
 
 // ================================= Input ==================================
 // Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
@@ -871,7 +908,7 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-//     GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -894,7 +931,7 @@ int InitializeEnvironment(void) {
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     //                 3 = depth
-//     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -975,6 +1012,36 @@ int InitializeEnvironment(void) {
     return 0;
 }
 
+float playerVelocity_y = 0.0f;
+int Physics(void) {
+    if (noclip) return 0;
+    
+//     DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);
+    float floorHeightForPlayer = INVALID_FLOOR_HEIGHT;
+    for (int i=0;i<INSTANCE_COUNT;i++) {
+        if ((uint16_t)cellIndexForInstance[i] == playerCellIdx) {
+            if (instances[i].floorHeight > INVALID_FLOOR_HEIGHT) {
+                floorHeightForPlayer = instances[i].floorHeight;
+            }
+        }
+    }
+    
+    float stopHeight = floorHeightForPlayer + 0.84f;
+    if (stopHeight < (INVALID_FLOOR_HEIGHT + 1.0f)) stopHeight = -45.5f;
+    if (cam_y <= stopHeight) {
+//         DualLog("Player hit floor at %f\n",stopHeight);
+        cam_y = stopHeight;
+        playerVelocity_y = 0.0f;
+        return 0;
+    }
+    
+    playerVelocity_y += 0.02f;
+    if (playerVelocity_y > 1.0f) playerVelocity_y = 1.0f; // Terminal velocity
+    cam_y -= (0.16f * playerVelocity_y);
+//     DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
+    return 0;
+}
+
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
 int EventExecute(Event* event) {
@@ -992,6 +1059,7 @@ int EventExecute(Event* event) {
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
+        case EV_PHYSICS_TICK: return Physics();
         case EV_QUIT: return 1; break;
     }
 
@@ -1060,33 +1128,6 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     }
 
     return false; // Outside FOV cone
-}
-
-float playerVelocity_y = 0.0f;
-void Physics(void) {
-//     DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);
-    float floorHeightForPlayer = INVALID_FLOOR_HEIGHT;
-    for (int i=0;i<INSTANCE_COUNT;i++) {
-        if ((uint16_t)cellIndexForInstance[i] == playerCellIdx) {
-            if (instances[i].floorHeight > INVALID_FLOOR_HEIGHT) {
-                floorHeightForPlayer = instances[i].floorHeight;
-            }
-        }
-    }
-    
-    float stopHeight = floorHeightForPlayer + 0.84f;
-    if (stopHeight < (INVALID_FLOOR_HEIGHT + 1.0f)) stopHeight = -45.5f;
-    if (cam_y <= stopHeight) {
-//         DualLog("Player hit floor at %f\n",stopHeight);
-        cam_y = stopHeight;
-        playerVelocity_y = 0.0f;
-        return;
-    }
-    
-    playerVelocity_y += 0.02f;
-    if (playerVelocity_y > 1.0f) playerVelocity_y = 1.0f; // Terminal velocity
-    cam_y -= (0.16f * playerVelocity_y);
-//     DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
 }
 
 int main(int argc, char* argv[]) {
@@ -1213,7 +1254,7 @@ int main(int argc, char* argv[]) {
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
         if (timeSinceLastPhysicsTick > 0.016666666f) { // 60fps fixed tick rate
             last_physics_time = current_time;
-            Physics();
+            EnqueueEvent_Simple(EV_PHYSICS_TICK);
         }
 
         // Enqueue all logged events for the current frame.
@@ -1358,7 +1399,7 @@ int main(int argc, char* argv[]) {
         memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
         memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         float distSqrd = 0.0f;
-        float lodRangeSqrd = 20.48f * 20.48f;
+        float lodRangeSqrd = 38.4f * 38.4f;
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
             
@@ -1432,8 +1473,9 @@ int main(int argc, char* argv[]) {
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             if (isDoubleSided(instances[i].texIndex) || instances[i].sclx < 0.0f || instances[i].scly < 0.0f || instances[i].sclz < 0.0f) glDisable(GL_CULL_FACE); // Disable backface culling
+            else glEnable(GL_CULL_FACE); // Even thought I tried to only set this just after the draw, it seems it can get stuck on so this ensures correctness.
+            
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-            if (isDoubleSided(instances[i].texIndex)) glEnable(GL_CULL_FACE); // Reenable backface culling
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
@@ -1476,12 +1518,12 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // ====================================================================
         
+        if (debugView != 2) {
         // 5. Deferred Lighting
         //        Apply deferred lighting with compute shader.  All lights are
         //        dynamic and can be updated at any time (flicker, light switches,
         //        move, change color, get marked as "culled" so shader can skip it,
         //        etc.).
-        if (debugView != 2) {
 //             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
 //             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
 //             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
@@ -1502,15 +1544,34 @@ int main(int argc, char* argv[]) {
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
-        }
 //         double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
+
+        // 6. SSR (Screen Space Reflections)
+            glUseProgram(ssrShaderProgram);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+            // These should be static but cause issues if not...
+            glUniform1ui(screenWidthLoc_ssr, screen_width); // Makes screen all black if not sent every frame.
+            glUniform1ui(screenHeightLoc_ssr, screen_height); // Makes screen all black if not sent every frame.
+            float viewProj[16];
+            mul_mat4(viewProj, rasterPerspectiveProjection, view);
+            glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+            glUniform1f(cam_xLoc_ssr, cam_x);
+            glUniform1f(cam_yLoc_ssr, cam_y);
+            glUniform1f(cam_zLoc_ssr, cam_z);
+            
+            // Dispatch compute shader
+            glDispatchCompute(groupX, groupY, 1);
+            CHECK_GL_ERROR();
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+        }
         
         // 6. Render final meshes' results with full screen quad
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         if (debugView == 0) {
-//             glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward + GI
+            glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
+//             glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward + GI
         } else { // 1,2,3,4,5,6
             glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward Pass Debug Views
         }

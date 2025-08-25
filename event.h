@@ -31,6 +31,8 @@
 #define EV_PLAYAUDIO_CLIP 40u
 #define EV_PLAYAUDIO_STREAM 41u
 
+#define EV_PHYSICS_TICK 50u
+
 #define EV_PAUSE 254u
 #define EV_QUIT 255u
 
