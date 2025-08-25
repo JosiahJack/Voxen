@@ -50,6 +50,9 @@ const char* deferredLighting_computeShader =
     "uniform int debugView;\n"
     "uniform float worldMin_x;\n"
     "uniform float worldMin_z;\n"
+    "uniform float cam_x;\n"
+    "uniform float cam_y;\n"
+    "uniform float cam_z;\n"
     
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -135,9 +138,11 @@ const char* deferredLighting_computeShader =
 
     "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
     "    vec3 worldPos = worldPosPack.xyz;\n"
+    "    vec3 camPos = vec3(cam_x, cam_y, cam_z);\n"
     "    vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
     "    if (debugView == 1 || color.a < 1.0) return;\n"
 
+    "    float distToPixel = length(worldPos - camPos);\n"
     "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
     "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
@@ -206,6 +211,11 @@ const char* deferredLighting_computeShader =
     "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
     "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
     "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
+    
+    // Fog
+    "    float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);\n"
+    "    vec3 fogColor = vec3(0.05, 0.05, 0.2);\n"
+    "    lighting = mix(fogColor, lighting, 1.0 - fogFac);\n"
     
     "    imageStore(inputImage, ivec2(pixel), vec4(lighting, color.a));\n"
     "}\n";

@@ -146,7 +146,7 @@ GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
-      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1; // uniform locations
+      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1; // uniform locations
       
 //    SSR (Screen Space Reflections)
 GLuint ssrShaderProgram;
@@ -370,6 +370,9 @@ int CompileShaders(void) {
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
     worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
+    cam_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_x");
+    cam_yLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_y");
+    cam_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_z");
     
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -1562,6 +1565,9 @@ int main(int argc, char* argv[]) {
             glUniform1i(debugViewLoc_deferred, debugView);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
+            glUniform1f(cam_xLoc_deferred, cam_x);
+            glUniform1f(cam_yLoc_deferred, cam_y);
+            glUniform1f(cam_zLoc_deferred, cam_z);
             
             // Dispatch compute shader
             GLuint groupX = (screen_width + 31) / 32;
@@ -1573,31 +1579,20 @@ int main(int argc, char* argv[]) {
 
         // 6. SSR (Screen Space Reflections)
             glUseProgram(ssrShaderProgram);
-            CHECK_GL_ERROR();
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-            CHECK_GL_ERROR();
 
             // These should be static but cause issues if not...
             glUniform1ui(screenWidthLoc_ssr, screen_width); // Makes screen all black if not sent every frame.
-            CHECK_GL_ERROR();
             glUniform1ui(screenHeightLoc_ssr, screen_height); // Makes screen all black if not sent every frame.
-            CHECK_GL_ERROR();
             float viewProj[16];
             mul_mat4(viewProj, rasterPerspectiveProjection, view);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-            CHECK_GL_ERROR();
             glUniform1f(cam_xLoc_ssr, cam_x);
-            CHECK_GL_ERROR();
             glUniform1f(cam_yLoc_ssr, cam_y);
-            CHECK_GL_ERROR();
             glUniform1f(cam_zLoc_ssr, cam_z);
-            CHECK_GL_ERROR();
             glUniform1i(stepCountLoc_ssr, ssr_StepCount);
-            CHECK_GL_ERROR();
             glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
-            CHECK_GL_ERROR();
             glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
-            CHECK_GL_ERROR();
             
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
