@@ -15,6 +15,7 @@ const char* deferredLighting_computeShader =
     // Uniforms, why must we all wear these ridiculous types!
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
+    "uniform mat4 viewProjection;\n"
     "uniform int debugView;\n"
     "uniform float worldMin_x;\n"
     "uniform float worldMin_z;\n"
@@ -55,6 +56,42 @@ const char* deferredLighting_computeShader =
     "        v.x * (xy2 + wz2) + v.y * (1.0 - xx2 - zz2) + v.z * (yz2 - wx2),\n"
     "        v.x * (xz2 - wy2) + v.y * (yz2 + wx2) + v.z * (1.0 - xx2 - yy2)\n"
     "    );\n"
+    "}\n"
+    
+    "const int maxSteps = 64;\n"
+    "const float stepSize = 0.02;\n"
+    
+    "bool traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, vec3 camPos) {\n"
+    "    vec3 toLight = lightPos - startPos;\n"
+    "    float totalDist = length(toLight);\n"
+    "    if (totalDist > maxDist || totalDist <= 0.001) return false;\n"
+
+    "    vec3 rayPos = startPos;\n"
+    "    vec3 rayDir = normalize(lightPos - rayPos);\n"
+    "    vec2 hitUV = vec2(0.0);\n"
+    "    vec3 rayStep = rayDir * stepSize;\n"
+    "    float traveled = 0.0;\n"
+    "    for (int i = 0; i < int(maxSteps); ++i) {\n"
+    "        rayPos += rayStep;\n"
+    "        traveled += stepSize;\n"
+    "        if (traveled > 25.6) break;\n"
+    
+    "        vec4 clipPos = viewProjection * vec4(rayPos, 1.0);\n"
+    "        if (clipPos.w <= 0.0) break;\n"
+
+    "        vec2 ndc = clipPos.xy / clipPos.w;\n"
+    "        hitUV = ndc * 0.5 + 0.5;\n"
+    "        if (hitUV.x <= 0.0 || hitUV.x >= 1.0 || hitUV.y <= 0.0 || hitUV.y >= 1.0) break;\n"
+
+    "        ivec2 samplePixel = ivec2(floor(hitUV * vec2(screenWidth, screenHeight)));\n"
+    "        samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
+    "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel);\n"
+    "        vec3 sampledWorldPos = sampledWorldPosPack.xyz;\n"
+    "        float worldDist = length(sampledWorldPos - camPos);\n"
+    "        float depthDelta = length(rayPos - camPos) - worldDist;\n"
+    "        if (abs(depthDelta) < 0.16 && depthDelta > 0.001) return true;\n"
+    "    }\n"
+    "    return false;\n"
     "}\n"
     
     "const int MAX_VISIBLE_LIGHTS = 90;\n"
@@ -149,6 +186,8 @@ const char* deferredLighting_computeShader =
     "            if (spotFalloff <= 0.0) continue;\n"
     "        }\n"
 
+    "        if (traceShadowRay(worldPos, lightPos, range, camPos)) continue;\n"
+    
     "        vec3 lightColor = vec3(lightInPVS[lightIdx + LIGHT_DATA_OFFSET_R],\n"
     "                               lightInPVS[lightIdx + LIGHT_DATA_OFFSET_G],\n"
     "                               lightInPVS[lightIdx + LIGHT_DATA_OFFSET_B]);\n"

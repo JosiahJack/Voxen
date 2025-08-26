@@ -23,6 +23,7 @@
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
 #include "ssr.compute"
+// #include "sss.compute"
 #include "bluenoise64.cginc"
 #include "audio.h"
 #include "instance.h"
@@ -139,7 +140,7 @@ GLuint vao_chunk; // Vertex Array Object
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
       specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
-      overrideGlowBLoc_chunk = -1; // uniform locations
+      overrideGlowBLoc_chunk = -1;
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -147,12 +148,7 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
-      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1; // uniform locations
-      
-//    SSR (Screen Space Reflections)
-GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, stepCountLoc_ssr = -1,
-      cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1; // uniform locations
+      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1, viewProjectionLoc_deferred = -1;
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
 float ssr_StepSize = 0.185f;
@@ -161,11 +157,20 @@ float fogColorR = 0.04f;
 float fogColorG = 0.04f;
 float fogColorB = 0.09f;
 
+//    SSS (Screen Space Shadows), aka Contact Shadows
+// GLuint sssShaderProgram;
+// GLint screenWidthLoc_sss = -1, screenHeightLoc_sss = -1, 
+
+//    SSR (Screen Space Reflections)
+GLuint ssrShaderProgram;
+GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, stepCountLoc_ssr = -1,
+      cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1;
+
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1,
-      screenWidthLoc_imageBlit = -1, screenHeightLoc_imageBlit = -1; // uniform locations
+      screenWidthLoc_imageBlit = -1, screenHeightLoc_imageBlit = -1;
 
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
@@ -345,6 +350,11 @@ int CompileShaders(void) {
     ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");        if (!ssrShaderProgram) { return 1; }
     CHECK_GL_ERROR();
     
+    // Screen Space Shadows Compute Shader Program
+//     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Shadows Compute Shader"); if (!computeShader) { return 1; }
+//     sssShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Shadows Shader Program");        if (!sssShaderProgram) { return 1; }
+//     CHECK_GL_ERROR();
+    
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
@@ -383,7 +393,8 @@ int CompileShaders(void) {
     fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
     fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
     fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
-
+    viewProjectionLoc_deferred = glGetUniformLocation(ssrShaderProgram, "viewProjection");
+    
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
@@ -1596,6 +1607,8 @@ int main(int argc, char* argv[]) {
         
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
+        float viewProj[16];
+        mul_mat4(viewProj, rasterPerspectiveProjection, view);
         if (debugView < 1) {
         // 5. Deferred Lighting
         //        Apply deferred lighting with compute shader.  All lights are
@@ -1622,13 +1635,13 @@ int main(int argc, char* argv[]) {
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
             glUniform1f(fogColorBLoc_deferred, fogColorB);
-            
+            glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
+
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
 //         double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
-
         }
         
         // 6. SSR (Screen Space Reflections)
@@ -1639,8 +1652,6 @@ int main(int argc, char* argv[]) {
             // These should be static but cause issues if not...
             glUniform1ui(screenWidthLoc_ssr, screen_width / 2); // Makes screen all black if not sent every frame.
             glUniform1ui(screenHeightLoc_ssr, screen_height / 2); // Makes screen all black if not sent every frame.
-            float viewProj[16];
-            mul_mat4(viewProj, rasterPerspectiveProjection, view);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
             glUniform1f(cam_xLoc_ssr, cam_x);
             glUniform1f(cam_yLoc_ssr, cam_y);
@@ -1648,6 +1659,7 @@ int main(int argc, char* argv[]) {
             glUniform1i(stepCountLoc_ssr, ssr_StepCount);
             glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
             glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
+            
             
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
