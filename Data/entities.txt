@@ -895,23 +895,23 @@ index: 171
 model: 278
 cardchunk: 1
 texture: 507
-spectexture: 1242
+spectexture: 1238
 #chunk_med1_9d
 index: 174
 model: 269
 cardchunk: 1
 texture: 505
-spectexture: 1242
+spectexture: 1238
 #chunk_med1_9d_ofs112_90
 index: 176
 model: 270
 texture: 505
-spectexture: 1242
+spectexture: 1238
 #chunk_med1_9d_ofs144_90
 index: 177
 model: 272
 texture: 505
-spectexture: 1242
+spectexture: 1238
 #chunk_med2_1
 index: 178
 model: 280

@@ -146,10 +146,6 @@ const char* deferredLighting_computeShader =
     "    vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
     "    if (debugView == 1 || color.a < 1.0) return;\n"
 
-    "    float colorBleedFac = 1.25;\n"
-    "    color.r = pow(color.r,colorBleedFac);\n"
-    "    color.g = pow(color.g,colorBleedFac);\n"
-    "    color.b = pow(color.b,colorBleedFac);\n"
     "    float distToPixel = length(worldPos - camPos);\n"
     "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
@@ -157,7 +153,6 @@ const char* deferredLighting_computeShader =
     "    vec3 normal = normalize(vec3(normalXY.x,normalXY.y,normalZ0.x));\n"
 
     "    vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));\n"
-//     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
     "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
     "    uint lightIdx = 0;\n"
@@ -208,9 +203,8 @@ const char* deferredLighting_computeShader =
     "        }\n"
 
     "        float distOverRange = dist / range;\n"
-    "        float distOverRange2 = distOverRange * distOverRange;\n"
-    "        float attenuation = (1.0 / (1.0 + 25.0 * distOverRange2)) * max(dot(normal, lightDir), 0.0);\n"
-    "        lighting += color.rgb * intensity * attenuation * lightColor * spotFalloff;\n"
+    "        float attenuation = (1.0 - (distOverRange * distOverRange)) * max(dot(normal, lightDir), 0.0);\n"
+    "        lighting += color.rgb * (intensity * 0.4) * pow(attenuation,1.6) * lightColor * spotFalloff;\n"
     "    }\n"
 
     "    lighting += glowColor.rgb;\n"
