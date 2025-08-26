@@ -64,7 +64,7 @@ int LoadTextures(void);
 
 // Models
 #define MODEL_COUNT 768
-#define VERTEX_ATTRIBUTES_COUNT 14 // x,y,z,nx,ny,nz,u,v,texIdx,glowIdx,specIdx,normIdx,modelIdx,instanceIdx
+#define VERTEX_ATTRIBUTES_COUNT 16 // x,y,z,nx,ny,nz,u,v,texIdx,glowIdx,specIdx,normIdx,modelIdx,instanceIdx,u_lm,v_lm
 
 extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern uint32_t modelTriangleCounts[MODEL_COUNT];

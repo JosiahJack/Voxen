@@ -496,6 +496,7 @@ int LoadGeometry(void) {
     largestVertCount = 0;
     largestTriangleCount = 0;
 //     largestEdgeCount = 0;
+    float lightmapScale = 2.0f;
 
     // Allocate persistent temporary buffers
     tempVertices = (float *)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -627,6 +628,8 @@ int LoadGeometry(void) {
                 tempVertices[vertexIndex++] = 0; // Normal Index
                 tempVertices[vertexIndex++] = 0; // Model Index
                 tempVertices[vertexIndex++] = 0; // Instance Index
+                tempVertices[vertexIndex++] = 0.0f; // u_lm for lightmap
+                tempVertices[vertexIndex++] = 0.0f; // v_lm for lightmap
                 if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
                 if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
                 if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
