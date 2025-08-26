@@ -36,7 +36,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 1920, screen_height = 1080;
+int screen_width = 800, screen_height = 600;
 bool window_has_focus = false;
 FILE *console_log_file = NULL;
 
@@ -1401,14 +1401,25 @@ int main(int argc, char* argv[]) {
             if (distSqrd < sightRangeSquared && inPVS) {
                 candidates[numCandidates].index = i;
                 candidates[numCandidates].distanceSquared = distSqrd;
-                candidates[numCandidates].score = litIntensity / (distSqrd + 0.01f);
+
+                // Adjust score to favor lights in view frustum if distance > 5.12
+                float score = litIntensity / (distSqrd + 0.01f);
+                if (distSqrd > 26.2144f) {
+                    // Boost score for lights in the view frustum
+                    float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+                    if (IsSphereInFOVCone(litx, lity, litz, range)) {
+                        score *= 2.0f; // Increase score for frustum lights (tune this multiplier)
+                    } else {
+                        score *= 0.5f; // Reduce score for lights outside frustum
+                    }
+                }
+
+                candidates[numCandidates].score = score;
                 numCandidates++;
             }
         }
 
         // Step 2: Sort candidates by score (descending) to get top MAX_VISIBLE_LIGHTS
-        // Using a simple partial sort or selection sort for simplicity
-        // Alternatively, use std::sort for better performance on large arrays
         for (uint16_t i = 0; i < numCandidates && i < MAX_VISIBLE_LIGHTS; ++i) {
             uint16_t bestIdx = i;
             float bestScore = candidates[i].score;
@@ -1418,8 +1429,8 @@ int main(int argc, char* argv[]) {
                     bestIdx = j;
                 }
             }
-            // Swap to put the best candidate at position i
-            if (bestIdx != i) {
+           
+            if (bestIdx != i) { // Swap to put the best candidate at position i
                 LightCandidate temp = candidates[i];
                 candidates[i] = candidates[bestIdx];
                 candidates[bestIdx] = temp;
