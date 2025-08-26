@@ -26,6 +26,8 @@ const char* deferredLighting_computeShader =
     "uniform float fogColorR;\n"
     "uniform float fogColorG;\n"
     "uniform float fogColorB;\n"
+    "uniform float sssStepSize;\n"
+    "uniform int sssMaxSteps;\n"
     
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -58,23 +60,21 @@ const char* deferredLighting_computeShader =
     "    );\n"
     "}\n"
     
-    "const int maxSteps = 64;\n"
-    "const float stepSize = 0.02;\n"
-    
-    "bool traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, vec3 camPos) {\n"
+    "float traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, vec3 camPos) {\n"
     "    vec3 toLight = lightPos - startPos;\n"
     "    float totalDist = length(toLight);\n"
-    "    if (totalDist > maxDist || totalDist <= 0.001) return false;\n"
-
+    "    if (totalDist > maxDist || totalDist <= 0.001) return 1.0;\n"
+    
     "    vec3 rayPos = startPos;\n"
     "    vec3 rayDir = normalize(lightPos - rayPos);\n"
+    "    rayPos += (rayDir * 0.01);\n"
     "    vec2 hitUV = vec2(0.0);\n"
-    "    vec3 rayStep = rayDir * stepSize;\n"
+    "    vec3 rayStep = rayDir * sssStepSize;\n"
     "    float traveled = 0.0;\n"
-    "    for (int i = 0; i < int(maxSteps); ++i) {\n"
+    "    for (int i = 0; i < sssMaxSteps; ++i) {\n"
     "        rayPos += rayStep;\n"
-    "        traveled += stepSize;\n"
-    "        if (traveled > 25.6) break;\n"
+    "        traveled += sssStepSize;\n"
+    "        if (traveled > 7.68) break;\n"
     
     "        vec4 clipPos = viewProjection * vec4(rayPos, 1.0);\n"
     "        if (clipPos.w <= 0.0) break;\n"
@@ -89,9 +89,10 @@ const char* deferredLighting_computeShader =
     "        vec3 sampledWorldPos = sampledWorldPosPack.xyz;\n"
     "        float worldDist = length(sampledWorldPos - camPos);\n"
     "        float depthDelta = length(rayPos - camPos) - worldDist;\n"
-    "        if (abs(depthDelta) < 0.16 && depthDelta > 0.001) return true;\n"
+    "        if (abs(depthDelta) < 0.16 && depthDelta > 0.001) return 0.0;\n"
     "    }\n"
-    "    return false;\n"
+    
+    "    return 1.0;\n"
     "}\n"
     
     "const int MAX_VISIBLE_LIGHTS = 90;\n"
@@ -186,7 +187,9 @@ const char* deferredLighting_computeShader =
     "            if (spotFalloff <= 0.0) continue;\n"
     "        }\n"
 
-    "        if (traceShadowRay(worldPos, lightPos, range, camPos)) continue;\n"
+    "        float shadowFac = 1.0;\n"
+    "        float luminosity = intensity / (range * range);\n"
+    "        if (luminosity > 0.0451) shadowFac = traceShadowRay(worldPos, lightPos, range, camPos);\n"
     
     "        vec3 lightColor = vec3(lightInPVS[lightIdx + LIGHT_DATA_OFFSET_R],\n"
     "                               lightInPVS[lightIdx + LIGHT_DATA_OFFSET_G],\n"
@@ -194,7 +197,7 @@ const char* deferredLighting_computeShader =
     
     "        float distOverRange = dist / range;\n"
     "        float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;\n"
-    "        lighting += color.rgb * (intensity * 0.4) * pow(attenuation,1.6) * lightColor * spotFalloff;\n"
+    "        lighting += color.rgb * (intensity * 0.4) * pow(attenuation,1.6) * lightColor * spotFalloff * shadowFac;\n"
     "    }\n"
 
     "    lighting += glowColor.rgb;\n"

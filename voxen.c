@@ -23,7 +23,6 @@
 #include "imageblit.glsl"
 #include "deferred_lighting.compute"
 #include "ssr.compute"
-// #include "sss.compute"
 #include "bluenoise64.cginc"
 #include "audio.h"
 #include "instance.h"
@@ -148,7 +147,8 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
-      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1, viewProjectionLoc_deferred = -1;
+      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1, 
+      viewProjectionLoc_deferred = -1, sssMaxStepsLoc_deferred = -1, sssStepSizeLoc_deferred = -1;
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
 float ssr_StepSize = 0.185f;
@@ -156,6 +156,8 @@ float fogLuminanceFac = 1.0f;
 float fogColorR = 0.04f;
 float fogColorG = 0.04f;
 float fogColorB = 0.09f;
+int sssMaxSteps = 96;
+float sssStepSize = 0.025;
 
 //    SSS (Screen Space Shadows), aka Contact Shadows
 // GLuint sssShaderProgram;
@@ -393,7 +395,9 @@ int CompileShaders(void) {
     fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
     fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
     fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
-    viewProjectionLoc_deferred = glGetUniformLocation(ssrShaderProgram, "viewProjection");
+    viewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "viewProjection");
+    sssMaxStepsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sssMaxSteps");
+    sssStepSizeLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sssStepSize");
     
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -623,6 +627,19 @@ int Input_KeyDown(uint32_t scancode) {
         fogColorB += 0.01f;
     } else if (keys[SDL_SCANCODE_6]) {
         fogColorB -= 0.01f;
+    }
+    
+    
+    if (keys[SDL_SCANCODE_7]) {
+        sssStepSize += 0.005f;
+    } else if (keys[SDL_SCANCODE_8]) {
+        sssStepSize -= 0.005f;
+    }
+    
+    if (keys[SDL_SCANCODE_9]) {
+        sssMaxSteps++;
+    } else if (keys[SDL_SCANCODE_0]) {
+        sssMaxSteps--;
     }
 
     return 0;
@@ -1634,8 +1651,15 @@ int main(int argc, char* argv[]) {
             glUniform1f(luminanceFogFacLoc_deferred, fogLuminanceFac);
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
+            CHECK_GL_ERROR();
             glUniform1f(fogColorBLoc_deferred, fogColorB);
+            CHECK_GL_ERROR();
             glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
+            CHECK_GL_ERROR();
+            glUniform1i(sssMaxStepsLoc_deferred, sssMaxSteps);
+            CHECK_GL_ERROR();
+            glUniform1f(sssStepSizeLoc_deferred, sssStepSize);
+            CHECK_GL_ERROR();
 
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
@@ -1701,8 +1725,9 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_YELLOW, "SSR steps: %d, SSR step size: %f, SSR max dist: %f, Lum: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist, fogLuminanceFac);
+        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "SSR steps: %d, SSR step size: %f, SSR max dist: %f, Lum: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist, fogLuminanceFac);
         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
+        RenderFormattedText(10, textY + (textVertOfset * 7), TEXT_YELLOW, "SSS steps: %d, SSS step size: %f", sssMaxSteps, sssStepSize);
 //         double ft8 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7);
 //         RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Frame Timings: 0. %.3f | 1. %.3f | 2. %.3f | 3. %.3f | 4. %.3f | 5. %.3f | 6. %.3f | 7. %.3f | 8. %.3f",ft0 * 1000.0f,ft1 * 1000.0f,ft2 * 1000.0f,ft3 * 1000.0f,ft4 * 1000.0f,ft5 * 1000.0f,ft6 * 1000.0f,ft7 * 1000.0f,ft8 * 1000.0f);
 //         DualLog("ft0: %f, ft1: %f, ft2: %f, ft3: %f, ft4: %f, ft5: %f, ft6: %f, ft7: %f, ft8: %f\n",ft0,ft1,ft2,ft3,ft4,ft5,ft6,ft7,ft8);
