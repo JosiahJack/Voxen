@@ -60,39 +60,58 @@ const char* deferredLighting_computeShader =
     "    );\n"
     "}\n"
     
-    "float traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, vec3 camPos) {\n"
+    "const float shadowBias = 0.02;\n"  // Avoid self-occlusion
+    "const float softnessFactor = 2.0;\n" // Controls shadow softness (tune as needed)
+    
+    "float traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, vec3 camPos, vec3 normal) {\n"
     "    vec3 toLight = lightPos - startPos;\n"
     "    float totalDist = length(toLight);\n"
-    "    if (totalDist > maxDist || totalDist <= 0.001) return 1.0;\n"
+    "    if (totalDist > maxDist || totalDist <= 0.001) return 1.0;\n" // No shadow if too far or too close
+
+    "    vec3 rayPos = startPos + normal * shadowBias;\n" // Offset start to avoid self-occlusion
+    "    vec3 rayDir = normalize(toLight);\n"
+    "    float stepSize = sssStepSize * max(1.0, totalDist / 5.12);\n" // Scale with distance
+    "    vec3 rayStep = rayDir * stepSize;\n"
+    "    float tolerance = 0.16;\n" // Depth tolerance scales with step size
+    "    int blueNoiseTextureWidth = 64;\n" // Blue noise for jittering to reduce aliasing
+    "    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);\n"
+    "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + \n"
+    "                         (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n"
     
-    "    vec3 rayPos = startPos;\n"
-    "    vec3 rayDir = normalize(lightPos - rayPos);\n"
-    "    rayPos += (rayDir * 0.01);\n"
-    "    vec2 hitUV = vec2(0.0);\n"
-    "    vec3 rayStep = rayDir * sssStepSize;\n"
+    "    float noise = blueNoiseColors[pixelIndex] / 255.0;\n" // [0, 1]
+    "    rayPos += rayStep * noise * 0.02;\n" // Jitter first step to reduce banding
+    "    float shadowFactor = 1.0;\n" // 1.0 = no shadow, 0.0 = full shadow
     "    float traveled = 0.0;\n"
+    "    int stepsTaken = 0;\n"
     "    for (int i = 0; i < sssMaxSteps; ++i) {\n"
     "        rayPos += rayStep;\n"
-    "        traveled += sssStepSize;\n"
-    "        if (traveled > 7.68) break;\n"
-    
+    "        traveled += stepSize;\n"
+    "        stepsTaken++;\n"
+    "        if (traveled > totalDist) break;\n" // Stop at light position
+
     "        vec4 clipPos = viewProjection * vec4(rayPos, 1.0);\n"
-    "        if (clipPos.w <= 0.0) break;\n"
+    "        if (clipPos.w <= 0.01) continue;\n" // Skip if behind near plane
 
     "        vec2 ndc = clipPos.xy / clipPos.w;\n"
-    "        hitUV = ndc * 0.5 + 0.5;\n"
-    "        if (hitUV.x <= 0.0 || hitUV.x >= 1.0 || hitUV.y <= 0.0 || hitUV.y >= 1.0) break;\n"
+    "        vec2 hitUV = ndc * 0.5 + 0.5;\n"
+    "        if (hitUV.x < 0.0 || hitUV.x > 1.0 || hitUV.y < 0.0 || hitUV.y > 1.0) continue;\n"
 
-    "        ivec2 samplePixel = ivec2(floor(hitUV * vec2(screenWidth, screenHeight)));\n"
-    "        samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
+    "        ivec2 samplePixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
+    "        samplePixel = clamp(samplePixel, ivec2(0), ivec2(screenWidth - 1, screenHeight - 1));\n"
     "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel);\n"
     "        vec3 sampledWorldPos = sampledWorldPosPack.xyz;\n"
-    "        float worldDist = length(sampledWorldPos - camPos);\n"
-    "        float depthDelta = length(rayPos - camPos) - worldDist;\n"
-    "        if (abs(depthDelta) < 0.16 && depthDelta > 0.001) return 0.0;\n"
+    "        float rayDepth = length(rayPos - camPos);\n"
+    "        float sampledDepth = length(sampledWorldPos - camPos);\n"
+    "        float depthDelta = rayDepth - sampledDepth;\n"
+    "        if (abs(depthDelta) < tolerance && depthDelta > 0.0) {\n" // Check for occluder
+    "            float occluderDist = clamp(traveled / (totalDist * 15.36), 0.0, 1.0);\n"
+    "            shadowFactor = min(shadowFactor, smoothstep(0.0, softnessFactor * stepSize, occluderDist));\n"
+    "            break;\n"
+    "        }\n"
     "    }\n"
     
-    "    return 1.0;\n"
+    "    shadowFactor = mix(shadowFactor, 1.0, clamp(float(stepsTaken) / float(sssMaxSteps), 0.0, 0.5));\n" // Soften based on steps
+    "    return clamp(shadowFactor, 0.0, 1.0);\n"
     "}\n"
     
     "const int MAX_VISIBLE_LIGHTS = 90;\n"
@@ -188,8 +207,8 @@ const char* deferredLighting_computeShader =
     "        }\n"
 
     "        float shadowFac = 1.0;\n"
-    "        float luminosity = intensity / (range * range);\n"
-    "        if (luminosity > 0.0451) shadowFac = traceShadowRay(worldPos, lightPos, range, camPos);\n"
+//     "        float luminosity = intensity / (range * range);\n"
+//     "        if (luminosity > 0.0451) shadowFac = traceShadowRay(worldPos, lightPos, range, camPos, normal);\n"
     
     "        vec3 lightColor = vec3(lightInPVS[lightIdx + LIGHT_DATA_OFFSET_R],\n"
     "                               lightInPVS[lightIdx + LIGHT_DATA_OFFSET_G],\n"

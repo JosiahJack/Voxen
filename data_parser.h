@@ -32,6 +32,7 @@ typedef struct {
     uint16_t constIndex; // Changed to uint16_t to align with MAX_ENTRIES
     uint16_t lodIndex; // Model index for LOD to use when far away
     char path[MAX_PATH];
+    char modname[MAX_PATH]; // Longest game name is 176 characters, so 256 should be aplenty.
     struct { float x, y, z; } localPosition;
     struct { float x, y, z, w; } localRotation;
     struct { float x, y, z; } localScale;

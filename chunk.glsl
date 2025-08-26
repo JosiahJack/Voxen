@@ -6,6 +6,7 @@ const char* vertexShaderSource =
     "layout(location = 0) in vec3 aPos;\n"
     "layout(location = 1) in vec3 aNormal;\n"
     "layout(location = 2) in vec2 aTexCoord;\n"
+    "layout(location = 9) in vec2 aTexCoordLightmap;\n"
 
     "uniform int texIndex;\n"
     "uniform int glowIndex;\n"
@@ -20,6 +21,7 @@ const char* vertexShaderSource =
     "out vec3 FragPos;\n"
     "out vec3 Normal;\n"
     "out vec2 TexCoord;\n"
+    "out vec2 TexCoordLightmap;\n"
 
     "flat out int TexIndex;\n"
     "flat out int GlowIndex;\n"
@@ -32,6 +34,7 @@ const char* vertexShaderSource =
     "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
     "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"
     "    TexCoord = aTexCoord;\n" // Pass along data to each vertex, shared for whole tri's pixels.
+    "    TexCoordLightmap = aTexCoordLightmap;\n" // Lightmap UVs
     "    TexIndex = texIndex;\n"
     "    GlowIndex = glowIndex;\n"
     "    SpecIndex = specIndex;\n"
@@ -46,6 +49,7 @@ const char* fragmentShaderTraditional =
     "#extension GL_ARB_shading_language_packing : require\n"
 
     "in vec2 TexCoord;\n"
+    "in vec2 TexCoordLightmap;\n"
     "in vec3 Normal;\n"
     "in vec3 FragPos;\n"
 

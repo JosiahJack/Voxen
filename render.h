@@ -72,6 +72,6 @@ typedef struct {
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);
 
-// void render_debug_text(float x, float y, const char *text, SDL_Color color);
+extern bool global_modIsCitadel;
 
 #endif // VOXEN_RENDER_H

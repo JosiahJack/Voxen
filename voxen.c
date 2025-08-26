@@ -36,9 +36,9 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 800, screen_height = 600;
+int screen_width = 1920, screen_height = 1080;
 bool window_has_focus = false;
-FILE *console_log_file = NULL;
+FILE* console_log_file = NULL;
 
 // Instances
 Instance instances[INSTANCE_COUNT];
@@ -49,13 +49,15 @@ GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
 
 // Game/Mod Definition
+const char* global_modname;
+bool global_modIsCitadel = false;
 uint8_t numLevels = 2;
 uint8_t startLevel = 3;
 uint8_t currentLevel = 0;
 bool gamePaused = false;
 bool menuActive = false;
-const char *valid_gamedata_keys[] = {"levelcount","startlevel"};
-#define NUM_GAMDAT_KEYS 2
+const char* valid_gamedata_keys[] = {"modname","levelcount","startlevel"};
+#define NUM_GAMDAT_KEYS 3
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
@@ -156,12 +158,8 @@ float fogLuminanceFac = 1.0f;
 float fogColorR = 0.04f;
 float fogColorG = 0.04f;
 float fogColorB = 0.09f;
-int sssMaxSteps = 96;
-float sssStepSize = 0.025;
-
-//    SSS (Screen Space Shadows), aka Contact Shadows
-// GLuint sssShaderProgram;
-// GLint screenWidthLoc_sss = -1, screenHeightLoc_sss = -1, 
+int sssMaxSteps = 64;
+float sssStepSize = 0.03;
 
 //    SSR (Screen Space Reflections)
 GLuint ssrShaderProgram;
@@ -985,7 +983,8 @@ int InitializeEnvironment(void) {
     glVertexAttribFormat(6, 1, GL_FLOAT, GL_FALSE, 11 * sizeof(float)); // Normal Index (int)
     glVertexAttribFormat(7, 1, GL_FLOAT, GL_FALSE, 12 * sizeof(float)); // Model Index (int)
     glVertexAttribFormat(8, 1, GL_FLOAT, GL_FALSE, 13 * sizeof(float)); // Instance Index (int)
-    for (uint8_t i = 0; i < 9; i++) {
+    glVertexAttribFormat(9, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float)); // Tex Coord Lightmap (vec2)
+    for (uint8_t i = 0; i < 10; i++) {
         glVertexAttribBinding(i, 0);
         glEnableVertexAttribArray(i);
     }
@@ -1095,10 +1094,12 @@ int InitializeEnvironment(void) {
     }
     
     fclose(gamedatfile);
+    global_modname = entry.modname;
+    if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
     numLevels = entry.levelCount;
     startLevel = entry.startLevel;
     currentLevel = startLevel;
-    DualLog("Game Definition:: num levels: %d, start level: %d\n",numLevels,startLevel);
+    DualLog("Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1569,7 +1570,6 @@ int main(int argc, char* argv[]) {
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
             glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
-//             DualLog("Using specIndex of %d for instance[%d]\n",instances[i].specIndex,i); 
             glUniform1i(instanceIndexLoc_chunk, i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
             glUniform1i(modelIndexLoc_chunk, modelType);
@@ -1632,9 +1632,9 @@ int main(int argc, char* argv[]) {
         //        dynamic and can be updated at any time (flicker, light switches,
         //        move, change color, get marked as "culled" so shader can skip it,
         //        etc.).
-//             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
-//             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
-//             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
+            glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
             
             glUseProgram(deferredLightingShaderProgram);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -1684,7 +1684,6 @@ int main(int argc, char* argv[]) {
             glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
             glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
             
-            
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
@@ -1694,13 +1693,7 @@ int main(int argc, char* argv[]) {
         // 6. Render final meshes' results with full screen quad
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
-        if (debugView == 0) {
-//             glBindTexture(GL_TEXTURE_2D, outputImageID); // Forward + GI
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward + GI
-        } else { // 1,2,3,4,5,6
-            glBindTexture(GL_TEXTURE_2D, inputImageID); // Forward Pass Debug Views
-        }
-
+        glBindTexture(GL_TEXTURE_2D, inputImageID);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
