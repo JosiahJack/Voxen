@@ -157,9 +157,9 @@ int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
 float ssr_StepSize = 0.185f;
 float fogLuminanceFac = 1.0f;
-float fogColorR = 0.13f;
-float fogColorG = 0.19f;
-float fogColorB = 0.36f;
+float fogColorR = 0.04f;
+float fogColorG = 0.04f;
+float fogColorB = 0.09f;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
