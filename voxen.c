@@ -36,7 +36,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 800, screen_height = 600;
+int screen_width = 1920, screen_height = 1080;
 bool window_has_focus = false;
 FILE *console_log_file = NULL;
 
@@ -560,12 +560,12 @@ int Input_KeyDown(uint32_t scancode) {
 
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
-        if (debugView > 6) debugView = 0;
+        if (debugView > 7) debugView = 0;
     }
 
     if (keys[SDL_SCANCODE_Y]) {
         debugValue++;
-        if (debugValue > 5) debugValue = 0;
+        if (debugValue > 6) debugValue = 0;
     }
 
     if (keys[SDL_SCANCODE_E]) {
@@ -1136,7 +1136,8 @@ static const char* debugViewNames[] = {
     "depth",           // 3
     "indices",         // 4
     "worldpos",        // 5
-    "lightview"        // 6
+    "lightview",       // 6
+    "reflections"      // 7
 };
 
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
@@ -1582,7 +1583,9 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // ====================================================================
         
-        if (debugView != 2) {
+        GLuint groupX = (screen_width + 31) / 32;
+        GLuint groupY = (screen_height + 31) / 32;
+        if (debugView < 1) {
         // 5. Deferred Lighting
         //        Apply deferred lighting with compute shader.  All lights are
         //        dynamic and can be updated at any time (flicker, light switches,
@@ -1610,14 +1613,15 @@ int main(int argc, char* argv[]) {
             glUniform1f(fogColorBLoc_deferred, fogColorB);
             
             // Dispatch compute shader
-            GLuint groupX = (screen_width + 31) / 32;
-            GLuint groupY = (screen_height + 31) / 32;
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
 //         double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
 
+        }
+        
         // 6. SSR (Screen Space Reflections)
+        if (debugView < 1 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 

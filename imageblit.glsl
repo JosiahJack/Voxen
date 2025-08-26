@@ -179,7 +179,8 @@ const char* quadFragmentShaderSource =
 
     "void main() {\n"
     "    FragColor = texture(tex, TexCoord);\n"
-    "    if (debugView == 0) {\n"
+    "    vec4 reflectionColor = vec4(0.0);\n"
+    "    if (debugView == 0 || debugView == 7) {\n"
     "        ivec2 pixel = ivec2(TexCoord * vec2(screenWidth, screenHeight));\n"
     "        vec4 centerNormalPack = imageLoad(inputNormals, pixel);\n"
     "        vec3 centerNormal = unpackNormal(centerNormalPack);\n"
@@ -191,7 +192,7 @@ const char* quadFragmentShaderSource =
     "            vec3 neighborNormal = unpackNormal(imageLoad(inputNormals, samplePixel));\n"
     "            normalDiff = max(normalDiff, length(centerNormal - neighborNormal));\n"
     "        }\n"
-    "        vec4 reflectionColor = vec4(0.0);\n"
+
     "        ivec2 reflPixel = ivec2(TexCoord * vec2(screenWidth/2, screenHeight/2));\n"
     "        if (normalDiff > 0.05) {\n" // 5x5 Gaussian blur in high-variation areas
     "            float weights[25] = float[](\n"
@@ -222,21 +223,8 @@ const char* quadFragmentShaderSource =
     "            jitterPixel = clamp(jitterPixel, ivec2(0), ivec2(int(screenWidth/2)-1, int(screenHeight/2)-1));\n"
     "            reflectionColor = imageLoad(outputImage, jitterPixel);\n"
     "        }\n"
-    "        FragColor += reflectionColor;\n"
-    "    } else if (debugView == 7 || debugView == 10) {\n"
-    "        FragColor = imageLoad(outputImage, ivec2(TexCoord * vec2(screenWidth/2, screenHeight/2)));\n"
-    "    } else if (debugView == 9) {\n"
-    "        ivec2 pixel = ivec2(TexCoord * vec2(screenWidth, screenHeight));\n"
-    "        vec4 centerNormalPack = imageLoad(inputNormals, pixel);\n"
-    "        vec3 centerNormal = unpackNormal(centerNormalPack);\n"
-    "        float normalDiff = 0.0;\n"
-    "        ivec2 offsets[4] = ivec2[](ivec2(-1, 0), ivec2(1, 0), ivec2(0, -1), ivec2(0, 1));\n"
-    "        for (int i = 0; i < 4; ++i) {\n"
-    "            ivec2 samplePixel = pixel + offsets[i];\n"
-    "            samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
-    "            vec3 neighborNormal = unpackNormal(imageLoad(inputNormals, samplePixel));\n"
-    "            normalDiff = max(normalDiff, length(centerNormal - neighborNormal));\n"
-    "        }\n"
-    "        FragColor = vec4(normalDiff, normalDiff, normalDiff, 1.0);\n"
+
+    "        if (debugView == 7) FragColor = reflectionColor;\n"
+    "        else FragColor += reflectionColor;\n"
     "    }\n"
     "}\n";
