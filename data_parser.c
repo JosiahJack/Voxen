@@ -35,6 +35,11 @@ GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
+GLuint vboMasterTable;
+GLuint tboMasterTable;
+GLuint modelVertexOffsetsID;
+GLuint modelVertexCountsID;
+GLuint modelTriangleCountsID;
 float * tempVertices;
 uint32_t * tempTriangles;
 float ** vertexDataArrays;
@@ -779,6 +784,63 @@ int LoadGeometry(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     CHECK_GL_ERROR();
     malloc_trim(0);
+    
+    // Upload modelVertexOffsets
+    uint32_t modelVertexOffsets[MODEL_COUNT];
+    uint32_t offset = 0;
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
+        modelVertexOffsets[i] = offset;
+        offset += modelVertexCounts[i];
+    }
+    
+    glGenBuffers(1, &modelVertexOffsetsID);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexOffsets, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 30, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
+    
+    // Upload triangle counts
+    glGenBuffers(1, &tboMasterTable);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, tboMasterTable);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelTriangleCounts, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 29, tboMasterTable);
+    CHECK_GL_ERROR();
+    
+    // Pass Model Vertex Counts to GPU
+    glGenBuffers(1, &modelVertexCountsID);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexCountsID);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 28, modelVertexCountsID);
+    CHECK_GL_ERROR();
+    
+    // Create duplicate of all mesh data in one flat buffer in VRAM without using RAM
+    glGenBuffers(1, &vboMasterTable);
+    CHECK_GL_ERROR();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
+    CHECK_GL_ERROR();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    for (int i = 0; i < MODEL_COUNT; ++i) {
+        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
+        CHECK_GL_ERROR();
+        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
+        CHECK_GL_ERROR();
+        glCopyBufferSubData(GL_COPY_READ_BUFFER,GL_COPY_WRITE_BUFFER,0, modelVertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        CHECK_GL_ERROR(); // Getting GL error here, 1282
+    }
+
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, vboMasterTable);
+    CHECK_GL_ERROR();
+    
     free(tempVertices);
     free(tempTriangles);
     malloc_trim(0);
