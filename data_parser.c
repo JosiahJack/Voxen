@@ -23,48 +23,23 @@
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 #define NUM_MODEL_KEYS 1
-#define HASH_SIZE 65536 // Power of 2 for fast modulo
-#define HASH(v0, v1) (((v0 * 31 + v1) ^ (v1 * 17)) & (HASH_SIZE - 1))
 #define MAX_VERT_COUNT 21444
 #define MAX_TRI_COUNT 32449
-#define MAX_EDGE_COUNT 97345
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
-// uint32_t modelEdgeCounts[MODEL_COUNT];
 GLuint vbos[MODEL_COUNT];
 GLuint tbos[MODEL_COUNT]; // Triangle index buffers
-// GLuint tebos[MODEL_COUNT]; // Triangle's edge indices buffers
-GLuint ebos[MODEL_COUNT]; // Edge index buffers
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
-// uint32_t largestEdgeCount = 0;
 float * tempVertices;
 uint32_t * tempTriangles;
-// uint32_t * tempTriEdges;
-
-// Structure to represent an edge for building edge list
-// typedef struct {
-//     uint32_t v0, v1; // Vertex indices (sorted: v0 < v1)
-//     uint32_t tri0, tri1; // Triangle indices (tri1 = UINT32_MAX if unshared)
-// } Edge;
-// 
-// Edge * tempEdges;
-
-// Simple hash table for edge lookup
-// typedef struct {
-//     uint32_t v0, v1;
-//     uint32_t edgeIndex;
-// } EdgeHashEntry;
-// 
-// EdgeHashEntry * edgeHash;
-
 float ** vertexDataArrays;
 uint32_t ** triangleDataArrays;
 uint32_t ** triEdgeDataArrays;
-// uint32_t ** edgeDataArrays;
+
 //-----------------------------------------------------------------------------
 // Level Data Parsing
 DataParser level_parser;
@@ -199,16 +174,11 @@ static bool process_key_value(DataParser *parser, DataEntry *entry, const char *
             else if (strcmp(trimmed_key, "normtexture") == 0)     entry->normIndex = parse_numberu16(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "doublesided") == 0)     entry->doublesided = parse_bool(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "cardchunk") == 0)       entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
-            
-            // Game/Mod Definition
-            else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(entry->modname, trimmed_value, sizeof(entry->modname) - 1); entry->modname[sizeof(entry->modname) - 1] = '\0'; entry->index = 0; }
+            else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(entry->modname, trimmed_value, sizeof(entry->modname) - 1); entry->modname[sizeof(entry->modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
             else if (strcmp(trimmed_key, "levelcount") == 0)      { entry->levelCount = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
             else if (strcmp(trimmed_key, "startlevel") == 0)      { entry->startLevel = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
-            
             else if (strcmp(trimmed_key, "constIndex") == 0)      entry->constIndex = parse_numberu16(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "lod") == 0)             entry->lodIndex = parse_numberu16(trimmed_value, line, lineNum);
-            
-            // Transform 10-pack
             else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->localPosition.x = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->localPosition.y = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localPosition.z") == 0) entry->localPosition.z = parse_float(trimmed_value, line, lineNum);
@@ -219,7 +189,6 @@ static bool process_key_value(DataParser *parser, DataEntry *entry, const char *
             else if (strcmp(trimmed_key, "localScale.x") == 0)    entry->localScale.x = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localScale.y") == 0)    entry->localScale.y = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "localScale.z") == 0)    entry->localScale.z = parse_float(trimmed_value, line, lineNum);
-            
             else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "range") == 0)           entry->range = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
@@ -272,7 +241,7 @@ bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *
     char key[256];
     strncpy(key, token, sizeof(key) - 1);
     key[sizeof(key) - 1] = '\0';
-    if (!read_token(file, token, sizeof(token), '\n', &is_comment, is_eof, &is_newline, lineNum))return false;
+    if (!read_token(file, token, sizeof(token), '\n', &is_comment, is_eof, &is_newline, lineNum)) return false;
     
     process_key_value(parser, entry, key, token, key, *lineNum);
     *lineNum += 1;
@@ -280,7 +249,6 @@ bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *
 }
 
 static bool ParseResourceData(DataParser *parser, const char *filename) {
-//     DualLog("Starting ParseResourceData for file: %s\n", filename);
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
 
@@ -302,12 +270,10 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
 
         char *colon = strchr(start, ':');
         if (colon && strncmp(start, "index", colon - start) == 0) {
-//             if (strcmp(filename, "./Data/textures.txt") == 0) DualLog("Parsing index from line: %s, ",line);
             char *value = colon + 1;
             while (isspace((unsigned char)*value)) value++;
             uint32_t idx = parse_numberu32(value, line, lineNum);
             if (idx > max_index) max_index = idx;
-//             if (strcmp(filename, "./Data/textures.txt") == 0) DualLog("New max index: %d, Idx as parsed: %d\n",max_index,idx);
        }
     }
 
@@ -315,7 +281,6 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
 
     // Allocate enough space for max_index + 1
     allocate_entries(parser, max_index + 1);
-//     parser->count = entry_count; // Track actual number of valid entries
 
     // Second pass: parse entries
     rewind(file);
@@ -375,8 +340,6 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
 }
 
 static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
-//     DualLog("Starting ParseSaveLevelData for file: %s\n", filename);
-    
     // Check if file exists and is readable
     FILE *file = fopen(filename, "r");
     if (!file) {
@@ -419,12 +382,7 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
             if (is_comment) { lineNum++; continue; }
             
             if (is_newline) {
-                if (current_index < parser->count) {
-                    parser->entries[current_index++] = entry;
-//                     DualLog("Loaded entry %d for save/level data %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n\n",
-//                             current_index, entry.path, entry.constIndex,
-//                             entry.localPosition.x, entry.localPosition.y, entry.localPosition.z);
-                }
+                if (current_index < parser->count) parser->entries[current_index++] = entry;
                 init_data_entry(&entry);
                 lineNum++;
             }
@@ -445,28 +403,14 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
         }
 
         if (is_newline) {
-            if (current_index < parser->count) {
-                parser->entries[current_index++] = entry;
-//                 DualLog("Loaded entry %d for %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n\n",
-//                         current_index, entry.path, entry.constIndex,
-//                         entry.localPosition.x, entry.localPosition.y, entry.localPosition.z);
-            }
+            if (current_index < parser->count) parser->entries[current_index++] = entry;
             init_data_entry(&entry);
             lineNum++;
         }
     }
 
     // Store last entry
-    if (entry.path[0] && current_index < parser->count) {
-        parser->entries[current_index] = entry;
-        current_index++;
-//         DualLog("Loaded final entry %d for save/level data %s with values:\n  constIndex: %d\n  localPosition: %f %f %f\n  localRotation: %f %f %f %f\n  localScale: %f %f %f\n",
-//                 current_index, entry.path, entry.constIndex,
-//                 entry.localPosition.x, entry.localPosition.y, entry.localPosition.z,
-//                 entry.localRotation.x, entry.localRotation.y, entry.localRotation.z, entry.localRotation.w,
-//                 entry.localScale.x, entry.localScale.y, entry.localScale.z);
-    }
-
+    if (entry.path[0] && current_index < parser->count) { parser->entries[current_index] = entry; current_index++; }
     fclose(file);
     return true;
 }
@@ -492,11 +436,8 @@ int LoadGeometry(void) {
     int totalVertCount = 0;
     int totalBounds = 0;
     int totalTriCount = 0;
-//     int totalEdgeCount = 0;
     largestVertCount = 0;
     largestTriangleCount = 0;
-//     largestEdgeCount = 0;
-    float lightmapScale = 2.0f;
 
     // Allocate persistent temporary buffers
     tempVertices = (float *)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -505,41 +446,20 @@ int LoadGeometry(void) {
     tempTriangles = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
     DebugRAM("tempTriangles buffer");
 
-//     tempTriEdges = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
-//     DebugRAM("tempTriEdges buffer");
-
-//     tempEdges = (Edge *)calloc(MAX_EDGE_COUNT, sizeof(Edge));
-//     DebugRAM("tempEdges buffer");
-
-//     edgeHash = (EdgeHashEntry *)calloc(HASH_SIZE, sizeof(EdgeHashEntry));
-//     DebugRAM("edgeHash buffer");
-
     vertexDataArrays = (float **)calloc(MODEL_COUNT, sizeof(float *));
     DebugRAM("vertexDataArrays buffer");
 
     triangleDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
     DebugRAM("triangleDataArrays buffer");
 
-//     triEdgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
-//     DebugRAM("triEdgeDataArrays buffer");
-
-//     edgeDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
-//     DebugRAM("edgeDataArrays buffer");
-
     // Generate staging buffers
     GLuint stagingVBO, stagingTBO;//, stagingTEBO, stagingEBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
-//     glGenBuffers(1, &stagingTEBO);
-//     glGenBuffers(1, &stagingEBO);
     glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
     glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
-//     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-//     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
-//     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_EDGE_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
     DebugRAM("after staging buffers allocation");
     for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
@@ -575,11 +495,10 @@ int LoadGeometry(void) {
             triCount += scene->mMeshes[m]->mNumFaces;
         }
 
-        if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT || triCount * 3 > MAX_EDGE_COUNT) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u), edges=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT, triCount * 3, MAX_EDGE_COUNT); return 1; }
+        if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); return 1; }
 
         modelVertexCounts[i] = vertexCount;
         modelTriangleCounts[i] = triCount;
-//         uint32_t edgeCount = 0; // Will be updated after edge processing
         if (vertexCount > largestVertCount) largestVertCount = vertexCount;
         if (triCount > largestTriangleCount) largestTriangleCount = triCount;
 
@@ -593,9 +512,6 @@ int LoadGeometry(void) {
         totalVertCount += vertexCount;
         totalTriCount += triCount;
 
-        // Clear hash table
-//         memset(edgeHash, 0, HASH_SIZE * sizeof(EdgeHashEntry));
-
         // Extract vertex and triangle data, build edge list
         uint32_t vertexIndex = 0;
         float minx = 1E9f;
@@ -605,7 +521,6 @@ int LoadGeometry(void) {
         float maxy = -1E9f;
         float maxz = -1E9f;
         uint32_t triangleIndex = 0;
-//         uint32_t triEdgeIndex = 0;
         uint32_t globalVertexOffset = 0;
 
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
@@ -644,8 +559,6 @@ int LoadGeometry(void) {
                 if (face->mNumIndices != 3) { DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); return 1; }
 
                 uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
-//                 uint32_t triangleIdx = triangleIndex / 3;
-//                 uint32_t edgeIndices[3];
 
                 // Validate vertex indices
                 if (v[0] >= vertexCount || v[1] >= vertexCount || v[2] >= vertexCount) { DualLogError("Invalid vertex index in %s, face %u: v0=%u, v1=%u, v2=%u, vertexCount=%u\n", model_parser.entries[matchedParserIdx].path, f, v[0], v[1], v[2], vertexCount);return 1; }
@@ -654,42 +567,6 @@ int LoadGeometry(void) {
                 tempTriangles[triangleIndex++] = v[0];
                 tempTriangles[triangleIndex++] = v[1];
                 tempTriangles[triangleIndex++] = v[2];
-
-                // Process edges with hash table
-//                 for (int e = 0; e < 3; e++) {
-//                     uint32_t v0 = v[e];
-//                     uint32_t v1 = v[(e + 1) % 3];
-//                     if (v0 > v1) { uint32_t temp = v0; v0 = v1; v1 = temp; }
-// 
-//                     uint32_t hash = HASH(v0, v1);
-//                     while (edgeHash[hash].edgeIndex != 0 && (edgeHash[hash].v0 != v0 || edgeHash[hash].v1 != v1)) {
-//                         hash = (hash + 1) & (HASH_SIZE - 1); // Linear probing
-//                     }
-// 
-//                     int edgeFound = -1;
-//                     if (edgeHash[hash].edgeIndex != 0) {
-//                         edgeFound = edgeHash[hash].edgeIndex - 1;
-//                         tempEdges[edgeFound].tri1 = triangleIdx;
-//                     } else {
-//                         if (edgeCount < MAX_EDGE_COUNT) {
-//                             tempEdges[edgeCount].v0 = v0;
-//                             tempEdges[edgeCount].v1 = v1;
-//                             tempEdges[edgeCount].tri0 = triangleIdx;
-//                             tempEdges[edgeCount].tri1 = UINT32_MAX;
-//                             edgeHash[hash].v0 = v0;
-//                             edgeHash[hash].v1 = v1;
-//                             edgeHash[hash].edgeIndex = edgeCount + 1;
-//                             edgeFound = edgeCount++;
-//                         } else DualLogError("Edge count exceeds estimate for %s: %u >= %u\n", model_parser.entries[matchedParserIdx].path, edgeCount, MAX_EDGE_COUNT);
-//                     }
-// 
-//                     edgeIndices[e] = edgeFound;
-//                 }
-
-                // Store edge indices
-//                 tempTriEdges[triEdgeIndex++] = edgeIndices[0];
-//                 tempTriEdges[triEdgeIndex++] = edgeIndices[1];
-//                 tempTriEdges[triEdgeIndex++] = edgeIndices[2];
             }
             
             globalVertexOffset += mesh->mNumVertices;
@@ -703,23 +580,6 @@ int LoadGeometry(void) {
         triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle data in triangleDataArrays
         memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
         DebugRAM("triangleDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
-
-//         triEdgeDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle-edge data in triEdgeDataArrays
-//         memcpy(triEdgeDataArrays[i], tempTriEdges, triCount * 3 * sizeof(uint32_t));
-//         DebugRAM("triEdgeDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
-// 
-//         edgeDataArrays[i] = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t)); // Store edge data in edgeDataArrays
-//         DebugRAM("edgeDataArrays %d alloc for model %s",i, model_parser.entries[matchedParserIdx].path);
-//         for (uint32_t j = 0; j < edgeCount; j++) {
-//             edgeDataArrays[i][j * 4 + 0] = tempEdges[j].v0;
-//             edgeDataArrays[i][j * 4 + 1] = tempEdges[j].v1;
-//             edgeDataArrays[i][j * 4 + 2] = tempEdges[j].tri0;
-//             edgeDataArrays[i][j * 4 + 3] = tempEdges[j].tri1;
-//         }
-        
-//         modelEdgeCounts[i] = edgeCount;
-//         totalEdgeCount += edgeCount;
-//         if (edgeCount > largestEdgeCount) largestEdgeCount = edgeCount;
 
         aiReleaseImport(scene);
         malloc_trim(0);
@@ -753,43 +613,7 @@ int LoadGeometry(void) {
             glFlush();
             glFinish();
             DebugRAM("post tri buffer tbos upload for model %s", model_parser.entries[matchedParserIdx].path);
-            
-/*            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTEBO);
-            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCount * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, tempTriEdges, triCount * 3 * sizeof(uint32_t));
-            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-            
-            glGenBuffers(1, &tebos[i]);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, tebos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
-            glFlush();
-            glFinish();
-            DebugRAM("post tri buffer tebos upload for model %s", model_parser.entries[matchedParserIdx].path)*/;
         }
-
-//         if (edgeCount > 0) {
-//             uint32_t *tempEdgeData = (uint32_t *)malloc(edgeCount * 4 * sizeof(uint32_t));
-//             for (uint32_t j = 0; j < edgeCount; j++) {
-//                 tempEdgeData[j * 4 + 0] = tempEdges[j].v0;
-//                 tempEdgeData[j * 4 + 1] = tempEdges[j].v1;
-//                 tempEdgeData[j * 4 + 2] = tempEdges[j].tri0;
-//                 tempEdgeData[j * 4 + 3] = tempEdges[j].tri1;
-//             }
-// 
-//             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingEBO);
-//             void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, edgeCount * 4 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-//             memcpy(mapped_buffer, tempEdgeData, edgeCount * 4 * sizeof(uint32_t));
-//             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-//             glGenBuffers(1, &ebos[i]);
-//             glBindBuffer(GL_COPY_WRITE_BUFFER, ebos[i]);
-//             glBufferData(GL_COPY_WRITE_BUFFER, edgeCount * 4 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-//             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, edgeCount * 4 * sizeof(uint32_t));
-//             glFlush();
-//             glFinish();
-//             free(tempEdgeData);
-//             DebugRAM("post edge data free for model %s", model_parser.entries[matchedParserIdx].path);
-//         }
 
         float minx_pos = fabs(minx);
         float miny_pos = fabs(miny);
@@ -815,8 +639,6 @@ int LoadGeometry(void) {
     // Delete staging buffers
     glDeleteBuffers(1, &stagingVBO);
     glDeleteBuffers(1, &stagingTBO);
-//     glDeleteBuffers(1, &stagingTEBO);
-//     glDeleteBuffers(1, &stagingEBO);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
@@ -824,15 +646,10 @@ int LoadGeometry(void) {
 
 #ifdef DEBUG_MODEL_LOAD_DATA
     DualLog("Largest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
-//     DualLog("Largest vertex count: %d, triangle count: %d, edge count: %d\n", largestVertCount, largestTriangleCount, largestEdgeCount);
     DualLog("Total vertices: %d (", totalVertCount);
     print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     DualLog(")\nTotal triangles: %d (", totalTriCount);
     print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
-//     DualLog(")\nTotal tri-edges: %d (", totalTriCount);
-//     print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
-//     DualLog(")\nTotal edges: %d (", totalEdgeCount);
-//     print_bytes_no_newline(totalEdgeCount * 4 * sizeof(uint32_t));
     DualLog(")\nBounds (");
     print_bytes_no_newline(totalBounds * sizeof(float));
     DualLog(")\n");
@@ -856,9 +673,6 @@ int LoadGeometry(void) {
     DebugRAM("post model model bounds data transfer");
     free(tempVertices);
     free(tempTriangles);
-//     free(tempTriEdges);
-//     free(tempEdges);
-//     free(edgeHash);
     malloc_trim(0);
     double end_time = get_time();
     DualLog("Load Models took %f seconds\n", end_time - start_time);
