@@ -4,15 +4,40 @@ const char* deferredLighting_computeShader =
     "#version 450 core\n"
     "layout(local_size_x = 32, local_size_y = 32) in;\n"
 
+    "struct Instance {\n"
+    "    int modelIndex;\n"
+    "    int texIndex;\n"
+    "    int glowIndex;\n"
+    "    int specIndex;\n"
+    "    int normIndex;\n"
+    "    int lodIndex;\n"
+    "    float posx;\n"
+    "    float posy;\n"
+    "    float posz;\n"
+    "    float sclx;\n"
+    "    float scly;\n"
+    "    float sclz;\n"
+    "    float rotx;\n"
+    "    float roty;\n"
+    "    float rotz;\n"
+    "    float rotw;\n"
+    "    float floorHeight;\n"
+    "};\n"
+
     "layout(rgba8,   binding = 0) uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2) uniform image2D inputNormals;\n"
     "layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };\n"
+    "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n" // Added
     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
     "layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };\n"
+    "layout(std430, binding = 21) buffer LightmapLuxelData { float luxelData[]; };\n" // Added
+    "layout(std430, binding = 22) buffer LightmapOffsets { float lightmapLuxelOffsets[]; };\n" // Added
+    "layout(std430, binding = 23) buffer TriLuxel { float triLuxelMetaData[]; };\n" // Added
+    "layout(std430, binding = 28) readonly buffer VertexCounts { uint vertexCounts[]; };\n" // Added
+    "layout(std430, binding = 29) readonly buffer TriangleCounts { uint triangleCounts[]; };\n" // Added
 
-    // Uniforms, why must we all wear these ridiculous types!
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
     "uniform mat4 viewProjection;\n"
@@ -28,74 +53,65 @@ const char* deferredLighting_computeShader =
     "uniform float fogColorB;\n"
     "uniform float sssStepSize;\n"
     "uniform int sssMaxSteps;\n"
-    
+
     "vec4 unpackColor32(uint color) {\n"
-    "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
-    "                float((color >> 16) & 0xFF) / 255.0,\n"  // g
-    "                float((color >>  8) & 0xFF) / 255.0,\n"  // b
-    "                float((color      ) & 0xFF) / 255.0);\n" // a
+    "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"
+    "                float((color >> 16) & 0xFF) / 255.0,\n"
+    "                float((color >>  8) & 0xFF) / 255.0,\n"
+    "                float((color      ) & 0xFF) / 255.0);\n"
     "}\n"
-    
+
     "vec3 quat_rotate(vec4 q, vec3 v) {\n"
     "    float x2 = q.x + q.x;\n"
     "    float y2 = q.y + q.y;\n"
     "    float z2 = q.z + q.z;\n"
-
     "    float xx2 = q.x * x2;\n"
     "    float yy2 = q.y * y2;\n"
     "    float zz2 = q.z * z2;\n"
-
     "    float xy2 = q.x * y2;\n"
     "    float xz2 = q.x * z2;\n"
     "    float yz2 = q.y * z2;\n"
-
     "    float wx2 = q.w * x2;\n"
     "    float wy2 = q.w * y2;\n"
     "    float wz2 = q.w * z2;\n"
-
     "    return vec3(\n"
     "        v.x * (1.0 - yy2 - zz2) + v.y * (xy2 - wz2) + v.z * (xz2 + wy2),\n"
     "        v.x * (xy2 + wz2) + v.y * (1.0 - xx2 - zz2) + v.z * (yz2 - wx2),\n"
     "        v.x * (xz2 - wy2) + v.y * (yz2 + wx2) + v.z * (1.0 - xx2 - yy2)\n"
     "    );\n"
     "}\n"
-    
-    "const float shadowBias = 0.02;\n"  // Avoid self-occlusion
-    "const float softnessFactor = 2.0;\n" // Controls shadow softness (tune as needed)
-    
+
+    "const float shadowBias = 0.02;\n"
+    "const float softnessFactor = 2.0;\n"
+
     "float traceShadowRay(vec3 startPos, vec3 lightPos, float maxDist, vec3 camPos, vec3 normal) {\n"
     "    vec3 toLight = lightPos - startPos;\n"
     "    float totalDist = length(toLight);\n"
-    "    if (totalDist > maxDist || totalDist <= 0.001) return 1.0;\n" // No shadow if too far or too close
-
-    "    vec3 rayPos = startPos + normal * shadowBias;\n" // Offset start to avoid self-occlusion
+    "    if (totalDist > maxDist || totalDist <= 0.001) return 1.0;\n"
+    "    vec3 rayPos = startPos + normal * shadowBias;\n"
     "    vec3 rayDir = normalize(toLight);\n"
-    "    float stepSize = sssStepSize * max(1.0, totalDist / 5.12);\n" // Scale with distance
+    "    float stepSize = sssStepSize * max(1.0, totalDist / 5.12);\n"
     "    vec3 rayStep = rayDir * stepSize;\n"
-    "    float tolerance = 0.16;\n" // Depth tolerance scales with step size
-    "    int blueNoiseTextureWidth = 64;\n" // Blue noise for jittering to reduce aliasing
+    "    float tolerance = 0.16;\n"
+    "    int blueNoiseTextureWidth = 64;\n"
     "    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);\n"
     "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + \n"
     "                         (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n"
-    
-    "    float noise = blueNoiseColors[pixelIndex] / 255.0;\n" // [0, 1]
-    "    rayPos += rayStep * noise * 0.02;\n" // Jitter first step to reduce banding
-    "    float shadowFactor = 1.0;\n" // 1.0 = no shadow, 0.0 = full shadow
+    "    float noise = blueNoiseColors[pixelIndex] / 255.0;\n"
+    "    rayPos += rayStep * noise * 0.02;\n"
+    "    float shadowFactor = 1.0;\n"
     "    float traveled = 0.0;\n"
     "    int stepsTaken = 0;\n"
     "    for (int i = 0; i < sssMaxSteps; ++i) {\n"
     "        rayPos += rayStep;\n"
     "        traveled += stepSize;\n"
     "        stepsTaken++;\n"
-    "        if (traveled > totalDist) break;\n" // Stop at light position
-
+    "        if (traveled > totalDist) break;\n"
     "        vec4 clipPos = viewProjection * vec4(rayPos, 1.0);\n"
-    "        if (clipPos.w <= 0.01) continue;\n" // Skip if behind near plane
-
+    "        if (clipPos.w <= 0.01) continue;\n"
     "        vec2 ndc = clipPos.xy / clipPos.w;\n"
     "        vec2 hitUV = ndc * 0.5 + 0.5;\n"
     "        if (hitUV.x < 0.0 || hitUV.x > 1.0 || hitUV.y < 0.0 || hitUV.y > 1.0) continue;\n"
-
     "        ivec2 samplePixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
     "        samplePixel = clamp(samplePixel, ivec2(0), ivec2(screenWidth - 1, screenHeight - 1));\n"
     "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel);\n"
@@ -103,17 +119,16 @@ const char* deferredLighting_computeShader =
     "        float rayDepth = length(rayPos - camPos);\n"
     "        float sampledDepth = length(sampledWorldPos - camPos);\n"
     "        float depthDelta = rayDepth - sampledDepth;\n"
-    "        if (abs(depthDelta) < tolerance && depthDelta > 0.0) {\n" // Check for occluder
+    "        if (abs(depthDelta) < tolerance && depthDelta > 0.0) {\n"
     "            float occluderDist = clamp(traveled / (totalDist * 15.36), 0.0, 1.0);\n"
     "            shadowFactor = min(shadowFactor, smoothstep(0.0, softnessFactor * stepSize, occluderDist));\n"
     "            break;\n"
     "        }\n"
     "    }\n"
-    
-    "    shadowFactor = mix(shadowFactor, 1.0, clamp(float(stepsTaken) / float(sssMaxSteps), 0.0, 0.5));\n" // Soften based on steps
+    "    shadowFactor = mix(shadowFactor, 1.0, clamp(float(stepsTaken) / float(sssMaxSteps), 0.0, 0.5));\n"
     "    return clamp(shadowFactor, 0.0, 1.0);\n"
     "}\n"
-    
+
     "const int MAX_VISIBLE_LIGHTS = 90;\n"
     "const int LIGHT_DATA_SIZE = 13;\n"
     "const int LIGHT_DATA_OFFSET_POSX = 0;\n"
@@ -131,15 +146,15 @@ const char* deferredLighting_computeShader =
     "const int LIGHT_DATA_OFFSET_B = 12;\n"
     "const float WORLDCELL_WIDTH_F = 2.56;\n"
     "const float CELLXHALF = 1.28;\n"
-    
+
     "uvec2 PosToCellCoords(float pos_x, float pos_z) {\n"
     "    uvec2 retval;\n"
     "    retval.x = uint(int((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F));\n"
     "    retval.y = uint(int((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F));\n"
     "    return retval;\n"
     "}\n"
-    
-    // --- Main Compute Shader ---
+
+    // Main Compute Shader
     "void main() {\n"
     "    uvec2 pixel = gl_GlobalInvocationID.xy;\n"
     "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
@@ -152,40 +167,84 @@ const char* deferredLighting_computeShader =
     "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
     "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
-    "    vec3 normal = normalize(vec3(normalXY.x,normalXY.y,normalZ0.x));\n"
+    "    vec3 normal = normalize(vec3(normalXY.x, normalXY.y, normalZ0.x));\n"
     "    vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));\n"
-    "    vec3 lighting = vec3(0.0,0.0,0.0);\n"
+    "    vec2 uv_lm = unpackHalf2x16(floatBitsToInt(normalPack.a));\n" // Assume lightmap UVs in normalPack.a
     "    int pixelInstance = floatBitsToInt(worldPosPack.a);\n"
-    "    uint lightIdx = 0;\n"
+
+    // Debug View: Output lightmap color
+    "    if (debugView == 8) {\n"
+    "        if (pixelInstance < 0) {\n"
+    "            imageStore(inputImage, ivec2(pixel), vec4(1.0, 0.0, 0.0, 1.0));\n" // Red: Invalid instance
+    "            return;\n"
+    "        }\n"
+    "        uint modelIdx = uint(instances[pixelInstance].modelIndex);\n"
+    "        if (modelIdx >= 768) {\n"
+    "            imageStore(inputImage, ivec2(pixel), vec4(1.0, 0.5, 0.0, 1.0));\n" // Orange: Invalid modelIdx
+    "            return;\n"
+    "        }\n"
+    "        uint triIdx = 0;\n"
+    "        uint localLuxelIdx = 0;\n"
+    "        bool foundTri = false;\n"
+    "        for (uint i = 0; i < triangleCounts[modelIdx]; i++) {\n"
+    "            uint triLuxelOffset = uint(triLuxelMetaData[modelIdx * triangleCounts[modelIdx] * 3 + i * 3]);\n"
+    "            uint luxel_u = uint(triLuxelMetaData[modelIdx * triangleCounts[modelIdx] * 3 + i * 3 + 1]);\n"
+    "            uint luxel_v = uint(triLuxelMetaData[modelIdx * triangleCounts[modelIdx] * 3 + i * 3 + 2]);\n"
+    "            uint triLuxelCount = luxel_u * luxel_v;\n"
+    "            if (localLuxelIdx < triLuxelOffset + triLuxelCount) {\n"
+    "                triIdx = i;\n"
+    "                localLuxelIdx -= triLuxelOffset;\n"
+    "                foundTri = true;\n"
+    "                break;\n"
+    "            }\n"
+    "        }\n"
+    "        if (!foundTri) {\n"
+    "            imageStore(inputImage, ivec2(pixel), vec4(0.0, 1.0, 0.0, 1.0));\n" // Green: No triangle found
+    "            return;\n"
+    "        }\n"
+    "        uint luxel_u = uint(triLuxelMetaData[modelIdx * triangleCounts[modelIdx] * 3 + triIdx * 3 + 1]);\n"
+    "        uint luxelIdxU = uint(clamp(uv_lm.x, 0.0, 1.0) * float(luxel_u));\n"
+    "        uint luxelIdxV = uint(clamp(uv_lm.y, 0.0, 1.0) * float(luxel_u));\n"
+    "        uint luxelOffset = uint(lightmapLuxelOffsets[modelIdx]) + uint(triLuxelMetaData[modelIdx * triangleCounts[modelIdx] * 3 + triIdx * 3 + 0]);\n"
+    "        uint luxelIdx = luxelOffset + luxelIdxU + luxelIdxV * luxel_u;\n"
+    "        vec4 lightmapColor = vec4(luxelData[luxelIdx * 4 + 0],\n"
+    "                                  luxelData[luxelIdx * 4 + 1],\n"
+    "                                  luxelData[luxelIdx * 4 + 2],\n"
+    "                                  luxelData[luxelIdx * 4 + 3]);\n"
+    "        if (lightmapColor.r == 1.0 && lightmapColor.g == 0.0 && lightmapColor.b == 0.0) {\n"
+    "            imageStore(inputImage, ivec2(pixel), vec4(0.0, 0.0, 1.0, 1.0));\n" // Blue: Lightmap data is red (invalid)
+    "            return;\n"
+    "        }\n"
+    "        imageStore(inputImage, ivec2(pixel), lightmapColor);\n"
+    "        return;\n"
+    "    }\n"
+
+    // Regular lighting calculation
+    "    vec3 lighting = vec3(0.0, 0.0, 0.0);\n"
     "    for (uint i = 0; i < MAX_VISIBLE_LIGHTS; i++) {\n"
-    "        uint lightIdx = i * LIGHT_DATA_SIZE;\n" // LIGHT_DATA_SIZE
+    "        uint lightIdx = i * LIGHT_DATA_SIZE;\n"
     "        float intensity = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];\n"
     "        if (intensity < 0.05) continue;\n"
-
-    "        float range = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_RANGE];\n"    
+    "        float range = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_RANGE];\n"
     "        vec3 lightPos = vec3(lightInPVS[lightIdx + LIGHT_DATA_OFFSET_POSX],\n"
     "                             lightInPVS[lightIdx + LIGHT_DATA_OFFSET_POSY],\n"
     "                             lightInPVS[lightIdx + LIGHT_DATA_OFFSET_POSZ]);\n"
-    
     "        vec3 toLight = lightPos - worldPos;\n"
     "        float dist = length(toLight);\n"
     "        if (dist > range) continue;\n"
-    
     "        vec3 lightDir = normalize(toLight);\n"
     "        float lambertian = max(dot(normal, lightDir), 0.0);\n"
-    "        if (lambertian < 0.25) continue;\n" // Aggressive lambert cutoff
-    
+    "        if (lambertian < 0.25) continue;\n"
     "        if (dist > 2.56) {\n"
-        "        uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);\n"
-        "        uint checkCellIdx = cellIndexForInstance[pixelInstance];\n"
-        "        uint lightCellIdx1D = (lightCell.y * 64) + lightCell.x;\n"
-        "        uint bitIndex = lightCellIdx1D * 4096 + checkCellIdx;\n"
-        "        uint wordIdx = bitIndex / 32;\n"
-        "        uint bitPos  = bitIndex % 32;\n"
-        "        bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;\n"
-        "        if (!lightCanSeeCell) continue;\n"
+    "            uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);\n"
+    "            uint checkCellIdx = cellIndexForInstance[pixelInstance];\n"
+    "            uint lightCellIdx1D = (lightCell.y * 64) + lightCell.x;\n"
+    "            uint bitIndex = lightCellIdx1D * 4096 + checkCellIdx;\n"
+    "            uint wordIdx = bitIndex / 32;\n"
+    "            uint bitPos = bitIndex % 32;\n"
+    "            bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;\n"
+    "            if (!lightCanSeeCell) continue;\n"
     "        }\n"
-
     "        float spotAng = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];\n"
     "        float spotFalloff = 1.0;\n"
     "        if (spotAng > 0.0) {\n"
@@ -193,40 +252,34 @@ const char* deferredLighting_computeShader =
     "            float quat_y = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];\n"
     "            float quat_z = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];\n"
     "            float quat_w = lightInPVS[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRW];\n"
-    "            vec4 quat = vec4(quat_x,quat_y,quat_z,quat_w);\n"
-    "            vec3 baseDir = vec3(0.0,0.0,1.0);\n" // Forward vec
-    "            vec3 spotDir = normalize(quat_rotate(quat,baseDir));\n"
+    "            vec4 quat = vec4(quat_x, quat_y, quat_z, quat_w);\n"
+    "            vec3 baseDir = vec3(0.0, 0.0, 1.0);\n"
+    "            vec3 spotDir = normalize(quat_rotate(quat, baseDir));\n"
     "            float spotdot = dot(spotDir, -lightDir);\n"
     "            float cosAngle = cos(radians(spotAng / 2.0));\n"
     "            if (spotdot < cosAngle) continue;\n"
-    
     "            float cosOuterAngle = cos(radians(spotAng / 2.0));\n"
     "            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));\n"
     "            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);\n"
     "            if (spotFalloff <= 0.0) continue;\n"
     "        }\n"
-
     "        float shadowFac = 1.0;\n"
-//     "        float luminosity = intensity / (range * range);\n"
-//     "        if (luminosity > 0.0451) shadowFac = traceShadowRay(worldPos, lightPos, range, camPos, normal);\n"
-    
     "        vec3 lightColor = vec3(lightInPVS[lightIdx + LIGHT_DATA_OFFSET_R],\n"
     "                               lightInPVS[lightIdx + LIGHT_DATA_OFFSET_G],\n"
     "                               lightInPVS[lightIdx + LIGHT_DATA_OFFSET_B]);\n"
-    
     "        float distOverRange = dist / range;\n"
     "        float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;\n"
-    "        lighting += color.rgb * (intensity * 0.4) * pow(attenuation,1.6) * lightColor * spotFalloff * shadowFac;\n"
+    "        lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFac;\n"
     "    }\n"
 
     "    lighting += glowColor.rgb;\n"
 
     // Dither
     "    int blueNoiseTextureWidth = 64;\n"
-    "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
+    "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n"
     "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
     "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
-    
+
     // Fog
     "    float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);\n"
     "    float lum = dot(lighting, vec3(0.299, 0.587, 0.114));\n"

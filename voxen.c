@@ -21,6 +21,7 @@
 #include "text.glsl"
 #include "chunk.glsl"
 #include "imageblit.glsl"
+#include "lightmap.compute"
 #include "deferred_lighting.compute"
 #include "ssr.compute"
 #include "bluenoise64.cginc"
@@ -36,7 +37,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 1920, screen_height = 1080;
+int screen_width = 800, screen_height = 600;
 bool window_has_focus = false;
 FILE* console_log_file = NULL;
 
@@ -142,6 +143,10 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
       specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
       overrideGlowBLoc_chunk = -1;
+      
+//    GPU Lightmapper Compute Shader
+GLuint lightmapShaderProgram;
+GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1;
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -341,6 +346,10 @@ int CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
 
+    // Lightmap Baking Compute Shader Program
+    computeShader = CompileShader(GL_COMPUTE_SHADER, lightmap_compute_shader, "Lightmap Baking Compute Shader"); if (!computeShader) { return 1; }
+    lightmapShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Lightmap Baking Shader Program");        if (!lightmapShaderProgram) { return 1; }
+    
     // Deferred Lighting Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
     deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program");        if (!deferredLightingShaderProgram) { return 1; }
@@ -349,12 +358,7 @@ int CompileShaders(void) {
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader"); if (!computeShader) { return 1; }
     ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");        if (!ssrShaderProgram) { return 1; }
     CHECK_GL_ERROR();
-    
-    // Screen Space Shadows Compute Shader Program
-//     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Shadows Compute Shader"); if (!computeShader) { return 1; }
-//     sssShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Shadows Shader Program");        if (!sssShaderProgram) { return 1; }
-//     CHECK_GL_ERROR();
-    
+
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
@@ -380,6 +384,10 @@ int CompileShaders(void) {
     overrideGlowGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowG");
     overrideGlowBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowB");
 
+    totalLuxelCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "totalLuxelCount");
+    instanceCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "instanceCount");
+    CHECK_GL_ERROR();
+    
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
@@ -406,7 +414,6 @@ int CompileShaders(void) {
     stepCountLoc_ssr = glGetUniformLocation(ssrShaderProgram, "maxSteps");
     stepSizeLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepSize");
     maxDistLoc_ssr = glGetUniformLocation(ssrShaderProgram, "maxDistance");
-    CHECK_GL_ERROR();
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -573,7 +580,7 @@ int Input_KeyDown(uint32_t scancode) {
 
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
-        if (debugView > 7) debugView = 0;
+        if (debugView > 8) debugView = 0;
     }
 
     if (keys[SDL_SCANCODE_Y]) {
@@ -1134,6 +1141,25 @@ int Physics(void) {
     return 0;
 }
 
+int LightmapBake() {
+    double start_time = get_time();
+    DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit... <<<<<<<<<<<<<<<<<<<<<<<<<\n  hang on...\n\nhang on hanging on......\n", totalLuxelCount, gameObjectCount);
+    GLuint groupX = (screen_width + 31) / 32;
+    GLuint groupY = (screen_height + 31) / 32;
+    glUseProgram(lightmapShaderProgram);
+    CHECK_GL_ERROR();
+    glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount); // Makes screen all black if not sent every frame.
+    CHECK_GL_ERROR();
+    glUniform1ui(instanceCountLoc_lightmap, gameObjectCount); 
+    CHECK_GL_ERROR();
+    glDispatchCompute(groupX, groupY, 1);
+    CHECK_GL_ERROR();
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    double end_time = get_time();
+    DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
+    return 0;
+}
+
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
 int EventExecute(Event* event) {
@@ -1148,6 +1174,7 @@ int EventExecute(Event* event) {
             return 0;
         case EV_LOAD_INSTANCES: return SetupInstances();
         case EV_CULL_INIT: return Cull_Init();
+        case EV_LIGHTMAP_BAKE: return LightmapBake();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -1166,7 +1193,8 @@ static const char* debugViewNames[] = {
     "indices",         // 4
     "worldpos",        // 5
     "lightview",       // 6
-    "reflections"      // 7
+    "reflections",      // 7
+    "lightmap"
 };
 
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
@@ -1287,6 +1315,7 @@ int main(int argc, char* argv[]) {
     EnqueueEvent_Simple(EV_LOAD_INSTANCES);
     EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities!
     EnqueueEvent_Simple(EV_CULL_INIT); // Must be after level!
+    EnqueueEvent_Simple(EV_LIGHTMAP_BAKE); // Must be after EVERYTHING ELSE!
     double accumulator = 0.0;
     double last_physics_time = get_time();
     last_time = get_time();
@@ -1626,7 +1655,7 @@ int main(int argc, char* argv[]) {
         GLuint groupY = (screen_height + 31) / 32;
         float viewProj[16];
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
-        if (debugView < 1) {
+        if (debugView == 0 || debugView == 8) {
         // 5. Deferred Lighting
         //        Apply deferred lighting with compute shader.  All lights are
         //        dynamic and can be updated at any time (flicker, light switches,
@@ -1664,12 +1693,12 @@ int main(int argc, char* argv[]) {
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 //         double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
         }
         
         // 6. SSR (Screen Space Reflections)
-        if (debugView < 1 || debugView == 7) {
+        if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
@@ -1687,7 +1716,7 @@ int main(int argc, char* argv[]) {
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // Runs slightly faster 0.1ms without this, but may need if more shaders added in between
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
         
         // 6. Render final meshes' results with full screen quad

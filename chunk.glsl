@@ -115,6 +115,7 @@ const char* fragmentShaderTraditional =
     "    vec3 worldPos = worldPosPack.xyz;\n"
     "    if (debugView == 1) {\n"
     "        outAlbedo = albedoColor;\n"
+    "        outAlbedo.a = 1.0;\n"
     "    } else if (debugView == 2) {\n"
     "        outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;\n"
     "        outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;\n"
@@ -136,7 +137,8 @@ const char* fragmentShaderTraditional =
     "    } else if (debugView == 6) {\n" // Lightview Mode
     "        outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);\n"
     "    } else {\n"
-    "        outAlbedo = albedoColor;\n"
+    "        outAlbedo.rgb = albedoColor.rgb;\n"
+    "        outAlbedo.a = uintBitsToFloat(packHalf2x16(TexCoordLightmap.xy));\n"
     "    }\n"
     "    outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));\n"
     "    outNormal.g = uintBitsToFloat(packHalf2x16(vec2(adjustedNormal.z,0.0)));\n"

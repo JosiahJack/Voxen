@@ -46,6 +46,7 @@
 #define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define INVALID_FLOOR_HEIGHT -1300.0f
+#define LUXEL_SIZE 0.16f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
