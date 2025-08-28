@@ -702,7 +702,7 @@ int LoadGeometry(void) {
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
         CHECK_GL_ERROR();
     }
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, vboMasterTable);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 18, vboMasterTable);
     CHECK_GL_ERROR();
     // -------------------------------------------------------------------------------------------------------------------------
 

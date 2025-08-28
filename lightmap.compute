@@ -22,23 +22,35 @@ const char* lightmap_compute_shader =
     "    float floorHeight;\n"
     "};\n"
 
+    // binding 0 unusable here, in-out gbuffer for colors (starts as unlit, gets deferred lighting and reflections applied in separate passes)
+    // binding 1 unusable here, unlit raster's gbuffer for world position xyz as rgb (RGBA32F), index into full instances[] array packed into alpha channel
+    // binding 2 unusable here, unlit raster's gbuffer for normals xyz half loats packed in rg
+    // binding 3 unused at all, unlit raster's gbuffer for depth (placeholder, using renderbuffer for now as this isn't needed with having world position gbuffer on binding point 1)
+    // binding 4 unusable here, deferred lighting's output color after applying lighting and screenspace reflections
+    // binding 5 unused at all, placeholder for possible future gbuffer if needed
+    "layout(std430, binding = 6) buffer LightmapData { float lightmapData[]; };\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
     "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
     "layout(std430, binding = 11) readonly buffer InstancesMatricesBuffer { mat4 instanceMatrices[]; };\n"
-    "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
-    "layout(std430, binding = 21) buffer LightmapLuxelData { float luxelData[]; };\n"
-    "layout(std430, binding = 22) readonly buffer LightmapOffsets { uint lightmapLuxelOffsets[]; };\n"
-    "layout(std430, binding = 23) readonly buffer TriLuxel { uint triLuxelMetaData[]; };\n"
-    "layout(std430, binding = 26) readonly buffer VertexData { float vboMasterTable[]; };\n"
-    "layout(std430, binding = 27) readonly buffer TriangleData { uint tboMasterTable[]; };\n"
-    "layout(std430, binding = 28) readonly buffer VertexCounts { uint vertexCounts[]; };\n"
-    "layout(std430, binding = 29) readonly buffer TriangleCounts { uint triangleCounts[]; };\n"
-    "layout(std430, binding = 30) readonly buffer VertexOffsets { uint vertexOffsets[]; };\n"
-    "layout(std430, binding = 31) readonly buffer TriangleOffsets { uint triangleOffsets[]; };\n"
+    "layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; };\n" // 1D color array (RGBA)
+    "layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; };\n" // Starting index in colors for each texture
+    "layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; };\n" // x,y pairs for width and height of textures
+    "layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; };\n" // Palette colors
+    "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
+    "layout(std430, binding = 18) readonly buffer VertexData { float vboMasterTable[]; };\n"
+    "layout(std430, binding = 19) buffer LightData { float lights[]; };\n" // Full list of all lights, no PVS for lightmapping (normally this is just lights in player's PVS)
+    "layout(std430, binding = 21) readonly buffer TriangleCounts { uint triangleCounts[]; };\n"
+    "layout(std430, binding = 22) readonly buffer TriangleOffsets { uint triangleOffsets[]; };\n"
+    "layout(std430, binding = 23) readonly buffer TriangleData { uint tboMasterTable[]; };\n"
+    "layout(std430, binding = 24) readonly buffer VertexCounts { uint vertexCounts[]; };\n"
+    "layout(std430, binding = 25) readonly buffer VertexOffsets { uint vertexOffsets[]; };\n"
 
     "uniform uint totalLuxelCount;\n"
     "uniform uint instanceCount;\n"
     "uniform uint modelCount;\n"
+    "uniform uint lightCount;\n"
+    "uniform float worldMin_x;\n" // Min position x,z for getting cell coordinates in the 64 x 64 world cells,
+    "uniform float worldMin_z;\n" // used for precomputedVisibleCellsFromHere coarse culling
     "const int MAX_VISIBLE_LIGHTS = 90;\n"
     "const int LIGHT_DATA_SIZE = 13;\n"
     "const int LIGHT_DATA_OFFSET_POSX = 0;\n"
@@ -49,6 +61,8 @@ const char* lightmap_compute_shader =
     "const int LIGHT_DATA_OFFSET_R = 10;\n"
     "const int LIGHT_DATA_OFFSET_G = 11;\n"
     "const int LIGHT_DATA_OFFSET_B = 12;\n"
+    "const float WORLDCELL_WIDTH_F = 2.56;\n"
+    "const float CELLXHALF = 1.28;\n"
     "const int VERTEX_ATTRIBUTES_COUNT = 16;\n"
     "const int BOUNDS_ATTRIBUTES_COUNT = 7;\n"
     "const int BOUNDS_DATA_OFFSET_MINX = 0;\n"
@@ -73,6 +87,45 @@ const char* lightmap_compute_shader =
     "const int VERTEX_OFFSET_INSTANCEINDEX = 13;\n"
     "const int VERTEX_OFFSET_U_LM = 14;\n"
     "const int VERTEX_OFFSET_V_LM = 15;\n"
+
+    "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
+    "    if (texIndex >= 65535) return vec4(0.0);\n"
+
+    "    uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;\n"
+    "    uint slotIndex = pixelOffset / 2;\n"
+    "    uint packedIdx = colors[slotIndex];\n"
+    "    uint paletteIndex = (pixelOffset % 2 == 0) ? (packedIdx & 0xFFFF) : (packedIdx >> 16);\n"
+    "    uint paletteOffset = texturePaletteOffsets[texIndex];\n"
+    "    uint color = texturePalettes[paletteOffset + paletteIndex];\n"
+    "    return vec4(\n"
+    "        float((color >> 24) & 0xFF) / 255.0,\n"
+    "        float((color >> 16) & 0xFF) / 255.0,\n"
+    "        float((color >> 8) & 0xFF) / 255.0,\n"
+    "        float(color & 0xFF) / 255.0\n"
+    "    );\n"
+    "}\n"
+
+    "uvec2 PosToCellCoords(float pos_x, float pos_z) {\n"
+    "    uvec2 retval;\n"
+    "    retval.x = uint(int((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F));\n"
+    "    retval.y = uint(int((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F));\n"
+    "    return retval;\n"
+    "}\n"
+
+    "vec3 fetchVertexPos(uint globalVertexIndex) {\n"
+    "     uint base = globalVertexIndex * uint(VERTEX_ATTRIBUTES_COUNT);\n"
+    "     return vec3(vboMasterTable[base + VERTEX_OFFSET_POSX], vboMasterTable[base + VERTEX_OFFSET_POSY], vboMasterTable[base + VERTEX_OFFSET_POSZ]);\n"
+    "}\n"
+
+    "vec3 fetchVertexNor(uint globalVertexIndex) {\n"
+    "     uint base = globalVertexIndex * uint(VERTEX_ATTRIBUTES_COUNT);\n"
+    "     return normalize(vec3(vboMasterTable[base + VERTEX_OFFSET_NORX], vboMasterTable[base + VERTEX_OFFSET_NORY], vboMasterTable[base + VERTEX_OFFSET_NORZ]));\n"
+    "}\n"
+
+    "vec2 fetchVertexUV(uint globalVertexIndex) {\n"
+    "     uint base = globalVertexIndex * uint(VERTEX_ATTRIBUTES_COUNT);\n"
+    "     return vec2(vboMasterTable[base + VERTEX_OFFSET_U], vboMasterTable[base + VERTEX_OFFSET_V]);\n"
+    "}\n"
 
     // Ray-Triangle Intersection (Möller-Trumbore)
     "bool RayTriangle(vec3 origin, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t) {\n"
@@ -113,174 +166,34 @@ const char* lightmap_compute_shader =
     "    return vec3(1.0 - u - v, u, v);\n"
     "}\n"
 
-    " void main() {\n"
-         // Flattened global luxel index computed from X and global size\n"
-    "    uint W = gl_NumWorkGroups.x * gl_WorkGroupSize.x;\n"
-    "    uint x = gl_GlobalInvocationID.x;\n"
-    "    uint y = gl_GlobalInvocationID.y;\n"
-    "    uint luxelIdx = x + y * W;\n"
-    "    if (luxelIdx >= totalLuxelCount) return;\n"
+     "void main() {\n"
+     "    uint gid = gl_GlobalInvocationID.x;\n"
+     "    if (gid >= totalLuxelCount) return;\n"
+     "\n"
+     "    // Figure out which instance this luxel belongs to\n"
+     "    uint instanceIndex = gid / (64u * 64u);\n"
+     "    uint localLuxel = gid % (64u * 64u);\n"
+     "    uint lx = localLuxel % 64u;\n"
+     "    uint ly = localLuxel / 64u;\n"
+     "\n"
+     "    // Lookup instance transform\n"
+     "    mat4 modelMat = instanceMatrices[instanceIndex];\n"
+     "\n"
+     "    // For now just placeholder lighting accumulation\n"
+     "    vec3 accumLight = vec3(0.0);\n"
+     "    for (uint l = 0u; l < lightCount; ++l) {\n"
+     "        uint base = l * LIGHT_DATA_SIZE;\n"
+     "        vec3 pos = vec3(lights[base+0], lights[base+1], lights[base+2]);\n"
+     "        float intensity = lights[base+3];\n"
+     "        float r = length(pos);\n"
+     "        accumLight += vec3(intensity) / (1.0 + r*r);\n"
+     "    }\n"
+     "\n"
+     "    // Write out to lightmap buffer\n"
+     "    uint writeIndex = gid * 4u;\n"
+     "    lightmapData[writeIndex+0] = accumLight.r;\n"
+     "    lightmapData[writeIndex+1] = accumLight.g;\n"
+     "    lightmapData[writeIndex+2] = accumLight.b;\n"
+     "    lightmapData[writeIndex+3] = 1.0;\n"
+     "}\n";
 
-         // Find model for this luxel using lightmap offsets
-    "    uint modelIdx = 0u;\n"
-    "    uint luxelOffset = 0u;\n"
-    "    bool found = false;\n"
-    "    for (uint i = 0u; i + 1u < modelCount; ++i) {\n"
-    "        if (luxelIdx < lightmapLuxelOffsets[i + 1u]) {\n"
-    "            modelIdx = i;\n"
-    "            luxelOffset = lightmapLuxelOffsets[i];\n"
-    "            found = true;\n"
-    "            break;\n"
-    "        }\n"
-    "    }\n"
-
-    "    if (!found) {\n"
-             // Out-of-range debug color (red)
-    "        luxelData[luxelIdx * 4u + 0u] = 1.0;\n"
-    "        luxelData[luxelIdx * 4u + 1u] = 0.0;\n"
-    "        luxelData[luxelIdx * 4u + 2u] = 0.0;\n"
-    "        luxelData[luxelIdx * 4u + 3u] = 1.0;\n"
-    "        return;\n"
-    "    }\n"
-
-    "    uint localLuxelIdx = luxelIdx - luxelOffset;\n"
-
-         // Per-model triangle base index
-    "    uint baseTri = triangleOffsets[modelIdx];\n"
-    "    uint triCount = triangleCounts[modelIdx];\n"
-    "    uint triLuxelMetaBase = baseTri * 3u;\n" // each tri: [offset, u, v]
-
-         // Find triangle within model for this local luxel
-    "    uint triIdx = 0u;\n"
-    "    for (uint i = 0u; i < triCount; ++i) {\n"
-    "        uint o = triLuxelMetaBase + i * 3u;\n"
-    "        uint triOff = triLuxelMetaData[o + 0u];\n"
-    "        uint luxU = triLuxelMetaData[o + 1u];\n"
-    "        uint luxV = triLuxelMetaData[o + 2u];\n"
-    "        uint triCnt = luxU * luxV;\n"
-    "        if (localLuxelIdx < triOff + triCnt) { triIdx = i; localLuxelIdx -= triOff; break; }\n"
-    "    }\n"
-
-         // Luxel grid coords
-    "    uint luxU = triLuxelMetaData[triLuxelMetaBase + triIdx * 3u + 1u];\n"
-    "    uint luxV = triLuxelMetaData[triLuxelMetaBase + triIdx * 3u + 2u];\n"
-    "    uint luxelIdxU = localLuxelIdx % luxU;\n"
-    "    uint luxelIdxV = localLuxelIdx / luxU;\n"
-    "    float u = (float(luxelIdxU) + 0.5) / float(luxU);\n"
-    "    float v = (float(luxelIdxV) + 0.5) / float(luxV);\n"
-
-         // Vertex base offset for this model
-    "    uint baseV = vertexOffsets[modelIdx];\n"
-    "    uint baseTriIndex = baseTri * 3u;\n"
-    "    uint t0 = tboMasterTable[baseTriIndex + triIdx * 3u + 0u];\n"
-    "    uint t1 = tboMasterTable[baseTriIndex + triIdx * 3u + 1u];\n"
-    "    uint t2 = tboMasterTable[baseTriIndex + triIdx * 3u + 2u];\n"
-    "    uint v0Idx = baseV + t0;\n"
-    "    uint v1Idx = baseV + t1;\n"
-    "    uint v2Idx = baseV + t2;\n"
-
-    "    vec3 v0 = vec3(vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSX],\n"
-    "    vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSY],\n"
-    "    vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSZ]);\n"
-    "    vec3 v1 = vec3(vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSX],\n"
-    "    vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSY],\n"
-    "    vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSZ]);\n"
-    "    vec3 v2 = vec3(vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSX],\n"
-    "    vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSY],\n"
-    "    vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSZ]);\n"
-
-    "    vec3 n0 = vec3(vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORX],\n"
-    "    vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORY],\n"
-    "    vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORZ]);\n"
-    "    vec3 n1 = vec3(vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORX],\n"
-    "    vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORY],\n"
-    "    vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORZ]);\n"
-    "    vec3 n2 = vec3(vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORX],\n"
-    "    vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORY],\n"
-    "    vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_NORZ]);\n"
-
-    "    vec2 uv0 = vec2(vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_U_LM],\n"
-    "    vboMasterTable[v0Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_V_LM]);\n"
-    "    vec2 uv1 = vec2(vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_U_LM],\n"
-    "    vboMasterTable[v1Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_V_LM]);\n"
-    "    vec2 uv2 = vec2(vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_U_LM],\n"
-    "    vboMasterTable[v2Idx * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_V_LM]);\n"
-
-    "    vec3 bary = Barycentric2D(vec2(u, v), uv0, uv1, uv2);\n"
-    "    vec3 luxelPos = v0 * bary.x + v1 * bary.y + v2 * bary.z;\n"
-    "    vec3 luxelNormal = normalize(n0 * bary.x + n1 * bary.y + n2 * bary.z);\n"
-
-         // Use instance 0 as before (or apply per-instance logic if you have instance index)
-    "    mat4 instanceMatrix = instanceMatrices[0];\n"
-    "    vec4 worldPos = instanceMatrix * vec4(luxelPos, 1.0);\n"
-    "    vec3 worldNormal = normalize((instanceMatrix * vec4(luxelNormal, 0.0)).xyz);\n"
-
-    "    vec3 lighting = vec3(0.0);\n"
-    "    for (uint i = 0u; i < MAX_VISIBLE_LIGHTS; ++i) {\n"
-    "        uint lightIdx = i * uint(LIGHT_DATA_SIZE);\n"
-    "        float intensity = lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_INTENSITY)];\n"
-    "        if (intensity < 0.05) continue;\n"
-
-    "        vec3 lightPos = vec3(lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_POSX)],\n"
-    "        lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_POSY)],\n"
-    "        lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_POSZ)]);\n"
-    "        vec3 lightColor = vec3(lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_R)],\n"
-    "        lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_G)],\n"
-    "        lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_B)]);\n"
-    "        float range = lightInPVS[lightIdx + uint(LIGHT_DATA_OFFSET_RANGE)];\n"
-    "        vec3 toLight = lightPos - worldPos.xyz;\n"
-    "        float dist = length(toLight);\n"
-    "        if (dist > range) continue;\n"
-
-    "        vec3 lightDir = normalize(toLight);\n"
-    "        float lambertian = max(dot(worldNormal, lightDir), 0.0);\n"
-    "        if (lambertian < 0.25) continue;\n"
-
-    "        bool occluded = false;\n"
-    "        for (uint j = 0u; j < instanceCount; ++j) {\n"
-    "            uint instModelIdx = uint(instances[j].modelIndex);\n"
-    "            if (instModelIdx >= modelCount) continue;\n"
-
-    "            mat4 instMatrix = instanceMatrices[j];\n"
-    "            uint instBaseTri = triangleOffsets[instModelIdx];\n"
-    "            uint instTriCount = triangleCounts[instModelIdx];\n"
-    "            uint instTriBaseIndex = instBaseTri * 3u;\n"
-    "            for (uint t = 0u; t < instTriCount; ++t) {\n"
-    "                uint ti0 = tboMasterTable[instTriBaseIndex + t * 3u + 0u];\n"
-    "                uint ti1 = tboMasterTable[instTriBaseIndex + t * 3u + 1u];\n"
-    "                uint ti2 = tboMasterTable[instTriBaseIndex + t * 3u + 2u];\n"
-
-                     // Add vertex base for that model
-    "                uint t0vi = vertexOffsets[instModelIdx] + ti0;\n"
-    "                uint t1vi = vertexOffsets[instModelIdx] + ti1;\n"
-    "                uint t2vi = vertexOffsets[instModelIdx] + ti2;\n"
-    "                vec3 tt0 = vec3(vboMasterTable[t0vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSX],\n"
-    "                vboMasterTable[t0vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSY],\n"
-    "                vboMasterTable[t0vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSZ]);\n"
-    "                vec3 tt1 = vec3(vboMasterTable[t1vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSX],\n"
-    "                vboMasterTable[t1vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSY],\n"
-    "                vboMasterTable[t1vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSZ]);\n"
-    "                vec3 tt2 = vec3(vboMasterTable[t2vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSX],\n"
-    "                vboMasterTable[t2vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSY],\n"
-    "                vboMasterTable[t2vi * VERTEX_ATTRIBUTES_COUNT + VERTEX_OFFSET_POSZ]);\n"
-    "                vec4 wt0 = instMatrix * vec4(tt0, 1.0);\n"
-    "                vec4 wt1 = instMatrix * vec4(tt1, 1.0);\n"
-    "                vec4 wt2 = instMatrix * vec4(tt2, 1.0);\n"
-    "                float tHit;\n"
-    "                if (RayTriangle(worldPos.xyz, lightDir, wt0.xyz, wt1.xyz, wt2.xyz, tHit) && tHit < dist) { occluded = true; break; }\n"
-    "            }\n"
-
-    "            if (occluded) break;\n"
-    "        }\n"
-
-    "        if (!occluded) {\n"
-    "            float attenuation = 1.0 / (1.0 + 0.1 * dist + 0.01 * dist * dist);\n"
-    "            lighting += lightColor * intensity * lambertian * attenuation;\n"
-    "        }\n"
-    "    }\n"
-
-    "    luxelData[luxelIdx * 4u + 0u] = lighting.r;\n"
-    "    luxelData[luxelIdx * 4u + 1u] = lighting.g;\n"
-    "    luxelData[luxelIdx * 4u + 2u] = lighting.b;\n"
-    "    luxelData[luxelIdx * 4u + 3u] = 1.0;\n"
-    " }\n";

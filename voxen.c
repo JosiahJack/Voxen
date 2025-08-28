@@ -146,7 +146,8 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
       
 //    GPU Lightmapper Compute Shader
 GLuint lightmapShaderProgram;
-GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1, modelCountLoc_lightmap = -1;
+GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1, modelCountLoc_lightmap = -1,
+       worldMin_xLoc_lightmap = -1, worldMin_zLoc_lightmap = -1, lightCountLoc_lightmap = -1;
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -155,7 +156,9 @@ GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLi
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
       luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1, 
-      viewProjectionLoc_deferred = -1, sssMaxStepsLoc_deferred = -1, sssStepSizeLoc_deferred = -1, modelCountLoc_deferred = -1;
+      viewProjectionLoc_deferred = -1, sssMaxStepsLoc_deferred = -1, sssStepSizeLoc_deferred = -1, modelCountLoc_deferred = -1,
+      totalLuxelCountLoc_deferred = -1;
+      
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
 float ssr_StepSize = 0.185f;
@@ -168,8 +171,8 @@ float sssStepSize = 0.03;
 
 //    SSR (Screen Space Reflections)
 GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, stepCountLoc_ssr = -1,
-      cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1;
+GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, 
+      stepCountLoc_ssr = -1, cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -387,6 +390,9 @@ int CompileShaders(void) {
     totalLuxelCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "totalLuxelCount");
     instanceCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "instanceCount");
     modelCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "modelCount");
+    lightCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "lightCount");
+    worldMin_xLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "worldMin_x");
+    worldMin_zLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "worldMin_z");
     
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
@@ -405,7 +411,8 @@ int CompileShaders(void) {
     sssMaxStepsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sssMaxSteps");
     sssStepSizeLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sssStepSize");
     modelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "modelCount");
-    
+    totalLuxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "totalLuxelCount");
+
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
@@ -1154,18 +1161,19 @@ int LightmapBake() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-    
     for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer); 
-    
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     GLuint groupsX = (totalLuxelCount + 31u) / 32u;
     glUseProgram(lightmapShaderProgram);
     glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
     glUniform1ui(instanceCountLoc_lightmap, renderableCount);
     glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
+    glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
+    glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
+    glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
     glDispatchCompute(groupsX, 1, 1);
     CHECK_GL_ERROR();
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
@@ -1173,7 +1181,6 @@ int LightmapBake() {
     DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
     return 0;
 }
-
 
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
@@ -1687,6 +1694,7 @@ int main(int argc, char* argv[]) {
             glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
             glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
             glUniform1ui(modelCountLoc_deferred, MODEL_COUNT);
+            glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
             glUniform1i(debugViewLoc_deferred, debugView);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
