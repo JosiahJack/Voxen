@@ -1166,7 +1166,6 @@ int LightmapBake() {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer); 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    GLuint groupsX = (totalLuxelCount + 31u) / 32u;
     glUseProgram(lightmapShaderProgram);
     glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
     glUniform1ui(instanceCountLoc_lightmap, renderableCount);
@@ -1174,7 +1173,9 @@ int LightmapBake() {
     glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
     glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
     glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
-    glDispatchCompute(groupsX, 1, 1);
+    GLuint groupsX = (800 + 31) / 32;
+    GLuint groupsY = (600 + 31) / 32;
+    glDispatchCompute(groupsX, groupsY, 1);
     CHECK_GL_ERROR();
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
     double end_time = get_time();
