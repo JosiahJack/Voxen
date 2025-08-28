@@ -28,25 +28,17 @@ const char *valid_mdldata_keys[] = {"index"};
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
-uint32_t modelLuxelCounts[MODEL_COUNT];
 GLuint vbos[MODEL_COUNT];
 GLuint tbos[MODEL_COUNT]; // Triangle index buffers
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
-GLuint vboMasterTable;
-GLuint tboMasterTable;
-GLuint modelVertexOffsetsID;
-GLuint modelVertexCountsID;
-GLuint modelTriangleCountsID;
 float * tempVertices;
 uint32_t * tempTriangles;
 float ** vertexDataArrays;
 uint32_t ** triangleDataArrays;
 uint32_t ** triEdgeDataArrays;
-uint32_t totalLuxelCount = 0;
-int gameObjectCount = 0;
 
 //-----------------------------------------------------------------------------
 // Level Data Parsing
@@ -430,334 +422,104 @@ bool parse_data_file(DataParser *parser, const char *filename, int type) {
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
-
-typedef struct { float x, y, z; } Vec3;
-static inline Vec3 vec3_sub(Vec3 a, Vec3 b) { return (Vec3){a.x - b.x, a.y - b.y, a.z - b.z}; }
-static inline float vec3_length(Vec3 v) { return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z); }
-static inline Vec3 vec3_normalize(Vec3 v) { float len = vec3_length(v); return (Vec3){v.x / len, v.y / len, v.z / len}; }
-static inline Vec3 vec3_cross(Vec3 a, Vec3 b) { return (Vec3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-static inline float vec3_dot(Vec3 a, Vec3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-//-----------------------------------------------------------------------------
-// Generate lightmap UVs and luxel counts for a model
-void GenerateLightmapUVs(float *vertices, uint32_t *triangles, uint32_t triCount, uint32_t *outLuxelCount, uint32_t *outTriLuxelOffsets, uint32_t *outTriLuxelDims, float *modelBounds, uint32_t modelIndex) {
-    float max_dim = fmaxf(modelBounds[modelIndex * BOUNDS_ATTRIBUTES_COUNT + BOUNDS_DATA_OFFSET_MAXX] - modelBounds[modelIndex * BOUNDS_ATTRIBUTES_COUNT + BOUNDS_DATA_OFFSET_MINX],
-                          fmaxf(modelBounds[modelIndex * BOUNDS_ATTRIBUTES_COUNT + BOUNDS_DATA_OFFSET_MAXY] - modelBounds[modelIndex * BOUNDS_ATTRIBUTES_COUNT + BOUNDS_DATA_OFFSET_MINY],
-                                modelBounds[modelIndex * BOUNDS_ATTRIBUTES_COUNT + BOUNDS_DATA_OFFSET_MAXZ] - modelBounds[modelIndex * BOUNDS_ATTRIBUTES_COUNT + BOUNDS_DATA_OFFSET_MINZ]));
-    float luxel_size = max_dim / 16.0f; // Model-specific luxel size
-    if (luxel_size < 0.16f) luxel_size = 0.16f; // Minimum luxel size
-    uint32_t totalLuxels = 0;
-    for (uint32_t f = 0; f < triCount; f++) {
-        // Get vertex indices and positions
-        uint32_t idx0 = triangles[f * 3 + 0] * VERTEX_ATTRIBUTES_COUNT;
-        uint32_t idx1 = triangles[f * 3 + 1] * VERTEX_ATTRIBUTES_COUNT;
-        uint32_t idx2 = triangles[f * 3 + 2] * VERTEX_ATTRIBUTES_COUNT;
-        Vec3 v0 = {vertices[idx0], vertices[idx0 + 1], vertices[idx0 + 2]};
-        Vec3 v1 = {vertices[idx1], vertices[idx1 + 1], vertices[idx1 + 2]};
-        Vec3 v2 = {vertices[idx2], vertices[idx2 + 1], vertices[idx2 + 2]};
-
-        // Find longest edge (U-axis)
-        float len01 = vec3_length(vec3_sub(v1, v0));
-        float len12 = vec3_length(vec3_sub(v2, v1));
-        float len20 = vec3_length(vec3_sub(v0, v2));
-        Vec3 u_axis, v0_edge;
-        if (len01 >= len12 && len01 >= len20) {
-            u_axis = vec3_normalize(vec3_sub(v1, v0));
-            v0_edge = v0;
-        } else if (len12 >= len01 && len12 >= len20) {
-            u_axis = vec3_normalize(vec3_sub(v2, v1));
-            v0_edge = v1;
-        } else {
-            u_axis = vec3_normalize(vec3_sub(v0, v2));
-            v0_edge = v2;
-        }
-
-        // Compute centroid and V-axis
-        Vec3 centroid = { (v0.x + v1.x + v2.x) / 3.0f, (v0.y + v1.y + v2.y) / 3.0f, (v0.z + v1.z + v2.z) / 3.0f };
-        Vec3 normal = vec3_normalize(vec3_cross(vec3_sub(v1, v0), vec3_sub(v2, v0)));
-        Vec3 v_axis = vec3_normalize(vec3_cross(normal, u_axis));
-
-        // Project vertices to 2D UV space
-        float u0 = vec3_dot(vec3_sub(v0, v0_edge), u_axis);
-        float u1 = vec3_dot(vec3_sub(v1, v0_edge), u_axis);
-        float u2 = vec3_dot(vec3_sub(v2, v0_edge), u_axis);
-        float v0_coord = vec3_dot(vec3_sub(v0, centroid), v_axis);
-        float v1_coord = vec3_dot(vec3_sub(v1, centroid), v_axis);
-        float v2_coord = vec3_dot(vec3_sub(v2, centroid), v_axis);
-
-        // Compute 2D bounds
-        float min_u = fminf(u0, fminf(u1, u2));
-        float max_u = fmaxf(u0, fmaxf(u1, u2));
-        float min_v = fminf(v0_coord, fminf(v1_coord, v2_coord));
-        float max_v = fmaxf(v0_coord, fmaxf(v1_coord, v2_coord));
-
-        // Compute luxel count, cap at 64x64
-        float u_range = max_u - min_u < 0.001f ? 0.001f : max_u - min_u;
-        float v_range = max_v - min_v < 0.001f ? 0.001f : max_v - min_v;
-        uint32_t luxel_u = (uint32_t)ceilf(u_range / luxel_size);
-        uint32_t luxel_v = (uint32_t)ceilf(v_range / luxel_size);
-        luxel_u = luxel_u > 64 ? 64 : (luxel_u < 1 ? 1 : luxel_u);
-        luxel_v = luxel_v > 64 ? 64 : (luxel_v < 1 ? 1 : luxel_v);
-        uint32_t luxel_count = luxel_u * luxel_v;
-        if (luxel_count > 4096) { DualLog("Warning: Triangle %u has %u luxels (u=%u, v=%u)\n", f, luxel_count, luxel_u, luxel_v); }
-
-        // Store triangle luxel offset and dimensions
-        outTriLuxelOffsets[f] = totalLuxels;
-        outTriLuxelDims[f * 2 + 0] = luxel_u;
-        outTriLuxelDims[f * 2 + 1] = luxel_v;
-        totalLuxels += luxel_count;
-
-        // Normalize UVs to [0,1] for the triangle’s luxel grid
-        float u_scale = u_range > 0.0f ? 1.0f / u_range : 1.0f;
-        float v_scale = v_range > 0.0f ? 1.0f / v_range : 1.0f;
-        vertices[idx0 + 13] = (u0 - min_u) * u_scale; // u_lm
-        vertices[idx0 + 14] = (v0_coord - min_v) * v_scale; // v_lm
-        vertices[idx1 + 13] = (u1 - min_u) * u_scale;
-        vertices[idx1 + 14] = (v1_coord - min_v) * v_scale;
-        vertices[idx2 + 13] = (u2 - min_u) * u_scale;
-        vertices[idx2 + 14] = (v2_coord - min_v) * v_scale;
-    }
-    
-//     DualLog("Model %u: max_dim=%.2f, luxel_size=%.2f, totalLuxels: %d\n", modelIndex, max_dim, luxel_size, totalLuxels);
-    *outLuxelCount = totalLuxels;
-}
-
 int LoadGeometry(void) {
     double start_time = get_time();
-    parser_init(&model_parser, valid_mdldata_keys, NUM_MODEL_KEYS);
-    if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) {
-        DualLogError("Could not parse ./Data/models.txt!\n");
-        return 1;
-    }
+    parser_init(&model_parser, valid_mdldata_keys, NUM_MODEL_KEYS); // First parse ./Data/models.txt to see what to load to what indices
+    if (!parse_data_file(&model_parser, "./Data/models.txt",0)) { DualLogError("Could not parse ./Data/models.txt!\n"); return 1; }
 
     int maxIndex = -1;
-    for (int k = 0; k < model_parser.count; ++k) {
-        if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX)
-            maxIndex = model_parser.entries[k].index;
+    for (int k=0;k<model_parser.count;k++) {
+        if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
-    DualLog("Parsing %d models, max index: %d\n", model_parser.count, maxIndex);
 
+    DualLog("Parsing %d models with max index of %d ...\n",model_parser.count, maxIndex);
     int totalVertCount = 0;
+    int totalBounds = 0;
     int totalTriCount = 0;
     largestVertCount = 0;
     largestTriangleCount = 0;
-    uint32_t *luxelOffsets = (uint32_t *)calloc(MODEL_COUNT + 1, sizeof(uint32_t));
-    uint32_t *vertexOffsets = (uint32_t *)calloc(MODEL_COUNT + 1, sizeof(uint32_t));
-    uint32_t *triangleOffsets = (uint32_t *)calloc(MODEL_COUNT + 1, sizeof(uint32_t));
-    uint32_t *vertexCounts = (uint32_t *)calloc(MODEL_COUNT, sizeof(uint32_t));
-    uint32_t *triangleCounts = (uint32_t *)calloc(MODEL_COUNT, sizeof(uint32_t));
-    if (!luxelOffsets || !vertexOffsets || !triangleOffsets || !vertexCounts || !triangleCounts) {
-        DualLogError("Failed to allocate offset or count arrays\n");
-        return 1;
-    }
-    totalLuxelCount = 0;
 
-    // Precompute total vertex and triangle counts
-    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
-        int matchedParserIdx = -1;
-        for (int k = 0; k < model_parser.count; ++k) {
-            if (model_parser.entries[k].index == i) {
-                matchedParserIdx = k;
-                break;
-            }
-        }
-        if (matchedParserIdx < 0 || !model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') {
-            continue;
-        }
-
-        struct aiPropertyStore* props = aiCreatePropertyStore();
-        if (!props) {
-            DualLogError("Failed to create Assimp property store for model %u\n", i);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 1);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_MATERIALS | aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 12);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-
-        const struct aiScene *scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path,
-            aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices,
-            NULL, props);
-        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString());
-            aiReleasePropertyStore(props);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-
-        uint32_t vertexCount = 0;
-        uint32_t triCount = 0;
-        for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
-            if (!scene->mMeshes[m]) {
-                DualLogError("Null mesh %u in model %u\n", m, i);
-                aiReleaseImport(scene);
-                aiReleasePropertyStore(props);
-                free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                return 1;
-            }
-            vertexCount += scene->mMeshes[m]->mNumVertices;
-            triCount += scene->mMeshes[m]->mNumFaces;
-        }
-        if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) {
-            DualLogError("Model %u exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n",
-                i, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT);
-            aiReleaseImport(scene);
-            aiReleasePropertyStore(props);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        totalVertCount += vertexCount;
-        totalTriCount += triCount;
-        if (vertexCount > largestVertCount) largestVertCount = vertexCount;
-        if (triCount > largestTriangleCount) largestTriangleCount = triCount;
-        aiReleaseImport(scene);
-        aiReleasePropertyStore(props);
-    }
-
-    // Allocate temporary buffers for the largest model
-    tempVertices = (float *)malloc(largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-    tempTriangles = (uint32_t *)malloc(largestTriangleCount * 3 * sizeof(uint32_t));
-    if (!tempVertices || !tempTriangles) {
-        DualLogError("Failed to allocate tempVertices or tempTriangles\n");
-        free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-        return 1;
-    }
+    // Allocate persistent temporary buffers
+    tempVertices = (float *)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    tempTriangles = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
+    vertexDataArrays = (float **)calloc(MODEL_COUNT, sizeof(float *));
+    triangleDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
 
     // Generate staging buffers
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
     glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
-    glBufferData(GL_ARRAY_BUFFER, largestVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
+    glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, largestTriangleCount * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-
-    uint32_t currentVertexOffset = 0;
-    uint32_t currentTriangleOffset = 0;
-    uint32_t *triLuxelMetadata = (uint32_t *)calloc(totalTriCount * 3, sizeof(uint32_t));
-    if (!triLuxelMetadata) {
-        DualLogError("Failed to allocate triLuxelMetadata\n");
-        free(tempVertices); free(tempTriangles);
-        free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-        return 1;
-    }
-
-    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) {
         int matchedParserIdx = -1;
-        for (int k = 0; k < model_parser.count; ++k) {
-            if (model_parser.entries[k].index == i) {
-                matchedParserIdx = k;
-                break;
-            }
+        for (int k=0;k<model_parser.count;k++) {
+            if (model_parser.entries[k].index == i) {matchedParserIdx = k; break; }
         }
-        if (matchedParserIdx < 0 || !model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') {
-            DualLog("Skipping model index %u: no valid path\n", i);
-            continue;
-        }
-        DualLog("Processing model %u: %s\n", i, model_parser.entries[matchedParserIdx].path);
 
-        struct aiPropertyStore* props = aiCreatePropertyStore();
-        if (!props) {
-            DualLogError("Failed to create Assimp property store for model %u\n", i);
-            free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 1);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_MATERIALS | aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 12);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
+        if (matchedParserIdx < 0) continue;
+        if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
 
-        const struct aiScene *scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path,
-            aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices,
-            NULL, props);
-        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-            DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString());
-            aiReleasePropertyStore(props);
-            free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        DualLog("Model %u: %u meshes, scene=%p\n", i, scene->mNumMeshes, scene);
+        struct aiPropertyStore* props = aiCreatePropertyStore(); // Disable non-essential FBX components
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 0); // Disable animations
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0); // Disable materials
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0); // Disable textures
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0); // Disable lights
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0); // Disable cameras
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1); // Drop empty animations
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 1); // Disable skeleton meshes
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_MATERIALS | aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS); // Remove non-mesh components
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT); // Skip non-triangular primitives
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 12); // Optimize vertex cache
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4); // Limit bone weights
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1); // Remove degenerate primitives
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0); // Disable hierarchy preservation
+        const struct aiScene *scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices, NULL, props);
+        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); return 1; }
 
+        // Count vertices, triangles
         uint32_t vertexCount = 0;
         uint32_t triCount = 0;
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
-            if (!scene->mMeshes[m]) {
-                DualLogError("Null mesh %u in model %u\n", m, i);
-                aiReleaseImport(scene);
-                aiReleasePropertyStore(props);
-                free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                return 1;
-            }
             vertexCount += scene->mMeshes[m]->mNumVertices;
             triCount += scene->mMeshes[m]->mNumFaces;
         }
-        DualLog("Model %u: %u vertices, %u triangles\n", i, vertexCount, triCount);
 
-        if (vertexCount > largestVertCount || triCount > largestTriangleCount) {
-            DualLogError("Model %u exceeds temp buffer: verts=%u (> %u), tris=%u (> %u)\n",
-                i, vertexCount, largestVertCount, triCount, largestTriangleCount);
-            aiReleaseImport(scene);
-            aiReleasePropertyStore(props);
-            free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
+        if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); return 1; }
 
         modelVertexCounts[i] = vertexCount;
         modelTriangleCounts[i] = triCount;
-        vertexCounts[i] = vertexCount;
-        triangleCounts[i] = triCount;
-        vertexOffsets[i] = currentVertexOffset;
-        triangleOffsets[i] = currentTriangleOffset;
+        if (vertexCount > largestVertCount) largestVertCount = vertexCount;
+        if (triCount > largestTriangleCount) largestTriangleCount = triCount;
 
+#ifdef DEBUG_MODEL_LOAD_DATA
+        if (triCount > 1000U) {
+            DualLog("Model %s loaded with %d vertices, \033[1;33m%d\033[0;0m triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        } else {
+            //DualLog("Model %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+        }
+#endif
+        totalVertCount += vertexCount;
+        totalTriCount += triCount;
+
+        // Extract vertex and triangle data
         uint32_t vertexIndex = 0;
-        float minx = 1E9f, miny = 1E9f, minz = 1E9f;
-        float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
+        float minx = 1E9f;
+        float miny = 1E9f;
+        float minz = 1E9f;
+        float maxx = -1E9f;
+        float maxy = -1E9f;
+        float maxz = -1E9f;
         uint32_t triangleIndex = 0;
         uint32_t globalVertexOffset = 0;
-
-        for (unsigned int m = 0; m < scene->mNumMeshes; ++m) {
+        for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             struct aiMesh *mesh = scene->mMeshes[m];
-            if (!mesh->mVertices || !mesh->mNormals) {
-                DualLogError("Model %u, mesh %u: missing vertices or normals\n", i, m);
-                aiReleaseImport(scene);
-                aiReleasePropertyStore(props);
-                free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                return 1;
-            }
-            for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
-                if (vertexIndex + VERTEX_ATTRIBUTES_COUNT > largestVertCount * VERTEX_ATTRIBUTES_COUNT) {
-                    DualLogError("Vertex buffer overrun in model %u, vertex %u\n", i, v);
-                    aiReleaseImport(scene);
-                    aiReleasePropertyStore(props);
-                    free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                    free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                    return 1;
-                }
-                tempVertices[vertexIndex++] = mesh->mVertices[v].x;
+            
+            // Vertex data
+            for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
+                tempVertices[vertexIndex++] = mesh->mVertices[v].x; // Position
                 tempVertices[vertexIndex++] = mesh->mVertices[v].y;
                 tempVertices[vertexIndex++] = mesh->mVertices[v].z;
                 tempVertices[vertexIndex++] = mesh->mNormals[v].x;
@@ -767,14 +529,14 @@ int LoadGeometry(void) {
                 float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
                 tempVertices[vertexIndex++] = tempU;
                 tempVertices[vertexIndex++] = tempV;
-                tempVertices[vertexIndex++] = 0; // texIdx
-                tempVertices[vertexIndex++] = 0; // glowIdx
-                tempVertices[vertexIndex++] = 0; // specIdx
-                tempVertices[vertexIndex++] = 0; // normIdx
-                tempVertices[vertexIndex++] = (float)i; // modelIdx
-                tempVertices[vertexIndex++] = 0; // instanceIdx
-                tempVertices[vertexIndex++] = 0.0f; // u_lm
-                tempVertices[vertexIndex++] = 0.0f; // v_lm
+                tempVertices[vertexIndex++] = 0; // Tex Index      Indices used later
+                tempVertices[vertexIndex++] = 0; // Glow Index
+                tempVertices[vertexIndex++] = 0; // Spec Index
+                tempVertices[vertexIndex++] = 0; // Normal Index
+                tempVertices[vertexIndex++] = 0; // Model Index
+                tempVertices[vertexIndex++] = 0; // Instance Index
+                tempVertices[vertexIndex++] = 0.0f; // u_lm for lightmap
+                tempVertices[vertexIndex++] = 0.0f; // v_lm for lightmap
                 if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
                 if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
                 if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
@@ -783,69 +545,34 @@ int LoadGeometry(void) {
                 if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
             }
 
-            for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
+            // Triangle data
+            for (unsigned int f = 0; f < mesh->mNumFaces; f++) {
                 struct aiFace *face = &mesh->mFaces[f];
-                if (face->mNumIndices != 3) {
-                    DualLogError("Non-triangular face in model %u, face %u\n", i, f);
-                    aiReleaseImport(scene);
-                    aiReleasePropertyStore(props);
-                    free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                    free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                    return 1;
-                }
+                if (face->mNumIndices != 3) { DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); return 1; }
+
                 uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
-                if (v[0] >= vertexCount || v[1] >= vertexCount || v[2] >= vertexCount) {
-                    DualLogError("Invalid vertex index in model %u, face %u: v0=%u, v1=%u, v2=%u, vertexCount=%u\n",
-                        i, f, v[0], v[1], v[2], vertexCount);
-                    aiReleaseImport(scene);
-                    aiReleasePropertyStore(props);
-                    free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                    free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                    return 1;
-                }
+
+                // Validate vertex indices
+                if (v[0] >= vertexCount || v[1] >= vertexCount || v[2] >= vertexCount) { DualLogError("Invalid vertex index in %s, face %u: v0=%u, v1=%u, v2=%u, vertexCount=%u\n", model_parser.entries[matchedParserIdx].path, f, v[0], v[1], v[2], vertexCount); return 1; }
+
+                // Store vertex indices
                 tempTriangles[triangleIndex++] = v[0];
                 tempTriangles[triangleIndex++] = v[1];
                 tempTriangles[triangleIndex++] = v[2];
             }
+            
             globalVertexOffset += mesh->mNumVertices;
         }
 
-        // Generate lightmap UVs and luxel counts
-        uint32_t *triLuxelOffsets = (uint32_t *)calloc(triCount, sizeof(uint32_t));
-        uint32_t *triLuxelDims = (uint32_t *)calloc(triCount * 2, sizeof(uint32_t));
-        if (!triLuxelOffsets || !triLuxelDims) {
-            DualLogError("Failed to allocate triLuxelOffsets or triLuxelDims for model %u\n", i);
-            aiReleaseImport(scene);
-            aiReleasePropertyStore(props);
-            free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        uint32_t preLuxelCount = totalLuxelCount;
-        GenerateLightmapUVs(tempVertices, tempTriangles, triCount, &modelLuxelCounts[i], triLuxelOffsets, triLuxelDims, modelBounds, i);
-        luxelOffsets[i] = totalLuxelCount;
-        totalLuxelCount += modelLuxelCounts[i];
-        DualLog("Model %u: Added %u luxels, totalLuxelCount=%llu\n", i, modelLuxelCounts[i], totalLuxelCount);
-
-        // Log lightmap UVs for debugging
-        for (uint32_t v = 0; v < vertexCount && v < 5; v++) {
-            DualLog("Model %u, Vertex %u: u_lm=%f, v_lm=%f\n", i, v,
-                    tempVertices[v * VERTEX_ATTRIBUTES_COUNT + 14], tempVertices[v * VERTEX_ATTRIBUTES_COUNT + 15]);
-        }
-
-        // Copy to staging buffers
-        if (vertexCount > 0) {
+        vertexDataArrays[i] = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); // Store vertex data in vertexDataArrays
+        memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle data in triangleDataArrays
+        memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
+        aiReleaseImport(scene);
+        malloc_trim(0);
+        if (vertexCount > 0) { // Copy to staging buffers
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
             void *mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            if (!mapped_buffer) {
-                DualLogError("Failed to map vertex buffer for model %u\n", i);
-                free(triLuxelOffsets); free(triLuxelDims);
-                aiReleaseImport(scene);
-                aiReleasePropertyStore(props);
-                free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                return 1;
-            }
             memcpy(mapped_buffer, tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glUnmapBuffer(GL_ARRAY_BUFFER);
             glGenBuffers(1, &vbos[i]);
@@ -859,26 +586,18 @@ int LoadGeometry(void) {
         if (triCount > 0) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
             void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCount * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            if (!mapped_buffer) {
-                DualLogError("Failed to map triangle buffer for model %u\n", i);
-                free(triLuxelOffsets); free(triLuxelDims);
-                aiReleaseImport(scene);
-                aiReleasePropertyStore(props);
-                free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-                free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-                return 1;
-            }
             memcpy(mapped_buffer, tempTriangles, triCount * 3 * sizeof(uint32_t));
             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+            
             glGenBuffers(1, &tbos[i]);
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
             glFlush();
             glFinish();
+            DebugRAM("post tri buffer tbos upload for model %s", model_parser.entries[matchedParserIdx].path);
         }
 
-        // Update bounds
         float minx_pos = fabs(minx);
         float miny_pos = fabs(miny);
         float minz_pos = fabs(minz);
@@ -894,149 +613,30 @@ int LoadGeometry(void) {
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
+        totalBounds += BOUNDS_ATTRIBUTES_COUNT;
 
-        // Copy luxel metadata
-        for (uint32_t f = 0; f < triCount; ++f) {
-            triLuxelMetadata[(currentTriangleOffset + f) * 3 + 0] = triLuxelOffsets[f];
-            triLuxelMetadata[(currentTriangleOffset + f) * 3 + 1] = triLuxelDims[f * 2 + 0];
-            triLuxelMetadata[(currentTriangleOffset + f) * 3 + 2] = triLuxelDims[f * 2 + 1];
-        }
-        free(triLuxelOffsets);
-        free(triLuxelDims);
-
-        currentVertexOffset += vertexCount;
-        currentTriangleOffset += triCount;
-
-        aiReleaseImport(scene);
-        aiReleasePropertyStore(props);
         malloc_trim(0);
+        DebugRAM("post GPU upload for model %s", model_parser.entries[matchedParserIdx].path);
     }
 
-    vertexOffsets[MODEL_COUNT] = currentVertexOffset;
-    triangleOffsets[MODEL_COUNT] = currentTriangleOffset;
-    luxelOffsets[MODEL_COUNT] = totalLuxelCount;
+    // Delete staging buffers
+    glDeleteBuffers(1, &stagingVBO);
+    glDeleteBuffers(1, &stagingTBO);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+    DebugRAM("after staging buffers deleted");
 
-    // Create lightmap SSBO
-    float *luxelData = (float *)calloc(totalLuxelCount * 4, sizeof(float));
-    if (!luxelData) {
-        DualLogError("Failed to allocate luxelData\n");
-        free(triLuxelMetadata); free(tempVertices); free(tempTriangles);
-        free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-        return 1;
-    }
-    for (uint64_t j = 0; j < totalLuxelCount; ++j) {
-        luxelData[j * 4 + 0] = 1.0f;
-        luxelData[j * 4 + 1] = 1.0f;
-        luxelData[j * 4 + 2] = 1.0f;
-        luxelData[j * 4 + 3] = 1.0f;
-    }
-    GLuint lightmapSSBO;
-    glGenBuffers(1, &lightmapSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightmapSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalLuxelCount * 4 * sizeof(float), luxelData, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, lightmapSSBO);
-    free(luxelData);
-    CHECK_GL_ERROR();
-
-    // Create model offset SSBO
-    GLuint offsetSSBO;
-    glGenBuffers(1, &offsetSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, offsetSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, (MODEL_COUNT + 1) * sizeof(uint32_t), luxelOffsets, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 22, offsetSSBO);
-    CHECK_GL_ERROR();
-
-    // Create triangle luxel metadata SSBO
-    GLuint triLuxelSSBO;
-    glGenBuffers(1, &triLuxelSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, triLuxelSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalTriCount * 3 * sizeof(uint32_t), triLuxelMetadata, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 23, triLuxelSSBO);
-    free(triLuxelMetadata);
-    CHECK_GL_ERROR();
-
-    // Create model vertex and triangle count SSBOs
-    GLuint vertexCountSSBO, triangleCountSSBO;
-    glGenBuffers(1, &vertexCountSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexCountSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), vertexCounts, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 28, vertexCountSSBO);
-    CHECK_GL_ERROR();
-
-    glGenBuffers(1, &triangleCountSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleCountSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), triangleCounts, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 29, triangleCountSSBO);
-    CHECK_GL_ERROR();
-
-    // Create model vertex offsets SSBO
-    glGenBuffers(1, &modelVertexOffsetsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), vertexOffsets, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 30, modelVertexOffsetsID);
-    CHECK_GL_ERROR();
-
-    // Create vboMasterTable
-    glGenBuffers(1, &vboMasterTable);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-
-    // Copy to vboMasterTable
-    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
-        if (vertexCounts[i] == 0 || vbos[i] == 0) {
-            DualLog("Skipping model %u: no vertices or invalid VBO\n", i);
-            continue;
-        }
-        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
-        CHECK_GL_ERROR();
-        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
-        CHECK_GL_ERROR();
-        GLintptr srcOffset = 0;
-        GLintptr dstOffset = (GLintptr)(vertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        GLsizeiptr size = (GLsizeiptr)(vertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        if (dstOffset + size > totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)) {
-            DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n",
-                i, dstOffset, size, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            free(tempVertices); free(tempTriangles);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
-        CHECK_GL_ERROR();
-    }
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, vboMasterTable);
-    CHECK_GL_ERROR();
-
-    // Create tboMasterTable
-    glGenBuffers(1, &tboMasterTable);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, tboMasterTable);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalTriCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
-        if (triangleCounts[i] == 0 || tbos[i] == 0) {
-            DualLog("Skipping model %u: no triangles or invalid TBO\n", i);
-            continue;
-        }
-        glBindBuffer(GL_COPY_READ_BUFFER, tbos[i]);
-        CHECK_GL_ERROR();
-        glBindBuffer(GL_COPY_WRITE_BUFFER, tboMasterTable);
-        CHECK_GL_ERROR();
-        GLintptr srcOffset = 0;
-        GLintptr dstOffset = (GLintptr)(triangleOffsets[i] * 3 * sizeof(uint32_t));
-        GLsizeiptr size = (GLsizeiptr)(triangleCounts[i] * 3 * sizeof(uint32_t));
-        if (dstOffset + size > totalTriCount * 3 * sizeof(uint32_t)) {
-            DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n",
-                i, dstOffset, size, totalTriCount * 3 * sizeof(uint32_t));
-            free(tempVertices); free(tempTriangles);
-            free(luxelOffsets); free(vertexOffsets); free(triangleOffsets); free(vertexCounts); free(triangleCounts);
-            return 1;
-        }
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
-        CHECK_GL_ERROR();
-    }
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, tboMasterTable);
-    CHECK_GL_ERROR();
+#ifdef DEBUG_MODEL_LOAD_DATA
+    DualLog("Largest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
+    DualLog("Total vertices: %d (", totalVertCount);
+    print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    DualLog(")\nTotal triangles: %d (", totalTriCount);
+    print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
+    DualLog(")\nBounds (");
+    print_bytes_no_newline(totalBounds * sizeof(float));
+    DualLog(")\n");
+#endif
 
     // Pass Model Type Bounds to GPU
     glGenBuffers(1, &modelBoundsID);
@@ -1044,39 +644,13 @@ int LoadGeometry(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     CHECK_GL_ERROR();
-
-    // Clean up
+    malloc_trim(0);
     free(tempVertices);
     free(tempTriangles);
-    free(luxelOffsets);
-    free(vertexOffsets);
-    free(triangleOffsets);
-    free(vertexCounts);
-    free(triangleCounts);
-    glDeleteBuffers(1, &stagingVBO);
-    glDeleteBuffers(1, &stagingTBO);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     malloc_trim(0);
-
-    // Log for debugging
-    DualLog("vertexCounts[0..5]: %u %u %u %u %u %u\n",
-        vertexCounts[0], vertexCounts[1], vertexCounts[2], vertexCounts[3], vertexCounts[4], vertexCounts[5]);
-    DualLog("triangleCounts[0..5]: %u %u %u %u %u %u\n",
-        triangleCounts[0], triangleCounts[1], triangleCounts[2], triangleCounts[3], triangleCounts[4], triangleCounts[5]);
-    DualLog("luxelOffsets[0..5]: %u %u %u %u %u %u\n",
-        luxelOffsets[0], luxelOffsets[1], luxelOffsets[2], luxelOffsets[3], luxelOffsets[4], luxelOffsets[5]);
-    DualLog("luxelOffsets[MODEL_COUNT]: %u\n", luxelOffsets[MODEL_COUNT]);
-    if (totalTriCount > 0) {
-        DualLog("triLuxelMetadata[0]: offset=%u, u=%u, v=%u\n",
-            triLuxelMetadata[0], triLuxelMetadata[1], triLuxelMetadata[2]);
-    }
-
     double end_time = get_time();
-    DualLog("Load Models took %f seconds, Total luxels: %llu, Total vertices: %d, Total triangles: %d\n",
-        end_time - start_time, totalLuxelCount, totalVertCount, totalTriCount);
+    DualLog("Load Models took %f seconds\n", end_time - start_time);
+    DebugRAM("After full LoadModels completed");
     return 0;
 }
 
@@ -1112,7 +686,7 @@ int LoadEntities(void) {
     DualLog("Parsing %d entities...\n", entityCount);
 
     // Populate entities array
-    for (int i = 0; i < entityCount; ++i) {
+    for (int i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
         // Copy with truncation to 31 characters to fit 32 char array for name.  Smaller for RAM constraints.
@@ -1123,10 +697,6 @@ int LoadEntities(void) {
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
         entities[i].lodIndex = entity_parser.entries[i].cardchunk ? 178: entity_parser.entries[i].lodIndex; // Generic LOD card
-    }
-    
-    for (int i = entityCount; i < MAX_ENTITIES; ++i) {
-        entities[i].modelIndex = UINT16_MAX;      
     }
 
     DebugRAM("after loading all entities");
@@ -1323,72 +893,21 @@ float quat_angle_deg(Quaternion a, Quaternion b) {
 }
 
 //----------------------------------- Level -----------------------------------
-// Loads level geometry and instance lightmaps
 int LoadLevelGeometry(uint8_t curlevel) {
-    if (curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n", curlevel, numLevels - 1); return 1; }
+    if (curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
+    DebugRAM("start of LoadLevelGeometry");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_geometry_level%d.txt", curlevel);
     parser_init(&level_parser, valid_leveldata_keys, NUM_LEVDAT_KEYS);
-    if (!parse_data_file(&level_parser, filename, 1)) { DualLogError("Could not parse %s!\n", filename); return 1; }
+    if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
-    gameObjectCount = level_parser.count;
-    DualLog("Loading %d objects for Level %d...\n", gameObjectCount, curlevel);
+    int gameObjectCount = level_parser.count;
+    DualLog("Loading %d objects for Level %d...\n",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
-    GetLevel_Transform_Offsets(curlevel, &correctionX, &correctionY, &correctionZ);
-
-    // Calculate instance lightmap offsets.
-    uint64_t totalInstanceLuxelCount = 0;
-    uint32_t *instanceLuxelOffsets = (uint32_t *)calloc(INSTANCE_COUNT, sizeof(uint32_t));
-    if (!instanceLuxelOffsets) { DualLogError("Failed to allocate instanceLuxelOffsets\n"); return 1; }
-    uint32_t validInstanceCount = 0;
-    for (int idx = 0; idx < gameObjectCount; idx++) {
+    GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
+    for (int idx=0;idx<gameObjectCount;++idx) {
         int entIdx = level_parser.entries[idx].constIndex;
-        if (entIdx < 0 || entIdx >= MAX_ENTITIES) {
-//             DualLogError("Invalid entIdx %d for instance %d, skipping\n", entIdx, idx);
-            continue;
-        }
-        int32_t modelIndex = entities[entIdx].modelIndex;
-        if (modelIndex < 0 || modelIndex >= MODEL_COUNT || modelLuxelCounts[modelIndex] == 0) {
-//             DualLogError("Invalid modelIndex %d for instance %d (entIdx %d), luxelCount=%u, skipping\n", modelIndex, idx, entIdx, modelLuxelCounts[modelIndex]);
-            continue;
-        }
-        instanceLuxelOffsets[idx] = totalInstanceLuxelCount;
-        totalInstanceLuxelCount += modelLuxelCounts[modelIndex];
-        validInstanceCount++;
-    }
-
-    // Create instance lightmap SSBO (RGBA floats for HDR)
-    float *instanceLuxelData = (float *)calloc(totalInstanceLuxelCount * 4, sizeof(float));
-    if (!instanceLuxelData) { DualLogError("Failed to allocate %llu instance luxels\n", totalInstanceLuxelCount); free(instanceLuxelOffsets); return 1; }
-    for (uint64_t j = 0; j < totalInstanceLuxelCount; j++) {
-        instanceLuxelData[j * 4 + 0] = 1.0f;
-        instanceLuxelData[j * 4 + 1] = 1.0f;
-        instanceLuxelData[j * 4 + 2] = 1.0f;
-        instanceLuxelData[j * 4 + 3] = 1.0f;
-    }
-    GLuint instanceLightmapSSBO;
-    glGenBuffers(1, &instanceLightmapSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instanceLightmapSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalInstanceLuxelCount * 4 * sizeof(float), instanceLuxelData, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 24, instanceLightmapSSBO);
-    free(instanceLuxelData);
-
-    // Create instance offset SSBO
-    GLuint instanceOffsetSSBO;
-    glGenBuffers(1, &instanceOffsetSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instanceOffsetSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), instanceLuxelOffsets, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 25, instanceOffsetSSBO);
-    free(instanceLuxelOffsets);
-
-    // Load instance data
-    for (int idx = 0; idx < gameObjectCount; idx++) {
-        int entIdx = level_parser.entries[idx].constIndex;
-        if (entIdx < 0 || entIdx >= MAX_ENTITIES) continue;
-        uint16_t modelIndex = entities[entIdx].modelIndex;
-        if (modelIndex >= MODEL_COUNT || modelLuxelCounts[modelIndex] == 0u) continue; // Skip instances that don't have models
-
         instances[idx].modelIndex = entities[entIdx].modelIndex;
         instances[idx].texIndex = entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
@@ -1407,18 +926,20 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].sclz = level_parser.entries[idx].localScale.z;
         Quaternion quat = {instances[idx].rotx, instances[idx].roty, instances[idx].rotz, instances[idx].rotw};
         Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
-        float angle = quat_angle_deg(quat, upQuat);
+        float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
         bool pointsUp = angle <= 30.0f;
-        instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT;
+        instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
     }
 
     malloc_trim(0);
+    DebugRAM("end of LoadLevelGeometry");
     return 0;
 }
 
 int LoadLevelLights(uint8_t curlevel) {
     if (curlevel >= numLevels) { DualLogError("Cannot load level lights %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
+    DebugRAM("start of LoadLevelLights");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_lights_level%d.txt", curlevel);
     parser_init(&lights_parser, valid_lightdata_keys, NUM_LIGHTDAT_KEYS);
@@ -1447,5 +968,6 @@ int LoadLevelLights(uint8_t curlevel) {
     }
 
     malloc_trim(0);
+    DebugRAM("end of LoadLevelLights");
     return 0;
 }
