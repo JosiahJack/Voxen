@@ -28,15 +28,15 @@ const char* deferredLighting_computeShader =
     "layout(rgba32f, binding = 1) uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2) uniform image2D inputNormals;\n"
     "layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };\n"
-    "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n" // Added
+    "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
     "layout(std430, binding = 19) buffer LightIndices { float lightInPVS[]; };\n"
     "layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };\n"
-    "layout(std430, binding = 21) buffer LightmapLuxelData { float luxelData[]; };\n" // Added
-    "layout(std430, binding = 22) buffer LightmapOffsets { float lightmapLuxelOffsets[]; };\n" // Added
-    "layout(std430, binding = 23) buffer TriLuxel { float triLuxelMetaData[]; };\n" // Added
-    "layout(std430, binding = 28) readonly buffer VertexCounts { uint vertexCounts[]; };\n" // Added
-    "layout(std430, binding = 29) readonly buffer TriangleCounts { uint triangleCounts[]; };\n" // Added
+    "layout(std430, binding = 21) buffer LightmapLuxelData { float luxelData[]; };\n"
+    "layout(std430, binding = 22) buffer LightmapOffsets { float lightmapLuxelOffsets[]; };\n"
+    "layout(std430, binding = 23) buffer TriLuxel { float triLuxelMetaData[]; };\n"
+    "layout(std430, binding = 28) readonly buffer VertexCounts { uint vertexCounts[]; };\n"
+    "layout(std430, binding = 29) readonly buffer TriangleCounts { uint triangleCounts[]; };\n"
     "layout(std430, binding = 31) readonly buffer TriangleOffsets { uint triangleOffsets[]; };\n"
 
     "uniform uint screenWidth;\n"

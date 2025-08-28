@@ -72,7 +72,7 @@ extern GLuint modelBoundsID;
 extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
-extern uint32_t totalLuxelCount;
+extern uint32_t renderableCount;
 extern int gameObjectCount;
 
 int LoadGeometry(void);

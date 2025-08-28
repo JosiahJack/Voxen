@@ -187,7 +187,7 @@ GLuint lightIBOs[MAX_VISIBLE_LIGHTS];
 uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
 uint32_t lightIndexCounts[MAX_VISIBLE_LIGHTS];
 float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
-GLuint visibleLightsID;
+GLuint lightsID;
 
 // Text
 #define TEXT_WHITE 0
@@ -790,9 +790,9 @@ void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx
 }
 
 void UpdateInstanceMatrix(int i) {
-    if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; }
+    if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; } // No model
     if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
-    if (instances[i].modelIndex < 0) return; // Culled
+    if (instances[i].modelIndex < 0) return; // Invalid or culled
 
     float mat[16]; // 4x4 matrix
     SetUpdatedMatrix(mat, instances[i].posx, instances[i].posy, instances[i].posz, instances[i].rotx, instances[i].roty, instances[i].rotz, instances[i].rotw, instances[i].sclx, instances[i].scly, instances[i].sclz);
@@ -838,17 +838,20 @@ int SetupInstances(void) {
     instances[idx].scly = 0.4f;
     instances[idx].sclz = 0.4f;
 
+    // Generate and size instance related buffers
     glGenBuffers(1, &instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
     glGenBuffers(1, &instancesInPVSBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    
     glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
@@ -1056,10 +1059,10 @@ int InitializeEnvironment(void) {
     DebugRAM("text init");
 
     // Lights buffer
-    glGenBuffers(1, &visibleLightsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 32 * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
+    glGenBuffers(1, &lightsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DebugRAM("after Lights Buffer Init");
     
@@ -1143,27 +1146,31 @@ int Physics(void) {
 }
 
 int LightmapBake() {
-//     double start_time = get_time();
-//     DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, gameObjectCount);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
-//     
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-//     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-//     
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-//     GLuint groupsX = (totalLuxelCount + 31u) / 32u;
-//     glUseProgram(lightmapShaderProgram);
-//     glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
-//     glUniform1ui(instanceCountLoc_lightmap, gameObjectCount);
-//     glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
-//     glDispatchCompute(groupsX, 1, 1);
-//     CHECK_GL_ERROR();
-//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-//     double end_time = get_time();
-//     DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
+    double start_time = get_time();
+    if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
+    
+    uint32_t totalLuxelCount = 64u * 64u * renderableCount;
+    DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
+    
+    for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer); 
+    
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    GLuint groupsX = (totalLuxelCount + 31u) / 32u;
+    glUseProgram(lightmapShaderProgram);
+    glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
+    glUniform1ui(instanceCountLoc_lightmap, renderableCount);
+    glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
+    glDispatchCompute(groupsX, 1, 1);
+    CHECK_GL_ERROR();
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+    double end_time = get_time();
+    DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
     return 0;
 }
 
@@ -1528,9 +1535,9 @@ int main(int argc, char* argv[]) {
             lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
         }
         
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, visibleLightsID);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, visibleLightsID);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 //         double ft2 = get_time() - current_time - (ft0 + ft1);
 

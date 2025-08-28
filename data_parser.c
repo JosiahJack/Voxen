@@ -39,6 +39,9 @@ uint32_t * tempTriangles;
 float ** vertexDataArrays;
 uint32_t ** triangleDataArrays;
 uint32_t ** triEdgeDataArrays;
+GLuint lightmapID;
+uint32_t renderableCount = 0;
+
 
 //-----------------------------------------------------------------------------
 // Level Data Parsing
@@ -440,10 +443,14 @@ int LoadGeometry(void) {
     largestTriangleCount = 0;
 
     // Allocate persistent temporary buffers
-    tempVertices = (float *)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-    tempTriangles = (uint32_t *)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
-    vertexDataArrays = (float **)calloc(MODEL_COUNT, sizeof(float *));
-    triangleDataArrays = (uint32_t **)calloc(MODEL_COUNT, sizeof(uint32_t *));
+    tempVertices = (float*)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+    tempTriangles = (uint32_t*)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
+    vertexDataArrays = (float**)calloc(MODEL_COUNT, sizeof(float *));
+    triangleDataArrays = (uint32_t**)calloc(MODEL_COUNT, sizeof(uint32_t *));
+    uint32_t* vertexOffsets = (uint32_t*)calloc(MODEL_COUNT, sizeof(uint32_t));
+    uint32_t* triangleOffsets = (uint32_t*)calloc(MODEL_COUNT, sizeof(uint32_t));
+    uint32_t currentVertexOffset = 0;
+    uint32_t currentTriangleOffset = 0;
 
     // Generate staging buffers
     GLuint stagingVBO, stagingTBO;
@@ -503,6 +510,8 @@ int LoadGeometry(void) {
 #endif
         totalVertCount += vertexCount;
         totalTriCount += triCount;
+        vertexOffsets[i] = currentVertexOffset;
+        triangleOffsets[i] = currentTriangleOffset;
 
         // Extract vertex and triangle data
         uint32_t vertexIndex = 0;
@@ -568,6 +577,8 @@ int LoadGeometry(void) {
         memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle data in triangleDataArrays
         memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
+        currentVertexOffset += vertexCount;
+        currentTriangleOffset += triCount;
         aiReleaseImport(scene);
         malloc_trim(0);
         if (vertexCount > 0) { // Copy to staging buffers
@@ -598,26 +609,102 @@ int LoadGeometry(void) {
             DebugRAM("post tri buffer tbos upload for model %s", model_parser.entries[matchedParserIdx].path);
         }
 
-        float minx_pos = fabs(minx);
-        float miny_pos = fabs(miny);
-        float minz_pos = fabs(minz);
-        float boundradius = minx_pos > miny_pos ? minx_pos : miny_pos;
-        boundradius = boundradius > minz_pos ? boundradius : minz_pos;
-        boundradius = boundradius > maxx ? boundradius : maxx;
-        boundradius = boundradius > maxy ? boundradius : maxy;
-        boundradius = boundradius > maxz ? boundradius : maxz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = boundradius;
+        modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
-
         malloc_trim(0);
         DebugRAM("post GPU upload for model %s", model_parser.entries[matchedParserIdx].path);
     }
+    
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Duplicate and Send all Triangle Data
+    GLuint triangleCountSSBO;
+    glGenBuffers(1, &triangleCountSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleCountSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelTriangleCounts, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, triangleCountSSBO);
+    CHECK_GL_ERROR();
+    
+    // Create model triangle offsets SSBO
+    GLuint modelTriangleOffsetsID;
+    glGenBuffers(1, &modelTriangleOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelTriangleOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), triangleOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 22, modelTriangleOffsetsID);
+    CHECK_GL_ERROR();
+    
+    // Create tboMasterTable for all triangles containing vertex indices
+    GLuint tboMasterTable;
+    glGenBuffers(1, &tboMasterTable);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, tboMasterTable);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalTriCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
+        if (modelTriangleCounts[i] == 0 || tbos[i] == 0) continue; // Skip ones at the end of the list that aren't used.
+        
+        glBindBuffer(GL_COPY_READ_BUFFER, tbos[i]);
+        CHECK_GL_ERROR();
+        glBindBuffer(GL_COPY_WRITE_BUFFER, tboMasterTable);
+        CHECK_GL_ERROR();
+        GLintptr srcOffset = 0;
+        GLintptr dstOffset = (GLintptr)(triangleOffsets[i] * 3 * sizeof(uint32_t));
+        GLsizeiptr size = (GLsizeiptr)(modelTriangleCounts[i] * 3 * sizeof(uint32_t));
+        if (dstOffset + size > totalTriCount * 3 * (uint32_t)sizeof(uint32_t)) { DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n", i, dstOffset, size, totalTriCount * 3 * sizeof(uint32_t)); return 1; }
+        
+        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
+        CHECK_GL_ERROR();
+    }
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 23, tboMasterTable);
+    CHECK_GL_ERROR();
+    
+    // -------------------------------------------------------------------------------------------------------------------------
+    // Duplicate and Send all Vertex Data
+    GLuint vertexCountSSBO;
+    glGenBuffers(1, &vertexCountSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexCountSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 24, vertexCountSSBO);
+    CHECK_GL_ERROR();
+    
+    // Create model vertex offsets SSBO
+    GLuint modelVertexOffsetsID;
+    glGenBuffers(1, &modelVertexOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), vertexOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 25, modelVertexOffsetsID);
+    CHECK_GL_ERROR();
+
+    // Create vboMasterTable for all vertices of all model types in flat buffer
+    GLuint vboMasterTable;
+    glGenBuffers(1, &vboMasterTable);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
+
+    // Copy to vboMasterTable
+    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
+        if (modelVertexCounts[i] == 0 || vbos[i] == 0) continue; // Skip ones at the end of the list that aren't used.
+        
+        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
+        CHECK_GL_ERROR();
+        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
+        CHECK_GL_ERROR();
+        GLintptr srcOffset = 0;
+        GLintptr dstOffset = (GLintptr)(vertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        GLsizeiptr size = (GLsizeiptr)(modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        if (dstOffset + size > totalVertCount * VERTEX_ATTRIBUTES_COUNT * (uint32_t)sizeof(float)) { DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n", i, dstOffset, size, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); return 1; }
+        
+        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
+        CHECK_GL_ERROR();
+    }
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, vboMasterTable);
+    CHECK_GL_ERROR();
+    // -------------------------------------------------------------------------------------------------------------------------
 
     // Delete staging buffers
     glDeleteBuffers(1, &stagingVBO);
@@ -647,6 +734,8 @@ int LoadGeometry(void) {
     malloc_trim(0);
     free(tempVertices);
     free(tempTriangles);
+    free(triangleOffsets);
+    free(vertexOffsets);
     malloc_trim(0);
     double end_time = get_time();
     DualLog("Load Models took %f seconds\n", end_time - start_time);
@@ -906,9 +995,11 @@ int LoadLevelGeometry(uint8_t curlevel) {
     DualLog("Loading %d objects for Level %d...\n",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
+    renderableCount = 0;
     for (int idx=0;idx<gameObjectCount;++idx) {
         int entIdx = level_parser.entries[idx].constIndex;
         instances[idx].modelIndex = entities[entIdx].modelIndex;
+        if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
         instances[idx].specIndex = entities[entIdx].specIndex;
@@ -931,6 +1022,19 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
     }
 
+    // Upload new instance data to SSBO for it
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    // Generate lightmap
+    glGenBuffers(1, &lightmapID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightmapID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, renderableCount * 64 * 64 * 4 * sizeof(float), NULL, GL_DYNAMIC_DRAW); // 256x256 lightmap per model, 4 channel rgba, HDR float
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightmapID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
     malloc_trim(0);
     DebugRAM("end of LoadLevelGeometry");
     return 0;

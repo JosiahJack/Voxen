@@ -8,8 +8,15 @@
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 #define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
+#define CHECK_GL_ERROR_HERE(msg) \
+    do { \
+        GLenum err = glGetError(); \
+        if (err != GL_NO_ERROR) \
+            DualLogError("GL Error at %s:%d (%s): %d\n", __FILE__, __LINE__, msg, err); \
+    } while(0)
 #else
 #define CHECK_GL_ERROR() do {} while(0)
+#define CHECK_GL_ERROR_HERE() do {} while(0)
 #endif
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
 #define LIGHT_DATA_SIZE 13 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, spotDirw, r, g, b
@@ -63,6 +70,7 @@ extern GLuint matricesBuffer;
 extern GLuint precomputedVisibleCellsFromHereID;
 extern GLuint cellIndexForInstanceID;
 extern GLuint cellIndexForLightID;
+extern GLuint lightmapID;
 extern GLuint masterIndexForLightsInPVSID;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
 
