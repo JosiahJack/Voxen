@@ -33,27 +33,16 @@ const char *valid_texdata_keys[] = {"index","doublesided"};
 #define NUM_TEX_KEYS 2
 
 bool *doubleSidedTexture = NULL;
+bool *transparentTexture = NULL;
 
 bool isDoubleSided(uint32_t texIndexToCheck) { return (doubleSidedTexture[texIndexToCheck]); }
+bool isTransparent(uint32_t texIndexToCheck) { return (transparentTexture[texIndexToCheck]); }
 
 typedef struct {
     uint32_t color;    // RGBA color (packed)
     uint16_t index;    // Palette index
     UT_hash_handle hh;
 } ColorEntry;
-
-typedef enum {
-    TEX_PARSER = 0,
-    TEX_OFFSETS,
-    TEX_SIZES,
-    TEX_PALOFFSETS,
-    TEX_PALETS,
-    TEX_SSBOS,
-    TEX_DOUBLESIDES,
-    TEX_COUNT // Number of subsystems
-} TextureLoadDataType;
-
-bool loadTextureItemInitialized[TEX_COUNT] = { [0 ... TEX_COUNT - 1] = false };
 
 int LoadTextures(void) {
     double start_time = get_time();
@@ -63,13 +52,10 @@ int LoadTextures(void) {
     // First parse ./Data/textures.txt to see what textures to load to what indices
     parser_init(&texture_parser, valid_texdata_keys, NUM_TEX_KEYS);
     if (!parse_data_file(&texture_parser, "./Data/textures.txt",0)) { DualLogError("Could not parse ./Data/textures.txt!\n"); return 1; }
-    loadTextureItemInitialized[TEX_PARSER] = true;
     
     int maxIndex = -1;
-//     DualLog("Getting max index from list of %d textures\n",texture_parser.count);
     for (int k=0;k<texture_parser.count;k++) {
-        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) {maxIndex = texture_parser.entries[k].index; }
-//         DualLog("texture_parser.entries[k].index > maxIndex: %d > %d", texture_parser.entries[k].index, maxIndex);
+        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) { maxIndex = texture_parser.entries[k].index; }
     }
     
     textureCount = (uint16_t)texture_parser.count;
@@ -78,24 +64,13 @@ int LoadTextures(void) {
     
     DualLog("Parsing %d textures with max index %d...\n",textureCount,maxIndex);
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
-    loadTextureItemInitialized[TEX_OFFSETS] = true;
-    DebugRAM("after textureOffsets malloc");
-    
     textureSizes = malloc(textureCount * 2 * sizeof(int)); // Times 2 for x and y pairs flat packed (e.g. x,y,x,y,x,y for 3 textures)
-    loadTextureItemInitialized[TEX_SIZES] = true;
-    DebugRAM("after textureSizes malloc");
-
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
-    loadTextureItemInitialized[TEX_PALOFFSETS] = true;
-    DebugRAM("after texturePaletteOffsets mallocn");
-
     doubleSidedTexture = malloc(textureCount * sizeof(bool));
-    loadTextureItemInitialized[TEX_DOUBLESIDES] = true;
-    DebugRAM("after doubleSidedTexture malloc");
-    
+    isTransparent = malloc(textureCount * sizeof(bool));
     size_t maxFileSize = 10000000; // 10MB
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
-    DebugRAM("after file_buffer malloc");
+    DebugRAM("after texture buffers mallocs");
 
     // First Pass: Calculate total pixels and offsets
     totalPixels = 0;
@@ -135,6 +110,8 @@ int LoadTextures(void) {
         for (int j = 0; j < width * height * 4; j += 4) {
             uint32_t color = ((uint32_t)image_data[j] << 24) | ((uint32_t)image_data[j + 1] << 16) |
                              ((uint32_t)image_data[j + 2] << 8) | (uint32_t)image_data[j + 3];
+
+            if (image_data[j] < 255) isTransparent[i] = true; // Don't remove if, need to preserve in case any pixels are not transparent
             HASH_FIND_INT(color_table, &color, entry);
             if (!entry) {
                 if (palette_size >= MAX_PALETTE_SIZE) { DualLog("\033[33mWARNING: Palette size exceeded for %s\033[0m\n", texture_parser.entries[matchedParserIdx].path); palette_size = MAX_PALETTE_SIZE - 1; break; }
@@ -159,29 +136,23 @@ int LoadTextures(void) {
     }
     
     texturePalettes = malloc(totalPaletteColors * sizeof(uint32_t));
-    loadTextureItemInitialized[TEX_PALETS] = true;
-    DebugRAM("after texturePalettes malloc");
 
     // Create SSBO for texture palettes
     glGenBuffers(1, &texturePalettesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColors * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    DebugRAM("after glGenBuffers texturePalettesID");
     
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
     int colorBufferSize = ((totalPixels + 1) / 2) * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, colorBufferSize, NULL, GL_STATIC_DRAW);
-    loadTextureItemInitialized[TEX_SSBOS] = true;
-    DebugRAM("after glGenBuffers colorBufferID");
 
     // Second pass: Load textures into color buffer
     uint32_t pixel_offset = 0;
     uint32_t palette_offset = 0;
     uint32_t maxPalletSize = 0;
     uint16_t *indices = malloc(4096 * 4096 * sizeof(uint16_t));
-    DebugRAM("after indices malloc");
     
     GLuint stagingBuffer;
     glGenBuffers(1, &stagingBuffer);

@@ -628,7 +628,6 @@ int LoadGeometry(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleCountSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelTriangleCounts, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, triangleCountSSBO);
-    CHECK_GL_ERROR();
     
     // Create model triangle offsets SSBO
     GLuint modelTriangleOffsetsID;
@@ -636,31 +635,26 @@ int LoadGeometry(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelTriangleOffsetsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), triangleOffsets, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 22, modelTriangleOffsetsID);
-    CHECK_GL_ERROR();
     
     // Create tboMasterTable for all triangles containing vertex indices
     GLuint tboMasterTable;
     glGenBuffers(1, &tboMasterTable);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, tboMasterTable);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalTriCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
         if (modelTriangleCounts[i] == 0 || tbos[i] == 0) continue; // Skip ones at the end of the list that aren't used.
         
         glBindBuffer(GL_COPY_READ_BUFFER, tbos[i]);
-        CHECK_GL_ERROR();
         glBindBuffer(GL_COPY_WRITE_BUFFER, tboMasterTable);
-        CHECK_GL_ERROR();
         GLintptr srcOffset = 0;
         GLintptr dstOffset = (GLintptr)(triangleOffsets[i] * 3 * sizeof(uint32_t));
         GLsizeiptr size = (GLsizeiptr)(modelTriangleCounts[i] * 3 * sizeof(uint32_t));
         if (dstOffset + size > totalTriCount * 3 * (uint32_t)sizeof(uint32_t)) { DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n", i, dstOffset, size, totalTriCount * 3 * sizeof(uint32_t)); return 1; }
         
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
-        CHECK_GL_ERROR();
     }
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 23, tboMasterTable);
-    CHECK_GL_ERROR();
     
     // -------------------------------------------------------------------------------------------------------------------------
     // Duplicate and Send all Vertex Data
@@ -669,7 +663,6 @@ int LoadGeometry(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexCountSSBO);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 24, vertexCountSSBO);
-    CHECK_GL_ERROR();
     
     // Create model vertex offsets SSBO
     GLuint modelVertexOffsetsID;
@@ -677,33 +670,28 @@ int LoadGeometry(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), vertexOffsets, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 25, modelVertexOffsetsID);
-    CHECK_GL_ERROR();
 
     // Create vboMasterTable for all vertices of all model types in flat buffer
     GLuint vboMasterTable;
     glGenBuffers(1, &vboMasterTable);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
 
     // Copy to vboMasterTable
     for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
         if (modelVertexCounts[i] == 0 || vbos[i] == 0) continue; // Skip ones at the end of the list that aren't used.
         
         glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
-        CHECK_GL_ERROR();
         glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
-        CHECK_GL_ERROR();
         GLintptr srcOffset = 0;
         GLintptr dstOffset = (GLintptr)(vertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         GLsizeiptr size = (GLsizeiptr)(modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         if (dstOffset + size > totalVertCount * VERTEX_ATTRIBUTES_COUNT * (uint32_t)sizeof(float)) { DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n", i, dstOffset, size, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); return 1; }
         
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
-        CHECK_GL_ERROR();
     }
+
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 18, vboMasterTable);
-    CHECK_GL_ERROR();
     // -------------------------------------------------------------------------------------------------------------------------
 
     // Delete staging buffers
@@ -1015,6 +1003,16 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].sclx = level_parser.entries[idx].localScale.x;
         instances[idx].scly = level_parser.entries[idx].localScale.y;
         instances[idx].sclz = level_parser.entries[idx].localScale.z;
+        if (isDoubleSided(instances[idx].texIndex) || instances[idx].sclx < 0.0f || instances[idx].scly < 0.0f || instances[idx].sclz < 0.0f) {
+            doubleSidedInstances[doubleSidedInstancesHead] = idx;
+            doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
+        }
+
+        if (isTransparent(instances[idx].texIndex) {
+            transparentInstances[transparentInstancesHead] = idx;
+            transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
+        }
+
         Quaternion quat = {instances[idx].rotx, instances[idx].roty, instances[idx].rotz, instances[idx].rotw};
         Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
         float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector

@@ -60,6 +60,7 @@ extern GLuint colorBufferID;
 extern uint16_t textureCount;
 
 bool isDoubleSided(uint32_t texIndexToCheck);
+bool isTransparent(uint32_t texIndexToCheck);
 int LoadTextures(void);
 
 // Models

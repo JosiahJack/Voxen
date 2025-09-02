@@ -45,6 +45,10 @@ FILE* console_log_file = NULL;
 Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
+uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
+uint16_t doubleSidedInstancesHead = 0;
+uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.
+uint16_t transparentInstancesHead = 0;
 GLuint instancesBuffer;
 GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
@@ -360,7 +364,6 @@ int CompileShaders(void) {
     // Screen Space Reflections Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader"); if (!computeShader) { return 1; }
     ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");        if (!ssrShaderProgram) { return 1; }
-    CHECK_GL_ERROR();
 
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
@@ -396,7 +399,6 @@ int CompileShaders(void) {
     
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
     worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
@@ -484,7 +486,6 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     glBindBuffer(GL_ARRAY_BUFFER, textVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // Render quad (two triangles)
-    CHECK_GL_ERROR();
     drawCallsRenderedThisFrame++;
     verticesRenderedThisFrame+=6;
 
@@ -516,7 +517,6 @@ void Screenshot() {
     
     unsigned char* pixels = (unsigned char*)malloc(screen_width * screen_height * 4);
     glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    CHECK_GL_ERROR();
     char timestamp[32];
     char filename[96];
     time_t now = time(NULL);
@@ -588,11 +588,15 @@ int Input_KeyDown(uint32_t scancode) {
 
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
+        glProgramUniform1i(deferredLightingShaderProgram, debugViewLoc_deferred, debugView);
+        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
+        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
         if (debugView > 8) debugView = 0;
     }
 
     if (keys[SDL_SCANCODE_Y]) {
         debugValue++;
+        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
         if (debugValue > 6) debugValue = 0;
     }
 
@@ -808,9 +812,7 @@ void UpdateInstanceMatrix(int i) {
 }
 
 int SetupInstances(void) {
-    DebugRAM("start of SetupInstances");
     DualLog("Initializing instances...\n");
-    CHECK_GL_ERROR();
     int x,z,idx;
     for (idx = 0, x = 0, z = 0;idx<INSTANCE_COUNT;idx++) {
         int entIdx = idx < MAX_ENTITIES ? idx : 0;
@@ -954,7 +956,34 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
 
     if (CompileShaders()) return SYS_COUNT + 1;
-    DebugRAM("compile shaders");
+    glUseProgram(chunkShaderProgram);
+    glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, rasterPerspectiveProjection);
+
+    glUseProgram(chunkShaderProgram);
+    glUniform1f(overrideGlowRLoc_chunk, 0.0f);
+    glUniform1f(overrideGlowGLoc_chunk, 0.0f);
+    glUniform1f(overrideGlowBLoc_chunk, 0.0f);
+
+    glUseProgram(imageBlitShaderProgram);
+    glUniform1ui(screenWidthLoc_imageBlit, screen_width);
+    glUniform1ui(screenHeightLoc_imageBlit, screen_height);
+
+    glUseProgram(deferredLightingShaderProgram);
+    glUniform1ui(screenWidthLoc_deferred, screen_width);
+    glUniform1ui(screenHeightLoc_deferred, screen_height);
+    glUniform1ui(modelCountLoc_deferred, MODEL_COUNT);
+    glUniform1i(sssMaxStepsLoc_deferred, sssMaxSteps);
+    glUniform1f(sssStepSizeLoc_deferred, sssStepSize);
+
+    glUseProgram(ssrShaderProgram);
+    int SSR_RES = 2; // 50% of render resolution.
+    glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
+    glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
+    glUniform1i(stepCountLoc_ssr, ssr_StepCount);
+    glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
+    glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
+    glUseProgram(0);
+    CHECK_GL_ERROR();
     malloc_trim(0);
     
     // Setup full screen quad for image blit for post processing effects like lighting.
@@ -966,32 +995,19 @@ int InitializeEnvironment(void) {
     };
     
     glCreateBuffers(1, &quadVBO);
-    CHECK_GL_ERROR();
     glNamedBufferData(quadVBO, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
     glCreateVertexArrays(1, &quadVAO);
-    CHECK_GL_ERROR();
     glEnableVertexArrayAttrib(quadVAO, 0);
-    CHECK_GL_ERROR();
     glEnableVertexArrayAttrib(quadVAO, 1);
-    CHECK_GL_ERROR();
     glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
-    CHECK_GL_ERROR();
     glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
-    CHECK_GL_ERROR();
     glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-    CHECK_GL_ERROR();
     glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
-    CHECK_GL_ERROR();
     glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
-    CHECK_GL_ERROR();
     
     // VAO for Global Vertex Definition
     glGenVertexArrays(1, &vao_chunk);
-    CHECK_GL_ERROR();
     glBindVertexArray(vao_chunk);
-    CHECK_GL_ERROR();
-    
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
     glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
@@ -1016,7 +1032,7 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width / 2, screen_height / 2,    GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width / SSR_RES, screen_height / SSR_RES,    GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -1426,14 +1442,10 @@ int main(int argc, char* argv[]) {
         verticesRenderedThisFrame = 0;
         
         // 0. Clear Frame Buffers and Depth
-//         double ft0 = get_time() - current_time;
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear screen
-        
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
+
         Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
-//         double ft1 = get_time() - current_time - (ft0);
 
         // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
         numLightsFound = 0;
@@ -1547,7 +1559,6 @@ int main(int argc, char* argv[]) {
         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-//         double ft2 = get_time() - current_time - (ft0 + ft1);
 
         // 2. Instance Culling to only those in range of player
         bool instanceIsCulledArray[INSTANCE_COUNT];
@@ -1578,7 +1589,6 @@ int main(int argc, char* argv[]) {
                 curIdx++;
             }
         }
-//         double ft3 = get_time() - current_time - (ft0 + ft1 + ft2);
         
         // 3. Pass all instance matrices to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
@@ -1588,7 +1598,6 @@ int main(int argc, char* argv[]) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-//         double ft4 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3);
         
         // 4. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1598,12 +1607,7 @@ int main(int argc, char* argv[]) {
         float view[16]; // Set up view matrices
         mat4_lookat(view);
         glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
-        glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, rasterPerspectiveProjection);
-        glUniform1i(debugViewLoc_chunk, debugView);
         glBindVertexArray(vao_chunk);
-        glUniform1f(overrideGlowRLoc_chunk, 0.0f);
-        glUniform1f(overrideGlowGLoc_chunk, 0.0f);
-        glUniform1f(overrideGlowBLoc_chunk, 0.0f);
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
             if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
@@ -1618,7 +1622,7 @@ int main(int argc, char* argv[]) {
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
             if (!IsSphereInFOVCone(instances[i].posx, instances[i].posy, instances[i].posz, radius)) continue; // Cone Frustum Culling
             
-            if (dirtyInstances[i]) UpdateInstanceMatrix(i);            
+            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
             glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
@@ -1667,7 +1671,6 @@ int main(int argc, char* argv[]) {
         }
         
         glDisable(GL_BLEND);
-//         double ft5 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4);
 
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
@@ -1692,11 +1695,7 @@ int main(int argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
             // These should be static but cause issues if not...
-            glUniform1ui(screenWidthLoc_deferred, screen_width); // Makes screen all black if not sent every frame.
-            glUniform1ui(screenHeightLoc_deferred, screen_height); // Makes screen all black if not sent every frame.
-            glUniform1ui(modelCountLoc_deferred, MODEL_COUNT);
             glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
-            glUniform1i(debugViewLoc_deferred, debugView);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
             glUniform1f(cam_xLoc_deferred, cam_x);
@@ -1705,40 +1704,22 @@ int main(int argc, char* argv[]) {
             glUniform1f(luminanceFogFacLoc_deferred, fogLuminanceFac);
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
-            CHECK_GL_ERROR();
             glUniform1f(fogColorBLoc_deferred, fogColorB);
-            CHECK_GL_ERROR();
             glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
-            CHECK_GL_ERROR();
-            glUniform1i(sssMaxStepsLoc_deferred, sssMaxSteps);
-            CHECK_GL_ERROR();
-            glUniform1f(sssStepSizeLoc_deferred, sssStepSize);
-            CHECK_GL_ERROR();
 
             // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-//         double ft6 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5);
         }
         
         // 6. SSR (Screen Space Reflections)
         if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-            // These should be static but cause issues if not...
-            glUniform1ui(screenWidthLoc_ssr, screen_width / 2); // Makes screen all black if not sent every frame.
-            glUniform1ui(screenHeightLoc_ssr, screen_height / 2); // Makes screen all black if not sent every frame.
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
             glUniform1f(cam_xLoc_ssr, cam_x);
             glUniform1f(cam_yLoc_ssr, cam_y);
             glUniform1f(cam_zLoc_ssr, cam_z);
-            glUniform1i(stepCountLoc_ssr, ssr_StepCount);
-            glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
-            glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
-            
-            // Dispatch compute shader
             glDispatchCompute(groupX, groupY, 1);
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -1749,10 +1730,6 @@ int main(int argc, char* argv[]) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputImageID);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
-        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
-        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
-        glUniform1ui(screenWidthLoc_imageBlit, screen_width); // Makes screen all black if not sent every frame.
-        glUniform1ui(screenHeightLoc_imageBlit, screen_height);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
@@ -1761,7 +1738,6 @@ int main(int argc, char* argv[]) {
         glBindTextureUnit(0, 0);
         glUseProgram(0);
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
-//         double ft7 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6);
         
         // 7. Render UI Images
  
@@ -1775,9 +1751,6 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "SSR steps: %d, SSR step size: %f, SSR max dist: %f, Lum: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist, fogLuminanceFac);
         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
         RenderFormattedText(10, textY + (textVertOfset * 7), TEXT_YELLOW, "SSS steps: %d, SSS step size: %f", sssMaxSteps, sssStepSize);
-//         double ft8 = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7);
-//         RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "Frame Timings: 0. %.3f | 1. %.3f | 2. %.3f | 3. %.3f | 4. %.3f | 5. %.3f | 6. %.3f | 7. %.3f | 8. %.3f",ft0 * 1000.0f,ft1 * 1000.0f,ft2 * 1000.0f,ft3 * 1000.0f,ft4 * 1000.0f,ft5 * 1000.0f,ft6 * 1000.0f,ft7 * 1000.0f,ft8 * 1000.0f);
-//         DualLog("ft0: %f, ft1: %f, ft2: %f, ft3: %f, ft4: %f, ft5: %f, ft6: %f, ft7: %f, ft8: %f\n",ft0,ft1,ft2,ft3,ft4,ft5,ft6,ft7,ft8);
         
         // Frame stats
         double time_now = get_time();
@@ -1802,8 +1775,6 @@ int main(int argc, char* argv[]) {
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
-//         double ft8_to_end = get_time() - current_time - (ft0 + ft1 + ft2 + ft3 + ft4 + ft5 + ft6 + ft7 + ft8);
-//         DualLog("ft8_to_end time chunk: %f\n",ft8_to_end);
     }
 
     return 0;
