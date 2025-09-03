@@ -20,7 +20,7 @@ const char* quadFragmentShaderSource =
     "uniform int debugValue;\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
-    "layout(rgba32f, binding = 4) uniform image2D outputImage;\n"
+    "layout(rgba8, binding = 4) uniform image2D outputImage;\n"
     "const int SSR_RES = 4;\n"
     "void main() {\n"
     "    FragColor = texture(tex, TexCoord);\n"

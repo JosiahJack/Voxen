@@ -7,18 +7,11 @@ const char* ssr_computeShader =
     "layout(rgba8,   binding = 0)  readonly uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1)  readonly uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2)  readonly uniform image2D inputNormals;\n"
-    "layout(rgba32f, binding = 4)  writeonly uniform image2D outputImage;\n"
-    "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
+    "layout(rgba8, binding = 4)  writeonly uniform image2D outputImage;\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
     "uniform mat4 viewProjection;\n"
-    "uniform float cam_x;\n"
-    "uniform float cam_y;\n"
-    "uniform float cam_z;\n"
-    "uniform int   maxSteps;\n"
-    "uniform float stepSize;\n"
-    "uniform float maxDistance;\n"
-    "const int SSR_RES = 4;\n"
+    "uniform vec3 camPos;\n"
 
     "vec4 unpackColor32(uint color) {\n"
     "    return vec4(float((color >> 24) & 0xFF) / 255.0,\n"  // r
@@ -32,28 +25,29 @@ const char* ssr_computeShader =
     "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
 
     "    imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));\n"
-    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * SSR_RES));\n"
+    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * 4));\n"// SSR_RES = 4
     "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    vec4 baseColor = imageLoad(inputImage, ivec2(pixel * SSR_RES));\n"
-    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * SSR_RES));\n"
+    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * 4));\n"// SSR_RES = 4
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
     "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
     "    vec3 normal = normalize(vec3(normalXY.x, normalXY.y, normalZ0.x));\n"
     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
     "    if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;\n"
 
-    "    vec3 camPos = vec3(cam_x, cam_y, cam_z);\n"
     "    vec3 viewDir = normalize(worldPos - camPos);\n"
-    "    vec3 reflectDir = normalize(reflect(viewDir, normal));\n"
+    "    vec3 reflectDir = reflect(viewDir, normal);\n"
     "    vec2 hitUV = vec2(0.0);\n"
     "    bool hit = false;\n"
     "    vec3 marchPos = worldPos + normal * 0.005;\n"
     "    float traveled = 0.0;\n"
-    "    vec3 rayStep = reflectDir * stepSize;\n"
-    "    for (int i = 0; i < maxSteps; ++i) {\n"
+    "    vec3 rayStep = reflectDir * 0.26;\n" // stepSize
+    "    vec2 screenSize = vec2(screenWidth, screenHeight);\n"
+    "    ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1);\n"
+    "    ivec2 zeroIVec2 = ivec2(0, 0);\n"
+    "    for (int i = 0; i < 100; ++i) {\n" // maxSteps 100
     "        marchPos += rayStep;\n"
-    "        traveled += stepSize;\n"
-    "        if (traveled > maxDistance) break;\n"
+    "        traveled += 0.26;\n" // stepSize
+    "        if (traveled > 71.68) break;\n"
 
     "        vec4 clipPos = viewProjection * vec4(marchPos, 1.0);\n"
     "        if (clipPos.w <= 0.0) break;\n"
@@ -62,25 +56,19 @@ const char* ssr_computeShader =
     "        hitUV = ndc * 0.5 + 0.5;\n"
     "        if (hitUV.x <= 0.0 || hitUV.x >= 1.0 || hitUV.y <= 0.0 || hitUV.y >= 1.0) break;\n"
 
-    "        ivec2 samplePixel = ivec2(floor(hitUV * vec2(screenWidth, screenHeight)));\n"
-    "        samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
-    "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * SSR_RES);\n"
+    "        ivec2 samplePixel = ivec2(floor(hitUV * screenSize));\n"
+    "        samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);\n"
+    "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * 4);\n" // SSR_RES = 4
     "        vec3 sampledWorldPos = sampledWorldPosPack.xyz;\n"
-    "        float distToSampled = abs(length(marchPos - sampledWorldPos));\n"
-    "        if (distToSampled < 0.16) { hit = true; break; }\n"
+    "        float dist2 = dot(marchPos - sampledWorldPos, marchPos - sampledWorldPos);\n"
+    "        if (dist2 < 0.0256) { hit = true; break; }\n" // 0.16^2
     "    }\n"
 
     "    if (!hit) return;\n"
 
     "    ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
     "    hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
-    "    vec4 reflectionColor = imageLoad(inputImage, hitPixel * SSR_RES);\n"
+    "    vec4 reflectionColor = imageLoad(inputImage, hitPixel * 4);\n" // SSR_RES = 4
     "    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor.rgb, specColor.rgb);\n"
-
-    // Dither
-    "    int blueNoiseTextureWidth = 64;\n"
-    "    int pixelIndex = int(((int(hitUV.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(hitUV.x) % blueNoiseTextureWidth))) * 3;\n" // Calculate 1D index.  * 4 for four rgba values.
-    "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
-    "    combined += ((bluenoise.rgb * 2.0/255.0) - (1.0/255.0));\n"
     "    imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));\n"
     "}\n";

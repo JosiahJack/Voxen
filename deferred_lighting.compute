@@ -21,9 +21,7 @@ const char* deferredLighting_computeShader =
     "uniform int debugView;\n"
     "uniform float worldMin_x;\n"
     "uniform float worldMin_z;\n"
-    "uniform float cam_x;\n"
-    "uniform float cam_y;\n"
-    "uniform float cam_z;\n"
+    "uniform vec3 camPos;\n"
     "uniform float fogColorR;\n"
     "uniform float fogColorG;\n"
     "uniform float fogColorB;\n"
@@ -87,7 +85,6 @@ const char* deferredLighting_computeShader =
 
     "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));\n"
     "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    vec3 camPos = vec3(cam_x, cam_y, cam_z);\n"
     "    vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));\n"
     "    float distToPixel = length(worldPos - camPos);\n"
     "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));\n"

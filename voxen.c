@@ -160,13 +160,10 @@ GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
-      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
+      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, camPosLoc_deferred = -1,
       fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
       viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1;
 
-int ssr_StepCount = 128;
-float ssr_MaxDist = 71.68f;
-float ssr_StepSize = 0.185f;
 float fogColorR = 0.04f;
 float fogColorG = 0.04f;
 float fogColorB = 0.09f;
@@ -174,8 +171,7 @@ float fogColorB = 0.09f;
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
 GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, 
-      stepCountLoc_ssr = -1, cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1;
+GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, camPosLoc_ssr = -1;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -401,9 +397,7 @@ int CompileShaders(void) {
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
     worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
     worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
-    cam_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_x");
-    cam_yLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_y");
-    cam_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_z");
+    camPosLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "camPos");
     fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
     fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
     fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
@@ -414,12 +408,7 @@ int CompileShaders(void) {
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
-    cam_xLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_x");
-    cam_yLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_y");
-    cam_zLoc_ssr = glGetUniformLocation(ssrShaderProgram, "cam_z");
-    stepCountLoc_ssr = glGetUniformLocation(ssrShaderProgram, "maxSteps");
-    stepSizeLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepSize");
-    maxDistLoc_ssr = glGetUniformLocation(ssrShaderProgram, "maxDistance");
+    camPosLoc_ssr = glGetUniformLocation(ssrShaderProgram, "camPos");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
@@ -600,24 +589,6 @@ int Input_KeyDown(uint32_t scancode) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
     }
     
-    if (keys[SDL_SCANCODE_O]) {
-        ssr_StepCount++;
-    } else if (keys[SDL_SCANCODE_P]) {
-        ssr_StepCount--;
-    }
-    
-    if (keys[SDL_SCANCODE_K]) {
-        ssr_MaxDist += 0.32f;
-    } else if (keys[SDL_SCANCODE_L]) {
-        ssr_MaxDist -= 0.32f;
-    }
-    
-    if (keys[SDL_SCANCODE_N]) {
-        ssr_StepSize += 0.01f;
-    } else if (keys[SDL_SCANCODE_M]) {
-        ssr_StepSize -= 0.01f;
-    }
-    
 
     if (keys[SDL_SCANCODE_1]) {
         fogColorR += 0.01f;
@@ -791,41 +762,14 @@ void UpdateInstanceMatrix(int i) {
 
 int SetupInstances(void) {
     DualLog("Initializing instances...\n");
-//     int x,z;
-//     x = 0; z = 0;
     int idx;
     for (idx = 0;idx<INSTANCE_COUNT;idx++) {
-//         int entIdx = idx < MAX_ENTITIES ? idx : 0;
-        instances[idx].modelIndex = UINT16_MAX;//entities[entIdx].modelIndex;
-        instances[idx].texIndex = UINT16_MAX;//entities[entIdx].texIndex;
-        instances[idx].glowIndex = UINT16_MAX;//entities[entIdx].glowIndex;
-        instances[idx].specIndex = UINT16_MAX;//entities[entIdx].specIndex;
-        instances[idx].normIndex = UINT16_MAX;//entities[entIdx].normIndex;
-        instances[idx].lodIndex = UINT16_MAX;//entities[entIdx].lodIndex;
-        instances[idx].posx = 0.0f;//((float)x * 2.56f);
-        instances[idx].posy = 0.0f;
-        instances[idx].posz = 0.0f;//((float)z * 5.12f);
+        instances[idx].modelIndex = instances[idx].texIndex = instances[idx].glowIndex = instances[idx].specIndex = instances[idx].normIndex = instances[idx].lodIndex = UINT16_MAX;
+        instances[idx].posx = instances[idx].posy = instances[idx].posz = 0.0f;
         instances[idx].sclx = instances[idx].scly = instances[idx].sclz = 1.0f; // Default scale
-        instances[idx].rotx = instances[idx].roty = instances[idx].rotz = 0.0f;
-        instances[idx].rotw = 1.0f; // Quaternion identity
-//         x++;
-//         if (idx == 100 || idx == 200 || idx == 300 || idx == 400 || idx == 500
-//             || idx == 600 || idx == 700 || idx == 800 || idx == 900) {
-//
-//             x = 0;
-//             z++;
-//         }
-
+        instances[idx].rotx = instances[idx].roty = instances[idx].rotz = 0.0f; instances[idx].rotw = 1.0f; // Quaternion identity
         dirtyInstances[idx] = true;
     }
-    
-//     idx = 5455;  // Test light representative, not actually the light, moves with it
-//     instances[idx].modelIndex = 621; // Test Light Sphere
-//     instances[idx].texIndex = 881; // white light
-//     instances[idx].glowIndex = 881; // white light
-//     instances[idx].sclx = 0.4f;
-//     instances[idx].scly = 0.4f;
-//     instances[idx].sclz = 0.4f;
 
     // Generate and size instance related buffers
     glGenBuffers(1, &instancesBuffer);
@@ -833,14 +777,14 @@ int SetupInstances(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
+
     glGenBuffers(1, &instancesInPVSBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    
+
     glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
@@ -882,33 +826,33 @@ void UpdateScreenSize(void) {
 }
 
 int LightmapBake() {
-    double start_time = get_time();
-    if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
-
-    uint32_t totalLuxelCount = 64u * 64u * renderableCount;
-    DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-    for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glUseProgram(lightmapShaderProgram);
-    glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
-    glUniform1ui(instanceCountLoc_lightmap, renderableCount);
-    glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
-    glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
-    glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
-    glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
-    GLuint groupsX = (800 + 31) / 32;
-    GLuint groupsY = (600 + 31) / 32;
-    glDispatchCompute(groupsX, groupsY, 1);
-    CHECK_GL_ERROR();
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-    double end_time = get_time();
-    DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
+//     double start_time = get_time();
+//     if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
+//
+//     uint32_t totalLuxelCount = 64u * 64u * renderableCount;
+//     DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
+//     for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+//     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     glUseProgram(lightmapShaderProgram);
+//     glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
+//     glUniform1ui(instanceCountLoc_lightmap, renderableCount);
+//     glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
+//     glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
+//     glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
+//     glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
+//     GLuint groupsX = (800 + 31) / 32;
+//     GLuint groupsY = (600 + 31) / 32;
+//     glDispatchCompute(groupsX, groupsY, 1);
+//     CHECK_GL_ERROR();
+//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+//     double end_time = get_time();
+//     DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
     return 0;
 }
 
@@ -987,9 +931,6 @@ int InitializeEnvironment(void) {
     glUseProgram(ssrShaderProgram);
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
     glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
-    glUniform1i(stepCountLoc_ssr, ssr_StepCount);
-    glUniform1f(maxDistLoc_ssr, ssr_MaxDist);
-    glUniform1f(stepSizeLoc_ssr, ssr_StepSize);
     glUseProgram(0);
     CHECK_GL_ERROR();
     malloc_trim(0);
@@ -1040,7 +981,7 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-    GenerateAndBindTexture(&outputImageID,          GL_RGBA32F, screen_width / SSR_RES, screen_height / SSR_RES,    GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Deferred Lighting Result Colors");
+    GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,            GL_FLOAT, GL_TEXTURE_2D, "SSR");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -1063,7 +1004,7 @@ int InitializeEnvironment(void) {
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     //                 3 = depth
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F); // Output
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Output
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1907,35 +1848,26 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // ====================================================================
 
+        // 5. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
         float viewProj[16];
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
         if (debugView == 0 || debugView == 8) {
-        // 5. Deferred Lighting
-        //        Apply deferred lighting with compute shader.  All lights are
-        //        dynamic and can be updated at any time (flicker, light switches,
-        //        move, change color, get marked as "culled" so shader can skip it,
-        //        etc.).
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
             glUseProgram(deferredLightingShaderProgram);
             glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
-            glUniform1f(cam_xLoc_deferred, cam_x);
-            glUniform1f(cam_yLoc_deferred, cam_y);
-            glUniform1f(cam_zLoc_deferred, cam_z);
+            glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
             glUniform1f(fogColorBLoc_deferred, fogColorB);
             glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
-
-            // Dispatch compute shader
-            glDispatchCompute(groupX, groupY, 1);
+            glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
@@ -1944,9 +1876,7 @@ int main(int argc, char* argv[]) {
         if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-            glUniform1f(cam_xLoc_ssr, cam_x);
-            glUniform1f(cam_yLoc_ssr, cam_y);
-            glUniform1f(cam_zLoc_ssr, cam_z);
+            glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
             GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
             GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
             glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -1977,7 +1907,6 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "SSR steps: %d, SSR step size: %f, SSR max dist: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist);
         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
         
         // Frame stats
