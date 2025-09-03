@@ -15,6 +15,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <time.h>
+#include <enet/enet.h>
 #include "event.h"
 #include "data_parser.h"
 #include "render.h"
@@ -29,7 +31,6 @@
 #include "instance.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
-#include <enet/enet.h>
 #include "constants.h"
 #include "dynamic_culling.h"
 
@@ -107,6 +108,7 @@ const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
 double screenshotTimeout = 0.0;
+bool journalFirstWrite = true;
 
 // Networking
 typedef enum {
@@ -147,7 +149,7 @@ GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texInd
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
       specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
       overrideGlowBLoc_chunk = -1;
-      
+
 //    GPU Lightmapper Compute Shader
 GLuint lightmapShaderProgram;
 GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1, modelCountLoc_lightmap = -1,
@@ -159,10 +161,10 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
-      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1, 
+      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
       viewProjectionLoc_deferred = -1, sssMaxStepsLoc_deferred = -1, sssStepSizeLoc_deferred = -1, modelCountLoc_deferred = -1,
       totalLuxelCountLoc_deferred = -1;
-      
+
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
 float ssr_StepSize = 0.185f;
@@ -652,7 +654,7 @@ int Input_KeyDown(uint32_t scancode) {
     } else if (keys[SDL_SCANCODE_8]) {
         sssStepSize -= 0.005f;
     }
-    
+
     if (keys[SDL_SCANCODE_9]) {
         sssMaxSteps++;
     } else if (keys[SDL_SCANCODE_0]) {
@@ -813,39 +815,41 @@ void UpdateInstanceMatrix(int i) {
 
 int SetupInstances(void) {
     DualLog("Initializing instances...\n");
-    int x,z,idx;
-    for (idx = 0, x = 0, z = 0;idx<INSTANCE_COUNT;idx++) {
-        int entIdx = idx < MAX_ENTITIES ? idx : 0;
-        instances[idx].modelIndex = entities[entIdx].modelIndex;
-        instances[idx].texIndex = entities[entIdx].texIndex;
-        instances[idx].glowIndex = entities[entIdx].glowIndex;
-        instances[idx].specIndex = entities[entIdx].specIndex;
-        instances[idx].normIndex = entities[entIdx].normIndex;
-        instances[idx].lodIndex = entities[entIdx].lodIndex;
-        instances[idx].posx = ((float)x * 2.56f);
+//     int x,z;
+//     x = 0; z = 0;
+    int idx;
+    for (idx = 0;idx<INSTANCE_COUNT;idx++) {
+//         int entIdx = idx < MAX_ENTITIES ? idx : 0;
+        instances[idx].modelIndex = UINT16_MAX;//entities[entIdx].modelIndex;
+        instances[idx].texIndex = UINT16_MAX;//entities[entIdx].texIndex;
+        instances[idx].glowIndex = UINT16_MAX;//entities[entIdx].glowIndex;
+        instances[idx].specIndex = UINT16_MAX;//entities[entIdx].specIndex;
+        instances[idx].normIndex = UINT16_MAX;//entities[entIdx].normIndex;
+        instances[idx].lodIndex = UINT16_MAX;//entities[entIdx].lodIndex;
+        instances[idx].posx = 0.0f;//((float)x * 2.56f);
         instances[idx].posy = 0.0f;
-        instances[idx].posz = ((float)z * 5.12f);
+        instances[idx].posz = 0.0f;//((float)z * 5.12f);
         instances[idx].sclx = instances[idx].scly = instances[idx].sclz = 1.0f; // Default scale
         instances[idx].rotx = instances[idx].roty = instances[idx].rotz = 0.0f;
-        instances[idx].rotw = 1.0f;
-        x++;
-        if (idx == 100 || idx == 200 || idx == 300 || idx == 400 || idx == 500
-            || idx == 600 || idx == 700 || idx == 800 || idx == 900) {
-
-            x = 0;
-            z++;
-        }
+        instances[idx].rotw = 1.0f; // Quaternion identity
+//         x++;
+//         if (idx == 100 || idx == 200 || idx == 300 || idx == 400 || idx == 500
+//             || idx == 600 || idx == 700 || idx == 800 || idx == 900) {
+//
+//             x = 0;
+//             z++;
+//         }
 
         dirtyInstances[idx] = true;
     }
     
-    idx = 5455;  // Test light representative, not actually the light, moves with it
-    instances[idx].modelIndex = 621; // Test Light Sphere
-    instances[idx].texIndex = 881; // white light
-    instances[idx].glowIndex = 881; // white light
-    instances[idx].sclx = 0.4f;
-    instances[idx].scly = 0.4f;
-    instances[idx].sclz = 0.4f;
+//     idx = 5455;  // Test light representative, not actually the light, moves with it
+//     instances[idx].modelIndex = 621; // Test Light Sphere
+//     instances[idx].texIndex = 881; // white light
+//     instances[idx].glowIndex = 881; // white light
+//     instances[idx].sclx = 0.4f;
+//     instances[idx].scly = 0.4f;
+//     instances[idx].sclz = 0.4f;
 
     // Generate and size instance related buffers
     glGenBuffers(1, &instancesBuffer);
@@ -899,6 +903,37 @@ void UpdateScreenSize(void) {
     m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
     m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(farPlane + nearPlane) / (farPlane - nearPlane); m[11]= -1.0f;
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
+}
+
+int LightmapBake() {
+    double start_time = get_time();
+    if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
+
+    uint32_t totalLuxelCount = 64u * 64u * renderableCount;
+    DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
+    for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glUseProgram(lightmapShaderProgram);
+    glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
+    glUniform1ui(instanceCountLoc_lightmap, renderableCount);
+    glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
+    glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
+    glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
+    glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
+    GLuint groupsX = (800 + 31) / 32;
+    GLuint groupsY = (600 + 31) / 32;
+    glDispatchCompute(groupsX, groupsY, 1);
+    CHECK_GL_ERROR();
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+    double end_time = get_time();
+    DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
+    return 0;
 }
 
 int InitializeEnvironment(void) {
@@ -1134,6 +1169,14 @@ int InitializeEnvironment(void) {
     startLevel = entry.startLevel;
     currentLevel = startLevel;
     DualLog("Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
+    if (LoadTextures()) return 1;
+    if (LoadGeometry()) return 1;
+    if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
+    if (SetupInstances()) return 1;
+    if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
+    if (LoadLevelLights(currentLevel)) return 1;
+    if (Cull_Init()) return 1; // Must be after level!
+    if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1168,52 +1211,12 @@ int Physics(void) {
     return 0;
 }
 
-int LightmapBake() {
-    double start_time = get_time();
-    if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
-    
-    uint32_t totalLuxelCount = 64u * 64u * renderableCount;
-    DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-    for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer); 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glUseProgram(lightmapShaderProgram);
-    glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
-    glUniform1ui(instanceCountLoc_lightmap, renderableCount);
-    glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
-    glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
-    glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
-    glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
-    GLuint groupsX = (800 + 31) / 32;
-    GLuint groupsY = (600 + 31) / 32;
-    glDispatchCompute(groupsX, groupsY, 1);
-    CHECK_GL_ERROR();
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-    double end_time = get_time();
-    DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
-    return 0;
-}
-
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
 int EventExecute(Event* event) {
+    if (event->type == EV_NULL) return 0;
+
     switch(event->type) {
-        case EV_INIT: return InitializeEnvironment(); // Init called prior to Loading Data
-        case EV_LOAD_TEXTURES: return LoadTextures();
-        case EV_LOAD_MODELS: return LoadGeometry();
-        case EV_LOAD_ENTITIES: return LoadEntities();
-        case EV_LOAD_LEVELS:
-            LoadLevelGeometry(currentLevel);
-            LoadLevelLights(currentLevel);
-            return 0;
-        case EV_LOAD_INSTANCES: return SetupInstances();
-        case EV_CULL_INIT: return Cull_Init();
-        case EV_LIGHTMAP_BAKE: return LightmapBake();
         case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
         case EV_KEYUP: return Input_KeyUp(event->payload1u);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
@@ -1221,7 +1224,8 @@ int EventExecute(Event* event) {
         case EV_QUIT: return 1; break;
     }
 
-    return 99; // Something went wrong
+    DualLogError("Unknown event %d\n",event->type);
+    return 99;
 }
 
 static const char* debugViewNames[] = {
@@ -1290,6 +1294,260 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     return false; // Outside FOV cone
 }
 
+int EventInit(void) {
+    journalFirstWrite = true;
+
+    // Initialize the eventQueue as empty
+    clear_ev_queue();
+    clear_ev_journal(); // Initialize the event journal as empty.
+    eventQueue[eventIndex].type = EV_NULL;
+    eventQueue[eventIndex].timestamp = get_time();
+    eventQueue[eventIndex].deltaTime_ns = 0.0;
+    return 0;
+}
+
+int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
+    if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { DualLogError("Queue buffer filled!\n"); return 1; }
+
+    //DualLog("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
+    eventQueue[eventQueueEnd].frameNum = globalFrameNum;
+    eventQueue[eventQueueEnd].type = type;
+    eventQueue[eventQueueEnd].timestamp = 0;
+    eventQueue[eventQueueEnd].payload1u = payload1u;
+    eventQueue[eventQueueEnd].payload2u = payload2u;
+    eventQueue[eventQueueEnd].payload1f = payload1f;
+    eventQueue[eventQueueEnd].payload2f = payload2f;
+    eventQueueEnd++;
+    return 0;
+}
+
+int EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
+    return EnqueueEvent(type,payload1u,payload2u,0.0f,0.0f);
+}
+
+int EnqueueEvent_Uint(uint8_t type, uint32_t payload1u) {
+    return EnqueueEvent(type,payload1u,0u,0.0f,0.0f);
+}
+
+int EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
+    return EnqueueEvent(type,0u,0u,payload1f,payload2f);
+}
+
+int EnqueueEvent_Float(uint8_t type, float payload1f) {
+    return EnqueueEvent(type,0u,0u,payload1f,0.0f);
+}
+
+// Enqueues an event with type only and no payload values.
+int EnqueueEvent_Simple(uint8_t type) {
+    return EnqueueEvent(type,0u,0u,0.0f,0.0f);
+}
+
+// Intended to be called after each buffered write to the logfile in .dem
+// format which is custom but similar concept to Quake 1 demos.
+void clear_ev_journal(void) {
+    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
+    for (int i=0;i<EVENT_JOURNAL_BUFFER_SIZE;i++) {
+        eventJournal[i].type = EV_NULL;
+        eventJournal[i].frameNum = 0;
+        eventJournal[i].timestamp = 0.0;
+        eventJournal[i].deltaTime_ns = 0.0;
+    }
+
+    eventJournalIndex = 0; // Restart at the beginning.
+}
+
+void JournalLog(void) {
+    FILE* fp;
+    if (journalFirstWrite) {
+        fp = fopen("./voxen.dem", "wb"); // Overwrite for first write.
+        journalFirstWrite = false;
+
+        // TODO: Write player positions on first and 2nd line
+    } else fp = fopen("./voxen.dem", "ab"); // Append
+
+    if (!fp) {
+        DualLogError("Failed to open voxen.dem for journal log\n");
+        return;
+    }
+
+    // Write all valid events in eventJournal
+    for (int i = 0; i < eventJournalIndex; i++) {
+        if (eventJournal[i].type != EV_NULL) {
+            fwrite(&eventJournal[i], sizeof(Event), 1, fp);
+        }
+    }
+
+    fflush(fp);
+    fclose(fp);
+}
+
+bool IsPlayableEventType(uint8_t type) {
+    if (type == EV_KEYDOWN || type == EV_KEYUP) return true;
+    return type != EV_NULL;
+}
+
+// Makes use of global activeLogFile handle to read through log and enqueue events with matching frameNum to globalFrameNum
+int ReadActiveLog() {
+    static bool eof_reached = false; // Track EOF across calls
+    Event event;
+    int events_processed = 0;
+
+    if (eof_reached) {
+        return 2; // Indicate EOF was previously reached
+    }
+
+    DualLog("------ ReadActiveLog start for frame %d ------\n",globalFrameNum);
+    while (events_processed < MAX_EVENTS_PER_FRAME) {
+        size_t read_count = fread(&event, sizeof(Event), 1, activeLogFile);
+        if (read_count != 1) {
+            if (feof(activeLogFile)) {
+                eof_reached = true;
+                log_playback = false; // Finished enqueuing last frame, main will finish processing the queue and return input to user.
+                return events_processed > 0 ? 0 : 2; // 0 if events were processed, 2 if EOF and no events
+            }
+
+            if (ferror(activeLogFile)) {
+                DualLogError("Could not read log file\n");
+                return -1; // Read error
+            }
+        }
+
+        if (!IsPlayableEventType(event.type)) continue; // Skip unplayable events
+
+        if (event.frameNum == globalFrameNum) {
+            // Enqueue events matching the current frame
+            EnqueueEvent(event.type, event.payload1u, event.payload2u, event.payload1f, event.payload2f);
+            events_processed++;
+            DualLog("Enqueued event %d from log for frame %d\n",event.type,event.frameNum);
+        } else if (event.frameNum > globalFrameNum) {
+            // Event is for a future frame; seek back and stop processing
+            fseek(activeLogFile, -(long)sizeof(Event), SEEK_CUR);
+            DualLog("Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
+            return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if no matching events
+        }
+        // If event.frameNum < globalFrameNum, skip it (past event)
+    }
+
+    DualLog("End of log. Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
+    return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if limit reached with no matching events
+}
+
+// Convert the binary .dem file into human readable text
+int JournalDump(const char* dem_file) {
+    FILE* fpR = fopen(dem_file, "rb");
+    if (!fpR) {
+        DualLogError("Failed to open .dem file\n");
+        return -1;
+    }
+
+    FILE* fpW = fopen("./log_dump.txt", "wb");
+    if (!fpW) {
+        fclose(fpR); // Close .dem file that we were reading.
+        DualLogError("Failed to open voxen.dem\n");
+        return -1;
+    }
+
+    Event event;
+    while (fread(&event, sizeof(Event), 1, fpR) == 1) {
+        fprintf(fpW,"frameNum: %d, ",event.frameNum);
+        fprintf(fpW,"event type: %d, ",event.type);
+        fprintf(fpW,"timestamp: %f, ", event.timestamp);
+        fprintf(fpW,"delta time: %f, ", event.deltaTime_ns);
+        fprintf(fpW,"payload1u: %d, ", event.payload1u);
+        fprintf(fpW,"payload2u: %d, ", event.payload2u);
+        fprintf(fpW,"payload1f: %f, ", event.payload1f);
+        fprintf(fpW,"payload2f: %f\n", event.payload2f); // \n flushes write to file
+    }
+
+    fclose(fpW);
+    fclose(fpR);
+    return 0;
+}
+
+// Queue was processed for the frame, clear it so next frame starts fresh.
+void clear_ev_queue(void) {
+    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
+    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+        eventQueue[i].type = EV_NULL;
+        eventQueue[i].frameNum = 0;
+        eventQueue[i].timestamp = 0.0;
+        eventQueue[i].deltaTime_ns = 0.0;
+    }
+
+    eventIndex = 0;
+    eventQueueEnd = 0;
+}
+
+double get_time(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+        DualLogError("clock_gettime failed\n");
+        return 0.0;
+    }
+
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
+}
+
+// Process the entire event queue. Events might add more new events to the queue.
+// Intended to be called once per loop iteration by the main loop.
+int EventQueueProcess(void) {
+    int status = 0;
+    double timestamp = 0.0;
+    int eventCount = 0;
+    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+        if (eventQueue[i].type != EV_NULL) {
+            eventCount++;
+        }
+    }
+
+    if (eventCount > maxEventCount_debug) maxEventCount_debug = eventCount;
+    eventIndex = 0;
+    while (eventIndex < MAX_EVENTS_PER_FRAME) {
+        if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
+
+        eventQueue[eventIndex].frameNum = globalFrameNum;
+        timestamp = current_time;
+        eventQueue[eventIndex].timestamp = timestamp;
+        eventQueue[eventIndex].deltaTime_ns = timestamp - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
+
+        // Journal buffer entry of this event.  Still written to during playback for time deltas but never logged to .dem
+        eventJournalIndex++; // Increment now to then write event into the journal.
+        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (timestamp - lastJournalWriteTime) > 5.0) {
+            if (!log_playback) {
+                JournalLog();
+                lastJournalWriteTime = get_time();
+//                 DualLog("Event queue cleared after journal filled, log updated\n");
+            } else {
+//                 DualLog("Event queue cleared after journal filled, not writing to log during playback.\n");
+            }
+
+            clear_ev_journal(); // Also sets eventJournalIndex to 0.
+        }
+
+        eventJournal[eventJournalIndex].frameNum = eventQueue[eventIndex].frameNum;
+        eventJournal[eventJournalIndex].type = eventQueue[eventIndex].type;
+        eventJournal[eventJournalIndex].timestamp = eventQueue[eventIndex].timestamp;
+        eventJournal[eventJournalIndex].deltaTime_ns = eventQueue[eventIndex].deltaTime_ns;
+        eventJournal[eventJournalIndex].payload1u = eventQueue[eventIndex].payload1u;
+        eventJournal[eventJournalIndex].payload2u = eventQueue[eventIndex].payload2u;
+        eventJournal[eventJournalIndex].payload1f = eventQueue[eventIndex].payload1f;
+        eventJournal[eventJournalIndex].payload2f = eventQueue[eventIndex].payload2f;
+
+        // Execute event after journal buffer entry such that we can dump the
+        // journal buffer on error and last entry will be the problematic event.
+        status = EventExecute(&eventQueue[eventIndex]);
+        if (status) {
+            if (status != 1) DualLog("EventExecute returned nonzero status: %d\n", status);
+            return status;
+        }
+
+        eventIndex++;
+    }
+
+    clear_ev_queue();
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
@@ -1345,16 +1603,8 @@ int main(int argc, char* argv[]) {
     }
     
     DebugRAM("prior init events queued");
+    if (InitializeEnvironment()) return 1;
 
-    // Queue order for loading is IMPORTANT!
-    EnqueueEvent_Simple(EV_INIT);
-    EnqueueEvent_Simple(EV_LOAD_TEXTURES);
-    EnqueueEvent_Simple(EV_LOAD_MODELS);
-    EnqueueEvent_Simple(EV_LOAD_ENTITIES); // Must be after models and textures else entity types can't be validated.
-    EnqueueEvent_Simple(EV_LOAD_INSTANCES);
-    EnqueueEvent_Simple(EV_LOAD_LEVELS); // Must be after entities!
-    EnqueueEvent_Simple(EV_CULL_INIT); // Must be after level!
-    EnqueueEvent_Simple(EV_LIGHTMAP_BAKE); // Must be after EVERYTHING ELSE!
     double accumulator = 0.0;
     double last_physics_time = get_time();
     last_time = get_time();
@@ -1604,11 +1854,23 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glUseProgram(chunkShaderProgram);
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
         float view[16]; // Set up view matrices
         mat4_lookat(view);
         glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
         glBindVertexArray(vao_chunk);
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
+            if (i == startOfDoubleSidedInstances) {
+                if (debugValue > 0) DualLog("For frame %d, enabling doublesided\n",globalFrameNum);
+                glDisable(GL_CULL_FACE);
+            }
+
+            if (i == startOfTransparentInstances) {
+                if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
+                glEnable(GL_BLEND); // Enable blending for transparent instances
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
+                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
+            }
             if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
@@ -1628,55 +1890,53 @@ int main(int argc, char* argv[]) {
             glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
             glUniform1i(instanceIndexLoc_chunk, i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
+            if (debugValue > 0) DualLog("For frame %d, rendering model type %d\n",globalFrameNum,instances[i].modelIndex);
             glUniform1i(modelIndexLoc_chunk, modelType);
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-            if (isDoubleSided(instances[i].texIndex) || instances[i].sclx < 0.0f || instances[i].scly < 0.0f || instances[i].sclz < 0.0f) glDisable(GL_CULL_FACE); // Disable backface culling
-            else glEnable(GL_CULL_FACE); // Even thought I tried to only set this just after the draw, it seems it can get stuck on so this ensures correctness.
-            
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
         
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
         glEnable(GL_CULL_FACE); // Reenable backface culling
         glEnable(GL_DEPTH_TEST);
-        if (debugView == 6) { // Render Light Spheres
-           for (uint16_t i=0;i<numLightsFound;++i) {
-                float mat[16]; // 4x4 matrix
-                uint16_t idx = i * LIGHT_DATA_SIZE;
-                float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
-                if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
-                SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ],
-                                 0.0f, 0.0f, 0.0f, 1.0f, // Quaternion identity
-                                 sphoxelSize, sphoxelSize, sphoxelSize); // Uniform scale
-                
-                glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                glUniform1i(texIndexLoc_chunk, 41);
-                glUniform1i(glowIndexLoc_chunk, 41);
-                glUniform1i(specIndexLoc_chunk, 41);
-                glUniform1i(instanceIndexLoc_chunk, i);
-                int modelType = 621; // Test light icosphere
-                glUniform1i(modelIndexLoc_chunk, modelType);
-                glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
-                glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-                drawCallsRenderedThisFrame++;
-                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
-           }
-        }
-        
-        glDisable(GL_BLEND);
+//         if (debugView == 6) { // Render Light Spheres
+//            for (uint16_t i=0;i<numLightsFound;++i) {
+//                 float mat[16]; // 4x4 matrix
+//                 uint16_t idx = i * LIGHT_DATA_SIZE;
+//                 float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
+//                 if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
+//                 SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ],
+//                                  0.0f, 0.0f, 0.0f, 1.0f, // Quaternion identity
+//                                  sphoxelSize, sphoxelSize, sphoxelSize); // Uniform scale
+//
+//                 glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+//                 glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+//                 glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+//                 glUniform1i(texIndexLoc_chunk, 41);
+//                 glUniform1i(glowIndexLoc_chunk, 41);
+//                 glUniform1i(specIndexLoc_chunk, 41);
+//                 glUniform1i(instanceIndexLoc_chunk, i);
+//                 int modelType = 621; // Test light icosphere
+//                 glUniform1i(modelIndexLoc_chunk, modelType);
+//                 glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
+//                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+//                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+//                 glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+//                 drawCallsRenderedThisFrame++;
+//                 verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+//            }
+//         }
 
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // ====================================================================
-        
+
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
         float viewProj[16];
@@ -1690,7 +1950,7 @@ int main(int argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
-            
+
             glUseProgram(deferredLightingShaderProgram);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 

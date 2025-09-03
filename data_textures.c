@@ -67,7 +67,7 @@ int LoadTextures(void) {
     textureSizes = malloc(textureCount * 2 * sizeof(int)); // Times 2 for x and y pairs flat packed (e.g. x,y,x,y,x,y for 3 textures)
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
     doubleSidedTexture = malloc(textureCount * sizeof(bool));
-    isTransparent = malloc(textureCount * sizeof(bool));
+    transparentTexture = malloc(textureCount * sizeof(bool));
     size_t maxFileSize = 10000000; // 10MB
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
     DebugRAM("after texture buffers mallocs");
@@ -111,7 +111,7 @@ int LoadTextures(void) {
             uint32_t color = ((uint32_t)image_data[j] << 24) | ((uint32_t)image_data[j + 1] << 16) |
                              ((uint32_t)image_data[j + 2] << 8) | (uint32_t)image_data[j + 3];
 
-            if (image_data[j] < 255) isTransparent[i] = true; // Don't remove if, need to preserve in case any pixels are not transparent
+            if (image_data[j + 3] < 255) transparentTexture[i] = true; // Don't remove if, need to preserve in case any pixels are not transparent
             HASH_FIND_INT(color_table, &color, entry);
             if (!entry) {
                 if (palette_size >= MAX_PALETTE_SIZE) { DualLog("\033[33mWARNING: Palette size exceeded for %s\033[0m\n", texture_parser.entries[matchedParserIdx].path); palette_size = MAX_PALETTE_SIZE - 1; break; }
@@ -273,8 +273,6 @@ int LoadTextures(void) {
     print_bytes_no_newline(totalPaletteColors * 4);
     DualLog(")\n");
 #endif
-
-    // 13 is BlueNoise for deferred shader
     
     // Send static uniforms to chunk shader
     glGenBuffers(1, &textureOffsetsID);

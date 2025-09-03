@@ -7,33 +7,15 @@
 // Event types for debugging and playback callbacks
 #define EV_NULL 0u
 #define EV_INIT 1u
-
 #define EV_KEYDOWN 10u
 #define EV_KEYUP 11u
 #define EV_MOUSEMOVE 12u
 #define EV_MOUSEDOWN 13u
 #define EV_MOUSEUP 14u
 #define EV_MOUSEWARP 15u
-
-#define EV_LOAD_TEXTURES 20u
-#define EV_LOAD_ENTITIES 21u
-#define EV_LOAD_MODELS 22u
-#define EV_LOAD_LEVELS 23u
-#define EV_LOAD_VOXELS 24u
-#define EV_LOAD_INSTANCES 25u
-#define EV_CULL_INIT 26u
-#define EV_LIGHTMAP_BAKE 27u
-
-#define EV_NETWORK_PACKET_RX 30u
-#define EV_NETWORK_PACKET_TX 31u
-#define EV_NETWORK_CONNECT 32u
-#define EV_NETWORK_DISCONNECT 33u
-
 #define EV_PLAYAUDIO_CLIP 40u
 #define EV_PLAYAUDIO_STREAM 41u
-
 #define EV_PHYSICS_TICK 50u
-
 #define EV_PAUSE 254u
 #define EV_QUIT 255u
 

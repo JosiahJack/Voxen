@@ -22,11 +22,11 @@ const char* lightmap_compute_shader =
     "    float floorHeight;\n"
     "};\n"
 
-    // binding 0 unusable here, in-out gbuffer for colors (starts as unlit, gets deferred lighting and reflections applied in separate passes)
+    // binding 0 unusable here, in-out gbuffer for colors (reflections applied as well in separate pass)
     // binding 1 unusable here, unlit raster's gbuffer for world position xyz as rgb (RGBA32F), index into full instances[] array packed into alpha channel
     // binding 2 unusable here, unlit raster's gbuffer for normals xyz half loats packed in rg
     // binding 3 unused at all, unlit raster's gbuffer for depth (placeholder, using renderbuffer for now as this isn't needed with having world position gbuffer on binding point 1)
-    // binding 4 unusable here, deferred lighting's output color after applying lighting and screenspace reflections
+    // binding 4 unusable here, ssr's output color downsized from main resolution
     // binding 5 unused at all, placeholder for possible future gbuffer if needed
     "layout(std430, binding = 6) buffer LightmapData { float lightmapData[]; };\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"

@@ -7,7 +7,7 @@
 
 #define INSTANCE_COUNT 5750 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects
 
-typedef struct { // Ensure deferred_lighting.compute struct matches!
+typedef struct { // Ensure chunk.glsl struct matches!
     int32_t modelIndex;
     int32_t texIndex;
     int32_t glowIndex;
@@ -34,6 +34,8 @@ extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern GLuint instancesBuffer;
 extern GLuint instancesInPVSBuffer;
 extern GLuint matricesBuffer;
+extern int startOfDoubleSidedInstances;
+extern int startOfTransparentInstances;
 
 int SetupInstances(void);
 

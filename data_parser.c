@@ -41,7 +41,8 @@ uint32_t ** triangleDataArrays;
 uint32_t ** triEdgeDataArrays;
 GLuint lightmapID;
 uint32_t renderableCount = 0;
-
+int startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
+int startOfTransparentInstances = INSTANCE_COUNT - 1;
 
 //-----------------------------------------------------------------------------
 // Level Data Parsing
@@ -1008,7 +1009,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
             doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
 
-        if (isTransparent(instances[idx].texIndex) {
+        if (isTransparent(instances[idx].texIndex)) {
             transparentInstances[transparentInstancesHead] = idx;
             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
@@ -1020,13 +1021,52 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
     }
 
-    // Upload new instance data to SSBO for it
+    // Filter transparent instances to exclude double-sided ones
+    int transparentOnlyCount = 0;
+    int transparentOnlyIndices[INSTANCE_COUNT];
+    for (int i = 0; i < transparentInstancesHead; ++i) {
+        int idx = transparentInstances[i];
+        bool isDoubleSided = false;
+        for (int j = 0; j < doubleSidedInstancesHead; ++j) {
+            if (doubleSidedInstances[j] == idx) {
+                isDoubleSided = true;
+                break;
+            }
+        }
+        if (!isDoubleSided) {
+            transparentOnlyIndices[transparentOnlyCount] = idx;
+            transparentOnlyCount++;
+        }
+    }
+
+    startOfDoubleSidedInstances = gameObjectCount - doubleSidedInstancesHead - transparentOnlyCount; // e.g., 5453 - 19 - 42 = 5392
+    startOfTransparentInstances = gameObjectCount - doubleSidedInstancesHead;
+    int maxValidIdx = startOfDoubleSidedInstances;
+    for (int i = 0; i < doubleSidedInstancesHead; ++i) {
+        int idx = doubleSidedInstances[i];
+        if (idx < 0 || idx >= gameObjectCount) continue;
+
+        Instance tempInstance = instances[maxValidIdx];
+        instances[maxValidIdx] = instances[idx];
+        instances[idx] = tempInstance;
+        maxValidIdx++;
+    }
+
+    for (int i = 0; i < transparentOnlyCount; ++i) {
+        int idx = transparentOnlyIndices[i];
+        if (idx < 0 || idx >= gameObjectCount) continue;
+
+        Instance tempInstance = instances[maxValidIdx];
+        instances[maxValidIdx] = instances[idx];
+        instances[idx] = tempInstance;
+        maxValidIdx++;
+    }
+
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
-    // Generate lightmap
     glGenBuffers(1, &lightmapID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightmapID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, renderableCount * 64 * 64 * 4 * sizeof(float), NULL, GL_DYNAMIC_DRAW); // 256x256 lightmap per model, 4 channel rgba, HDR float

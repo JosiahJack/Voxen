@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <stdbool.h>
+#include "instance.h"
 
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
@@ -20,7 +21,7 @@
 #endif
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
 #define LIGHT_DATA_SIZE 13 // posx, posy, posz, intensity, radius, spotAng, spotDirx, spotDiry, spotDirz, spotDirw, r, g, b
-      // Make sure this^^^^ matches in deferredLighting_computeShader!
+      // Make sure this^^^^ matches in chunk.glsl shader!
 
 #define LIGHT_DATA_OFFSET_POSX 0
 #define LIGHT_DATA_OFFSET_POSY 1
@@ -35,7 +36,7 @@
 #define LIGHT_DATA_OFFSET_R 10
 #define LIGHT_DATA_OFFSET_G 11
 #define LIGHT_DATA_OFFSET_B 12
-// Make sure these match in deferredLighting_computeShader!
+// Make sure these match in chunk.glsl shader!
                    
 #define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define LIGHT_MAX_INTENSITY 8.0f
@@ -73,6 +74,10 @@ extern GLuint cellIndexForLightID;
 extern GLuint lightmapID;
 extern GLuint masterIndexForLightsInPVSID;
 extern bool lightDirty[MAX_VISIBLE_LIGHTS];
+extern uint16_t doubleSidedInstances[INSTANCE_COUNT];
+extern uint16_t doubleSidedInstancesHead;
+extern uint16_t transparentInstances[INSTANCE_COUNT];
+extern uint16_t transparentInstancesHead;
 
 typedef struct {
     float x, y, z, w;
