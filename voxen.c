@@ -161,19 +161,15 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, cam_xLoc_deferred = -1, cam_yLoc_deferred = -1, cam_zLoc_deferred = -1,
-      luminanceFogFacLoc_deferred = -1, fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
-      viewProjectionLoc_deferred = -1, sssMaxStepsLoc_deferred = -1, sssStepSizeLoc_deferred = -1, modelCountLoc_deferred = -1,
-      totalLuxelCountLoc_deferred = -1;
+      fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
+      viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1;
 
 int ssr_StepCount = 128;
 float ssr_MaxDist = 71.68f;
 float ssr_StepSize = 0.185f;
-float fogLuminanceFac = 1.0f;
 float fogColorR = 0.04f;
 float fogColorG = 0.04f;
 float fogColorB = 0.09f;
-int sssMaxSteps = 64;
-float sssStepSize = 0.03;
 
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
@@ -408,13 +404,10 @@ int CompileShaders(void) {
     cam_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_x");
     cam_yLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_y");
     cam_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "cam_z");
-    luminanceFogFacLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "luminanceFac");
     fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
     fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
     fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
     viewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "viewProjection");
-    sssMaxStepsLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sssMaxSteps");
-    sssStepSizeLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "sssStepSize");
     modelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "modelCount");
     totalLuxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "totalLuxelCount");
 
@@ -625,12 +618,7 @@ int Input_KeyDown(uint32_t scancode) {
         ssr_StepSize -= 0.01f;
     }
     
-    if (keys[SDL_SCANCODE_G]) {
-        fogLuminanceFac += 0.01f;
-    } else if (keys[SDL_SCANCODE_B]) {
-        fogLuminanceFac -= 0.01f;
-    }
-    
+
     if (keys[SDL_SCANCODE_1]) {
         fogColorR += 0.01f;
     } else if (keys[SDL_SCANCODE_2]) {
@@ -647,19 +635,6 @@ int Input_KeyDown(uint32_t scancode) {
         fogColorB += 0.01f;
     } else if (keys[SDL_SCANCODE_6]) {
         fogColorB -= 0.01f;
-    }
-    
-    
-    if (keys[SDL_SCANCODE_7]) {
-        sssStepSize += 0.005f;
-    } else if (keys[SDL_SCANCODE_8]) {
-        sssStepSize -= 0.005f;
-    }
-
-    if (keys[SDL_SCANCODE_9]) {
-        sssMaxSteps++;
-    } else if (keys[SDL_SCANCODE_0]) {
-        sssMaxSteps--;
     }
 
     return 0;
@@ -1008,8 +983,6 @@ int InitializeEnvironment(void) {
     glUniform1ui(screenWidthLoc_deferred, screen_width);
     glUniform1ui(screenHeightLoc_deferred, screen_height);
     glUniform1ui(modelCountLoc_deferred, MODEL_COUNT);
-    glUniform1i(sssMaxStepsLoc_deferred, sssMaxSteps);
-    glUniform1f(sssStepSizeLoc_deferred, sssStepSize);
 
     glUseProgram(ssrShaderProgram);
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
@@ -1947,18 +1920,15 @@ int main(int argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
-
-            glUseProgram(deferredLightingShaderProgram);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-            // These should be static but cause issues if not...
+            glUseProgram(deferredLightingShaderProgram);
             glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
             glUniform1f(cam_xLoc_deferred, cam_x);
             glUniform1f(cam_yLoc_deferred, cam_y);
             glUniform1f(cam_zLoc_deferred, cam_z);
-            glUniform1f(luminanceFogFacLoc_deferred, fogLuminanceFac);
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
             glUniform1f(fogColorBLoc_deferred, fogColorB);
@@ -2007,9 +1977,8 @@ int main(int argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "SSR steps: %d, SSR step size: %f, SSR max dist: %f, Lum: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist, fogLuminanceFac);
+        RenderFormattedText(10, textY + (textVertOfset * 5), TEXT_WHITE, "SSR steps: %d, SSR step size: %f, SSR max dist: %f", ssr_StepCount, ssr_StepSize, ssr_MaxDist);
         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
-        RenderFormattedText(10, textY + (textVertOfset * 7), TEXT_YELLOW, "SSS steps: %d, SSS step size: %f", sssMaxSteps, sssStepSize);
         
         // Frame stats
         double time_now = get_time();
