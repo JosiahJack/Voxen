@@ -176,6 +176,7 @@ int sssMaxSteps = 64;
 float sssStepSize = 0.03;
 
 //    SSR (Screen Space Reflections)
+#define SSR_RES 4 // 25% of render resolution.
 GLuint ssrShaderProgram;
 GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, maxDistLoc_ssr = -1, stepSizeLoc_ssr = -1, 
       stepCountLoc_ssr = -1, cam_xLoc_ssr = -1, cam_yLoc_ssr = -1, cam_zLoc_ssr = -1;
@@ -1011,7 +1012,6 @@ int InitializeEnvironment(void) {
     glUniform1f(sssStepSizeLoc_deferred, sssStepSize);
 
     glUseProgram(ssrShaderProgram);
-    int SSR_RES = 2; // 50% of render resolution.
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
     glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
     glUniform1i(stepCountLoc_ssr, ssr_StepCount);
@@ -1094,9 +1094,6 @@ int InitializeEnvironment(void) {
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    malloc_trim(0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    CHECK_GL_ERROR();
     malloc_trim(0);
     DebugRAM("setup gbuffer end");
     
@@ -1865,12 +1862,12 @@ int main(int argc, char* argv[]) {
                 glDisable(GL_CULL_FACE);
             }
 
-            if (i == startOfTransparentInstances) {
-                if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
-                glEnable(GL_BLEND); // Enable blending for transparent instances
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
-                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
-            }
+//             if (i == startOfTransparentInstances) {
+//                 if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
+//                 glEnable(GL_BLEND); // Enable blending for transparent instances
+//                 glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
+//                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
+//             }
             if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
@@ -1980,7 +1977,9 @@ int main(int argc, char* argv[]) {
             glUniform1f(cam_xLoc_ssr, cam_x);
             glUniform1f(cam_yLoc_ssr, cam_y);
             glUniform1f(cam_zLoc_ssr, cam_z);
-            glDispatchCompute(groupX, groupY, 1);
+            GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
+            GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
+            glDispatchCompute(groupX_ssr, groupY_ssr, 1);
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
