@@ -7,6 +7,7 @@ const char* ssr_computeShader =
     "layout(rgba8,   binding = 0)  readonly uniform image2D inputImage;\n"
     "layout(rgba32f, binding = 1)  readonly uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2)  readonly uniform image2D inputNormals;\n"
+//     "layout(binding = 3) uniform sampler2D inputDepth;\n"
     "layout(rgba8, binding = 4)  writeonly uniform image2D outputImage;\n"
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
@@ -25,9 +26,10 @@ const char* ssr_computeShader =
     "    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;\n"
 
     "    imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));\n"
-    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * 4));\n"// SSR_RES = 4
+    "    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * 4));\n" // SSR_RES = 4
     "    vec3 worldPos = worldPosPack.xyz;\n"
-    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * 4));\n"// SSR_RES = 4
+//     "    float depth = texelFetch(inputDepth, ivec2(pixel * 4), 0).r;\n" // SSR_RES = 4
+    "    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * 4));\n" // SSR_RES = 4
     "    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));\n"
     "    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));\n"
     "    vec3 normal = normalize(vec3(normalXY.x, normalXY.y, normalZ0.x));\n"
