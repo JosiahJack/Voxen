@@ -75,8 +75,8 @@ const char* deferredLighting_computeShader =
     "const float CELLXHALF = 1.28;\n"
 
     "uint GetVoxelIndex(vec3 worldPos) {\n"
-    "    float offsetX = worldPos.x - worldMin_x;\n"
-    "    float offsetZ = worldPos.z - worldMin_z;\n"
+    "    float offsetX = worldPos.x - worldMin_x + (VOXEL_SIZE * 0.5);\n"
+    "    float offsetZ = worldPos.z - worldMin_z + (VOXEL_SIZE * 0.5);\n"
     "    uint cellX = uint(offsetX / WORLDCELL_WIDTH_F);\n"
     "    uint cellZ = uint(offsetZ / WORLDCELL_WIDTH_F);\n"
     "    float localX = mod(offsetX, WORLDCELL_WIDTH_F);\n"
@@ -85,7 +85,7 @@ const char* deferredLighting_computeShader =
     "    uint voxelZ = uint(localZ / VOXEL_SIZE);\n"
     "    uint cellIndex = cellZ * 64 + cellX;\n"
     "    uint voxelIndexInCell = voxelZ * 8 + voxelX;\n"
-    "    return cellIndex * 8 * 8 + voxelIndexInCell;\n"
+    "    return cellIndex * 64 + voxelIndexInCell;\n"
     "}\n"
 
     "uvec2 PosToCellCoords(float pos_x, float pos_z) {\n"
@@ -135,7 +135,7 @@ const char* deferredLighting_computeShader =
     // Regular lighting calculation
     "    vec3 lighting = vec3(0.0, 0.0, 0.0);\n"
     "    vec3 baseDir = vec3(0.0, 0.0, 1.0);\n"
-    "    uint voxelIdx = 2344;\n"//GetVoxelIndex(worldPos);\n"
+    "    uint voxelIdx = GetVoxelIndex(worldPos);\n"
     "    uint offset = voxelLightListIndices[voxelIdx * 2];\n"
     "    uint count  = voxelLightListIndices[voxelIdx * 2 + 1];\n"
     "    for (uint i = 0; i < count; i++) {\n"

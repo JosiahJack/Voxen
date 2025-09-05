@@ -832,96 +832,64 @@ void UpdateScreenSize(void) {
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
 }
 
-#define UNIQUE_LIGHT_LIST_COUNT_MAX 5200
-uint32_t voxelLightListsRaw[262144]; // Temporary buffer for building lists
-uint32_t voxelLightListIndices[64 * 64 * 8 * 8 * 2]; // Pairs of (offset, length) for each voxel
-uint32_t uniqueLightLists[UNIQUE_LIGHT_LIST_COUNT_MAX] = {0}; // Only need 5151
-uint32_t uniqueLightListsSize = 0; // Current size
-uint32_t tempList[LIGHT_COUNT] = {0};
+#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
+#define VOXEL_SIZE 0.32F
+#define VOXEL_HALF_SIZE (VOXEL_SIZE * 0.5)
+uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // Average of 4 lights per voxel, very conservative considering half of all voxels are empty
+uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length) for each voxel
 
 // Iterate over 64x64 cells (each 2.56x2.56, containing 8x8 voxels)
 int VoxelLists() {
     double start_time = get_time();
-    const float voxelSize = 0.32f;
-    const float voxelHalfSize = voxelSize / 2.0f;
-    const float startX = worldMin_x + voxelHalfSize;
-    const float startZ = worldMin_z + voxelHalfSize;
+    const float startX = worldMin_x + VOXEL_HALF_SIZE;
+    const float startZ = worldMin_z + VOXEL_HALF_SIZE;
     uint32_t head = 0; // Current index in voxelLightListsRaw
-    uint32_t voxelIndex = 0; // Tracks voxel for voxelLightListIndices
-    uniqueLightListsSize = 0;
-    for (uint32_t cellX = 0; cellX < 64; ++cellX) {
-        for (uint32_t cellZ = 0; cellZ < 64; ++cellZ) {
-            for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
-                    float posX = startX + (cellX * 2.56f) + (voxelX * voxelSize);
-                    float posZ = startZ + (cellZ * 2.56f) + (voxelZ * voxelSize);
-                    uint32_t lightCount = 0;
-                    for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
-                        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-                        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-                        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-                        float range = lights[litIdx + 3];
-                        float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-                        if (distSqrd < (range * range)) tempList[lightCount++] = lightIdx; // Naturally sorted
-                    }
+    for (uint32_t idx = 0; idx < VOXEL_COUNT; ++idx) {
+        // Compute cell and voxel coordinates from 1D index
+        uint32_t cellIndex = idx / (8 * 8); // Each cell has 8x8 voxels
+        uint32_t voxelIndexInCell = idx % (8 * 8);
+        uint32_t cellX = cellIndex % 64;
+        uint32_t cellZ = cellIndex / 64;
+        uint32_t voxelX = voxelIndexInCell % 8;
+        uint32_t voxelZ = voxelIndexInCell / 8;
+        float posX = startX + (cellX * 2.56f) + (voxelX * VOXEL_SIZE);
+        float posZ = startZ + (cellZ * 2.56f) + (voxelZ * VOXEL_SIZE);
 
-                    // Find matching list in uniqueLightLists
-                    uint32_t listOffset = 0;
-                    bool found = 0;
-                    for (uint32_t i = 0; i < uniqueLightListsSize; ) {
-                        uint32_t currLength = uniqueLightLists[i];
-                        if (currLength == lightCount) {
-                            // Compare lists
-                            if (memcmp(&uniqueLightLists[i + 1], tempList, lightCount * sizeof(uint32_t)) == 0) {
-                                listOffset = i + 1;
-                                found = true;
-                                break;
-                            }
-                        }
-                        i += currLength + 1; // Skip length prefix + list
-                    }
-
-                    // If no match, append to uniqueLightLists
-                    if (!found) {
-                        // Check if we need to resize uniqueLightLists
-                        if (uniqueLightListsSize + lightCount + 1 > UNIQUE_LIGHT_LIST_COUNT_MAX) { DualLogError("Failed to realloc uniqueLightLists\n"); return 1; }
-
-                        // Store length prefix and list
-                        uniqueLightLists[uniqueLightListsSize] = lightCount;
-                        memcpy(&uniqueLightLists[uniqueLightListsSize + 1], tempList, lightCount * sizeof(uint32_t));
-                        listOffset = uniqueLightListsSize + 1;
-                        uniqueLightListsSize += lightCount + 1;
-                    }
-
-                    // Store offset and length in voxelLightListIndices
-                    voxelLightListIndices[voxelIndex * 2] = listOffset;
-                    voxelLightListIndices[voxelIndex * 2 + 1] = lightCount;
-
-                    // Store in voxelLightListsRaw (optional, for debugging)
-                    if (head + lightCount <= 262144) {
-                        memcpy(&voxelLightListsRaw[head], tempList, lightCount * sizeof(uint32_t));
-                        head += lightCount;
-                    } else { DualLogError("voxelLightListsRaw buffer overflow at voxel %u\n", voxelIndex); return 1; }
-
-                    voxelIndex++;
-                }
-            }
+        // Build light list for this voxel
+        uint32_t lightCount = 0;
+        for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
+            uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+            float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+            float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+//             range *= 1.42f; // Helps smooth some edges but not all, going higher causes buffer overflow!
+            float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
+            if (distSqrd < (range * range)) voxelLightListsRaw[head + lightCount++] = lightIdx; // Naturally sorted
         }
+
+        // Store list in voxelLightListsRaw
+        if (head + lightCount <= VOXEL_COUNT * 4) {
+            voxelLightListIndices[idx * 2] = head; // Store offset
+            voxelLightListIndices[idx * 2 + 1] = lightCount; // Store count
+            head += lightCount;
+        } else { DualLogError("voxelLightListsRaw buffer overflow at voxel %u\n", idx); return 1; }
     }
 
+    // Upload to GPU
     GLuint voxelLightListIndicesID;
     glGenBuffers(1, &voxelLightListIndicesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListIndicesID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 64 * 64 * 8 * 8 * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, 262144 * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, voxelLightListIndicesID);
 
-    GLuint uniqueLightListsID;
-    glGenBuffers(1, &uniqueLightListsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, uniqueLightListsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, UNIQUE_LIGHT_LIST_COUNT_MAX * sizeof(uint32_t), uniqueLightLists, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, uniqueLightListsID);
+    GLuint voxelLightListsRawID;
+    glGenBuffers(1, &voxelLightListsRawID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListsRawID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, head * sizeof(uint32_t), voxelLightListsRaw, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, voxelLightListsRawID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    DualLog("Light voxel lists processing took %f seconds, unique lists size: %u\n", get_time() - start_time, uniqueLightListsSize);
+
+    DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     return 0;
 }
 
