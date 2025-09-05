@@ -171,8 +171,7 @@ float fogColorB = 0.09f;
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
 GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1,
-      camPosLoc_ssr = -1, inverseViewProjectionLoc_ssr = -1;
+GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, camPosLoc_ssr = -1;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -409,7 +408,6 @@ int CompileShaders(void) {
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
-    inverseViewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "inverseViewProjection");
     camPosLoc_ssr = glGetUniformLocation(ssrShaderProgram, "camPos");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
@@ -835,7 +833,7 @@ void UpdateScreenSize(void) {
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_SIZE 0.32F
 #define VOXEL_HALF_SIZE (VOXEL_SIZE * 0.5)
-uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // Average of 4 lights per voxel, very conservative considering half of all voxels are empty
+uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // 1048576, getting 946377, so my average of 4 lights per voxel is really close
 uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length) for each voxel
 
 // Iterate over 64x64 cells (each 2.56x2.56, containing 8x8 voxels)
@@ -843,6 +841,12 @@ int VoxelLists() {
     double start_time = get_time();
     const float startX = worldMin_x + VOXEL_HALF_SIZE;
     const float startZ = worldMin_z + VOXEL_HALF_SIZE;
+    float rangeSquared[LIGHT_COUNT];
+    for (int i=0;i<LIGHT_COUNT;++i) {
+        rangeSquared[i] = lights[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_RANGE];
+        rangeSquared[i] *= rangeSquared[i];
+    }
+
     uint32_t head = 0; // Current index in voxelLightListsRaw
     for (uint32_t idx = 0; idx < VOXEL_COUNT; ++idx) {
         // Compute cell and voxel coordinates from 1D index
@@ -861,10 +865,8 @@ int VoxelLists() {
             uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
             float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
             float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//             range *= 1.42f; // Helps smooth some edges but not all, going higher causes buffer overflow!
             float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-            if (distSqrd < (range * range)) voxelLightListsRaw[head + lightCount++] = lightIdx; // Naturally sorted
+            if (distSqrd < rangeSquared[lightIdx]) voxelLightListsRaw[head + lightCount++] = lightIdx;
         }
 
         // Store list in voxelLightListsRaw
@@ -900,7 +902,7 @@ int LightmapBake() {
 //     uint32_t totalLuxelCount = 64u * 64u * renderableCount;
 //     DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
     for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
@@ -1675,122 +1677,8 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
 
+        // 1. Culling
         Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
-
-        // 1. Light Culling to limit of MAX_VISIBLE_LIGHTS
-//         numLightsFound = 0;
-//         LightCandidate candidates[LIGHT_COUNT];
-//         uint16_t numCandidates = 0;
-//
-//         // Step 1: Collect valid lights within sightRangeSquared
-//         for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
-//             uint16_t litIdx = (i * LIGHT_DATA_SIZE);
-//             float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-//             if (litIntensity < 0.015f) continue; // Skip if light is off
-//
-//             float litx = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-//             float lity = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-//             float litz = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-//             float distSqrd = squareDistance3D(cam_x, cam_y, cam_z, litx, lity, litz);
-//             int lightCellIdx = cellIndexForLight[i];
-//             int x = lightCellIdx % WORLDX;
-//             int y = lightCellIdx / WORLDX;
-//             int range = floor(lights[litIdx + LIGHT_DATA_OFFSET_RANGE] / 2.56f);
-//             int xMin = x - range; int xMax = x + range;
-//             int yMin = y - range; int yMax = y + range;
-//             bool inPVS = false;
-//             if ((gridCellStates[lightCellIdx] & CELL_VISIBLE)) {// || !(gridCellStates[lightCellIdx] & CELL_OPEN)) {
-//                 inPVS = true; // Allow lights outside windows (and thus in non open cells) to still be applicable.
-//             } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
-//                 bool breakout = false;
-//                 for (int ix = xMin;ix <= xMax; ix++) {
-//                     for (int iy = yMin;iy <= yMax; iy++) {
-//                         if (!XZPairInBounds(ix,iy)) continue;
-//
-//                         int subIdx = (iy * WORLDX) + ix;
-//                         if ((gridCellStates[subIdx] & CELL_VISIBLE) // Player can see cell in light's range.
-//                             && precomputedVisibleCellsFromHere[(lightCellIdx * ARRSIZE) + subIdx]) { // Light's cell can see the cell in light's range.
-//
-//                             inPVS = true;
-//                             breakout = true;
-//                             break; // Avoid checking any more.  One is enough to count.
-//                         }
-//                     }
-//
-//                     if (breakout) break;
-//                 }
-//             }
-//
-//             if (distSqrd < sightRangeSquared && inPVS) {
-//                 candidates[numCandidates].index = i;
-//                 candidates[numCandidates].distanceSquared = distSqrd;
-//
-//                 // Adjust score to favor lights in view frustum if distance > 5.12
-//                 float score = litIntensity / (distSqrd + 0.01f);
-//                 if (distSqrd > 26.2144f) {
-//                     // Boost score for lights in the view frustum
-//                     float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//                     if (IsSphereInFOVCone(litx, lity, litz, range)) {
-//                         score *= 2.0f; // Increase score for frustum lights (tune this multiplier)
-//                     } else {
-//                         score *= 0.5f; // Reduce score for lights outside frustum
-//                     }
-//                 }
-//
-//                 candidates[numCandidates].score = score;
-//                 numCandidates++;
-//             }
-//         }
-//
-//         // Step 2: Sort candidates by score (descending) to get top MAX_VISIBLE_LIGHTS
-//         for (uint16_t i = 0; i < numCandidates && i < MAX_VISIBLE_LIGHTS; ++i) {
-//             uint16_t bestIdx = i;
-//             float bestScore = candidates[i].score;
-//             for (uint16_t j = i + 1; j < numCandidates; ++j) {
-//                 if (candidates[j].score > bestScore) {
-//                     bestScore = candidates[j].score;
-//                     bestIdx = j;
-//                 }
-//             }
-//
-//             if (bestIdx != i) { // Swap to put the best candidate at position i
-//                 LightCandidate temp = candidates[i];
-//                 candidates[i] = candidates[bestIdx];
-//                 candidates[bestIdx] = temp;
-//             }
-//         }
-//
-//         // Step 3: Copy the top MAX_VISIBLE_LIGHTS to lightsInProximity
-//         numLightsFound = numCandidates < MAX_VISIBLE_LIGHTS ? numCandidates : MAX_VISIBLE_LIGHTS;
-//         for (uint16_t i = 0; i < numLightsFound; ++i) {
-//             uint16_t litIdx = candidates[i].index * LIGHT_DATA_SIZE;
-//             uint16_t idx = i * LIGHT_DATA_SIZE;
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX] = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY] = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ] = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_SPOTDIRW] = lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_R] = lights[litIdx + LIGHT_DATA_OFFSET_R];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_G] = lights[litIdx + LIGHT_DATA_OFFSET_G];
-//             lightsInProximity[idx + LIGHT_DATA_OFFSET_B] = lights[litIdx + LIGHT_DATA_OFFSET_B];
-//         }
-//
-//         // Step 4: Clear remaining slots in lightsInProximity
-//         for (uint8_t i = numLightsFound; i < MAX_VISIBLE_LIGHTS; ++i) {
-//             lightsInProximity[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
-//         }
-//
-//         glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-//         glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), lightsInProximity, GL_DYNAMIC_DRAW);
-//         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-//         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-        // 2. Instance Culling to only those in range of player
         bool instanceIsCulledArray[INSTANCE_COUNT];
         bool instanceIsLODArray[INSTANCE_COUNT];
         memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
@@ -1799,18 +1687,18 @@ int main(int argc, char* argv[]) {
         float lodRangeSqrd = 38.4f * 38.4f;
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
-            
+
             distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
             if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
             if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
         }
-        
+
         uint16_t instancesInPVSCount = 0;
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) instancesInPVSCount++;
             if (instancesInPVSCount >= INSTANCE_COUNT - 1) break;
         }
-        
+
         uint32_t instancesInPVS[instancesInPVSCount];
         uint32_t curIdx = 0;
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
@@ -1820,7 +1708,7 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        // 3. Pass all instance matrices to GPU
+        // 2. Pass instance data to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instancesInPVSCount * sizeof(uint32_t), instancesInPVS); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
@@ -1829,7 +1717,7 @@ int main(int argc, char* argv[]) {
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
         
-        // 4. Raterized Geometry
+        // 3. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glUseProgram(chunkShaderProgram);
@@ -1917,13 +1805,11 @@ int main(int argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // ====================================================================
 
-        // 5. Deferred Lighting
+        // 4. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
         float viewProj[16];
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
-//         float inverseViewProj[16];
-//         inverse_mat4(inverseViewProj,viewProj);
         if (debugView == 0 || debugView == 8) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
@@ -1947,7 +1833,6 @@ int main(int argc, char* argv[]) {
         if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-//             glUniformMatrix4fv(inverseViewProjectionLoc_ssr, 1, GL_FALSE, inverseViewProj);
             glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
             GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
             GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
