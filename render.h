@@ -57,7 +57,6 @@
 #define LUXEL_SIZE 0.16f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-extern float lightsRangeSquared[LIGHT_COUNT];
 
 extern uint8_t numLevels;
 extern uint8_t currentLevel;

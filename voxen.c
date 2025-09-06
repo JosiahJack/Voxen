@@ -49,7 +49,6 @@ uint16_t doubleSidedInstancesHead = 0;
 uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.
 uint16_t transparentInstancesHead = 0;
 GLuint instancesBuffer;
-// GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
 
 // Game/Mod Definition
@@ -180,13 +179,7 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
-float lightsRangeSquared[LIGHT_COUNT] = {0};
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
-GLuint lightVBOs[MAX_VISIBLE_LIGHTS];
-GLuint lightIBOs[MAX_VISIBLE_LIGHTS];
-uint32_t lightVertexCounts[MAX_VISIBLE_LIGHTS];
-uint32_t lightIndexCounts[MAX_VISIBLE_LIGHTS];
-float lightsInProximity[MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE];
 GLuint lightsID;
 
 // Text
@@ -239,7 +232,6 @@ static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_li
 void DualLog(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
 void DualLogWarn(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
 void DualLogError(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
-
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 void DebugRAM(const char *context, ...) {
@@ -775,21 +767,12 @@ int SetupInstances(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-//     glGenBuffers(1, &instancesInPVSBuffer);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-    CHECK_GL_ERROR();
-    malloc_trim(0);
     DebugRAM("end of SetupInstances");
     return 0;
 }
@@ -922,17 +905,31 @@ int VoxelLists() {
 //     return 0;
 // }
 
+void RenderLoadingProgress(const char* text) {
+    glUseProgram(imageBlitShaderProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, inputImageID);
+    glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
+    glBindVertexArray(quadVAO);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glEnable(GL_DEPTH_TEST);
+    glBindTextureUnit(0, 0);
+    glUseProgram(0);
+    RenderFormattedText(screen_width / 2 - 50, screen_height / 2 - 5, TEXT_WHITE, text);
+    SDL_GL_SwapWindow(window);
+}
+
 int InitializeEnvironment(void) {
     DebugRAM("InitializeEnvironment start");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { DualLogError("SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
     systemInitialized[SYS_SDL] = true;
     DebugRAM("SDL init");
-    malloc_trim(0);
 
     if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     systemInitialized[SYS_TTF] = true;
     DebugRAM("TTF init");
-    malloc_trim(0);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -944,13 +941,11 @@ int InitializeEnvironment(void) {
     systemInitialized[SYS_WIN] = true;
     UpdateScreenSize();
     DebugRAM("window init");
-    malloc_trim(0);
 
     gl_context = SDL_GL_CreateContext(window);
     if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return SYS_CTX + 1; }    
     systemInitialized[SYS_CTX] = true;
     DebugRAM("GL init");
-    malloc_trim(0);
     
     stbi_flip_vertically_on_write(1);
 
@@ -963,7 +958,6 @@ int InitializeEnvironment(void) {
     const GLubyte* renderer = glGetString(GL_RENDERER);
     DualLog("OpenGL Version: %s\n", version ? (const char*)version : "unknown");
     DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
-    malloc_trim(0);
 
     int vsync_enable = 0;//1; // Set to 0 for false.
     SDL_GL_SetSwapInterval(vsync_enable);
@@ -998,8 +992,6 @@ int InitializeEnvironment(void) {
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
     glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
     glUseProgram(0);
-    CHECK_GL_ERROR();
-    malloc_trim(0);
     
     // Setup full screen quad for image blit for post processing effects like lighting.
     float vertices[] = {
@@ -1074,7 +1066,6 @@ int InitializeEnvironment(void) {
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    malloc_trim(0);
     DebugRAM("setup gbuffer end");
     
     // Text Initialization
@@ -1088,7 +1079,6 @@ int InitializeEnvironment(void) {
     glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
     glVertexArrayAttribBinding(textVAO, 0, 0); // DSA: Bind position to binding index 0
     glVertexArrayAttribBinding(textVAO, 1, 0); // DSA: Bind texcoord to binding index 0
-    CHECK_GL_ERROR();
     font = TTF_OpenFont("./Fonts/SystemShockText.ttf", 12);
     if (!font) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     DebugRAM("text init");
@@ -1096,7 +1086,7 @@ int InitializeEnvironment(void) {
     // Lights buffer
     glGenBuffers(1, &lightsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MAX_VISIBLE_LIGHTS * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DebugRAM("after Lights Buffer Init");
@@ -1120,7 +1110,9 @@ int InitializeEnvironment(void) {
     InitializeAudio();
     DebugRAM("audio init");
     systemInitialized[SYS_AUD] = true;
-    
+
+    RenderLoadingProgress("Loading...");
+
     // Load Game/Mod Definition
     const char* filename = "./Data/gamedata.txt";
     DualLog("Loading game definition from %s...\n",filename);    
@@ -1146,15 +1138,21 @@ int InitializeEnvironment(void) {
     startLevel = entry.startLevel;
     currentLevel = startLevel;
     DualLog("Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
+    RenderLoadingProgress("Loading textures...");
     if (LoadTextures()) return 1;
+    RenderLoadingProgress("Loading models...");
     if (LoadGeometry()) return 1;
+    RenderLoadingProgress("Loading entities...");
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
     if (SetupInstances()) return 1;
+    RenderLoadingProgress("Loading level data...");
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
     if (LoadLevelLights(currentLevel)) return 1;
+    RenderLoadingProgress("Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level!
     if (VoxelLists()) return 1;
 //     if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
+    malloc_trim(0);
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1749,33 +1747,6 @@ int main(int argc, char* argv[]) {
         glDepthMask(GL_TRUE);
         glEnable(GL_CULL_FACE); // Reenable backface culling
         glEnable(GL_DEPTH_TEST);
-        if (debugView == 6) { // Render Light Spheres
-           for (uint16_t i=0;i<numLightsFound;++i) {
-                float mat[16]; // 4x4 matrix
-                uint16_t idx = i * LIGHT_DATA_SIZE;
-                float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
-                if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
-                SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ],
-                                 0.0f, 0.0f, 0.0f, 1.0f, // Quaternion identity
-                                 sphoxelSize, sphoxelSize, sphoxelSize); // Uniform scale
-
-                glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-                glUniform1i(texIndexLoc_chunk, 41);
-                glUniform1i(glowIndexLoc_chunk, 41);
-                glUniform1i(specIndexLoc_chunk, 41);
-                glUniform1i(instanceIndexLoc_chunk, i);
-                int modelType = 621; // Test light icosphere
-                glUniform1i(modelIndexLoc_chunk, modelType);
-                glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
-                glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-                drawCallsRenderedThisFrame++;
-                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
-           }
-        }
 
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.

@@ -64,7 +64,7 @@ bool isTransparent(uint32_t texIndexToCheck);
 int LoadTextures(void);
 
 // Models
-#define MODEL_COUNT 768
+#define MODEL_COUNT 680
 #define VERTEX_ATTRIBUTES_COUNT 16 // x,y,z,nx,ny,nz,u,v,texIdx,glowIdx,specIdx,normIdx,modelIdx,instanceIdx,u_lm,v_lm
 
 extern uint32_t modelVertexCounts[MODEL_COUNT];
@@ -79,7 +79,7 @@ extern int gameObjectCount;
 int LoadGeometry(void);
 
 // Entities
-#define MAX_ENTITIES 1024 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
+#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 #define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
 
 // Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.

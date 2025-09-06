@@ -9,22 +9,6 @@
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
-#define UFBX_NO_ANIMATION
-#define UFBX_NO_SKINNING
-#define UFBX_NO_BLEND_SHAPES
-#define UFBX_NO_CACHE
-#define UFBX_NO_MATERIALS
-#define UFBX_NO_METADATA
-#define UFBX_NO_ASSERT
-#define UFBX_NO_LIGHTS
-#define UFBX_NO_CAMERAS
-#define UFBX_NO_TEXTURES
-#define UFBX_NO_VERTEX_CACHE
-#define UFBX_NO_SCENE
-#define UFBX_NO_MEMORY_STATISTICS
-#define UFBX_NO_ERROR_STACK
-#define UFBX_MEMORY_LIMIT (1024 * 1024 * 8) // 8MB limit
-// #include "ufbx.h"
 #include <math.h>
 #include "constants.h"
 #include "instance.h"
@@ -52,7 +36,6 @@ uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
 float * tempVertices;
 uint32_t * tempTriangles;
-float ** vertexDataArrays;
 uint32_t ** triangleDataArrays;
 uint32_t ** triEdgeDataArrays;
 GLuint lightmapID;
@@ -462,7 +445,6 @@ int LoadGeometry(void) {
     // Allocate persistent temporary buffers
     tempVertices = (float*)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     tempTriangles = (uint32_t*)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
-    vertexDataArrays = (float**)calloc(MODEL_COUNT, sizeof(float *));
     triangleDataArrays = (uint32_t**)calloc(MODEL_COUNT, sizeof(uint32_t *));
     uint32_t* vertexOffsets = (uint32_t*)calloc(MODEL_COUNT, sizeof(uint32_t));
     uint32_t* triangleOffsets = (uint32_t*)calloc(MODEL_COUNT, sizeof(uint32_t));
@@ -522,7 +504,7 @@ int LoadGeometry(void) {
         if (triCount > 1000U) {
             DualLog("Model %s loaded with %d vertices, \033[1;33m%d\033[0;0m triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         } else {
-            //DualLog("Model %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+            DualLog("Model %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         }
 #endif
         totalVertCount += vertexCount;
@@ -590,14 +572,11 @@ int LoadGeometry(void) {
             globalVertexOffset += mesh->mNumVertices;
         }
 
-        vertexDataArrays[i] = (float *)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); // Store vertex data in vertexDataArrays
-        memcpy(vertexDataArrays[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
         triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle data in triangleDataArrays
         memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
         currentVertexOffset += vertexCount;
         currentTriangleOffset += triCount;
         aiReleaseImport(scene);
-        malloc_trim(0);
         if (vertexCount > 0) { // Copy to staging buffers
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
             void *mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
@@ -607,8 +586,7 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glFlush();
-            glFinish();
+
         }
 
         if (triCount > 0) {
@@ -616,13 +594,10 @@ int LoadGeometry(void) {
             void *mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCount * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
             memcpy(mapped_buffer, tempTriangles, triCount * 3 * sizeof(uint32_t));
             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-            
             glGenBuffers(1, &tbos[i]);
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
-            glFlush();
-            glFinish();
             DebugRAM("post tri buffer tbos upload for model %s", model_parser.entries[matchedParserIdx].path);
         }
 
@@ -634,7 +609,6 @@ int LoadGeometry(void) {
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
-        malloc_trim(0);
         DebugRAM("post GPU upload for model %s", model_parser.entries[matchedParserIdx].path);
     }
     
@@ -736,7 +710,6 @@ int LoadGeometry(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     CHECK_GL_ERROR();
-    malloc_trim(0);
     free(tempVertices);
     free(tempTriangles);
     free(triangleOffsets);
@@ -1088,8 +1061,6 @@ int LoadLevelGeometry(uint8_t curlevel) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, renderableCount * 64 * 64 * 4 * sizeof(float), NULL, GL_DYNAMIC_DRAW); // 256x256 lightmap per model, 4 channel rgba, HDR float
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightmapID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
-    malloc_trim(0);
     DebugRAM("end of LoadLevelGeometry");
     return 0;
 }
@@ -1114,7 +1085,6 @@ int LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].localPosition.z + correctionLightZ;
         lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
         lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
-        lightsRangeSquared[i] = lights_parser.entries[i].range * lights_parser.entries[i].range;
         lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights_parser.entries[i].type == 0 ? 0.0f : lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].localRotation.x;
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights_parser.entries[i].localRotation.y;
@@ -1125,7 +1095,6 @@ int LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
     }
 
-    malloc_trim(0);
     DebugRAM("end of LoadLevelLights");
     return 0;
 }

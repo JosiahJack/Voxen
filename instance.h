@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define INSTANCE_COUNT 5750 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects
+#define INSTANCE_COUNT 5800 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects
 
 typedef struct { // Ensure chunk.glsl struct matches!
     int32_t modelIndex;

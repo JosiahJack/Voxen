@@ -68,7 +68,7 @@ int LoadTextures(void) {
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
     doubleSidedTexture = malloc(textureCount * sizeof(bool));
     transparentTexture = malloc(textureCount * sizeof(bool));
-    size_t maxFileSize = 10000000; // 10MB
+    size_t maxFileSize = 8000000; // 8MB
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
     DebugRAM("after texture buffers mallocs");
 
@@ -227,8 +227,8 @@ int LoadTextures(void) {
         glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
         glBindBuffer(GL_COPY_WRITE_BUFFER, colorBufferID);
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, ((pixel_offset + 1) / 2) * sizeof(uint32_t), ((width * height + 1) / 2) * sizeof(uint32_t));
-        glFlush();
-        glFinish();
+//         glFlush(); Commented out to trade peak RAM going up to 256mb to gain 0.3s off loading time
+//         glFinish();
         pixel_offset += width * height;
         palette_offset += palette_size;
 #ifdef DEBUG_TEXTURE_LOAD_DATA
@@ -243,7 +243,6 @@ int LoadTextures(void) {
         }
         
         stbi_image_free(image_data);
-        malloc_trim(0);
     }
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);  
@@ -295,8 +294,9 @@ int LoadTextures(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 17, texturePaletteOffsetsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     free(texturePaletteOffsets);
-    
+
     CHECK_GL_ERROR();
+    malloc_trim(0);
     DebugRAM("After LoadTextures");
     double end_time = get_time();
     DualLog("Load Textures took %f seconds\n", end_time - start_time);
