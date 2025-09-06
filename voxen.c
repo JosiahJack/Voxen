@@ -808,57 +808,129 @@ void UpdateScreenSize(void) {
 }
 
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-#define VOXEL_SIZE 0.32F
-#define VOXEL_HALF_SIZE (VOXEL_SIZE * 0.5)
-uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // 1048576, getting 946377, so my average of 4 lights per voxel is really close
-uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length) for each voxel
+#define VOXEL_SIZE 0.32f
+#define VOXEL_HALF_SIZE (VOXEL_SIZE * 0.5f)
+#define CELL_SIZE 2.56f // Each cell is 2.56x2.56
+#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
+uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // 1,048,576, ~946,377 used
+uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length)
 
-// Iterate over 64x64 cells (each 2.56x2.56, containing 8x8 voxels)
 int VoxelLists() {
     double start_time = get_time();
     const float startX = worldMin_x + VOXEL_HALF_SIZE;
     const float startZ = worldMin_z + VOXEL_HALF_SIZE;
-    float rangeSquared[LIGHT_COUNT];
-    for (int i=0;i<LIGHT_COUNT;++i) {
+    memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
+    float rangeSquared[LIGHT_COUNT]; // Precompute light ranges
+    for (int i = 0; i < LIGHT_COUNT; ++i) {
         rangeSquared[i] = lights[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_RANGE];
         rangeSquared[i] *= rangeSquared[i];
     }
 
-    uint32_t head = 0; // Current index in voxelLightListsRaw
-    for (uint32_t idx = 0; idx < VOXEL_COUNT; ++idx) {
-        // Compute cell and voxel coordinates from 1D index
-        uint32_t cellIndex = idx / (8 * 8); // Each cell has 8x8 voxels
-        uint32_t voxelIndexInCell = idx % (8 * 8);
-        uint32_t cellX = cellIndex % 64;
-        uint32_t cellZ = cellIndex / 64;
-        uint32_t voxelX = voxelIndexInCell % 8;
-        uint32_t voxelZ = voxelIndexInCell / 8;
-        float posX = startX + (cellX * 2.56f) + (voxelX * VOXEL_SIZE);
-        float posZ = startZ + (cellZ * 2.56f) + (voxelZ * VOXEL_SIZE);
+    // Step 1: Count lights per voxel to precompute total size
+    uint32_t totalLightAssignments = 0;
+    for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
+        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float range = sqrtf(rangeSquared[lightIdx]);
 
-        // Build light list for this voxel
-        uint32_t lightCount = 0;
-        for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
-            uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-            float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-            float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-            float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-            if (distSqrd < rangeSquared[lightIdx]) voxelLightListsRaw[head + lightCount++] = lightIdx;
+        // Calculate affected cell range (2.56x2.56 cells)
+        int minCellX = (int)floorf((litX - range - worldMin_x) / CELL_SIZE);
+        int maxCellX = (int)ceilf((litX + range - worldMin_x) / CELL_SIZE);
+        int minCellZ = (int)floorf((litZ - range - worldMin_z) / CELL_SIZE);
+        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / CELL_SIZE);
+
+        // Clamp to grid bounds (64x64 cells)
+        minCellX = minCellX > 0 ? minCellX : 0;
+        maxCellX = 63 < maxCellX ? 63 : maxCellX;
+        minCellZ = minCellZ > 0 ? minCellZ : 0;
+        maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
+
+        // Count lights per voxel
+        for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+            for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
+                uint32_t cellIndex = cellZ * 64 + cellX;
+                for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+                    for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
+                        uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+                        float posX = startX + (cellX * CELL_SIZE) + (voxelX * VOXEL_SIZE);
+                        float posZ = startZ + (cellZ * CELL_SIZE) + (voxelZ * VOXEL_SIZE);
+                        float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
+
+                        if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
+                            voxelLightListIndices[voxelIndex * 2 + 1]++; // Increment light count
+                            totalLightAssignments++;
+                        }
+                    }
+                }
+            }
         }
+    }
 
-        // Store list in voxelLightListsRaw
-        if (head + lightCount <= VOXEL_COUNT * 4) {
-            voxelLightListIndices[idx * 2] = head; // Store offset
-            voxelLightListIndices[idx * 2 + 1] = lightCount; // Store count
-            head += lightCount;
-        } else { DualLogError("voxelLightListsRaw buffer overflow at voxel %u\n", idx); return 1; }
+    // Check if buffer is sufficient
+    if (totalLightAssignments > VOXEL_COUNT * 4) {
+        DualLogError("Total light assignments (%u) exceed voxelLightListsRaw capacity (%u)\n", totalLightAssignments, VOXEL_COUNT * 4);
+        return 1;
+    }
+
+    // Step 2: Assign offsets and populate voxelLightListsRaw
+    uint32_t head = 0;
+    for (uint32_t idx = 0; idx < VOXEL_COUNT; ++idx) {
+        if (voxelLightListIndices[idx * 2 + 1] > 0) {
+            voxelLightListIndices[idx * 2] = head; // Set offset
+            head += voxelLightListIndices[idx * 2 + 1]; // Advance head
+        } else {
+            voxelLightListIndices[idx * 2] = head; // Empty list points to current head
+        }
+    }
+
+    // Step 3: Assign light indices to voxelLightListsRaw
+    uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
+    for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
+        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float range = sqrtf(rangeSquared[lightIdx]);
+
+        // Calculate affected cell range
+        int minCellX = (int)floorf((litX - range - worldMin_x) / CELL_SIZE);
+        int maxCellX = (int)ceilf((litX + range - worldMin_x) / CELL_SIZE);
+        int minCellZ = (int)floorf((litZ - range - worldMin_z) / CELL_SIZE);
+        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / CELL_SIZE);
+
+        // Clamp to grid bounds
+        minCellX = minCellX > 0 ? minCellX : 0;
+        maxCellX = 63 < maxCellX ? 63 : maxCellX;
+        minCellZ = minCellZ > 0 ? minCellZ : 0;
+        maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
+
+        // Assign light to affected voxels
+        for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+            for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
+                uint32_t cellIndex = cellZ * 64 + cellX;
+                for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+                    for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
+                        uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+                        float posX = startX + (cellX * CELL_SIZE) + (voxelX * VOXEL_SIZE);
+                        float posZ = startZ + (cellZ * CELL_SIZE) + (voxelZ * VOXEL_SIZE);
+                        float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
+
+                        if (distSqrd < rangeSquared[lightIdx] && lightCounts[voxelIndex] < MAX_LIGHTS_PER_VOXEL) {
+                            uint32_t offset = voxelLightListIndices[voxelIndex * 2];
+                            voxelLightListsRaw[offset + lightCounts[voxelIndex]] = lightIdx;
+                            lightCounts[voxelIndex]++;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Upload to GPU
     GLuint voxelLightListIndicesID;
     glGenBuffers(1, &voxelLightListIndicesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListIndicesID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 262144 * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, voxelLightListIndicesID);
 
     GLuint voxelLightListsRawID;
@@ -868,13 +940,13 @@ int VoxelLists() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, voxelLightListsRawID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    // Update all lights and instances initially.
+    // Update lights and instances
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-    for (uint16_t i=0;i<INSTANCE_COUNT;i++) UpdateInstanceMatrix(i); // Update every instance mat4x4 in modelMatrices array
+    for (uint16_t i = 0; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
