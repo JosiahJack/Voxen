@@ -1,8 +1,6 @@
 // File: voxen.c
-// Description: A realtime OpenGL based application for experimenting with
-// voxel lighting techniques to derive new methods of high speed accurate
-// lighting in resource constrained environements (e.g. embedded).
-#define VERSION_STRING "v0.4.0"
+// Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
+#define VERSION_STRING "v0.5.0"
 #include <malloc.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -51,7 +49,7 @@ uint16_t doubleSidedInstancesHead = 0;
 uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.
 uint16_t transparentInstancesHead = 0;
 GLuint instancesBuffer;
-GLuint instancesInPVSBuffer;
+// GLuint instancesInPVSBuffer;
 GLuint matricesBuffer;
 
 // Game/Mod Definition
@@ -147,7 +145,7 @@ GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
-      specIndexLoc_chunk = -1, instancesInPVSCount_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
+      specIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
       overrideGlowBLoc_chunk = -1;
 
 //    GPU Lightmapper Compute Shader
@@ -263,17 +261,13 @@ void DebugRAM(const char *context, ...) {
             else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
         }
         fclose(fp);
-    } else {
-        DualLogError("Failed to open /proc/self/smaps_rollup\n");
-    }
+    } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
 
     DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
-            formatted_context,
-            info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
+            formatted_context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
             uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
 #endif
 }
-
 
 void print_bytes_no_newline(int count) {
     DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
@@ -781,15 +775,15 @@ int SetupInstances(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    glGenBuffers(1, &instancesInPVSBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     glGenBuffers(1, &instancesInPVSBuffer);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-
     glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
@@ -891,16 +885,7 @@ int VoxelLists() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, voxelLightListsRawID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-    DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
-    return 0;
-}
-
-int LightmapBake() {
-//     double start_time = get_time();
-//     if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
-//
-//     uint32_t totalLuxelCount = 64u * 64u * renderableCount;
-//     DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
+    // Update all lights and instances initially.
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW); // Send all lights for level to lightmapper to bake er'thang.  This is limited down during main loop to culled lights
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
@@ -909,6 +894,17 @@ int LightmapBake() {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+    DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
+    return 0;
+}
+
+// int LightmapBake() {
+//     double start_time = get_time();
+//     if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
+//
+//     uint32_t totalLuxelCount = 64u * 64u * renderableCount;
+//     DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
 //     glUseProgram(lightmapShaderProgram);
 //     glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
 //     glUniform1ui(instanceCountLoc_lightmap, renderableCount);
@@ -923,8 +919,8 @@ int LightmapBake() {
 //     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 //     double end_time = get_time();
 //     DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
-    return 0;
-}
+//     return 0;
+// }
 
 int InitializeEnvironment(void) {
     DebugRAM("InitializeEnvironment start");
@@ -1158,7 +1154,7 @@ int InitializeEnvironment(void) {
     if (LoadLevelLights(currentLevel)) return 1;
     if (Cull_Init()) return 1; // Must be after level!
     if (VoxelLists()) return 1;
-    if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
+//     if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1692,27 +1688,8 @@ int main(int argc, char* argv[]) {
             if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
             if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
         }
-
-        uint16_t instancesInPVSCount = 0;
-        for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
-            if (!instanceIsCulledArray[i]) instancesInPVSCount++;
-            if (instancesInPVSCount >= INSTANCE_COUNT - 1) break;
-        }
-
-        uint32_t instancesInPVS[instancesInPVSCount];
-        uint32_t curIdx = 0;
-        for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
-            if (!instanceIsCulledArray[i]) {
-                instancesInPVS[curIdx] = i;
-                curIdx++;
-            }
-        }
         
         // 2. Pass instance data to GPU
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesInPVSBuffer);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, instancesInPVSCount * sizeof(uint32_t), instancesInPVS); // * 16 because matrix4x4
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, instancesInPVSBuffer);
-        
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
@@ -1772,33 +1749,33 @@ int main(int argc, char* argv[]) {
         glDepthMask(GL_TRUE);
         glEnable(GL_CULL_FACE); // Reenable backface culling
         glEnable(GL_DEPTH_TEST);
-//         if (debugView == 6) { // Render Light Spheres
-//            for (uint16_t i=0;i<numLightsFound;++i) {
-//                 float mat[16]; // 4x4 matrix
-//                 uint16_t idx = i * LIGHT_DATA_SIZE;
-//                 float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
-//                 if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
-//                 SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ],
-//                                  0.0f, 0.0f, 0.0f, 1.0f, // Quaternion identity
-//                                  sphoxelSize, sphoxelSize, sphoxelSize); // Uniform scale
-//
-//                 glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-//                 glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-//                 glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
-//                 glUniform1i(texIndexLoc_chunk, 41);
-//                 glUniform1i(glowIndexLoc_chunk, 41);
-//                 glUniform1i(specIndexLoc_chunk, 41);
-//                 glUniform1i(instanceIndexLoc_chunk, i);
-//                 int modelType = 621; // Test light icosphere
-//                 glUniform1i(modelIndexLoc_chunk, modelType);
-//                 glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
-//                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-//                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-//                 glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-//                 drawCallsRenderedThisFrame++;
-//                 verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
-//            }
-//         }
+        if (debugView == 6) { // Render Light Spheres
+           for (uint16_t i=0;i<numLightsFound;++i) {
+                float mat[16]; // 4x4 matrix
+                uint16_t idx = i * LIGHT_DATA_SIZE;
+                float sphoxelSize = lightsInProximity[idx + LIGHT_DATA_OFFSET_RANGE] * 0.04f; // Const.segiVoxelSize from Citadel main
+                if (sphoxelSize > 8.0f) sphoxelSize = 8.0f;
+                SetUpdatedMatrix(mat, lightsInProximity[idx + LIGHT_DATA_OFFSET_POSX], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSY], lightsInProximity[idx + LIGHT_DATA_OFFSET_POSZ],
+                                 0.0f, 0.0f, 0.0f, 1.0f, // Quaternion identity
+                                 sphoxelSize, sphoxelSize, sphoxelSize); // Uniform scale
+
+                glUniform1f(overrideGlowRLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_R] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                glUniform1f(overrideGlowGLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_G] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                glUniform1f(overrideGlowBLoc_chunk, lightsInProximity[idx + LIGHT_DATA_OFFSET_B] * lightsInProximity[idx + LIGHT_DATA_OFFSET_INTENSITY]);
+                glUniform1i(texIndexLoc_chunk, 41);
+                glUniform1i(glowIndexLoc_chunk, 41);
+                glUniform1i(specIndexLoc_chunk, 41);
+                glUniform1i(instanceIndexLoc_chunk, i);
+                int modelType = 621; // Test light icosphere
+                glUniform1i(modelIndexLoc_chunk, modelType);
+                glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, mat);
+                glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                drawCallsRenderedThisFrame++;
+                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+           }
+        }
 
         // ====================================================================
         // Ok, turn off temporary framebuffer so we can draw to screen now.
@@ -1859,13 +1836,13 @@ int main(int argc, char* argv[]) {
  
         // 8. Render UI Text;
         int textY = 25; int textVertOfset = 15;
-        RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
-        RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-        RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d, Instances in PVS: %d", debugView, debugViewNames[debugView], debugValue, instancesInPVSCount);
-        RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
-        
+//         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+//         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+//         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+//         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+//         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+//         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
+//
         // Frame stats
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)

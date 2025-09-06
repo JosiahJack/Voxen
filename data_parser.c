@@ -9,6 +9,22 @@
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#define UFBX_NO_ANIMATION
+#define UFBX_NO_SKINNING
+#define UFBX_NO_BLEND_SHAPES
+#define UFBX_NO_CACHE
+#define UFBX_NO_MATERIALS
+#define UFBX_NO_METADATA
+#define UFBX_NO_ASSERT
+#define UFBX_NO_LIGHTS
+#define UFBX_NO_CAMERAS
+#define UFBX_NO_TEXTURES
+#define UFBX_NO_VERTEX_CACHE
+#define UFBX_NO_SCENE
+#define UFBX_NO_MEMORY_STATISTICS
+#define UFBX_NO_ERROR_STACK
+#define UFBX_MEMORY_LIMIT (1024 * 1024 * 8) // 8MB limit
+// #include "ufbx.h"
 #include <math.h>
 #include "constants.h"
 #include "instance.h"
