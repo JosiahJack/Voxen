@@ -58,7 +58,7 @@ const char* quadFragmentShaderSource =
     "            ivec2 samplePixel = pixel + offsets[i];\n"
     "            samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth/SSR_RES)-1, int(screenHeight/SSR_RES)-1));\n"
     "            vec3 sampleWeight = vec3(weights[i],weights[i],weights[i]);\n"// * mix(vec3(0.08), vec3(0.02), specColor.rgb);\n"
-    "            reflectionColor.rgb += imageLoad(outputImage, samplePixel).rgb * sampleWeight * 8.0;\n"
+    "            reflectionColor.rgb += imageLoad(outputImage, samplePixel).rgb * sampleWeight * 6.0;\n"
     "        }\n"
     "        FragColor += reflectionColor;\n"
     "    } else if (debugView == 7 || debugView == 10) {\n"

@@ -54,10 +54,10 @@ const char* ssr_computeShader =
     "    for (int i = 0; i < 100; ++i) {\n" // maxSteps 100
     "        marchPos += rayStep;\n"
     "        traveled += 0.26;\n" // stepSize
-    "        if (traveled > 71.68) break;\n"
+//     "        if (traveled > 71.68) break;\n"
 
     "        vec4 clipPos = viewProjection * vec4(marchPos, 1.0);\n"
-    "        if (clipPos.w <= 0.0) break;\n"
+//     "        if (clipPos.w <= 0.0) break;\n"
 
     "        vec2 ndc = clipPos.xy / clipPos.w;\n"
     "        hitUV = ndc * 0.5 + 0.5;\n"
