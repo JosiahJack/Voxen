@@ -466,6 +466,8 @@ int LoadGeometry(void) {
         }
 
         if (matchedParserIdx < 0) continue;
+
+        if (i % 5 == 0) RenderLoadingProgress(100,"Loading models [%d of %d]...",matchedParserIdx,model_parser.count);
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
 
         struct aiPropertyStore* props = aiCreatePropertyStore(); // Disable non-essential FBX components

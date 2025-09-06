@@ -8,5 +8,6 @@ void DualLogWarn(const char *fmt, ...);
 void DualLogError(const char *fmt, ...);
 void print_bytes_no_newline(int count);
 void DebugRAM(const char *context, ...);
+void RenderLoadingProgress(int offset, const char* format, ...);
 
 #endif // VOXEN_DEBUG_H

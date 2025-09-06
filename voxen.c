@@ -977,7 +977,7 @@ int VoxelLists() {
 //     return 0;
 // }
 
-void RenderLoadingProgress(const char* text) {
+void RenderLoadingProgress(int offset, const char* format, ...) {
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, inputImageID);
@@ -989,7 +989,14 @@ void RenderLoadingProgress(const char* text) {
     glEnable(GL_DEPTH_TEST);
     glBindTextureUnit(0, 0);
     glUseProgram(0);
-    RenderFormattedText(screen_width / 2 - 50, screen_height / 2 - 5, TEXT_WHITE, text);
+
+    char buffer[256];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
     SDL_GL_SwapWindow(window);
 }
 
@@ -1183,7 +1190,7 @@ int InitializeEnvironment(void) {
     DebugRAM("audio init");
     systemInitialized[SYS_AUD] = true;
 
-    RenderLoadingProgress("Loading...");
+    RenderLoadingProgress(50,"Loading...");
 
     // Load Game/Mod Definition
     const char* filename = "./Data/gamedata.txt";
@@ -1210,25 +1217,24 @@ int InitializeEnvironment(void) {
     startLevel = entry.startLevel;
     currentLevel = startLevel;
     DualLog("Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
-    RenderLoadingProgress("Loading textures...");
+    RenderLoadingProgress(52,"Loading textures...");
     if (LoadTextures()) return 1;
-    RenderLoadingProgress("Loading models...");
+    RenderLoadingProgress(50,"Loading models...");
     if (LoadGeometry()) return 1;
-    RenderLoadingProgress("Loading entities...");
+    RenderLoadingProgress(52,"Loading entities...");
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
-    RenderLoadingProgress("Loading instances data...");
+    RenderLoadingProgress(65,"Loading instances data...");
     if (SetupInstances()) return 1;
-    RenderLoadingProgress("Loading level data...");
+    RenderLoadingProgress(50,"Loading level data...");
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
-    RenderLoadingProgress("Loading lighting data...");
+    RenderLoadingProgress(55,"Loading lighting data...");
     if (LoadLevelLights(currentLevel)) return 1;
-    RenderLoadingProgress("Loading cull system...");
+    RenderLoadingProgress(52,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level!
-    RenderLoadingProgress("Loading voxel lighting data...");
+    RenderLoadingProgress(70,"Loading voxel lighting data...");
     if (VoxelLists()) return 1;
 //     if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
     malloc_trim(0);
-    RenderLoadingProgress("Starting game!");
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1852,7 +1858,7 @@ int main(int argc, char* argv[]) {
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
-        
+
         // 6. SSR (Screen Space Reflections)
         if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
