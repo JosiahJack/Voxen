@@ -8,7 +8,6 @@ const char* ssr_computeShader =
     "layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;\n"
     "layout(rgba32f, binding = 2) readonly uniform image2D inputNormals;\n"
     "layout(rgba8, binding = 4) writeonly uniform image2D outputImage;\n"
-//     "layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };\n"
 
     "uniform uint screenWidth;\n"
     "uniform uint screenHeight;\n"
@@ -38,23 +37,23 @@ const char* ssr_computeShader =
 
     "    vec3 viewDir = normalize(worldPos - camPos);\n"
     "    vec3 reflectDir = reflect(viewDir, normal);\n"
+
+         // Compute Fresnel term (Schlick approximation)
+    "    float cosTheta = max(dot(-viewDir, normal), 0.0);\n"
+    "    vec3 F0 = specColor.rgb;\n"
+    "    vec3 fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);\n"
     "    vec2 hitUV = vec2(0.0);\n"
-    "    bool hit = false;\n"
+    "    vec3 reflectionColor = vec3(0.0);\n"
+    "    float totalWeight = 0.0;\n"
     "    vec3 marchPos = worldPos + normal * 0.005;\n"
     "    float traveled = 0.0;\n"
     "    vec3 rayStep = reflectDir * 0.26;\n" // stepSize
     "    vec2 screenSize = vec2(screenWidth, screenHeight);\n"
     "    ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1);\n"
     "    ivec2 zeroIVec2 = ivec2(0, 0);\n"
-//     "    int blueNoiseTextureWidth = 64;\n"
-//     "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n"
-//     "    float jitteredStepSize = 0.26 * (1.0 + blueNoiseColors[pixelIndex] * 0.25);\n"
-    "    float cosTheta = max(dot(-viewDir, normal), 0.0);\n"
-    "    vec3 F0 = specColor.rgb;\n"
-    "    vec3 fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);\n"
     "    for (int i = 0; i < 100; ++i) {\n" // maxSteps 100
     "        marchPos += rayStep;\n"
-    "        traveled += 0.26;\n"
+    "        traveled += 0.26;\n" // stepSize
     "        if (traveled > 71.68) break;\n"
 
     "        vec4 clipPos = viewProjection * vec4(marchPos, 1.0);\n"
@@ -69,14 +68,22 @@ const char* ssr_computeShader =
     "        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * 4);\n" // SSR_RES = 4
     "        vec3 sampledWorldPos = sampledWorldPosPack.xyz;\n"
     "        float dist2 = dot(marchPos - sampledWorldPos, marchPos - sampledWorldPos);\n"
-    "        if (dist2 < 0.0256) { hit = true; break; }\n" // 0.16^2
+
+             // Smooth distance weighting
+    "        float sigma2 = 0.0256;\n" // 0.16^2
+    "        float weight = exp(-dist2 / sigma2);\n"
+    "        if (weight > 0.01) {\n" // Minimum weight threshold
+    "            ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
+    "            hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
+    "            vec4 sampleColor = imageLoad(inputImage, hitPixel * 4);\n" // SSR_RES = 4
+    "            reflectionColor += sampleColor.rgb * weight;\n"
+    "            totalWeight += weight;\n"
+    "        }\n"
     "    }\n"
 
-    "    if (!hit) return;\n"
+    "    if (totalWeight < 0.01) return;\n" // Avoid division by near-zero
 
-    "    ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));\n"
-    "    hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));\n"
-    "    vec4 reflectionColor = imageLoad(inputImage, hitPixel * 4);\n" // SSR_RES = 4
-    "    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor.rgb, specColor.rgb * fresnel);\n"
+    "    reflectionColor /= totalWeight;\n" // Normalize by total weight
+    "    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * fresnel);\n"
     "    imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));\n"
     "}\n";
