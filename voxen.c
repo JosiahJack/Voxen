@@ -1144,15 +1144,19 @@ int InitializeEnvironment(void) {
     if (LoadGeometry()) return 1;
     RenderLoadingProgress("Loading entities...");
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
+    RenderLoadingProgress("Loading instances data...");
     if (SetupInstances()) return 1;
     RenderLoadingProgress("Loading level data...");
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
+    RenderLoadingProgress("Loading lighting data...");
     if (LoadLevelLights(currentLevel)) return 1;
     RenderLoadingProgress("Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level!
+    RenderLoadingProgress("Loading voxel lighting data...");
     if (VoxelLists()) return 1;
 //     if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
     malloc_trim(0);
+    RenderLoadingProgress("Starting game!");
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1204,17 +1208,17 @@ int EventExecute(Event* event) {
     return 99;
 }
 
-static const char* debugViewNames[] = {
-    "standard render", // 0
-    "unlit",           // 1
-    "surface normals", // 2
-    "depth",           // 3
-    "indices",         // 4
-    "worldpos",        // 5
-    "lightview",       // 6
-    "reflections",      // 7
-    "lightmap"
-};
+// static const char* debugViewNames[] = {
+//     "standard render", // 0
+//     "unlit",           // 1
+//     "surface normals", // 2
+//     "depth",           // 3
+//     "indices",         // 4
+//     "worldpos",        // 5
+//     "lightview",       // 6
+//     "reflections",     // 7
+//     "lightmap"         // 8
+// };
 
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
     return x1 * x2 + y1 * y2 + z1 * z2;
