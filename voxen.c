@@ -144,7 +144,7 @@ GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
       instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
-      specIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
+      specIndexLoc_chunk = -1, normIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
       overrideGlowBLoc_chunk = -1;
 
 //    GPU Lightmapper Compute Shader
@@ -364,6 +364,7 @@ int CompileShaders(void) {
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
     glowIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowIndex");
     specIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "specIndex");
+    normIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normIndex");
     instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
     modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
@@ -1813,6 +1814,7 @@ int main(int argc, char* argv[]) {
             glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
             glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
             glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
+            glUniform1i(normIndexLoc_chunk, instances[i].normIndex);
             glUniform1i(instanceIndexLoc_chunk, i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
             if (debugValue > 0) DualLog("For frame %d, rendering model type %d\n",globalFrameNum,instances[i].modelIndex);

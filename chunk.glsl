@@ -11,7 +11,7 @@ const char* vertexShaderSource =
     "uniform int texIndex;\n"
     "uniform int glowIndex;\n"
     "uniform int specIndex;\n"
-    "uniform int normalIndex;\n"
+    "uniform int normIndex;\n"
     "uniform int instanceIndex;\n"
     "uniform int modelIndex;\n"
     "uniform mat4 matrix;\n"
@@ -22,6 +22,8 @@ const char* vertexShaderSource =
     "out vec3 Normal;\n"
     "out vec2 TexCoord;\n"
     "out vec2 TexCoordLightmap;\n"
+//     "out vec3 Tangent;\n"
+//     "out vec3 Bitangent;\n"
 
     "flat out int TexIndex;\n"
     "flat out int GlowIndex;\n"
@@ -33,12 +35,14 @@ const char* vertexShaderSource =
     "void main() {\n"
     "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
     "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"
+//     "    Tangent = mat3(matrix) * aTangent;\n"
+//     "    Bitangent = mat3(matrix) * aBitangent;\n"
     "    TexCoord = aTexCoord;\n" // Pass along data to each vertex, shared for whole tri's pixels.
     "    TexCoordLightmap = aTexCoordLightmap;\n" // Lightmap UVs
     "    TexIndex = texIndex;\n"
     "    GlowIndex = glowIndex;\n"
     "    SpecIndex = specIndex;\n"
-    "    NormalIndex = normalIndex;\n"
+    "    NormalIndex = normIndex;\n"
     "    ModelIndex = modelIndex;\n"
     "    InstanceIndex = instanceIndex;\n"
     "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
@@ -52,6 +56,8 @@ const char* fragmentShaderTraditional =
     "in vec2 TexCoordLightmap;\n"
     "in vec3 Normal;\n"
     "in vec3 FragPos;\n"
+//     "in vec3 Tangent;\n"
+//     "in vec3 Bitangent;\n"
 
     "uniform int debugView;\n"
     "uniform float overrideGlowR = 0.0;\n"
@@ -108,7 +114,19 @@ const char* fragmentShaderTraditional =
     "    if (albedoColor.a < 0.05) discard;\n" // Alpha cutout threshold
 
     "    vec3 adjustedNormal = Normal;\n"
-    "    if (!gl_FrontFacing) adjustedNormal = -Normal;\n"
+    "    if (NormalIndex < 65535 && NormalIndex > 0) {\n"
+        "    vec3 dp1 = dFdx(FragPos);\n"
+        "    vec3 dp2 = dFdy(FragPos);\n"
+        "    vec2 duv1 = dFdx(TexCoord);\n"
+        "    vec2 duv2 = dFdy(TexCoord);\n"
+        "    vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);\n"
+        "    vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);\n"
+        "    mat3 TBN3x3 = mat3(t, b, Normal);\n"
+        "    vec3 normalColor = normalize(getTextureColor(NormalIndex,ivec2(x,y)).rgb * 2.0 - 1.0);\n"
+        "    normalColor.g = -normalColor.g;\n"
+        "    adjustedNormal = normalize(TBN3x3 * normalColor);\n"
+    "    }\n"
+    "    if (!gl_FrontFacing) adjustedNormal = -adjustedNormal;\n"
     "    vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));\n"
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
     "    vec4 worldPosPack = vec4(FragPos,intBitsToFloat(InstanceIndex));\n"

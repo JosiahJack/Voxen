@@ -353,15 +353,19 @@ index: 64
 model: 133
 cardchunk: 1
 texture: 298
+spectexture: 1257
 #chunk_exec2_6
 index: 65
 model: 134
 cardchunk: 1
 texture: 299
+spectexture: 1257
 #chunk_exec2_7
 index: 66
+model: 133
 cardchunk: 1
 texture: 300
+spectexture: 1257
 #chunk_exec3_1
 index: 67 
 cardchunk: 1
@@ -769,27 +773,32 @@ index: 149
 model: 249
 cardchunk: 1
 texture: 486
-spectexture: 1236
+spectexture: 1256
+normtexture: 1255
 #chunk_med1_1_half_top
 index: 150
 model: 250
 texture: 486
-spectexture: 1236
+spectexture: 1256
+normtexture: 1255
 #chunk_med1_1_slice128high
 index: 151
 model: 251
 texture: 486
-spectexture: 1236
+spectexture: 1256
+normtexture: 1255
 #chunk_med1_1_slice192RH
 index: 152
 model: 252
 texture: 486
-spectexture: 1236
+spectexture: 1256
+normtexture: 1255
 #chunk_med1_1_slice256
 index: 153
 model: 253
 texture: 486
-spectexture: 1236
+spectexture: 1256
+normtexture: 1255
 #chunk_med1_1d
 index: 154
 model: 248
@@ -797,76 +806,83 @@ cardchunk: 1
 texture: 485
 glowtexture: 484
 spectexture: 1236
+normtexture: 1255
 #chunk_med1_2
 index: 155
 model: 255
 cardchunk: 1
 texture: 489
 glowtexture: 488
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_2d
 index: 156
 model: 254
 cardchunk: 1
 texture: 487
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_3
 index: 157
 model: 257
 cardchunk: 1
 texture: 493
 glowtexture: 492
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_3d
 index: 158
 model: 256
 cardchunk: 1
 texture: 491
 glowtexture: 490
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_4
 index: 159
 model: 258
 cardchunk: 1
 texture: 494
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_5
 index: 160
 model: 669
 cardchunk: 1
 texture: 495
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_6
 index: 161
 model: 259
 cardchunk: 1
 texture: 496
-spectexture: 1236
+spectexture: 1256
 #chunk_med1_7
 index: 162
 model: 262
 cardchunk: 1
 texture: 499
 spectexture: 1236
+normtexture: 1254
 #chunk_med1_7_slice14_64
 index: 163
 model: 263
 texture: 499
+spectexture: 1236
+normtexture: 1254
 #chunk_med1_7_slice45_320lh
 index: 164
 model: 264
 texture: 499
 spectexture: 1236
+normtexture: 1254
 #chunk_med1_7_slice45_320rh
 index: 165
 model: 265
 texture: 499
 spectexture: 1236
+normtexture: 1254
 #chunk_med1_7_slice96high
 index: 166
 model: 266
 texture: 499
 spectexture: 1236
+normtexture: 1254
 #chunk_med1_7d
 index: 167
 model: 260
