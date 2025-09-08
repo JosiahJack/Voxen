@@ -46,7 +46,7 @@ typedef struct {
 
 int LoadTextures(void) {
     double start_time = get_time();
-    DebugRAM("before LoadTextures");
+    DebugRAM("start of LoadTextures");
     textureCount = 0u;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
@@ -70,13 +70,13 @@ int LoadTextures(void) {
     transparentTexture = malloc(textureCount * sizeof(bool));
     size_t maxFileSize = 8000000; // 8MB
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
-    DebugRAM("after texture buffers mallocs");
+//     DebugRAM("after texture buffers mallocs");
 
     // First Pass: Calculate total pixels and offsets
     totalPixels = 0;
     totalPaletteColors = 0;
     for (int i = 0; i < textureCount; i++) {
-        if (i % 20 == 0) RenderLoadingProgress(100,"Loading textures [%d of %d]...",i,textureCount);
+        RenderLoadingProgress(105,"Loading textures [%d of %d]...",i,textureCount);
         textureOffsets[i] = totalPixels;
         texturePaletteOffsets[i] = totalPaletteColors;
         int matchedParserIdx = -1;
@@ -159,7 +159,7 @@ int LoadTextures(void) {
     glGenBuffers(1, &stagingBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, (((4096 * 4096) + 1) / 2) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY); // Max texture size
-    DebugRAM("after glGenBuffers stagingBuffer");
+//     DebugRAM("after glGenBuffers stagingBuffer");
     for (uint16_t i = 0; i < textureCount; i++) {
         int matchedParserIdx = -1;
         for (int k=0;k<texture_parser.count;k++) { // Find matching index to i that was parsed from file
@@ -185,7 +185,7 @@ int LoadTextures(void) {
         unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
         if (!image_data) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); return 1; }
         
-        DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
+//         DebugRAM("after stbi_load_from_memory for %s", texture_parser.entries[matchedParserIdx].path);
         
         // Populate palette and indices
         ColorEntry *color_table = NULL, *entry, *tmp;
@@ -195,10 +195,7 @@ int LoadTextures(void) {
             uint8_t gval = image_data[j + 1];
             uint8_t bval = image_data[j + 2];
             uint8_t aval = image_data[j + 3];
-//             if (aval < 1) rval = gval = bval = 0; // CAUSED WEIRD MISSING BLACK REGIONS, may revisit later
-            uint32_t color = ((uint32_t)rval << 24) | ((uint32_t)gval << 16) |
-                             ((uint32_t)bval << 8) | aval;
-
+            uint32_t color = ((uint32_t)rval << 24) | ((uint32_t)gval << 16) | ((uint32_t)bval << 8) | aval;
             HASH_FIND_INT(color_table, &color, entry);
             if (!entry) {
                 if (palette_size >= MAX_PALETTE_SIZE) { DualLog("\033[33mWARNING: Palette size exceeded for %s\033[0m\n", texture_parser.entries[matchedParserIdx].path); palette_size = MAX_PALETTE_SIZE - 1; break; }
@@ -228,8 +225,6 @@ int LoadTextures(void) {
         glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
         glBindBuffer(GL_COPY_WRITE_BUFFER, colorBufferID);
         glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, ((pixel_offset + 1) / 2) * sizeof(uint32_t), ((width * height + 1) / 2) * sizeof(uint32_t));
-//         glFlush(); Commented out to trade peak RAM going up to 256mb to gain 0.3s off loading time
-//         glFinish();
         pixel_offset += width * height;
         palette_offset += palette_size;
 #ifdef DEBUG_TEXTURE_LOAD_DATA
@@ -250,11 +245,11 @@ int LoadTextures(void) {
     glDeleteBuffers(1, &stagingBuffer);
     free(indices);
     free(file_buffer);
-    DebugRAM("freeing indices and file_buffer");
+//     DebugRAM("freeing indices and file_buffer");
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
     glFlush();
     glFinish();
-    DebugRAM("after SSBO upload");
+//     DebugRAM("after SSBO upload");
 #ifdef DEBUG_TEXTURE_LOAD_DATA
     DualLog("Largest palette size of %d\n", maxPalletSize);
 #endif
@@ -297,6 +292,8 @@ int LoadTextures(void) {
     free(texturePaletteOffsets);
 
     CHECK_GL_ERROR();
+    glFlush();
+    glFinish();
     malloc_trim(0);
     DebugRAM("After LoadTextures");
     double end_time = get_time();

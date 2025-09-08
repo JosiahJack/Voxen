@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -36,7 +35,7 @@
 
 // Window
 SDL_Window *window;
-int screen_width = 800, screen_height = 600;
+int screen_width = 1366, screen_height = 768;
 bool window_has_focus = false;
 FILE* console_log_file = NULL;
 
@@ -808,18 +807,13 @@ void UpdateScreenSize(void) {
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
 }
 
-#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-#define VOXEL_SIZE 0.32f
-#define VOXEL_HALF_SIZE (VOXEL_SIZE * 0.5f)
-#define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
 uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // 1,048,576, ~946,377 used
 uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length)
 
 int VoxelLists() {
     double start_time = get_time();
-    const float startX = worldMin_x + VOXEL_HALF_SIZE;
-    const float startZ = worldMin_z + VOXEL_HALF_SIZE;
+    const float startX = worldMin_x + (VOXEL_SIZE * 0.5f);
+    const float startZ = worldMin_z + (VOXEL_SIZE * 0.5f);
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
     float rangeSquared[LIGHT_COUNT]; // Precompute light ranges
     for (int i = 0; i < LIGHT_COUNT; ++i) {
@@ -836,10 +830,10 @@ int VoxelLists() {
         float range = sqrtf(rangeSquared[lightIdx]);
 
         // Calculate affected cell range (2.56x2.56 cells)
-        int minCellX = (int)floorf((litX - range - worldMin_x) / CELL_SIZE);
-        int maxCellX = (int)ceilf((litX + range - worldMin_x) / CELL_SIZE);
-        int minCellZ = (int)floorf((litZ - range - worldMin_z) / CELL_SIZE);
-        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / CELL_SIZE);
+        int minCellX = (int)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int maxCellX = (int)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int minCellZ = (int)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
 
         // Clamp to grid bounds (64x64 cells)
         minCellX = minCellX > 0 ? minCellX : 0;
@@ -854,8 +848,8 @@ int VoxelLists() {
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-                        float posX = startX + (cellX * CELL_SIZE) + (voxelX * VOXEL_SIZE);
-                        float posZ = startZ + (cellZ * CELL_SIZE) + (voxelZ * VOXEL_SIZE);
+                        float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
+                        float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
 
                         if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
@@ -894,10 +888,10 @@ int VoxelLists() {
         float range = sqrtf(rangeSquared[lightIdx]);
 
         // Calculate affected cell range
-        int minCellX = (int)floorf((litX - range - worldMin_x) / CELL_SIZE);
-        int maxCellX = (int)ceilf((litX + range - worldMin_x) / CELL_SIZE);
-        int minCellZ = (int)floorf((litZ - range - worldMin_z) / CELL_SIZE);
-        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / CELL_SIZE);
+        int minCellX = (int)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int maxCellX = (int)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int minCellZ = (int)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
 
         // Clamp to grid bounds
         minCellX = minCellX > 0 ? minCellX : 0;
@@ -912,8 +906,8 @@ int VoxelLists() {
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-                        float posX = startX + (cellX * CELL_SIZE) + (voxelX * VOXEL_SIZE);
-                        float posZ = startZ + (cellZ * CELL_SIZE) + (voxelZ * VOXEL_SIZE);
+                        float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
+                        float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
 
                         if (distSqrd < rangeSquared[lightIdx] && lightCounts[voxelIndex] < MAX_LIGHTS_PER_VOXEL) {
@@ -952,6 +946,7 @@ int VoxelLists() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
+    DebugRAM("end of voxel light lists");
     return 0;
 }
 
@@ -1608,6 +1603,7 @@ int EventQueueProcess(void) {
 }
 
 int main(int argc, char* argv[]) {
+    double programStartTime = get_time();
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
@@ -1669,6 +1665,7 @@ int main(int argc, char* argv[]) {
     last_time = get_time();
     lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
+    DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;

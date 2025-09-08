@@ -36,8 +36,6 @@ uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
 float * tempVertices;
 uint32_t * tempTriangles;
-uint32_t ** triangleDataArrays;
-uint32_t ** triEdgeDataArrays;
 GLuint lightmapID;
 uint32_t renderableCount = 0;
 int startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
@@ -427,6 +425,7 @@ bool parse_data_file(DataParser *parser, const char *filename, int type) {
 // Loads all 3D meshes
 int LoadGeometry(void) {
     double start_time = get_time();
+    DebugRAM("start of LoadGeometry");
     parser_init(&model_parser, valid_mdldata_keys, NUM_MODEL_KEYS); // First parse ./Data/models.txt to see what to load to what indices
     if (!parse_data_file(&model_parser, "./Data/models.txt",0)) { DualLogError("Could not parse ./Data/models.txt!\n"); return 1; }
 
@@ -441,17 +440,13 @@ int LoadGeometry(void) {
     int totalTriCount = 0;
     largestVertCount = 0;
     largestTriangleCount = 0;
-
-    // Allocate persistent temporary buffers
     tempVertices = (float*)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     tempTriangles = (uint32_t*)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
-    triangleDataArrays = (uint32_t**)calloc(MODEL_COUNT, sizeof(uint32_t *));
     uint32_t* vertexOffsets = (uint32_t*)calloc(MODEL_COUNT, sizeof(uint32_t));
     uint32_t* triangleOffsets = (uint32_t*)calloc(MODEL_COUNT, sizeof(uint32_t));
     uint32_t currentVertexOffset = 0;
     uint32_t currentTriangleOffset = 0;
 
-    // Generate staging buffers
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
@@ -467,7 +462,7 @@ int LoadGeometry(void) {
 
         if (matchedParserIdx < 0) continue;
 
-        if (i % 5 == 0) RenderLoadingProgress(100,"Loading models [%d of %d]...",matchedParserIdx,model_parser.count);
+        RenderLoadingProgress(105,"Loading models [%d of %d]...",matchedParserIdx,model_parser.count);
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
 
         struct aiPropertyStore* props = aiCreatePropertyStore(); // Disable non-essential FBX components
@@ -574,11 +569,10 @@ int LoadGeometry(void) {
             globalVertexOffset += mesh->mNumVertices;
         }
 
-        triangleDataArrays[i] = (uint32_t *)malloc(triCount * 3 * sizeof(uint32_t)); // Store triangle data in triangleDataArrays
-        memcpy(triangleDataArrays[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
         currentVertexOffset += vertexCount;
         currentTriangleOffset += triCount;
         aiReleaseImport(scene);
+        aiReleasePropertyStore(props);
         if (vertexCount > 0) { // Copy to staging buffers
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
             void *mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
@@ -588,7 +582,8 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-
+            glFlush();
+            glFinish();
         }
 
         if (triCount > 0) {
@@ -600,7 +595,8 @@ int LoadGeometry(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, triCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCount * 3 * sizeof(uint32_t));
-            DebugRAM("post tri buffer tbos upload for model %s", model_parser.entries[matchedParserIdx].path);
+            glFlush();
+            glFinish();
         }
 
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
@@ -611,81 +607,7 @@ int LoadGeometry(void) {
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
         modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
-        DebugRAM("post GPU upload for model %s", model_parser.entries[matchedParserIdx].path);
     }
-    
-    // -------------------------------------------------------------------------------------------------------------------------
-    // Duplicate and Send all Triangle Data
-    GLuint triangleCountSSBO;
-    glGenBuffers(1, &triangleCountSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleCountSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelTriangleCounts, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 21, triangleCountSSBO);
-    
-    // Create model triangle offsets SSBO
-    GLuint modelTriangleOffsetsID;
-    glGenBuffers(1, &modelTriangleOffsetsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelTriangleOffsetsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), triangleOffsets, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 22, modelTriangleOffsetsID);
-    
-    // Create tboMasterTable for all triangles containing vertex indices
-    GLuint tboMasterTable;
-    glGenBuffers(1, &tboMasterTable);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, tboMasterTable);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalTriCount * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
-        if (modelTriangleCounts[i] == 0 || tbos[i] == 0) continue; // Skip ones at the end of the list that aren't used.
-        
-        glBindBuffer(GL_COPY_READ_BUFFER, tbos[i]);
-        glBindBuffer(GL_COPY_WRITE_BUFFER, tboMasterTable);
-        GLintptr srcOffset = 0;
-        GLintptr dstOffset = (GLintptr)(triangleOffsets[i] * 3 * sizeof(uint32_t));
-        GLsizeiptr size = (GLsizeiptr)(modelTriangleCounts[i] * 3 * sizeof(uint32_t));
-        if (dstOffset + size > totalTriCount * 3 * (uint32_t)sizeof(uint32_t)) { DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n", i, dstOffset, size, totalTriCount * 3 * sizeof(uint32_t)); return 1; }
-        
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
-    }
-
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 23, tboMasterTable);
-    
-    // -------------------------------------------------------------------------------------------------------------------------
-    // Duplicate and Send all Vertex Data
-    GLuint vertexCountSSBO;
-    glGenBuffers(1, &vertexCountSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vertexCountSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), modelVertexCounts, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 24, vertexCountSSBO);
-    
-    // Create model vertex offsets SSBO
-    GLuint modelVertexOffsetsID;
-    glGenBuffers(1, &modelVertexOffsetsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelVertexOffsetsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * sizeof(uint32_t), vertexOffsets, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 25, modelVertexOffsetsID);
-
-    // Create vboMasterTable for all vertices of all model types in flat buffer
-    GLuint vboMasterTable;
-    glGenBuffers(1, &vboMasterTable);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, vboMasterTable);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-
-    // Copy to vboMasterTable
-    for (uint32_t i = 0; i < MODEL_COUNT; ++i) {
-        if (modelVertexCounts[i] == 0 || vbos[i] == 0) continue; // Skip ones at the end of the list that aren't used.
-        
-        glBindBuffer(GL_COPY_READ_BUFFER, vbos[i]);
-        glBindBuffer(GL_COPY_WRITE_BUFFER, vboMasterTable);
-        GLintptr srcOffset = 0;
-        GLintptr dstOffset = (GLintptr)(vertexOffsets[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        GLsizeiptr size = (GLsizeiptr)(modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        if (dstOffset + size > totalVertCount * VERTEX_ATTRIBUTES_COUNT * (uint32_t)sizeof(float)) { DualLogError("Buffer overflow for model %u: dstOffset=%ld, size=%ld, totalSize=%ld\n", i, dstOffset, size, totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); return 1; }
-        
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, srcOffset, dstOffset, size);
-    }
-
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 18, vboMasterTable);
-    // -------------------------------------------------------------------------------------------------------------------------
 
     // Delete staging buffers
     glDeleteBuffers(1, &stagingVBO);
@@ -693,7 +615,6 @@ int LoadGeometry(void) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
-    DebugRAM("after staging buffers deleted");
 
 #ifdef DEBUG_MODEL_LOAD_DATA
     DualLog("Largest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
@@ -716,10 +637,12 @@ int LoadGeometry(void) {
     free(tempTriangles);
     free(triangleOffsets);
     free(vertexOffsets);
+    glFlush();
+    glFinish();
     malloc_trim(0);
     double end_time = get_time();
+    DebugRAM("After Load Models");
     DualLog("Load Models took %f seconds\n", end_time - start_time);
-    DebugRAM("After full LoadModels completed");
     return 0;
 }
 

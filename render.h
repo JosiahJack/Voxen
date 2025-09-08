@@ -55,6 +55,11 @@
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define INVALID_FLOOR_HEIGHT -1300.0f
 #define LUXEL_SIZE 0.16f
+    
+#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
+#define VOXEL_SIZE 0.32f
+#define CELL_SIZE 2.56f // Each cell is 2.56x2.56
+#define MAX_LIGHTS_PER_VOXEL 32 // Cap to prevent overflow
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 
