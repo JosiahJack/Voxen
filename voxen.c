@@ -1706,26 +1706,26 @@ int main(int argc, char* argv[]) {
 
     // Grid/cull (big one: visibility table)
     touchingPointer = (volatile void*)gridCellStates;
-    bufferSize = sizeof(gridCellStates);
+    bufferSize = ARRSIZE * sizeof(uint8_t);
 #ifdef DEBUG_RAM_OUTPUT
     DualLog("Touching pages for gridCellStates[%zu bytes]\n", bufferSize);
 #endif
     memset((void*)touchingPointer, 0, bufferSize);
 
     touchingPointer = (volatile void*)gridCellFloorHeight;
-    bufferSize = sizeof(gridCellFloorHeight);
+    bufferSize = ARRSIZE * sizeof(float);
 #ifdef DEBUG_RAM_OUTPUT
     DualLog("Touching pages for gridCellFloorHeight[%zu bytes]\n", bufferSize);
 #endif
-    memset((void*)touchingPointer, 0, bufferSize);
+    memset((void*)touchingPointer, INVALID_FLOOR_HEIGHT, bufferSize);
 
     // Visibility: Sequential loop for bool array (avoids opt issues with memset)
+    touchingPointer = (volatile void*)precomputedVisibleCellsFromHere;
+    bufferSize = 524288 * sizeof(uint32_t);
 #ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for precomputedVisibleCellsFromHere[%zu bytes]\n", sizeof(precomputedVisibleCellsFromHere));
+    DualLog("Touching pages for precomputedVisibleCellsFromHere[%zu bytes]\n", bufferSize);
 #endif
-    for (size_t i = 0; i < sizeof(precomputedVisibleCellsFromHere); ++i) {
-        ((volatile char*)precomputedVisibleCellsFromHere)[i] = 0;  // Byte-wise for safety
-    }
+    memset((void*)touchingPointer, 0, bufferSize);
 
     // Model data
     touchingPointer = (volatile void*)modelVertexCounts;

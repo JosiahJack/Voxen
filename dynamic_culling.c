@@ -11,13 +11,29 @@
 
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
-bool precomputedVisibleCellsFromHere[ARRSIZE * ARRSIZE];
+uint32_t precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
 uint16_t cellIndexForLight[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
 uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
+
+static inline bool get_cull_bit(const uint32_t* arr, size_t idx) {
+    size_t word = idx / 32;
+    size_t bit = idx % 32;
+    return ((arr[word] & (1U << bit)) != 0);
+}
+
+static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
+    size_t word = idx / 32;
+    size_t bit = idx % 32;
+    if (val) {
+        arr[word] |= (1U << bit);
+    } else {
+        arr[word] &= ~(1U << bit);
+    }
+}
 
 void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
     int max = WORLDX - 1; // 63
@@ -603,17 +619,7 @@ void DetermineVisibleCells(int startX, int startZ) {
 }
 
 int Cull_Init(void) {
-    DebugRAM("start of Cull_Init");
-    for (int cellIdx = 0; cellIdx < ARRSIZE; ++cellIdx) {
-        gridCellStates[cellIdx] = 0u;
-        gridCellFloorHeight[cellIdx] = INVALID_FLOOR_HEIGHT;
-        for (int subCellIdx = 0; subCellIdx < ARRSIZE; ++subCellIdx) {
-            if (subCellIdx != cellIdx) precomputedVisibleCellsFromHere[(cellIdx * ARRSIZE) + subCellIdx] = false;
-        }
-    }
-    DebugRAM("Cull_Init after cell initialization");
-
-    
+    DebugRAM("start of Cull_Init");    
     switch(currentLevel) {
         case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
         case 1: worldMin_x = -81.92f; worldMin_z = -71.68f; break;
@@ -649,15 +655,18 @@ int Cull_Init(void) {
             for (int z2=0;z2<WORLDZ;z2++) {
                 for (int x2=0;x2<WORLDX;x2++) {
                     int subCellIdx = (z2 * WORLDX) + x2;
-                    precomputedVisibleCellsFromHere[(cellIdx * ARRSIZE) + subCellIdx] = gridCellStates[subCellIdx] & CELL_VISIBLE;
-                    if (precomputedVisibleCellsFromHere[(cellIdx * ARRSIZE) + subCellIdx]) numPrecomputedVisibleCells++;
+                    size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx;
+                    bool is_visible = (gridCellStates[subCellIdx] & CELL_VISIBLE);
+                    set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,is_visible);
+                    if (is_visible) numPrecomputedVisibleCells++;
                 }
             }
             
             if (currentLevel == 10) {
                 if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
-                    precomputedVisibleCellsFromHere[(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12)] = true;
-                    if (precomputedVisibleCellsFromHere[(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12)]) numPrecomputedVisibleCells++;
+                    size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
+                    set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
+                    numPrecomputedVisibleCells++;
                 }
             }
         }
@@ -669,7 +678,8 @@ int Cull_Init(void) {
     for (int z=0;z<WORLDZ;++z) {
         for (int x=0;x<WORLDX;++x) {
             int cellIdx = (z * WORLDX) + x;
-            if (precomputedVisibleCellsFromHere[cellToCellIdx + cellIdx]) {
+            size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
+            if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
                 numFoundVisibleCellsForPlayerStart++;
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
             }
@@ -686,18 +696,10 @@ int Cull_Init(void) {
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     uint32_t numBits = ARRSIZE * ARRSIZE;          // 4096 * 4096
     uint32_t numUint32s = (numBits + 31) / 32;    // ceil(bits/32)
-    uint32_t numBytes = numUint32s * sizeof(uint32_t);
-    uint32_t* bitPackedHandoffBuffer = malloc(numBytes); // 2097152 (~2MB)
-    memset(bitPackedHandoffBuffer,0,numBytes);
-    for (size_t i = 0; i < numBits; i++) {
-        size_t wordIdx = i / 32;
-        size_t bitIdx  = i % 32;
-        if (precomputedVisibleCellsFromHere[i]) bitPackedHandoffBuffer[wordIdx] |= (1u << bitIdx);
-    }
-    
+    uint32_t numBytes = numUint32s * sizeof(uint32_t);    
     glGenBuffers(1, &precomputedVisibleCellsFromHereID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, precomputedVisibleCellsFromHereID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numBytes, bitPackedHandoffBuffer, GL_DYNAMIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, numBytes, precomputedVisibleCellsFromHere, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, precomputedVisibleCellsFromHereID);
     
     glGenBuffers(1, &cellIndexForInstanceID);
@@ -706,7 +708,6 @@ int Cull_Init(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
 
     CHECK_GL_ERROR();
-    free(bitPackedHandoffBuffer);
     malloc_trim(0);
     DebugRAM("end of Cull_Init");
     return 0;
@@ -723,7 +724,8 @@ void CullCore(void) {
             if (cellIdx == 0) { gridCellStates[0] |= CELL_VISIBLE; continue; } // Errors default here so draw them anyways.  Don't count it though.
             if (cellIdx == playerCellIdx) { gridCellStates[playerCellIdx] |= CELL_VISIBLE; numCellsVisible++; continue; } // Always at least set player's cell.
 
-            if (precomputedVisibleCellsFromHere[cellToCellIdx + cellIdx]) {
+            size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
+            if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
                 numCellsVisible++;
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
             } else {
