@@ -134,6 +134,7 @@ int LoadTextures(void) {
         textureSizes[i * 2] = width;
         textureSizes[(i * 2) + 1] = height;
         stbi_image_free(image_data);
+        malloc_trim(0);
     }
     
     texturePalettes = malloc(totalPaletteColors * sizeof(uint32_t));

@@ -806,12 +806,14 @@ void UpdateScreenSize(void) {
     m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(farPlane + nearPlane) / (farPlane - nearPlane); m[11]= -1.0f;
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
 }
-
+/*
 uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // 1,048,576, ~946,377 used
-uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length)
+uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length)*/
 
 int VoxelLists() {
     double start_time = get_time();
+    uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
+    uint32_t* voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
     const float startX = worldMin_x + (VOXEL_SIZE * 0.5f);
     const float startZ = worldMin_z + (VOXEL_SIZE * 0.5f);
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -927,6 +929,7 @@ int VoxelLists() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListIndicesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, voxelLightListIndicesID);
+    free(voxelLightListIndices);
 
     GLuint voxelLightListsRawID;
     glGenBuffers(1, &voxelLightListsRawID);
@@ -934,6 +937,7 @@ int VoxelLists() {
     glBufferData(GL_SHADER_STORAGE_BUFFER, head * sizeof(uint32_t), voxelLightListsRaw, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, voxelLightListsRawID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    free(voxelLightListsRaw);
 
     // Update lights and instances
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);

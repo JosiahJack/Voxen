@@ -573,6 +573,8 @@ int LoadGeometry(void) {
         currentTriangleOffset += triCount;
         aiReleaseImport(scene);
         aiReleasePropertyStore(props);
+        aiDetachAllLogStreams();
+        malloc_trim(0);
         if (vertexCount > 0) { // Copy to staging buffers
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
             void *mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
