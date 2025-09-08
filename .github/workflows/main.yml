@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install libsdl2-dev libsdl2-ttf-dev libglew-dev libgl1-mesa-dev libassimp-dev libenet-dev uthash-dev
           chmod +x ./build.sh
-          ./build.sh
+          ./build.sh ci
       - name: Upload voxen binary
         uses: actions/upload-artifact@v4
         with:

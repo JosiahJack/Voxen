@@ -23,6 +23,7 @@ extern float cam_y;
 extern float cam_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
+extern float gridCellFloorHeight[ARRSIZE];
 extern bool precomputedVisibleCellsFromHere[ARRSIZE * ARRSIZE];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];

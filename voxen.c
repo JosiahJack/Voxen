@@ -31,7 +31,7 @@
 #include "constants.h"
 #include "dynamic_culling.h"
 
-// #define DEBUG_RAM_OUTPUT
+#define DEBUG_RAM_OUTPUT
 
 // Window
 SDL_Window *window;
@@ -160,6 +160,8 @@ GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_
       fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
       viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1;
 
+GLuint blueNoiseBuffer;
+      
 float fogColorR = 0.04f;
 float fogColorG = 0.04f;
 float fogColorB = 0.09f;
@@ -282,8 +284,6 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int he
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) DualLogError("Failed to create texture %s: OpenGL error %d\n", name, error);
 }
-
-GLuint blueNoiseBuffer;
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
@@ -806,9 +806,6 @@ void UpdateScreenSize(void) {
     m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(farPlane + nearPlane) / (farPlane - nearPlane); m[11]= -1.0f;
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
 }
-/*
-uint32_t voxelLightListsRaw[VOXEL_COUNT * 4]; // 1,048,576, ~946,377 used
-uint32_t voxelLightListIndices[VOXEL_COUNT * 2]; // Pairs of (offset, length)*/
 
 int VoxelLists() {
     double start_time = get_time();
@@ -948,7 +945,10 @@ int VoxelLists() {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
+    glFlush();
+    glFinish();
+    CHECK_GL_ERROR();    
+    malloc_trim(0);
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     DebugRAM("end of voxel light lists");
     return 0;
@@ -1194,7 +1194,7 @@ int InitializeEnvironment(void) {
 
     // Load Game/Mod Definition
     const char* filename = "./Data/gamedata.txt";
-    DualLog("Loading game definition from %s...\n",filename);    
+    DualLog("Loading game definition from %s...",filename);    
     DataParser gamedata_parser;
     DataEntry entry;
     init_data_entry(&entry);
@@ -1202,7 +1202,7 @@ int InitializeEnvironment(void) {
     gamedata_parser.valid_keys = valid_gamedata_keys;
     gamedata_parser.num_keys = NUM_GAMDAT_KEYS;
     FILE *gamedatfile = fopen(filename, "r");
-    if (!gamedatfile) { DualLogError("Cannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); return 1; }
+    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); return 1; }
     
     uint32_t lineNum = 0;
     bool is_eof;
@@ -1216,7 +1216,7 @@ int InitializeEnvironment(void) {
     numLevels = entry.levelCount;
     startLevel = entry.startLevel;
     currentLevel = startLevel;
-    DualLog("Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
+    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
     RenderLoadingProgress(52,"Loading textures...");
     if (LoadTextures()) return 1;
     RenderLoadingProgress(50,"Loading models...");
@@ -1646,6 +1646,173 @@ int main(int argc, char* argv[]) {
 
     globalFrameNum = 0;
     activeLogFile = 0;
+    DebugRAM("prior to static buffer touches"); // Ensure pages faulted up front for stable RAM usage and contiguous block for static arrays.
+    volatile void* touchingPointer = (volatile void*)instances;
+    size_t bufferSize = INSTANCE_COUNT * sizeof(Instance);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for instances[%zu bytes]\n",bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+    
+    touchingPointer = (volatile void*)modelMatrices;  // Adjacent to instances
+    bufferSize = INSTANCE_COUNT * 16 * sizeof(float);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for modelMatrices[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+    
+    touchingPointer = (volatile void*)dirtyInstances;
+    bufferSize = INSTANCE_COUNT * sizeof(uint8_t);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for dirtyInstances[%zu bytes]\n",bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+    
+    touchingPointer = (volatile void*)doubleSidedInstances;
+    bufferSize = INSTANCE_COUNT * sizeof(uint16_t);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for doubleSidedInstances[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)transparentInstances;
+    bufferSize = INSTANCE_COUNT * sizeof(uint16_t);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for transparentInstances[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    // Keys and events
+    touchingPointer = (volatile void*)keys;
+    bufferSize = sizeof(keys);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for keys[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)eventQueue;
+    bufferSize = sizeof(eventQueue);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for eventQueue[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)eventJournal;
+    bufferSize = sizeof(eventJournal);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for eventJournal[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    // Grid/cull (big one: visibility table)
+    touchingPointer = (volatile void*)gridCellStates;
+    bufferSize = sizeof(gridCellStates);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for gridCellStates[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)gridCellFloorHeight;
+    bufferSize = sizeof(gridCellFloorHeight);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for gridCellFloorHeight[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    // Visibility: Sequential loop for bool array (avoids opt issues with memset)
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for precomputedVisibleCellsFromHere[%zu bytes]\n", sizeof(precomputedVisibleCellsFromHere));
+#endif
+    for (size_t i = 0; i < sizeof(precomputedVisibleCellsFromHere); ++i) {
+        ((volatile char*)precomputedVisibleCellsFromHere)[i] = 0;  // Byte-wise for safety
+    }
+
+    // Model data
+    touchingPointer = (volatile void*)modelVertexCounts;
+    bufferSize = sizeof(modelVertexCounts);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for modelVertexCounts[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)modelTriangleCounts;
+    bufferSize = sizeof(modelTriangleCounts);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for modelTriangleCounts[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)vbos;
+    bufferSize = sizeof(vbos);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for vbos[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)tbos;
+    bufferSize = sizeof(tbos);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for tbos[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)modelBounds;
+    bufferSize = sizeof(modelBounds);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for modelBounds[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    // Projections, text, mappings (small)
+    touchingPointer = (volatile void*)uiOrthoProjection;
+    bufferSize = sizeof(uiOrthoProjection);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for uiOrthoProjection[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)rasterPerspectiveProjection;
+    bufferSize = sizeof(rasterPerspectiveProjection);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for rasterPerspectiveProjection[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)uiTextBuffer;
+    bufferSize = sizeof(uiTextBuffer);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for uiTextBuffer[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)mp3_sounds;
+    bufferSize = sizeof(mp3_sounds);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for mp3_sounds[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)wav_sounds;
+    bufferSize = sizeof(wav_sounds);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for wav_sounds[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)cellIndexForInstance;
+    bufferSize = sizeof(cellIndexForInstance);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for cellIndexForInstance[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+
+    touchingPointer = (volatile void*)cellIndexForLight;
+    bufferSize = sizeof(cellIndexForLight);
+#ifdef DEBUG_RAM_OUTPUT
+    DualLog("Touching pages for cellIndexForLight[%zu bytes]\n", bufferSize);
+#endif
+    memset((void*)touchingPointer, 0, bufferSize);
+    
     DebugRAM("prior to event system init");
     if (EventInit()) return 1;
 
@@ -1922,6 +2089,9 @@ int main(int argc, char* argv[]) {
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
+        if (globalFrameNum == 4) DebugRAM("after 4 frames of running");
+        else if (globalFrameNum == 100) DebugRAM("after 100 frames of running");
+        else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
     }
 
     return 0;

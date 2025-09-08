@@ -9,6 +9,7 @@
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/version.h>
 #include <math.h>
 #include "constants.h"
 #include "instance.h"
@@ -23,13 +24,13 @@
 DataParser model_parser;
 const char *valid_mdldata_keys[] = {"index"};
 #define NUM_MODEL_KEYS 1
-#define MAX_VERT_COUNT 21444
-#define MAX_TRI_COUNT 32449
+#define MAX_VERT_COUNT 32768
+#define MAX_TRI_COUNT 32768
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
 GLuint vbos[MODEL_COUNT];
-GLuint tbos[MODEL_COUNT]; // Triangle index buffers
+GLuint tbos[MODEL_COUNT];
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 uint32_t largestVertCount = 0;
@@ -434,7 +435,7 @@ int LoadGeometry(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
-    DualLog("Parsing %d models with max index of %d ...\n",model_parser.count, maxIndex);
+    DualLog("Parsing %d models with max index of %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
     int totalVertCount = 0;
     int totalBounds = 0;
     int totalTriCount = 0;
@@ -466,20 +467,20 @@ int LoadGeometry(void) {
         if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
 
         struct aiPropertyStore* props = aiCreatePropertyStore(); // Disable non-essential FBX components
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 0); // Disable animations
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1);
         aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0); // Disable materials
         aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0); // Disable textures
         aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0); // Disable lights
         aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0); // Disable cameras
         aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1); // Drop empty animations
-        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 1); // Disable skeleton meshes
-        aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS | aiComponent_MATERIALS | aiComponent_TEXTURES | aiComponent_LIGHTS | aiComponent_CAMERAS); // Remove non-mesh components
+        aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0); // Disable skeleton meshes
+        aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
         aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT); // Skip non-triangular primitives
         aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 12); // Optimize vertex cache
         aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4); // Limit bone weights
         aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1); // Remove degenerate primitives
         aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0); // Disable hierarchy preservation
-        const struct aiScene *scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_JoinIdenticalVertices, NULL, props);
+        const struct aiScene *scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_JoinIdenticalVertices | aiProcess_ImproveCacheLocality, NULL, props);
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); return 1; }
 
         // Count vertices, triangles
@@ -490,7 +491,7 @@ int LoadGeometry(void) {
             triCount += scene->mMeshes[m]->mNumFaces;
         }
 
-        if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); return 1; }
+        if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("\nModel %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); return 1; }
 
         modelVertexCounts[i] = vertexCount;
         modelTriangleCounts[i] = triCount;
@@ -499,9 +500,9 @@ int LoadGeometry(void) {
 
 #ifdef DEBUG_MODEL_LOAD_DATA
         if (triCount > 1000U) {
-            DualLog("Model %s loaded with %d vertices, \033[1;33m%d\033[0;0m triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+            DualLog("\nModel %s loaded with %d vertices, \033[1;33m%d\033[0;0m triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         } else {
-            DualLog("Model %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
+            DualLog("\nModel %s loaded with %d vertices, %d triangles\n", model_parser.entries[matchedParserIdx].path, vertexCount, triCount);
         }
 #endif
         totalVertCount += vertexCount;
@@ -553,12 +554,12 @@ int LoadGeometry(void) {
             // Triangle data
             for (unsigned int f = 0; f < mesh->mNumFaces; f++) {
                 struct aiFace *face = &mesh->mFaces[f];
-                if (face->mNumIndices != 3) { DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); return 1; }
+                if (face->mNumIndices != 3) { DualLogError("\nNon-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); return 1; }
 
                 uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
 
                 // Validate vertex indices
-                if (v[0] >= vertexCount || v[1] >= vertexCount || v[2] >= vertexCount) { DualLogError("Invalid vertex index in %s, face %u: v0=%u, v1=%u, v2=%u, vertexCount=%u\n", model_parser.entries[matchedParserIdx].path, f, v[0], v[1], v[2], vertexCount); return 1; }
+                if (v[0] >= vertexCount || v[1] >= vertexCount || v[2] >= vertexCount) { DualLogError("\nInvalid vertex index in %s, face %u: v0=%u, v1=%u, v2=%u, vertexCount=%u\n", model_parser.entries[matchedParserIdx].path, f, v[0], v[1], v[2], vertexCount); return 1; }
 
                 // Store vertex indices
                 tempTriangles[triangleIndex++] = v[0];
@@ -619,7 +620,7 @@ int LoadGeometry(void) {
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
 #ifdef DEBUG_MODEL_LOAD_DATA
-    DualLog("Largest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
+    DualLog("\nLargest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
     DualLog("Total vertices: %d (", totalVertCount);
     print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
     DualLog(")\nTotal triangles: %d (", totalTriCount);
@@ -643,8 +644,8 @@ int LoadGeometry(void) {
     glFinish();
     malloc_trim(0);
     double end_time = get_time();
+    DualLog(" took %f seconds\n", end_time - start_time);
     DebugRAM("After Load Models");
-    DualLog("Load Models took %f seconds\n", end_time - start_time);
     return 0;
 }
 
@@ -677,7 +678,7 @@ int LoadEntities(void) {
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); return 1; }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); return 1; }
 
-    DualLog("Parsing %d entities...\n", entityCount);
+    DualLog("Parsing %d entities...", entityCount);
 
     // Populate entities array
     for (int i = 0; i < entityCount; i++) {
@@ -693,9 +694,9 @@ int LoadEntities(void) {
         entities[i].lodIndex = entity_parser.entries[i].cardchunk ? 178: entity_parser.entries[i].lodIndex; // Generic LOD card
     }
 
-    DebugRAM("after loading all entities");
     double end_time = get_time();
-    DualLog("Load Entities took %f seconds\n", end_time - start_time);
+    DualLog(" took %f seconds\n", end_time - start_time);
+    DebugRAM("after loading all entities");
     return 0;
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning

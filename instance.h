@@ -27,7 +27,6 @@ typedef struct { // Ensure chunk.glsl struct matches!
     float floorHeight;
 } Instance;
 
-extern bool instanceInPVS[INSTANCE_COUNT];
 extern Instance instances[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];

@@ -3,7 +3,7 @@ clear
 CC=gcc
 CFLAGS="-std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
 MINIAUDIO_CFLAGS="-std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=199309L -DNDEBUG"
-LDFLAGS="-lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lassimp -lenet -lpthread -s"
+LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lenet -lpthread -s"
 SOURCES="voxen.c data_textures.c data_parser.c audio.c dynamic_culling.c miniaudio.c"
 
 TEMP_DIR=temp_build
@@ -38,4 +38,7 @@ fi
 
 rm -f "$TEMP_DIR"/*.o
 echo "Build complete."
-./voxen
+
+if [ $# -eq 0 ] || [ "$1" != "ci" ]; then
+    ./voxen
+fi
