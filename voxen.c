@@ -31,7 +31,7 @@
 #include "constants.h"
 #include "dynamic_culling.h"
 
-#define DEBUG_RAM_OUTPUT
+// #define DEBUG_RAM_OUTPUT
 
 // Window
 SDL_Window *window;
@@ -142,15 +142,19 @@ uint8_t numLightsFound = 0;
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
-      instanceIndexLoc_chunk = -1, modelIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowIndexLoc_chunk = -1,
-      specIndexLoc_chunk = -1, normIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1,
-      overrideGlowBLoc_chunk = -1;
+      debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1,
+      overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1;
 
 //    GPU Lightmapper Compute Shader
 GLuint lightmapShaderProgram;
 GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1, modelCountLoc_lightmap = -1,
        worldMin_xLoc_lightmap = -1, worldMin_zLoc_lightmap = -1, lightCountLoc_lightmap = -1;
 
+//    Voxel Tracing Compute Shader
+GLuint voxelTracingShaderProgram;
+GLint screenWidthLoc_vox = -1, screenHeightLoc_vox = -1, camPosLoc_vox = -1, worldMin_xLoc_vox = -1, worldMin_zLoc_vox = -1;
+GLuint shadowOcclusionTextureID;
+       
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
@@ -361,11 +365,8 @@ int CompileShaders(void) {
     projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
     matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
-    glowIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowIndex");
-    specIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "specIndex");
-    normIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normIndex");
-    instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
-    modelIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "modelIndex");
+    glowSpecIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowSpecIndex");
+    normInstanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
     overrideGlowRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowR");
     overrideGlowGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowG");
@@ -755,7 +756,12 @@ int SetupInstances(void) {
     DualLog("Initializing instances...\n");
     int idx;
     for (idx = 0;idx<INSTANCE_COUNT;idx++) {
-        instances[idx].modelIndex = instances[idx].texIndex = instances[idx].glowIndex = instances[idx].specIndex = instances[idx].normIndex = instances[idx].lodIndex = UINT16_MAX;
+        instances[idx].modelIndex = 1024u;
+        instances[idx].texIndex = UINT16_MAX;
+        instances[idx].glowIndex = 2048u;
+        instances[idx].specIndex = 2048u;
+        instances[idx].normIndex = 2048u;
+        instances[idx].lodIndex = UINT16_MAX;
         instances[idx].posx = instances[idx].posy = instances[idx].posz = 0.0f;
         instances[idx].sclx = instances[idx].scly = instances[idx].sclz = 1.0f; // Default scale
         instances[idx].rotx = instances[idx].roty = instances[idx].rotz = 0.0f; instances[idx].rotw = 1.0f; // Quaternion identity
@@ -1097,18 +1103,8 @@ int InitializeEnvironment(void) {
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
     glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
     glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    glVertexAttribFormat(3, 1, GL_FLOAT, GL_FALSE, 8 * sizeof(float)); // Tex Index (int)
-    glVertexAttribFormat(4, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float)); // Glow Index (int)
-    glVertexAttribFormat(5, 1, GL_FLOAT, GL_FALSE, 10 * sizeof(float)); // Spec Index (int)
-    glVertexAttribFormat(6, 1, GL_FLOAT, GL_FALSE, 11 * sizeof(float)); // Normal Index (int)
-    glVertexAttribFormat(7, 1, GL_FLOAT, GL_FALSE, 12 * sizeof(float)); // Model Index (int)
-    glVertexAttribFormat(8, 1, GL_FLOAT, GL_FALSE, 13 * sizeof(float)); // Instance Index (int)
-    glVertexAttribFormat(9, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float)); // Tex Coord Lightmap (vec2)
-    for (uint8_t i = 0; i < 10; i++) {
-        glVertexAttribBinding(i, 0);
-        glEnableVertexAttribArray(i);
-    }
-
+    glVertexAttribFormat(3, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float)); // Tex Coord Lightmap (vec2)
+    for (uint8_t i = 0; i < 4; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
     glBindVertexArray(0);
     DebugRAM("after vao chunk bind");
 
@@ -1979,18 +1975,23 @@ int main(int argc, char* argv[]) {
             if (!IsSphereInFOVCone(instances[i].posx, instances[i].posy, instances[i].posz, radius)) continue; // Cone Frustum Culling
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            glUniform1i(texIndexLoc_chunk, instances[i].texIndex);
-            glUniform1i(glowIndexLoc_chunk, instances[i].glowIndex);
-            glUniform1i(specIndexLoc_chunk, instances[i].specIndex);
-            glUniform1i(normIndexLoc_chunk, instances[i].normIndex);
-            glUniform1i(instanceIndexLoc_chunk, i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
-            if (debugValue > 0) DualLog("For frame %d, rendering model type %d\n",globalFrameNum,instances[i].modelIndex);
-            glUniform1i(modelIndexLoc_chunk, modelType);
+            uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+            glowdex = glowdex >= 2048 ? 41 : glowdex;
+            uint32_t specdex = (uint32_t)instances[i].specIndex;
+            specdex = specdex >= 2048 ? 41 : specdex;
+            uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
+            uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
+            nordex = nordex >= 2048 ? 41 : nordex;
+            uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
+            glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+            glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+            glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+            CHECK_GL_ERROR();
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
@@ -2004,6 +2005,9 @@ int main(int argc, char* argv[]) {
         // Ok, turn off temporary framebuffer so we can draw to screen now.
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // ====================================================================
+
+        // 4. Voxel Tracing
+//         glBindTexture(GL_TEXTURE_2D, shadowOcclusionTextureID);
 
         // 4. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;

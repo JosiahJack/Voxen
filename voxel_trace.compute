@@ -1,0 +1,117 @@
+// voxel_trace.compute
+// Compute shader for tracing against voxels for shadows
+const char* voxelTrace_computeShader =
+    "#version 450 core\n"
+    layout(local_size_x = 32, local_size_y = 32) in;
+
+    layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
+    layout(rgba32f, binding = 2) readonly uniform image2D inputNormals;
+    layout(std430, binding = 19) buffer LightIndices { float lights[]; };
+    layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
+    layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
+
+    layout(binding = 5, r8) writeonly uniform image2D shadowOcclusion;  // Quarter-res output (0=lit, 1=shadowed)
+
+    uniform uint screenWidth;
+    uniform uint screenHeight;
+    uniform vec3 camPos;
+    uniform float worldMin_x;
+    uniform float worldMin_z;
+    uniform sampler2D voxelOpacity;  // XZ 2D texture (R8, 1=opaque voxel)
+    const int SSR_RES = 4;  // Match your SSR
+    const float VOXEL_SIZE = 0.32;
+    const float WORLDCELL_WIDTH_F = 2.56;
+    const uint VOXEL_GRID_SIZE = 512;  // 64*8
+    const float CONE_APERTURE = 0.1;  // Tune for softness (radians)
+    const int MAX_STEPS = 16;  // Short for XZ-only
+    const int MAX_LIGHTS = 32;
+
+    vec2 worldToVoxelXZ(vec3 worldPos) {
+        float offsetX = worldPos.x - worldMin_x;
+        float offsetZ = worldPos.z - worldMin_z;
+        return vec2(offsetX / VOXEL_SIZE, offsetZ / VOXEL_SIZE);  // [0,512]
+    }
+
+    float traceConeXZ(vec3 startPos, vec3 lightPos, float maxDist) {
+        vec3 toLight = lightPos - startPos;
+        float dist = length(toLight);
+        if (dist > maxDist) return 0.0;
+        vec3 dir = normalize(toLight);
+        vec2 startXZ = worldToVoxelXZ(startPos);
+        vec2 stepXZ = vec2(dir.x, dir.z) * (VOXEL_SIZE / VOXEL_SIZE);  // Normalize to texels
+        float coneRadius = 0.5;  // Start small
+        float occlusion = 0.0;
+        float stepLen = dist / float(MAX_STEPS);
+        for (int i = 0; i < MAX_STEPS; ++i) {
+            float t = float(i) * stepLen;
+            vec3 rayPos = startPos + dir * t;
+            vec2 rayXZ = worldToVoxelXZ(rayPos);
+            // Sample cone: Average opacity in circle (approx 4 samples for perf)
+            float avgOpacity = 0.0;
+            for (float a = 0.0; a < 6.28; a += 1.57) {  // 4 angles
+                vec2 offset = vec2(cos(a), sin(a)) * coneRadius;
+                vec2 sampleXZ = rayXZ + offset;
+                sampleXZ = clamp(sampleXZ / float(VOXEL_GRID_SIZE), 0.0, 1.0);
+                avgOpacity += texture(voxelOpacity, sampleXZ).r;
+            }
+            avgOpacity /= 4.0;
+            occlusion += avgOpacity;
+            coneRadius += CONE_APERTURE * stepLen;  // Widen cone
+            if (occlusion > 0.99) break;  // Early out
+        }
+        return clamp(occlusion / float(MAX_STEPS), 0.0, 1.0);  // Normalized shadow factor
+    }
+
+    uint GetVoxelIndexXZ(vec3 worldPos) {  // Reuse/modify your func, ignore Y
+        float offsetX = worldPos.x - worldMin_x + (VOXEL_SIZE * 0.5);
+        float offsetZ = worldPos.z - worldMin_z + (VOXEL_SIZE * 0.5);
+        uint cellX = uint(offsetX / WORLDCELL_WIDTH_F);
+        uint cellZ = uint(offsetZ / WORLDCELL_WIDTH_F);
+        float localX = mod(offsetX, WORLDCELL_WIDTH_F);
+        float localZ = mod(offsetZ, WORLDCELL_WIDTH_F);
+        uint voxelX = uint(localX / VOXEL_SIZE);
+        uint voxelZ = uint(localZ / VOXEL_SIZE);
+        uint cellIndex = cellZ * 64 + cellX;
+        return cellIndex * 64 + voxelZ * 8 + voxelX;  // Flatten to 1D for lists
+    }
+
+    void main() {
+        ivec2 pixel = ivec2(gl_GlobalInvocationID.xy * SSR_RES);  // Full-res trace, but output quarter
+        if (pixel.x >= int(screenWidth) || pixel.y >= int(screenHeight)) return;
+
+        vec4 worldPosPack = imageLoad(inputWorldPos, pixel);
+        vec3 worldPos = worldPosPack.xyz;
+        vec2 normalXY = unpackHalf2x16(floatBitsToInt(imageLoad(inputNormals, pixel).r));
+        vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(imageLoad(inputNormals, pixel).g));
+        vec3 normal = normalize(vec3(normalXY, normalZ0.x));
+        if (length(normal) < 0.01) {  // Sky/empty
+            imageStore(shadowOcclusion, ivec2(gl_GlobalInvocationID.xy), vec4(0.0));
+            return;
+        }
+
+        uint voxelIdx = GetVoxelIndexXZ(worldPos);
+        uint count = voxelLightListIndices[voxelIdx * 2 + 1];
+        float totalOcclusion = 0.0;
+        uint listOffset = voxelLightListIndices[voxelIdx * 2];
+
+        for (uint i = 0; i < min(count, MAX_LIGHTS); ++i) {
+            uint lightIdx = uniqueLightLists[listOffset + i] * 13u;  // LIGHT_DATA_SIZE=13
+            vec3 lightPos = vec3(lights[lightIdx + 0], lights[lightIdx + 1], lights[lightIdx + 2]);
+            float range = lights[lightIdx + 4];
+            float intensity = lights[lightIdx + 3];
+            if (intensity < 0.05) continue;
+
+            vec3 toLight = lightPos - worldPos;
+            float distToLight = length(toLight);
+            if (distToLight > range || distToLight < 0.01) continue;
+
+            vec3 lightDir = normalize(toLight);
+            float NdotL = max(dot(normal, lightDir), 0.0);
+            if (NdotL < 0.25) continue;  // Backface culling
+
+            float occ = traceConeXZ(worldPos, lightPos, range);
+            totalOcclusion += occ * NdotL;  // Weight by direct contrib
+        }
+        float avgOcclusion = count > 0 ? (totalOcclusion / float(count)) : 0.0;
+        imageStore(shadowOcclusion, ivec2(gl_GlobalInvocationID.xy), vec4(avgOcclusion));  // Per-light avg or max; tune
+    }\n";

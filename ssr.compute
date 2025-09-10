@@ -84,6 +84,6 @@ const char* ssr_computeShader =
     "    if (totalWeight < 0.01) return;\n" // Avoid division by near-zero
 
     "    reflectionColor /= totalWeight;\n" // Normalize by total weight
-    "    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * fresnel);\n"
+    "    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * fresnel * 1.5);\n"
     "    imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));\n"
     "}\n";
