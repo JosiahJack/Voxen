@@ -1,6 +1,6 @@
 // File: voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#define VERSION_STRING "v0.5.0"
+#define VERSION_STRING "v0.6.0"
 #include <malloc.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -21,6 +21,7 @@
 #include "chunk.glsl"
 #include "imageblit.glsl"
 #include "lightmap.compute"
+#include "voxel_trace.compute"
 #include "deferred_lighting.compute"
 #include "ssr.compute"
 #include "bluenoise64.cginc"
@@ -32,13 +33,13 @@
 #include "dynamic_culling.h"
 
 // #define DEBUG_RAM_OUTPUT
-
+// ----------------------------------------------------------------------------
 // Window
 SDL_Window *window;
 int screen_width = 1366, screen_height = 768;
 bool window_has_focus = false;
 FILE* console_log_file = NULL;
-
+// ----------------------------------------------------------------------------
 // Instances
 Instance instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -49,7 +50,7 @@ uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah 
 uint16_t transparentInstancesHead = 0;
 GLuint instancesBuffer;
 GLuint matricesBuffer;
-
+// ----------------------------------------------------------------------------
 // Game/Mod Definition
 const char* global_modname;
 bool global_modIsCitadel = false;
@@ -74,52 +75,6 @@ float cam_fov = 65.0f;
 
 float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 float rad2deg(float radians) { return radians * (180.0f / M_PI); }
-
-float move_speed = 0.15f;
-float mouse_sensitivity = 0.1f;
-bool in_cyberspace = true;
-float sprinting = 0.0f;
-bool noclip = true;
-
-// Input
-bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
-int mouse_x = 0, mouse_y = 0; // Mouse position
-int debugView = 0;
-int debugValue = 0;
-
-// Event System states
-int maxEventCount_debug = 0;
-double lastJournalWriteTime = 0;
-uint32_t globalFrameNum = 0;
-FILE* activeLogFile;
-const char* manualLogName;
-bool log_playback = false;
-Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
-Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
-int eventJournalIndex;
-int eventIndex; // Event that made it to the counter.  Indices below this were
-                // already executed and walked away from the counter.
-int eventQueueEnd; // End of the waiting line
-const double time_step = 1.0 / 60.0; // 60fps
-double last_time = 0.0;
-double current_time = 0.0;
-double screenshotTimeout = 0.0;
-bool journalFirstWrite = true;
-
-// Networking
-typedef enum {
-    MODE_LISTEN_SERVER,    // Runs both server and client locally
-    //MODE_DEDICATED_SERVER, // Server only, no rendering (headless) Currently only using Listen for coop
-    MODE_CLIENT            // Client only, connects to a server
-} EngineMode;
-
-EngineMode engine_mode = MODE_LISTEN_SERVER; // Default mode
-char* server_address = "127.0.0.1"; // Default to localhost for listen server
-int server_port = 27015; // Default port
-
-ENetHost* server_host = NULL;
-ENetHost* client_host = NULL;
-ENetPeer* server_peer = NULL; // Client's connection to server
 
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering
@@ -151,8 +106,11 @@ GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1, modelCo
 
 //    Voxel Tracing Compute Shader
 GLuint voxelTracingShaderProgram;
-GLint screenWidthLoc_vox = -1, screenHeightLoc_vox = -1, camPosLoc_vox = -1, worldMin_xLoc_vox = -1, worldMin_zLoc_vox = -1;
+GLint screenWidthLoc_vox = -1, screenHeightLoc_vox = -1, camPosLoc_vox = -1, worldMin_xLoc_vox = -1, worldMin_zLoc_vox = -1, voxelOpacityTexLoc_vox = -1;
 GLuint shadowOcclusionTextureID;
+GLuint voxelOpacityTextureID;
+GLubyte voxelOpacityData[512 * 512];
+uint8_t shadowOcclusionData[512 * 512 * 4];
        
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -219,7 +177,53 @@ float textQuadVertices[] = { // 2 triangles, text is applied as an image from SD
 
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
+// ----------------------------------------------------------------------------
+// Input
+float move_speed = 0.15f;
+float mouse_sensitivity = 0.1f;
+bool in_cyberspace = true;
+float sprinting = 0.0f;
+bool noclip = true;
+bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
+int mouse_x = 0, mouse_y = 0; // Mouse position
+int debugView = 0;
+int debugValue = 0;
+// ----------------------------------------------------------------------------
+// Event System states
+int maxEventCount_debug = 0;
+double lastJournalWriteTime = 0;
+uint32_t globalFrameNum = 0;
+FILE* activeLogFile;
+const char* manualLogName;
+bool log_playback = false;
+Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
+Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
+int eventJournalIndex;
+int eventIndex; // Event that made it to the counter.  Indices below this were
+                // already executed and walked away from the counter.
+int eventQueueEnd; // End of the waiting line
+const double time_step = 1.0 / 60.0; // 60fps
+double last_time = 0.0;
+double current_time = 0.0;
+double screenshotTimeout = 0.0;
+bool journalFirstWrite = true;
+// ----------------------------------------------------------------------------
+// Networking
+typedef enum {
+    MODE_LISTEN_SERVER,    // Runs both server and client locally
+    //MODE_DEDICATED_SERVER, // Server only, no rendering (headless) Currently only using Listen for coop
+    MODE_CLIENT            // Client only, connects to a server
+} EngineMode;
 
+EngineMode engine_mode = MODE_LISTEN_SERVER; // Default mode
+char* server_address = "127.0.0.1"; // Default to localhost for listen server
+int server_port = 27015; // Default port
+
+ENetHost* server_host = NULL;
+ENetHost* client_host = NULL;
+ENetPeer* server_peer = NULL; // Client's connection to server
+// ----------------------------------------------------------------------------
+// Diagnostics
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
     va_list copy; va_copy(copy, args);
     if (prefix) fprintf(stream, "%s\033[0m", prefix);
@@ -268,7 +272,7 @@ void DebugRAM(const char *context, ...) {
 void print_bytes_no_newline(int count) {
     DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
 }
-
+// ----------------------------------------------------------------------------
 // ============================================================================
 // OpenGL / Rendering Helper Functions
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, GLenum target, const char *name) {
@@ -339,6 +343,10 @@ int CompileShaders(void) {
     // Lightmap Baking Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, lightmap_compute_shader, "Lightmap Baking Compute Shader"); if (!computeShader) { return 1; }
     lightmapShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Lightmap Baking Shader Program");        if (!lightmapShaderProgram) { return 1; }
+
+    // Voxel Trace Compute Shader Program
+    computeShader = CompileShader(GL_COMPUTE_SHADER, voxelTrace_computeShader, "Voxel Trace Compute Shader"); if (!computeShader) { return 1; }
+    voxelTracingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Trace Shader Program");        if (!voxelTracingShaderProgram) { return 1; }
     
     // Deferred Lighting Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
@@ -377,6 +385,13 @@ int CompileShaders(void) {
     worldMin_xLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "worldMin_x");
     worldMin_zLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "worldMin_z");
     
+    screenWidthLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "screenWidth");
+    screenHeightLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "screenHeight");
+    camPosLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "camPos");
+    worldMin_xLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "worldMin_x");
+    worldMin_zLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "worldMin_z");
+    voxelOpacityTexLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "voxelOpacity");
+
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
@@ -836,6 +851,7 @@ void UpdateScreenSize(void) {
 }
 
 int VoxelLists() {
+    DualLog("Generating voxel lighting data...\n");
     double start_time = get_time();
     uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     uint32_t* voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -954,7 +970,6 @@ int VoxelLists() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListIndicesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, voxelLightListIndicesID);
-    free(voxelLightListIndices);
 
     GLuint voxelLightListsRawID;
     glGenBuffers(1, &voxelLightListsRawID);
@@ -962,7 +977,6 @@ int VoxelLists() {
     glBufferData(GL_SHADER_STORAGE_BUFFER, head * sizeof(uint32_t), voxelLightListsRaw, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, voxelLightListsRawID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    free(voxelLightListsRaw);
 
     // Update lights and instances
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
@@ -973,6 +987,135 @@ int VoxelLists() {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    
+    // Create voxel opacity texture for shadow tracing
+    for (int cellZ = 0; cellZ < 64; ++cellZ) {
+        for (int cellX = 0; cellX < 64; ++cellX) {
+            uint32_t cellidx = cellZ * 64 + cellX;
+            GLubyte pixelColor = (gridCellStates[cellidx] & CELL_OPEN) ? 255 : 0;  // 0=empty, 255=occupied
+            // Map cell (x,z) to voxel texture coords (8x8 per cell)
+            int baseTexX = cellX * 8;
+            int baseTexY = cellZ * 8;
+            for (int voxX = 0; voxX < 8; ++voxX) {
+                for (int voxZ = 0; voxZ < 8; ++voxZ) {
+                    int texX = baseTexX + voxX;
+                    int texY = baseTexY + voxZ;
+                    voxelOpacityData[texY * 512 + texX] = pixelColor;
+                }
+            }
+        }
+    }
+
+    int success = stbi_write_png("Screenshots/VoxelOpacity.png", 512, 512, 1, voxelOpacityData, 512 * 1);
+    if (!success) DualLogError("Failed to save voxel opacity debug image\n");
+
+    // Upload voxelOpacity to GPU
+    glBindTexture(GL_TEXTURE_2D, voxelOpacityTextureID);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 512, GL_RED, GL_UNSIGNED_BYTE, voxelOpacityData);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Step 4: Compute shadows by iterating over voxels
+    uint32_t occlusionCount = 0;
+    for (int cellZ = 0; cellZ < 64; ++cellZ) {
+        for (int cellX = 0; cellX < 64; ++cellX) {
+            uint32_t cellIndex = cellZ * 64 + cellX;
+            if (!(gridCellStates[cellIndex] & CELL_OPEN) || cellIndex == 0) continue;
+            
+            for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+                for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
+                    uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+                    if (voxelIndex >= VOXEL_COUNT) { DualLogError("Invalid voxelIndex: %u for cellIndex=%u, voxelX=%u, voxelZ=%u\n", voxelIndex, cellIndex, voxelX, voxelZ); continue; }
+                    
+                    uint32_t texX = cellX * 8 + voxelX;
+                    uint32_t texY = cellZ * 8 + voxelZ;
+                    if (texX >= 512 || texY >= 512) { DualLogError("Invalid texture coords: texX=%u, texY=%u\n", texX, texY); continue; }
+                    
+                    uint32_t texIdx = (texY * 512 + texX) * 4; // RGBA
+                    float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
+                    float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
+
+                    // Get light list for this voxel
+                    uint32_t offset = voxelLightListIndices[voxelIndex * 2];
+                    uint32_t count = voxelLightListIndices[voxelIndex * 2 + 1];
+                    if (offset + count > VOXEL_COUNT * 4) { DualLogError("Invalid light list access: offset=%u, count=%u, voxelIndex=%u\n", offset, count, voxelIndex); continue; }
+                 
+                    for (uint32_t i = 0; i < count && i < MAX_LIGHTS_PER_VOXEL; ++i) {
+                        uint32_t lightIdx = voxelLightListsRaw[offset + i];
+                        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+                        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+                        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+                        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+                        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+                        if (intensity < 0.05f) continue;
+
+                        // Check distance
+                        float dx = litX - posX;
+                        float dz = litZ - posZ;
+                        float dist = sqrtf(dx * dx + dz * dz);
+                        if (dist < 0.01f || dist > range) continue;
+
+                        // Amanatides and Woo ray traversal
+                        int traceStartX = (int)floorf((posX - worldMin_x) / VOXEL_SIZE);
+                        int traceStartZ = (int)floorf((posZ - worldMin_z) / VOXEL_SIZE);
+                        int endX = (int)floorf((litX - worldMin_x) / VOXEL_SIZE);
+                        int endZ = (int)floorf((litZ - worldMin_z) / VOXEL_SIZE);
+
+                        int stepX = (dx > 0) ? 1 : -1;
+                        int stepZ = (dz > 0) ? 1 : -1;
+                        float tMaxX = ((traceStartX + (dx > 0 ? 1 : 0)) * VOXEL_SIZE + worldMin_x - posX) / dx;
+                        float tMaxZ = ((traceStartZ + (dz > 0 ? 1 : 0)) * VOXEL_SIZE + worldMin_z - posZ) / dz;
+                        float tDeltaX = (dx != 0) ? VOXEL_SIZE / fabsf(dx) : 1e10f;
+                        float tDeltaZ = (dz != 0) ? VOXEL_SIZE / fabsf(dz) : 1e10f;
+                        int x = traceStartX;
+                        int z = traceStartZ;
+                        bool occluded = false;
+                        while (x != endX || z != endZ) {
+                            if (x < 0 || x >= 512 || z < 0 || z >= 512) break;
+                            uint32_t rayVoxelIdx = z * 512 + x;
+                            if (voxelOpacityData[rayVoxelIdx] > 128) { // Opaque voxel
+                                occluded = true;
+                                break;
+                            }
+
+                            if (tMaxX < tMaxZ) {
+                                x += stepX;
+                                tMaxX += tDeltaX;
+                            } else {
+                                z += stepZ;
+                                tMaxZ += tDeltaZ;
+                            }
+                        }
+
+                        if (occluded) {
+                            // Set shadow bit in shadowOcclusionData
+                            uint32_t bitIdx = i; // Light index in the list
+                            if (bitIdx < 32) {
+                                uint32_t byteIdx = bitIdx / 8; // 0=R, 1=G, 2=B, 3=A
+                                if (texIdx + byteIdx >= 512 * 512 * 4) { DualLogError("Invalid shadowOcclusionData access: texIdx=%u, byteIdx=%u\n", texIdx, byteIdx); continue; }
+        
+                                uint32_t bitInByte = bitIdx % 8;
+                                shadowOcclusionData[texIdx + byteIdx] |= (1 << bitInByte);
+                                occlusionCount++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Save shadow occlusion debug image with per-channel output
+    success = stbi_write_png("Screenshots/ShadowVoxels.png", 512, 512, 4, shadowOcclusionData, 512 * 4);
+    if (!success) DualLogError("Failed to save shadow occlusion debug image\n");
+    else DualLog("Saved shadow occlusion debug image Screenshots/ShadowVoxels.png\n");
+
+    // Upload shadowOcclusion to GPU
+    glBindTexture(GL_TEXTURE_2D, shadowOcclusionTextureID);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 512, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE, shadowOcclusionData);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    
+    free(voxelLightListIndices);
+    free(voxelLightListsRaw);
     glFlush();
     glFinish();
     CHECK_GL_ERROR();    
@@ -1063,6 +1206,10 @@ int InitializeEnvironment(void) {
     glUseProgram(imageBlitShaderProgram);
     glUniform1ui(screenWidthLoc_imageBlit, screen_width);
     glUniform1ui(screenHeightLoc_imageBlit, screen_height);
+    
+    glUseProgram(voxelTracingShaderProgram);
+    glUniform1ui(screenWidthLoc_vox, screen_width);
+    glUniform1ui(screenHeightLoc_vox, screen_height);
 
     glUseProgram(deferredLightingShaderProgram);
     glUniform1ui(screenWidthLoc_deferred, screen_width);
@@ -1110,7 +1257,9 @@ int InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
-    GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,            GL_FLOAT, GL_TEXTURE_2D, "SSR");
+    GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,          GL_FLOAT, GL_TEXTURE_2D, "SSR");
+    GenerateAndBindTexture(&shadowOcclusionTextureID, GL_RGBA8UI, 512, 512,                     GL_RGBA_INTEGER,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Shadow Occlusion");
+    GenerateAndBindTexture(&voxelOpacityTextureID,       GL_R8, 512, 512,                                GL_RED,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Voxel Opacity");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -1129,11 +1278,12 @@ int InitializeEnvironment(void) {
         }
     }
     
-    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8);
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Double duty unlit raster and deferred lighting results, reused sequentially
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
     glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     //                 3 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // SSR result
+    glBindImageTexture(5, shadowOcclusionTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8UI); // Voxel Trace result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2005,8 +2155,18 @@ int main(int argc, char* argv[]) {
         // ====================================================================
 
         // 4. Voxel Tracing
-//         glBindTexture(GL_TEXTURE_2D, shadowOcclusionTextureID);
-
+        glUseProgram(voxelTracingShaderProgram);
+        glUniform1f(worldMin_xLoc_vox, worldMin_x);
+        glUniform1f(worldMin_zLoc_vox, worldMin_z);
+        glUniform3f(camPosLoc_vox, cam_x, cam_y, cam_z);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, voxelOpacityTextureID);
+        glUniform1i(voxelOpacityTexLoc_vox, 0);
+        GLuint groupX_vox = (screen_width / 4 + 31) / 32;
+        GLuint groupY_vox = (screen_height / 4 + 31) / 32;
+        glDispatchCompute(groupX_vox, groupY_vox, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        
         // 4. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
