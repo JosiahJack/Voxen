@@ -141,9 +141,8 @@ uint8_t numLightsFound = 0;
 // Shaders
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
-GLint viewLoc_chunk = -1, projectionLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1,
-      debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1,
-      overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1;
+GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, 
+      normInstanceIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1;
 
 //    GPU Lightmapper Compute Shader
 GLuint lightmapShaderProgram;
@@ -361,8 +360,7 @@ int CompileShaders(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Cache uniform locations after shader compile!
-    viewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "view");
-    projectionLoc_chunk = glGetUniformLocation(chunkShaderProgram, "projection");
+    viewProjLoc_chunk = glGetUniformLocation(chunkShaderProgram, "viewProjection");
     matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
     glowSpecIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowSpecIndex");
@@ -752,9 +750,33 @@ void UpdateInstanceMatrix(int i) {
     dirtyInstances[i] = false;
 }
 
+void RenderLoadingProgress(int offset, const char* format, ...) {
+    glUseProgram(imageBlitShaderProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, inputImageID);
+    glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
+    glBindVertexArray(quadVAO);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glEnable(GL_DEPTH_TEST);
+    glBindTextureUnit(0, 0);
+    glUseProgram(0);
+
+    char buffer[256];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
+    RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
+    SDL_GL_SwapWindow(window);
+}
+
 int SetupInstances(void) {
     DualLog("Initializing instances...\n");
     int idx;
+    RenderLoadingProgress(65,"Initializing instances...");
     for (idx = 0;idx<INSTANCE_COUNT;idx++) {
         instances[idx].modelIndex = 1024u;
         instances[idx].texIndex = UINT16_MAX;
@@ -983,29 +1005,6 @@ int VoxelLists() {
 //     return 0;
 // }
 
-void RenderLoadingProgress(int offset, const char* format, ...) {
-    glUseProgram(imageBlitShaderProgram);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, inputImageID);
-    glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
-    glBindVertexArray(quadVAO);
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glEnable(GL_DEPTH_TEST);
-    glBindTextureUnit(0, 0);
-    glUseProgram(0);
-
-    char buffer[256];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
-    SDL_GL_SwapWindow(window);
-}
-
 int InitializeEnvironment(void) {
     DebugRAM("InitializeEnvironment start");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { DualLogError("SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
@@ -1056,9 +1055,6 @@ int InitializeEnvironment(void) {
     CHECK_GL_ERROR();
 
     if (CompileShaders()) return SYS_COUNT + 1;
-    glUseProgram(chunkShaderProgram);
-    glUniformMatrix4fv(projectionLoc_chunk, 1, GL_FALSE, rasterPerspectiveProjection);
-
     glUseProgram(chunkShaderProgram);
     glUniform1f(overrideGlowRLoc_chunk, 0.0f);
     glUniform1f(overrideGlowGLoc_chunk, 0.0f);
@@ -1216,7 +1212,7 @@ int InitializeEnvironment(void) {
     RenderLoadingProgress(52,"Loading textures...");
     if (LoadTextures()) return 1;
     RenderLoadingProgress(50,"Loading models...");
-    if (LoadGeometry()) return 1;
+    if (LoadModels()) return 1;
     RenderLoadingProgress(52,"Loading entities...");
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
     RenderLoadingProgress(65,"Loading instances data...");
@@ -1947,7 +1943,9 @@ int main(int argc, char* argv[]) {
         glEnable(GL_CULL_FACE);
         float view[16]; // Set up view matrices
         mat4_lookat(view);
-        glUniformMatrix4fv(viewLoc_chunk,       1, GL_FALSE,       view);
+        float viewProj[16];
+        mul_mat4(viewProj, rasterPerspectiveProjection, view);
+        glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
         glBindVertexArray(vao_chunk);
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
             if (i == startOfDoubleSidedInstances) {
@@ -2012,8 +2010,6 @@ int main(int argc, char* argv[]) {
         // 4. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
-        float viewProj[16];
-        mul_mat4(viewProj, rasterPerspectiveProjection, view);
         if (debugView == 0 || debugView == 8) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);

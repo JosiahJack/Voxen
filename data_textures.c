@@ -62,7 +62,7 @@ int LoadTextures(void) {
     if (textureCount > 4096) { DualLogError("Too many textures in parser count %d, greater than 4096!\n", textureCount); return 1; } 
     if (textureCount == 0) { DualLog("No textures found in textures.txt\n"); return 1; }
     
-    DualLog("Parsing %d textures with max index %d, using stb_image version: 2.28...",textureCount,maxIndex);
+    DualLog("Loading %d textures with max index %d, using stb_image version: 2.28...",textureCount,maxIndex);
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
     textureSizes = malloc(textureCount * 2 * sizeof(int)); // Times 2 for x and y pairs flat packed (e.g. x,y,x,y,x,y for 3 textures)
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
@@ -76,7 +76,6 @@ int LoadTextures(void) {
     totalPixels = 0;
     totalPaletteColors = 0;
     for (int i = 0; i < textureCount; i++) {
-        RenderLoadingProgress(105,"Loading textures [%d of %d]...",i,textureCount);
         textureOffsets[i] = totalPixels;
         texturePaletteOffsets[i] = totalPaletteColors;
         int matchedParserIdx = -1;
@@ -162,6 +161,7 @@ int LoadTextures(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, (((4096 * 4096) + 1) / 2) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY); // Max texture size
 //     DebugRAM("after glGenBuffers stagingBuffer");
     for (uint16_t i = 0; i < textureCount; i++) {
+        RenderLoadingProgress(105,"Loading textures [%d of %d]...",i,textureCount);
         int matchedParserIdx = -1;
         for (int k=0;k<texture_parser.count;k++) { // Find matching index to i that was parsed from file
             if ((uint16_t)texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }

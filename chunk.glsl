@@ -12,8 +12,7 @@ const char* vertexShaderSource =
     "uniform uint glowSpecIndex;\n"
     "uniform uint normInstanceIndex;\n"
     "uniform mat4 matrix;\n"
-    "uniform mat4 view;\n"
-    "uniform mat4 projection;\n"
+    "uniform mat4 viewProjection;\n"
 
     "out vec3 FragPos;\n"
     "out vec3 Normal;\n"
@@ -36,7 +35,7 @@ const char* vertexShaderSource =
     "    SpecIndex = (glowSpecIndex >> 16) & 0xFFFFu;\n"
     "    NormalIndex = normInstanceIndex & 0xFFFFu;\n"
     "    InstanceIndex = (normInstanceIndex >> 16) & 0xFFFFu;\n"
-    "    gl_Position = projection * view * vec4(FragPos, 1.0);\n"
+    "    gl_Position = viewProjection * vec4(FragPos, 1.0);\n"
     "}\n";
 
 const char* fragmentShaderTraditional =

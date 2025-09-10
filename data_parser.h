@@ -76,7 +76,7 @@ extern GLuint tbos[MODEL_COUNT];
 extern uint32_t renderableCount;
 extern int gameObjectCount;
 
-int LoadGeometry(void);
+int LoadModels(void);
 
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.

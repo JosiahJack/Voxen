@@ -424,9 +424,9 @@ bool parse_data_file(DataParser *parser, const char *filename, int type) {
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
-int LoadGeometry(void) {
+int LoadModels(void) {
     double start_time = get_time();
-    DebugRAM("start of LoadGeometry");
+    DebugRAM("start of LoadModels");
     parser_init(&model_parser, valid_mdldata_keys, NUM_MODEL_KEYS); // First parse ./Data/models.txt to see what to load to what indices
     if (!parse_data_file(&model_parser, "./Data/models.txt",0)) { DualLogError("Could not parse ./Data/models.txt!\n"); return 1; }
 
@@ -435,7 +435,7 @@ int LoadGeometry(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
-    DualLog("Parsing %d models with max index of %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
+    DualLog("Loading %d models with max index of %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
     int totalVertCount = 0;
     int totalBounds = 0;
     int totalTriCount = 0;
@@ -623,6 +623,8 @@ int LoadGeometry(void) {
     print_bytes_no_newline(totalBounds * sizeof(float));
     DualLog(")\n");
 #endif
+    
+    RenderLoadingProgress(105,"Loading models [%d of %d]...",model_parser.count,model_parser.count);
 
     // Pass Model Type Bounds to GPU
     glGenBuffers(1, &modelBoundsID);
