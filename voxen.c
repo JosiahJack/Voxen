@@ -1018,165 +1018,145 @@ int VoxelLists() {
     // Count is number of shadow edges this light has in range.
     // Angle is the angle relative to 0rad from top view for the shadow edge in the xz plane as rotated in standard positive radians only
     // Dist is the squared distance from the point light's origin to the shadow edge, in xz plane.
-    size_t lightShadowBufferSize = LIGHT_COUNT * SHADOW_ANGLE_DEG_BINS * sizeof(float);
-    float* lightShadowAngleDistsList = malloc(lightShadowBufferSize); // Safe estimate of 36 points per light + count
-
-    uint32_t shadowEdgesTotal = 0;
-    uint32_t shadEdgeCountMax = (WORLDX + 1) * (WORLDX + 1);
-    float* shadowEdges = malloc(shadEdgeCountMax * 2 * sizeof(float));
-
-    head = 0;
-    for (int z=0;z<WORLDZ + 1;++z) { // Iterate over corners between cells
-        for (int x=0;x<WORLDX + 1;++x) { // not the cells themselves
-            if (x == 0 || x >= 64) continue; // Skip all corners for the rows and columns around the edges of the world, don't care as there is nothing out there. 
-            if (z == 0 || z >= 64) continue; // Saves on having to bounds check anything below.
-            
-            int cellIdxNW = ((z - 1) * WORLDX) + (x - 1); // [X][ ] Top left cell relative to the center point of 4 cells
-                                                          // [ ][ ]
-            
-            int cellIdxNE = ((z - 1) * WORLDX) + (x);     // [ ][X] Top right cell relative to the center point of 4 cells
-                                                          // [ ][ ]
-            
-            int cellIdxSE = ((z) * WORLDX) + (x);         // [ ][ ] Bottom right cell relative to the center point of 4 cells
-                                                          // [ ][X]
-            
-            int cellIdxSW = ((z) * WORLDX) + (x - 1);     // [ ][ ] Bottom left cell relative to the center point of 4 cells
-                                                          // [X][ ]
-            
-            bool openNW = (gridCellStates[cellIdxNW] & CELL_OPEN); 
-            bool openNE = (gridCellStates[cellIdxNE] & CELL_OPEN); 
-            bool openSE = (gridCellStates[cellIdxSE] & CELL_OPEN); 
-            bool openSW = (gridCellStates[cellIdxSW] & CELL_OPEN); 
-            if (!openNW && !openNE && !openSE && !openSW) continue; // Must have an open space somewhere to make a shadow!
-            if (openNW && openNE && openSE && openSW) continue; // Must have at least one wall somewhere to make a shadow!
-            
-            shadowEdges[head * 2 + 0] = worldMin_x + (WORLDCELL_WIDTH_F * x); // X position in world space
-            shadowEdges[head * 2 + 1] = worldMin_z + (WORLDCELL_WIDTH_F * z); // Z position in world space
-            head++;
-            shadowEdgesTotal++;
-        }
-    }
-    
-    DualLog("Found %d shadow edges for shadow data from world cell grid states\n",shadowEdgesTotal);
-
-    for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
-        uint16_t lightIdx = i * LIGHT_DATA_SIZE;
-        float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
-        float rangeSq = range * range;
-        for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
-            lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq; // Set all slots for all lights to have lights range * range.
-        }
-    }
-    
-//     for (uint16_t i=0; i<LIGHT_COUNT; ++i) {
+//     size_t lightShadowBufferSize = LIGHT_COUNT * SHADOW_ANGLE_DEG_BINS * sizeof(float);
+//     float* lightShadowAngleDistsList = malloc(lightShadowBufferSize); // Safe estimate of 36 points per light + count
+// 
+//     uint32_t shadowEdgesTotal = 0;
+//     uint32_t shadEdgeCountMax = (WORLDX + 1) * (WORLDX + 1);
+//     float* shadowEdges = malloc(shadEdgeCountMax * 2 * sizeof(float));
+// 
+//     head = 0;
+//     for (int z=0;z<WORLDZ + 1;++z) { // Iterate over corners between cells
+//         for (int x=0;x<WORLDX + 1;++x) { // not the cells themselves
+//             if (x == 0 || x >= 64) continue; // Skip all corners for the rows and columns around the edges of the world, don't care as there is nothing out there. 
+//             if (z == 0 || z >= 64) continue; // Saves on having to bounds check anything below.
+//             
+//             int cellIdxNW = ((z - 1) * WORLDX) + (x - 1); // [X][ ] Top left cell relative to the center point of 4 cells
+//                                                           // [ ][ ]
+//             
+//             int cellIdxNE = ((z - 1) * WORLDX) + (x);     // [ ][X] Top right cell relative to the center point of 4 cells
+//                                                           // [ ][ ]
+//             
+//             int cellIdxSE = ((z) * WORLDX) + (x);         // [ ][ ] Bottom right cell relative to the center point of 4 cells
+//                                                           // [ ][X]
+//             
+//             int cellIdxSW = ((z) * WORLDX) + (x - 1);     // [ ][ ] Bottom left cell relative to the center point of 4 cells
+//                                                           // [X][ ]
+//             
+//             bool openNW = (gridCellStates[cellIdxNW] & CELL_OPEN); 
+//             bool openNE = (gridCellStates[cellIdxNE] & CELL_OPEN); 
+//             bool openSE = (gridCellStates[cellIdxSE] & CELL_OPEN); 
+//             bool openSW = (gridCellStates[cellIdxSW] & CELL_OPEN); 
+//             if (!openNW && !openNE && !openSE && !openSW) continue; // Must have an open space somewhere to make a shadow!
+//             if (openNW && openNE && openSE && openSW) continue; // Must have at least one wall somewhere to make a shadow!
+//             
+//             shadowEdges[head * 2 + 0] = worldMin_x + (WORLDCELL_WIDTH_F * x); // X position in world space
+//             shadowEdges[head * 2 + 1] = worldMin_z + (WORLDCELL_WIDTH_F * z); // Z position in world space
+//             head++;
+//             shadowEdgesTotal++;
+//         }
+//     }
+//     
+//     DualLog("Found %d shadow edges for shadow data from world cell grid states\n",shadowEdgesTotal);
+// 
+//     for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
+//         uint16_t lightIdx = i * LIGHT_DATA_SIZE;
+//         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
+//         float rangeSq = range * range;
+//         for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
+//             lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq; // Set all slots for all lights to have lights range * range.
+//         }
+//     }
+//     
+//     for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
 //         uint16_t lightIdx = i * LIGHT_DATA_SIZE;
 //         float litX = lights[lightIdx + LIGHT_DATA_OFFSET_POSX];
 //         float litZ = lights[lightIdx + LIGHT_DATA_OFFSET_POSZ];
 //         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
-//         float rangeSq = range * range; // Get range squared
+//         float rangeSq = range * range;
+// 
+//         // Initialize all slots to rangeSq
+//         for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
+//             lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq;
+//         }
+// 
+//         ShadowEdge* edges = malloc(shadowEdgesTotal * sizeof(ShadowEdge));
+//         uint32_t edgeCount = 0;
+// 
 //         for (uint32_t shadowEdgeIdx = 0; shadowEdgeIdx < shadowEdgesTotal; ++shadowEdgeIdx) {
-//             float shadX = shadowEdges[(shadowEdgeIdx * 2) + 0]; // XZ pair in shadowEdges buffer gets corners of cells where wall chunks meet
+//             float shadX = shadowEdges[(shadowEdgeIdx * 2) + 0];
 //             float shadZ = shadowEdges[(shadowEdgeIdx * 2) + 1];
 //             float distToEdgeFromLight = squareDistance2D(litX, litZ, shadX, shadZ);
-//             if (distToEdgeFromLight >= rangeSq) continue; // Shadow edge out of range
-//             
-//             float angle = atan2f(shadZ - litZ, shadX - litX); // Angle (in radians)
-//             if (angle < 0.0f) angle += 2.0f * M_PI; // Normalize to positive from [-pi,pi]
-//             uint16_t slot = (uint16_t)rad2deg(angle) % SHADOW_ANGLE_DEG_BINS;
-//             lightShadowAngleDistsList[(i * SHADOW_ANGLE_DEG_BINS) + slot] = distToEdgeFromLight; // Dist (squared)
-//             DualLog("Light %d has shadow distance %f at degree slot %d\n",i,sqrt(distToEdgeFromLight),slot);
+//             if (distToEdgeFromLight >= rangeSq) continue;
+// 
+//             float angle = atan2f(shadZ - litZ, shadX - litX);
+//             if (angle < 0.0f) angle += 2.0f * M_PI;
+//             edges[edgeCount].angle = angle;
+//             edges[edgeCount].distSq = distToEdgeFromLight;
+//             DualLog("Light %d has shadow distance %f at degree slot %d\n", i, sqrt(distToEdgeFromLight), (uint16_t)rad2deg(angle) % SHADOW_ANGLE_DEG_BINS);
+//             edgeCount++;
 //         }
+// 
+//         // Sort edges by angle
+//         qsort(edges, edgeCount, sizeof(ShadowEdge), compareShadowEdges);
+// 
+//         // Fill slots between consecutive edges
+//         for (uint32_t j = 0; j < edgeCount; ++j) {
+//             uint32_t next = (j + 1) % edgeCount; // Handle wraparound
+//             float angleStart = edges[j].angle;
+//             float angleEnd = edges[next].angle;
+//             float distStart = edges[j].distSq;
+//             float distEnd = edges[next].distSq;
+// 
+//             // Handle wraparound case
+//             if (angleEnd < angleStart) angleEnd += 2.0f * M_PI;
+// 
+//             int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
+//             int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
+// 
+//             // Number of slots to fill
+//             int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
+//             if (slotCount <= 0) continue;
+// 
+//             // Linearly interpolate distances
+//             for (int k = 0; k < slotCount; ++k) {
+//                 int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
+//                 float t = (float)k / (float)slotCount;
+//                 float interpolatedDist = distStart + t * (distEnd - distStart);
+//                 lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
+//             }
+//         }
+// 
+//         // Handle wraparound for the last-to-first edge
+//         if (edgeCount > 0) {
+//             float angleStart = edges[edgeCount - 1].angle;
+//             float angleEnd = edges[0].angle + 2.0f * M_PI; // Wrap to next cycle
+//             float distStart = edges[edgeCount - 1].distSq;
+//             float distEnd = edges[0].distSq;
+// 
+//             int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
+//             int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
+// 
+//             int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
+//             for (int k = 0; k < slotCount; ++k) {
+//                 int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
+//                 float t = (float)k / (float)slotCount;
+//                 float interpolatedDist = distStart + t * (distEnd - distStart);
+//                 lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
+//             }
+//         }
+// 
+//         free(edges);
 //     }
-    
-    for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
-        uint16_t lightIdx = i * LIGHT_DATA_SIZE;
-        float litX = lights[lightIdx + LIGHT_DATA_OFFSET_POSX];
-        float litZ = lights[lightIdx + LIGHT_DATA_OFFSET_POSZ];
-        float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
-        float rangeSq = range * range;
-
-        // Initialize all slots to rangeSq
-        for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
-            lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq;
-        }
-
-        ShadowEdge* edges = malloc(shadowEdgesTotal * sizeof(ShadowEdge));
-        uint32_t edgeCount = 0;
-
-        for (uint32_t shadowEdgeIdx = 0; shadowEdgeIdx < shadowEdgesTotal; ++shadowEdgeIdx) {
-            float shadX = shadowEdges[(shadowEdgeIdx * 2) + 0];
-            float shadZ = shadowEdges[(shadowEdgeIdx * 2) + 1];
-            float distToEdgeFromLight = squareDistance2D(litX, litZ, shadX, shadZ);
-            if (distToEdgeFromLight >= rangeSq) continue;
-
-            float angle = atan2f(shadZ - litZ, shadX - litX);
-            if (angle < 0.0f) angle += 2.0f * M_PI;
-            edges[edgeCount].angle = angle;
-            edges[edgeCount].distSq = distToEdgeFromLight;
-            DualLog("Light %d has shadow distance %f at degree slot %d\n", i, sqrt(distToEdgeFromLight), (uint16_t)rad2deg(angle) % SHADOW_ANGLE_DEG_BINS);
-            edgeCount++;
-        }
-
-        // Sort edges by angle
-        qsort(edges, edgeCount, sizeof(ShadowEdge), compareShadowEdges);
-
-        // Fill slots between consecutive edges
-        for (uint32_t j = 0; j < edgeCount; ++j) {
-            uint32_t next = (j + 1) % edgeCount; // Handle wraparound
-            float angleStart = edges[j].angle;
-            float angleEnd = edges[next].angle;
-            float distStart = edges[j].distSq;
-            float distEnd = edges[next].distSq;
-
-            // Handle wraparound case
-            if (angleEnd < angleStart) angleEnd += 2.0f * M_PI;
-
-            int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
-            int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
-
-            // Number of slots to fill
-            int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
-            if (slotCount <= 0) continue;
-
-            // Linearly interpolate distances
-            for (int k = 0; k < slotCount; ++k) {
-                int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
-                float t = (float)k / (float)slotCount;
-                float interpolatedDist = distStart + t * (distEnd - distStart);
-                lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
-            }
-        }
-
-        // Handle wraparound for the last-to-first edge
-        if (edgeCount > 0) {
-            float angleStart = edges[edgeCount - 1].angle;
-            float angleEnd = edges[0].angle + 2.0f * M_PI; // Wrap to next cycle
-            float distStart = edges[edgeCount - 1].distSq;
-            float distEnd = edges[0].distSq;
-
-            int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
-            int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
-
-            int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
-            for (int k = 0; k < slotCount; ++k) {
-                int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
-                float t = (float)k / (float)slotCount;
-                float interpolatedDist = distStart + t * (distEnd - distStart);
-                lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
-            }
-        }
-
-        free(edges);
-    }
-    
-    free(shadowEdges);
-    
-    GLuint lightShadowEdgeBufferID;
-    glGenBuffers(1, &lightShadowEdgeBufferID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightShadowEdgeBufferID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, lightShadowBufferSize, lightShadowAngleDistsList, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 28, lightShadowEdgeBufferID);
-    free(lightShadowAngleDistsList);
+//     
+//     free(shadowEdges);
+//     
+//     GLuint lightShadowEdgeBufferID;
+//     glGenBuffers(1, &lightShadowEdgeBufferID);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightShadowEdgeBufferID);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, lightShadowBufferSize, lightShadowAngleDistsList, GL_STATIC_DRAW);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 28, lightShadowEdgeBufferID);
+//     free(lightShadowAngleDistsList);
 
     CHECK_GL_ERROR();
     malloc_trim(0);
