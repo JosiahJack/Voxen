@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <time.h>
@@ -116,7 +117,7 @@ uint8_t shadowOcclusionData[512 * 512 * 4];
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
-GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1,
+GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, debugValueLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, camPosLoc_deferred = -1,
       fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
       viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1;
@@ -395,6 +396,7 @@ int CompileShaders(void) {
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
+    debugValueLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugValue");
     worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
     worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
     camPosLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "camPos");
@@ -572,16 +574,17 @@ int Input_KeyDown(uint32_t scancode) {
 
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
+        if (debugView > 8) debugView = 0;
         glProgramUniform1i(deferredLightingShaderProgram, debugViewLoc_deferred, debugView);
         glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
-        if (debugView > 8) debugView = 0;
     }
 
     if (keys[SDL_SCANCODE_Y]) {
         debugValue++;
+        if (debugValue > 2) debugValue = 0;
+        glProgramUniform1i(deferredLightingShaderProgram, debugValueLoc_deferred, debugValue);
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
-        if (debugValue > 6) debugValue = 0;
     }
 
     if (keys[SDL_SCANCODE_E]) {
@@ -854,6 +857,17 @@ void UpdateScreenSize(void) {
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
 }
 
+typedef struct {
+    float angle; // In radians
+    float distSq; // Squared distance
+} ShadowEdge;
+
+int compareShadowEdges(const void* a, const void* b) {
+    const ShadowEdge* edgeA = (const ShadowEdge*)a;
+    const ShadowEdge* edgeB = (const ShadowEdge*)b;
+    return edgeA->angle < edgeB->angle ? -1 : (edgeA->angle > edgeB->angle ? 1 : 0);
+}
+
 int VoxelLists() {
     DualLog("Generating voxel lighting data...\n");
     double start_time = get_time();
@@ -974,6 +988,7 @@ int VoxelLists() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListIndicesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 26, voxelLightListIndicesID);
+    free(voxelLightListIndices);
 
     GLuint voxelLightListsRawID;
     glGenBuffers(1, &voxelLightListsRawID);
@@ -981,6 +996,7 @@ int VoxelLists() {
     glBufferData(GL_SHADER_STORAGE_BUFFER, head * sizeof(uint32_t), voxelLightListsRaw, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 27, voxelLightListsRawID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    free(voxelLightListsRaw);
 
     // Update lights and instances
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
@@ -991,138 +1007,178 @@ int VoxelLists() {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    
-    // Create voxel opacity texture for shadow tracing
-    for (int cellZ = 0; cellZ < 64; ++cellZ) {
-        for (int cellX = 0; cellX < 64; ++cellX) {
-            uint32_t cellidx = cellZ * 64 + cellX;
-            GLubyte pixelColor = (gridCellStates[cellidx] & CELL_OPEN) ? 255 : 0;  // 0=empty, 255=occupied
-            // Map cell (x,z) to voxel texture coords (8x8 per cell)
-            int baseTexX = cellX * 8;
-            int baseTexY = cellZ * 8;
-            for (int voxX = 0; voxX < 8; ++voxX) {
-                for (int voxZ = 0; voxZ < 8; ++voxZ) {
-                    int texX = baseTexX + voxX;
-                    int texY = baseTexY + voxZ;
-                    voxelOpacityData[texY * 512 + texX] = pixelColor;
-                }
-            }
-        }
-    }
-
-    int success = stbi_write_png("Screenshots/VoxelOpacity.png", 512, 512, 1, voxelOpacityData, 512 * 1);
-    if (!success) DualLogError("Failed to save voxel opacity debug image\n");
-
-    // Upload voxelOpacity to GPU
-    glBindTexture(GL_TEXTURE_2D, voxelOpacityTextureID);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 512, GL_RED, GL_UNSIGNED_BYTE, voxelOpacityData);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // Step 4: Compute shadows by iterating over voxels
-    uint32_t occlusionCount = 0;
-    for (int cellZ = 0; cellZ < 64; ++cellZ) {
-        for (int cellX = 0; cellX < 64; ++cellX) {
-            uint32_t cellIndex = cellZ * 64 + cellX;
-            if (!(gridCellStates[cellIndex] & CELL_OPEN) || cellIndex == 0) continue;
-            
-            for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
-                for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                    uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-                    if (voxelIndex >= VOXEL_COUNT) { DualLogError("Invalid voxelIndex: %u for cellIndex=%u, voxelX=%u, voxelZ=%u\n", voxelIndex, cellIndex, voxelX, voxelZ); continue; }
-                    
-                    uint32_t texX = cellX * 8 + voxelX;
-                    uint32_t texY = cellZ * 8 + voxelZ;
-                    if (texX >= 512 || texY >= 512) { DualLogError("Invalid texture coords: texX=%u, texY=%u\n", texX, texY); continue; }
-                    
-                    uint32_t texIdx = (texY * 512 + texX) * 4; // RGBA
-                    float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
-                    float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
-
-                    // Get light list for this voxel
-                    uint32_t offset = voxelLightListIndices[voxelIndex * 2];
-                    uint32_t count = voxelLightListIndices[voxelIndex * 2 + 1];
-                    if (offset + count > VOXEL_COUNT * 4) { DualLogError("Invalid light list access: offset=%u, count=%u, voxelIndex=%u\n", offset, count, voxelIndex); continue; }
-                 
-                    for (uint32_t i = 0; i < count && i < MAX_LIGHTS_PER_VOXEL; ++i) {
-                        uint32_t lightIdx = voxelLightListsRaw[offset + i];
-                        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-                        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-                        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-                        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-                        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-                        if (intensity < 0.05f) continue;
-
-                        // Check distance
-                        float dx = litX - posX;
-                        float dz = litZ - posZ;
-                        float dist = sqrtf(dx * dx + dz * dz);
-                        if (dist < 0.01f || dist > range) continue;
-
-                        // Amanatides and Woo ray traversal
-                        int traceStartX = (int)floorf((posX - worldMin_x) / VOXEL_SIZE);
-                        int traceStartZ = (int)floorf((posZ - worldMin_z) / VOXEL_SIZE);
-                        int endX = (int)floorf((litX - worldMin_x) / VOXEL_SIZE);
-                        int endZ = (int)floorf((litZ - worldMin_z) / VOXEL_SIZE);
-
-                        int stepX = (dx > 0) ? 1 : -1;
-                        int stepZ = (dz > 0) ? 1 : -1;
-                        float tMaxX = ((traceStartX + (dx > 0 ? 1 : 0)) * VOXEL_SIZE + worldMin_x - posX) / dx;
-                        float tMaxZ = ((traceStartZ + (dz > 0 ? 1 : 0)) * VOXEL_SIZE + worldMin_z - posZ) / dz;
-                        float tDeltaX = (dx != 0) ? VOXEL_SIZE / fabsf(dx) : 1e10f;
-                        float tDeltaZ = (dz != 0) ? VOXEL_SIZE / fabsf(dz) : 1e10f;
-                        int x = traceStartX;
-                        int z = traceStartZ;
-                        bool occluded = false;
-                        while (x != endX || z != endZ) {
-                            if (x < 0 || x >= 512 || z < 0 || z >= 512) break;
-                            uint32_t rayVoxelIdx = z * 512 + x;
-                            if (voxelOpacityData[rayVoxelIdx] > 128) { // Opaque voxel
-                                occluded = true;
-                                break;
-                            }
-
-                            if (tMaxX < tMaxZ) {
-                                x += stepX;
-                                tMaxX += tDeltaX;
-                            } else {
-                                z += stepZ;
-                                tMaxZ += tDeltaZ;
-                            }
-                        }
-
-                        if (occluded) {
-                            // Set shadow bit in shadowOcclusionData
-                            uint32_t bitIdx = i; // Light index in the list
-                            if (bitIdx < 32) {
-                                uint32_t byteIdx = bitIdx / 8; // 0=R, 1=G, 2=B, 3=A
-                                if (texIdx + byteIdx >= 512 * 512 * 4) { DualLogError("Invalid shadowOcclusionData access: texIdx=%u, byteIdx=%u\n", texIdx, byteIdx); continue; }
-        
-                                uint32_t bitInByte = bitIdx % 8;
-                                shadowOcclusionData[texIdx + byteIdx] |= (1 << bitInByte);
-                                occlusionCount++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // Save shadow occlusion debug image with per-channel output
-    success = stbi_write_png("Screenshots/ShadowVoxels.png", 512, 512, 4, shadowOcclusionData, 512 * 4);
-    if (!success) DualLogError("Failed to save shadow occlusion debug image\n");
-    else DualLog("Saved shadow occlusion debug image Screenshots/ShadowVoxels.png\n");
-
-    // Upload shadowOcclusion to GPU
-    glBindTexture(GL_TEXTURE_2D, shadowOcclusionTextureID);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 512, 512, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE, shadowOcclusionData);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    free(voxelLightListIndices);
-    free(voxelLightListsRaw);
     glFlush();
     glFinish();
     CHECK_GL_ERROR();    
+    malloc_trim(0);
+    DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
+    
+    // ----------------------------------------------------------------------------------------------------------------
+    // List of shadow edges per light as count,angle,dist,angle,dist,angle,dist,angle,dist,count,angle,dist,count,count,angle,dist,angle,dist, etc. e.g. for counts of 4, 1, 0, and 2 respectively.
+    // Count is number of shadow edges this light has in range.
+    // Angle is the angle relative to 0rad from top view for the shadow edge in the xz plane as rotated in standard positive radians only
+    // Dist is the squared distance from the point light's origin to the shadow edge, in xz plane.
+    size_t lightShadowBufferSize = LIGHT_COUNT * SHADOW_ANGLE_DEG_BINS * sizeof(float);
+    float* lightShadowAngleDistsList = malloc(lightShadowBufferSize); // Safe estimate of 36 points per light + count
+
+    uint32_t shadowEdgesTotal = 0;
+    uint32_t shadEdgeCountMax = (WORLDX + 1) * (WORLDX + 1);
+    float* shadowEdges = malloc(shadEdgeCountMax * 2 * sizeof(float));
+
+    head = 0;
+    for (int z=0;z<WORLDZ + 1;++z) { // Iterate over corners between cells
+        for (int x=0;x<WORLDX + 1;++x) { // not the cells themselves
+            if (x == 0 || x >= 64) continue; // Skip all corners for the rows and columns around the edges of the world, don't care as there is nothing out there. 
+            if (z == 0 || z >= 64) continue; // Saves on having to bounds check anything below.
+            
+            int cellIdxNW = ((z - 1) * WORLDX) + (x - 1); // [X][ ] Top left cell relative to the center point of 4 cells
+                                                          // [ ][ ]
+            
+            int cellIdxNE = ((z - 1) * WORLDX) + (x);     // [ ][X] Top right cell relative to the center point of 4 cells
+                                                          // [ ][ ]
+            
+            int cellIdxSE = ((z) * WORLDX) + (x);         // [ ][ ] Bottom right cell relative to the center point of 4 cells
+                                                          // [ ][X]
+            
+            int cellIdxSW = ((z) * WORLDX) + (x - 1);     // [ ][ ] Bottom left cell relative to the center point of 4 cells
+                                                          // [X][ ]
+            
+            bool openNW = (gridCellStates[cellIdxNW] & CELL_OPEN); 
+            bool openNE = (gridCellStates[cellIdxNE] & CELL_OPEN); 
+            bool openSE = (gridCellStates[cellIdxSE] & CELL_OPEN); 
+            bool openSW = (gridCellStates[cellIdxSW] & CELL_OPEN); 
+            if (!openNW && !openNE && !openSE && !openSW) continue; // Must have an open space somewhere to make a shadow!
+            if (openNW && openNE && openSE && openSW) continue; // Must have at least one wall somewhere to make a shadow!
+            
+            shadowEdges[head * 2 + 0] = worldMin_x + (WORLDCELL_WIDTH_F * x); // X position in world space
+            shadowEdges[head * 2 + 1] = worldMin_z + (WORLDCELL_WIDTH_F * z); // Z position in world space
+            head++;
+            shadowEdgesTotal++;
+        }
+    }
+    
+    DualLog("Found %d shadow edges for shadow data from world cell grid states\n",shadowEdgesTotal);
+
+    for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
+        uint16_t lightIdx = i * LIGHT_DATA_SIZE;
+        float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
+        float rangeSq = range * range;
+        for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
+            lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq; // Set all slots for all lights to have lights range * range.
+        }
+    }
+    
+//     for (uint16_t i=0; i<LIGHT_COUNT; ++i) {
+//         uint16_t lightIdx = i * LIGHT_DATA_SIZE;
+//         float litX = lights[lightIdx + LIGHT_DATA_OFFSET_POSX];
+//         float litZ = lights[lightIdx + LIGHT_DATA_OFFSET_POSZ];
+//         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
+//         float rangeSq = range * range; // Get range squared
+//         for (uint32_t shadowEdgeIdx = 0; shadowEdgeIdx < shadowEdgesTotal; ++shadowEdgeIdx) {
+//             float shadX = shadowEdges[(shadowEdgeIdx * 2) + 0]; // XZ pair in shadowEdges buffer gets corners of cells where wall chunks meet
+//             float shadZ = shadowEdges[(shadowEdgeIdx * 2) + 1];
+//             float distToEdgeFromLight = squareDistance2D(litX, litZ, shadX, shadZ);
+//             if (distToEdgeFromLight >= rangeSq) continue; // Shadow edge out of range
+//             
+//             float angle = atan2f(shadZ - litZ, shadX - litX); // Angle (in radians)
+//             if (angle < 0.0f) angle += 2.0f * M_PI; // Normalize to positive from [-pi,pi]
+//             uint16_t slot = (uint16_t)rad2deg(angle) % SHADOW_ANGLE_DEG_BINS;
+//             lightShadowAngleDistsList[(i * SHADOW_ANGLE_DEG_BINS) + slot] = distToEdgeFromLight; // Dist (squared)
+//             DualLog("Light %d has shadow distance %f at degree slot %d\n",i,sqrt(distToEdgeFromLight),slot);
+//         }
+//     }
+    
+    for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
+        uint16_t lightIdx = i * LIGHT_DATA_SIZE;
+        float litX = lights[lightIdx + LIGHT_DATA_OFFSET_POSX];
+        float litZ = lights[lightIdx + LIGHT_DATA_OFFSET_POSZ];
+        float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
+        float rangeSq = range * range;
+
+        // Initialize all slots to rangeSq
+        for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
+            lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq;
+        }
+
+        ShadowEdge* edges = malloc(shadowEdgesTotal * sizeof(ShadowEdge));
+        uint32_t edgeCount = 0;
+
+        for (uint32_t shadowEdgeIdx = 0; shadowEdgeIdx < shadowEdgesTotal; ++shadowEdgeIdx) {
+            float shadX = shadowEdges[(shadowEdgeIdx * 2) + 0];
+            float shadZ = shadowEdges[(shadowEdgeIdx * 2) + 1];
+            float distToEdgeFromLight = squareDistance2D(litX, litZ, shadX, shadZ);
+            if (distToEdgeFromLight >= rangeSq) continue;
+
+            float angle = atan2f(shadZ - litZ, shadX - litX);
+            if (angle < 0.0f) angle += 2.0f * M_PI;
+            edges[edgeCount].angle = angle;
+            edges[edgeCount].distSq = distToEdgeFromLight;
+            DualLog("Light %d has shadow distance %f at degree slot %d\n", i, sqrt(distToEdgeFromLight), (uint16_t)rad2deg(angle) % SHADOW_ANGLE_DEG_BINS);
+            edgeCount++;
+        }
+
+        // Sort edges by angle
+        qsort(edges, edgeCount, sizeof(ShadowEdge), compareShadowEdges);
+
+        // Fill slots between consecutive edges
+        for (uint32_t j = 0; j < edgeCount; ++j) {
+            uint32_t next = (j + 1) % edgeCount; // Handle wraparound
+            float angleStart = edges[j].angle;
+            float angleEnd = edges[next].angle;
+            float distStart = edges[j].distSq;
+            float distEnd = edges[next].distSq;
+
+            // Handle wraparound case
+            if (angleEnd < angleStart) angleEnd += 2.0f * M_PI;
+
+            int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
+            int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
+
+            // Number of slots to fill
+            int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
+            if (slotCount <= 0) continue;
+
+            // Linearly interpolate distances
+            for (int k = 0; k < slotCount; ++k) {
+                int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
+                float t = (float)k / (float)slotCount;
+                float interpolatedDist = distStart + t * (distEnd - distStart);
+                lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
+            }
+        }
+
+        // Handle wraparound for the last-to-first edge
+        if (edgeCount > 0) {
+            float angleStart = edges[edgeCount - 1].angle;
+            float angleEnd = edges[0].angle + 2.0f * M_PI; // Wrap to next cycle
+            float distStart = edges[edgeCount - 1].distSq;
+            float distEnd = edges[0].distSq;
+
+            int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
+            int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
+
+            int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
+            for (int k = 0; k < slotCount; ++k) {
+                int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
+                float t = (float)k / (float)slotCount;
+                float interpolatedDist = distStart + t * (distEnd - distStart);
+                lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
+            }
+        }
+
+        free(edges);
+    }
+    
+    free(shadowEdges);
+    
+    GLuint lightShadowEdgeBufferID;
+    glGenBuffers(1, &lightShadowEdgeBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightShadowEdgeBufferID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, lightShadowBufferSize, lightShadowAngleDistsList, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 28, lightShadowEdgeBufferID);
+    free(lightShadowAngleDistsList);
+
+    CHECK_GL_ERROR();
     malloc_trim(0);
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     DebugRAM("end of voxel light lists");
@@ -1436,17 +1492,17 @@ int EventExecute(Event* event) {
     return 99;
 }
 
-// static const char* debugViewNames[] = {
-//     "standard render", // 0
-//     "unlit",           // 1
-//     "surface normals", // 2
-//     "depth",           // 3
-//     "indices",         // 4
-//     "worldpos",        // 5
-//     "lightview",       // 6
-//     "reflections",     // 7
-//     "lightmap"         // 8
-// };
+static const char* debugViewNames[] = {
+    "standard render", // 0
+    "unlit",           // 1
+    "surface normals", // 2
+    "depth",           // 3
+    "indices",         // 4
+    "worldpos",        // 5
+    "lightview",       // 6
+    "reflections",     // 7
+    "lightmap"         // 8
+};
 
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
     return x1 * x2 + y1 * y2 + z1 * z2;
@@ -2226,10 +2282,10 @@ int main(int argc, char* argv[]) {
  
         // 8. Render UI Text;
         int textY = 25; int textVertOfset = 15;
-//         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
-//         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+        RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-//         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+        RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 //         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
 //

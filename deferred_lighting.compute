@@ -14,6 +14,7 @@ const char* deferredLighting_computeShader =
     "layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };\n"
     "layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };\n"
     "layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };\n"
+    "layout(std430, binding = 28) buffer LightShadowAngleDistsList { float lightShadowAngleDistsList[]; };\n"
     
     "uniform uint totalLuxelCount;\n"
     "uniform uint screenWidth;\n"
@@ -21,6 +22,7 @@ const char* deferredLighting_computeShader =
     "uniform uint modelCount;\n"
     "uniform mat4 viewProjection;\n"
     "uniform int debugView;\n"
+    "uniform int debugValue;\n"
     "uniform float worldMin_x;\n"
     "uniform float worldMin_z;\n"
     "uniform vec3 camPos;\n"
@@ -70,10 +72,13 @@ const char* deferredLighting_computeShader =
     "const int LIGHT_DATA_OFFSET_G = 11;\n"
     "const int LIGHT_DATA_OFFSET_B = 12;\n"
     "const float WORLDCELL_WIDTH_F = 2.56;\n"
+    "const int SHADOW_ANGLE_DEG_BINS = 360;\n"
     "const float VOXEL_SIZE = 0.32;\n"
     "const float CELLXHALF = 1.28;\n"
     "const vec3 baseDir = vec3(0.0, 0.0, 1.0);\n"
     "const int SSR_RES = 4;\n"
+    
+    "float rad2deg(float radians) { return radians * (180.0 / 3.1415926535); }\n"
 
     "uint GetVoxelIndex(vec3 worldPos) {\n"
     "    float offsetX = worldPos.x - worldMin_x + (VOXEL_SIZE * 0.5);\n"
@@ -112,19 +117,7 @@ const char* deferredLighting_computeShader =
 
     // Regular lighting calculation
     "    uint voxelIdx = GetVoxelIndex(worldPos);\n"
-    "    uint count  = voxelLightListIndices[voxelIdx * 2 + 1];\n"
-    "    uvec4 shadowBits = uvec4(0.0,0.0,0.0,0.0);\n"
-    "    if (count > 0) {\n"
-    "        uint cellIndex = voxelIdx / 64;\n"
-    "        uint voxelIndexInCell = voxelIdx % 64;\n"
-    "        uint cellX = cellIndex % 64;\n"
-    "        uint cellZ = cellIndex / 64;\n"
-    "        uint voxelX = voxelIndexInCell % 8;\n"
-    "        uint voxelZ = voxelIndexInCell / 8;\n"
-    "        ivec2 texCoord = ivec2(cellX * 8 + voxelX + 4, cellZ * 8 + voxelZ + 4);\n" // No Flip Y
-    "        shadowBits = uvec4(imageLoad(shadowOcclusion, texCoord));\n"
-    "    }\n"
-    
+    "    uint count  = voxelLightListIndices[voxelIdx * 2 + 1];\n"    
     "    vec3 lighting = vec3(0.0, 0.0, 0.0);\n"
     "    vec3 normal = vec3(0.0,0.0,0.0);\n"
     "    uint listoffset = 0;\n"
@@ -187,10 +180,26 @@ const char* deferredLighting_computeShader =
     "                               lights[lightIdx + LIGHT_DATA_OFFSET_B]);\n"
     "        float distOverRange = dist / range;\n"
     "        float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;\n"
-    "        uint byteIdx = i / 8u;\n"
-    "        uint bitInByte = i % 8u;\n"
-    "        float shadowFactor = 1.0;\n"//(shadowBits[byteIdx] & (1u << bitInByte)) != 0u ? 1.0 : .0;\n"
-    "        lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;\n"
+
+             // Shadow
+/*    "        float distsq = dot(toLight.xz, toLight.xz);\n"
+    "        float angleToLight = atan(toLight.z, toLight.x); // pixel -> light direction in xz plane\n"
+    "        if (angleToLight < 0.0) angleToLight += 2.0 * 3.14159265;\n"
+    "        uint slot0 = uint(rad2deg(angleToLight)) % SHADOW_ANGLE_DEG_BINS;\n"
+    "        uint slot1 = (slot0 + 1) % SHADOW_ANGLE_DEG_BINS;\n"
+    "        uint slot_1 = (slot0 + SHADOW_ANGLE_DEG_BINS - 1) % SHADOW_ANGLE_DEG_BINS;\n"
+    "        float distSlot_1 = lightShadowAngleDistsList[lightIdxInPVS * SHADOW_ANGLE_DEG_BINS + slot_1];\n"
+    "        float distSlot0 = lightShadowAngleDistsList[lightIdxInPVS * SHADOW_ANGLE_DEG_BINS + slot0];\n"
+    "        float distSlot1 = lightShadowAngleDistsList[lightIdxInPVS * SHADOW_ANGLE_DEG_BINS + slot1];\n"
+    "        float shadowFactor0 = distSlot0 < distsq ? 0.0 : 1.0;\n"
+    "        float shadowFactor_1 = distSlot_1 < distsq ? 0.0 : 1.0;\n"
+    "        float shadowFactor1 = distSlot1 < distsq ? 0.0 : 1.0;\n"
+    "        float t = fract(rad2deg(angleToLight)); */// fractional part for linear interpolation\n"
+    "        float shadowFactor = 1.0;\n"//mix(mix(shadowFactor_1, shadowFactor0, 1.0 - t), mix(shadowFactor0, shadowFactor1, t), 0.5);\n"
+
+//     "        if (debugValue == 1) lighting += vec3(shadowFactor, shadowFactor, shadowFactor);\n"
+//     "        else if (debugValue == 2) lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff;\n"
+    "        /*else*/ lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;\n"
     "    }\n"
 
     "    lighting += glowColor.rgb;\n"
@@ -199,7 +208,7 @@ const char* deferredLighting_computeShader =
     "    int blueNoiseTextureWidth = 64;\n"
     "    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;\n"
     "    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);\n"
-    "    lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
+    "    if (debugValue == 0) lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));\n"
 
     // Fog
     "    float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);\n"

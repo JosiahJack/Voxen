@@ -33,6 +33,8 @@ const char* quadFragmentShaderSource =
 
     "void main() {\n"
     "    FragColor = texture(tex, TexCoord);\n"
+    "    if (debugValue > 0) return;\n"
+
     "    vec4 normalPack = imageLoad(inputNormals, ivec2(TexCoord.x,TexCoord.y));\n"
     "    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));\n"
     "    if (debugView == 0) {\n"
