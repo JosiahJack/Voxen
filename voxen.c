@@ -26,11 +26,11 @@
 #include "ssr.compute"
 #include "bluenoise64.cginc"
 #include "audio.h"
-#include "instance.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #include "constants.h"
 #include "dynamic_culling.h"
+#include "data_parser.h"
 
 // #define DEBUG_RAM_OUTPUT
 // ----------------------------------------------------------------------------
@@ -41,7 +41,7 @@ bool window_has_focus = false;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Instances
-Instance instances[INSTANCE_COUNT];
+Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
@@ -757,10 +757,11 @@ void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx
 void UpdateInstanceMatrix(int i) {
     if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; } // No model
     if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
-    if (instances[i].modelIndex < 0) return; // Invalid or culled
 
     float mat[16]; // 4x4 matrix
-    SetUpdatedMatrix(mat, instances[i].posx, instances[i].posy, instances[i].posz, instances[i].rotx, instances[i].roty, instances[i].rotz, instances[i].rotw, instances[i].sclx, instances[i].scly, instances[i].sclz);
+    SetUpdatedMatrix(mat, instances[i].position.x, instances[i].position.y, instances[i].position.z,
+                     instances[i].rotation.x, instances[i].rotation.y, instances[i].rotation.z, instances[i].rotation.w,
+                     instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
 }
@@ -799,17 +800,20 @@ int SetupInstances(void) {
         instances[idx].specIndex = 2048u;
         instances[idx].normIndex = 2048u;
         instances[idx].lodIndex = UINT16_MAX;
-        instances[idx].posx = instances[idx].posy = instances[idx].posz = 0.0f;
-        instances[idx].sclx = instances[idx].scly = instances[idx].sclz = 1.0f; // Default scale
-        instances[idx].rotx = instances[idx].roty = instances[idx].rotz = 0.0f; instances[idx].rotw = 1.0f; // Quaternion identity
+        instances[idx].cardchunk = false;
+        instances[idx].position.x = instances[idx].position.y = instances[idx].position.z = 0.0f;
+        instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
+        instances[idx].rotation.x = instances[idx].rotation.y = instances[idx].rotation.z = 0.0f; instances[idx].rotation.w = 1.0f; // Quaternion identity
+        instances[idx].floorHeight = INVALID_FLOOR_HEIGHT;
+        instances[idx].intensity = 0.0f;
+        instances[idx].range = 0.0f;
+        instances[idx].spotAngle = 0.0f;
+        instances[idx].color.r = 0.0f;
+        instances[idx].color.g = 0.0f;
+        instances[idx].color.b = 0.0f;
+        snprintf(instances[idx].name, ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1,"init");
         dirtyInstances[idx] = true;
     }
-
-    // Generate and size instance related buffers
-    glGenBuffers(1, &instancesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
 
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     glGenBuffers(1, &matricesBuffer);
@@ -1338,7 +1342,7 @@ int InitializeEnvironment(void) {
     const char* filename = "./Data/gamedata.txt";
     DualLog("Loading game definition from %s...",filename);    
     DataParser gamedata_parser;
-    DataEntry entry;
+    Entity entry;
     init_data_entry(&entry);
     gamedata_parser.entries = &entry;
     gamedata_parser.valid_keys = valid_gamedata_keys;
@@ -1368,9 +1372,13 @@ int InitializeEnvironment(void) {
     RenderLoadingProgress(65,"Loading instances data...");
     if (SetupInstances()) return 1;
     RenderLoadingProgress(50,"Loading level data...");
+    renderableCount = 0;
+    loadedInstances = 0;
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
     RenderLoadingProgress(55,"Loading lighting data...");
     if (LoadLevelLights(currentLevel)) return 1;
+//     RenderLoadingProgress(52,"Loading dynamic object data...");
+//     if (LoadLevelDynamicObjects(currentLevel)) return 1;
     RenderLoadingProgress(52,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level!
     RenderLoadingProgress(70,"Loading voxel lighting data...");
@@ -1790,7 +1798,7 @@ int main(int argc, char* argv[]) {
     activeLogFile = 0;
     DebugRAM("prior to static buffer touches"); // Ensure pages faulted up front for stable RAM usage and contiguous block for static arrays.
     volatile void* touchingPointer = (volatile void*)instances;
-    size_t bufferSize = INSTANCE_COUNT * sizeof(Instance);
+    size_t bufferSize = INSTANCE_COUNT * sizeof(Entity);
 #ifdef DEBUG_RAM_OUTPUT
     DualLog("Touching pages for instances[%zu bytes]\n",bufferSize);
 #endif
@@ -2075,7 +2083,7 @@ int main(int argc, char* argv[]) {
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
 
-            distSqrd = squareDistance3D(instances[i].posx,instances[i].posy,instances[i].posz,cam_x, cam_y, cam_z);
+            distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
             if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
             if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
         }
@@ -2112,7 +2120,6 @@ int main(int argc, char* argv[]) {
             if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
-            if (instances[i].modelIndex < 0) continue; // Invalid or hidden
             
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
             if (instCellIdx < ARRSIZE) {
@@ -2120,7 +2127,7 @@ int main(int argc, char* argv[]) {
             }
             
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-            if (!IsSphereInFOVCone(instances[i].posx, instances[i].posy, instances[i].posz, radius)) continue; // Cone Frustum Culling
+            if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
             
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;

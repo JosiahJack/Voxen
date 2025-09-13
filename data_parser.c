@@ -12,7 +12,6 @@
 #include <assimp/version.h>
 #include <math.h>
 #include "constants.h"
-#include "instance.h"
 #include "data_parser.h"
 #include "debug.h"
 #include "render.h"
@@ -39,6 +38,7 @@ float * tempVertices;
 uint32_t * tempTriangles;
 GLuint lightmapID;
 uint32_t renderableCount = 0;
+uint32_t loadedInstances = 0;
 int startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
 int startOfTransparentInstances = INSTANCE_COUNT - 1;
 
@@ -56,6 +56,13 @@ const char *valid_lightdata_keys[] = {"localPosition.x","localPosition.y","local
                                       "localRotation.x","localRotation.y","localRotation.z","localRotation.w",
                                       "color.r","color.g","color.b","spotAngle"};
 #define NUM_LIGHTDAT_KEYS 14
+
+// Level Dynamic Objects Parsing
+DataParser dynamics_parser;
+const char *valid_dynamicsdata_keys[] = {"constIndex","saveableType","go.activeSelf","localPosition.x","localPosition.y","localPosition.z",
+                                         "localRotation.x","localRotation.y","localRotation.z","localRotation.w",
+                                         "localScale.x","localScale.y","localScale.z"};
+#define NUM_DYNDAT_KEYS 13
 //-----------------------------------------------------------------------------
 
 void parser_init(DataParser *parser, const char **valid_keys, int num_keys) {
@@ -102,7 +109,7 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
     return val;
 }
 
-void init_data_entry(DataEntry *entry) {
+void init_data_entry(Entity *entry) {
     entry->modname[0] = '\0';
     entry->levelCount = 0;
     entry->startLevel = 0;
@@ -115,12 +122,11 @@ void init_data_entry(DataEntry *entry) {
     entry->glowIndex = 2048;
     entry->specIndex = 2048;
     entry->normIndex = 2048;
-    entry->constIndex = 0;
     entry->lodIndex = UINT16_MAX;
     entry->path[0] = '\0';
-    entry->localPosition.x = 0.0f; entry->localPosition.y = 0.0f; entry->localPosition.z = 0.0f;
-    entry->localRotation.x = 0.0f; entry->localRotation.y = 0.0f; entry->localRotation.z = 0.0f; entry->localRotation.w = 1.0f;
-    entry->localScale.x = 1.0f; entry->localScale.y = 1.0f; entry->localScale.z = 1.0f;
+    entry->position.x = 0.0f; entry->position.y = 0.0f; entry->position.z = 0.0f;
+    entry->rotation.x = 0.0f; entry->rotation.y = 0.0f; entry->rotation.z = 0.0f; entry->rotation.w = 1.0f;
+    entry->scale.x = 1.0f; entry->scale.y = 1.0f; entry->scale.z = 1.0f;
     entry->intensity = 0.0f;
     entry->range = 0.0f;
     entry->spotAngle = 0.0f;
@@ -134,7 +140,7 @@ void allocate_entries(DataParser *parser, int entry_count) {
     }
     
     if (entry_count > parser->capacity) {
-        DataEntry *new_entries = realloc(parser->entries, entry_count * sizeof(DataEntry));        
+        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));        
         parser->entries = new_entries;
         for (int i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
         parser->capacity = entry_count;
@@ -142,7 +148,7 @@ void allocate_entries(DataParser *parser, int entry_count) {
     parser->count = entry_count;
 }
 
-static bool process_key_value(DataParser *parser, DataEntry *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
+static bool process_key_value(DataParser *parser, Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
     if (!key || !value) {
         DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line);
         return false;
@@ -179,18 +185,18 @@ static bool process_key_value(DataParser *parser, DataEntry *entry, const char *
             else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(entry->modname, trimmed_value, sizeof(entry->modname) - 1); entry->modname[sizeof(entry->modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
             else if (strcmp(trimmed_key, "levelcount") == 0)      { entry->levelCount = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
             else if (strcmp(trimmed_key, "startlevel") == 0)      { entry->startLevel = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
-            else if (strcmp(trimmed_key, "constIndex") == 0)      entry->constIndex = parse_numberu16(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "constIndex") == 0)      entry->index = parse_numberu16(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "lod") == 0)             entry->lodIndex = parse_numberu16(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->localPosition.x = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->localPosition.y = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localPosition.z") == 0) entry->localPosition.z = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localRotation.x") == 0) entry->localRotation.x = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localRotation.y") == 0) entry->localRotation.y = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localRotation.z") == 0) entry->localRotation.z = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localRotation.w") == 0) entry->localRotation.w = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localScale.x") == 0)    entry->localScale.x = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localScale.y") == 0)    entry->localScale.y = parse_float(trimmed_value, line, lineNum);
-            else if (strcmp(trimmed_key, "localScale.z") == 0)    entry->localScale.z = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->position.x = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->position.y = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localPosition.z") == 0) entry->position.z = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localRotation.x") == 0) entry->rotation.x = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localRotation.y") == 0) entry->rotation.y = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localRotation.z") == 0) entry->rotation.z = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localRotation.w") == 0) entry->rotation.w = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localScale.x") == 0)    entry->scale.x = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localScale.y") == 0)    entry->scale.y = parse_float(trimmed_value, line, lineNum);
+            else if (strcmp(trimmed_key, "localScale.z") == 0)    entry->scale.z = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "range") == 0)           entry->range = parse_float(trimmed_value, line, lineNum);
             else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
@@ -230,7 +236,7 @@ static bool read_token(FILE *file, char *token, size_t max_len, char delimiter, 
     return pos > 0;
 }
 
-bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *lineNum, bool *is_eof) {
+bool read_key_value(FILE *file, DataParser *parser, Entity *entry, uint32_t *lineNum, bool *is_eof) {
     char token[1024];
     bool is_comment, is_newline;
     if (!read_token(file, token, sizeof(token), ':', &is_comment, is_eof, &is_newline, lineNum)) {
@@ -250,17 +256,12 @@ bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *
     return true;
 }
 
-static bool ParseResourceData(DataParser *parser, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
-
+static bool ParseResourceData(DataParser *parser, FILE* file, const char *filename) {
     char line[1024];
     uint32_t lineNum = 0;
     int entry_count = 0;
     uint32_t max_index = 0;
-
-    // First pass: count entries and find max index
-    while (fgets(line, sizeof(line), file)) {
+    while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;
         if (line[0] == '#') { entry_count++; continue; }
         
@@ -279,14 +280,13 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
        }
     }
 
-    if (entry_count == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
+    if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
 
-    // Allocate enough space for max_index + 1
     allocate_entries(parser, max_index + 1);
 
     // Second pass: parse entries
     rewind(file);
-    DataEntry entry;
+    Entity entry;
     init_data_entry(&entry);
     int entries_stored = 0;
     lineNum = 0;
@@ -341,20 +341,12 @@ static bool ParseResourceData(DataParser *parser, const char *filename) {
     return true;
 }
 
-static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
-    // Check if file exists and is readable
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        DualLogError("Cannot open %s: %s\n", filename, strerror(errno));
-        return false;
-    }
-
-    // First pass: count entries
+static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filename) {
     int entry_count = 0;
     bool is_comment, is_eof, is_newline;
     int c;
     uint32_t lineNum = 0;
-    while ((c = fgetc(file)) != EOF) {
+    while ((c = fgetc(file)) != EOF) { // First pass: count entries
         if (isspace(c) || c == '\n') continue;
         if (c == '/' && (c = fgetc(file)) == '/') {
             while ((c = fgetc(file)) != EOF && c != '\n');
@@ -363,12 +355,8 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
         entry_count++;
         while ((c = fgetc(file)) != EOF && c != '\n');
     }
-    
-    if (entry_count == 0) {
-        DualLogWarn("No entries found in %s\n", filename);
-        fclose(file);
-        return true; // Or return false if an empty file is an error
-    }
+
+    if (entry_count == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
 
     allocate_entries(parser, entry_count);
 
@@ -377,7 +365,7 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
     int current_index = 0;
     lineNum = 0;
     char token[1024];
-    DataEntry entry;
+    Entity entry;
     init_data_entry(&entry);
     while (!feof(file)) {
         if (!read_token(file, token, sizeof(token), '|', &is_comment, &is_eof, &is_newline, &lineNum)) {
@@ -418,8 +406,11 @@ static bool ParseSaveLevelData(DataParser *parser, const char *filename) {
 }
 
 bool parse_data_file(DataParser *parser, const char *filename, int type) {
-    if (type == 1) return ParseSaveLevelData(parser, filename);
-    else return ParseResourceData(parser, filename);
+    FILE *file = fopen(filename, "r");
+    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
+    
+    if (type == 1) return ParseSaveLevelData(parser, file, filename);
+    else return ParseResourceData(parser, file, filename);
 }
 
 //-----------------------------------------------------------------------------
@@ -688,6 +679,18 @@ int LoadEntities(void) {
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
         entities[i].lodIndex = entity_parser.entries[i].cardchunk ? 178: entity_parser.entries[i].lodIndex; // Generic LOD card
+        entities[i].cardchunk = entity_parser.entries[i].cardchunk;
+        entities[i].position.x = 0.0f;
+        entities[i].position.y = 0.0f;
+        entities[i].position.z = 0.0f;
+        entities[i].scale.x = 0.0f;
+        entities[i].scale.y = 0.0f;
+        entities[i].scale.z = 0.0f;
+        entities[i].rotation.x = 0.0f;
+        entities[i].rotation.y = 0.0f;
+        entities[i].rotation.z = 0.0f;
+        entities[i].rotation.w = 0.0f;
+        entities[i].floorHeight = INVALID_FLOOR_HEIGHT;
     }
 
     double end_time = get_time();
@@ -885,7 +888,7 @@ float quat_angle_deg(Quaternion a, Quaternion b) {
 
 //----------------------------------- Level -----------------------------------
 int LoadLevelGeometry(uint8_t curlevel) {
-    if (curlevel >= numLevels) { DualLogError("Cannot load level %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
     DebugRAM("start of LoadLevelGeometry");
     char filename[64];
@@ -897,9 +900,9 @@ int LoadLevelGeometry(uint8_t curlevel) {
     DualLog("Loading %d objects for Level %d...\n",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    renderableCount = 0;
     for (int idx=0;idx<gameObjectCount;++idx) {
-        int entIdx = level_parser.entries[idx].constIndex;
+        loadedInstances++;
+        int entIdx = level_parser.entries[idx].index;
         instances[idx].modelIndex = entities[entIdx].modelIndex;
         if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
@@ -907,17 +910,17 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].specIndex = entities[entIdx].specIndex;
         instances[idx].normIndex = entities[entIdx].normIndex;
         instances[idx].lodIndex = entities[entIdx].lodIndex;
-        instances[idx].posx = level_parser.entries[idx].localPosition.x + correctionX;
-        instances[idx].posy = level_parser.entries[idx].localPosition.y + correctionY;
-        instances[idx].posz = level_parser.entries[idx].localPosition.z + correctionZ;
-        instances[idx].rotx = level_parser.entries[idx].localRotation.x;
-        instances[idx].roty = level_parser.entries[idx].localRotation.y;
-        instances[idx].rotz = level_parser.entries[idx].localRotation.z;
-        instances[idx].rotw = level_parser.entries[idx].localRotation.w;
-        instances[idx].sclx = level_parser.entries[idx].localScale.x;
-        instances[idx].scly = level_parser.entries[idx].localScale.y;
-        instances[idx].sclz = level_parser.entries[idx].localScale.z;
-        if (isDoubleSided(instances[idx].texIndex) || instances[idx].sclx < 0.0f || instances[idx].scly < 0.0f || instances[idx].sclz < 0.0f) {
+        instances[idx].position.x = level_parser.entries[idx].position.x + correctionX;
+        instances[idx].position.y = level_parser.entries[idx].position.y + correctionY;
+        instances[idx].position.z = level_parser.entries[idx].position.z + correctionZ;
+        instances[idx].rotation.x = level_parser.entries[idx].rotation.x;
+        instances[idx].rotation.y = level_parser.entries[idx].rotation.y;
+        instances[idx].rotation.z = level_parser.entries[idx].rotation.z;
+        instances[idx].rotation.w = level_parser.entries[idx].rotation.w;
+        instances[idx].scale.x = level_parser.entries[idx].scale.x;
+        instances[idx].scale.y = level_parser.entries[idx].scale.y;
+        instances[idx].scale.z = level_parser.entries[idx].scale.z;
+        if (isDoubleSided(instances[idx].texIndex) || instances[idx].scale.x < 0.0f || instances[idx].scale.y < 0.0f || instances[idx].scale.z < 0.0f) {
             doubleSidedInstances[doubleSidedInstancesHead] = idx;
             doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
@@ -927,11 +930,11 @@ int LoadLevelGeometry(uint8_t curlevel) {
             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
 
-        Quaternion quat = {instances[idx].rotx, instances[idx].roty, instances[idx].rotz, instances[idx].rotw};
+        Quaternion quat = {instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w};
         Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
         float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
         bool pointsUp = angle <= 30.0f;
-        instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
+        instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].position.y : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
     }
 
     // Filter transparent instances to exclude double-sided ones
@@ -959,7 +962,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
         int idx = doubleSidedInstances[i];
         if (idx < 0 || idx >= gameObjectCount) continue;
 
-        Instance tempInstance = instances[maxValidIdx];
+        Entity tempInstance = instances[maxValidIdx];
         instances[maxValidIdx] = instances[idx];
         instances[idx] = tempInstance;
         maxValidIdx++;
@@ -969,16 +972,13 @@ int LoadLevelGeometry(uint8_t curlevel) {
         int idx = transparentOnlyIndices[i];
         if (idx < 0 || idx >= gameObjectCount) continue;
 
-        Instance tempInstance = instances[maxValidIdx];
+        Entity tempInstance = instances[maxValidIdx];
         instances[maxValidIdx] = instances[idx];
         instances[idx] = tempInstance;
         maxValidIdx++;
     }
 
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, instancesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(Instance), instances, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, instancesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    // Instances uploaded after loading statics and dynamics in next functions...
     
     glGenBuffers(1, &lightmapID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightmapID);
@@ -990,7 +990,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
 }
 
 int LoadLevelLights(uint8_t curlevel) {
-    if (curlevel >= numLevels) { DualLogError("Cannot load level lights %d, out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+    if (curlevel >= numLevels) { DualLogError("Cannot load level lights, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
     DebugRAM("start of LoadLevelLights");
     char filename[64];
@@ -1004,16 +1004,16 @@ int LoadLevelLights(uint8_t curlevel) {
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
     for (int i=0;i<lightsCount;++i) {
         uint16_t idx = (i * LIGHT_DATA_SIZE);
-        lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].localPosition.x + correctionLightX;
-        lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].localPosition.y + correctionLightY;
-        lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].localPosition.z + correctionLightZ;
+        lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].position.x + correctionLightX;
+        lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].position.y + correctionLightY;
+        lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].position.z + correctionLightZ;
         lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
         lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
         lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights_parser.entries[i].type == 0 ? 0.0f : lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].localRotation.x;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights_parser.entries[i].localRotation.y;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights_parser.entries[i].localRotation.z;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRW] = lights_parser.entries[i].localRotation.w;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].rotation.x;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights_parser.entries[i].rotation.y;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights_parser.entries[i].rotation.z;
+        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRW] = lights_parser.entries[i].rotation.w;
         lights[idx + LIGHT_DATA_OFFSET_R] = lights_parser.entries[i].color.r;
         lights[idx + LIGHT_DATA_OFFSET_G] = lights_parser.entries[i].color.g;
         lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
@@ -1022,3 +1022,57 @@ int LoadLevelLights(uint8_t curlevel) {
     DebugRAM("end of LoadLevelLights");
     return 0;
 }
+
+// int LoadLevelDynamicObjects(uint8_t curleve) {
+//     if (curlevel >= numLevels) { DualLogError("Cannot load level dynamic objects, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+// 
+//     DebugRAM("start of LoadLevelDynamicObjects");
+//     char filename[64];
+//     snprintf(filename, sizeof(filename), "./Data/CitadelScene_geometry_level%d.txt", curlevel);
+//     parser_init(&dynamics_parser, valid_dynamicsdata_keys, NUM_LEVDAT_KEYS);
+//     if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
+// 
+//     int dynamicObjectCount = dynamics_parser.count;
+//     DualLog("Loading %d objects for Level %d...\n",dynamicObjectCount,curlevel);
+//     float correctionX, correctionY, correctionZ;
+//     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
+//     for (int idx=loadedInstances;idx<dynamicObjectCount;++idx) {
+//         loadedInstances++;
+//         int entIdx = dynamics_parser.entries[idx].constIndex;
+//         instances[idx].modelIndex = entities[entIdx].modelIndex;
+//         if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
+//         instances[idx].texIndex = entities[entIdx].texIndex;
+//         instances[idx].glowIndex = entities[entIdx].glowIndex;
+//         instances[idx].specIndex = entities[entIdx].specIndex;
+//         instances[idx].normIndex = entities[entIdx].normIndex;
+//         instances[idx].lodIndex = entities[entIdx].lodIndex;
+//         instances[idx].position.x = dynamics_parser.entries[idx].position.x + correctionX;
+//         instances[idx].position.y = dynamics_parser.entries[idx].position.y + correctionY;
+//         instances[idx].position.z = dynamics_parser.entries[idx].position.z + correctionZ;
+//         instances[idx].rotation.x = dynamics_parser.entries[idx].rotation.x;
+//         instances[idx].rotation.y = dynamics_parser.entries[idx].rotation.y;
+//         instances[idx].rotation.z = dynamics_parser.entries[idx].rotation.z;
+//         instances[idx].rotation.w = dynamics_parser.entries[idx].rotation.w;
+//         instances[idx].scale.x = dynamics_parser.entries[idx].scale.x;
+//         instances[idx].scale.y = dynamics_parser.entries[idx].scale.y;
+//         instances[idx].scale.z = dynamics_parser.entries[idx].scale.z;
+//         if (isDoubleSided(instances[idx].texIndex) || instances[idx].sclx < 0.0f || instances[idx].scly < 0.0f || instances[idx].sclz < 0.0f) {
+//             doubleSidedInstances[doubleSidedInstancesHead] = idx;
+//             doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
+//         }
+// 
+//         if (isTransparent(instances[idx].texIndex)) {
+//             transparentInstances[transparentInstancesHead] = idx;
+//             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
+//         }
+// 
+//         Quaternion quat = {instances[idx].rotx, instances[idx].roty, instances[idx].rotz, instances[idx].rotw};
+//         Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
+//         float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
+//         bool pointsUp = angle <= 30.0f;
+//         instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].posy : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
+//     }
+// 
+//     DebugRAM("end of LoadLevelDynamicObjects");
+//     return 0;
+// }

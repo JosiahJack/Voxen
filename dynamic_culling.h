@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include "render.h"
-#include "instance.h"
+#include "data_parser.h"
 
 #define CELL_VISIBLE       1
 #define CELL_OPEN          2

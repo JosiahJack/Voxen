@@ -6,7 +6,7 @@
 #include "External/stb_image.h"
 #include "dynamic_culling.h"
 #include "render.h"
-#include "instance.h"
+#include "data_parser.h"
 #include "debug.h"
 
 uint8_t gridCellStates[ARRSIZE];
@@ -52,7 +52,7 @@ void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
     for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
-        PosToCellCoords(instances[c].posx, instances[c].posz, &x, &z);
+        PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
         cellIdx = (z * WORLDX) + x;
         cellIndexForInstance[c] = (uint32_t)cellIdx;
         if (instances[c].floorHeight > INVALID_FLOOR_HEIGHT && instances[c].floorHeight > gridCellFloorHeight[cellIdx]) {
@@ -82,59 +82,11 @@ int DetermineClosedEdges() {
     DebugRAM("Start of DetermineClosedEdges");
     size_t maxFileSize = 1000000; // 1MB
     uint8_t* file_buffer = malloc(maxFileSize);
-    char filename[256];
-    sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
-
-    FILE* fp = fopen(filename, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename); return 1; }
-    
-    fseek(fp, 0, SEEK_END);
-    size_t file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); return 1; }
-    
-    fseek(fp, 0, SEEK_SET);
-    size_t read_size = fread(file_buffer, 1, file_size, fp);
-    fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); return 1; }
-
+    FILE* fp;
+    size_t file_size, read_size;
     int wpng, hpng, channels;
-    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
-    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return 1; }
-
-    unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
-    for (int x=0;x<WORLDX;x++) {
-        for (int z=0;z<WORLDZ;z++) {
-            int cellIdx = (z * WORLDX) + x;
-            gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
-            int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
-            int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
-            closedData_r = edgePixels[pixelIdx + 0];
-            closedData_g = edgePixels[pixelIdx + 1];
-            closedData_b = edgePixels[pixelIdx + 2];
-            closedData_a = edgePixels[pixelIdx + 3];
-            if (closedData_r > 127) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH;
-            if (closedData_g > 127) gridCellStates[cellIdx] |= CELL_CLOSEDEAST;
-            if (closedData_b > 127) gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH;
-            if (   (closedData_r < 255 && closedData_r > 0)
-                || (closedData_g < 255 && closedData_g > 0)
-                || (closedData_b < 255 && closedData_b > 0)) {
-                
-                // Anything that has closed west edge will be not at full 255 on at least one channel.
-                // Typical for all other edge conditions is to use full brightness 255 on the channel(s).
-                // All 4 closed would be 128 128 128 but this doesn't ever happen.
-                // None closed is 0 0 0
-                gridCellStates[cellIdx] |= CELL_CLOSEDWEST;
-            }
-            
-            if (closedData_a > 0 && closedData_a < 255) {
-                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST;
-            }
-        }
-    }
     
-    stbi_image_free(edgePixels);
-    malloc_trim(0);
-
+    // ------------------- Open Cells ------------------
     char filename2[256];
     sprintf(filename2,"./Data/worldcellopen_%d.png",currentLevel);
     fp = fopen(filename2, "rb");
@@ -152,6 +104,7 @@ int DetermineClosedEdges() {
 	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); return 1; }
  
     unsigned char openData_r, openData_g, openData_b;
+    uint16_t totalOpenCells = 0;
     for (int x=0;x<WORLDX;++x) {
         for (int z=0;z<WORLDZ;++z) {
             int cellIdx = (z * WORLDX) + x;
@@ -163,16 +116,74 @@ int DetermineClosedEdges() {
             openData_b = openPixels[pixelIdx + 2];
             if (openData_r > 0 || openData_g > 0 || openData_b > 0) {
                 gridCellStates[cellIdx] |= CELL_OPEN;
+                totalOpenCells++;
             } else {
                 gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST; // Also force close the edges for closed cells even if above edges image said tweren't closed edges.
             }
         }
     }
     
+    DualLog("Found %d open cells for level %d\n",totalOpenCells,currentLevel);
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
     stbi_image_free(openPixels);
     malloc_trim(0);
     
+    // ------------------- Closed Edges ------------------    
+    char filename[256];
+    sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
+
+    fp = fopen(filename, "rb");
+    if (!fp) { DualLogError("Failed to open %s\n", filename); return 1; }
+    
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); return 1; }
+    
+    fseek(fp, 0, SEEK_SET);
+    read_size = fread(file_buffer, 1, file_size, fp);
+    fclose(fp);
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); return 1; }
+
+    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return 1; }
+
+    unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
+    uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
+    for (int x=0;x<WORLDX;x++) {
+        for (int z=0;z<WORLDZ;z++) {
+            int cellIdx = (z * WORLDX) + x;
+            gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
+            int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            closedData_r = edgePixels[pixelIdx + 0];
+            closedData_g = edgePixels[pixelIdx + 1];
+            closedData_b = edgePixels[pixelIdx + 2];
+            closedData_a = edgePixels[pixelIdx + 3];
+            if (closedData_r > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDNORTH; closedCountNorth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
+            if (closedData_g > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDEAST; closedCountEast += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
+            if (closedData_b > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH; closedCountSouth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
+            if (   (closedData_r < 255 && closedData_r > 0)
+                || (closedData_g < 255 && closedData_g > 0)
+                || (closedData_b < 255 && closedData_b > 0)) {
+                
+                // Anything that has closed west edge will be not at full 255 on at least one channel.
+                // Typical for all other edge conditions is to use full brightness 255 on the channel(s).
+                // All 4 closed would be 128 128 128 but this doesn't ever happen.
+                // None closed is 0 0 0
+                gridCellStates[cellIdx] |= CELL_CLOSEDWEST; closedCountWest += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0;
+            }
+            
+            if (closedData_a > 0 && closedData_a < 255) {
+                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST;
+            }
+        }
+    }
+    
+    DualLog("Found closed edges north: %d, south: %d, east: %d, west: %d\n",closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
+    stbi_image_free(edgePixels);
+    malloc_trim(0);
+    
+    // ------------------- Sky/Sun Visibility ------------------    
     char filename3[256];
     sprintf(filename3,"./Data/worldcellskyvis_%d.png",currentLevel);
     fp = fopen(filename3, "rb");

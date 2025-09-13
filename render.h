@@ -4,7 +4,7 @@
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
 #include <stdbool.h>
-#include "instance.h"
+#include "data_parser.h"
 
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL

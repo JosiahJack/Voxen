@@ -2,26 +2,6 @@ const char* lightmap_compute_shader =
     "#version 450 core\n"
     "layout(local_size_x = 32, local_size_y = 32) in;\n"
 
-    "struct Instance {\n"
-    "    int modelIndex;\n"
-    "    int texIndex;\n"
-    "    int glowIndex;\n"
-    "    int specIndex;\n"
-    "    int normIndex;\n"
-    "    int lodIndex;\n"
-    "    float posx;\n"
-    "    float posy;\n"
-    "    float posz;\n"
-    "    float sclx;\n"
-    "    float scly;\n"
-    "    float sclz;\n"
-    "    float rotx;\n"
-    "    float roty;\n"
-    "    float rotz;\n"
-    "    float rotw;\n"
-    "    float floorHeight;\n"
-    "};\n"
-
     // binding 0 unusable here, in-out gbuffer for colors (reflections applied as well in separate pass)
     // binding 1 unusable here, unlit raster's gbuffer for world position xyz as rgb (RGBA32F), index into full instances[] array packed into alpha channel
     // binding 2 unusable here, unlit raster's gbuffer for normals xyz half loats packed in rg
@@ -30,7 +10,6 @@ const char* lightmap_compute_shader =
     // binding 5 unused at all, placeholder for possible future gbuffer if needed
     "layout(std430, binding = 6) buffer LightmapData { float lightmapData[]; };\n"
     "layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };\n"
-    "layout(std430, binding = 10) readonly buffer InstancesBuffer { Instance instances[]; };\n"
     "layout(std430, binding = 11) readonly buffer InstancesMatricesBuffer { mat4 instanceMatrices[]; };\n"
     "layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; };\n" // 1D color array (RGBA)
     "layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; };\n" // Starting index in colors for each texture

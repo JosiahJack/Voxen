@@ -17,41 +17,46 @@
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 
+#define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
+
+// Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
 typedef struct {
-    uint8_t levelCount;
-    uint8_t startLevel;
-    uint8_t type;
     bool cardchunk;
     bool doublesided;
-    uint16_t index;
     uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t glowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
-    uint16_t constIndex; // Changed to uint16_t to align with MAX_ENTRIES
-    uint16_t lodIndex; // Model index for LOD to use when far away
-    char path[MAX_PATH];
-    char modname[MAX_PATH]; // Longest game name is 176 characters, so 256 should be aplenty.
-    struct { float x, y, z; } localPosition;
-    struct { float x, y, z, w; } localRotation;
-    struct { float x, y, z; } localScale;
+    uint16_t lodIndex;
+    struct { float x, y, z; } position;
+    struct { float x, y, z, w; } rotation;
+    struct { float x, y, z; } scale;
+    float floorHeight;
     float intensity;
     float range;
     float spotAngle;
     struct { float r, g, b; } color;
-} DataEntry;
+    char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, nice even multiple of 4 bytes
+
+    uint16_t index;
+    uint8_t levelCount;
+    uint8_t startLevel;
+    uint8_t type;
+    char path[MAX_PATH];
+    char modname[MAX_PATH]; // Longest game name is 176 characters, so 256 should be aplenty.
+} Entity;
 
 typedef struct {
-    DataEntry* entries;
+    Entity* entries;
     int count;        // Added to track valid entries
     int capacity;
     const char** valid_keys;
     int num_keys;
 } DataParser;
 
-void init_data_entry(DataEntry *entry);
-bool read_key_value(FILE *file, DataParser *parser, DataEntry *entry, uint32_t *lineNum, bool *is_eof);
+void init_data_entry(Entity *entry);
+bool read_key_value(FILE *file, DataParser *parser, Entity *entry, uint32_t *lineNum, bool *is_eof);
 void parser_init(DataParser *parser, const char **valid_keys, int num_keys);
 bool parse_data_file(DataParser *parser, const char *filename, int type);
 
@@ -74,28 +79,25 @@ extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
 extern uint32_t renderableCount;
+extern uint32_t loadedInstances;
 extern int gameObjectCount;
 
 int LoadModels(void);
 
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
-
-// Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
-typedef struct {
-    uint16_t modelIndex;
-    uint16_t texIndex;
-    uint16_t glowIndex;
-    uint16_t specIndex;
-    uint16_t normIndex;
-    uint16_t lodIndex;
-    bool cardchunk;
-    char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, nice even multiple of 4 bytes
-} Entity;
+#define INSTANCE_COUNT 5800 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects
 
 extern Entity entities[MAX_ENTITIES];
+extern Entity instances[INSTANCE_COUNT];
+extern float modelMatrices[INSTANCE_COUNT * 16];
+extern uint8_t dirtyInstances[INSTANCE_COUNT];
+extern GLuint instancesBuffer;
+extern GLuint matricesBuffer;
+extern int startOfDoubleSidedInstances;
+extern int startOfTransparentInstances;
 
+int SetupInstances(void);
 int LoadEntities(void);
 
 // Levels
