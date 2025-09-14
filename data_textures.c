@@ -13,7 +13,6 @@
 #include "event.h"
 
 // #define DEBUG_TEXTURE_LOAD_DATA 1
-
 #define MAX_PALETTE_SIZE 65535u
 
 DataParser texture_parser;
@@ -29,9 +28,6 @@ uint32_t totalPixels = 0; // Total pixels across all textures
 uint32_t totalPaletteColors = 0; // Total colors across all palettes
 int* textureSizes = NULL; // Needs to be textureCount * 2
 uint16_t textureCount;
-const char* valid_texdata_keys[] = {"index","doublesided"};
-#define NUM_TEX_KEYS 2
-
 bool* doubleSidedTexture = NULL;
 bool* transparentTexture = NULL;
 
@@ -50,7 +46,7 @@ int LoadTextures(void) {
     textureCount = 0u;
     
     // First parse ./Data/textures.txt to see what textures to load to what indices
-    parser_init(&texture_parser, valid_texdata_keys, NUM_TEX_KEYS);
+    parser_init(&texture_parser);
     if (!parse_data_file(&texture_parser, "./Data/textures.txt",0)) { DualLogError("Could not parse ./Data/textures.txt!\n"); return 1; }
     
     int maxIndex = -1;

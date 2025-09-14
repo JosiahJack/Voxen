@@ -14,7 +14,7 @@ const char* deferredLighting_computeShader =
     "layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };\n"
     "layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };\n"
     "layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };\n"
-    "layout(std430, binding = 28) buffer LightShadowAngleDistsList { float lightShadowAngleDistsList[]; };\n"
+//     "layout(std430, binding = 28) buffer LightShadowAngleDistsList { float lightShadowAngleDistsList[]; };\n"
     
     "uniform uint totalLuxelCount;\n"
     "uniform uint screenWidth;\n"

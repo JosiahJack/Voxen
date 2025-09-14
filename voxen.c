@@ -1377,19 +1377,30 @@ int InitializeEnvironment(void) {
     // Load Game/Mod Definition
     const char* filename = "./Data/gamedata.txt";
     DualLog("Loading game definition from %s...",filename);    
-    DataParser gamedata_parser;
     Entity entry;
     init_data_entry(&entry);
-    gamedata_parser.entries = &entry;
-    gamedata_parser.valid_keys = valid_gamedata_keys;
-    gamedata_parser.num_keys = NUM_GAMDAT_KEYS;
     FILE *gamedatfile = fopen(filename, "r");
     if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); return 1; }
     
     uint32_t lineNum = 0;
     bool is_eof;
     while (!feof(gamedatfile)) {
-        read_key_value(gamedatfile,&gamedata_parser, &entry, &lineNum, &is_eof);
+        char token[1024];
+        bool is_comment, is_newline;
+        if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
+            if (is_comment || is_newline) {
+                if (is_newline) lineNum += 1;
+                continue;
+            }
+        }
+        
+        char key[256];
+        strncpy(key, token, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+        if (!read_token(gamedatfile, token, sizeof(token), '\n', &is_comment, &is_eof, &is_newline, &lineNum)) continue;
+        
+        process_key_value(&entry, key, token, key, lineNum);
+        lineNum += 1;
     }
     
     fclose(gamedatfile);
@@ -1413,8 +1424,8 @@ int InitializeEnvironment(void) {
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
     RenderLoadingProgress(55,"Loading lighting data...");
     if (LoadLevelLights(currentLevel)) return 1;
-//     RenderLoadingProgress(52,"Loading dynamic object data...");
-//     if (LoadLevelDynamicObjects(currentLevel)) return 1;
+    RenderLoadingProgress(52,"Loading dynamic object data...");
+    if (LoadLevelDynamicObjects(currentLevel)) return 1;
     RenderLoadingProgress(52,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level!
     RenderLoadingProgress(70,"Loading voxel lighting data...");

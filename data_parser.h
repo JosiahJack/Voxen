@@ -43,21 +43,24 @@ typedef struct {
     uint8_t levelCount;
     uint8_t startLevel;
     uint8_t type;
+    bool active;
+    uint8_t saveableType;
     char path[MAX_PATH];
     char modname[MAX_PATH]; // Longest game name is 176 characters, so 256 should be aplenty.
 } Entity;
+
+#define ENTITY_FIELD_COUNT 33
 
 typedef struct {
     Entity* entries;
     int count;        // Added to track valid entries
     int capacity;
-    const char** valid_keys;
-    int num_keys;
 } DataParser;
 
 void init_data_entry(Entity *entry);
-bool read_key_value(FILE *file, DataParser *parser, Entity *entry, uint32_t *lineNum, bool *is_eof);
-void parser_init(DataParser *parser, const char **valid_keys, int num_keys);
+bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum);
+bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum);
+void parser_init(DataParser *parser);
 bool parse_data_file(DataParser *parser, const char *filename, int type);
 
 // Textures
@@ -107,5 +110,6 @@ extern uint8_t numLevels; // Can be set by gamedata.txt
 int LoadLevels();
 int LoadLevelGeometry(uint8_t curlevel);
 int LoadLevelLights(uint8_t curlevel);
+int LoadLevelDynamicObjects(uint8_t curlevel);
 
 #endif // VOXEN_DATA_PARSER_H
