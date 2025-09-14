@@ -791,41 +791,6 @@ void RenderLoadingProgress(int offset, const char* format, ...) {
     RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
     SDL_GL_SwapWindow(window);
 }
-
-int SetupInstances(void) {
-    DualLog("Initializing instances...\n");
-    int idx;
-    RenderLoadingProgress(65,"Initializing instances...");
-    for (idx = 0;idx<INSTANCE_COUNT;idx++) {
-        instances[idx].modelIndex = 1024u;
-        instances[idx].texIndex = UINT16_MAX;
-        instances[idx].glowIndex = 2048u;
-        instances[idx].specIndex = 2048u;
-        instances[idx].normIndex = 2048u;
-        instances[idx].lodIndex = UINT16_MAX;
-        instances[idx].cardchunk = false;
-        instances[idx].position.x = instances[idx].position.y = instances[idx].position.z = 0.0f;
-        instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
-        instances[idx].rotation.x = instances[idx].rotation.y = instances[idx].rotation.z = 0.0f; instances[idx].rotation.w = 1.0f; // Quaternion identity
-        instances[idx].floorHeight = INVALID_FLOOR_HEIGHT;
-        instances[idx].intensity = 0.0f;
-        instances[idx].range = 0.0f;
-        instances[idx].spotAngle = 0.0f;
-        instances[idx].color.r = 0.0f;
-        instances[idx].color.g = 0.0f;
-        instances[idx].color.b = 0.0f;
-        snprintf(instances[idx].name, ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1,"init");
-        dirtyInstances[idx] = true;
-    }
-
-    memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    glGenBuffers(1, &matricesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
-    DebugRAM("end of SetupInstances");
-    return 0;
-}
 // ============================================================================
 
 typedef enum {
@@ -1011,7 +976,6 @@ int VoxelLists() {
     glFinish();
     CHECK_GL_ERROR();    
     malloc_trim(0);
-    DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     
     // ----------------------------------------------------------------------------------------------------------------
     // List of shadow edges per light as count,angle,dist,angle,dist,angle,dist,angle,dist,count,angle,dist,count,count,angle,dist,angle,dist, etc. e.g. for counts of 4, 1, 0, and 2 respectively.
@@ -1161,7 +1125,6 @@ int VoxelLists() {
     CHECK_GL_ERROR();
     malloc_trim(0);
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
-    DebugRAM("end of voxel light lists");
     return 0;
 }
 
@@ -1189,6 +1152,7 @@ int VoxelLists() {
 // }
 
 int InitializeEnvironment(void) {
+    double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");
     if (SDL_Init(SDL_INIT_VIDEO) < 0) { DualLogError("SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
     systemInitialized[SYS_SDL] = true;
@@ -1411,13 +1375,12 @@ int InitializeEnvironment(void) {
     currentLevel = startLevel;
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
     RenderLoadingProgress(52,"Loading textures...");
+    DualLog("Window and GL Init took %f seconds\n", get_time() - init_start_time);
     if (LoadTextures()) return 1;
     RenderLoadingProgress(50,"Loading models...");
     if (LoadModels()) return 1;
     RenderLoadingProgress(52,"Loading entities...");
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
-    RenderLoadingProgress(65,"Loading instances data...");
-    if (SetupInstances()) return 1;
     RenderLoadingProgress(50,"Loading level data...");
     renderableCount = 0;
     loadedInstances = 0;
@@ -1431,7 +1394,6 @@ int InitializeEnvironment(void) {
     RenderLoadingProgress(70,"Loading voxel lighting data...");
     if (VoxelLists()) return 1;
 //     if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
-    malloc_trim(0);
     DebugRAM("InitializeEnvironment end");
     return 0;
 }

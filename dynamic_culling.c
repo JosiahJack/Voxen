@@ -8,6 +8,7 @@
 #include "render.h"
 #include "data_parser.h"
 #include "debug.h"
+#include "event.h"
 
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
@@ -630,6 +631,8 @@ void DetermineVisibleCells(int startX, int startZ) {
 }
 
 int Cull_Init(void) {
+    double start_time = get_time();    
+    DualLog("Culling...\n");
     DebugRAM("start of Cull_Init");    
     switch(currentLevel) {
         case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
@@ -720,6 +723,7 @@ int Cull_Init(void) {
 
     CHECK_GL_ERROR();
     malloc_trim(0);
+    DualLog("Culling took %f seconds\n", get_time() - start_time);
     DebugRAM("end of Cull_Init");
     return 0;
 }

@@ -168,10 +168,8 @@ void allocate_entries(DataParser *parser, int entry_count) {
 }
 
 bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
-    if (!key || !value) {
-        DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line);
-        return false;
-    }
+    if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
+    
     while (isspace((unsigned char)*key)) key++;
     while (isspace((unsigned char)*value)) value++;
     char trimmed_key[256];
@@ -425,7 +423,7 @@ int LoadModels(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
-    DualLog("Loading %d models with max index of %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
+    DualLog("Loading  %d   models with max index  %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
     int totalVertCount = 0;
     int totalBounds = 0;
     int totalTriCount = 0;
@@ -629,8 +627,7 @@ int LoadModels(void) {
     glFlush();
     glFinish();
     malloc_trim(0);
-    double end_time = get_time();
-    DualLog(" took %f seconds\n", end_time - start_time);
+    DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
     return 0;
 }
@@ -664,7 +661,7 @@ int LoadEntities(void) {
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); return 1; }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); return 1; }
 
-    DualLog("Parsing %d entities...", entityCount);
+    DualLog("Loading  %d entities...", entityCount);
 
     // Populate entities array
     for (int i = 0; i < entityCount; i++) {
@@ -692,8 +689,7 @@ int LoadEntities(void) {
         entities[i].floorHeight = INVALID_FLOOR_HEIGHT;
     }
 
-    double end_time = get_time();
-    DualLog(" took %f seconds\n", end_time - start_time);
+    DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("after loading all entities");
     return 0;
 }
@@ -717,28 +713,6 @@ void GetLevel_Transform_Offsets(int curlevel, float* ofsx, float* ofsy, float* o
         case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
         case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
         case 13: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_DynamicObjectsSaveableInstantiated_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DynamicObjectsSaveableInstantiated
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.84f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.07f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.04f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.16f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.08f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.32f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.2f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -887,6 +861,39 @@ float quat_angle_deg(Quaternion a, Quaternion b) {
 
 //----------------------------------- Level -----------------------------------
 int LoadLevelGeometry(uint8_t curlevel) {
+    double start_time = get_time();
+    
+    // Initialize instances
+    int idx;
+    RenderLoadingProgress(65,"Initializing instances...");
+    for (idx = 0;idx<INSTANCE_COUNT;idx++) {
+        instances[idx].modelIndex = 1024u;
+        instances[idx].texIndex = UINT16_MAX;
+        instances[idx].glowIndex = 2048u;
+        instances[idx].specIndex = 2048u;
+        instances[idx].normIndex = 2048u;
+        instances[idx].lodIndex = UINT16_MAX;
+        instances[idx].cardchunk = false;
+        instances[idx].position.x = instances[idx].position.y = instances[idx].position.z = 0.0f;
+        instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
+        instances[idx].rotation.x = instances[idx].rotation.y = instances[idx].rotation.z = 0.0f; instances[idx].rotation.w = 1.0f; // Quaternion identity
+        instances[idx].floorHeight = INVALID_FLOOR_HEIGHT;
+        instances[idx].intensity = 0.0f;
+        instances[idx].range = 0.0f;
+        instances[idx].spotAngle = 0.0f;
+        instances[idx].color.r = 0.0f;
+        instances[idx].color.g = 0.0f;
+        instances[idx].color.b = 0.0f;
+        snprintf(instances[idx].name, ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1,"init");
+        dirtyInstances[idx] = true;
+    }
+
+    memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    glGenBuffers(1, &matricesBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+    DebugRAM("end of SetupInstances");
     if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
     DebugRAM("start of LoadLevelGeometry");
@@ -896,7 +903,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
     if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
     int gameObjectCount = level_parser.count;
-    DualLog("Loading %d objects for Level %d...\n",gameObjectCount,curlevel);
+    DualLog("Loading %d geometry chunks for Level %d...",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
     for (int idx=0;idx<gameObjectCount;++idx) {
@@ -978,11 +985,13 @@ int LoadLevelGeometry(uint8_t curlevel) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, renderableCount * 64 * 64 * 4 * sizeof(float), NULL, GL_DYNAMIC_DRAW); // 256x256 lightmap per model, 4 channel rgba, HDR float
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightmapID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("end of LoadLevelGeometry");
     return 0;
 }
 
 int LoadLevelLights(uint8_t curlevel) {
+    double start_time = get_time();
     if (curlevel >= numLevels) { DualLogError("Cannot load level lights, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
     DebugRAM("start of LoadLevelLights");
@@ -992,7 +1001,7 @@ int LoadLevelLights(uint8_t curlevel) {
     if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
     int lightsCount = lights_parser.count;
-    DualLog("Loading %d lights for Level %d...\n",lightsCount,curlevel);
+    DualLog("Loading  %d   lights for Level %d...",lightsCount,curlevel);
     float correctionLightX, correctionLightY, correctionLightZ;
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
     for (int i=0;i<lightsCount;++i) {
@@ -1011,12 +1020,14 @@ int LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_G] = lights_parser.entries[i].color.g;
         lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
     }
-
+    
+    DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("end of LoadLevelLights");
     return 0;
 }
 
 int LoadLevelDynamicObjects(uint8_t curlevel) {
+    double start_time = get_time();
     if (curlevel >= numLevels) { DualLogError("Cannot load level dynamic objects, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
     DebugRAM("start of LoadLevelDynamicObjects");
@@ -1026,7 +1037,7 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
     if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
     int dynamicObjectCount = dynamics_parser.count;
-    DualLog("Loading %d dynamic objects for Level %d...\n",dynamicObjectCount,curlevel);
+    DualLog("Loading  %d  dynamic objects for Level %d...",dynamicObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
     int startingIdx = (int)loadedInstances;
@@ -1053,6 +1064,7 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
         }
     }
 
+    DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("end of LoadLevelDynamicObjects");
     return 0;
 }
