@@ -76,7 +76,6 @@ int LoadTextures(void) {
     totalPaletteColors = 0;
     uint32_t totalPaletteColorsExtraSized = 170172; // Actual for Citadel is 170172
     struct stat file_stat;
-    size_t fileSizes[textureCount];
     uint32_t pixel_offset = 0;
     uint32_t palette_offset = 0;
     uint32_t maxPalletSize = 0;
@@ -101,26 +100,31 @@ int LoadTextures(void) {
     ColorEntry *color_pool = malloc(textureCount * MAX_PALETTE_SIZE * sizeof(ColorEntry));
     uint32_t *pool_indices = malloc(textureCount * sizeof(uint32_t));
     memset(pool_indices, 0, textureCount * sizeof(uint32_t));
+    
+    int matched_indices[textureCount];
+    for (int i = 0; i < textureCount; i++) matched_indices[i] = -1;
+    for (int k = 0; k < texture_parser.count; k++) {
+        if (texture_parser.entries[k].index < textureCount) {
+            matched_indices[texture_parser.entries[k].index] = k;
+        }
+    }
+    
     for (int i = 0; i < textureCount; i++) {
 //         RenderLoadingProgress(105,"Loading textures [%d of %d]...",i,textureCount);
         textureOffsets[i] = totalPixels;
         texturePaletteOffsets[i] = totalPaletteColors;
-        int matchedParserIdx = -1;
-        for (int k=0;k<texture_parser.count;k++) {
-            if (texture_parser.entries[k].index == i) {matchedParserIdx = k; break; }
-        }
-        
+        int matchedParserIdx = matched_indices[i];
         if (matchedParserIdx < 0) continue;
         if (stat(texture_parser.entries[matchedParserIdx].path, &file_stat) != 0) { DualLogError("Failed to stat %s: %s\n", texture_parser.entries[matchedParserIdx].path, strerror(errno)); return 1; }
 
-        fileSizes[i] = file_stat.st_size;
-        if (fileSizes[i] > maxFileSize) { DualLogError("\nPNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdx].path, fileSizes[i]); return 1; }
+        size_t file_size = file_stat.st_size;
+        if (file_size > maxFileSize) { DualLogError("\nPNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdx].path, file_size); return 1; }
         
         FILE* fp = fopen(texture_parser.entries[matchedParserIdx].path, "rb");
-        fread(file_buffer, 1, fileSizes[i], fp);
+        fread(file_buffer, 1, file_size, fp);
         fclose(fp);
         int width, height, channels;
-        unsigned char* image_data = stbi_load_from_memory(file_buffer, fileSizes[i], &width, &height, &channels, STBI_rgb_alpha);
+        unsigned char* image_data = stbi_load_from_memory(file_buffer, file_size, &width, &height, &channels, STBI_rgb_alpha);
         if (!image_data) { DualLogError("\nstbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdx].path, stbi_failure_reason()); return 1; }
         
         doubleSidedTexture[i] = texture_parser.entries[matchedParserIdx].doublesided;
