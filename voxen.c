@@ -1748,7 +1748,9 @@ int main(int argc, char* argv[]) {
         memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         float distSqrd = 0.0f;
         float lodRangeSqrd = 38.4f * 38.4f;
+        #pragma omp parallel for
         for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
+            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
 
             distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
@@ -1797,7 +1799,6 @@ int main(int argc, char* argv[]) {
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
             if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
             
-            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
             glowdex = glowdex >= 2048 ? 41 : glowdex;
