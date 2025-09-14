@@ -110,7 +110,7 @@ int LoadTextures(void) {
     }
     
     for (int i = 0; i < textureCount; i++) {
-//         RenderLoadingProgress(105,"Loading textures [%d of %d]...",i,textureCount);
+//         if (i % 50 == 0 || i == textureCount - 1) RenderLoadingProgress(105,"Loading textures [%d of %d]...",i,textureCount);
         textureOffsets[i] = totalPixels;
         texturePaletteOffsets[i] = totalPaletteColors;
         int matchedParserIdx = matched_indices[i];
