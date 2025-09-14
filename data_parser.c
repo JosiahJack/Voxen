@@ -417,39 +417,28 @@ int LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
     parser_init(&model_parser);
-    if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) {
-        DualLogError("Could not parse ./Data/models.txt!\n");
-        return 1;
-    }
+    if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) { DualLogError("Could not parse ./Data/models.txt!\n"); return 1; }
 
     int maxIndex = -1;
     for (int k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX)
-            maxIndex = model_parser.entries[k].index;
+        if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
     DualLog("Loading %d models with max index %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
-
     int totalVertCount = 0;
     int totalBounds = 0;
     int totalTriCount = 0;
     uint32_t largestVertCount = 0;
     uint32_t largestTriangleCount = 0;
-
-    // Allocate shared arrays
     uint32_t* vertexOffsets = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
     uint32_t* triangleOffsets = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
     memset(vertexOffsets, 0, MODEL_COUNT * sizeof(uint32_t));
     memset(triangleOffsets, 0, MODEL_COUNT * sizeof(uint32_t));
-
-    // Per-model vertex and triangle data (temporary storage for parallel phase)
     float** modelVertices = (float**)malloc(MODEL_COUNT * sizeof(float*));
     uint32_t** modelTriangles = (uint32_t**)malloc(MODEL_COUNT * sizeof(uint32_t*));
     uint32_t* vertexCounts = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
     uint32_t* triCounts = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
     float* modelBoundsLocal = (float*)malloc(MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
-
-    // Initialize staging buffers
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
@@ -457,7 +446,6 @@ int LoadModels(void) {
     glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-
     uint32_t currentVertexOffset = 0;
     uint32_t currentTriangleOffset = 0;
 
@@ -494,12 +482,7 @@ int LoadModels(void) {
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-
-            const struct aiScene* scene = aiImportFileExWithProperties(
-                model_parser.entries[matchedParserIdx].path,
-                aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_ImproveCacheLocality,
-                NULL, props);
-
+            const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
             if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
                 #pragma omp critical
                 DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); continue;
@@ -590,7 +573,6 @@ int LoadModels(void) {
 
             aiReleaseImport(scene);
             aiReleasePropertyStore(props);
-            malloc_trim(0);
         }
 
         free(tempVertices);
@@ -902,7 +884,6 @@ int LoadLevelGeometry(uint8_t curlevel) {
     
     // Initialize instances
     int idx;
-    RenderLoadingProgress(65,"Initializing instances...");
     for (idx = 0;idx<INSTANCE_COUNT;idx++) {
         instances[idx].modelIndex = 1024u;
         instances[idx].texIndex = UINT16_MAX;
@@ -1079,7 +1060,6 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
     int startingIdx = (int)loadedInstances;
     for (int idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
-        RenderLoadingProgress(100,"Loading dynamic object [%d of %d]...",i,dynamicObjectCount);
         loadedInstances++;
         int entIdx = dynamics_parser.entries[i].index;
         if (entIdx >= MAX_ENTITIES) {DualLogError("Entity index when loading dynamic object %d was %d, exceeds max entity count of %d\n",(idx - startingIdx),entIdx,MAX_ENTITIES); continue; }

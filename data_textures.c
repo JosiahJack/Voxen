@@ -68,10 +68,8 @@ int LoadTextures(void) {
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
     doubleSidedTexture = malloc(textureCount * sizeof(bool));
     transparentTexture = malloc(textureCount * sizeof(bool));
-    size_t maxFileSize = 3000000; // 3MB
+    size_t maxFileSize = 3000000; // 3MB, largest file size is 2757863
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
-
-    // First Pass: Calculate total pixels and offsets
     totalPixels = 0;
     totalPaletteColors = 0;
     uint32_t totalPaletteColorsExtraSized = 170172; // Actual for Citadel is 170172

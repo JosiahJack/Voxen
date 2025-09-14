@@ -838,36 +838,30 @@ int VoxelLists() {
     double start_time = get_time();
     uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     uint32_t* voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
+    memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
     const float startX = worldMin_x + (VOXEL_SIZE * 0.5f);
     const float startZ = worldMin_z + (VOXEL_SIZE * 0.5f);
-    memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
     float rangeSquared[LIGHT_COUNT]; // Precompute light ranges
     for (int i = 0; i < LIGHT_COUNT; ++i) {
         rangeSquared[i] = lights[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_RANGE];
         rangeSquared[i] *= rangeSquared[i];
     }
 
-    // Step 1: Count lights per voxel to precompute total size
+    // Precompute total size
     uint32_t totalLightAssignments = 0;
     for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = sqrtf(rangeSquared[lightIdx]);
-
-        // Calculate affected cell range (2.56x2.56 cells)
         int minCellX = (int)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
         int maxCellX = (int)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
         int minCellZ = (int)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
         int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
-
-        // Clamp to grid bounds (64x64 cells)
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
         maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
-
-        // Count lights per voxel
         for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * 64 + cellX;
@@ -888,13 +882,9 @@ int VoxelLists() {
         }
     }
 
-    // Check if buffer is sufficient
-    if (totalLightAssignments > VOXEL_COUNT * 4) {
-        DualLogError("Total light assignments (%u) exceed voxelLightListsRaw capacity (%u)\n", totalLightAssignments, VOXEL_COUNT * 4);
-        return 1;
-    }
+    if (totalLightAssignments > VOXEL_COUNT * 4) { DualLogError("Total light assignments (%u) exceed voxelLightListsRaw capacity (%u)\n", totalLightAssignments, VOXEL_COUNT * 4); return 1; }
 
-    // Step 2: Assign offsets and populate voxelLightListsRaw
+    // Assign offsets and populate voxelLightListsRaw
     uint32_t head = 0;
     for (uint32_t idx = 0; idx < VOXEL_COUNT; ++idx) {
         if (voxelLightListIndices[idx * 2 + 1] > 0) {
@@ -905,27 +895,21 @@ int VoxelLists() {
         }
     }
 
-    // Step 3: Assign light indices to voxelLightListsRaw
+    // Assign light indices to voxelLightListsRaw
     uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
     for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = sqrtf(rangeSquared[lightIdx]);
-
-        // Calculate affected cell range
         int minCellX = (int)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
         int maxCellX = (int)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
         int minCellZ = (int)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
         int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
-
-        // Clamp to grid bounds
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
         maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
-
-        // Assign light to affected voxels
         for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * 64 + cellX;
@@ -947,7 +931,6 @@ int VoxelLists() {
         }
     }
 
-    // Upload to GPU
     GLuint voxelLightListIndicesID;
     glGenBuffers(1, &voxelLightListIndicesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxelLightListIndicesID);
@@ -963,10 +946,10 @@ int VoxelLists() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     free(voxelLightListsRaw);
 
-    // Update lights and instances
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
+    
     for (uint16_t i = 0; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
@@ -975,154 +958,6 @@ int VoxelLists() {
     glFlush();
     glFinish();
     CHECK_GL_ERROR();    
-    malloc_trim(0);
-    
-    // ----------------------------------------------------------------------------------------------------------------
-    // List of shadow edges per light as count,angle,dist,angle,dist,angle,dist,angle,dist,count,angle,dist,count,count,angle,dist,angle,dist, etc. e.g. for counts of 4, 1, 0, and 2 respectively.
-    // Count is number of shadow edges this light has in range.
-    // Angle is the angle relative to 0rad from top view for the shadow edge in the xz plane as rotated in standard positive radians only
-    // Dist is the squared distance from the point light's origin to the shadow edge, in xz plane.
-//     size_t lightShadowBufferSize = LIGHT_COUNT * SHADOW_ANGLE_DEG_BINS * sizeof(float);
-//     float* lightShadowAngleDistsList = malloc(lightShadowBufferSize); // Safe estimate of 36 points per light + count
-// 
-//     uint32_t shadowEdgesTotal = 0;
-//     uint32_t shadEdgeCountMax = (WORLDX + 1) * (WORLDX + 1);
-//     float* shadowEdges = malloc(shadEdgeCountMax * 2 * sizeof(float));
-// 
-//     head = 0;
-//     for (int z=0;z<WORLDZ + 1;++z) { // Iterate over corners between cells
-//         for (int x=0;x<WORLDX + 1;++x) { // not the cells themselves
-//             if (x == 0 || x >= 64) continue; // Skip all corners for the rows and columns around the edges of the world, don't care as there is nothing out there. 
-//             if (z == 0 || z >= 64) continue; // Saves on having to bounds check anything below.
-//             
-//             int cellIdxNW = ((z - 1) * WORLDX) + (x - 1); // [X][ ] Top left cell relative to the center point of 4 cells
-//                                                           // [ ][ ]
-//             
-//             int cellIdxNE = ((z - 1) * WORLDX) + (x);     // [ ][X] Top right cell relative to the center point of 4 cells
-//                                                           // [ ][ ]
-//             
-//             int cellIdxSE = ((z) * WORLDX) + (x);         // [ ][ ] Bottom right cell relative to the center point of 4 cells
-//                                                           // [ ][X]
-//             
-//             int cellIdxSW = ((z) * WORLDX) + (x - 1);     // [ ][ ] Bottom left cell relative to the center point of 4 cells
-//                                                           // [X][ ]
-//             
-//             bool openNW = (gridCellStates[cellIdxNW] & CELL_OPEN); 
-//             bool openNE = (gridCellStates[cellIdxNE] & CELL_OPEN); 
-//             bool openSE = (gridCellStates[cellIdxSE] & CELL_OPEN); 
-//             bool openSW = (gridCellStates[cellIdxSW] & CELL_OPEN); 
-//             if (!openNW && !openNE && !openSE && !openSW) continue; // Must have an open space somewhere to make a shadow!
-//             if (openNW && openNE && openSE && openSW) continue; // Must have at least one wall somewhere to make a shadow!
-//             
-//             shadowEdges[head * 2 + 0] = worldMin_x + (WORLDCELL_WIDTH_F * x); // X position in world space
-//             shadowEdges[head * 2 + 1] = worldMin_z + (WORLDCELL_WIDTH_F * z); // Z position in world space
-//             head++;
-//             shadowEdgesTotal++;
-//         }
-//     }
-//     
-//     DualLog("Found %d shadow edges for shadow data from world cell grid states\n",shadowEdgesTotal);
-// 
-//     for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
-//         uint16_t lightIdx = i * LIGHT_DATA_SIZE;
-//         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
-//         float rangeSq = range * range;
-//         for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
-//             lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq; // Set all slots for all lights to have lights range * range.
-//         }
-//     }
-//     
-//     for (uint16_t i = 0; i < LIGHT_COUNT; ++i) {
-//         uint16_t lightIdx = i * LIGHT_DATA_SIZE;
-//         float litX = lights[lightIdx + LIGHT_DATA_OFFSET_POSX];
-//         float litZ = lights[lightIdx + LIGHT_DATA_OFFSET_POSZ];
-//         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
-//         float rangeSq = range * range;
-// 
-//         // Initialize all slots to rangeSq
-//         for (int slot = 0; slot < SHADOW_ANGLE_DEG_BINS; ++slot) {
-//             lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = rangeSq;
-//         }
-// 
-//         ShadowEdge* edges = malloc(shadowEdgesTotal * sizeof(ShadowEdge));
-//         uint32_t edgeCount = 0;
-// 
-//         for (uint32_t shadowEdgeIdx = 0; shadowEdgeIdx < shadowEdgesTotal; ++shadowEdgeIdx) {
-//             float shadX = shadowEdges[(shadowEdgeIdx * 2) + 0];
-//             float shadZ = shadowEdges[(shadowEdgeIdx * 2) + 1];
-//             float distToEdgeFromLight = squareDistance2D(litX, litZ, shadX, shadZ);
-//             if (distToEdgeFromLight >= rangeSq) continue;
-// 
-//             float angle = atan2f(shadZ - litZ, shadX - litX);
-//             if (angle < 0.0f) angle += 2.0f * M_PI;
-//             edges[edgeCount].angle = angle;
-//             edges[edgeCount].distSq = distToEdgeFromLight;
-//             DualLog("Light %d has shadow distance %f at degree slot %d\n", i, sqrt(distToEdgeFromLight), (uint16_t)rad2deg(angle) % SHADOW_ANGLE_DEG_BINS);
-//             edgeCount++;
-//         }
-// 
-//         // Sort edges by angle
-//         qsort(edges, edgeCount, sizeof(ShadowEdge), compareShadowEdges);
-// 
-//         // Fill slots between consecutive edges
-//         for (uint32_t j = 0; j < edgeCount; ++j) {
-//             uint32_t next = (j + 1) % edgeCount; // Handle wraparound
-//             float angleStart = edges[j].angle;
-//             float angleEnd = edges[next].angle;
-//             float distStart = edges[j].distSq;
-//             float distEnd = edges[next].distSq;
-// 
-//             // Handle wraparound case
-//             if (angleEnd < angleStart) angleEnd += 2.0f * M_PI;
-// 
-//             int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
-//             int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
-// 
-//             // Number of slots to fill
-//             int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
-//             if (slotCount <= 0) continue;
-// 
-//             // Linearly interpolate distances
-//             for (int k = 0; k < slotCount; ++k) {
-//                 int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
-//                 float t = (float)k / (float)slotCount;
-//                 float interpolatedDist = distStart + t * (distEnd - distStart);
-//                 lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
-//             }
-//         }
-// 
-//         // Handle wraparound for the last-to-first edge
-//         if (edgeCount > 0) {
-//             float angleStart = edges[edgeCount - 1].angle;
-//             float angleEnd = edges[0].angle + 2.0f * M_PI; // Wrap to next cycle
-//             float distStart = edges[edgeCount - 1].distSq;
-//             float distEnd = edges[0].distSq;
-// 
-//             int slotStart = (uint16_t)rad2deg(angleStart) % SHADOW_ANGLE_DEG_BINS;
-//             int slotEnd = (uint16_t)rad2deg(angleEnd) % SHADOW_ANGLE_DEG_BINS;
-// 
-//             int slotCount = (slotEnd >= slotStart) ? (slotEnd - slotStart + 1) : (slotEnd + SHADOW_ANGLE_DEG_BINS - slotStart + 1);
-//             for (int k = 0; k < slotCount; ++k) {
-//                 int slot = (slotStart + k) % SHADOW_ANGLE_DEG_BINS;
-//                 float t = (float)k / (float)slotCount;
-//                 float interpolatedDist = distStart + t * (distEnd - distStart);
-//                 lightShadowAngleDistsList[i * SHADOW_ANGLE_DEG_BINS + slot] = interpolatedDist;
-//             }
-//         }
-// 
-//         free(edges);
-//     }
-//     
-//     free(shadowEdges);
-//     
-//     GLuint lightShadowEdgeBufferID;
-//     glGenBuffers(1, &lightShadowEdgeBufferID);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightShadowEdgeBufferID);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, lightShadowBufferSize, lightShadowAngleDistsList, GL_STATIC_DRAW);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 28, lightShadowEdgeBufferID);
-//     free(lightShadowAngleDistsList);
-
-    CHECK_GL_ERROR();
     malloc_trim(0);
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     return 0;
@@ -1154,19 +989,10 @@ int VoxelLists() {
 int InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) { DualLogError("SDL_Init failed: %s\n", SDL_GetError()); return SYS_SDL + 1; }
-    systemInitialized[SYS_SDL] = true;
-    DebugRAM("SDL init");
-
     if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     systemInitialized[SYS_TTF] = true;
     DebugRAM("TTF init");
-
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
     systemInitialized[SYS_WIN] = true;
@@ -1805,173 +1631,6 @@ int main(int argc, char* argv[]) {
 
     globalFrameNum = 0;
     activeLogFile = 0;
-    DebugRAM("prior to static buffer touches"); // Ensure pages faulted up front for stable RAM usage and contiguous block for static arrays.
-    volatile void* touchingPointer = (volatile void*)instances;
-    size_t bufferSize = INSTANCE_COUNT * sizeof(Entity);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for instances[%zu bytes]\n",bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-    
-    touchingPointer = (volatile void*)modelMatrices;  // Adjacent to instances
-    bufferSize = INSTANCE_COUNT * 16 * sizeof(float);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for modelMatrices[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-    
-    touchingPointer = (volatile void*)dirtyInstances;
-    bufferSize = INSTANCE_COUNT * sizeof(uint8_t);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for dirtyInstances[%zu bytes]\n",bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-    
-    touchingPointer = (volatile void*)doubleSidedInstances;
-    bufferSize = INSTANCE_COUNT * sizeof(uint16_t);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for doubleSidedInstances[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)transparentInstances;
-    bufferSize = INSTANCE_COUNT * sizeof(uint16_t);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for transparentInstances[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    // Keys and events
-    touchingPointer = (volatile void*)keys;
-    bufferSize = sizeof(keys);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for keys[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)eventQueue;
-    bufferSize = sizeof(eventQueue);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for eventQueue[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)eventJournal;
-    bufferSize = sizeof(eventJournal);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for eventJournal[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    // Grid/cull (big one: visibility table)
-    touchingPointer = (volatile void*)gridCellStates;
-    bufferSize = ARRSIZE * sizeof(uint8_t);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for gridCellStates[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)gridCellFloorHeight;
-    bufferSize = ARRSIZE * sizeof(float);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for gridCellFloorHeight[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, INVALID_FLOOR_HEIGHT, bufferSize);
-
-    // Visibility: Sequential loop for bool array (avoids opt issues with memset)
-    touchingPointer = (volatile void*)precomputedVisibleCellsFromHere;
-    bufferSize = 524288 * sizeof(uint32_t);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for precomputedVisibleCellsFromHere[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    // Model data
-    touchingPointer = (volatile void*)modelVertexCounts;
-    bufferSize = sizeof(modelVertexCounts);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for modelVertexCounts[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)modelTriangleCounts;
-    bufferSize = sizeof(modelTriangleCounts);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for modelTriangleCounts[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)vbos;
-    bufferSize = sizeof(vbos);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for vbos[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)tbos;
-    bufferSize = sizeof(tbos);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for tbos[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)modelBounds;
-    bufferSize = sizeof(modelBounds);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for modelBounds[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    // Projections, text, mappings (small)
-    touchingPointer = (volatile void*)uiOrthoProjection;
-    bufferSize = sizeof(uiOrthoProjection);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for uiOrthoProjection[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)rasterPerspectiveProjection;
-    bufferSize = sizeof(rasterPerspectiveProjection);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for rasterPerspectiveProjection[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)uiTextBuffer;
-    bufferSize = sizeof(uiTextBuffer);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for uiTextBuffer[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)mp3_sounds;
-    bufferSize = sizeof(mp3_sounds);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for mp3_sounds[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)wav_sounds;
-    bufferSize = sizeof(wav_sounds);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for wav_sounds[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)cellIndexForInstance;
-    bufferSize = sizeof(cellIndexForInstance);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for cellIndexForInstance[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-
-    touchingPointer = (volatile void*)cellIndexForLight;
-    bufferSize = sizeof(cellIndexForLight);
-#ifdef DEBUG_RAM_OUTPUT
-    DualLog("Touching pages for cellIndexForLight[%zu bytes]\n", bufferSize);
-#endif
-    memset((void*)touchingPointer, 0, bufferSize);
-    
     DebugRAM("prior to event system init");
     if (EventInit()) return 1;
 
