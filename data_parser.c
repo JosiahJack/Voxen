@@ -590,6 +590,7 @@ int LoadModels(void) {
 
             aiReleaseImport(scene);
             aiReleasePropertyStore(props);
+            malloc_trim(0);
         }
 
         free(tempVertices);
