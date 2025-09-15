@@ -72,7 +72,7 @@ int LoadTextures(void) {
     uint8_t * file_buffer = malloc(maxFileSize); // Reused buffer for loading .png files.  64MB for 4096 * 4096 image.    
     totalPixels = 0;
     totalPaletteColors = 0;
-    uint32_t totalPaletteColorsExtraSized = 170172; // Actual for Citadel is 170172
+    uint32_t totalPaletteColorsExtraSized = 200000; // Actual for Citadel is 170172
     struct stat file_stat;
     uint32_t pixel_offset = 0;
     uint32_t palette_offset = 0;
@@ -92,7 +92,7 @@ int LoadTextures(void) {
     // Create SSBO for color buffer
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    int colorBufferSize = ((54845087 + 1) / 2) * sizeof(uint32_t);
+    int colorBufferSize = ((60000000 + 1) / 2) * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, colorBufferSize, NULL, GL_STATIC_DRAW);
     
     ColorEntry *color_pool = malloc(textureCount * MAX_PALETTE_SIZE * sizeof(ColorEntry));

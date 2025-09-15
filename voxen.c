@@ -32,6 +32,7 @@
 #include "constants.h"
 #include "dynamic_culling.h"
 #include "data_parser.h"
+#include "physics.h"
 
 // #define DEBUG_RAM_OUTPUT
 // ----------------------------------------------------------------------------
@@ -1225,20 +1226,31 @@ int InitializeEnvironment(void) {
 }
 
 float playerVelocity_y = 0.0f;
+float gravityAdd = 0.02f; // Amount of gravity to apply every 1/60th of a second.
 int Physics(void) {
-    if (noclip) return 0;
-    
-//     DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);
-    float floorHeightForPlayer = INVALID_FLOOR_HEIGHT;
-    for (int i=0;i<INSTANCE_COUNT;i++) {
-        if ((uint16_t)cellIndexForInstance[i] == playerCellIdx) {
-            if (instances[i].floorHeight > INVALID_FLOOR_HEIGHT) {
-                floorHeightForPlayer = instances[i].floorHeight;
-            }
+    // Dynamic Object Physics
+    for (uint16_t physObjIdx=0u;physObjIdx < MAX_DYNAMIC_ENTITIES;++physObjIdx) {
+        if (physObjects[physObjIdx].modelIndex >= MODEL_COUNT) continue;
+        
+        float floorHeight = gridCellFloorHeight[physObjects[physObjIdx].index];
+        physObjects[physObjIdx].velocity.y += gravityAdd;
+        if (physObjects[physObjIdx].velocity.y > TERMINAL_VELOCITY) physObjects[physObjIdx].velocity.y = TERMINAL_VELOCITY;
+        uint16_t boundsIdx = physObjects[physObjIdx].modelIndex * BOUNDS_ATTRIBUTES_COUNT;
+        float objHalfHeight = modelBounds[boundsIdx + BOUNDS_DATA_OFFSET_RADIUS];
+        float stopPos = floorHeight + objHalfHeight;
+        if ((physObjects[physObjIdx].position.y - stopPos) < 0.02f) { // Within 2 frames travel distance or gone through it
+            physObjects[physObjIdx].velocity.y = 0.0f;
+            physObjects[physObjIdx].position.y = stopPos;
+        } else {
+            physObjects[physObjIdx].position.y -= (0.16f * physObjects[physObjIdx].velocity.y); // Apply gravity
         }
     }
     
-    float stopHeight = floorHeightForPlayer + 0.84f;
+    // Player Physics
+    if (noclip) return 0;
+    
+//     DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);    
+    float stopHeight = gridCellFloorHeight[playerCellIdx] + 0.84f;
     if (stopHeight < (INVALID_FLOOR_HEIGHT + 1.0f)) stopHeight = -45.5f;
     if (cam_y <= stopHeight) {
 //         DualLog("Player hit floor at %f\n",stopHeight);
@@ -1247,7 +1259,7 @@ int Physics(void) {
         return 0;
     }
     
-    playerVelocity_y += 0.02f;
+    playerVelocity_y += gravityAdd;
     if (playerVelocity_y > 1.0f) playerVelocity_y = 1.0f; // Terminal velocity
     cam_y -= (0.16f * playerVelocity_y);
 //     DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
@@ -1799,14 +1811,14 @@ int main(int argc, char* argv[]) {
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
             if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
             
-            int modelType = instanceIsLODArray[i] && instances[i].lodIndex < UINT16_MAX ? instances[i].lodIndex : instances[i].modelIndex;
+            int modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-            glowdex = glowdex >= 2048 ? 41 : glowdex;
+            glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
             uint32_t specdex = (uint32_t)instances[i].specIndex;
-            specdex = specdex >= 2048 ? 41 : specdex;
+            specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
             uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
             uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
-            nordex = nordex >= 2048 ? 41 : nordex;
+            nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
             uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
             glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
             glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);

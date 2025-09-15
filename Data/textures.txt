@@ -2514,3 +2514,7 @@ index: 1255
 index: 1256
 #Textures/exec2_spec.png
 index: 1257
+#Textures/hw_navunit.png
+index: 1258
+#Textures/hw_navunit_glow.png
+index: 1259

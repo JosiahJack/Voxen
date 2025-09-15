@@ -11,12 +11,13 @@
 #include <assimp/postprocess.h>
 #include <assimp/version.h>
 #include <math.h>
+#include <omp.h>
 #include "constants.h"
 #include "data_parser.h"
 #include "debug.h"
 #include "render.h"
 #include "event.h"
-#include <omp.h>
+#include "physics.h"
 
 // #define DEBUG_MODEL_LOAD_DATA 1U
 #define NUM_MODEL_KEYS 1
@@ -42,6 +43,7 @@ DataParser model_parser;
 DataParser level_parser;
 DataParser lights_parser;
 DataParser dynamics_parser;
+Entity physObjects[MAX_DYNAMIC_ENTITIES];
 
 void parser_init(DataParser *parser) {
     parser->entries = NULL;
@@ -137,11 +139,11 @@ void init_data_entry(Entity *entry) {
     entry->cardchunk = false;
     entry->doublesided = false;
     entry->index = UINT16_MAX;
-    entry->modelIndex = 1024;
+    entry->modelIndex = MODEL_IDX_MAX;
     entry->texIndex = UINT16_MAX;
-    entry->glowIndex = 2048;
-    entry->specIndex = 2048;
-    entry->normIndex = 2048;
+    entry->glowIndex = MATERIAL_IDX_MAX;
+    entry->specIndex = MATERIAL_IDX_MAX;
+    entry->normIndex = MATERIAL_IDX_MAX;
     entry->lodIndex = UINT16_MAX;
     entry->path[0] = '\0';
     entry->position.x = 0.0f; entry->position.y = 0.0f; entry->position.z = 0.0f;
@@ -883,26 +885,18 @@ int LoadLevelGeometry(uint8_t curlevel) {
     double start_time = get_time();
     
     // Initialize instances
+    memset(instances,0,INSTANCE_COUNT * sizeof(Entity));
     int idx;
     for (idx = 0;idx<INSTANCE_COUNT;idx++) {
-        instances[idx].modelIndex = 1024u;
+        instances[idx].modelIndex = MODEL_IDX_MAX;
         instances[idx].texIndex = UINT16_MAX;
-        instances[idx].glowIndex = 2048u;
-        instances[idx].specIndex = 2048u;
-        instances[idx].normIndex = 2048u;
+        instances[idx].glowIndex = MATERIAL_IDX_MAX;
+        instances[idx].specIndex = MATERIAL_IDX_MAX;
+        instances[idx].normIndex = MATERIAL_IDX_MAX;
         instances[idx].lodIndex = UINT16_MAX;
-        instances[idx].cardchunk = false;
-        instances[idx].position.x = instances[idx].position.y = instances[idx].position.z = 0.0f;
         instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
-        instances[idx].rotation.x = instances[idx].rotation.y = instances[idx].rotation.z = 0.0f; instances[idx].rotation.w = 1.0f; // Quaternion identity
+        instances[idx].rotation.w = 1.0f; // Quaternion identity
         instances[idx].floorHeight = INVALID_FLOOR_HEIGHT;
-        instances[idx].intensity = 0.0f;
-        instances[idx].range = 0.0f;
-        instances[idx].spotAngle = 0.0f;
-        instances[idx].color.r = 0.0f;
-        instances[idx].color.g = 0.0f;
-        instances[idx].color.b = 0.0f;
-        snprintf(instances[idx].name, ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1,"init");
         dirtyInstances[idx] = true;
     }
 
@@ -1050,6 +1044,18 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
 
     DebugRAM("start of LoadLevelDynamicObjects");
     char filename[64];
+    memset(physObjects,0,MAX_DYNAMIC_ENTITIES * sizeof(Entity));
+    for (int idx = 0;idx<MAX_DYNAMIC_ENTITIES;idx++) {
+        physObjects[idx].modelIndex = MODEL_IDX_MAX;
+        physObjects[idx].texIndex = UINT16_MAX;
+        physObjects[idx].glowIndex = MATERIAL_IDX_MAX;
+        physObjects[idx].specIndex = MATERIAL_IDX_MAX;
+        physObjects[idx].normIndex = MATERIAL_IDX_MAX;
+        physObjects[idx].lodIndex = UINT16_MAX;
+        physObjects[idx].scale.x = physObjects[idx].scale.y = physObjects[idx].scale.z = 1.0f; // Default scale
+        physObjects[idx].rotation.w = 1.0f; // Quaternion identity
+    }
+    
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_dynamics_level%d.txt", curlevel);
     parser_init(&dynamics_parser);
     if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
@@ -1059,6 +1065,7 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
     int startingIdx = (int)loadedInstances;
+    uint16_t physHead = 0;
     for (int idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
         loadedInstances++;
         int entIdx = dynamics_parser.entries[i].index;
@@ -1078,6 +1085,22 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
         if (isTransparent(instances[idx].texIndex)) {
             transparentInstances[transparentInstancesHead] = idx;
             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
+        }
+        
+        if (   (instances[idx].index >= 307 && instances[idx].index <= 404)
+            || (instances[idx].index >= 402 && instances[idx].index <= 404)
+            ||  instances[idx].index == 417
+            || (instances[idx].index >= 419 && instances[idx].index <= 428)
+            || (instances[idx].index >= 430 && instances[idx].index <= 437)
+            || (instances[idx].index >= 440 && instances[idx].index <= 442)
+            || (instances[idx].index >= 458 && instances[idx].index <= 463)
+            || (instances[idx].index >= 472 && instances[idx].index <= 476)
+            || (instances[idx].index >= 419 && instances[idx].index <= 428)) {
+            
+            physObjects[physHead] = instances[idx];
+            physObjects[physHead].index = idx;
+            physHead++;
+            if (physHead > MAX_DYNAMIC_ENTITIES) { DualLog( "Too many physics entities! %d greater than %d\n",physHead,MAX_DYNAMIC_ENTITIES); return 1; }
         }
     }
 

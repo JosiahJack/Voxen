@@ -8,6 +8,8 @@
 // Generic Parser
 #define MAX_ENTRIES 65535 // uint16_t limit
 #define MAX_PATH 256
+#define MODEL_IDX_MAX 1024
+#define MATERIAL_IDX_MAX 2048
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
 #define BOUNDS_DATA_OFFSET_MINY 1
@@ -32,6 +34,8 @@ typedef struct {
     struct { float x, y, z; } position;
     struct { float x, y, z, w; } rotation;
     struct { float x, y, z; } scale;
+    struct { float x, y, z; } velocity;
+    struct { float x, y, z; } angularVelocity;
     float floorHeight;
     float intensity;
     float range;

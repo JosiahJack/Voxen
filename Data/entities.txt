@@ -1666,30 +1666,41 @@ model: 183
 #item_patch_berserk
 index: 321
 model: 488
+texture: 590
 #item_patch_detox
 index: 322
 model: 488
+texture: 591
 #item_patch_genius
 index: 323
 model: 488
+texture: 592
 #item_patch_medi
 index: 324
 model: 488
+texture: 600
 #item_patch_reflex
 index: 325
 model: 488
+texture: 641
 #item_patch_sight
 index: 326
 model: 488
+texture: 646
 #item_patch_staminup
 index: 327
 model: 488
+texture: 647
 #item_hw_system
 index: 328
 model: 207
+texture: 405
+glowtexture: 404
 #item_hw_navunit
 index: 329
 model: 204
+texture: 1258
+glowtexture: 1259
 #item_hw_ereader
 index: 330
 model: 200
@@ -1750,6 +1761,7 @@ model: 653
 #weapon_pipe
 index: 349
 model: 649
+texture: 887
 #weapon_magnum
 index: 350
 model: 644

@@ -57,6 +57,7 @@ const char* fragmentShaderTraditional =
     "flat in uint SpecIndex;\n"
     "flat in uint NormalIndex;\n"
     "flat in uint InstanceIndex;\n"
+    "const uint MATERIAL_IDX_MAX = 2048;\n"
 
     "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
     "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
@@ -69,7 +70,7 @@ const char* fragmentShaderTraditional =
     "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
 
     "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
-    "    if (texIndex >= 2048) return vec4(0.0,0.0,0.0,1.0);\n"
+    "    if (texIndex >= MATERIAL_IDX_MAX) return vec4(0.0,0.0,0.0,1.0);\n"
 
     "    uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;\n"
     "    uint slotIndex = pixelOffset / 2;\n"
@@ -101,7 +102,7 @@ const char* fragmentShaderTraditional =
     "    if (albedoColor.a < 0.05) discard;\n" // Alpha cutout threshold
 
     "    vec3 adjustedNormal = Normal;\n"
-    "    if (NormalIndex < 2048 && NormalIndex > 0 && NormalIndex != 41) {\n"
+    "    if (NormalIndex < MATERIAL_IDX_MAX && NormalIndex > 0 && NormalIndex != 41) {\n"
         "    vec3 dp1 = dFdx(FragPos);\n"
         "    vec3 dp2 = dFdy(FragPos);\n"
         "    vec2 duv1 = dFdx(TexCoord);\n"
