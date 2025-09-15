@@ -1,6 +1,6 @@
 // File: voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#define VERSION_STRING "v0.6.0"
+#define VERSION_STRING "v0.7.0"
 #include <malloc.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
@@ -25,8 +25,6 @@
 #include "External/stb_image_write.h"
 #include "voxen.h"
 
-// #define DEBUG_RAM_OUTPUT
-// ----------------------------------------------------------------------------
 // Window
 SDL_Window *window;
 uint16_t screen_width = 1366, screen_height = 768;
@@ -1747,8 +1745,7 @@ int32_t main(int32_t argc, char* argv[]) {
         memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         float distSqrd = 0.0f;
         float lodRangeSqrd = 38.4f * 38.4f;
-        #pragma omp parallel for
-        for (uint16_t i=0;i<INSTANCE_COUNT;++i) {
+        for (uint16_t i=0;i<INSTANCE_COUNT;++i) { // This loop executes faster single threaded
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
 

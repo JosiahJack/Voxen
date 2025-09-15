@@ -9,9 +9,6 @@
 #include <uthash.h>
 #include "voxen.h"
 
-// #define DEBUG_TEXTURE_LOAD_DATA 1
-#define MAX_PALETTE_SIZE 65535u
-
 DataParser texture_parser;
 GLuint colorBufferID = 0; // Single color buffer
 GLuint textureSizesID = 0;

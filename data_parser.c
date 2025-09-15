@@ -13,11 +13,6 @@
 #include <omp.h>
 #include "voxen.h"
 
-// #define DEBUG_MODEL_LOAD_DATA 1U
-#define NUM_MODEL_KEYS 1
-#define MAX_VERT_COUNT 40000
-#define MAX_TRI_COUNT 32768
-
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
 GLuint vbos[MODEL_COUNT];
@@ -933,11 +928,11 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].position.y += correctionY;
         instances[idx].position.z += correctionZ;
         if (isTransparent(instances[idx].texIndex)) {
-            DualLog("Adding transparent mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
+//             DualLog("Adding transparent mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
             transparentInstances[transparentInstancesHead] = idx;
             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         } else if (isDoubleSided(instances[idx].texIndex) || instances[idx].scale.x < 0.0f || instances[idx].scale.y < 0.0f || instances[idx].scale.z < 0.0f) {
-            DualLog("Adding doublesided mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
+//             DualLog("Adding doublesided mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
             doubleSidedInstances[doubleSidedInstancesHead] = idx;
             doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
@@ -972,10 +967,10 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
         maxValidIdx++;
     }
     
-    DualLog("Final instances[%d] table::\n",maxValidIdx);
-    for (int32_t i=0;i<maxValidIdx;++i) {
-        DualLog("Instances[%d] loaded: model %d, texture %d, doublesided %d, transparent %d\n",i,instances[i].modelIndex,instances[i].texIndex,doubleSidedInstances[i],transparentInstances[i]);
-    }
+//     DualLog("Final instances[%d] table::\n",maxValidIdx);
+//     for (int32_t i=0;i<maxValidIdx;++i) {
+//         DualLog("Instances[%d] loaded: model %d, texture %d, doublesided %d, transparent %d\n",i,instances[i].modelIndex,instances[i].texIndex,doubleSidedInstances[i],transparentInstances[i]);
+//     }
 
     // Instances uploaded after loading statics and dynamics in next functions...
     

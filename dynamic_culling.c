@@ -6,7 +6,7 @@
 
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
-uint32_t precomputedVisibleCellsFromHere[524288]; // 4096 * 4096 / 32
+uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
 uint16_t cellIndexForLight[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
@@ -75,7 +75,7 @@ void PutMeshesInCells(int32_t type) {
 
 int32_t DetermineClosedEdges() {
     DebugRAM("Start of DetermineClosedEdges");
-    size_t maxFileSize = 1000000; // 1MB
+    size_t maxFileSize = 500000; // 0.5MB
     uint8_t* file_buffer = malloc(maxFileSize);
     FILE* fp;
     size_t file_size, read_size;

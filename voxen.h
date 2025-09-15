@@ -1,6 +1,11 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
 
+// Debug and Compile Flags
+// #define DEBUG_RAM_OUTPUT
+// #define DEBUG_TEXTURE_LOAD_DATA 1
+// #define DEBUG_MODEL_LOAD_DATA 1U
+
 // Remap terrible names to explicit ones
 #define  int8_t  signed char
 #define uint8_t  unsigned char
@@ -53,7 +58,7 @@
 
 // ----------------------------------------------------------------------------
 // Audio
-#include "External/miniaudio.h"
+#include "./External/miniaudio.h"
 #define MAX_CHANNELS 64
 extern ma_engine audio_engine;
 // extern fluid_synth_t* midi_synth; TODO Add midi support
@@ -69,8 +74,6 @@ void CleanupAudio();
 // ----------------------------------------------------------------------------
 // Data Parsing
 #define MAX_ENTRIES 65535 // uint16_t limit
-#define MODEL_IDX_MAX 1024 // Max value the bit packing bits allow
-#define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 #define MAX_PATH 256
 #define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
 
@@ -123,6 +126,8 @@ void parser_init(DataParser *parser);
 bool parse_data_file(DataParser *parser, const char *filename, int type);
 
 // Textures
+#define MAX_PALETTE_SIZE 9000
+#define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 extern GLuint colorBufferID;
 extern uint16_t textureCount;
 bool isDoubleSided(uint32_t texIndexToCheck);
@@ -131,6 +136,9 @@ int32_t LoadTextures(void);
 
 // Models
 #define MODEL_COUNT 680
+#define MODEL_IDX_MAX 1024 // Max value the bit packing bits allow
+#define MAX_VERT_COUNT 40000
+#define MAX_TRI_COUNT 32768
 #define VERTEX_ATTRIBUTES_COUNT 10 // x,y,z,nx,ny,nz,u,v,u_lm,v_lm
 extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern uint32_t modelTriangleCounts[MODEL_COUNT];
@@ -285,6 +293,7 @@ int32_t EventQueueProcess(void);
 #define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
 #define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
+#define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
 
 // TODO: Citadel specific value that is well below the world at a position that falling objects
 //       in Unity reach terminal velocity and are caught by the stupid catch tray that detects such errors.
