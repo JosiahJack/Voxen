@@ -13,18 +13,19 @@
 #include <errno.h>
 #include <time.h>
 #include <enet/enet.h>
-#include "text_vert.glsl.h"
-#include "text_frag.glsl.h"
-#include "chunk_vert.glsl.h"
-#include "chunk_frag.glsl.h"
-#include "composite_vert.glsl.h"
-#include "composite_frag.glsl.h"
-#include "deferred_lighting.compute.h"
-#include "ssr.compute.h"
-#include "Shaders/bluenoise64.cginc"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #include "voxen.h"
+
+#include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
+#include "Shaders/text_frag.glsl.h"
+#include "Shaders/chunk_vert.glsl.h"
+#include "Shaders/chunk_frag.glsl.h"
+#include "Shaders/composite_vert.glsl.h"
+#include "Shaders/composite_frag.glsl.h"
+#include "Shaders/deferred_lighting.compute.h"
+#include "Shaders/ssr.compute.h"
+#include "Shaders/bluenoise64.cginc"
 
 // Window
 SDL_Window *window;

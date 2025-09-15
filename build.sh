@@ -5,45 +5,45 @@ mkdir -p $TEMP_DIR
 rm -f "$TEMP_DIR"/*.o
 
 # Convert shaders into string headers
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/deferred_lighting.compute \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/deferred_lighting.compute \
     | sed '1i const char* deferredLighting_computeShader =' \
     | sed '$a ;' \
-    > deferred_lighting.compute.h
+    > ./Shaders/deferred_lighting.compute.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/ssr.compute \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/ssr.compute \
     | sed '1i const char* ssr_computeShader =' \
     | sed '$a ;' \
-    > ssr.compute.h
+    > ./Shaders/ssr.compute.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/chunk_vert.glsl \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/chunk_vert.glsl \
     | sed '1i const char* vertexShaderSource =' \
     | sed '$a ;' \
-    > chunk_vert.glsl.h
+    > ./Shaders/chunk_vert.glsl.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/chunk_frag.glsl \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/chunk_frag.glsl \
     | sed '1i const char* fragmentShaderTraditional =' \
     | sed '$a ;' \
-    > chunk_frag.glsl.h
+    > ./Shaders/chunk_frag.glsl.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/text_vert.glsl \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/text_vert.glsl \
     | sed '1i const char* textVertexShaderSource =' \
     | sed '$a ;' \
-    > text_vert.glsl.h
+    > ./Shaders/text_vert.glsl.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/text_frag.glsl \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/text_frag.glsl \
     | sed '1i const char* textFragmentShaderSource =' \
     | sed '$a ;' \
-    > text_frag.glsl.h
+    > ./Shaders/text_frag.glsl.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/composite_vert.glsl \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/composite_vert.glsl \
     | sed '1i const char* quadVertexShaderSource =' \
     | sed '$a ;' \
-    > composite_vert.glsl.h
+    > ./Shaders/composite_vert.glsl.h
 
-sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' Shaders/composite_frag.glsl \
+sed 's/"/\\"/g; s/^/"/; s/$/\\n"/' ./Shaders/composite_frag.glsl \
     | sed '1i const char* quadFragmentShaderSource =' \
     | sed '$a ;' \
-    > composite_frag.glsl.h
+    > ./Shaders/composite_frag.glsl.h
 
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
@@ -78,14 +78,14 @@ if [ $? -ne 0 ]; then
 fi
 
 rm -f "$TEMP_DIR"/*.o
-rm -f ./deferred_lighting.compute.h
-rm -f ./ssr.compute.h
-rm -f ./chunk_vert.glsl.h
-rm -f ./chunk_frag.glsl.h
-rm -f ./text_vert.glsl.h
-rm -f ./text_frag.glsl.h
-rm -f ./composite_vert.glsl.h
-rm -f ./composite_frag.glsl.h
+rm -f ./Shaders/deferred_lighting.compute.h
+rm -f ./Shaders/ssr.compute.h
+rm -f ./Shaders/chunk_vert.glsl.h
+rm -f ./Shaders/chunk_frag.glsl.h
+rm -f ./Shaders/text_vert.glsl.h
+rm -f ./Shaders/text_frag.glsl.h
+rm -f ./Shaders/composite_vert.glsl.h
+rm -f ./Shaders/composite_frag.glsl.h
 echo "Build complete."
 
 if [ $# -eq 0 ] || [ "$1" != "ci" ]; then
