@@ -1,7 +1,6 @@
 #include <SDL2/SDL.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <errno.h>
 #include <malloc.h>
@@ -12,12 +11,7 @@
 #include <assimp/version.h>
 #include <math.h>
 #include <omp.h>
-#include "constants.h"
-#include "data_parser.h"
-#include "debug.h"
-#include "render.h"
-#include "event.h"
-#include "physics.h"
+#include "voxen.h"
 
 // #define DEBUG_MODEL_LOAD_DATA 1U
 #define NUM_MODEL_KEYS 1
@@ -37,8 +31,12 @@ uint32_t * tempTriangles;
 GLuint lightmapID;
 uint32_t renderableCount = 0;
 uint32_t loadedInstances = 0;
-int startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
-int startOfTransparentInstances = INSTANCE_COUNT - 1;
+int32_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
+int32_t startOfTransparentInstances = INSTANCE_COUNT - 1;
+uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
+uint16_t doubleSidedInstancesHead = 0;
+uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.
+uint16_t transparentInstancesHead = 0;
 DataParser model_parser;
 DataParser level_parser;
 DataParser lights_parser;
@@ -138,6 +136,7 @@ void init_data_entry(Entity *entry) {
     entry->type = 0;
     entry->cardchunk = false;
     entry->doublesided = false;
+    entry->transparent = false;
     entry->index = UINT16_MAX;
     entry->modelIndex = MODEL_IDX_MAX;
     entry->texIndex = UINT16_MAX;
@@ -155,7 +154,7 @@ void init_data_entry(Entity *entry) {
     entry->color.r = 0.0f; entry->color.g = 0.0f; entry->color.b = 0.0f;
 }
 
-void allocate_entries(DataParser *parser, int entry_count) {
+void allocate_entries(DataParser *parser, int32_t entry_count) {
     if (entry_count > MAX_ENTRIES) {
         DualLogWarn("\033[38;5;208mEntry count %d exceeds %d\033[0m\n", entry_count, MAX_ENTRIES);
         entry_count = MAX_ENTRIES;
@@ -164,7 +163,7 @@ void allocate_entries(DataParser *parser, int entry_count) {
     if (entry_count > parser->capacity) {
         Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));        
         parser->entries = new_entries;
-        for (int i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
+        for (int32_t i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
         parser->capacity = entry_count;
     }
     parser->count = entry_count;
@@ -192,7 +191,7 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
         return true;
     }
 
-    for (int i = 0; i < ENTITY_FIELD_COUNT; i++) {
+    for (int32_t i = 0; i < ENTITY_FIELD_COUNT; i++) {
              if (strcmp(trimmed_key, "index") == 0)           entry->index = parse_numberu16(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "constIndex") == 0)      entry->index = parse_numberu16(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "model") == 0)           entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
@@ -201,6 +200,7 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
         else if (strcmp(trimmed_key, "spectexture") == 0)     entry->specIndex = parse_numberu16(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "normtexture") == 0)     entry->normIndex = parse_numberu16(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "doublesided") == 0)     entry->doublesided = parse_bool(trimmed_value, line, lineNum);
+        else if (strcmp(trimmed_key, "transparent") == 0)     entry->transparent = parse_bool(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "cardchunk") == 0)       entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(entry->modname, trimmed_value, sizeof(entry->modname) - 1); entry->modname[sizeof(entry->modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
         else if (strcmp(trimmed_key, "levelcount") == 0)      { entry->levelCount = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
@@ -236,7 +236,7 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
     *is_eof = false;
     *is_newline = false;
     size_t pos = 0;
-    int c;
+    int32_t c;
     while ((c = fgetc(file)) != EOF && isspace(c) && c != '\n');
     if (c == EOF) { *is_eof = true; return false; }
     if (c == '\n') { *is_newline = true; return false; }
@@ -259,7 +259,7 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
 static bool ParseResourceData(DataParser *parser, FILE* file, const char *filename) {
     char line[1024];
     uint32_t lineNum = 0;
-    int entry_count = 0;
+    int32_t entry_count = 0;
     uint32_t max_index = 0;
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;
@@ -288,7 +288,7 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
     rewind(file);
     Entity entry;
     init_data_entry(&entry);
-    int entries_stored = 0;
+    int32_t entries_stored = 0;
     lineNum = 0;
     while (fgets(line, sizeof(line), file)) {
         lineNum++;
@@ -342,9 +342,9 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
 }
 
 static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filename) {
-    int entry_count = 0;
+    int32_t entry_count = 0;
     bool is_comment, is_eof, is_newline;
-    int c;
+    int32_t c;
     uint32_t lineNum = 0;
     while ((c = fgetc(file)) != EOF) { // First pass: count entries
         if (isspace(c) || c == '\n') continue;
@@ -362,7 +362,7 @@ static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filen
 
     // Second pass: parse entries
     rewind(file);
-    int current_index = 0;
+    int32_t current_index = 0;
     lineNum = 0;
     char token[1024];
     Entity entry;
@@ -405,7 +405,7 @@ static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filen
     return true;
 }
 
-bool parse_data_file(DataParser *parser, const char *filename, int type) {
+bool parse_data_file(DataParser *parser, const char *filename, int32_t type) {
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
     
@@ -415,21 +415,21 @@ bool parse_data_file(DataParser *parser, const char *filename, int type) {
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
-int LoadModels(void) {
+int32_t LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
     parser_init(&model_parser);
     if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) { DualLogError("Could not parse ./Data/models.txt!\n"); return 1; }
 
-    int maxIndex = -1;
-    for (int k = 0; k < model_parser.count; k++) {
+    int32_t maxIndex = -1;
+    for (int32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
     DualLog("Loading %d models with max index %d, using Assimp version: %d.%d.%d (rev %d, flags %d)...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch(), aiGetVersionRevision(), aiGetCompileFlags());
-    int totalVertCount = 0;
-    int totalBounds = 0;
-    int totalTriCount = 0;
+    int32_t totalVertCount = 0;
+    int32_t totalBounds = 0;
+    int32_t totalTriCount = 0;
     uint32_t largestVertCount = 0;
     uint32_t largestTriangleCount = 0;
     uint32_t* vertexOffsets = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
@@ -463,8 +463,8 @@ int LoadModels(void) {
             modelTriangles[i] = NULL;
             vertexCounts[i] = 0;
             triCounts[i] = 0;
-            int matchedParserIdx = -1;
-            for (int k = 0; k < model_parser.count; k++) {
+            int32_t matchedParserIdx = -1;
+            for (int32_t k = 0; k < model_parser.count; k++) {
                 if (model_parser.entries[k].index == i) { matchedParserIdx = k; break; }
             }
 
@@ -491,7 +491,7 @@ int LoadModels(void) {
             }
 
             uint32_t vertexCount = 0, triCount = 0;
-            for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
+            for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
                 vertexCount += scene->mMeshes[m]->mNumVertices;
                 triCount += scene->mMeshes[m]->mNumFaces;
             }
@@ -519,9 +519,9 @@ int LoadModels(void) {
             float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
             uint32_t triangleIndex = 0;
             uint32_t globalVertexOffset = 0;
-            for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
+            for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
                 struct aiMesh* mesh = scene->mMeshes[m];
-                for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
+                for (uint32_t v = 0; v < mesh->mNumVertices; v++) {
                     tempVertices[vertexIndex++] = mesh->mVertices[v].x;
                     tempVertices[vertexIndex++] = mesh->mVertices[v].y;
                     tempVertices[vertexIndex++] = mesh->mVertices[v].z;
@@ -542,7 +542,7 @@ int LoadModels(void) {
                     if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
                 }
 
-                for (unsigned int f = 0; f < mesh->mNumFaces; f++) {
+                for (uint32_t f = 0; f < mesh->mNumFaces; f++) {
                     struct aiFace* face = &mesh->mFaces[f];
                     if (face->mNumIndices != 3) {
                         #pragma omp critical
@@ -588,7 +588,7 @@ int LoadModels(void) {
         triangleOffsets[i] = currentTriangleOffset;
         currentVertexOffset += vertexCounts[i];
         currentTriangleOffset += triCounts[i];
-        for (int j = 0; j < BOUNDS_ATTRIBUTES_COUNT; j++) { // Copy to modelBounds
+        for (int32_t j = 0; j < BOUNDS_ATTRIBUTES_COUNT; j++) { // Copy to modelBounds
             modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + j] = modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + j];
         }
         
@@ -655,7 +655,7 @@ int LoadModels(void) {
 
 //--------------------------------- Entities -------------------------------------
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-int entityCount = 0;            // Number of entities loaded
+int32_t entityCount = 0;            // Number of entities loaded
 DataParser entity_parser;
 const char *valid_entity_keys[] = {"index", "model", "texture", "glowtexture", "spectexture", "normtexture", "cardchunk", "lod"};
 #define NUM_ENTITY_KEYS 8
@@ -670,7 +670,7 @@ bool loadEntityItemInitialized[ENT_COUNT] = { [0 ... ENT_COUNT - 1] = false };
 // Suppress -Wformat-truncation for LoadEntities so it can share 256 length "path" and truncate it into 32 length "name".
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-int LoadEntities(void) {
+int32_t LoadEntities(void) {
     double start_time = get_time();
     
     // Initialize parser with entity-specific keys
@@ -685,7 +685,7 @@ int LoadEntities(void) {
     DualLog("Loading  %d entities...", entityCount);
 
     // Populate entities array
-    for (int i = 0; i < entityCount; i++) {
+    for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
         // Copy with truncation to 31 characters to fit 32 char array for name.  Smaller for RAM constraints.
@@ -716,7 +716,7 @@ int LoadEntities(void) {
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning
 
-void GetLevel_Transform_Offsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
     
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
@@ -738,7 +738,7 @@ void GetLevel_Transform_Offsets(int curlevel, float* ofsx, float* ofsy, float* o
     }
 }
 
-void GetLevel_LightsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticSaveable
@@ -760,7 +760,7 @@ void GetLevel_LightsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, f
     }
 }
 
-void GetLevel_LightsStaticImmutable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
@@ -782,7 +782,7 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int curlevel, float* ofsx, 
     }
 }
 
-void GetLevel_DoorsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DoorsStaticSaveable
@@ -804,7 +804,7 @@ void GetLevel_DoorsStaticSaveable_ContainerOffsets(int curlevel, float* ofsx, fl
     }
 }
 
-void GetLevel_StaticObjectsSaveable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsSaveable
@@ -826,7 +826,7 @@ void GetLevel_StaticObjectsSaveable_ContainerOffsets(int curlevel, float* ofsx, 
     }
 }
 
-void GetLevel_StaticObjectsImmutable_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsImmutable
@@ -848,7 +848,7 @@ void GetLevel_StaticObjectsImmutable_ContainerOffsets(int curlevel, float* ofsx,
     }
 }
 
-void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int curlevel, float* ofsx, float* ofsy, float* ofsz) {
+void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.NPCsSaveableInstantiated
@@ -881,12 +881,12 @@ float quat_angle_deg(Quaternion a, Quaternion b) {
 }
 
 //----------------------------------- Level -----------------------------------
-int LoadLevelGeometry(uint8_t curlevel) {
+int32_t LoadLevelGeometry(uint8_t curlevel) {
     double start_time = get_time();
     
     // Initialize instances
     memset(instances,0,INSTANCE_COUNT * sizeof(Entity));
-    int idx;
+    int32_t idx;
     for (idx = 0;idx<INSTANCE_COUNT;idx++) {
         instances[idx].modelIndex = MODEL_IDX_MAX;
         instances[idx].texIndex = UINT16_MAX;
@@ -914,14 +914,14 @@ int LoadLevelGeometry(uint8_t curlevel) {
     parser_init(&level_parser);
     if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
-    int gameObjectCount = level_parser.count;
-    DualLog("Loading %d geometry chunks for Level %d...",gameObjectCount,curlevel);
+    int32_t gameObjectCount = level_parser.count;
+    DualLog("Loading %d geometry chunks for Level %d...\n",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    for (int idx=0;idx<gameObjectCount;++idx) {
+    for (int32_t idx=0;idx<gameObjectCount;++idx) {
         loadedInstances++;
         instances[idx] = level_parser.entries[idx];
-        int entIdx = level_parser.entries[idx].index;
+        int32_t entIdx = level_parser.entries[idx].index;
         instances[idx].modelIndex = entities[entIdx].modelIndex;
         if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
@@ -932,14 +932,14 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].position.x += correctionX;
         instances[idx].position.y += correctionY;
         instances[idx].position.z += correctionZ;
-        if (isDoubleSided(instances[idx].texIndex) || instances[idx].scale.x < 0.0f || instances[idx].scale.y < 0.0f || instances[idx].scale.z < 0.0f) {
-            doubleSidedInstances[doubleSidedInstancesHead] = idx;
-            doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
-        }
-
         if (isTransparent(instances[idx].texIndex)) {
+            DualLog("Adding transparent mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
             transparentInstances[transparentInstancesHead] = idx;
             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
+        } else if (isDoubleSided(instances[idx].texIndex) || instances[idx].scale.x < 0.0f || instances[idx].scale.y < 0.0f || instances[idx].scale.z < 0.0f) {
+            DualLog("Adding doublesided mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
+            doubleSidedInstances[doubleSidedInstancesHead] = idx;
+            doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
 
         Quaternion quat = {instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w};
@@ -949,29 +949,11 @@ int LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].position.y : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
     }
 
-    // Filter transparent instances to exclude double-sided ones
-    int transparentOnlyCount = 0;
-    int transparentOnlyIndices[INSTANCE_COUNT];
-    for (int i = 0; i < transparentInstancesHead; ++i) {
-        int idx = transparentInstances[i];
-        bool isDoubleSided = false;
-        for (int j = 0; j < doubleSidedInstancesHead; ++j) {
-            if (doubleSidedInstances[j] == idx) {
-                isDoubleSided = true;
-                break;
-            }
-        }
-        if (!isDoubleSided) {
-            transparentOnlyIndices[transparentOnlyCount] = idx;
-            transparentOnlyCount++;
-        }
-    }
-
-    startOfDoubleSidedInstances = gameObjectCount - doubleSidedInstancesHead - transparentOnlyCount; // e.g., 5453 - 19 - 42 = 5392
+    startOfDoubleSidedInstances = gameObjectCount - doubleSidedInstancesHead - transparentInstancesHead; // e.g., 5453 - 19 - 42 = 5392
     startOfTransparentInstances = gameObjectCount - doubleSidedInstancesHead;
-    int maxValidIdx = startOfDoubleSidedInstances;
-    for (int i = 0; i < doubleSidedInstancesHead; ++i) {
-        int idx = doubleSidedInstances[i];
+    int32_t maxValidIdx = startOfDoubleSidedInstances;
+    for (int32_t i = 0; i < doubleSidedInstancesHead; ++i) {
+        int32_t idx = doubleSidedInstances[i];
         if (idx < 0 || idx >= gameObjectCount) continue;
 
         Entity tempInstance = instances[maxValidIdx];
@@ -980,14 +962,19 @@ int LoadLevelGeometry(uint8_t curlevel) {
         maxValidIdx++;
     }
 
-    for (int i = 0; i < transparentOnlyCount; ++i) {
-        int idx = transparentOnlyIndices[i];
+    for (int32_t i = 0; i < transparentInstancesHead; ++i) {
+        int32_t idx = transparentInstances[i];
         if (idx < 0 || idx >= gameObjectCount) continue;
 
         Entity tempInstance = instances[maxValidIdx];
         instances[maxValidIdx] = instances[idx];
         instances[idx] = tempInstance;
         maxValidIdx++;
+    }
+    
+    DualLog("Final instances[%d] table::\n",maxValidIdx);
+    for (int32_t i=0;i<maxValidIdx;++i) {
+        DualLog("Instances[%d] loaded: model %d, texture %d, doublesided %d, transparent %d\n",i,instances[i].modelIndex,instances[i].texIndex,doubleSidedInstances[i],transparentInstances[i]);
     }
 
     // Instances uploaded after loading statics and dynamics in next functions...
@@ -1002,7 +989,7 @@ int LoadLevelGeometry(uint8_t curlevel) {
     return 0;
 }
 
-int LoadLevelLights(uint8_t curlevel) {
+int32_t LoadLevelLights(uint8_t curlevel) {
     double start_time = get_time();
     if (curlevel >= numLevels) { DualLogError("Cannot load level lights, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
@@ -1012,11 +999,11 @@ int LoadLevelLights(uint8_t curlevel) {
     parser_init(&lights_parser);
     if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
-    int lightsCount = lights_parser.count;
+    int32_t lightsCount = lights_parser.count;
     DualLog("Loading  %d   lights for Level %d...",lightsCount,curlevel);
     float correctionLightX, correctionLightY, correctionLightZ;
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
-    for (int i=0;i<lightsCount;++i) {
+    for (int32_t i=0;i<lightsCount;++i) {
         uint16_t idx = (i * LIGHT_DATA_SIZE);
         lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].position.x + correctionLightX;
         lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].position.y + correctionLightY;
@@ -1038,14 +1025,14 @@ int LoadLevelLights(uint8_t curlevel) {
     return 0;
 }
 
-int LoadLevelDynamicObjects(uint8_t curlevel) {
+int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
     double start_time = get_time();
     if (curlevel >= numLevels) { DualLogError("Cannot load level dynamic objects, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
 
     DebugRAM("start of LoadLevelDynamicObjects");
     char filename[64];
     memset(physObjects,0,MAX_DYNAMIC_ENTITIES * sizeof(Entity));
-    for (int idx = 0;idx<MAX_DYNAMIC_ENTITIES;idx++) {
+    for (int32_t idx = 0;idx<MAX_DYNAMIC_ENTITIES;idx++) {
         physObjects[idx].modelIndex = MODEL_IDX_MAX;
         physObjects[idx].texIndex = UINT16_MAX;
         physObjects[idx].glowIndex = MATERIAL_IDX_MAX;
@@ -1060,15 +1047,15 @@ int LoadLevelDynamicObjects(uint8_t curlevel) {
     parser_init(&dynamics_parser);
     if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
-    int dynamicObjectCount = dynamics_parser.count;
+    int32_t dynamicObjectCount = dynamics_parser.count;
     DualLog("Loading  %d  dynamic objects for Level %d...",dynamicObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    int startingIdx = (int)loadedInstances;
+    int32_t startingIdx = (int32_t)loadedInstances;
     uint16_t physHead = 0;
-    for (int idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
+    for (int32_t idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
         loadedInstances++;
-        int entIdx = dynamics_parser.entries[i].index;
+        int32_t entIdx = dynamics_parser.entries[i].index;
         if (entIdx >= MAX_ENTITIES) {DualLogError("Entity index when loading dynamic object %d was %d, exceeds max entity count of %d\n",(idx - startingIdx),entIdx,MAX_ENTITIES); continue; }
         
         instances[idx] = dynamics_parser.entries[i];

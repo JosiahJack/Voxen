@@ -1,14 +1,8 @@
 #include <malloc.h>
-#include <stdint.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <GL/glew.h>
 #include "External/stb_image.h"
-#include "dynamic_culling.h"
-#include "render.h"
-#include "data_parser.h"
-#include "debug.h"
-#include "event.h"
+#include "voxen.h"
 
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
@@ -37,13 +31,13 @@ static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
 }
 
 void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
-    int max = WORLDX - 1; // 63
-    int xval = (int)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
+    int32_t max = WORLDX - 1; // 63
+    int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
     if (xval > max) xval = max;
     if (xval < 0) xval = 0;
     *x = (uint16_t)xval;
     
-    int zval = (int)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
+    int32_t zval = (int32_t)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
     if (zval > max) zval = max;
     if (zval < 0) zval = 0;
     *z = (uint16_t)zval;
@@ -62,16 +56,16 @@ void PutChunksInCells() {
     }
 }
 
-void PutMeshesInCells(int type) {
-    int count = 0;
+void PutMeshesInCells(int32_t type) {
+    int32_t count = 0;
     switch(type) {
         case 5: count = LIGHT_COUNT; break; // Lights
     }
-    for (int index=0;index<count;index++) {
+    for (int32_t index=0;index<count;index++) {
         uint16_t x,z;
         switch(type) {
             case 5: // Lights
-                int lightIdx = (index * LIGHT_DATA_SIZE);
+                int32_t lightIdx = (index * LIGHT_DATA_SIZE);
                 PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
                 cellIndexForLight[index] = (z * WORLDX) + x;
                 break;
@@ -79,13 +73,13 @@ void PutMeshesInCells(int type) {
     }
 }
 
-int DetermineClosedEdges() {
+int32_t DetermineClosedEdges() {
     DebugRAM("Start of DetermineClosedEdges");
     size_t maxFileSize = 1000000; // 1MB
     uint8_t* file_buffer = malloc(maxFileSize);
     FILE* fp;
     size_t file_size, read_size;
-    int wpng, hpng, channels;
+    int32_t wpng, hpng, channels;
     
     // ------------------- Open Cells ------------------
     char filename2[256];
@@ -106,12 +100,12 @@ int DetermineClosedEdges() {
  
     unsigned char openData_r, openData_g, openData_b;
     uint16_t totalOpenCells = 0;
-    for (int x=0;x<WORLDX;++x) {
-        for (int z=0;z<WORLDZ;++z) {
-            int cellIdx = (z * WORLDX) + x;
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~CELL_OPEN;
-            int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
-            int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
             openData_r = openPixels[pixelIdx + 0];
             openData_g = openPixels[pixelIdx + 1];
             openData_b = openPixels[pixelIdx + 2];
@@ -150,12 +144,12 @@ int DetermineClosedEdges() {
 
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
     uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
-    for (int x=0;x<WORLDX;x++) {
-        for (int z=0;z<WORLDZ;z++) {
-            int cellIdx = (z * WORLDX) + x;
+    for (int32_t x=0;x<WORLDX;x++) {
+        for (int32_t z=0;z<WORLDZ;z++) {
+            int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
-            int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
-            int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
             closedData_r = edgePixels[pixelIdx + 0];
             closedData_g = edgePixels[pixelIdx + 1];
             closedData_b = edgePixels[pixelIdx + 2];
@@ -202,11 +196,11 @@ int DetermineClosedEdges() {
     if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); return 1; }
 
     unsigned char skyData_r, skyData_g, skyData_b;
-    for (int x=0;x<WORLDX;++x) {
-        for (int z=0;z<WORLDZ;++z) {
-            int cellIdx = (z * WORLDX) + x;
-            int flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
-            int pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx = (z * WORLDX) + x;
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
             skyData_r = skyPixels[pixelIdx + 0];
             skyData_g = skyPixels[pixelIdx + 1];
             skyData_b = skyPixels[pixelIdx + 2];
@@ -233,14 +227,14 @@ bool UpdatedPlayerCell() {
     return true;
 }
 
-bool XZPairInBounds(int x, int z) {
+bool XZPairInBounds(int32_t x, int32_t z) {
     return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
 }
 
-int CastRayCellCheck(int x, int z, int lastX, int lastZ) {
+int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
     if (!(lastX == x && lastZ == z)) {
         if (XZPairInBounds(lastX,lastZ)) {
-            int cellIdx_last = (lastZ * WORLDX) + lastX;
+            int32_t cellIdx_last = (lastZ * WORLDX) + lastX;
             if (lastZ == z) {
                 if (lastX > x) { // [  x  ][lastX]
                     if (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) return -1;
@@ -260,13 +254,13 @@ int CastRayCellCheck(int x, int z, int lastX, int lastZ) {
 
             // Diagonals
             if (lastZ != z && lastX != x) {
-                int cellIdx_neighborNorth = ((lastZ + 1) * WORLDX) + lastX;
+                int32_t cellIdx_neighborNorth = ((lastZ + 1) * WORLDX) + lastX;
                 cellIdx_neighborNorth = cellIdx_neighborNorth > ARRSIZE ? ARRSIZE : cellIdx_neighborNorth;
-                int cellIdx_neighborSouth = ((lastZ - 1) * WORLDX) + lastX;
+                int32_t cellIdx_neighborSouth = ((lastZ - 1) * WORLDX) + lastX;
                 cellIdx_neighborSouth = cellIdx_neighborSouth > ARRSIZE ? ARRSIZE : cellIdx_neighborSouth;
-                int cellIdx_neighborEast = (lastZ * WORLDX) + lastX + 1;
+                int32_t cellIdx_neighborEast = (lastZ * WORLDX) + lastX + 1;
                 cellIdx_neighborEast = cellIdx_neighborEast > ARRSIZE ? ARRSIZE : cellIdx_neighborEast;
-                int cellIdx_neighborWest = (lastZ * WORLDX) + lastX - 1;
+                int32_t cellIdx_neighborWest = (lastZ * WORLDX) + lastX - 1;
                 cellIdx_neighborWest = cellIdx_neighborWest > ARRSIZE ? ARRSIZE : cellIdx_neighborWest;
                 
                 if (lastZ > z && lastX > x) { // [Nb][ 1]
@@ -315,7 +309,7 @@ int CastRayCellCheck(int x, int z, int lastX, int lastZ) {
     }
     
     if (XZPairInBounds(x,z)) {
-        int cellIdx_xz = (z * WORLDX) + x; 
+        int32_t cellIdx_xz = (z * WORLDX) + x; 
         if (gridCellStates[cellIdx_xz] & CELL_OPEN) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
         else gridCellStates[cellIdx_xz] &= ~CELL_VISIBLE;
         
@@ -326,24 +320,24 @@ int CastRayCellCheck(int x, int z, int lastX, int lastZ) {
     return 0;
 }
 
-int CastStraightZ(int px, int pz, int signz) {
+int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
     if (signz > 0 && pz >= (WORLDZ - 1)) return pz; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
     if (signz < 0 && pz <= 0) return pz;
     if (!XZPairInBounds(px,pz)) return pz;
     
-    int cellIdx = (pz * WORLDX) + px;
+    int32_t cellIdx = (pz * WORLDX) + px;
     if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) return pz;
     
     bool currentVisible = true;
-    int x = px;
-    int z = pz + signz;
-    int zabs = abs(z);
+    int32_t x = px;
+    int32_t z = pz + signz;
+    int32_t zabs = abs(z);
     for (;zabs<WORLDX;z+=signz) { // Up/Down
         currentVisible = false;
-        int cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
-        int cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+        int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
+        int32_t cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
         if (XZPairInBounds(x,z - signz) && XZPairInBounds(x,z)) {
-            int cellIdx_x_zmnus_sign = ((z - signz) * WORLDX) + x;
+            int32_t cellIdx_x_zmnus_sign = ((z - signz) * WORLDX) + x;
             if (gridCellStates[cellIdx_x_zmnus_sign] & CELL_VISIBLE) {
                 if (signz > 0) {
                     if (gridCellStates[cellIdx_x_zmnus1] & CELL_CLOSEDNORTH && gridCellStates[cellIdx_x_zmnus1] & CELL_OPEN) return z;
@@ -351,7 +345,7 @@ int CastStraightZ(int px, int pz, int signz) {
                     if (gridCellStates[cellIdx_x_zplus1] & CELL_CLOSEDSOUTH && gridCellStates[cellIdx_x_zplus1] & CELL_OPEN) return z;
                 }
 
-                int subCellIdx = (z * WORLDX) + x;
+                int32_t subCellIdx = (z * WORLDX) + x;
                 if (gridCellStates[subCellIdx] & CELL_OPEN) gridCellStates[subCellIdx] |= CELL_VISIBLE;
                 else gridCellStates[subCellIdx] &= ~CELL_VISIBLE;
                 
@@ -362,7 +356,7 @@ int CastStraightZ(int px, int pz, int signz) {
         if (!currentVisible) break; // Hit wall!
 
         if (XZPairInBounds(x + 1,z)) {
-            int cellIdx_xplus1_z = (z * WORLDX) + x + 1;
+            int32_t cellIdx_xplus1_z = (z * WORLDX) + x + 1;
             if (CastRayCellCheck(x,z,x + 1,z) > 0) {
                 if (gridCellStates[cellIdx_xplus1_z] & CELL_OPEN) gridCellStates[cellIdx_xplus1_z] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
@@ -372,7 +366,7 @@ int CastStraightZ(int px, int pz, int signz) {
         }
         
         if (XZPairInBounds(x - 1,z)) {
-            int cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
+            int32_t cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
             if (CastRayCellCheck(x,z,x - 1,z) > 0) {
                 if (gridCellStates[cellIdx_xmnus1_z] & CELL_OPEN) gridCellStates[cellIdx_xmnus1_z] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
@@ -385,22 +379,22 @@ int CastStraightZ(int px, int pz, int signz) {
     return WORLDX * signz;
 }
 
-int CastStraightX(int px, int pz, int signx) {
+int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
     if (signx > 0 && px >= (WORLDX - 1)) return px; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
     if (signx < 0 && px <= 0) return px;
     if (!XZPairInBounds(px,pz)) return px;
     if (!gridCellStates[(pz * WORLDX) + px] & CELL_VISIBLE) return px;
 
-    int x = px + signx;
-    int z = pz;
+    int32_t x = px + signx;
+    int32_t z = pz;
     bool currentVisible = true;
-    int xabs = abs(x);
+    int32_t xabs = abs(x);
     for (;xabs<WORLDX;x+=signx) { // Right/Left
         currentVisible = false;
-        int cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
-        int cellIdx_xplus1_z = (z * WORLDX) + x + 1;
+        int32_t cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
+        int32_t cellIdx_xplus1_z = (z * WORLDX) + x + 1;
         if (XZPairInBounds(x - signx,z) && XZPairInBounds(x,z)) {
-            int cellIdx_xmnussign_z = (z * WORLDX) + x - signx;
+            int32_t cellIdx_xmnussign_z = (z * WORLDX) + x - signx;
             if (gridCellStates[cellIdx_xmnussign_z] & CELL_VISIBLE) {
                 if (signx > 0) {
                     if ((gridCellStates[cellIdx_xmnus1_z] & CELL_CLOSEDEAST) && (gridCellStates[cellIdx_xmnus1_z] & CELL_OPEN)) return x;
@@ -408,7 +402,7 @@ int CastStraightX(int px, int pz, int signx) {
                     if ((gridCellStates[cellIdx_xplus1_z] & CELL_CLOSEDWEST) && (gridCellStates[cellIdx_xplus1_z] & CELL_OPEN)) return x;
                 }
                 
-                int subCellIdx = (z * WORLDX) + x;
+                int32_t subCellIdx = (z * WORLDX) + x;
                 if (gridCellStates[subCellIdx] & CELL_OPEN) gridCellStates[subCellIdx] |= CELL_VISIBLE;
                 else gridCellStates[subCellIdx] &= ~CELL_VISIBLE;
                 
@@ -419,7 +413,7 @@ int CastStraightX(int px, int pz, int signx) {
         if (!currentVisible) break; // Hit wall!
         
         if (XZPairInBounds(x,z + 1)) {
-            int cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+            int32_t cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
             if (CastRayCellCheck(x,z,x,z + 1) > 0) {
                 if (gridCellStates[cellIdx_x_zplus1] & CELL_OPEN) gridCellStates[cellIdx_x_zplus1] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_x_zplus1] &= ~CELL_VISIBLE;
@@ -429,7 +423,7 @@ int CastStraightX(int px, int pz, int signx) {
         }
         
         if (XZPairInBounds(x,z - 1)) {
-            int cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
+            int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
             if (CastRayCellCheck(x,z,x,z - 1) > 0) {
                 if (gridCellStates[cellIdx_x_zmnus1] & CELL_OPEN) gridCellStates[cellIdx_x_zmnus1] |= CELL_VISIBLE;
                 else gridCellStates[cellIdx_x_zmnus1] &= ~CELL_VISIBLE;
@@ -442,57 +436,57 @@ int CastStraightX(int px, int pz, int signx) {
     return WORLDX * signx;
 }
 
-void CastRay(int x0, int z0, int x1, int z1) {
-    int dx = abs(x1 - x0);       int dz = abs(z1 - z0);
-    int sx = (x0 < x1) ? 1 : -1; int sz = (z0 < z1) ? 1 : -1;
-    int x = x0;                  int z = z0;
-    int lastX = x;               int lastZ = z;
-    int err = dx - dz;
-    int iter = dx > dz ? dx : dz;
+void CastRay(int32_t x0, int32_t z0, int32_t x1, int32_t z1) {
+    int32_t dx = abs(x1 - x0);       int32_t dz = abs(z1 - z0);
+    int32_t sx = (x0 < x1) ? 1 : -1; int32_t sz = (z0 < z1) ? 1 : -1;
+    int32_t x = x0;                  int32_t z = z0;
+    int32_t lastX = x;               int32_t lastZ = z;
+    int32_t err = dx - dz;
+    int32_t iter = dx > dz ? dx : dz;
     while (iter >= 0) {
         if (!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)) continue;
         if (CastRayCellCheck(x,z,lastX,lastZ) == -1) return;
 
         lastX = x;
         lastZ = z;
-        int e2 = 2 * err;
+        int32_t e2 = 2 * err;
         if (e2 > -dz) { err -= dz; x += sx; }
         if (e2 <  dx) { err += dx; z += sz; }
         iter--;
     }
 }
 
-void CircleFanRays(int x0, int z0) { // CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
+void CircleFanRays(int32_t x0, int32_t z0) { // CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
     if (!XZPairInBounds(x0,z0)) return;
     if (!(gridCellStates[(z0 * WORLDX) + x0] & CELL_VISIBLE)) return;
 
-    int x,z;     
-    int max = WORLDX; // Reduce work slightly by not casting towards 
-    int min = 0;      // edges but 1 less = [1,63].
+    int32_t x,z;     
+    int32_t max = WORLDX; // Reduce work slightly by not casting towards 
+    int32_t min = 0;      // edges but 1 less = [1,63].
     for (x=min;x<max;x++) CastRay(x0,z0,x,min);
     for (x=min;x<max;x++) CastRay(x0,z0,x,max);
     for (z=min;z<max;z++) CastRay(x0,z0,min,z);
     for (z=min;z<max;z++) CastRay(x0,z0,max,z);
 }
 
-void DetermineVisibleCells(int startX, int startZ) {
+void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     if (!XZPairInBounds(startX,startZ)) return;
 
-    for (int x=0;x<WORLDX;x++) {
-        for (int z=0;z<WORLDZ;z++) {
-            int subCellIdx = (z * WORLDX) + x;
+    for (int32_t x=0;x<WORLDX;x++) {
+        for (int32_t z=0;z<WORLDZ;z++) {
+            int32_t subCellIdx = (z * WORLDX) + x;
             gridCellStates[subCellIdx] &= ~CELL_VISIBLE; // Clear all to not visible.
         }
     }
 
-    int cellIdx_start = (startZ * WORLDX) + startX;
+    int32_t cellIdx_start = (startZ * WORLDX) + startX;
     gridCellStates[cellIdx_start] |= CELL_VISIBLE; // Force starting player cell to visible.
     
     // Cast to the right (East)        [ ][3]
     CastStraightX(startX,startZ,1); // [1][2]
                                     // [ ][3]
-    int iter = 0;
-    for (int march=startX;march<(WORLDX - 1);march++) {
+    int32_t iter = 0;
+    for (int32_t march=startX;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
         
@@ -504,7 +498,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     }
     
     iter = 0;
-    for (int march=startX;march<(WORLDX - 1);march++) {
+    for (int32_t march=startX;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -519,7 +513,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     CastStraightX(startX,startZ,-1); // [2][1]
                                      // [3][ ]
     iter = 0;
-    for (int march=startX;march>=1;march--) {
+    for (int32_t march=startX;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
         
@@ -531,7 +525,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     }
 
     iter = 0;
-    for (int march=startX;march>=1;march--) {
+    for (int32_t march=startX;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -545,7 +539,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     // Cast down (South)                [ ][1][ ]
     CastStraightZ(startX,startZ,-1); // [3][2][3]
     iter = 0;
-    for (int march=startZ;march>=1;march--) {
+    for (int32_t march=startZ;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -557,7 +551,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     }
     
     iter = 0;
-    for (int march=startZ;march>=1;march--) {
+    for (int32_t march=startZ;march>=1;march--) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -571,7 +565,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     // Cast up (North)                 [3][2][3]
     CastStraightZ(startX,startZ,1); // [ ][1][ ]
     iter = 0;
-    for (int march=startZ;march<(WORLDX - 1);march++) {
+    for (int32_t march=startZ;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -583,7 +577,7 @@ void DetermineVisibleCells(int startX, int startZ) {
     }
     
     iter = 0;
-    for (int march=startZ;march<(WORLDX - 1);march++) {
+    for (int32_t march=startZ;march<(WORLDX - 1);march++) {
         iter++;
         if (iter > WORLDX) break;
 
@@ -603,9 +597,9 @@ void DetermineVisibleCells(int startX, int startZ) {
     CircleFanRays(startX - 1,startZ - 1);
     CircleFanRays(startX,startZ - 1);
     CircleFanRays(startX + 1,startZ - 1);
-    for (int x=0;x<WORLDX;++x) {
-        for (int z=0;z<WORLDZ;++z) {
-            int cellIdx_xz = (z * WORLDX) + x;
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx_xz = (z * WORLDX) + x;
             if (currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
                 if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
                     || (x >= 32 && startX >= 32)
@@ -622,15 +616,15 @@ void DetermineVisibleCells(int startX, int startZ) {
         }
     }
     
-    int numVisible = 0;
-    for (int x=0;x<WORLDX;++x) {
-        for (int z=0;z<WORLDZ;++z) {
+    int32_t numVisible = 0;
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
             if (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE) numVisible++;
         }
     }
 }
 
-int Cull_Init(void) {
+int32_t Cull_Init(void) {
     double start_time = get_time();    
     DualLog("Culling...\n");
     DebugRAM("start of Cull_Init");    
@@ -659,16 +653,16 @@ int Cull_Init(void) {
     // Then store the visibility of gridCellStates into the table of all visible cells for that cell
     // at the appropriate offset for looking up later when actually re-assigning gridCellStates
     // from this precalculated visibility state for the particular cell.
-    int numPrecomputedVisibleCells = 0;
-    for (int z=0;z<WORLDZ;z++) {
-        for (int x=0;x<WORLDX;x++) {
+    int32_t numPrecomputedVisibleCells = 0;
+    for (int32_t z=0;z<WORLDZ;z++) {
+        for (int32_t x=0;x<WORLDX;x++) {
             playerCellIdx_x = x;
             playerCellIdx_z = z;
             DetermineVisibleCells(x,z);
-            int cellIdx = (z * WORLDX) + x;
-            for (int z2=0;z2<WORLDZ;z2++) {
-                for (int x2=0;x2<WORLDX;x2++) {
-                    int subCellIdx = (z2 * WORLDX) + x2;
+            int32_t cellIdx = (z * WORLDX) + x;
+            for (int32_t z2=0;z2<WORLDZ;z2++) {
+                for (int32_t x2=0;x2<WORLDX;x2++) {
+                    int32_t subCellIdx = (z2 * WORLDX) + x2;
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx;
                     bool is_visible = (gridCellStates[subCellIdx] & CELL_VISIBLE);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,is_visible);
@@ -687,11 +681,11 @@ int Cull_Init(void) {
     }
     
     UpdatedPlayerCell();
-    int cellToCellIdx = playerCellIdx * ARRSIZE;
-    int numFoundVisibleCellsForPlayerStart = 0;
-    for (int z=0;z<WORLDZ;++z) {
-        for (int x=0;x<WORLDX;++x) {
-            int cellIdx = (z * WORLDX) + x;
+    int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
+    int32_t numFoundVisibleCellsForPlayerStart = 0;
+    for (int32_t z=0;z<WORLDZ;++z) {
+        for (int32_t x=0;x<WORLDX;++x) {
+            int32_t cellIdx = (z * WORLDX) + x;
             size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
             if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
                 numFoundVisibleCellsForPlayerStart++;
@@ -732,10 +726,10 @@ void CullCore(void) {
     if (currentLevel >= (numLevels - 1)) return;
 
     numCellsVisible = 0;
-    int cellToCellIdx = playerCellIdx * ARRSIZE;
-    for (int z=0;z<WORLDZ;++z) {
-        for (int x=0;x<WORLDX;++x) {
-            int cellIdx = (z * WORLDX) + x;
+    int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
+    for (int32_t z=0;z<WORLDZ;++z) {
+        for (int32_t x=0;x<WORLDX;++x) {
+            int32_t cellIdx = (z * WORLDX) + x;
             if (cellIdx == 0) { gridCellStates[0] |= CELL_VISIBLE; continue; } // Errors default here so draw them anyways.  Don't count it though.
             if (cellIdx == playerCellIdx) { gridCellStates[playerCellIdx] |= CELL_VISIBLE; numCellsVisible++; continue; } // Always at least set player's cell.
 

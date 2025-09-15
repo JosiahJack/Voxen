@@ -93,6 +93,7 @@ index: 34
 index: 35
 #Textures/beaker.png
 index: 36
+transparent: 1
 #Textures/beverage01.png
 index: 37
 #Textures/beverage02.png
@@ -105,6 +106,7 @@ index: 40
 index: 41
 #Textures/blood_core.png
 index: 42
+transparent: 1
 #Textures/bridg1_1_norm.png
 index: 43
 #Textures/bridg1_1.png
@@ -154,10 +156,13 @@ index: 65
 index: 66
 #Textures/Burst.png
 index: 67
+transparent: 1
 #Textures/BurstSmooth.png
 index: 68
+transparent: 1
 #Textures/BurstTiny.png
 index: 69
+transparent: 1
 #Textures/cabinet.png
 index: 70
 #Textures/cable.png
@@ -168,8 +173,10 @@ index: 72
 index: 73
 #Textures/CameraSpatter.png
 index: 74
+transparent: 1
 #Textures/CenterFluff.png
 index: 75
+transparent: 1
 #Textures/charge_stat_glow.png
 index: 76
 #Textures/charge_stat.png
@@ -265,30 +272,37 @@ index: 124
 index: 125
 #Textures/corpse_blueshirt.png
 index: 126
+transparent: 1
 #Textures/corpse_blueshirt_specular.png
 index: 127
 #Textures/corpse_brownshirt.png
 index: 128
+transparent: 1
 #Textures/corpse_brownshirt_specular.png
 index: 129
 #Textures/corpse_eaten.png
 index: 130
+transparent: 1
 #Textures/corpse_eaten_specular.png
 index: 131
 #Textures/corpse_labcoat.png
 index: 132
+transparent: 1
 #Textures/corpse_labcoat_specular.png
 index: 133
 #Textures/corpse_redshirt.png
 index: 134
+transparent: 1
 #Textures/corpse_redshirt_specular.png
 index: 135
 #Textures/corpse_security.png
 index: 136
+transparent: 1
 #Textures/corpse_security_specular.png
 index: 137
 #Textures/corpse_tan.png
 index: 138
+transparent: 1
 #Textures/crate1_1.png
 index: 139
 #Textures/crate1_2.png
@@ -316,9 +330,11 @@ index: 150
 #Textures/cyberpanel.png
 index: 151
 doublesided: 1
+transparent: 1
 #Textures/cyberpanel_slice45.png
 index: 152
 doublesided: 1
+transparent: 1
 #Textures/cyber.png
 index: 153
 #Textures/d_arrow1_glow.png
@@ -331,6 +347,7 @@ index: 156
 index: 157
 #Textures/darthit.png
 index: 158
+transparent: 1
 
 #Textures/dexmissile_glow.png
 index: 162
@@ -341,57 +358,75 @@ index: 164
 #Textures/d_logo10.png
 index: 165
 doublesided: 1
+transparent: 1
 #Textures/d_logo11.png
 index: 166
 doublesided: 1
+transparent: 1
 #Textures/d_logo12.png
 index: 167
 doublesided: 1
+transparent: 1
 #Textures/d_logo13.png
 index: 168
 doublesided: 1
+transparent: 1
 #Textures/d_logo14.png
 index: 169
 doublesided: 1
+transparent: 1
 #Textures/d_logo15.png
 index: 170
 doublesided: 1
+transparent: 1
 #Textures/d_logo16.png
 index: 171
 doublesided: 1
+transparent: 1
 #Textures/d_logo17.png
 index: 172
 doublesided: 1
+transparent: 1
 #Textures/d_logo18.png
 index: 173
 doublesided: 1
+transparent: 1
 #Textures/d_logo1.png
 index: 174
 doublesided: 1
+transparent: 1
 #Textures/d_logo2.png
 index: 175
 doublesided: 1
+transparent: 1
 #Textures/d_logo3.png
 index: 176
 doublesided: 1
+transparent: 1
 #Textures/d_logo4.png
 index: 177
 doublesided: 1
+transparent: 1
 #Textures/d_logo5.png
 index: 178
 doublesided: 1
+transparent: 1
 #Textures/d_logo6.png
 index: 179
 doublesided: 1
+transparent: 1
 #Textures/d_logo7.png
 index: 180
 doublesided: 1
+transparent: 1
 #Textures/d_logo8.png
 index: 181
 doublesided: 1
+transparent: 1
 #Textures/d_logo9.png
 index: 182
 doublesided: 1
+transparent: 1
 #Textures/door1_1_normal.png
 index: 183
 #Textures/door1_1.png
@@ -410,6 +445,7 @@ index: 189
 index: 190
 #Textures/door1_6_glass.png
 index: 191
+transparent: 1
 #Textures/door1_6.png
 index: 192
 #Textures/door1_7.png
@@ -476,48 +512,69 @@ index: 222
 index: 223
 #Textures/d_post1.png
 index: 224
+transparent: 1
 #Textures/d_post2_normal.png
 index: 225
 #Textures/d_post2.png
 index: 226
+transparent: 1
 #Textures/d_scor1.png
 index: 227
+transparent: 1
 #Textures/d_scor2.png
 index: 228
+transparent: 1
 #Textures/d_scor3.png
 index: 229
+transparent: 1
 #Textures/d_scor4.png
 index: 230
+transparent: 1
 #Textures/d_scorchsplat1.png
 index: 231
+transparent: 1
 #Textures/d_scorchtiny.png
 index: 232
+transparent: 1
 #Textures/d_splat1.png
 index: 233
+transparent: 1
 #Textures/d_splat2.png
 index: 234
+transparent: 1
 #Textures/d_words1.png
 index: 235
+transparent: 1
 #Textures/d_words2.png
 index: 236
+transparent: 1
 #Textures/d_words3.png
 index: 237
+transparent: 1
 #Textures/d_words4.png
 index: 238
+transparent: 1
 #Textures/d_words5.png
 index: 239
+transparent: 1
 #Textures/d_words6.png
 index: 240
+transparent: 1
 #Textures/d_words7.png
 index: 241
+transparent: 1
 #Textures/d_words8.png
 index: 242
+transparent: 1
 #Textures/ef_cyber0.png
 index: 243
+transparent: 1
 #Textures/ef_cyber1.png
 index: 244
+transparent: 1
 #Textures/ef_shard.png
 index: 245
+transparent: 1
 #Textures/elev1_dn.png
 index: 246
 #Textures/elev1_up.png
@@ -532,6 +589,7 @@ index: 250
 index: 251
 #Textures/EnemShot2.png
 index: 252
+transparent: 1
 #Textures/eng1_1d.png
 index: 253
 #Textures/eng1_1.png
@@ -687,17 +745,21 @@ index: 328
 #Textures/foliage01.png
 index: 329
 doublesided: 1
+transparent: 1
 #Textures/foliage_fern1_glow.png
 index: 330
 #Textures/foliage_fern1mutatedorange.png
 index: 331
 doublesided: 1
+transparent: 1
 #Textures/foliage_fern1mutated.png
 index: 332
 doublesided: 1
+transparent: 1
 #Textures/foliage_fern1.png
 index: 333
 doublesided: 1
+transparent: 1
 #Textures/g_conc.png
 index: 334
 #Textures/gear_lg.png
@@ -739,8 +801,10 @@ index: 355
 index: 356
 #Textures/grass_mutatedorange.png
 index: 357
+transparent: 1
 #Textures/grass.png
 index: 358
+transparent: 1
 #Textures/grate1_1.png
 index: 359
 #Textures/grate1_2.png
@@ -749,6 +813,7 @@ index: 360
 index: 361
 #Textures/grove1_1.png
 index: 362
+transparent: 1
 #Textures/grove1_2.png
 index: 363
 #Textures/grove1_3.png
@@ -1075,10 +1140,12 @@ index: 523
 index: 524
 #Textures/med2_5_glass.png
 index: 525
+transparent: 1
 #Textures/med2_5_glow.png
 index: 526
 #Textures/med2_5.png
 index: 527
+transparent: 1
 #Textures/med2_6.png
 index: 528
 #Textures/med2_7_glow.png
@@ -2460,6 +2527,7 @@ index: 1228
 index: 1229
 #Textures/col8.png
 index: 1230
+transparent: 1
 #Textures/a111spec.png
 index: 1231
 #Textures/a210spec.png

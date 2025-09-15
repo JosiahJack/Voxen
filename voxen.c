@@ -7,17 +7,12 @@
 #include <GL/glew.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <time.h>
 #include <enet/enet.h>
-#include "event.h"
-#include "data_parser.h"
-#include "render.h"
 #include "text.glsl"
 #include "chunk.glsl"
 #include "imageblit.glsl"
@@ -26,19 +21,15 @@
 #include "deferred_lighting.compute"
 #include "ssr.compute"
 #include "bluenoise64.cginc"
-#include "audio.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
-#include "constants.h"
-#include "dynamic_culling.h"
-#include "data_parser.h"
-#include "physics.h"
+#include "voxen.h"
 
 // #define DEBUG_RAM_OUTPUT
 // ----------------------------------------------------------------------------
 // Window
 SDL_Window *window;
-int screen_width = 1366, screen_height = 768;
+uint16_t screen_width = 1366, screen_height = 768;
 bool window_has_focus = false;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
@@ -46,10 +37,6 @@ FILE* console_log_file = NULL;
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
-uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
-uint16_t doubleSidedInstancesHead = 0;
-uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.
-uint16_t transparentInstancesHead = 0;
 GLuint instancesBuffer;
 GLuint matricesBuffer;
 // ----------------------------------------------------------------------------
@@ -187,12 +174,12 @@ bool in_cyberspace = true;
 float sprinting = 0.0f;
 bool noclip = true;
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
-int mouse_x = 0, mouse_y = 0; // Mouse position
-int debugView = 0;
-int debugValue = 0;
+uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
+int32_t debugView = 0;
+int32_t debugValue = 0;
 // ----------------------------------------------------------------------------
 // Event System states
-int maxEventCount_debug = 0;
+int32_t maxEventCount_debug = 0;
 double lastJournalWriteTime = 0;
 uint32_t globalFrameNum = 0;
 FILE* activeLogFile;
@@ -200,10 +187,10 @@ const char* manualLogName;
 bool log_playback = false;
 Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
 Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
-int eventJournalIndex;
-int eventIndex; // Event that made it to the counter.  Indices below this were
+int32_t eventJournalIndex;
+int32_t eventIndex; // Event that made it to the counter.  Indices below this were
                 // already executed and walked away from the counter.
-int eventQueueEnd; // End of the waiting line
+int32_t eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
@@ -219,7 +206,7 @@ typedef enum {
 
 EngineMode engine_mode = MODE_LISTEN_SERVER; // Default mode
 char* server_address = "127.0.0.1"; // Default to localhost for listen server
-int server_port = 27015; // Default port
+int32_t server_port = 27015; // Default port
 
 ENetHost* server_host = NULL;
 ENetHost* client_host = NULL;
@@ -271,13 +258,13 @@ void DebugRAM(const char *context, ...) {
 #endif
 }
 
-void print_bytes_no_newline(int count) {
+void print_bytes_no_newline(int32_t count) {
     DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
 }
 // ----------------------------------------------------------------------------
 // ============================================================================
 // OpenGL / Rendering Helper Functions
-void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int width, int height, GLenum format, GLenum type, GLenum target, const char *name) {
+void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target, const char *name) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
@@ -310,9 +297,9 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     return shader;
 }
 
-GLuint LinkProgram(GLuint *shaders, int count, const char *programName) {
+GLuint LinkProgram(GLuint *shaders, int32_t count, const char *programName) {
     GLuint program = glCreateProgram();
-    for (int i = 0; i < count; i++) glAttachShader(program, shaders[i]);
+    for (int32_t i = 0; i < count; i++) glAttachShader(program, shaders[i]);
     glLinkProgram(program);
 
     GLint success;
@@ -325,11 +312,11 @@ GLuint LinkProgram(GLuint *shaders, int count, const char *programName) {
         return 0;
     }
 
-    for (int i = 0; i < count; i++) glDeleteShader(shaders[i]);
+    for (int32_t i = 0; i < count; i++) glDeleteShader(shaders[i]);
     return program;
 }
 
-int CompileShaders(void) {
+int32_t CompileShaders(void) {
     GLuint vertShader, fragShader, computeShader;
 
     // Chunk Shader
@@ -428,7 +415,7 @@ int CompileShaders(void) {
 }
 
 // Renders text at x,y coordinates specified using pointer to the string array.
-void RenderText(float x, float y, const char *text, int colorIdx) {
+void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glDisable(GL_CULL_FACE); // Disable backface culling
     if (!font) { DualLogError("Font is NULL\n"); return; }
     if (!text) { DualLogError("Text is NULL\n"); return; }
@@ -489,7 +476,7 @@ void RenderText(float x, float y, const char *text, int colorIdx) {
     CHECK_GL_ERROR();
 }
 
-void RenderFormattedText(int x, int y, uint32_t color, const char* format, ...) {
+void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
@@ -513,7 +500,7 @@ void Screenshot() {
     
     strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
     snprintf(filename, sizeof(filename), "Screenshots/%s_%s.png", timestamp, VERSION_STRING);
-    int success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
+    int32_t success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
     if (!success) DualLog("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
@@ -523,8 +510,8 @@ void Screenshot() {
 // out = a * b
 static inline void mul_mat4(float *out, const float *a, const float *b) {
     float result[16];
-    for (int col = 0; col < 4; ++col) {
-        for (int row = 0; row < 4; ++row) {
+    for (int32_t col = 0; col < 4; ++col) {
+        for (int32_t row = 0; row < 4; ++row) {
             result[col*4 + row] =
                 a[0*4 + row] * b[col*4 + 0] +
                 a[1*4 + row] * b[col*4 + 1] +
@@ -533,7 +520,7 @@ static inline void mul_mat4(float *out, const float *a, const float *b) {
         }
     }
     // copy back
-    for (int i = 0; i < 16; i++)
+    for (int32_t i = 0; i < 16; i++)
         out[i] = result[i];
 }
 
@@ -565,7 +552,7 @@ void Input_MouselookApply() {
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
-int Input_KeyDown(uint32_t scancode) {
+int32_t Input_KeyDown(uint32_t scancode) {
     keys[scancode] = true;
     if (scancode == SDL_SCANCODE_TAB) {
         in_cyberspace = !in_cyberspace;
@@ -614,12 +601,12 @@ int Input_KeyDown(uint32_t scancode) {
     return 0;
 }
 
-int Input_KeyUp(uint32_t scancode) {
+int32_t Input_KeyUp(uint32_t scancode) {
     keys[scancode] = false;
     return 0;
 }
 
-int Input_MouseMove(float xrel, float yrel) {
+int32_t Input_MouseMove(float xrel, float yrel) {
     cam_yaw -= xrel * -mouse_sensitivity;
     cam_pitch += yrel * mouse_sensitivity;
     if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
@@ -758,7 +745,7 @@ void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx
     mat[12] = posx;          mat[13] = posy;          mat[14] = posz;          mat[15] = 1.0f;
 }
 
-void UpdateInstanceMatrix(int i) {
+void UpdateInstanceMatrix(int32_t i) {
     if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; } // No model
     if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
 
@@ -770,7 +757,7 @@ void UpdateInstanceMatrix(int i) {
     dirtyInstances[i] = false;
 }
 
-void RenderLoadingProgress(int offset, const char* format, ...) {
+void RenderLoadingProgress(int32_t offset, const char* format, ...) {
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, inputImageID);
@@ -828,13 +815,13 @@ typedef struct {
     float distSq; // Squared distance
 } ShadowEdge;
 
-int compareShadowEdges(const void* a, const void* b) {
+int32_t compareShadowEdges(const void* a, const void* b) {
     const ShadowEdge* edgeA = (const ShadowEdge*)a;
     const ShadowEdge* edgeB = (const ShadowEdge*)b;
     return edgeA->angle < edgeB->angle ? -1 : (edgeA->angle > edgeB->angle ? 1 : 0);
 }
 
-int VoxelLists() {
+int32_t VoxelLists() {
     DualLog("Generating voxel lighting data...\n");
     double start_time = get_time();
     uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
@@ -843,7 +830,7 @@ int VoxelLists() {
     const float startX = worldMin_x + (VOXEL_SIZE * 0.5f);
     const float startZ = worldMin_z + (VOXEL_SIZE * 0.5f);
     float rangeSquared[LIGHT_COUNT]; // Precompute light ranges
-    for (int i = 0; i < LIGHT_COUNT; ++i) {
+    for (int32_t i = 0; i < LIGHT_COUNT; ++i) {
         rangeSquared[i] = lights[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_RANGE];
         rangeSquared[i] *= rangeSquared[i];
     }
@@ -855,16 +842,16 @@ int VoxelLists() {
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = sqrtf(rangeSquared[lightIdx]);
-        int minCellX = (int)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int maxCellX = (int)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int minCellZ = (int)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
-        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
         maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
-        for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
-            for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
+        for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+            for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * 64 + cellX;
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
@@ -903,16 +890,16 @@ int VoxelLists() {
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = sqrtf(rangeSquared[lightIdx]);
-        int minCellX = (int)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int maxCellX = (int)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int minCellZ = (int)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
-        int maxCellZ = (int)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
         maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
-        for (int cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
-            for (int cellX = minCellX; cellX <= maxCellX; ++cellX) {
+        for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+            for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * 64 + cellX;
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
@@ -964,7 +951,7 @@ int VoxelLists() {
     return 0;
 }
 
-// int LightmapBake() {
+// int32_t LightmapBake() {
 //     double start_time = get_time();
 //     if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
 //
@@ -987,7 +974,7 @@ int VoxelLists() {
 //     return 0;
 // }
 
-int InitializeEnvironment(void) {
+int32_t InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");
     if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
@@ -1017,7 +1004,7 @@ int InitializeEnvironment(void) {
     DualLog("OpenGL Version: %s\n", version ? (const char*)version : "unknown");
     DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
-    int vsync_enable = 0;//1; // Set to 0 for false.
+    int32_t vsync_enable = 0;//1; // Set to 0 for false.
     SDL_GL_SetSwapInterval(vsync_enable);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
@@ -1227,7 +1214,7 @@ int InitializeEnvironment(void) {
 
 float playerVelocity_y = 0.0f;
 float gravityAdd = 0.02f; // Amount of gravity to apply every 1/60th of a second.
-int Physics(void) {
+int32_t Physics(void) {
     // Dynamic Object Physics
     for (uint16_t physObjIdx=0u;physObjIdx < MAX_DYNAMIC_ENTITIES;++physObjIdx) {
         if (physObjects[physObjIdx].modelIndex >= MODEL_COUNT) continue;
@@ -1268,7 +1255,7 @@ int Physics(void) {
 
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
-int EventExecute(Event* event) {
+int32_t EventExecute(Event* event) {
     if (event->type == EV_NULL) return 0;
 
     switch(event->type) {
@@ -1349,7 +1336,7 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     return false; // Outside FOV cone
 }
 
-int EventInit(void) {
+int32_t EventInit(void) {
     journalFirstWrite = true;
 
     // Initialize the eventQueue as empty
@@ -1361,7 +1348,7 @@ int EventInit(void) {
     return 0;
 }
 
-int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
+int32_t EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
     if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { DualLogError("Queue buffer filled!\n"); return 1; }
 
     //DualLog("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
@@ -1376,24 +1363,24 @@ int EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float pay
     return 0;
 }
 
-int EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
+int32_t EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
     return EnqueueEvent(type,payload1u,payload2u,0.0f,0.0f);
 }
 
-int EnqueueEvent_Uint(uint8_t type, uint32_t payload1u) {
+int32_t EnqueueEvent_Uint(uint8_t type, uint32_t payload1u) {
     return EnqueueEvent(type,payload1u,0u,0.0f,0.0f);
 }
 
-int EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
+int32_t EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
     return EnqueueEvent(type,0u,0u,payload1f,payload2f);
 }
 
-int EnqueueEvent_Float(uint8_t type, float payload1f) {
+int32_t EnqueueEvent_Float(uint8_t type, float payload1f) {
     return EnqueueEvent(type,0u,0u,payload1f,0.0f);
 }
 
 // Enqueues an event with type only and no payload values.
-int EnqueueEvent_Simple(uint8_t type) {
+int32_t EnqueueEvent_Simple(uint8_t type) {
     return EnqueueEvent(type,0u,0u,0.0f,0.0f);
 }
 
@@ -1401,7 +1388,7 @@ int EnqueueEvent_Simple(uint8_t type) {
 // format which is custom but similar concept to Quake 1 demos.
 void clear_ev_journal(void) {
     //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
-    for (int i=0;i<EVENT_JOURNAL_BUFFER_SIZE;i++) {
+    for (int32_t i=0;i<EVENT_JOURNAL_BUFFER_SIZE;i++) {
         eventJournal[i].type = EV_NULL;
         eventJournal[i].frameNum = 0;
         eventJournal[i].timestamp = 0.0;
@@ -1426,7 +1413,7 @@ void JournalLog(void) {
     }
 
     // Write all valid events in eventJournal
-    for (int i = 0; i < eventJournalIndex; i++) {
+    for (int32_t i = 0; i < eventJournalIndex; i++) {
         if (eventJournal[i].type != EV_NULL) {
             fwrite(&eventJournal[i], sizeof(Event), 1, fp);
         }
@@ -1442,10 +1429,10 @@ bool IsPlayableEventType(uint8_t type) {
 }
 
 // Makes use of global activeLogFile handle to read through log and enqueue events with matching frameNum to globalFrameNum
-int ReadActiveLog() {
+int32_t ReadActiveLog() {
     static bool eof_reached = false; // Track EOF across calls
     Event event;
-    int events_processed = 0;
+    int32_t events_processed = 0;
 
     if (eof_reached) {
         return 2; // Indicate EOF was previously reached
@@ -1488,7 +1475,7 @@ int ReadActiveLog() {
 }
 
 // Convert the binary .dem file into human readable text
-int JournalDump(const char* dem_file) {
+int32_t JournalDump(const char* dem_file) {
     FILE* fpR = fopen(dem_file, "rb");
     if (!fpR) {
         DualLogError("Failed to open .dem file\n");
@@ -1522,7 +1509,7 @@ int JournalDump(const char* dem_file) {
 // Queue was processed for the frame, clear it so next frame starts fresh.
 void clear_ev_queue(void) {
     //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
-    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+    for (int32_t i=0;i<MAX_EVENTS_PER_FRAME;i++) {
         eventQueue[i].type = EV_NULL;
         eventQueue[i].frameNum = 0;
         eventQueue[i].timestamp = 0.0;
@@ -1545,11 +1532,11 @@ double get_time(void) {
 
 // Process the entire event queue. Events might add more new events to the queue.
 // Intended to be called once per loop iteration by the main loop.
-int EventQueueProcess(void) {
-    int status = 0;
+int32_t EventQueueProcess(void) {
+    int32_t status = 0;
     double timestamp = 0.0;
-    int eventCount = 0;
-    for (int i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+    int32_t eventCount = 0;
+    for (int32_t i=0;i<MAX_EVENTS_PER_FRAME;i++) {
         if (eventQueue[i].type != EV_NULL) {
             eventCount++;
         }
@@ -1603,7 +1590,7 @@ int EventQueueProcess(void) {
     return 0;
 }
 
-int main(int argc, char* argv[]) {
+int32_t main(int32_t argc, char* argv[]) {
     double programStartTime = get_time();
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
@@ -1728,7 +1715,7 @@ int main(int argc, char* argv[]) {
         // Enqueue all logged events for the current frame.
         if (log_playback) {
             // Read the log file for current frame and enqueue events from log.
-            int read_status = ReadActiveLog();
+            int32_t read_status = ReadActiveLog();
             if (read_status == 2) { // EOF reached, no more events
                 DualLog("Log playback completed.  Control returned.\n");
             } else if (read_status == -1) { // Read error
@@ -1788,21 +1775,22 @@ int main(int argc, char* argv[]) {
         glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
         glBindVertexArray(vao_chunk);
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
-            if (i == startOfDoubleSidedInstances) {
-                if (debugValue > 0) DualLog("For frame %d, enabling doublesided\n",globalFrameNum);
-                glDisable(GL_CULL_FACE);
-            }
-
-//             if (i == startOfTransparentInstances) {
-//                 if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
-//                 glEnable(GL_BLEND); // Enable blending for transparent instances
-//                 glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
-//                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
-//             }
             if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             
+            if (i >= startOfDoubleSidedInstances) {
+                if (debugValue > 0) DualLog("For frame %d, enabling doublesided\n",globalFrameNum);
+                glDisable(GL_CULL_FACE);
+            }
+            
+            if (i >= startOfTransparentInstances) {
+//                 if (instances[i].modelIndex == 287) DualLog("Rendering med2_4 as transparent! Instance: %d, startOfTransparentInstances: %d, texture: %d, model: %d\n",i,startOfTransparentInstances,instances[i].texIndex,instances[i].modelIndex);
+                if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
+                glEnable(GL_BLEND); // Enable blending for transparent instances
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
+                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
+            }
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
             if (instCellIdx < ARRSIZE) {
                 if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
@@ -1811,7 +1799,7 @@ int main(int argc, char* argv[]) {
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
             if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
             
-            int modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
             glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
             uint32_t specdex = (uint32_t)instances[i].specIndex;
@@ -1906,7 +1894,7 @@ int main(int argc, char* argv[]) {
         // 7. Render UI Images
  
         // 8. Render UI Text;
-        int textY = 25; int textVertOfset = 15;
+        int32_t textY = 25; int32_t textVertOfset = 15;
         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
