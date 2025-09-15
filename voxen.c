@@ -13,14 +13,15 @@
 #include <errno.h>
 #include <time.h>
 #include <enet/enet.h>
-#include "text.glsl"
-#include "chunk.glsl"
-#include "imageblit.glsl"
-#include "lightmap.compute"
-#include "voxel_trace.compute"
-#include "deferred_lighting.compute"
-#include "ssr.compute"
-#include "bluenoise64.cginc"
+#include "text_vert.glsl.h"
+#include "text_frag.glsl.h"
+#include "chunk_vert.glsl.h"
+#include "chunk_frag.glsl.h"
+#include "composite_vert.glsl.h"
+#include "composite_frag.glsl.h"
+#include "deferred_lighting.compute.h"
+#include "ssr.compute.h"
+#include "Shaders/bluenoise64.cginc"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #include "voxen.h"
@@ -39,7 +40,7 @@ GLuint instancesBuffer;
 GLuint matricesBuffer;
 // ----------------------------------------------------------------------------
 // Game/Mod Definition
-const char* global_modname;
+char global_modname[256];
 bool global_modIsCitadel = false;
 uint8_t numLevels = 2;
 uint8_t startLevel = 3;
@@ -85,19 +86,6 @@ GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, 
       normInstanceIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1;
-
-//    GPU Lightmapper Compute Shader
-GLuint lightmapShaderProgram;
-GLuint totalLuxelCountLoc_lightmap = -1, instanceCountLoc_lightmap = -1, modelCountLoc_lightmap = -1,
-       worldMin_xLoc_lightmap = -1, worldMin_zLoc_lightmap = -1, lightCountLoc_lightmap = -1;
-
-//    Voxel Tracing Compute Shader
-GLuint voxelTracingShaderProgram;
-GLint screenWidthLoc_vox = -1, screenHeightLoc_vox = -1, camPosLoc_vox = -1, worldMin_xLoc_vox = -1, worldMin_zLoc_vox = -1, voxelOpacityTexLoc_vox = -1;
-GLuint shadowOcclusionTextureID;
-GLuint voxelOpacityTextureID;
-GLubyte voxelOpacityData[512 * 512];
-uint8_t shadowOcclusionData[512 * 512 * 4];
        
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -327,14 +315,6 @@ int32_t CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
 
-    // Lightmap Baking Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, lightmap_compute_shader, "Lightmap Baking Compute Shader"); if (!computeShader) { return 1; }
-    lightmapShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Lightmap Baking Shader Program");        if (!lightmapShaderProgram) { return 1; }
-
-    // Voxel Trace Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, voxelTrace_computeShader, "Voxel Trace Compute Shader"); if (!computeShader) { return 1; }
-    voxelTracingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Trace Shader Program");        if (!voxelTracingShaderProgram) { return 1; }
-    
     // Deferred Lighting Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
     deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program");        if (!deferredLightingShaderProgram) { return 1; }
@@ -364,20 +344,6 @@ int32_t CompileShaders(void) {
     overrideGlowRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowR");
     overrideGlowGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowG");
     overrideGlowBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowB");
-
-    totalLuxelCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "totalLuxelCount");
-    instanceCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "instanceCount");
-    modelCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "modelCount");
-    lightCountLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "lightCount");
-    worldMin_xLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "worldMin_x");
-    worldMin_zLoc_lightmap = glGetUniformLocation(lightmapShaderProgram, "worldMin_z");
-    
-    screenWidthLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "screenWidth");
-    screenHeightLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "screenHeight");
-    camPosLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "camPos");
-    worldMin_xLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "worldMin_x");
-    worldMin_zLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "worldMin_z");
-    voxelOpacityTexLoc_vox = glGetUniformLocation(voxelTracingShaderProgram, "voxelOpacity");
 
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
@@ -949,29 +915,6 @@ int32_t VoxelLists() {
     return 0;
 }
 
-// int32_t LightmapBake() {
-//     double start_time = get_time();
-//     if (renderableCount < 1) { DualLogError("No renderables to bake lightmaps for!\n"); return 1; }
-//
-//     uint32_t totalLuxelCount = 64u * 64u * renderableCount;
-//     DualLog("Starting GPU Lightmapper bake for %d luxels and %d instances!  This could take a bit...\n", totalLuxelCount, renderableCount);
-//     glUseProgram(lightmapShaderProgram);
-//     glUniform1ui(totalLuxelCountLoc_lightmap, totalLuxelCount);
-//     glUniform1ui(instanceCountLoc_lightmap, renderableCount);
-//     glUniform1ui(modelCountLoc_lightmap, MODEL_COUNT);
-//     glUniform1ui(lightCountLoc_lightmap, LIGHT_COUNT);
-//     glUniform1f(worldMin_xLoc_lightmap, worldMin_x);
-//     glUniform1f(worldMin_zLoc_lightmap, worldMin_z);
-//     GLuint groupsX = (800 + 31) / 32;
-//     GLuint groupsY = (600 + 31) / 32;
-//     glDispatchCompute(groupsX, groupsY, 1);
-//     CHECK_GL_ERROR();
-//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
-//     double end_time = get_time();
-//     DualLog("Lightmap Bake took %f seconds\n", end_time - start_time);
-//     return 0;
-// }
-
 int32_t InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");
@@ -1022,10 +965,6 @@ int32_t InitializeEnvironment(void) {
     glUseProgram(imageBlitShaderProgram);
     glUniform1ui(screenWidthLoc_imageBlit, screen_width);
     glUniform1ui(screenHeightLoc_imageBlit, screen_height);
-    
-    glUseProgram(voxelTracingShaderProgram);
-    glUniform1ui(screenWidthLoc_vox, screen_width);
-    glUniform1ui(screenHeightLoc_vox, screen_height);
 
     glUseProgram(deferredLightingShaderProgram);
     glUniform1ui(screenWidthLoc_deferred, screen_width);
@@ -1074,8 +1013,6 @@ int32_t InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
     GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,          GL_FLOAT, GL_TEXTURE_2D, "SSR");
-    GenerateAndBindTexture(&shadowOcclusionTextureID, GL_RGBA8UI, 512, 512,                     GL_RGBA_INTEGER,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Shadow Occlusion");
-    GenerateAndBindTexture(&voxelOpacityTextureID,       GL_R8, 512, 512,                                GL_RED,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Voxel Opacity");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -1099,7 +1036,6 @@ int32_t InitializeEnvironment(void) {
     glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
     //                 3 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // SSR result
-    glBindImageTexture(5, shadowOcclusionTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA8UI); // Voxel Trace result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1180,10 +1116,7 @@ int32_t InitializeEnvironment(void) {
     }
     
     fclose(gamedatfile);
-    global_modname = entry.modname;
     if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
-    numLevels = entry.levelCount;
-    startLevel = entry.startLevel;
     currentLevel = startLevel;
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
     RenderLoadingProgress(52,"Loading textures...");
@@ -1205,7 +1138,6 @@ int32_t InitializeEnvironment(void) {
     if (Cull_Init()) return 1; // Must be after level!
     RenderLoadingProgress(70,"Loading voxel lighting data...");
     if (VoxelLists()) return 1;
-//     if (LightmapBake()) return 1; // Must be after EVERYTHING ELSE!
     DebugRAM("InitializeEnvironment end");
     return 0;
 }
@@ -1828,17 +1760,17 @@ int32_t main(int32_t argc, char* argv[]) {
         // ====================================================================
 
         // 4. Voxel Tracing
-        glUseProgram(voxelTracingShaderProgram);
-        glUniform1f(worldMin_xLoc_vox, worldMin_x);
-        glUniform1f(worldMin_zLoc_vox, worldMin_z);
-        glUniform3f(camPosLoc_vox, cam_x, cam_y, cam_z);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, voxelOpacityTextureID);
-        glUniform1i(voxelOpacityTexLoc_vox, 0);
-        GLuint groupX_vox = (screen_width / 4 + 31) / 32;
-        GLuint groupY_vox = (screen_height / 4 + 31) / 32;
-        glDispatchCompute(groupX_vox, groupY_vox, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//         glUseProgram(voxelTracingShaderProgram);
+//         glUniform1f(worldMin_xLoc_vox, worldMin_x);
+//         glUniform1f(worldMin_zLoc_vox, worldMin_z);
+//         glUniform3f(camPosLoc_vox, cam_x, cam_y, cam_z);
+//         glActiveTexture(GL_TEXTURE0);
+//         glBindTexture(GL_TEXTURE_2D, voxelOpacityTextureID);
+//         glUniform1i(voxelOpacityTexLoc_vox, 0);
+//         GLuint groupX_vox = (screen_width / 4 + 31) / 32;
+//         GLuint groupY_vox = (screen_height / 4 + 31) / 32;
+//         glDispatchCompute(groupX_vox, groupY_vox, 1);
+//         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         
         // 4. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;

@@ -125,9 +125,6 @@ uint8_t parse_saveablestring(const char* value, const char* line, uint32_t lineN
 }
 
 void init_data_entry(Entity *entry) {
-    entry->modname[0] = '\0';
-    entry->levelCount = 0;
-    entry->startLevel = 0;
     entry->type = 0;
     entry->cardchunk = false;
     entry->doublesided = false;
@@ -150,10 +147,7 @@ void init_data_entry(Entity *entry) {
 }
 
 void allocate_entries(DataParser *parser, int32_t entry_count) {
-    if (entry_count > MAX_ENTRIES) {
-        DualLogWarn("\033[38;5;208mEntry count %d exceeds %d\033[0m\n", entry_count, MAX_ENTRIES);
-        entry_count = MAX_ENTRIES;
-    }
+    if (entry_count > MAX_ENTRIES) { DualLogWarn("\033[38;5;208mEntry count %d exceeds %d\033[0m\n", entry_count, MAX_ENTRIES); entry_count = MAX_ENTRIES; }
     
     if (entry_count > parser->capacity) {
         Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));        
@@ -197,9 +191,9 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
         else if (strcmp(trimmed_key, "doublesided") == 0)     entry->doublesided = parse_bool(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "transparent") == 0)     entry->transparent = parse_bool(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "cardchunk") == 0)       entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
-        else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(entry->modname, trimmed_value, sizeof(entry->modname) - 1); entry->modname[sizeof(entry->modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
-        else if (strcmp(trimmed_key, "levelcount") == 0)      { entry->levelCount = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
-        else if (strcmp(trimmed_key, "startlevel") == 0)      { entry->startLevel = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
+        else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
+        else if (strcmp(trimmed_key, "levelcount") == 0)      { numLevels = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
+        else if (strcmp(trimmed_key, "startlevel") == 0)      { startLevel = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
         else if (strcmp(trimmed_key, "lod") == 0)             entry->lodIndex = parse_numberu16(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->position.x = parse_float(trimmed_value, line, lineNum);
         else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->position.y = parse_float(trimmed_value, line, lineNum);

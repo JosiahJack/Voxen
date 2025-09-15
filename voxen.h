@@ -73,42 +73,38 @@ void play_wav(const char* path, float volume);
 void CleanupAudio();
 // ----------------------------------------------------------------------------
 // Data Parsing
-#define MAX_ENTRIES 65535 // uint16_t limit
+#define MAX_ENTRIES 6000
 #define MAX_PATH 256
 #define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
 
 // Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
 typedef struct {
-    bool active;
-    bool cardchunk;
-    
-    bool doublesided; // Parsing only, TODO Remove
-    bool transparent; // Parsing only, TODO Remove
-    
+    struct { float x, y, z; } position;
+    struct { float x, y, z, w; } rotation;
+    struct { float x, y, z; } scale;
+    struct { float x, y, z; } velocity;
+    struct { float x, y, z; } angularVelocity;
+    struct { float r, g, b; } color;
+    float intensity;
+    float range;
+    float spotAngle;
     uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t glowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;
-    struct { float x, y, z; } position;
-    struct { float x, y, z, w; } rotation;
-    struct { float x, y, z; } scale;
-    struct { float x, y, z; } velocity;
-    struct { float x, y, z; } angularVelocity;
-    float floorHeight; // Parsing only, TODO Remove
-    float intensity;
-    float range;
-    float spotAngle;
-    struct { float r, g, b; } color;
     uint16_t index;
-    uint8_t levelCount;
-    uint8_t startLevel;
+    bool active;
+    bool cardchunk;
+    bool doublesided; // Parsing only, TODO Remove
+    bool transparent; // Parsing only, TODO Remove
+    float floorHeight; // Parsing only, TODO Remove
+
     uint8_t type; // Parsing only, TODO Remove
     uint8_t saveableType; // Parsing only, TODO Remove
     char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, plus 1 for null terminator, results in nice even multiple of 4 bytes
     char path[MAX_PATH]; // Parsing only, TODO Remove
-    char modname[MAX_PATH];  // Parsing only, TODO Remove// Longest game name is 176 characters, so 256 should be aplenty.
 } Entity;
 // Includes subfields for parsing from text files, e.g. x,y,z need to parse "position.x" one "field":
 #define ENTITY_FIELD_COUNT 41
@@ -205,6 +201,7 @@ int32_t LoadEntities(void);
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 
 // Levels / Game Management
+extern char global_modname[256];
 extern uint8_t startLevel;
 extern uint8_t numLevels; // Can be set by gamedata.txt
 extern uint8_t currentLevel;

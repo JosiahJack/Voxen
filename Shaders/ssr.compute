@@ -1,0 +1,84 @@
+// ssr.compute
+// Compute shader for processing 
+#version 450 core
+layout(local_size_x = 32, local_size_y = 32) in;
+
+layout(rgba8,   binding = 0) readonly uniform image2D inputImage;
+layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
+layout(rgba32f, binding = 2) readonly uniform image2D inputNormals;
+layout(rgba8, binding = 4) writeonly uniform image2D outputImage;
+
+uniform uint screenWidth;
+uniform uint screenHeight;
+uniform mat4 viewProjection;
+uniform vec3 camPos;
+
+vec4 unpackColor32(uint color) {
+    return vec4(float((color >> 24) & 0xFF) / 255.0,  // r
+                float((color >> 16) & 0xFF) / 255.0,  // g
+                float((color >>  8) & 0xFF) / 255.0,  // b
+                float((color      ) & 0xFF) / 255.0); // a
+}
+
+void main() {
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+    if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
+
+    imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));
+    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * 4)); // SSR_RES = 4
+    vec3 worldPos = worldPosPack.xyz;
+    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * 4)); // SSR_RES = 4
+    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));
+    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));
+    vec3 normal = normalize(vec3(normalXY.x, normalXY.y, normalZ0.x));
+    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));
+    if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;
+
+    vec3 viewDir = normalize(worldPos - camPos);
+    vec3 reflectDir = reflect(viewDir, normal);
+
+    // Compute Fresnel term (Schlick approximation)
+    float cosTheta = max(dot(-viewDir, normal), 0.0);
+    vec3 F0 = specColor.rgb;
+    vec3 fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+    vec2 hitUV = vec2(0.0);
+    vec3 reflectionColor = vec3(0.0);
+    float totalWeight = 0.0;
+    vec3 marchPos = worldPos + normal * 0.005;
+    float traveled = 0.0;
+    vec3 rayStep = reflectDir * 0.26; // stepSize
+    vec2 screenSize = vec2(screenWidth, screenHeight);
+    ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1);
+    ivec2 zeroIVec2 = ivec2(0, 0);
+    for (int i = 0; i < 100; ++i) { // maxSteps 100
+        marchPos += rayStep;
+        traveled += 0.26; // stepSize
+        vec4 clipPos = viewProjection * vec4(marchPos, 1.0);
+        vec2 ndc = clipPos.xy / clipPos.w;
+        hitUV = ndc * 0.5 + 0.5;
+        if (hitUV.x <= 0.0 || hitUV.x >= 1.0 || hitUV.y <= 0.0 || hitUV.y >= 1.0) break;
+
+        ivec2 samplePixel = ivec2(floor(hitUV * screenSize));
+        samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
+        vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * 4); // SSR_RES = 4
+        vec3 sampledWorldPos = sampledWorldPosPack.xyz;
+        float dist2 = dot(marchPos - sampledWorldPos, marchPos - sampledWorldPos);
+
+        // Smooth distance weighting
+        float sigma2 = 0.0256; // 0.16^2
+        float weight = exp(-dist2 / sigma2);
+        if (weight > 0.01) { // Minimum weight threshold
+            ivec2 hitPixel = ivec2(hitUV * vec2(screenWidth, screenHeight));
+            hitPixel = clamp(hitPixel, ivec2(0), ivec2(int(screenWidth)-1, int(screenHeight)-1));
+            vec4 sampleColor = imageLoad(inputImage, hitPixel * 4); // SSR_RES = 4
+            reflectionColor += sampleColor.rgb * weight;
+            totalWeight += weight;
+        }
+    }
+
+    if (totalWeight < 0.01) return; // Avoid division by near-zero
+
+    reflectionColor /= totalWeight; // Normalize by total weight
+    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * fresnel * 1.5);
+    imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));
+}

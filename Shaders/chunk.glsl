@@ -1,43 +1,3 @@
-// chunk.glsl: Generic shader for unlit textured surfaces (all world geometry, items,
-// enemies, doors, etc., without transparency for first pass prior to lighting.
-const char* vertexShaderSource =
-    "#version 450 core\n"
-
-    "layout(location = 0) in vec3 aPos;\n"
-    "layout(location = 1) in vec3 aNormal;\n"
-    "layout(location = 2) in vec2 aTexCoord;\n"
-    "layout(location = 3) in vec2 aTexCoordLightmap;\n"
-
-    "uniform uint texIndex;\n"
-    "uniform uint glowSpecIndex;\n"
-    "uniform uint normInstanceIndex;\n"
-    "uniform mat4 matrix;\n"
-    "uniform mat4 viewProjection;\n"
-
-    "out vec3 FragPos;\n"
-    "out vec3 Normal;\n"
-    "out vec2 TexCoord;\n"
-    "out vec2 TexCoordLightmap;\n"
-
-    "flat out uint TexIndex;\n"
-    "flat out uint GlowIndex;\n"
-    "flat out uint SpecIndex;\n"
-    "flat out uint NormalIndex;\n"
-    "flat out uint InstanceIndex;\n"
-
-    "void main() {\n"
-    "    FragPos = vec3(matrix * vec4(aPos, 1.0));\n" // Convert vertex from the model's local space into world space
-    "    Normal = mat3(transpose(inverse(matrix))) * aNormal;\n"
-    "    TexCoord = aTexCoord;\n" // Pass along data to each vertex, shared for whole tri's pixels.
-    "    TexCoordLightmap = aTexCoordLightmap;\n" // Lightmap UVs
-    "    TexIndex = texIndex;\n"
-    "    GlowIndex = glowSpecIndex & 0xFFFFu;\n"
-    "    SpecIndex = (glowSpecIndex >> 16) & 0xFFFFu;\n"
-    "    NormalIndex = normInstanceIndex & 0xFFFFu;\n"
-    "    InstanceIndex = (normInstanceIndex >> 16) & 0xFFFFu;\n"
-    "    gl_Position = viewProjection * vec4(FragPos, 1.0);\n"
-    "}\n";
-
 const char* fragmentShaderTraditional =
     "#version 450 core\n"
     "#extension GL_ARB_shading_language_packing : require\n"
@@ -59,15 +19,15 @@ const char* fragmentShaderTraditional =
     "flat in uint InstanceIndex;\n"
     "const uint MATERIAL_IDX_MAX = 2048;\n"
 
-    "layout(location = 0) out vec4 outAlbedo;\n"   // GL_COLOR_ATTACHMENT0
-    "layout(location = 1) out vec4 outWorldPos;\n" // GL_COLOR_ATTACHMENT1
-    "layout(location = 2) out vec4 outNormal;\n"   // GL_COLOR_ATTACHMENT2
+    "layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0\n"
+    "layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1\n"
+    "layout(location = 2) out vec4 outNormal;   // GL_COLOR_ATTACHMENT2\n"
 
-    "layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; };\n" // 1D color array (RGBA)
-    "layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; };\n" // Starting index in colors for each texture
-    "layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; };\n" // x,y pairs for width and height of textures
-    "layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; };\n" // Palette colors
-    "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; };\n" // Palette starting indices for each texture
+    "layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)\n"
+    "layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture\n"
+    "layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures\n"
+    "layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors\n"
+    "layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture\n"
 
     "vec4 getTextureColor(uint texIndex, ivec2 texCoord) {\n"
     "    if (texIndex >= MATERIAL_IDX_MAX) return vec4(0.0,0.0,0.0,1.0);\n"
@@ -95,30 +55,29 @@ const char* fragmentShaderTraditional =
     "    int texIndexChecked = 0;\n"
     "    if (TexIndex >= 0) texIndexChecked = int(TexIndex);\n"
     "    ivec2 texSize = textureSizes[texIndexChecked];\n"
-    "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0);\n" // Invert V, OpenGL convention vs import
+    "    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V, OpenGL convention vs import\n"
     "    int x = int(floor(uv.x * float(texSize.x)));\n"
     "    int y = int(floor(uv.y * float(texSize.y)));\n"
     "    vec4 albedoColor = getTextureColor(texIndexChecked,ivec2(x,y));\n"
-    "    if (albedoColor.a < 0.05) discard;\n" // Alpha cutout threshold
+    "    if (albedoColor.a < 0.05) discard; // Alpha cutout threshold\n"
 
     "    vec3 adjustedNormal = Normal;\n"
     "    if (NormalIndex < MATERIAL_IDX_MAX && NormalIndex > 0 && NormalIndex != 41) {\n"
-        "    vec3 dp1 = dFdx(FragPos);\n"
-        "    vec3 dp2 = dFdy(FragPos);\n"
-        "    vec2 duv1 = dFdx(TexCoord);\n"
-        "    vec2 duv2 = dFdy(TexCoord);\n"
-        "    float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);\n"
-        "    if (uvArea > 1e-4) {\n"
-//         "    if (length(duv1) > 1e-6 && length(duv2) > 1e-6) {\n"
-            "    vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);\n"
-            "    vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);\n"
-            "    mat3 TBN3x3 = mat3(t, b, Normal);\n"
-            "    vec3 normalColor = normalize(getTextureColor(NormalIndex,ivec2(x,y)).rgb * 2.0 - 1.0);\n"
-            "    normalColor.g = -normalColor.g;\n"
-            "    adjustedNormal = normalize(TBN3x3 * normalColor);\n"
-        "    }\n"
+    "    vec3 dp1 = dFdx(FragPos);\n"
+    "    vec3 dp2 = dFdy(FragPos);\n"
+    "    vec2 duv1 = dFdx(TexCoord);\n"
+    "    vec2 duv2 = dFdy(TexCoord);\n"
+    "    float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);\n"
+    "    if (uvArea > 1e-4) {\n"
+    "        if (length(duv1) > 1e-6 && length(duv2) > 1e-6) {\n"
+    "            vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);\n"
+    "            vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);\n"
+    "            mat3 TBN3x3 = mat3(t, b, Normal);\n"
+    "            vec3 normalColor = normalize(getTextureColor(NormalIndex,ivec2(x,y)).rgb * 2.0 - 1.0);\n"
+    "            normalColor.g = -normalColor.g;\n"
+    "            adjustedNormal = normalize(TBN3x3 * normalColor);\n"
+    "        }\n"
     "    }\n"
-
     "    if (!gl_FrontFacing) adjustedNormal = -adjustedNormal;\n"
     "    vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));\n"
     "    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));\n"
@@ -133,7 +92,7 @@ const char* fragmentShaderTraditional =
     "        outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;\n"
     "        outAlbedo.a = 1.0;\n"
     "    } else if (debugView == 3) {\n"
-    "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0);\n" // Depth debug
+    "        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug\n"
     "        float clipDepth = ndcDepth / gl_FragCoord.w;\n"
     "        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);\n"
     "        outAlbedo = vec4(vec3(linearDepth), 1.0);\n"
@@ -142,10 +101,10 @@ const char* fragmentShaderTraditional =
     "        outAlbedo.g = 0.0;\n"
     "        outAlbedo.b = float(texIndexChecked) / 1231.0;\n"
     "        outAlbedo.a = 1.0;\n"
-    "    } else if (debugView == 5) {\n" // Worldpos debug
+    "    } else if (debugView == 5) { // Worldpos debug\n"
     "        outAlbedo.rgb = worldPos;\n"
     "        outAlbedo.a = 1.0;\n"
-    "    } else if (debugView == 6) {\n" // Lightview Mode
+    "    } else if (debugView == 6) { // Lightview Mode\n"
     "        outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);\n"
     "    } else {\n"
     "        outAlbedo.rgb = albedoColor.rgb * albedoColor.a;\n"
