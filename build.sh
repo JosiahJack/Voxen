@@ -5,6 +5,8 @@ mkdir -p $TEMP_DIR
 rm -f "$TEMP_DIR"/*.o
 
 echo "Compiling voxen..."
+now_ms() { date +%s%3N; }
+shader_start=$(now_ms)
 
 # Convert shaders into string headers
 gen_header() {
@@ -27,6 +29,9 @@ gen_header ./Shaders/text_vert.glsl             textVertexShaderSource
 gen_header ./Shaders/text_frag.glsl             textFragmentShaderSource
 gen_header ./Shaders/composite_vert.glsl        quadVertexShaderSource
 gen_header ./Shaders/composite_frag.glsl        quadFragmentShaderSource
+shader_end=$(now_ms)
+build_start=$(now_ms)
+echo "Shaders converted to string constants in $((shader_end - shader_start)) ms"
 
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
@@ -52,16 +57,18 @@ for pid in "${pids[@]}"; do
 done
 
 # Link object files
+link_start=$(now_ms)
 $CC $TEMP_DIR/*.o -o voxen $LDFLAGS
 if [ $? -ne 0 ]; then
     echo "ERROR: Linking failed."
     exit 1
 fi
-
+link_end=$(now_ms)
+echo "Linking completed in $((link_end - link_start)) ms"
 rm -f "$TEMP_DIR"/*.o
 rm -f ./Shaders/*.h
-echo "Build complete."
-
+build_end=$(now_ms)
+echo "Build completed in $((build_end - build_start)) ms"
 if [ $# -eq 0 ] || [ "$1" != "ci" ]; then
     ./voxen
 fi
