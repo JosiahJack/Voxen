@@ -4,7 +4,6 @@
 #extension GL_ARB_shading_language_packing : require
 
 in vec2 TexCoord;
-in vec2 TexCoordLightmap;
 in vec3 Normal;
 in vec3 FragPos;
 
@@ -109,7 +108,7 @@ void main() {
         outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);
     } else {
         outAlbedo.rgb = albedoColor.rgb * albedoColor.a;
-        outAlbedo.a = uintBitsToFloat(packHalf2x16(TexCoordLightmap.xy));
+        outAlbedo.a = 1.0;
     }
 
     outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));

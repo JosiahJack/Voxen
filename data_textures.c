@@ -176,15 +176,19 @@ int32_t LoadTextures(void) {
             ColorEntry* color_table = NULL;
             uint32_t palette_size = 0;
             uint16_t* texture_indices = &all_indices[index_offsets[i]];
+            uint32_t pool_start = i * MAX_PALETTE_SIZE;
             for (int32_t j = 0; j < widths[i] * heights[i] * 4; j += 4) {
-                uint32_t color = ((uint32_t)image_data[i][j    ] << 24) | ((uint32_t)image_data[i][j + 1] << 16) |
-                                 ((uint32_t)image_data[i][j + 2] <<  8) |  (uint32_t)image_data[i][j + 3];
+                uint32_t color = ((uint32_t)image_data[i][j] << 24) | ((uint32_t)image_data[i][j + 1] << 16) |
+                                ((uint32_t)image_data[i][j + 2] << 8) | (uint32_t)image_data[i][j + 3];
                 ColorEntry* entry;
                 HASH_FIND_INT(color_table, &color, entry);
                 if (!entry) {
-                    if (palette_size >= MAX_PALETTE_SIZE) { DualLogError("Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdxes[i]].path); palette_size = MAX_PALETTE_SIZE - 1; break; }
-                        
-                    entry = malloc(sizeof(ColorEntry));
+                    if (palette_size >= MAX_PALETTE_SIZE) {
+                        DualLogError("Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdxes[i]].path);
+                        palette_size = MAX_PALETTE_SIZE - 1;
+                        break;
+                    }
+                    entry = &color_pool[pool_start + palette_size];
                     entry->color = color;
                     entry->index = (uint16_t)palette_size++;
                     HASH_ADD_INT(color_table, color, entry);
@@ -193,15 +197,9 @@ int32_t LoadTextures(void) {
                 texture_indices[j / 4] = entry->index;
             }
             per_texture_palette_sizes[i] = palette_size;
-            ColorEntry *entry, *tmp;
-            HASH_ITER(hh, color_table, entry, tmp) {
-                HASH_DEL(color_table, entry);
-                free(entry);
-            }
+            HASH_CLEAR(hh, color_table); // No free needed, as entries are from color_pool
         }
     }
-    
-    malloc_trim(0);
 
     for (int32_t i = 0; i < textureCount; i++) {
         if (matchedParserIdxes[i] < 0 || !image_data[i]) continue;

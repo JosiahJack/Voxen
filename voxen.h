@@ -137,7 +137,7 @@ int32_t LoadTextures(void);
 #define MODEL_IDX_MAX 1024 // Max value the bit packing bits allow
 #define MAX_VERT_COUNT 40000
 #define MAX_TRI_COUNT 32768
-#define VERTEX_ATTRIBUTES_COUNT 10 // x,y,z,nx,ny,nz,u,v,u_lm,v_lm
+#define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 extern uint32_t modelVertexCounts[MODEL_COUNT];
 extern uint32_t modelTriangleCounts[MODEL_COUNT];
 

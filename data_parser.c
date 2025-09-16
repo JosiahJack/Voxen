@@ -521,8 +521,6 @@ int32_t LoadModels(void) {
                     float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
                     tempVertices[vertexIndex++] = tempU;
                     tempVertices[vertexIndex++] = tempV;
-                    tempVertices[vertexIndex++] = 0.0f; // Lightmap u
-                    tempVertices[vertexIndex++] = 0.0f; // Lightmap v
                     if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
                     if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
                     if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
@@ -564,6 +562,10 @@ int32_t LoadModels(void) {
 
             aiReleaseImport(scene);
             aiReleasePropertyStore(props);
+            
+            for (int32_t j = 0; j < BOUNDS_ATTRIBUTES_COUNT; j++) { // Copy to modelBounds
+                modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + j] = modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + j];
+            }
         }
 
         free(tempVertices);
@@ -577,10 +579,6 @@ int32_t LoadModels(void) {
         triangleOffsets[i] = currentTriangleOffset;
         currentVertexOffset += vertexCounts[i];
         currentTriangleOffset += triCounts[i];
-        for (int32_t j = 0; j < BOUNDS_ATTRIBUTES_COUNT; j++) { // Copy to modelBounds
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + j] = modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + j];
-        }
-        
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         if (triCounts[i] > 0) { // Upload to GPU
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
