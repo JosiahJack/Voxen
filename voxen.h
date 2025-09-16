@@ -122,6 +122,8 @@ void parser_init(DataParser *parser);
 bool parse_data_file(DataParser *parser, const char *filename, int type);
 
 // Textures
+#define MAX_TEXTURE_COUNT 2048
+#define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 9000
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 extern GLuint colorBufferID;
