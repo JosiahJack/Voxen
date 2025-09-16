@@ -111,7 +111,6 @@ void main() {
     float distToPixel = length(worldPos - camPos);
     vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));
     vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));
-    vec2 uv_lm = unpackHalf2x16(floatBitsToInt(normalPack.a)); // Assume lightmap UVs in normalPack.a
     int pixelInstance = floatBitsToInt(worldPosPack.a);
 
     // Regular lighting calculation

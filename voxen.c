@@ -80,7 +80,6 @@ uint32_t framesPerLastSecond = 0;
 uint32_t worstFPS = UINT32_MAX;
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
-uint8_t numLightsFound = 0;
 
 // Shaders
 GLuint chunkShaderProgram;
@@ -91,7 +90,7 @@ GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debu
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
-GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID, cellIndexForLightID, masterIndexForLightsInPVSID;
+GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, debugValueLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, camPosLoc_deferred = -1,
       fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
@@ -527,7 +526,7 @@ int32_t Input_KeyDown(uint32_t scancode) {
 
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
-        if (debugView > 8) debugView = 0;
+        if (debugView > 7) debugView = 0;
         glProgramUniform1i(deferredLightingShaderProgram, debugViewLoc_deferred, debugView);
         glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
@@ -1208,8 +1207,7 @@ static const char* debugViewNames[] = {
     "indices",         // 4
     "worldpos",        // 5
     "lightview",       // 6
-    "reflections",     // 7
-    "lightmap"         // 8
+    "reflections"     // 7
 };
 
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
@@ -1828,7 +1826,7 @@ int32_t main(int32_t argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-//         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num lights: %d, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numLightsFound, numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+//         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 //         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
 //
         // Frame stats

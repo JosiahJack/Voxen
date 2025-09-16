@@ -35,7 +35,6 @@ echo "Shaders converted to string constants in $((shader_end - shader_start)) ms
 
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
-MINIAUDIO_CFLAGS="-std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=199309L -DNDEBUG"
 LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lenet -lpthread -fopenmp -s"
 SOURCES="voxen.c data_textures.c data_parser.c audio.c dynamic_culling.c miniaudio.c"
 

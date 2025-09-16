@@ -23,7 +23,6 @@ uint32_t largestVertCount = 0;
 uint32_t largestTriangleCount = 0;
 float * tempVertices;
 uint32_t * tempTriangles;
-GLuint lightmapID;
 uint32_t renderableCount = 0;
 uint32_t loadedInstances = 0;
 int32_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
@@ -965,12 +964,6 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
 //     }
 
     // Instances uploaded after loading statics and dynamics in next functions...
-    
-    glGenBuffers(1, &lightmapID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightmapID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, renderableCount * 64 * 64 * 4 * sizeof(float), NULL, GL_DYNAMIC_DRAW); // 256x256 lightmap per model, 4 channel rgba, HDR float
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightmapID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("end of LoadLevelGeometry");
     return 0;
