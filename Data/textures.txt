@@ -1814,8 +1814,7 @@ index: 864
 index: 865
 #Textures/toolbox_wheeled_specular.png
 index: 866
-#Textures/tycho3.png
-index: 869
+
 #Textures/vending1.png
 index: 870
 #Textures/vending2.png
