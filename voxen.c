@@ -30,6 +30,7 @@
 // Window
 SDL_Window *window;
 bool inventoryMode = false;
+bool consoleActive = false;
 uint16_t screen_width = 1366, screen_height = 768;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 bool window_has_focus = false;
@@ -521,10 +522,22 @@ void Input_MouselookApply() {
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
+bool inventoryModeWasActivePriorToConsole = false;
 int32_t Input_KeyDown(int32_t scancode) {
     keys[scancode] = true;    
     if (keys[SDL_SCANCODE_ESCAPE]) gamePaused = !gamePaused;
-    if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode;
+    if (keys[SDL_SCANCODE_GRAVE]) {
+        if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
+        consoleActive = !consoleActive; // Tilde
+        if (consoleActive) inventoryMode = true;
+        else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
+            inventoryMode = false;
+        }
+    }
+    
+    if (consoleActive) return 0;
+    
+    if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
         if (debugView > 7) debugView = 0;
@@ -575,8 +588,7 @@ bool CursorVisible() {
     return (inventoryMode || menuActive || gamePaused);
 }
 
-int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
-    
+int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {    
     if (CursorVisible()) {
         int32_t newX = cursorPosition_x + xrel;
         if (newX > screen_width) newX = screen_width;
@@ -642,9 +654,14 @@ void UpdatePlayerFacingAngles() {
     normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
 }
 
+void ConsoleEmulator() {
+    
+}
+
 // Update camera position based on input
 void ProcessInput(void) {
     if (gamePaused) return;
+    if (consoleActive) { ConsoleEmulator(); return; }
     
     if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 2.0f;
     else sprinting = 0.0f;
@@ -1756,12 +1773,14 @@ int32_t main(int32_t argc, char* argv[]) {
         if (gamePaused) RenderFormattedText((screen_width / 2) - 20, (screen_height / 2) - (int32_t)((float)screen_height * 0.30f), TEXT_RED, "PAUSED");
         
         // 8. Render UI Text;
-        int32_t textY = 25; int32_t textVertOfset = 15;
+        int32_t textY = 35; int32_t textVertOfset = 15;
         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+
+        if (consoleActive) RenderFormattedText(10, 0, TEXT_WHITE, "]");
 
         if (CursorVisible()) RenderFormattedText(cursorPosition_x, cursorPosition_y, TEXT_YELLOW, "|\\ live!");
 
