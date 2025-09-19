@@ -1,5 +1,7 @@
 #include <SDL2/SDL.h>
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -904,7 +906,7 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
     DualLog("Loading %d geometry chunks for Level %d...\n",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    for (int32_t idx=0;idx<gameObjectCount;++idx) {
+    for (int32_t idx=loadedInstances;idx<gameObjectCount;++idx) {
         loadedInstances++;
         instances[idx] = level_parser.entries[idx];
         int32_t entIdx = level_parser.entries[idx].index;

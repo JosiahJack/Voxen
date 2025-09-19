@@ -6,52 +6,20 @@
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
-// Remap terrible names to explicit ones
-#define  int8_t  signed char
-#define uint8_t  unsigned char
-#define  int16_t short
-#define uint16_t unsigned short
-#define  int32_t int
-#define uint32_t unsigned int
-#define bool     unsigned char
-#define size_t   unsigned long
-
-#ifndef INT8_MIN
-#define INT8_MIN (-128)
-#endif
-#ifndef INT8_MAX
-#define INT8_MAX 127
-#endif
-#ifndef UINT8_MAX
-#define UINT8_MAX 255
-#endif
-#ifndef INT16_MIN
-#define INT16_MIN (-32768)
-#endif
-#ifndef INT16_MAX
-#define INT16_MAX 32767
-#endif
-#ifndef UINT16_MAX
-#define UINT16_MAX 65535
-#endif
-#ifndef INT32_MIN
-#define INT32_MIN (-2147483648)
-#endif
-#ifndef INT32_MAX
-#define INT32_MAX 2147483647
-#endif
-#ifndef UINT32_MAX
-#define UINT32_MAX 4294967295U
-#endif
-
 // Generic Constants
-#define true 1
-#define false 0
 #define M_PI 3.141592653f
 #define M_PI_2 1.57079632679489661923f
 
+// Global Types
+typedef struct { float x,y; } Vector2;
+typedef struct { float x,y,z; } Vector3;
+typedef struct { float x,y,z,w; } Quaternion;
+typedef struct { float r,g,b,a; } Color;
+
 // Generic Lib Includes TODO REDUCE AS MUCH AS POSSIBLE!!
 #include <SDL2/SDL.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <GL/glew.h>
 // #include <fluidlite.h> TODO Add midi support
 // #include <libxmi.h>
@@ -79,12 +47,12 @@ void CleanupAudio();
 
 // Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
 typedef struct {
-    struct { float x, y, z; } position;
-    struct { float x, y, z, w; } rotation;
-    struct { float x, y, z; } scale;
-    struct { float x, y, z; } velocity;
-    struct { float x, y, z; } angularVelocity;
-    struct { float r, g, b; } color;
+    Vector3 position;
+    Quaternion rotation;
+    Vector3 scale;
+    Vector3 velocity;
+    Vector3 angularVelocity;
+    Color color;
     float intensity;
     float range;
     float spotAngle;
@@ -100,7 +68,6 @@ typedef struct {
     bool doublesided; // Parsing only, TODO Remove
     bool transparent; // Parsing only, TODO Remove
     float floorHeight; // Parsing only, TODO Remove
-
     uint8_t type; // Parsing only, TODO Remove
     uint8_t saveableType; // Parsing only, TODO Remove
     char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, plus 1 for null terminator, results in nice even multiple of 4 bytes
@@ -240,8 +207,8 @@ typedef struct {
     double timestamp;
     double deltaTime_ns;
     uint32_t frameNum;
-    uint32_t payload1u; // First one used for payloads less than or equal to 4 bytes
-    uint32_t payload2u; // Second one used for more values or for long ints by using bitpacking
+    int32_t payload1i; // First one used for payloads less than or equal to 4 bytes
+    int32_t payload2i; // Second one used for more values or for long ints by using bitpacking
     float payload1f; // First one used for float payloads
     float payload2f; // Second one used for a 2nd value or for double via bitpacking
     uint8_t type;
@@ -265,12 +232,13 @@ extern int32_t maxEventCount_debug;
 extern uint32_t globalFrameNum;
 extern double last_time;
 extern double current_time;
+extern float pauseRelativeTime;
 
 int32_t EventExecute(Event* event);
 int32_t EventInit(void);
-int32_t EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f);
-int32_t EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u);
-int32_t EnqueueEvent_Uint(uint8_t type, uint32_t payload1u);
+int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
+int32_t EnqueueEvent_IntInt(uint8_t type, int32_t payload1i, int32_t payload2i);
+int32_t EnqueueEvent_Int(uint8_t type, int32_t payload1i);
 int32_t EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f);
 int32_t EnqueueEvent_Float(uint8_t type, float payload1f);
 int32_t EnqueueEvent_Simple(uint8_t type);
@@ -335,6 +303,40 @@ void Cull();
 #define MAX_DYNAMIC_ENTITIES 256
 #define TERMINAL_VELOCITY 10.0f
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
+
+typedef uint8_t PhysicsLayer;
+static const uint8_t PhysicsLayer_Default          = 0;
+static const uint8_t PhysicsLayer_TransparentFX    = 1;
+static const uint8_t PhysicsLayer_IgnoreRaycast    = 2;
+//static const uint8_t PhysicsLayer_               = 3; // Layers direct copy from Unity version of Citadel, [sic] and sick
+static const uint8_t PhysicsLayer_BlocksRaycast    = 4;
+static const uint8_t PhysicsLayer_UI               = 5;
+//static const uint8_t PhysicsLayer_               = 6;
+//static const uint8_t PhysicsLayer_               = 7;
+//static const uint8_t PhysicsLayer_               = 8;
+static const uint8_t PhysicsLayer_Geometry         = 9;
+static const uint8_t PhysicsLayer_NPC              = 10;
+static const uint8_t PhysicsLayer_PlayerBullets    = 11;
+static const uint8_t PhysicsLayer_Player           = 12;
+static const uint8_t PhysicsLayer_Corpse           = 13;
+static const uint8_t PhysicsLayer_PhysObjects      = 14;
+static const uint8_t PhysicsLayer_Sky              = 15;
+//static const uint8_t PhysicsLayer_               = 16;
+//static const uint8_t PhysicsLayer_               = 17;
+static const uint8_t PhysicsLayer_Door             = 18;
+static const uint8_t PhysicsLayer_InterDebris      = 19;
+static const uint8_t PhysicsLayer_Player2          = 20;
+//static const uint8_t PhysicsLayer_               = 21;
+//static const uint8_t PhysicsLayer_               = 22;
+//static const uint8_t PhysicsLayer_               = 23;
+static const uint8_t PhysicsLayer_NPCBullet        = 24;
+static const uint8_t PhysicsLayer_NPCClip          = 25;
+static const uint8_t PhysicsLayer_Clip             = 26;
+//static const uint8_t PhysicsLayer_               = 27;
+//static const uint8_t PhysicsLayer_               = 28;
+static const uint8_t PhysicsLayer_CorpseSearchable = 29;
+
+
 // ----------------------------------------------------------------------------
 // Rendering
 #define DEBUG_OPENGL
@@ -350,6 +352,10 @@ extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 #define CHECK_GL_ERROR() do {} while(0)
 #define CHECK_GL_ERROR_HERE() do {} while(0)
 #endif
+    
+#define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
+#define NEAR_PLANE (0.02f)
+#define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
 
 extern uint16_t screen_width;
 extern uint16_t screen_height;
@@ -361,10 +367,6 @@ extern bool lightDirty[MAX_VISIBLE_LIGHTS];
 extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
 extern bool global_modIsCitadel;
-
-typedef struct {
-    float x, y, z, w;
-} Quaternion;
 
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);

@@ -1,4 +1,6 @@
 #include <malloc.h>
+#include <stdint.h>
+#include <stdbool.h>
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #define STBI_MAX_DIMENSIONS 2048

@@ -29,7 +29,9 @@
 
 // Window
 SDL_Window *window;
+bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
+int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 bool window_has_focus = false;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
@@ -48,8 +50,7 @@ uint8_t startLevel = 3;
 uint8_t currentLevel = 0;
 bool gamePaused = false;
 bool menuActive = false;
-const char* valid_gamedata_keys[] = {"modname","levelcount","startlevel"};
-#define NUM_GAMDAT_KEYS 3
+float pauseRelativeTime = 0.0f;
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
@@ -70,22 +71,19 @@ float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 SDL_GLContext gl_context;
 float uiOrthoProjection[16];
 float rasterPerspectiveProjection[16];
-float fov = 65.0f;
-float nearPlane = 0.02f;
-float farPlane = 71.68f;
-float sightRangeSquared = 71.68f * 71.68f; // Max player view, level 6 crawlway 28 cells
 double lastFrameSecCountTime = 0.00;
 uint32_t lastFrameSecCount = 0;
 uint32_t framesPerLastSecond = 0;
 uint32_t worstFPS = UINT32_MAX;
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
+bool instanceIsCulledArray[INSTANCE_COUNT];
+bool instanceIsLODArray[INSTANCE_COUNT];
 
 // Shaders
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
-GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, 
-      normInstanceIndexLoc_chunk = -1, overrideGlowRLoc_chunk = -1, overrideGlowGLoc_chunk = -1, overrideGlowBLoc_chunk = -1;
+GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1;
        
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -119,7 +117,11 @@ float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
 GLuint lightsID;
 
-// Text
+// UI
+//    Cursor
+bool cursorVisible = false;
+
+//    Text
 #define TEXT_WHITE 0
 #define TEXT_YELLOW 1
 #define TEXT_DARK_YELLOW 2
@@ -154,9 +156,9 @@ char uiTextBuffer[TEXT_BUFFER_SIZE];
 GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
 // ----------------------------------------------------------------------------
 // Input
-float move_speed = 0.15f;
 float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
+float move_speed = 0.15f;
 float sprinting = 0.0f;
 bool noclip = true;
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
@@ -186,7 +188,6 @@ bool journalFirstWrite = true;
 // Networking
 typedef enum {
     MODE_LISTEN_SERVER,    // Runs both server and client locally
-    //MODE_DEDICATED_SERVER, // Server only, no rendering (headless) Currently only using Listen for coop
     MODE_CLIENT            // Client only, connects to a server
 } EngineMode;
 
@@ -197,6 +198,9 @@ int32_t server_port = 27015; // Default port
 ENetHost* server_host = NULL;
 ENetHost* client_host = NULL;
 ENetPeer* server_peer = NULL; // Client's connection to server
+// ----------------------------------------------------------------------------
+// Physics
+
 // ----------------------------------------------------------------------------
 // Diagnostics
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -217,14 +221,17 @@ void DualLogWarn(const char *fmt, ...) { va_list args; va_start(args, fmt); Dual
 void DualLogError(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 void DebugRAM(const char *context, ...) {
+#ifdef DEBUG_RAM_OUTPUT
     char formatted_context[1024];
     va_list args;
     va_start(args, context);
     vsnprintf(formatted_context, sizeof(formatted_context), context, args);
     va_end(args);
 
-#ifdef DEBUG_RAM_OUTPUT
     struct mallinfo2 info = mallinfo2();
     size_t uss_bytes = 0;
     FILE *fp = fopen("/proc/self/smaps_rollup", "r");
@@ -243,6 +250,7 @@ void DebugRAM(const char *context, ...) {
             uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
 #endif
 }
+#pragma GCC diagnostic pop
 
 void print_bytes_no_newline(int32_t count) {
     DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
@@ -341,9 +349,6 @@ int32_t CompileShaders(void) {
     glowSpecIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowSpecIndex");
     normInstanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
-    overrideGlowRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowR");
-    overrideGlowGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowG");
-    overrideGlowBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "overrideGlowB");
 
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
@@ -516,14 +521,10 @@ void Input_MouselookApply() {
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
-int32_t Input_KeyDown(uint32_t scancode) {
-    keys[scancode] = true;
-    if (scancode == SDL_SCANCODE_TAB) {
-        in_cyberspace = !in_cyberspace;
-        cam_roll = 0.0f; // Reset roll for sanity
-        Input_MouselookApply();
-    }
-
+int32_t Input_KeyDown(int32_t scancode) {
+    keys[scancode] = true;    
+    if (keys[SDL_SCANCODE_ESCAPE]) gamePaused = !gamePaused;
+    if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode;
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
         if (debugView > 7) debugView = 0;
@@ -565,14 +566,32 @@ int32_t Input_KeyDown(uint32_t scancode) {
     return 0;
 }
 
-int32_t Input_KeyUp(uint32_t scancode) {
+int32_t Input_KeyUp(int32_t scancode) {
     keys[scancode] = false;
     return 0;
 }
 
-int32_t Input_MouseMove(float xrel, float yrel) {
-    cam_yaw -= xrel * -mouse_sensitivity;
-    cam_pitch += yrel * mouse_sensitivity;
+bool CursorVisible() {
+    return (inventoryMode || menuActive || gamePaused);
+}
+
+int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
+    
+    if (CursorVisible()) {
+        int32_t newX = cursorPosition_x + xrel;
+        if (newX > screen_width) newX = screen_width;
+        if (newX < 0) newX = 0;
+        cursorPosition_x = newX;
+        int32_t newY = cursorPosition_y + yrel;
+        if (newY > screen_height) newY = screen_height;
+        if (newY < 0) newY = 0;
+        cursorPosition_y = newY;
+    }
+    
+    if (gamePaused || inventoryMode) return 0;
+    
+    cam_yaw += (float)xrel * mouse_sensitivity;
+    cam_pitch += (float)yrel * mouse_sensitivity;
     if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
     if (cam_pitch < -89.0f) cam_pitch = -89.0f;
     Input_MouselookApply();
@@ -584,8 +603,8 @@ void normalize_vector(float* x, float* y, float* z) {
     if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } // Length check to avoid division by zero.
 }
 
-// Converts normalized quaternion to a 4x4 column-major matrix (left-handed, Y-up, Z-forward)
-void quat_to_matrix(Quaternion* q, float* m) {
+// Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
+inline void quat_to_matrix(Quaternion* q, float* m) {
     float x = q->x, y = q->y, z = q->z, w = q->w;
     float x2 = x * x, y2 = y * y, z2 = z * z;
     float xy = x * y, xz = x * z, yz = y * z;
@@ -625,6 +644,8 @@ void UpdatePlayerFacingAngles() {
 
 // Update camera position based on input
 void ProcessInput(void) {
+    if (gamePaused) return;
+    
     if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 2.0f;
     else sprinting = 0.0f;
 
@@ -678,31 +699,9 @@ float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z
 }
 // ============================================================================
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx, float roty, float rotz, float rotw, float sclx, float scly, float sclz) {
-    float x = rotx, y = roty, z = rotz, w = rotw;
-    float x2 = x * x, y2 = y * y, z2 = z * z;
-    float xy = x * y, xz = x * z, yz = y * z;
-    float wx = w * x, wy = w * y, wz = w * z;
-
-    // Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
     float rot[16];
-    rot[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
-    rot[1]  = 2.0f * (xy + wz);        // Right Y
-    rot[2]  = 2.0f * (xz - wy);        // Right Z
-    rot[3]  = 0.0f;
-    rot[4]  = 2.0f * (xy - wz);        // Up X
-    rot[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
-    rot[6]  = 2.0f * (yz + wx);        // Up Z
-    rot[7]  = 0.0f;
-    rot[8]  = 2.0f * (xz + wy);        // Forward X
-    rot[9]  = 2.0f * (yz - wx);        // Forward Y
-    rot[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
-    rot[11] = 0.0f;
-    rot[12] = 0.0f;
-    rot[13] = 0.0f;
-    rot[14] = 0.0f;
-    rot[15] = 1.0f;
-
-    // Apply uniform scaling to rotation matrix
+    Quaternion quat = { rotx, roty, rotz, rotw };
+    quat_to_matrix(&quat,rot);
     mat[0]  = rot[0] * -sclx; mat[1]  = rot[1] * -sclx; mat[2]  = rot[2] * -sclx; mat[3]  = 0.0f;
     mat[4]  = rot[4] * scly; mat[5]  = rot[5] * scly; mat[6]  = rot[6] * scly; mat[7]  = 0.0f;
     mat[8]  = rot[8] * sclz; mat[9]  = rot[9] * sclz; mat[10] = rot[10] * sclz; mat[11] = 0.0f;
@@ -766,12 +765,12 @@ void UpdateScreenSize(void) {
     m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
     float aspect = (float)screen_width / (float)screen_height;
-    float f = 1.0f / tan(fov * M_PI / 360.0f);
+    float f = 1.0f / tan(cam_fov * M_PI / 360.0f);
     m = rasterPerspectiveProjection;
     m[0] = f / aspect; m[1] = 0.0f; m[2] =                                                  0.0f; m[3] =  0.0f;
     m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
-    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(farPlane + nearPlane) / (farPlane - nearPlane); m[11]= -1.0f;
-    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * farPlane * nearPlane / (farPlane - nearPlane); m[15]=  0.0f;
+    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
 }
 
 typedef struct {
@@ -936,6 +935,7 @@ int32_t InitializeEnvironment(void) {
     stbi_flip_vertically_on_write(1);
 
     SDL_GL_MakeCurrent(window, gl_context);
+    SDL_ShowCursor(SDL_DISABLE);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_CTX + 1; }
 
@@ -957,11 +957,6 @@ int32_t InitializeEnvironment(void) {
     CHECK_GL_ERROR();
 
     if (CompileShaders()) return SYS_COUNT + 1;
-    glUseProgram(chunkShaderProgram);
-    glUniform1f(overrideGlowRLoc_chunk, 0.0f);
-    glUniform1f(overrideGlowGLoc_chunk, 0.0f);
-    glUniform1f(overrideGlowBLoc_chunk, 0.0f);
-
     glUseProgram(imageBlitShaderProgram);
     glUniform1ui(screenWidthLoc_imageBlit, screen_width);
     glUniform1ui(screenHeightLoc_imageBlit, screen_height);
@@ -1127,7 +1122,7 @@ int32_t InitializeEnvironment(void) {
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
     RenderLoadingProgress(50,"Loading level data...");
     renderableCount = 0;
-    loadedInstances = 0;
+    loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
     RenderLoadingProgress(55,"Loading lighting data...");
     if (LoadLevelLights(currentLevel)) return 1;
@@ -1141,44 +1136,9 @@ int32_t InitializeEnvironment(void) {
     return 0;
 }
 
-float playerVelocity_y = 0.0f;
-float gravityAdd = 0.02f; // Amount of gravity to apply every 1/60th of a second.
 int32_t Physics(void) {
-    // Dynamic Object Physics
-    for (uint16_t physObjIdx=0u;physObjIdx < MAX_DYNAMIC_ENTITIES;++physObjIdx) {
-        if (physObjects[physObjIdx].modelIndex >= MODEL_COUNT) continue;
-        
-        float floorHeight = gridCellFloorHeight[physObjects[physObjIdx].index];
-        physObjects[physObjIdx].velocity.y += gravityAdd;
-        if (physObjects[physObjIdx].velocity.y > TERMINAL_VELOCITY) physObjects[physObjIdx].velocity.y = TERMINAL_VELOCITY;
-        uint16_t boundsIdx = physObjects[physObjIdx].modelIndex * BOUNDS_ATTRIBUTES_COUNT;
-        float objHalfHeight = modelBounds[boundsIdx + BOUNDS_DATA_OFFSET_RADIUS];
-        float stopPos = floorHeight + objHalfHeight;
-        if ((physObjects[physObjIdx].position.y - stopPos) < 0.02f) { // Within 2 frames travel distance or gone through it
-            physObjects[physObjIdx].velocity.y = 0.0f;
-            physObjects[physObjIdx].position.y = stopPos;
-        } else {
-            physObjects[physObjIdx].position.y -= (0.16f * physObjects[physObjIdx].velocity.y); // Apply gravity
-        }
-    }
+    // If player position is near closed cell, move it back to open cell
     
-    // Player Physics
-    if (noclip) return 0;
-    
-//     DualLog("Physics tick, player at height: %f, playerVelocity_y: %f\n",cam_y, playerVelocity_y);    
-    float stopHeight = gridCellFloorHeight[playerCellIdx] + 0.84f;
-    if (stopHeight < (INVALID_FLOOR_HEIGHT + 1.0f)) stopHeight = -45.5f;
-    if (cam_y <= stopHeight) {
-//         DualLog("Player hit floor at %f\n",stopHeight);
-        cam_y = stopHeight;
-        playerVelocity_y = 0.0f;
-        return 0;
-    }
-    
-    playerVelocity_y += gravityAdd;
-    if (playerVelocity_y > 1.0f) playerVelocity_y = 1.0f; // Terminal velocity
-    cam_y -= (0.16f * playerVelocity_y);
-//     DualLog("Player velocity_y at end of Physics tick: %f with cam_y %f relative to stopHeight %f\n",playerVelocity_y,cam_y,stopHeight);
     return 0;
 }
 
@@ -1188,9 +1148,9 @@ int32_t EventExecute(Event* event) {
     if (event->type == EV_NULL) return 0;
 
     switch(event->type) {
-        case EV_KEYDOWN: return Input_KeyDown(event->payload1u);
-        case EV_KEYUP: return Input_KeyUp(event->payload1u);
-        case EV_MOUSEMOVE: return Input_MouseMove(event->payload1f,event->payload2f);
+        case EV_KEYDOWN: return Input_KeyDown(event->payload1i);
+        case EV_KEYUP: return Input_KeyUp(event->payload1i);
+        case EV_MOUSEMOVE: return Input_MouseMove(event->payload1i,event->payload2i);
         case EV_PHYSICS_TICK: return Physics();
         case EV_QUIT: return 1; break;
     }
@@ -1276,27 +1236,27 @@ int32_t EventInit(void) {
     return 0;
 }
 
-int32_t EnqueueEvent(uint8_t type, uint32_t payload1u, uint32_t payload2u, float payload1f, float payload2f) {
+int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f) {
     if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { DualLogError("Queue buffer filled!\n"); return 1; }
 
     //DualLog("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
     eventQueue[eventQueueEnd].frameNum = globalFrameNum;
     eventQueue[eventQueueEnd].type = type;
     eventQueue[eventQueueEnd].timestamp = 0;
-    eventQueue[eventQueueEnd].payload1u = payload1u;
-    eventQueue[eventQueueEnd].payload2u = payload2u;
+    eventQueue[eventQueueEnd].payload1i = payload1i;
+    eventQueue[eventQueueEnd].payload2i = payload2i;
     eventQueue[eventQueueEnd].payload1f = payload1f;
     eventQueue[eventQueueEnd].payload2f = payload2f;
     eventQueueEnd++;
     return 0;
 }
 
-int32_t EnqueueEvent_UintUint(uint8_t type, uint32_t payload1u, uint32_t payload2u) {
-    return EnqueueEvent(type,payload1u,payload2u,0.0f,0.0f);
+int32_t EnqueueEvent_IntInt(uint8_t type, int32_t payload1i, int32_t payload2i) {
+    return EnqueueEvent(type,payload1i,payload2i,0.0f,0.0f);
 }
 
-int32_t EnqueueEvent_Uint(uint8_t type, uint32_t payload1u) {
-    return EnqueueEvent(type,payload1u,0u,0.0f,0.0f);
+int32_t EnqueueEvent_Int(uint8_t type, int32_t payload1i) {
+    return EnqueueEvent(type,payload1i,0u,0.0f,0.0f);
 }
 
 int32_t EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
@@ -1361,10 +1321,7 @@ int32_t ReadActiveLog() {
     static bool eof_reached = false; // Track EOF across calls
     Event event;
     int32_t events_processed = 0;
-
-    if (eof_reached) {
-        return 2; // Indicate EOF was previously reached
-    }
+    if (eof_reached) return 2; // Indicate EOF was previously reached
 
     DualLog("------ ReadActiveLog start for frame %d ------\n",globalFrameNum);
     while (events_processed < MAX_EVENTS_PER_FRAME) {
@@ -1376,17 +1333,14 @@ int32_t ReadActiveLog() {
                 return events_processed > 0 ? 0 : 2; // 0 if events were processed, 2 if EOF and no events
             }
 
-            if (ferror(activeLogFile)) {
-                DualLogError("Could not read log file\n");
-                return -1; // Read error
-            }
+            if (ferror(activeLogFile)) { DualLogError("Could not read log file\n"); return -1; }
         }
 
         if (!IsPlayableEventType(event.type)) continue; // Skip unplayable events
 
         if (event.frameNum == globalFrameNum) {
             // Enqueue events matching the current frame
-            EnqueueEvent(event.type, event.payload1u, event.payload2u, event.payload1f, event.payload2f);
+            EnqueueEvent(event.type, event.payload1i, event.payload2i, event.payload1f, event.payload2f);
             events_processed++;
             DualLog("Enqueued event %d from log for frame %d\n",event.type,event.frameNum);
         } else if (event.frameNum > globalFrameNum) {
@@ -1394,8 +1348,7 @@ int32_t ReadActiveLog() {
             fseek(activeLogFile, -(long)sizeof(Event), SEEK_CUR);
             DualLog("Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
             return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if no matching events
-        }
-        // If event.frameNum < globalFrameNum, skip it (past event)
+        } // If event.frameNum < globalFrameNum, skip it (past event)
     }
 
     DualLog("End of log. Readback of %d events for this frame %d from log\n",events_processed,globalFrameNum);
@@ -1423,8 +1376,8 @@ int32_t JournalDump(const char* dem_file) {
         fprintf(fpW,"event type: %d, ",event.type);
         fprintf(fpW,"timestamp: %f, ", event.timestamp);
         fprintf(fpW,"delta time: %f, ", event.deltaTime_ns);
-        fprintf(fpW,"payload1u: %d, ", event.payload1u);
-        fprintf(fpW,"payload2u: %d, ", event.payload2u);
+        fprintf(fpW,"payload1i: %d, ", event.payload1i);
+        fprintf(fpW,"payload2i: %d, ", event.payload2i);
         fprintf(fpW,"payload1f: %f, ", event.payload1f);
         fprintf(fpW,"payload2f: %f\n", event.payload2f); // \n flushes write to file
     }
@@ -1486,9 +1439,6 @@ int32_t EventQueueProcess(void) {
             if (!log_playback) {
                 JournalLog();
                 lastJournalWriteTime = get_time();
-//                 DualLog("Event queue cleared after journal filled, log updated\n");
-            } else {
-//                 DualLog("Event queue cleared after journal filled, not writing to log during playback.\n");
             }
 
             clear_ev_journal(); // Also sets eventJournalIndex to 0.
@@ -1498,8 +1448,8 @@ int32_t EventQueueProcess(void) {
         eventJournal[eventJournalIndex].type = eventQueue[eventIndex].type;
         eventJournal[eventJournalIndex].timestamp = eventQueue[eventIndex].timestamp;
         eventJournal[eventJournalIndex].deltaTime_ns = eventQueue[eventIndex].deltaTime_ns;
-        eventJournal[eventJournalIndex].payload1u = eventQueue[eventIndex].payload1u;
-        eventJournal[eventJournalIndex].payload2u = eventQueue[eventIndex].payload2u;
+        eventJournal[eventJournalIndex].payload1i = eventQueue[eventIndex].payload1i;
+        eventJournal[eventJournalIndex].payload2i = eventQueue[eventIndex].payload2i;
         eventJournal[eventJournalIndex].payload1f = eventQueue[eventIndex].payload1f;
         eventJournal[eventJournalIndex].payload2f = eventQueue[eventIndex].payload2f;
 
@@ -1585,30 +1535,31 @@ int32_t main(int32_t argc, char* argv[]) {
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;
+        if (!gamePaused) pauseRelativeTime += frame_time;
         
         // Enqueue input events
         SDL_Event event;
-        float mouse_xrel = 0.0f, mouse_yrel = 0.0f;
+        int32_t mouse_xrel = 0.0f, mouse_yrel = 0.0f;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT); // [x] button
             else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_ESCAPE) {
+                if (event.key.keysym.sym == SDLK_F10) {
                     if (log_playback) {
                         log_playback = false;
                         DualLog("Exited log playback manually.  Control returned\n");                           
                     } else EnqueueEvent_Simple(EV_QUIT); // <<< THAT"S ALL FOLKS!
                 } else {
                     if (!log_playback) {
-                        EnqueueEvent_Uint(EV_KEYDOWN,(uint32_t)event.key.keysym.scancode);
+                        EnqueueEvent_Int(EV_KEYDOWN,event.key.keysym.scancode);
                     } else {
                         // Handle pause, rewind, fastforward of logs here
                     }
                 }
             } else if (event.type == SDL_KEYUP && !log_playback) {
-                EnqueueEvent_Uint(EV_KEYUP,(uint32_t)event.key.keysym.scancode);
+                EnqueueEvent_Int(EV_KEYUP,event.key.keysym.scancode);
             } else if (event.type == SDL_MOUSEMOTION && window_has_focus && !log_playback) {
-                mouse_xrel += event.motion.xrel;
-                mouse_yrel += event.motion.yrel;
+                mouse_xrel += event.motion.xrel; // Cast from int32_t
+                mouse_yrel += event.motion.yrel; // Cast from int32_t
 
             // These aren't really events so just handle them here.
             } else if (event.type == SDL_WINDOWEVENT) {
@@ -1624,7 +1575,7 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // After polling, enqueue a single mouse motion event if there was movement
         if (!log_playback && (mouse_xrel != 0.0f || mouse_yrel != 0.0f)) {
-            EnqueueEvent_FloatFloat(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
+            EnqueueEvent_IntInt(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
         }
         
         accumulator += frame_time;
@@ -1664,25 +1615,12 @@ int32_t main(int32_t argc, char* argv[]) {
         verticesRenderedThisFrame = 0;
         
         // 0. Clear Frame Buffers and Depth
-        glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+        if (!gamePaused) glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
 
+        if (!gamePaused) { // !PAUSED BLOCK -------------------------------------------------
         // 1. Culling
         Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
-        bool instanceIsCulledArray[INSTANCE_COUNT];
-        bool instanceIsLODArray[INSTANCE_COUNT];
-        memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
-        memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
-        float distSqrd = 0.0f;
-        float lodRangeSqrd = 38.4f * 38.4f;
-        for (uint16_t i=0;i<INSTANCE_COUNT;++i) { // This loop executes faster single threaded
-            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            if (!instanceIsCulledArray[i]) continue; // Already marked as visible.
-
-            distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
-            if (distSqrd < sightRangeSquared) instanceIsCulledArray[i] = false;
-            if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
-        }
         
         // 2. Pass instance data to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
@@ -1701,7 +1639,15 @@ int32_t main(int32_t argc, char* argv[]) {
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
         glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
         glBindVertexArray(vao_chunk);
+        float lodRangeSqrd = 38.4f * 38.4f;
+        memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
+        memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
+            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+            float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
+            if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
+            if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
+            
             if (instanceIsCulledArray[i]) continue; // Culled by distance
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
@@ -1712,7 +1658,6 @@ int32_t main(int32_t argc, char* argv[]) {
             }
             
             if (i >= startOfTransparentInstances) {
-//                 if (instances[i].modelIndex == 287) DualLog("Rendering med2_4 as transparent! Instance: %d, startOfTransparentInstances: %d, texture: %d, model: %d\n",i,startOfTransparentInstances,instances[i].texIndex,instances[i].modelIndex);
                 if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
                 glEnable(GL_BLEND); // Enable blending for transparent instances
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
@@ -1752,23 +1697,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_CULL_FACE); // Reenable backface culling
         glEnable(GL_DEPTH_TEST);
 
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
         // ====================================================================
-        // Ok, turn off temporary framebuffer so we can draw to screen now.
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // ====================================================================
-
-        // 4. Voxel Tracing
-//         glUseProgram(voxelTracingShaderProgram);
-//         glUniform1f(worldMin_xLoc_vox, worldMin_x);
-//         glUniform1f(worldMin_zLoc_vox, worldMin_z);
-//         glUniform3f(camPosLoc_vox, cam_x, cam_y, cam_z);
-//         glActiveTexture(GL_TEXTURE0);
-//         glBindTexture(GL_TEXTURE_2D, voxelOpacityTextureID);
-//         glUniform1i(voxelOpacityTexLoc_vox, 0);
-//         GLuint groupX_vox = (screen_width / 4 + 31) / 32;
-//         GLuint groupY_vox = (screen_height / 4 + 31) / 32;
-//         glDispatchCompute(groupX_vox, groupY_vox, 1);
-//         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         
         // 4. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;
@@ -1803,6 +1733,9 @@ int32_t main(int32_t argc, char* argv[]) {
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         }
+        } else { // END !PAUSED BLOCK -------------------------------------------------
+            glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
+        }
         
         // 6. Render final meshes' results with full screen quad
         glUseProgram(imageBlitShaderProgram);
@@ -1819,16 +1752,19 @@ int32_t main(int32_t argc, char* argv[]) {
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
         
         // 7. Render UI Images
- 
+        //    Cursor
+        if (gamePaused) RenderFormattedText((screen_width / 2) - 20, (screen_height / 2) - (int32_t)((float)screen_height * 0.30f), TEXT_RED, "PAUSED");
+        
         // 8. Render UI Text;
         int32_t textY = 25; int32_t textVertOfset = 15;
         RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
         RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-//         RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+        RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-//         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-//         RenderFormattedText(10, textY + (textVertOfset * 6), TEXT_WHITE, "Fog R: %f, G: %f, B: %f", fogColorR, fogColorG, fogColorB);
-//
+        RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+
+        if (CursorVisible()) RenderFormattedText(cursorPosition_x, cursorPosition_y, TEXT_YELLOW, "|\\ live!");
+
         // Frame stats
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)

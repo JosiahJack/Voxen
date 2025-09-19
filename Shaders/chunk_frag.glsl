@@ -8,9 +8,6 @@ in vec3 Normal;
 in vec3 FragPos;
 
 uniform int debugView;
-uniform float overrideGlowR = 0.0;
-uniform float overrideGlowG = 0.0;
-uniform float overrideGlowB = 0.0;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -104,8 +101,6 @@ void main() {
     } else if (debugView == 5) { // Worldpos debug
         outAlbedo.rgb = worldPos;
         outAlbedo.a = 1.0;
-    } else if (debugView == 6) { // Lightview Mode
-        outAlbedo = vec4(overrideGlowR,overrideGlowG,overrideGlowB,1.0);
     } else {
         outAlbedo.rgb = albedoColor.rgb * albedoColor.a;
         outAlbedo.a = 1.0;
