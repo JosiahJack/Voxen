@@ -31,6 +31,8 @@
 SDL_Window *window;
 bool inventoryMode = false;
 bool consoleActive = false;
+char consoleEntryText[1024] = "Enter a command...";
+int32_t currentEntryLength = 0;
 uint16_t screen_width = 1366, screen_height = 768;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 bool window_has_focus = false;
@@ -522,6 +524,60 @@ void Input_MouselookApply() {
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
+void ProcessConsoleCommand(const char* command) {
+    if (strcmp(command, "noclip") == 0) {
+        noclip = !noclip;
+        DualLog("Noclip %s\n", noclip ? "enabled" : "disabled");
+    } else if (strcmp(command, "quit") == 0) {
+        EnqueueEvent_Simple(EV_QUIT);
+    } else {
+        DualLog("Unknown command: %s\n", command);
+    }
+}
+
+void ConsoleEmulator(int32_t scancode) {
+    if (scancode == SDL_SCANCODE_U && keys[SDL_SCANCODE_LCTRL]) {
+        consoleEntryText[0] = '\0'; // Clear the input
+        currentEntryLength = 0;
+        return;
+    }
+    
+    if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) { // Handle alphabet keys (SDL scancodes 4-29 correspond to 'a' to 'z')
+        if (currentEntryLength < 1023) { // Ensure we don't overflow the buffer
+            char c = 'a' + (scancode - SDL_SCANCODE_A); // Map scancode to character
+            consoleEntryText[currentEntryLength] = c;
+            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
+            currentEntryLength++;
+        }
+    } else if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0) { // Handle number keys (SDL scancodes 30-39 correspond to '0' to '9')
+        if (currentEntryLength < 1023) {
+            char c;
+            if (scancode == SDL_SCANCODE_0) c = '0'; // Special case for '0'
+            else c = '1' + (scancode - SDL_SCANCODE_1); // Map 1-9 to '1'-'9'
+
+            consoleEntryText[currentEntryLength] = c;
+            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
+            currentEntryLength++;
+        }
+    } else if (scancode == SDL_SCANCODE_BACKSPACE && currentEntryLength > 0) { // Handle backspace
+        currentEntryLength--;
+        consoleEntryText[currentEntryLength] = '\0'; // Null-terminate
+    } else if (scancode == SDL_SCANCODE_SPACE) { // Handle other keys as needed (e.g., enter, space, etc.)
+        if (currentEntryLength < 1023) {
+            consoleEntryText[currentEntryLength] = ' ';
+            consoleEntryText[currentEntryLength + 1] = '\0';
+            currentEntryLength++;
+        }
+    } else if (scancode == SDL_SCANCODE_RETURN) {
+        // Handle command execution or clear the console
+        DualLog("Console command: %s\n", consoleEntryText);
+        ProcessConsoleCommand(consoleEntryText);
+        // Optionally process the command here
+        consoleEntryText[0] = '\0'; // Clear the input
+        currentEntryLength = 0;
+    }
+}
+
 bool inventoryModeWasActivePriorToConsole = false;
 int32_t Input_KeyDown(int32_t scancode) {
     keys[scancode] = true;    
@@ -535,7 +591,7 @@ int32_t Input_KeyDown(int32_t scancode) {
         }
     }
     
-    if (consoleActive) return 0;
+    if (consoleActive) { ConsoleEmulator(scancode); return 0; }
     
     if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
     if (keys[SDL_SCANCODE_R]) {
@@ -654,14 +710,10 @@ void UpdatePlayerFacingAngles() {
     normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
 }
 
-void ConsoleEmulator() {
-    
-}
-
 // Update camera position based on input
 void ProcessInput(void) {
     if (gamePaused) return;
-    if (consoleActive) { ConsoleEmulator(); return; }
+    if (consoleActive) return;
     
     if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 2.0f;
     else sprinting = 0.0f;
@@ -1780,7 +1832,7 @@ int32_t main(int32_t argc, char* argv[]) {
         RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 
-        if (consoleActive) RenderFormattedText(10, 0, TEXT_WHITE, "]");
+        if (consoleActive) RenderFormattedText(10, 0, TEXT_WHITE, "] %s",consoleEntryText);
 
         if (CursorVisible()) RenderFormattedText(cursorPosition_x, cursorPosition_y, TEXT_YELLOW, "|\\ live!");
 
