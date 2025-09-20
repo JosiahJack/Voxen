@@ -31,7 +31,12 @@
 SDL_Window *window;
 bool inventoryMode = false;
 bool consoleActive = false;
-char consoleEntryText[1024] = "Enter a command...";
+#define STATUS_TEXT_MAX_LENGTH 1024
+char consoleEntryText[STATUS_TEXT_MAX_LENGTH] = "Enter a command...";
+char statusText[STATUS_TEXT_MAX_LENGTH];
+int statusTextLengthWithoutNullTerminator = 6;
+float statusTextDecayFinished = 0.0f;
+float genericTextHeightFac = 0.02f;
 int32_t currentEntryLength = 0;
 uint16_t screen_width = 1366, screen_height = 768;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
@@ -219,17 +224,24 @@ static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_li
     va_end(copy);
 }
 
-void DualLog(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
-void DualLogWarn(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
-void DualLogError(const char *fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
-
+void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
+void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+void CenterStatusPrint(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    statusTextLengthWithoutNullTerminator = vsnprintf(statusText, STATUS_TEXT_MAX_LENGTH, fmt, args);
+    va_end(args);
+    DualLog("%s\n",statusText);
+    statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.
+}
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 void DebugRAM(const char *context, ...) {
 #ifdef DEBUG_RAM_OUTPUT
-    char formatted_context[1024];
+    char formatted_context[STATUS_TEXT_MAX_LENGTH];
     va_list args;
     va_start(args, context);
     vsnprintf(formatted_context, sizeof(formatted_context), context, args);
@@ -456,6 +468,13 @@ void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* forma
     RenderText(x, y, uiTextBuffer, color);
 }
 
+int32_t GetScreenRelativeX(float percentage) { return (int32_t)floorf((float)screen_width * percentage); }
+int32_t GetScreenRelativeY(float percentage) { return (int32_t)floorf((float)screen_height * percentage); }
+int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTerminator) {
+    float characterWidth = genericTextHeightFac * 0.75f * screen_height; // Measured some and found between 0.6 and 0.82 in Gimp for width to height ratio.
+    return (pointToCenterOn - (int32_t)( (float)numCharactersNoNullTerminator * 0.5f) * characterWidth); // This could be mid character ;)
+}
+
 void Screenshot() {
     struct stat st = {0};
     if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
@@ -524,15 +543,29 @@ void Input_MouselookApply() {
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
+bool inventoryModeWasActivePriorToConsole = false;
+void ToggleConsole() {
+    if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
+    consoleActive = !consoleActive; // Tilde
+    if (consoleActive) inventoryMode = true;
+    else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
+        inventoryMode = false;
+    } 
+}
+
 void ProcessConsoleCommand(const char* command) {
     if (strcmp(command, "noclip") == 0) {
         noclip = !noclip;
-        DualLog("Noclip %s\n", noclip ? "enabled" : "disabled");
-    } else if (strcmp(command, "quit") == 0) {
+        CenterStatusPrint("Noclip %s", noclip ? "enabled" : "disabled");
+        ToggleConsole();
+    }  else if (strcmp(command, "quit") == 0) {
         EnqueueEvent_Simple(EV_QUIT);
     } else {
-        DualLog("Unknown command: %s\n", command);
+        CenterStatusPrint("Unknown command: %s", command);
     }
+    
+    consoleEntryText[0] = '\0'; // Clear the input
+    currentEntryLength = 0;
 }
 
 void ConsoleEmulator(int32_t scancode) {
@@ -543,14 +576,14 @@ void ConsoleEmulator(int32_t scancode) {
     }
     
     if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) { // Handle alphabet keys (SDL scancodes 4-29 correspond to 'a' to 'z')
-        if (currentEntryLength < 1023) { // Ensure we don't overflow the buffer
+        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) { // Ensure we don't overflow the buffer
             char c = 'a' + (scancode - SDL_SCANCODE_A); // Map scancode to character
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
             currentEntryLength++;
         }
     } else if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0) { // Handle number keys (SDL scancodes 30-39 correspond to '0' to '9')
-        if (currentEntryLength < 1023) {
+        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) {
             char c;
             if (scancode == SDL_SCANCODE_0) c = '0'; // Special case for '0'
             else c = '1' + (scancode - SDL_SCANCODE_1); // Map 1-9 to '1'-'9'
@@ -563,7 +596,7 @@ void ConsoleEmulator(int32_t scancode) {
         currentEntryLength--;
         consoleEntryText[currentEntryLength] = '\0'; // Null-terminate
     } else if (scancode == SDL_SCANCODE_SPACE) { // Handle other keys as needed (e.g., enter, space, etc.)
-        if (currentEntryLength < 1023) {
+        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) {
             consoleEntryText[currentEntryLength] = ' ';
             consoleEntryText[currentEntryLength + 1] = '\0';
             currentEntryLength++;
@@ -572,25 +605,13 @@ void ConsoleEmulator(int32_t scancode) {
         // Handle command execution or clear the console
         DualLog("Console command: %s\n", consoleEntryText);
         ProcessConsoleCommand(consoleEntryText);
-        // Optionally process the command here
-        consoleEntryText[0] = '\0'; // Clear the input
-        currentEntryLength = 0;
     }
 }
 
-bool inventoryModeWasActivePriorToConsole = false;
 int32_t Input_KeyDown(int32_t scancode) {
     keys[scancode] = true;    
     if (keys[SDL_SCANCODE_ESCAPE]) gamePaused = !gamePaused;
-    if (keys[SDL_SCANCODE_GRAVE]) {
-        if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
-        consoleActive = !consoleActive; // Tilde
-        if (consoleActive) inventoryMode = true;
-        else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
-            inventoryMode = false;
-        }
-    }
-    
+    if (keys[SDL_SCANCODE_GRAVE]) ToggleConsole();
     if (consoleActive) { ConsoleEmulator(scancode); return 0; }
     
     if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
@@ -1115,7 +1136,7 @@ int32_t InitializeEnvironment(void) {
     glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
     glVertexArrayAttribBinding(textVAO, 0, 0); // DSA: Bind position to binding index 0
     glVertexArrayAttribBinding(textVAO, 1, 0); // DSA: Bind texcoord to binding index 0
-    font = TTF_OpenFont("./Fonts/SystemShockText.ttf", 12);
+    font = TTF_OpenFont("./Fonts/SystemShockText.ttf", GetScreenRelativeY(genericTextHeightFac));
     if (!font) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     DebugRAM("text init");
 
@@ -1205,7 +1226,13 @@ int32_t InitializeEnvironment(void) {
     return 0;
 }
 
+int32_t ParticleSystemStep(void) {
+    if (gamePaused || menuActive) return 0; // No particle movement on the menu or paused
+    
+    return 0;
+}
 int32_t Physics(void) {
+    if (gamePaused || menuActive) return 0; // No physics on the menu or paused
     // If player position is near closed cell, move it back to open cell
     
     return 0;
@@ -1221,6 +1248,7 @@ int32_t EventExecute(Event* event) {
         case EV_KEYUP: return Input_KeyUp(event->payload1i);
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1i,event->payload2i);
         case EV_PHYSICS_TICK: return Physics();
+        case EV_PARTICLE_TICK: return ParticleSystemStep();
         case EV_QUIT: return 1; break;
     }
 
@@ -1820,26 +1848,37 @@ int32_t main(int32_t argc, char* argv[]) {
         glUseProgram(0);
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
         
+        // UI Common References
+        int screenCenterX = screen_width / 2;
+        int screenCenterY = screen_height / 2;
+        int32_t lineSpacing = GetScreenRelativeY(0.03f);
+//         int32_t characterWidth = (int32_t)floorf(genericTextHeightFac * 0.75f * screen_height);
+//         int32_t characterHeight = (int32_t)floorf(genericTextHeightFac * screen_height);
+        int32_t characterWidthHalf = (int32_t)floorf(genericTextHeightFac * 0.75f * screen_height * 0.5f);
+        int32_t characterHeightHalf = (int32_t)floorf(genericTextHeightFac * screen_height * 0.5f);
         // 7. Render UI Images
         //    Cursor
-        if (gamePaused) RenderFormattedText((screen_width / 2) - 20, (screen_height / 2) - (int32_t)((float)screen_height * 0.30f), TEXT_RED, "PAUSED");
+        if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), TEXT_RED, "PAUSED");
         
         // 8. Render UI Text;
-        int32_t textY = 35; int32_t textVertOfset = 15;
-        RenderFormattedText(10, textY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
-        RenderFormattedText(10, textY + (textVertOfset * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(10, textY + (textVertOfset * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-        RenderFormattedText(10, textY + (textVertOfset * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-        RenderFormattedText(10, textY + (textVertOfset * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
+        int32_t leftPad = GetScreenRelativeX(0.0125f);
+        RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 
-        if (consoleActive) RenderFormattedText(10, 0, TEXT_WHITE, "] %s",consoleEntryText);
+        if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
+        if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
 
-        if (CursorVisible()) RenderFormattedText(cursorPosition_x, cursorPosition_y, TEXT_YELLOW, "|\\ live!");
+        if (CursorVisible()) RenderFormattedText(cursorPosition_x - characterWidthHalf, cursorPosition_y - characterHeightHalf, TEXT_RED, "+");
+        else RenderFormattedText(screenCenterX - characterWidthHalf, screenCenterY - characterHeightHalf, TEXT_GREEN, "+");
 
         // Frame stats
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(10, textY - textVertOfset, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d",
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d",
                             (time_now - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
         last_time = time_now;
         if ((time_now - lastFrameSecCountTime) >= 1.00) {

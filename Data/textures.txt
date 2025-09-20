@@ -2585,3 +2585,17 @@ index: 1257
 index: 1258
 #Textures/hw_navunit_glow.png
 index: 1259
+#Textures/UI/cursors/cursor.png
+index: 1260
+#Textures/UI/cursors/cursor_normal.png
+index: 1261
+#Textures/UI/cursors/cursor_LH.png
+index: 1262
+#Textures/UI/cursors/cursor_RH.png
+index: 1263
+#Textures/UI/cursors/cursor_DN.png
+index: 1264
+#Textures/UI/cursors/cursor_vmail.png
+index: 1265
+#Textures/UI/cursors/cursor_cyberspace.png
+index: 1266
