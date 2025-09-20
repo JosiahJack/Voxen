@@ -1231,10 +1231,29 @@ int32_t ParticleSystemStep(void) {
     
     return 0;
 }
+
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
-    // If player position is near closed cell, move it back to open cell
     
+    for (int i=0;i<physHead;++i) {
+        // Get modelBounds[physObjects[i].modelIndex]
+        // Orient the model space modelBounds using the physObjects[i].rotation which is a Quaternion { float x,y,z,w; }
+        // Get world cell index from world position
+        // Check all AABB bounds against world cell closed edges gridCellStates[cellIdx] & CELL_CLOSEDNORTH, CELL_CLOSEDEAST, CELL_CLOSEDSOUTH, CELL_CLOSEDWEST
+        // Also check AABB bounds against world cell floorHeight from gridCellFloorHeight[cellIdx] and ceiling from gridCellCeilingHeight[cellIdx]
+        // If overlapping, move by overlap amount on that axis
+        // Do for all 3 axes
+        // Ignore torque for now
+        // Ignore dynamic object to dynamic object overlap for now
+    }
+    
+    // Player Physics
+    // If player position is near closed cell, move it back to open cell
+    if (noclip) return 0;
+    if (!(gridCellStates[playerCellIdx] & CELL_OPEN)) return 0;
+    
+    float cam_Floor = cam_y - 0.84f;
+    if (cam_Floor < gridCellFloorHeight[playerCellIdx]) cam_y = gridCellFloorHeight[playerCellIdx] + 0.84f;
     return 0;
 }
 

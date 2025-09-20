@@ -64,10 +64,12 @@ typedef struct {
     uint16_t lodIndex;
     uint16_t index;
     bool active;
+    bool solid;
     bool cardchunk;
     bool doublesided; // Parsing only, TODO Remove
     bool transparent; // Parsing only, TODO Remove
     float floorHeight; // Parsing only, TODO Remove
+    float ceilingHeight; // Parsing only, TODO Remove
     uint8_t type; // Parsing only, TODO Remove
     uint8_t saveableType; // Parsing only, TODO Remove
     char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, plus 1 for null terminator, results in nice even multiple of 4 bytes
@@ -75,6 +77,12 @@ typedef struct {
 } Entity;
 // Includes subfields for parsing from text files, e.g. x,y,z need to parse "position.x" one "field":
 #define ENTITY_FIELD_COUNT 41
+
+typedef struct {
+    Vector3 mins;
+    Vector3 maxs;
+    uint8_t type;
+} Trigger;
 
 typedef struct {
     Entity* entries;
@@ -265,7 +273,8 @@ int32_t EventQueueProcess(void);
 
 // TODO: Citadel specific value that is well below the world at a position that falling objects
 //       in Unity reach terminal velocity and are caught by the stupid catch tray that detects such errors.
-#define INVALID_FLOOR_HEIGHT -1300.0f
+#define INVALID_FLOOR_HEIGHT -1300.0f // These values are known to be ok for Citadel TODO generic from mod data
+#define INVALID_CEIL_HEIGHT 1300.0f
 
 #define LUXEL_SIZE 0.16f
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
@@ -304,7 +313,7 @@ void Cull();
 #define MAX_DYNAMIC_ENTITIES 256
 #define TERMINAL_VELOCITY 10.0f
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
-
+extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;
 static const uint8_t PhysicsLayer_TransparentFX    = 1;

@@ -8,6 +8,7 @@
 
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
+float gridCellCeilingHeight[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
 uint16_t cellIndexForLight[LIGHT_COUNT];
@@ -48,12 +49,18 @@ void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
 void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
+    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = INVALID_FLOOR_HEIGHT;
+    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = INVALID_CEIL_HEIGHT;
     for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
         PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
         cellIdx = (z * WORLDX) + x;
         cellIndexForInstance[c] = (uint32_t)cellIdx;
         if (instances[c].floorHeight > INVALID_FLOOR_HEIGHT && instances[c].floorHeight > gridCellFloorHeight[cellIdx]) {
             gridCellFloorHeight[cellIdx] = instances[c].floorHeight; // Raise floor up until highest one is selected.
+        }
+        
+        if (instances[c].ceilingHeight < INVALID_CEIL_HEIGHT && instances[c].ceilingHeight < gridCellCeilingHeight[cellIdx]) {
+            gridCellCeilingHeight[cellIdx] = instances[c].ceilingHeight; // Raise floor up until highest one is selected.
         }
     }
 }

@@ -38,6 +38,7 @@ DataParser level_parser;
 DataParser lights_parser;
 DataParser dynamics_parser;
 Entity physObjects[MAX_DYNAMIC_ENTITIES];
+uint16_t physHead = 0;
 
 void parser_init(DataParser *parser) {
     parser->entries = NULL;
@@ -696,6 +697,7 @@ int32_t LoadEntities(void) {
         entities[i].rotation.z = 0.0f;
         entities[i].rotation.w = 0.0f;
         entities[i].floorHeight = INVALID_FLOOR_HEIGHT;
+        entities[i].ceilingHeight = INVALID_CEIL_HEIGHT;
     }
 
     DualLog(" took %f seconds\n", get_time() - start_time);
@@ -885,6 +887,7 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
         instances[idx].rotation.w = 1.0f; // Quaternion identity
         instances[idx].floorHeight = INVALID_FLOOR_HEIGHT;
+        instances[idx].ceilingHeight = INVALID_CEIL_HEIGHT;
         dirtyInstances[idx] = true;
     }
 
@@ -1034,7 +1037,7 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
     int32_t startingIdx = (int32_t)loadedInstances;
-    uint16_t physHead = 0;
+    physHead = 0;
     for (int32_t idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
         loadedInstances++;
         int32_t entIdx = dynamics_parser.entries[i].index;
