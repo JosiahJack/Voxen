@@ -17,6 +17,8 @@
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
+float** modelVertices = NULL;
+uint32_t** modelTriangles = NULL;
 GLuint vbos[MODEL_COUNT];
 GLuint tbos[MODEL_COUNT];
 GLuint modelBoundsID;
@@ -423,12 +425,8 @@ int32_t LoadModels(void) {
     int32_t totalTriCount = 0;
     uint32_t largestVertCount = 0;
     uint32_t largestTriangleCount = 0;
-    uint32_t* vertexOffsets = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
-    uint32_t* triangleOffsets = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
-    memset(vertexOffsets, 0, MODEL_COUNT * sizeof(uint32_t));
-    memset(triangleOffsets, 0, MODEL_COUNT * sizeof(uint32_t));
-    float** modelVertices = (float**)malloc(MODEL_COUNT * sizeof(float*));
-    uint32_t** modelTriangles = (uint32_t**)malloc(MODEL_COUNT * sizeof(uint32_t*));
+    modelVertices = (float**)malloc(MODEL_COUNT * sizeof(float*));
+    modelTriangles = (uint32_t**)malloc(MODEL_COUNT * sizeof(uint32_t*));
     uint32_t* vertexCounts = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
     uint32_t* triCounts = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
     float* modelBoundsLocal = (float*)malloc(MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
@@ -439,8 +437,6 @@ int32_t LoadModels(void) {
     glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-    uint32_t currentVertexOffset = 0;
-    uint32_t currentTriangleOffset = 0;
 
     #pragma omp parallel
     {
@@ -574,13 +570,9 @@ int32_t LoadModels(void) {
         free(tempTriangles);
     }
 
-    for (uint32_t i = 0; i < MODEL_COUNT; i++) { // Sequential phase: Compute offsets and upload to GPU
+    for (uint32_t i = 0; i < MODEL_COUNT; i++) { // Sequential phase
         if (vertexCounts[i] == 0 || triCounts[i] == 0) continue;
 
-        vertexOffsets[i] = currentVertexOffset;
-        triangleOffsets[i] = currentTriangleOffset;
-        currentVertexOffset += vertexCounts[i];
-        currentTriangleOffset += triCounts[i];
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         if (triCounts[i] > 0) { // Upload to GPU
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
@@ -600,8 +592,6 @@ int32_t LoadModels(void) {
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
             glBufferData(GL_COPY_WRITE_BUFFER, triCounts[i] * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
             glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCounts[i] * 3 * sizeof(uint32_t));
-            free(modelVertices[i]); // Free per-model buffers
-            free(modelTriangles[i]);
         }
     }
 
@@ -629,8 +619,6 @@ int32_t LoadModels(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
 
-    free(vertexOffsets);
-    free(triangleOffsets);
     free(modelVertices);
     free(modelTriangles);
     free(vertexCounts);

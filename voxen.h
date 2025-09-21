@@ -135,7 +135,7 @@ int32_t LoadModels(void);
 
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define INSTANCE_COUNT 5800 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects
+#define INSTANCE_COUNT 7400 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 extern Entity entities[MAX_ENTITIES];
 extern Entity instances[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
@@ -307,9 +307,6 @@ void Cull();
 // Physics
 #define MAX_DYNAMIC_ENTITIES 256
 #define TERMINAL_VELOCITY 10.0f
-#define PLAYER_RADIUS 0.48f
-#define PLAYER_HEIGHT 2.00f
-#define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;

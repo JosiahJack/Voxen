@@ -16,6 +16,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #include "voxen.h"
+#include "citadel.h"
 
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
@@ -168,7 +169,7 @@ float mouse_sensitivity = 0.1f;
 bool in_cyberspace = true;
 float move_speed = 0.15f;
 float sprinting = 0.0f;
-bool noclip = true;
+bool noclip = false;
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
 int32_t debugView = 0;
@@ -1236,10 +1237,14 @@ int32_t ParticleSystemStep(void) {
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
 
+    // Player Movement from Input
     if (window_has_focus) { // Move the player based on input first, then bound it below...
         UpdatePlayerFacingAngles();
         ProcessInput();
     }
+    
+    // Player Gravity
+    cam_y -= 0.08f;
     
     for (int i=0;i<physHead;++i) {
         // Get modelBounds[physObjects[i].modelIndex]
@@ -1258,12 +1263,13 @@ int32_t Physics(void) {
     if (noclip) return 0;
     
     cellFloorHeight = gridCellFloorHeight[playerCellIdx];
-    cellCeilHeight = gridCellCeilingHeight[playerCellIdx];
-    if (!(gridCellStates[playerCellIdx] & CELL_OPEN)) return 0;
-    if (cellFloorHeight <= (-FLT_MAX + MATH_EPSILON)) return 0;
-    
-    float cam_Floor = cam_y - PLAYER_RADIUS; // TODO handle body state offset for crouching/prone.
-    if (cam_Floor < cellFloorHeight) cam_y = cellFloorHeight + PLAYER_RADIUS; // Actual physics
+    cellCeilHeight = gridCellCeilingHeight[playerCellIdx];    
+    float bodyStateAdd = 0.0f;
+    switch(playerMovement.bodyState) {
+        case BodyState_Standing: bodyStateAdd = (PLAYER_HEIGHT * 0.5f); break;
+    }
+    float cam_Floor = cam_y - PLAYER_RADIUS - bodyStateAdd; // TODO handle body state offset for crouching/prone.
+    if (cam_Floor < cellFloorHeight) cam_y = cellFloorHeight + PLAYER_RADIUS + bodyStateAdd; // Actual physics
     float cam_Ceil = cam_y + PLAYER_RADIUS;
     if (cam_Ceil > cellCeilHeight) cam_y = cellCeilHeight - PLAYER_RADIUS; // Actual physics
     return 0;

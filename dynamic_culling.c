@@ -69,7 +69,23 @@ void PutChunksInCells() {
         if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
     }
     
-    for (int i=0;i<ARRSIZE;++i) DualLog("gridCellFloorHeight[%d]: %f\n",i,gridCellFloorHeight[i]);
+    float levelMinFloor = FLT_MAX;
+    float levelMaxCeil = -FLT_MAX;
+    for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
+        if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
+        if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
+    }
+    
+    DualLog("Min floor level for %d: %f, Max ceil %f\n",currentLevel,levelMinFloor, levelMaxCeil);
+    for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
+        if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
+        if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
+    }
+    
+//     for (int i=0;i<ARRSIZE;++i) {
+//         DualLog("gridCellFloorHeight[%d]: %f\n",i,gridCellFloorHeight[i]);
+//         DualLog("gridCellCeilingHeight[%d]: %f\n",i,gridCellCeilingHeight[i]);
+//     }
 }
 
 void PutMeshesInCells(int32_t type) {
@@ -77,6 +93,7 @@ void PutMeshesInCells(int32_t type) {
     switch(type) {
         case 5: count = LIGHT_COUNT; break; // Lights
     }
+
     for (int32_t index=0;index<count;index++) {
         uint16_t x,z;
         switch(type) {
