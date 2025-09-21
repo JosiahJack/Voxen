@@ -427,9 +427,6 @@ int32_t LoadModels(void) {
     uint32_t largestTriangleCount = 0;
     modelVertices = (float**)malloc(MODEL_COUNT * sizeof(float*));
     modelTriangles = (uint32_t**)malloc(MODEL_COUNT * sizeof(uint32_t*));
-    uint32_t* vertexCounts = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
-    uint32_t* triCounts = (uint32_t*)malloc(MODEL_COUNT * sizeof(uint32_t));
-    float* modelBoundsLocal = (float*)malloc(MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
@@ -448,8 +445,6 @@ int32_t LoadModels(void) {
         for (uint32_t i = 0; i < MODEL_COUNT; i++) {
             modelVertices[i] = NULL;
             modelTriangles[i] = NULL;
-            vertexCounts[i] = 0;
-            triCounts[i] = 0;
             int32_t matchedParserIdx = -1;
             for (int32_t k = 0; k < model_parser.count; k++) {
                 if (model_parser.entries[k].index == i) { matchedParserIdx = k; break; }
@@ -487,11 +482,14 @@ int32_t LoadModels(void) {
                 #pragma omp critical
                 DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); aiReleaseImport(scene); aiReleasePropertyStore(props); continue;
             }
+            
+            if (vertexCount < 1 || triCount < 1) {
+                #pragma omp critical
+                DualLogError("Model %s has no tris!\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); aiReleasePropertyStore(props); continue;
+            }
 
             modelVertexCounts[i] = vertexCount;
             modelTriangleCounts[i] = triCount;
-            vertexCounts[i] = vertexCount;
-            triCounts[i] = triCount;
 
             #pragma omp critical
             {
@@ -543,27 +541,19 @@ int32_t LoadModels(void) {
                 globalVertexOffset += mesh->mNumVertices;
             }
 
-            // Store vertex and triangle data for sequential upload
-            if (triCount > 0) {
-                modelVertices[i] = (float*)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                modelTriangles[i] = (uint32_t*)malloc(triCount * 3 * sizeof(uint32_t));
-                memcpy(modelVertices[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                memcpy(modelTriangles[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-                modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
-            }
-
+            modelVertices[i] = (float*)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            modelTriangles[i] = (uint32_t*)malloc(triCount * 3 * sizeof(uint32_t));
+            memcpy(modelVertices[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            memcpy(modelTriangles[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
             aiReleaseImport(scene);
             aiReleasePropertyStore(props);
-            
-            for (int32_t j = 0; j < BOUNDS_ATTRIBUTES_COUNT; j++) { // Copy to modelBounds
-                modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + j] = modelBoundsLocal[(i * BOUNDS_ATTRIBUTES_COUNT) + j];
-            }
         }
 
         free(tempVertices);
@@ -571,27 +561,27 @@ int32_t LoadModels(void) {
     }
 
     for (uint32_t i = 0; i < MODEL_COUNT; i++) { // Sequential phase
-        if (vertexCounts[i] == 0 || triCounts[i] == 0) continue;
+        if (modelVertexCounts[i] == 0 || modelTriangleCounts[i] == 0) continue;
 
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
-        if (triCounts[i] > 0) { // Upload to GPU
+        if (modelTriangleCounts[i] > 0) { // Upload to GPU
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
-            void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, modelVertices[i], vertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            memcpy(mapped_buffer, modelVertices[i], modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glUnmapBuffer(GL_ARRAY_BUFFER);
             glGenBuffers(1, &vbos[i]);
             glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, vertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBufferData(GL_COPY_WRITE_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
 
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
-            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triCounts[i] * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, modelTriangles[i], triCounts[i] * 3 * sizeof(uint32_t));
+            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, modelTriangleCounts[i] * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            memcpy(mapped_buffer, modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t));
             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             glGenBuffers(1, &tbos[i]);
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, triCounts[i] * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triCounts[i] * 3 * sizeof(uint32_t));
+            glBufferData(GL_COPY_WRITE_BUFFER, modelTriangleCounts[i] * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, modelTriangleCounts[i] * 3 * sizeof(uint32_t));
         }
     }
 
@@ -618,12 +608,6 @@ int32_t LoadModels(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
-
-    free(modelVertices);
-    free(modelTriangles);
-    free(vertexCounts);
-    free(triCounts);
-    free(modelBoundsLocal);
     malloc_trim(0);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
