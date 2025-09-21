@@ -295,7 +295,7 @@ texture: 285
 index: 53
 model: 122
 texture: 1252
-// eng_wallpump
+// eng_wallpump, animated, not a card chunk
 #chunk_exec1_1
 index: 54
 model: 124
@@ -634,7 +634,6 @@ glowtexture: 446
 #chunk_blockerflightbay
 index: 123
 model: 178
-cardchunk: 1
 texture: 1230
 #chunk_maint1_9
 index: 124

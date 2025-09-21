@@ -696,8 +696,6 @@ int32_t LoadEntities(void) {
         entities[i].rotation.y = 0.0f;
         entities[i].rotation.z = 0.0f;
         entities[i].rotation.w = 0.0f;
-        entities[i].floorHeight = INVALID_FLOOR_HEIGHT;
-        entities[i].ceilingHeight = INVALID_CEIL_HEIGHT;
     }
 
     DualLog(" took %f seconds\n", get_time() - start_time);
@@ -886,8 +884,6 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
         instances[idx].lodIndex = UINT16_MAX;
         instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
         instances[idx].rotation.w = 1.0f; // Quaternion identity
-        instances[idx].floorHeight = INVALID_FLOOR_HEIGHT;
-        instances[idx].ceilingHeight = INVALID_CEIL_HEIGHT;
         dirtyInstances[idx] = true;
     }
 
@@ -932,12 +928,6 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
             doubleSidedInstances[doubleSidedInstancesHead] = idx;
             doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
         }
-
-        Quaternion quat = {instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w};
-        Quaternion upQuat = {1.0f, 0.0f, 0.0f, 0.0f};
-        float angle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector
-        bool pointsUp = angle <= 30.0f;
-        instances[idx].floorHeight = global_modIsCitadel && pointsUp && currentLevel <= 12 ? instances[idx].position.y : INVALID_FLOOR_HEIGHT; // TODO: Citadel specific max floor height caring level threshold of 12
     }
 
     startOfDoubleSidedInstances = gameObjectCount - doubleSidedInstancesHead - transparentInstancesHead; // e.g., 5453 - 19 - 42 = 5392

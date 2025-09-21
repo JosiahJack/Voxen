@@ -49,20 +49,27 @@ void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
 void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
-    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = INVALID_FLOOR_HEIGHT;
-    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = INVALID_CEIL_HEIGHT;
+    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = -FLT_MAX;
+    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = FLT_MAX;
     for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
+        
         PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
         cellIdx = (z * WORLDX) + x;
         cellIndexForInstance[c] = (uint32_t)cellIdx;
-        if (instances[c].floorHeight > INVALID_FLOOR_HEIGHT && instances[c].floorHeight > gridCellFloorHeight[cellIdx]) {
-            gridCellFloorHeight[cellIdx] = instances[c].floorHeight; // Raise floor up until highest one is selected.
-        }
-        
-        if (instances[c].ceilingHeight < INVALID_CEIL_HEIGHT && instances[c].ceilingHeight < gridCellCeilingHeight[cellIdx]) {
-            gridCellCeilingHeight[cellIdx] = instances[c].ceilingHeight; // Raise floor up until highest one is selected.
-        }
+
+        if (!entities[instances[c].index].cardchunk) continue; // Only set ceiling and floor height from cards.
+        Quaternion quat = {instances[c].rotation.x, instances[c].rotation.y, instances[c].rotation.z, instances[c].rotation.w};
+        Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
+        float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
+        Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
+        float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
+        float floorHeight = (floorangle <= 30.0f) ? instances[c].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
+        if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
+        float ceilHeight = (ceilangle <= 30.0f) ? instances[c].position.y + 1.28f : FLT_MAX;
+        if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
     }
+    
+    for (int i=0;i<ARRSIZE;++i) DualLog("gridCellFloorHeight[%d]: %f\n",i,gridCellFloorHeight[i]);
 }
 
 void PutMeshesInCells(int32_t type) {

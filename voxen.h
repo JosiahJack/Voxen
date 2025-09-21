@@ -9,6 +9,7 @@
 // Generic Constants
 #define M_PI 3.141592653f
 #define M_PI_2 1.57079632679489661923f
+#define MATH_EPSILON 0.00001f
 
 // Global Types
 typedef struct { float x,y; } Vector2;
@@ -68,8 +69,6 @@ typedef struct {
     bool cardchunk;
     bool doublesided; // Parsing only, TODO Remove
     bool transparent; // Parsing only, TODO Remove
-    float floorHeight; // Parsing only, TODO Remove
-    float ceilingHeight; // Parsing only, TODO Remove
     uint8_t type; // Parsing only, TODO Remove
     uint8_t saveableType; // Parsing only, TODO Remove
     char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, plus 1 for null terminator, results in nice even multiple of 4 bytes
@@ -271,11 +270,6 @@ int32_t EventQueueProcess(void);
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
 
-// TODO: Citadel specific value that is well below the world at a position that falling objects
-//       in Unity reach terminal velocity and are caught by the stupid catch tray that detects such errors.
-#define INVALID_FLOOR_HEIGHT -1300.0f // These values are known to be ok for Citadel TODO generic from mod data
-#define INVALID_CEIL_HEIGHT 1300.0f
-
 #define LUXEL_SIZE 0.16f
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_SIZE 0.32f
@@ -299,6 +293,7 @@ extern float cam_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
 extern float gridCellFloorHeight[ARRSIZE];
+extern float gridCellCeilingHeight[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
@@ -312,6 +307,9 @@ void Cull();
 // Physics
 #define MAX_DYNAMIC_ENTITIES 256
 #define TERMINAL_VELOCITY 10.0f
+#define PLAYER_RADIUS 0.48f
+#define PLAYER_HEIGHT 2.00f
+#define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
@@ -378,6 +376,7 @@ extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
 extern bool global_modIsCitadel;
 
+float quat_angle_deg(Quaternion a, Quaternion b);
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);
 // ----------------------------------------------------------------------------

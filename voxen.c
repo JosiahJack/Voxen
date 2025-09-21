@@ -208,7 +208,8 @@ ENetHost* client_host = NULL;
 ENetPeer* server_peer = NULL; // Client's connection to server
 // ----------------------------------------------------------------------------
 // Physics
-
+float cellFloorHeight = 0.0f;
+float cellCeilHeight = 0.0f;
 // ----------------------------------------------------------------------------
 // Diagnostics
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -760,10 +761,10 @@ void ProcessInput(void) {
         cam_z -= finalMoveSpeed * cam_rightz;
     }
 
-    if (noclip) {
+//     if (noclip) {
         if (keys[SDL_SCANCODE_V]) cam_y += finalMoveSpeed; // Move up
         else if (keys[SDL_SCANCODE_C]) cam_y -= finalMoveSpeed; // Move down
-    }
+//     }
 
     if (keys[SDL_SCANCODE_Q]) {
         cam_roll += move_speed * 5.0f; // Move up
@@ -1234,6 +1235,11 @@ int32_t ParticleSystemStep(void) {
 
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
+
+    if (window_has_focus) { // Move the player based on input first, then bound it below...
+        UpdatePlayerFacingAngles();
+        ProcessInput();
+    }
     
     for (int i=0;i<physHead;++i) {
         // Get modelBounds[physObjects[i].modelIndex]
@@ -1250,10 +1256,16 @@ int32_t Physics(void) {
     // Player Physics
     // If player position is near closed cell, move it back to open cell
     if (noclip) return 0;
-    if (!(gridCellStates[playerCellIdx] & CELL_OPEN)) return 0;
     
-    float cam_Floor = cam_y - 0.84f;
-    if (cam_Floor < gridCellFloorHeight[playerCellIdx]) cam_y = gridCellFloorHeight[playerCellIdx] + 0.84f;
+    cellFloorHeight = gridCellFloorHeight[playerCellIdx];
+    cellCeilHeight = gridCellCeilingHeight[playerCellIdx];
+    if (!(gridCellStates[playerCellIdx] & CELL_OPEN)) return 0;
+    if (cellFloorHeight <= (-FLT_MAX + MATH_EPSILON)) return 0;
+    
+    float cam_Floor = cam_y - PLAYER_RADIUS; // TODO handle body state offset for crouching/prone.
+    if (cam_Floor < cellFloorHeight) cam_y = cellFloorHeight + PLAYER_RADIUS; // Actual physics
+    float cam_Ceil = cam_y + PLAYER_RADIUS;
+    if (cam_Ceil > cellCeilHeight) cam_y = cellCeilHeight - PLAYER_RADIUS; // Actual physics
     return 0;
 }
 
@@ -1694,12 +1706,12 @@ int32_t main(int32_t argc, char* argv[]) {
             EnqueueEvent_IntInt(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
         }
         
-        accumulator += frame_time;
-        UpdatePlayerFacingAngles();
-        while (accumulator >= time_step) {
-            if (window_has_focus) ProcessInput();
-            accumulator -= time_step;
-        }
+//         accumulator += frame_time;
+//         UpdatePlayerFacingAngles();
+//         while (accumulator >= time_step) {
+//             if (window_has_focus) ProcessInput();
+//             accumulator -= time_step;
+//         }
         
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
         if (timeSinceLastPhysicsTick > 0.016666666f) { // 60fps fixed tick rate
@@ -1887,6 +1899,7 @@ int32_t main(int32_t argc, char* argv[]) {
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Floor: %f, Ceil: %f", cellFloorHeight, cellCeilHeight);
 
         if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
