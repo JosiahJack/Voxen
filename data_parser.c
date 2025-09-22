@@ -407,8 +407,6 @@ bool parse_data_file(DataParser *parser, const char *filename, int32_t type) {
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
-//-----------------------------------------------------------------------------
-// Loads all 3D meshes
 int32_t LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");

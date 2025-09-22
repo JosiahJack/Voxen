@@ -1241,6 +1241,192 @@ void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
 }
 
+static inline Vector3 sub_vector3(Vector3 a, Vector3 b) {
+    Vector3 res = {a.x - b.x, a.y - b.y, a.z - b.z};
+    return res;
+}
+
+static inline Vector3 add_vector3(Vector3 a, Vector3 b) {
+    Vector3 res = {a.x + b.x, a.y + b.y, a.z + b.z};
+    return res;
+}
+
+static inline Vector3 scale_vector3(Vector3 v, float s) {
+    Vector3 res = {v.x * s, v.y * s, v.z * s};
+    return res;
+}
+
+static inline float dot_vector3(Vector3 a, Vector3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+static inline float dist_sq_vector3(Vector3 a, Vector3 b) {
+    Vector3 d = sub_vector3(a, b);
+    return dot_vector3(d, d);
+}
+
+static inline Vector3 cross_vector3(Vector3 a, Vector3 b) {
+    Vector3 res;
+    res.x = a.y * b.z - a.z * b.y;
+    res.y = a.z * b.x - a.x * b.z;
+    res.z = a.x * b.y - a.y * b.x;
+    return res;
+}
+
+static inline float length_vector3(Vector3 v) {
+    return sqrtf(dot_vector3(v, v));
+}
+
+static inline Vector3 normalize_vector3(Vector3 v) {
+    float len = length_vector3(v);
+    if (len > 1e-6f) {
+        v.x /= len; v.y /= len; v.z /= len;
+    }
+    return v;
+}
+
+static inline float clampf(float x, float a, float b) {
+    return x < a ? a : (x > b ? b : x);
+}
+
+static inline Vector3 mul_mat4_vector3(const float* mat, Vector3 v) {
+    // Assume homogeneous, w=1
+    Vector3 res;
+    res.x = mat[0] * v.x + mat[4] * v.y + mat[8] * v.z + mat[12];
+    res.y = mat[1] * v.x + mat[5] * v.y + mat[9] * v.z + mat[13];
+    res.z = mat[2] * v.x + mat[6] * v.y + mat[10] * v.z + mat[14];
+    return res;
+}
+
+// Point to segment squared distance, outputs closest points
+static float dist_point_segment_sq(Vector3 p, Vector3 a, Vector3 b, Vector3* closest_on_seg, Vector3* closest_on_p) {
+    Vector3 ab = sub_vector3(b, a);
+    float len2 = dot_vector3(ab, ab);
+    Vector3 ap = sub_vector3(p, a);
+    float proj = dot_vector3(ap, ab);
+    float t = 0.0f;
+    if (len2 > 1e-6f) {
+        t = clampf(proj / len2, 0.0f, 1.0f);
+    }
+    *closest_on_seg = add_vector3(a, scale_vector3(ab, t));
+    *closest_on_p = p;  // Point to itself
+    Vector3 diff = sub_vector3(p, *closest_on_seg);
+    return dot_vector3(diff, diff);
+}
+
+// Segment to segment squared distance (clamped)
+static float dist_segment_segment_sq(Vector3 a0, Vector3 a1, Vector3 b0, Vector3 b1, Vector3* closest_a, Vector3* closest_b) {
+    Vector3 d1 = sub_vector3(a1, a0);
+    Vector3 d2 = sub_vector3(b1, b0);
+    Vector3 d0 = sub_vector3(a0, b0);
+    float a = dot_vector3(d1, d1);
+    float e = dot_vector3(d2, d2);
+    float f = dot_vector3(d2, d1);
+    float c = dot_vector3(d1, d0);
+    float d = dot_vector3(d2, d0);
+    float det = a * e - f * f;
+    float s = 0.5f, t = 0.5f;
+    if (det > 1e-6f) {
+        s = clampf((f * d - e * c) / det, 0.0f, 1.0f);
+        t = clampf((a * d - f * c) / det, 0.0f, 1.0f);
+    }
+    *closest_a = add_vector3(a0, scale_vector3(d1, s));
+    *closest_b = add_vector3(b0, scale_vector3(d2, t));
+    Vector3 diff = sub_vector3(*closest_a, *closest_b);
+    return dot_vector3(diff, diff);
+}
+
+// Point to triangle squared distance (barycentric), outputs closest on tri
+static float point_tri_dist_sq(Vector3 p, Vector3 a, Vector3 b, Vector3 c, Vector3* closest) {
+    Vector3 ab = sub_vector3(b, a);
+    Vector3 ac = sub_vector3(c, a);
+    Vector3 ap = sub_vector3(p, a);
+    float d00 = dot_vector3(ab, ab);
+    float d01 = dot_vector3(ab, ac);
+    float d11 = dot_vector3(ac, ac);
+    float d20 = dot_vector3(ap, ab);
+    float d21 = dot_vector3(ap, ac);
+    float denom = d00 * d11 - d01 * d01;
+    float v = 0.0f, w = 0.0f;
+    if (fabsf(denom) > 1e-6f) {
+        v = clampf((d11 * d20 - d01 * d21) / denom, 0.0f, 1.0f);
+        w = clampf((d00 * d21 - d01 * d20) / denom, 0.0f, 1.0f);
+        if (v + w > 1.0f) {
+            float vv = (v + w - 1.0f);
+            v = clampf(v - vv, 0.0f, 1.0f);
+            w = clampf(w - vv, 0.0f, 1.0f);
+        }
+    }
+    *closest = add_vector3(a, add_vector3(scale_vector3(ab, v), scale_vector3(ac, w)));
+    Vector3 diff = sub_vector3(p, *closest);
+    return dot_vector3(diff, diff);
+}
+
+// Capsule vs triangle: Returns true if colliding, updates cap_center by pushing out
+static bool capsule_vs_tri(Vector3* cap_center, float half_h, float r, Vector3 t0, Vector3 t1, Vector3 t2) {
+    Vector3 cap_bot = {cap_center->x, cap_center->y - half_h, cap_center->z};
+    Vector3 cap_top = {cap_center->x, cap_center->y + half_h, cap_center->z};
+    Vector3 seg_closest, tri_closest;
+    float min_dist_sq = 1e30f;
+
+    // Vert to segment (3)
+    Vector3 tris[3] = {t0, t1, t2};
+    for (int i = 0; i < 3; i++) {
+        Vector3 dummy;
+        float d = dist_point_segment_sq(tris[i], cap_bot, cap_top, &seg_closest, &dummy);
+        if (d < min_dist_sq) {
+            min_dist_sq = d;
+            tri_closest = tris[i];
+        }
+    }
+
+    // Edges to segment (3)
+    Vector3 edges[3][2] = {{t0, t1}, {t1, t2}, {t2, t0}};
+    for (int i = 0; i < 3; i++) {
+        Vector3 dummy_a, dummy_b;
+        float d = dist_segment_segment_sq(cap_bot, cap_top, edges[i][0], edges[i][1], &seg_closest, &dummy_b);
+        if (d < min_dist_sq) {
+            min_dist_sq = d;
+            tri_closest = dummy_b;
+        }
+    }
+
+    // Segment to plane clamped (1)
+    Vector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
+    float d0 = dot_vector3(sub_vector3(cap_bot, t0), n);
+    float d1 = dot_vector3(sub_vector3(cap_top, t0), n);
+    if (fabsf(d0) > 1e-6f || fabsf(d1) > 1e-6f) {
+        float t = clampf(-d0 / (d1 - d0), 0.0f, 1.0f);
+        Vector3 foot = add_vector3(cap_bot, scale_vector3(sub_vector3(cap_top, cap_bot), t));
+        Vector3 cp;
+        float d = point_tri_dist_sq(foot, t0, t1, t2, &cp);
+        if (d < min_dist_sq) {
+            min_dist_sq = d;
+            seg_closest = foot;
+            tri_closest = cp;
+        }
+    }
+
+    float min_dist = sqrtf(min_dist_sq);
+    if (min_dist > r) return false;  // No collision
+
+    // Resolve: Push along connecting vector
+    Vector3 push_dir = sub_vector3(seg_closest, tri_closest);
+    push_dir = normalize_vector3(push_dir);
+    float pen = r - min_dist + 0.001f;  // Epsilon
+    *cap_center = add_vector3(*cap_center, scale_vector3(push_dir, pen));
+    return true;
+}
+
+// Check if instance is in 3x3 grid around player
+static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint32_t playerCellIdx) {
+    int32_t inst_x = instanceCellIdx % WORLDX; // Convert 1D indices to 2D (x, z)
+    int32_t inst_z = instanceCellIdx / WORLDZ;
+    int32_t player_x = playerCellIdx % WORLDX;
+    int32_t player_z = playerCellIdx / WORLDZ;
+    return abs(inst_x - player_x) <= 1 && abs(inst_z - player_z) <= 1;
+}
+
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
 
@@ -1249,54 +1435,65 @@ int32_t Physics(void) {
         UpdatePlayerFacingAngles();
         ProcessInput();
     }
-    
-    for (int i=0;i<physHead;++i) {
-        // Get modelBounds[physObjects[i].modelIndex]
-        // Orient the model space modelBounds using the physObjects[i].rotation which is a Quaternion { float x,y,z,w; }
-        // Get world cell index from world position
-        // Check all AABB bounds against world cell closed edges gridCellStates[cellIdx] & CELL_CLOSEDNORTH, CELL_CLOSEDEAST, CELL_CLOSEDSOUTH, CELL_CLOSEDWEST
-        // Also check AABB bounds against world cell floorHeight from gridCellFloorHeight[cellIdx] and ceiling from gridCellCeilingHeight[cellIdx]
-        // If overlapping, move by overlap amount on that axis
-        // Do for all 3 axes
-        // Ignore torque for now
-        // Ignore dynamic object to dynamic object overlap for now
-    }
-    
-    // Player Physics
-    // If player position is near closed cell, move it back to open cell
+
+    // Player Physics: Capsule-triangle naive collision
     if (noclip) return 0;
     
-    // Player Gravity
-    cam_y -= 0.08f;
+    // Apply gravity to camera (affects bottom of capsule)
+//     cam_y -= 0.08f;
     
-    // Handle Y
-    cellFloorHeight = gridCellFloorHeight[playerCellIdx];
-    cellCeilHeight = gridCellCeilingHeight[playerCellIdx];    
-    float bodyStateAdd = 0.0f;
-    if (currentLevel != LEVEL_CYBERSPACE) { // Keep player as PLAYER_RADIUS sized sphere.
-        switch(playerMovement.bodyState) {
-            case BodyState_Standing: bodyStateAdd = (PLAYER_HEIGHT * 0.5f); break;
+    // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
+    float capsule_offset = 0.32f;  // Center below camera (1.84 below, 0.16 above)
+    Vector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};
+    float half_height = 0.32f;  // Half of 2.0f height
+    float radius = 0.16f;
+    
+    // Adjust for body state (e.g., standing adds height, but here fixed for simplicity)
+    float body_state_add = 0.0f;
+    if (currentLevel != LEVEL_CYBERSPACE) {
+        switch (playerMovement.bodyState) {
+            case BodyState_Standing: body_state_add = (PLAYER_HEIGHT * 0.5f); break;
+            // Add cases for crouch/prone: adjust half_height, offset
         }
+        // For now, assume fixed; extend as needed
     }
     
-    float cam_Floor = cam_y - PLAYER_RADIUS - bodyStateAdd; // TODO handle body state offset for crouching/prone.
-    if (cam_Floor < cellFloorHeight) cam_y = cellFloorHeight + PLAYER_RADIUS + bodyStateAdd; // Actual physics
-    float cam_Ceil = cam_y + PLAYER_RADIUS;
-    if (cam_Ceil > cellCeilHeight) cam_y = cellCeilHeight - PLAYER_RADIUS; // Actual physics
-    
-    // Handle XZ
-    if (!(gridCellStates[playerCellIdx] & CELL_OPEN)) return 0;
-    
-    float cellX, cellZ;
-    CellCoordsToPos(playerCellIdx_x, playerCellIdx_z, &cellX, &cellZ);
-    cellNorth = (gridCellStates[playerCellIdx] & CELL_CLOSEDNORTH) ? cellZ + 1.28f :  FLT_MAX;
-    cellEast  = (gridCellStates[playerCellIdx] & CELL_CLOSEDEAST ) ? cellX + 1.28f :  FLT_MAX;
-    cellSouth = (gridCellStates[playerCellIdx] & CELL_CLOSEDSOUTH) ? cellZ - 1.28f : -FLT_MAX;
-    cellWest  = (gridCellStates[playerCellIdx] & CELL_CLOSEDWEST ) ? cellX - 1.28f : -FLT_MAX;
-    if ((cam_z + PLAYER_RADIUS) > cellNorth) cam_z = cellNorth - PLAYER_RADIUS;
-    if ((cam_x + PLAYER_RADIUS) > cellEast ) cam_x = cellEast  - PLAYER_RADIUS;
-    if ((cam_z - PLAYER_RADIUS) < cellSouth) cam_z = cellSouth + PLAYER_RADIUS;
-    if ((cam_x - PLAYER_RADIUS) < cellWest ) cam_x = cellWest  + PLAYER_RADIUS;
+    // Naive loop over all instances and their triangles
+    for (uint32_t i = 0; i < loadedInstances; i++) {  // Or INSTANCE_COUNT
+        if (instances[i].modelIndex >= MODEL_COUNT) continue;
+        if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
+        
+        int32_t mid = instances[i].modelIndex;
+        if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
+        
+        // Ensure matrix is up-to-date (assume dirty handled elsewhere)
+        if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+        const float* world_mat = &modelMatrices[i * 16];
+        uint32_t num_tris = modelTriangleCounts[mid];
+        for (uint32_t t = 0; t < num_tris; t++) {
+            uint32_t i0 = modelTriangles[mid][t * 3 + 0] * VERTEX_ATTRIBUTES_COUNT;
+            uint32_t i1 = modelTriangles[mid][t * 3 + 1] * VERTEX_ATTRIBUTES_COUNT;
+            uint32_t i2 = modelTriangles[mid][t * 3 + 2] * VERTEX_ATTRIBUTES_COUNT;
+            
+            // Transform positions to world
+            Vector3 v0 = mul_mat4_vector3(world_mat, (Vector3){
+                modelVertices[mid][i0 + 0], modelVertices[mid][i0 + 1], modelVertices[mid][i0 + 2]
+            });
+            Vector3 v1 = mul_mat4_vector3(world_mat, (Vector3){
+                modelVertices[mid][i1 + 0], modelVertices[mid][i1 + 1], modelVertices[mid][i1 + 2]
+            });
+            Vector3 v2 = mul_mat4_vector3(world_mat, (Vector3){
+                modelVertices[mid][i2 + 0], modelVertices[mid][i2 + 1], modelVertices[mid][i2 + 2]
+            });
+            
+            // Test and resolve
+            capsule_vs_tri(&cap_center, half_height, radius, v0, v1, v2);
+        }
+    }
+
+    cam_x = cap_center.x; // Update camera from resolved capsule center
+    cam_y = cap_center.y + capsule_offset;  // Restore offset
+    cam_z = cap_center.z;
     return 0;
 }
 
