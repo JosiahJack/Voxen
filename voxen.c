@@ -1002,7 +1002,6 @@ int32_t VoxelLists() {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
-    glFinish();
     CHECK_GL_ERROR();    
     malloc_trim(0);
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
@@ -1918,17 +1917,17 @@ int32_t main(int32_t argc, char* argv[]) {
         // 8. Render UI Text;
         int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
         int32_t leftPad = GetScreenRelativeX(0.0125f);
-        RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Floor: %.3f, Ceil: %.3f, N: %.3f, E: %.3f, S: %.3f, W: %.3f", cellFloorHeight < -1000.0f ? 0.0f : cellFloorHeight,
-                                                                                                                                         cellCeilHeight  >  1000.0f ? 0.0f : cellCeilHeight,
-                                                                                                                                         cellNorth       >  1000.0f ? 0.0f : cellNorth,
-                                                                                                                                         cellEast        >  1000.0f ? 0.0f : cellEast,
-                                                                                                                                         cellSouth       < -1000.0f ? 0.0f : cellSouth,
-                                                                                                                                         cellWest        < -1000.0f ? 0.0f : cellWest);
+//         RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Floor: %.3f, Ceil: %.3f, N: %.3f, E: %.3f, S: %.3f, W: %.3f", cellFloorHeight < -1000.0f ? 0.0f : cellFloorHeight,
+//                                                                                                                                          cellCeilHeight  >  1000.0f ? 0.0f : cellCeilHeight,
+//                                                                                                                                          cellNorth       >  1000.0f ? 0.0f : cellNorth,
+//                                                                                                                                          cellEast        >  1000.0f ? 0.0f : cellEast,
+//                                                                                                                                          cellSouth       < -1000.0f ? 0.0f : cellSouth,
+//                                                                                                                                          cellWest        < -1000.0f ? 0.0f : cellWest);
         if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
 

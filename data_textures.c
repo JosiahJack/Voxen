@@ -291,10 +291,8 @@ int32_t LoadTextures(void) {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
-
-    CHECK_GL_ERROR();
     glFlush();
-    glFinish();
+    CHECK_GL_ERROR();
     malloc_trim(0);
     double end_time = get_time();
     DualLog(" took %f seconds\n", end_time - start_time);

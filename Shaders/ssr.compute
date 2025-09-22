@@ -55,6 +55,7 @@ void main() {
     for (int i = 0; i < 100; ++i) { // maxSteps 100
         marchPos += rayStep;
         traveled += 0.26; // stepSize
+        if (traveled > 50.0) break;
         vec4 clipPos = viewProjection * vec4(marchPos, 1.0);
         vec2 ndc = clipPos.xy / clipPos.w;
         hitUV = ndc * 0.5 + 0.5;
@@ -77,6 +78,7 @@ void main() {
             vec4 sampleColor = imageLoad(inputImage, hitPixel * 4); // SSR_RES = 4
             reflectionColor += sampleColor.rgb * weight;
             totalWeight += weight;
+            if (totalWeight > 0.05) break;
         }
     }
 

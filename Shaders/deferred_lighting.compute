@@ -13,7 +13,7 @@ layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };
 layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
-layout(std430, binding = 28) buffer LightShadowAngleDistsList { float lightShadowAngleDistsList[]; };
+// layout(std430, binding = 28) buffer LightShadowAngleDistsList { float lightShadowAngleDistsList[]; };
     
 uniform uint totalLuxelCount;
 uniform uint screenWidth;
@@ -157,23 +157,23 @@ void main() {
             if (!lightCanSeeCell) continue;
         }
 
-        float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
+//         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
-        if (spotAng > 0.0) {
-            float quat_x = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
-            float quat_y = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
-            float quat_z = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
-            float quat_w = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
-            vec4 quat = vec4(quat_x, quat_y, quat_z, quat_w);
-            vec3 spotDir = normalize(quat_rotate(quat, baseDir));
-            float spotdot = dot(spotDir, -lightDir);
-            float cosAngle = cos(radians(spotAng / 2.0));
-            if (spotdot < cosAngle) continue;
-            float cosOuterAngle = cos(radians(spotAng / 2.0));
-            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));
-            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);
-            if (spotFalloff <= 0.0) continue;
-        }
+//         if (spotAng > 0.0) {
+//             float quat_x = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
+//             float quat_y = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
+//             float quat_z = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
+//             float quat_w = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
+//             vec4 quat = vec4(quat_x, quat_y, quat_z, quat_w);
+//             vec3 spotDir = normalize(quat_rotate(quat, baseDir));
+//             float spotdot = dot(spotDir, -lightDir);
+//             float cosAngle = cos(radians(spotAng / 2.0));
+//             if (spotdot < cosAngle) continue;
+//             float cosOuterAngle = cos(radians(spotAng / 2.0));
+//             float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));
+//             spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);
+//             if (spotFalloff <= 0.0) continue;
+//         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R],
                                lights[lightIdx + LIGHT_DATA_OFFSET_G],
@@ -182,7 +182,7 @@ void main() {
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
 
              // Shadow
-        float distsq = dot(toLight.xz, toLight.xz);
+/*        float distsq = dot(toLight.xz, toLight.xz);
         float angleToLight = atan(toLight.z, toLight.x); // pixel -> light direction in xz plane
         if (angleToLight < 0.0) angleToLight += 2.0 * 3.14159265;
         uint slot0 = uint(rad2deg(angleToLight)) % SHADOW_ANGLE_DEG_BINS;
@@ -194,7 +194,7 @@ void main() {
         float shadowFactor0 = distSlot0 < distsq ? 0.0 : 1.0;
         float shadowFactor_1 = distSlot_1 < distsq ? 0.0 : 1.0;
         float shadowFactor1 = distSlot1 < distsq ? 0.0 : 1.0;
-        float t = fract(rad2deg(angleToLight)); /// fractional part for linear interpolation
+        float t = fract(rad2deg(angleToLight));*/ /// fractional part for linear interpolation
         float shadowFactor = 1.0; //mix(mix(shadowFactor_1, shadowFactor0, 1.0 - t), mix(shadowFactor0, shadowFactor1, t), 0.5);
 
         if (debugValue == 1) lighting += vec3(shadowFactor, shadowFactor, shadowFactor);
