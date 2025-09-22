@@ -7,6 +7,8 @@
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 
+#define LEVEL_CYBERSPACE 13
+
 typedef struct {
     int SFXJump;
     int SFXJumpLand;
@@ -21,7 +23,6 @@ typedef struct {
     BodyState bodyState;
     int ladderState;
     bool gravliftState;
-    bool inCyberSpace;
     float walkAcceleration;
     int SFXIndex;
     float walkDeacceleration;

@@ -51,6 +51,8 @@ for pid in "${pids[@]}"; do
     wait $pid
     if [ $? -ne 0 ]; then
         echo "ERROR: Compilation failed for one or more source files."
+        rm -f ./Shaders/*.h
+        rm -f "$TEMP_DIR"/*.o
         exit 1
     fi
 done

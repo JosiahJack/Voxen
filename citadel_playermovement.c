@@ -1,5 +1,6 @@
 // PlayerMovement
 #include <stdbool.h>
+#include "voxen.h"
 #include "citadel.h"
 
 PlayerMovement playerMovement;
@@ -92,7 +93,7 @@ void Awake() {
         .burstForce = 35.0f,
         .doubleJumpFinished = pauseRelativeTime,
         .playerHome = (Vector3){ .x = -20.4f, .y = -43.792f, .z = 10.2f},
-        .turboFinished = 0.0f,
+        .turboFinished = pauseRelativeTime,
         .turboCyberTime = 15.0f,
         .inCyberTube = false,
         .stepFinished = pauseRelativeTime,
@@ -105,4 +106,35 @@ void Awake() {
         .bodyLerpGravityOffDelayFinished = pauseRelativeTime,
         .feetOffset = (Vector3){ .x = 0.0f, .y = -48.0f, .z = 0.0f },
     };
+}
+
+void CyberSetup() {
+    if (currentLevel == LEVEL_CYBERSPACE && !playerMovement.cyberSetup) {
+        playerMovement.cyberSetup = true;
+        playerMovement.cyberDesetup = true;
+    }
+}
+
+void CyberDestupOrNoclipMaintain() {
+    if (currentLevel == LEVEL_CYBERSPACE) return;
+    
+    if (playerMovement.cyberDesetup || playerMovement.CheatNoclip) {
+        playerMovement.cyberDesetup = false;
+        playerMovement.cyberSetup = false;
+        if (currentLevel == LEVEL_CYBERSPACE) DualLogError("Attempted to reset mouselook angles when exiting cyberspace but currentLevel not updated yet!\n");
+        Input_MouselookApply();
+    }
+}
+
+void Update() {
+    if (gamePaused || (playerMovement.ressurectingFinished >= pauseRelativeTime)) return;
+
+    CyberSetup();
+    CyberDestupOrNoclipMaintain();
+    playerMovement.isSprinting = false;// TODO: GetSprintInputState();
+//     Crouch();
+//     Prone();
+//     EndCrouchProneTransition();
+//     FatigueApply(); // Here fatigue me out, except in cyberspace
+//     Automap.a.UpdateAutomap(transform.localPosition); // Update the map.
 }

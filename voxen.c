@@ -166,7 +166,6 @@ GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1,
 // ----------------------------------------------------------------------------
 // Input
 float mouse_sensitivity = 0.1f;
-bool in_cyberspace = true;
 float move_speed = 0.15f;
 float sprinting = 0.0f;
 bool noclip = false;
@@ -211,6 +210,10 @@ ENetPeer* server_peer = NULL; // Client's connection to server
 // Physics
 float cellFloorHeight = 0.0f;
 float cellCeilHeight = 0.0f;
+float cellNorth = 0.0f;
+float cellSouth = 0.0f;
+float cellEast = 0.0f;
+float cellWest = 0.0f;
 // ----------------------------------------------------------------------------
 // Diagnostics
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -492,7 +495,7 @@ void Screenshot() {
     if (!utc_time) { DualLog("Failed to get current time for screenshot!\n"); free(pixels); return; }
     
     strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_%s.png", timestamp, VERSION_STRING);
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_x, cam_y, cam_z,get_time());
     int32_t success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
     if (!success) DualLog("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
@@ -541,7 +544,7 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
 }
 
 void Input_MouselookApply() {
-    if (in_cyberspace) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
+    if (currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
@@ -1234,6 +1237,11 @@ int32_t ParticleSystemStep(void) {
     return 0;
 }
 
+void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
+    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
+    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
+}
+
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
 
@@ -1262,16 +1270,34 @@ int32_t Physics(void) {
     // If player position is near closed cell, move it back to open cell
     if (noclip) return 0;
     
+    // Handle Y
     cellFloorHeight = gridCellFloorHeight[playerCellIdx];
     cellCeilHeight = gridCellCeilingHeight[playerCellIdx];    
     float bodyStateAdd = 0.0f;
-    switch(playerMovement.bodyState) {
-        case BodyState_Standing: bodyStateAdd = (PLAYER_HEIGHT * 0.5f); break;
+    if (currentLevel != LEVEL_CYBERSPACE) { // Keep player as PLAYER_RADIUS sized sphere.
+        switch(playerMovement.bodyState) {
+            case BodyState_Standing: bodyStateAdd = (PLAYER_HEIGHT * 0.5f); break;
+        }
     }
+    
     float cam_Floor = cam_y - PLAYER_RADIUS - bodyStateAdd; // TODO handle body state offset for crouching/prone.
     if (cam_Floor < cellFloorHeight) cam_y = cellFloorHeight + PLAYER_RADIUS + bodyStateAdd; // Actual physics
     float cam_Ceil = cam_y + PLAYER_RADIUS;
     if (cam_Ceil > cellCeilHeight) cam_y = cellCeilHeight - PLAYER_RADIUS; // Actual physics
+    
+    // Handle XZ
+    if (!(gridCellStates[playerCellIdx] & CELL_OPEN)) return 0;
+    
+    float cellX, cellZ;
+    CellCoordsToPos(playerCellIdx_x, playerCellIdx_z, &cellX, &cellZ);
+    cellNorth = (gridCellStates[playerCellIdx] & CELL_CLOSEDNORTH) ? cellZ + 1.28f :  FLT_MAX;
+    cellEast  = (gridCellStates[playerCellIdx] & CELL_CLOSEDEAST ) ? cellX + 1.28f :  FLT_MAX;
+    cellSouth = (gridCellStates[playerCellIdx] & CELL_CLOSEDSOUTH) ? cellZ - 1.28f : -FLT_MAX;
+    cellWest  = (gridCellStates[playerCellIdx] & CELL_CLOSEDWEST ) ? cellX - 1.28f : -FLT_MAX;
+    if ((cam_z + PLAYER_RADIUS) > cellNorth) cam_z = cellNorth - PLAYER_RADIUS;
+    if ((cam_x + PLAYER_RADIUS) > cellEast ) cam_x = cellEast  - PLAYER_RADIUS;
+    if ((cam_z - PLAYER_RADIUS) < cellSouth) cam_z = cellSouth + PLAYER_RADIUS;
+    if ((cam_x - PLAYER_RADIUS) < cellWest ) cam_x = cellWest  + PLAYER_RADIUS;
     return 0;
 }
 
@@ -1660,7 +1686,6 @@ int32_t main(int32_t argc, char* argv[]) {
     DebugRAM("prior init events queued");
     if (InitializeEnvironment()) return 1;
 
-    double accumulator = 0.0;
     double last_physics_time = get_time();
     last_time = get_time();
     lastJournalWriteTime = get_time();
@@ -1711,13 +1736,6 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!log_playback && (mouse_xrel != 0.0f || mouse_yrel != 0.0f)) {
             EnqueueEvent_IntInt(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
         }
-        
-//         accumulator += frame_time;
-//         UpdatePlayerFacingAngles();
-//         while (accumulator >= time_step) {
-//             if (window_has_focus) ProcessInput();
-//             accumulator -= time_step;
-//         }
         
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
         if (timeSinceLastPhysicsTick > 0.016666666f) { // 60fps fixed tick rate
@@ -1900,13 +1918,17 @@ int32_t main(int32_t argc, char* argv[]) {
         // 8. Render UI Text;
         int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
         int32_t leftPad = GetScreenRelativeX(0.0125f);
-        RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.2f, y: %.2f, z: %.2f", cam_x, cam_y, cam_z);
+        RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Floor: %f, Ceil: %f", cellFloorHeight, cellCeilHeight);
-
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Floor: %.3f, Ceil: %.3f, N: %.3f, E: %.3f, S: %.3f, W: %.3f", cellFloorHeight < -1000.0f ? 0.0f : cellFloorHeight,
+                                                                                                                                         cellCeilHeight  >  1000.0f ? 0.0f : cellCeilHeight,
+                                                                                                                                         cellNorth       >  1000.0f ? 0.0f : cellNorth,
+                                                                                                                                         cellEast        >  1000.0f ? 0.0f : cellEast,
+                                                                                                                                         cellSouth       < -1000.0f ? 0.0f : cellSouth,
+                                                                                                                                         cellWest        < -1000.0f ? 0.0f : cellWest);
         if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
 

@@ -43,8 +43,7 @@ void CleanupAudio();
 // ----------------------------------------------------------------------------
 // Data Parsing
 #define MAX_ENTRIES 6000
-#define MAX_PATH 256
-#define ENT_NAME_MAXLEN_NO_NULL_TERMINATOR 31
+#define MAX_PATH 128
 
 // Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
 typedef struct {
@@ -71,7 +70,7 @@ typedef struct {
     bool transparent; // Parsing only, TODO Remove
     uint8_t type; // Parsing only, TODO Remove
     uint8_t saveableType; // Parsing only, TODO Remove
-    char name[ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1]; // 31 characters max, plus 1 for null terminator, results in nice even multiple of 4 bytes
+    uint8_t metadata; // padding, TODO fix!
     char path[MAX_PATH]; // Parsing only, TODO Remove
 } Entity;
 // Includes subfields for parsing from text files, e.g. x,y,z need to parse "position.x" one "field":
@@ -341,6 +340,7 @@ static const uint8_t PhysicsLayer_Clip             = 26;
 //static const uint8_t PhysicsLayer_               = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 
+void Input_MouselookApply();
 
 // ----------------------------------------------------------------------------
 // Rendering

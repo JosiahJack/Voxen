@@ -5,6 +5,7 @@
 #include <GL/glew.h>
 #include "External/stb_image.h"
 #include "voxen.h"
+#include "citadel.h"
 
 uint8_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
@@ -782,7 +783,7 @@ void CullCore(void) {
 }
 
 void Cull() {
-    if (menuActive || gamePaused || currentLevel >= 13) return;
+    if (menuActive || gamePaused || currentLevel >= LEVEL_CYBERSPACE) return;
 
     // Now handle player position updating PVS. Always do UpdatedPlayerCell
     // to set playerCellX and playerCellY.

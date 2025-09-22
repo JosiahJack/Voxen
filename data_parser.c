@@ -14,6 +14,7 @@
 #include <math.h>
 #include <omp.h>
 #include "voxen.h"
+#include "citadel.h"
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
@@ -23,8 +24,6 @@ GLuint vbos[MODEL_COUNT];
 GLuint tbos[MODEL_COUNT];
 GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
-uint32_t largestVertCount = 0;
-uint32_t largestTriangleCount = 0;
 float * tempVertices;
 uint32_t * tempTriangles;
 uint32_t renderableCount = 0;
@@ -408,6 +407,8 @@ bool parse_data_file(DataParser *parser, const char *filename, int32_t type) {
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
+//-----------------------------------------------------------------------------
+// Loads all 3D meshes
 int32_t LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
@@ -423,8 +424,10 @@ int32_t LoadModels(void) {
     int32_t totalVertCount = 0;
     int32_t totalBounds = 0;
     int32_t totalTriCount = 0;
-    uint32_t largestVertCount = 0;
-    uint32_t largestTriangleCount = 0;
+    #ifdef DEBUG_MODEL_LOAD_DATA
+        uint32_t largestVertCount = 0;
+        uint32_t largestTriangleCount = 0;
+    #endif
     modelVertices = (float**)malloc(MODEL_COUNT * sizeof(float*));
     modelTriangles = (uint32_t**)malloc(MODEL_COUNT * sizeof(uint32_t*));
     GLuint stagingVBO, stagingTBO;
@@ -437,10 +440,6 @@ int32_t LoadModels(void) {
 
     #pragma omp parallel
     {
-        // Per-thread temporary buffers
-        float* tempVertices = (float*)malloc(MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        uint32_t* tempTriangles = (uint32_t*)malloc(MAX_TRI_COUNT * 3 * sizeof(uint32_t));
-
         #pragma omp for
         for (uint32_t i = 0; i < MODEL_COUNT; i++) {
             modelVertices[i] = NULL;
@@ -466,7 +465,7 @@ int32_t LoadModels(void) {
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-            const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
+            const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
             if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
                 #pragma omp critical
                 DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); continue;
@@ -493,30 +492,36 @@ int32_t LoadModels(void) {
 
             #pragma omp critical
             {
-                if (vertexCount > largestVertCount) largestVertCount = vertexCount;
-                if (triCount > largestTriangleCount) largestTriangleCount = triCount;
+                #ifdef DEBUG_MODEL_LOAD_DATA
+                    if (vertexCount > largestVertCount) largestVertCount = vertexCount;
+                    if (triCount > largestTriangleCount) largestTriangleCount = triCount;
+                #endif
                 totalVertCount += vertexCount;
                 totalTriCount += triCount;
             }
+
+            modelVertices[i] = (float*)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            modelTriangles[i] = (uint32_t*)malloc(triCount * 3 * sizeof(uint32_t));
 
             uint32_t vertexIndex = 0;
             float minx = 1E9f, miny = 1E9f, minz = 1E9f;
             float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
             uint32_t triangleIndex = 0;
             uint32_t globalVertexOffset = 0;
-            for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
+            bool load_failed = false;
+            for (uint32_t m = 0; m < scene->mNumMeshes && !load_failed; m++) {
                 struct aiMesh* mesh = scene->mMeshes[m];
                 for (uint32_t v = 0; v < mesh->mNumVertices; v++) {
-                    tempVertices[vertexIndex++] = mesh->mVertices[v].x;
-                    tempVertices[vertexIndex++] = mesh->mVertices[v].y;
-                    tempVertices[vertexIndex++] = mesh->mVertices[v].z;
-                    tempVertices[vertexIndex++] = mesh->mNormals[v].x;
-                    tempVertices[vertexIndex++] = mesh->mNormals[v].y;
-                    tempVertices[vertexIndex++] = mesh->mNormals[v].z;
+                    modelVertices[i][vertexIndex++] = mesh->mVertices[v].x;
+                    modelVertices[i][vertexIndex++] = mesh->mVertices[v].y;
+                    modelVertices[i][vertexIndex++] = mesh->mVertices[v].z;
+                    modelVertices[i][vertexIndex++] = mesh->mNormals[v].x;
+                    modelVertices[i][vertexIndex++] = mesh->mNormals[v].y;
+                    modelVertices[i][vertexIndex++] = mesh->mNormals[v].z;
                     float tempU = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].x : 0.0f;
                     float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
-                    tempVertices[vertexIndex++] = tempU;
-                    tempVertices[vertexIndex++] = tempV;
+                    modelVertices[i][vertexIndex++] = tempU;
+                    modelVertices[i][vertexIndex++] = tempV;
                     if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
                     if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
                     if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
@@ -529,22 +534,32 @@ int32_t LoadModels(void) {
                     struct aiFace* face = &mesh->mFaces[f];
                     if (face->mNumIndices != 3) {
                         #pragma omp critical
-                        DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); aiReleaseImport(scene); aiReleasePropertyStore(props); continue;
+                        DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f);
+                        load_failed = true;
+                        break;
                     }
                     
                     uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
-                    tempTriangles[triangleIndex++] = v[0];
-                    tempTriangles[triangleIndex++] = v[1];
-                    tempTriangles[triangleIndex++] = v[2];
+                    modelTriangles[i][triangleIndex++] = v[0];
+                    modelTriangles[i][triangleIndex++] = v[1];
+                    modelTriangles[i][triangleIndex++] = v[2];
                 }
                 
                 globalVertexOffset += mesh->mNumVertices;
             }
 
-            modelVertices[i] = (float*)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            modelTriangles[i] = (uint32_t*)malloc(triCount * 3 * sizeof(uint32_t));
-            memcpy(modelVertices[i], tempVertices, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            memcpy(modelTriangles[i], tempTriangles, triCount * 3 * sizeof(uint32_t));
+            if (load_failed) {
+                free(modelVertices[i]);
+                modelVertices[i] = NULL;
+                free(modelTriangles[i]);
+                modelTriangles[i] = NULL;
+                modelVertexCounts[i] = 0;
+                modelTriangleCounts[i] = 0;
+                aiReleaseImport(scene);
+                aiReleasePropertyStore(props);
+                continue;
+            }
+
             modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
             modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
             modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
@@ -555,9 +570,6 @@ int32_t LoadModels(void) {
             aiReleaseImport(scene);
             aiReleasePropertyStore(props);
         }
-
-        free(tempVertices);
-        free(tempTriangles);
     }
 
     for (uint32_t i = 0; i < MODEL_COUNT; i++) { // Sequential phase
@@ -565,23 +577,25 @@ int32_t LoadModels(void) {
 
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         if (modelTriangleCounts[i] > 0) { // Upload to GPU
+            size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
             glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
-            void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, modelVertices[i], modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            memcpy(mapped_buffer, modelVertices[i], vertSize);
             glUnmapBuffer(GL_ARRAY_BUFFER);
             glGenBuffers(1, &vbos[i]);
             glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBufferData(GL_COPY_WRITE_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertSize);
 
+            size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
-            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, modelTriangleCounts[i] * 3 * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t));
+            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+            memcpy(mapped_buffer, modelTriangles[i], triSize);
             glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
             glGenBuffers(1, &tbos[i]);
             glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, modelTriangleCounts[i] * 3 * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, modelTriangleCounts[i] * 3 * sizeof(uint32_t));
+            glBufferData(GL_COPY_WRITE_BUFFER, triSize, NULL, GL_STATIC_DRAW);
+            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triSize);
         }
     }
 
@@ -607,8 +621,6 @@ int32_t LoadModels(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
-    malloc_trim(0);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
     return 0;
@@ -650,7 +662,7 @@ int32_t LoadEntities(void) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
         // Copy with truncation to 31 characters to fit 32 char array for name.  Smaller for RAM constraints.
-        snprintf(entities[i].name, ENT_NAME_MAXLEN_NO_NULL_TERMINATOR + 1, "%s", entity_parser.entries[i].path);
+        snprintf(entities[i].path, MAX_PATH, "%s", entity_parser.entries[i].path);
         entities[i].modelIndex = entity_parser.entries[i].modelIndex;
         entities[i].texIndex = entity_parser.entries[i].texIndex;
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
@@ -693,7 +705,7 @@ void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, floa
         case 10: *ofsx = 107.37f; *ofsy = 101.2f; *ofsz = 35.48f; break;
         case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
         case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
-        case 13: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -715,7 +727,7 @@ void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofs
         case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -737,7 +749,7 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
         case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -759,7 +771,7 @@ void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx
         case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -781,7 +793,7 @@ void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* of
         case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -803,7 +815,7 @@ void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* o
         case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -825,7 +837,7 @@ void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float*
         case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 13: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
