@@ -5,7 +5,7 @@ layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba8,   binding = 0) readonly uniform image2D inputImage;
 layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
-layout(rgba32f, binding = 2) readonly uniform image2D inputNormals;
+layout(rg32f, binding = 2) readonly uniform image2D inputNormals;
 layout(rgba8, binding = 4) writeonly uniform image2D outputImage;
 
 uniform uint screenWidth;
@@ -26,12 +26,14 @@ void main() {
 
     imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));
     vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * 4)); // SSR_RES = 4
-    vec3 worldPos = worldPosPack.xyz;
-    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel * 4)); // SSR_RES = 4
-    vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));
-    vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));
+    vec2 worldXY = unpackHalf2x16(floatBitsToUint(worldPosPack.r));
+    vec2 worldZInst = unpackHalf2x16(floatBitsToUint(worldPosPack.g));
+    vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
+    vec2 normalPack = imageLoad(inputNormals, ivec2(pixel * 4)).rg; // SSR_RES = 4
+    vec2 normalXY = unpackHalf2x16(floatBitsToUint(normalPack.r));
+    vec2 normalZ0 = unpackHalf2x16(floatBitsToUint(normalPack.g));
     vec3 normal = normalize(vec3(normalXY.x, normalXY.y, normalZ0.x));
-    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));
+    vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
     if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;
 
     vec3 viewDir = normalize(worldPos - camPos);
@@ -61,7 +63,9 @@ void main() {
         ivec2 samplePixel = ivec2(floor(hitUV * screenSize));
         samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
         vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * 4); // SSR_RES = 4
-        vec3 sampledWorldPos = sampledWorldPosPack.xyz;
+        vec2 s_worldXY = unpackHalf2x16(floatBitsToUint(sampledWorldPosPack.r));
+        vec2 s_worldZInst = unpackHalf2x16(floatBitsToUint(sampledWorldPosPack.g));
+        vec3 sampledWorldPos = vec3(s_worldXY.x, s_worldXY.y, s_worldZInst.x);
         float dist2 = dot(marchPos - sampledWorldPos, marchPos - sampledWorldPos);
 
         // Smooth distance weighting

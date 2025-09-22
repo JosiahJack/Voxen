@@ -78,8 +78,14 @@ void main() {
     if (!gl_FrontFacing) adjustedNormal = -adjustedNormal;
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
     vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
-    vec4 worldPosPack = vec4(FragPos,uintBitsToFloat(InstanceIndex));
-    vec3 worldPos = worldPosPack.xyz;
+    vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
+                             uintBitsToFloat(packHalf2x16(vec2(FragPos.z,uintBitsToFloat(InstanceIndex)))),
+                             uintBitsToFloat(packColor(glowColor)),
+                             uintBitsToFloat(packColor(specColor)) );
+    outWorldPos = worldPosPack;
+
+    outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));
+    outNormal.g = uintBitsToFloat(packHalf2x16(vec2(adjustedNormal.z,0.0)));
     if (debugView == 1) {
         outAlbedo = albedoColor;
         outAlbedo.a = 1.0;
@@ -99,16 +105,10 @@ void main() {
         outAlbedo.b = float(texIndexChecked) / 1231.0;
         outAlbedo.a = 1.0;
     } else if (debugView == 5) { // Worldpos debug
-        outAlbedo.rgb = worldPos;
+        outAlbedo.rgb = worldPosPack.xyz;
         outAlbedo.a = 1.0;
     } else {
         outAlbedo.rgb = albedoColor.rgb * albedoColor.a;
         outAlbedo.a = 1.0;
     }
-
-    outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));
-    outNormal.g = uintBitsToFloat(packHalf2x16(vec2(adjustedNormal.z,0.0)));
-    outNormal.b = uintBitsToFloat(packColor(glowColor));
-    outNormal.a = uintBitsToFloat(packColor(specColor));
-    outWorldPos = worldPosPack;
 }

@@ -10,7 +10,6 @@ uniform int debugValue;
 uniform uint screenWidth;
 uniform uint screenHeight;
 layout(rgba8, binding = 4) uniform image2D outputImage;
-layout(rgba32f, binding = 2) readonly uniform image2D inputNormals;
 const int SSR_RES = 4;
 
 vec4 unpackColor32(uint color) {
@@ -24,8 +23,6 @@ void main() {
     FragColor = texture(tex, TexCoord);
     if (debugValue > 0) return;
 
-    vec4 normalPack = imageLoad(inputNormals, ivec2(TexCoord.x,TexCoord.y));
-    vec4 specColor = unpackColor32(floatBitsToUint(normalPack.a));
     if (debugView == 0) {
         ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
         vec4 reflectionColor = vec4(0.0);

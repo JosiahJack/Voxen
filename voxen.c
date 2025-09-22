@@ -1099,7 +1099,7 @@ int32_t InitializeEnvironment(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
-    GenerateAndBindTexture(&inputNormalsID,         GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
+    GenerateAndBindTexture(&inputNormalsID,           GL_RG32F, screen_width, screen_height,            GL_RG,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
     GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,          GL_FLOAT, GL_TEXTURE_2D, "SSR");
     glGenFramebuffers(1, &gBufferFBO);
@@ -1120,11 +1120,11 @@ int32_t InitializeEnvironment(void) {
         }
     }
     
-    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // Double duty unlit raster and deferred lighting results, reused sequentially
-    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
-    glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Double duty unlit raster and deferred lighting results, reused sequentially
+    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_READ_WRITE,   GL_RG32F);
     //                 3 = depth
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA8); // SSR result
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1251,9 +1251,6 @@ int32_t Physics(void) {
         ProcessInput();
     }
     
-    // Player Gravity
-    cam_y -= 0.08f;
-    
     for (int i=0;i<physHead;++i) {
         // Get modelBounds[physObjects[i].modelIndex]
         // Orient the model space modelBounds using the physObjects[i].rotation which is a Quaternion { float x,y,z,w; }
@@ -1269,6 +1266,9 @@ int32_t Physics(void) {
     // Player Physics
     // If player position is near closed cell, move it back to open cell
     if (noclip) return 0;
+    
+    // Player Gravity
+    cam_y -= 0.08f;
     
     // Handle Y
     cellFloorHeight = gridCellFloorHeight[playerCellIdx];

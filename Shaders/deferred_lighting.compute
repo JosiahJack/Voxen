@@ -5,7 +5,7 @@ layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba8,   binding = 0) uniform image2D inputImage;
 layout(rgba32f, binding = 1) uniform image2D inputWorldPos;
-layout(rgba32f, binding = 2) uniform image2D inputNormals;
+layout(rg32f,   binding = 2) uniform image2D inputNormals;
 layout(rgba8ui, binding = 5) uniform uimage2D shadowOcclusion;
 layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
@@ -106,22 +106,24 @@ void main() {
     if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
 
     vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));
-    vec3 worldPos = worldPosPack.xyz;
+    vec2 worldXY = unpackHalf2x16(floatBitsToUint(worldPosPack.r));
+    vec2 worldZInst = unpackHalf2x16(floatBitsToUint(worldPosPack.g));
+    vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
     vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));
     float distToPixel = length(worldPos - camPos);
     vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));
-    vec4 glowColor = unpackColor32(floatBitsToUint(normalPack.b));
-    int pixelInstance = floatBitsToInt(worldPosPack.a);
+    vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
+    uint pixelInstance = floatBitsToUint(worldZInst.y);
 
     // Regular lighting calculation
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count  = voxelLightListIndices[voxelIdx * 2 + 1];    
     vec3 lighting = vec3(0.0, 0.0, 0.0);
-    vec3 normal = vec3(0.0,0.0,0.0);
+    vec3 normal = vec3(0.0,0.0,1.0);
     uint listoffset = 0;
     if (count > 0) {
-        vec2 normalXY = unpackHalf2x16(floatBitsToInt(normalPack.r));
-        vec2 normalZ0 = unpackHalf2x16(floatBitsToInt(normalPack.g));
+        vec2 normalXY = unpackHalf2x16(floatBitsToUint(normalPack.r));
+        vec2 normalZ0 = unpackHalf2x16(floatBitsToUint(normalPack.g));
         normal = vec3(normalXY.x, normalXY.y, normalZ0.x);       
         listoffset = voxelLightListIndices[voxelIdx * 2];
     }
@@ -144,7 +146,7 @@ void main() {
         float lambertian = max(dot(normal, lightDir), 0.0);
         if (lambertian < 0.25) continue;
 
-        if (dist > 2.56) {
+        if (dist > 7.68) {
             uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
             uint checkCellIdx = cellIndexForInstance[pixelInstance];
             uint lightCellIdx1D = (lightCell.y * 64) + lightCell.x;
