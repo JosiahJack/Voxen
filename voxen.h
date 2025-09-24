@@ -16,6 +16,8 @@ typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 typedef struct { float r,g,b,a; } Color;
+typedef struct { int32_t x,y; } IVector2;
+typedef struct { int32_t x,y,z; } IVector3;
 
 // Generic Lib Includes TODO REDUCE AS MUCH AS POSSIBLE!!
 #include <SDL2/SDL.h>
@@ -270,11 +272,10 @@ int32_t EventQueueProcess(void);
 #define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
-
-#define LUXEL_SIZE 0.16f
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_SIZE 0.32f
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
+#define MAX_SQUARE_DIST_INT 268435456 // (64 * 256)^2 = max square dist
 #define MAX_LIGHTS_PER_VOXEL 24 // Cap to prevent overflow
 #define CELL_VISIBLE       1
 #define CELL_OPEN          2
@@ -288,9 +289,12 @@ extern uint16_t playerCellIdx;
 extern uint16_t playerCellIdx_x;
 extern uint16_t playerCellIdx_y;
 extern uint16_t playerCellIdx_z;
-extern float cam_x;
-extern float cam_y;
-extern float cam_z;
+extern int32_t cam_x;
+extern int32_t cam_y;
+extern int32_t cam_z;
+extern float cam_xf;
+extern float cam_yf;
+extern float cam_zf;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
 extern float gridCellFloorHeight[ARRSIZE];
@@ -300,14 +304,36 @@ extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
 extern float worldMin_x;
 extern float worldMin_z;
-bool XZPairInBounds(int32_t x, int32_t z);
 int32_t Cull_Init(void);
 void CullCore(void);
 void Cull();
+
+static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
+    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
+    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
+}
+
+static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
+    int32_t max = WORLDX - 1; // 63
+    int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
+    if (xval > max) xval = max;
+    if (xval < 0) xval = 0;
+    *x = (uint16_t)xval;
+    
+    int32_t zval = (int32_t)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
+    if (zval > max) zval = max;
+    if (zval < 0) zval = 0;
+    *z = (uint16_t)zval;
+}
+
+static inline bool XZPairInBounds(int32_t x, int32_t z) {
+    return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
+}
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 256
 #define TERMINAL_VELOCITY 10.0f
+#define PHYS_FLOAT_TO_INT_SCALEF 100.0f
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;

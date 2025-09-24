@@ -34,19 +34,6 @@ static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
     }
 }
 
-void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
-    int32_t max = WORLDX - 1; // 63
-    int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
-    if (xval > max) xval = max;
-    if (xval < 0) xval = 0;
-    *x = (uint16_t)xval;
-    
-    int32_t zval = (int32_t)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
-    if (zval > max) zval = max;
-    if (zval < 0) zval = 0;
-    *z = (uint16_t)zval;
-}
-
 void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
@@ -255,14 +242,10 @@ int32_t DetermineClosedEdges() {
 bool UpdatedPlayerCell() {
     uint16_t lastX = playerCellIdx_x;
     uint16_t lastZ = playerCellIdx_z;
-    PosToCellCoords(cam_x,cam_z,&playerCellIdx_x,&playerCellIdx_z);
+    PosToCellCoords(cam_xf,cam_zf,&playerCellIdx_x,&playerCellIdx_z);
     playerCellIdx = (playerCellIdx_z * WORLDX) + playerCellIdx_x;
     if (playerCellIdx_x == lastX && playerCellIdx_z == lastZ) return false;
     return true;
-}
-
-bool XZPairInBounds(int32_t x, int32_t z) {
-    return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
 }
 
 int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {

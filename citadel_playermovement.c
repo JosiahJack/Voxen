@@ -1,5 +1,6 @@
 // PlayerMovement
 #include <stdbool.h>
+#include <stdint.h>
 #include "voxen.h"
 #include "citadel.h"
 
@@ -13,7 +14,6 @@ void Awake() {
         .playerSpeed = 0.0f,
         .playerSpeedActual = 0.0f,
         .playerSpeedHorizontalActual = 0.0f,
-        .isSprinting = false,
         .grounded = false,
         .feetRayLength = 5.0f,
         .FatigueCheat = false,
@@ -131,7 +131,6 @@ void Update() {
 
     CyberSetup();
     CyberDestupOrNoclipMaintain();
-    playerMovement.isSprinting = false;// TODO: GetSprintInputState();
 //     Crouch();
 //     Prone();
 //     EndCrouchProneTransition();

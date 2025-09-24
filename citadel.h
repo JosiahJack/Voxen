@@ -16,7 +16,6 @@ typedef struct {
     float playerSpeed;
     float playerSpeedActual;
     float playerSpeedHorizontalActual;
-    bool isSprinting;
     bool grounded;
     float feetRayLength;
     bool FatigueCheat;

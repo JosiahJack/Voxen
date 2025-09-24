@@ -5,7 +5,6 @@ layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba8,   binding = 0) uniform image2D inputImage;
 layout(rgba32f, binding = 1) uniform image2D inputWorldPos;
-layout(rg32f,   binding = 2) uniform image2D inputNormals;
 layout(rgba8ui, binding = 5) uniform uimage2D shadowOcclusion;
 layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
@@ -13,7 +12,6 @@ layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };
 layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
-// layout(std430, binding = 28) buffer LightShadowAngleDistsList { float lightShadowAngleDistsList[]; };
     
 uniform uint totalLuxelCount;
 uniform uint screenWidth;
@@ -111,8 +109,8 @@ void main() {
     vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
     vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));
     float distToPixel = length(worldPos - camPos);
-    vec4 normalPack = imageLoad(inputNormals, ivec2(pixel));
     vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
+    vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
     uint pixelInstance = floatBitsToUint(worldZInst.y);
 
     // Regular lighting calculation
@@ -121,12 +119,15 @@ void main() {
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = vec3(0.0,0.0,1.0);
     uint listoffset = 0;
-    if (count > 0) {
-        vec2 normalXY = unpackHalf2x16(floatBitsToUint(normalPack.r));
-        vec2 normalZ0 = unpackHalf2x16(floatBitsToUint(normalPack.g));
-        normal = vec3(normalXY.x, normalXY.y, normalZ0.x);       
+    if (count > 0) {  
+        normal.x = (glowColor.a * 2.0) -1.0;
+        normal.y = (specColor.a * 2.0) - 1.0;
+        normal.z = (glowColor.r * 2.0) - 1.0; // Get the normal.z back at good precision
+        normal = normalize(normal);
         listoffset = voxelLightListIndices[voxelIdx * 2];
     }
+    
+    glowColor.r = color.a; // Glow color doesn't suffer from precision issues like normal did.
     
     for (uint i = 0; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
@@ -157,23 +158,23 @@ void main() {
             if (!lightCanSeeCell) continue;
         }
 
-//         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
+        float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
-//         if (spotAng > 0.0) {
-//             float quat_x = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
-//             float quat_y = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
-//             float quat_z = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
-//             float quat_w = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
-//             vec4 quat = vec4(quat_x, quat_y, quat_z, quat_w);
-//             vec3 spotDir = normalize(quat_rotate(quat, baseDir));
-//             float spotdot = dot(spotDir, -lightDir);
-//             float cosAngle = cos(radians(spotAng / 2.0));
-//             if (spotdot < cosAngle) continue;
-//             float cosOuterAngle = cos(radians(spotAng / 2.0));
-//             float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));
-//             spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);
-//             if (spotFalloff <= 0.0) continue;
-//         }
+        if (spotAng > 0.0) {
+            float quat_x = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
+            float quat_y = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
+            float quat_z = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];
+            float quat_w = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRW];
+            vec4 quat = vec4(quat_x, quat_y, quat_z, quat_w);
+            vec3 spotDir = normalize(quat_rotate(quat, baseDir));
+            float spotdot = dot(spotDir, -lightDir);
+            float cosAngle = cos(radians(spotAng / 2.0));
+            if (spotdot < cosAngle) continue;
+            float cosOuterAngle = cos(radians(spotAng / 2.0));
+            float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));
+            spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);
+            if (spotFalloff <= 0.0) continue;
+        }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R],
                                lights[lightIdx + LIGHT_DATA_OFFSET_G],
@@ -181,25 +182,11 @@ void main() {
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
 
-             // Shadow
-/*        float distsq = dot(toLight.xz, toLight.xz);
-        float angleToLight = atan(toLight.z, toLight.x); // pixel -> light direction in xz plane
-        if (angleToLight < 0.0) angleToLight += 2.0 * 3.14159265;
-        uint slot0 = uint(rad2deg(angleToLight)) % SHADOW_ANGLE_DEG_BINS;
-        uint slot1 = (slot0 + 1) % SHADOW_ANGLE_DEG_BINS;
-        uint slot_1 = (slot0 + SHADOW_ANGLE_DEG_BINS - 1) % SHADOW_ANGLE_DEG_BINS;
-        float distSlot_1 = lightShadowAngleDistsList[lightIdxInPVS * SHADOW_ANGLE_DEG_BINS + slot_1];
-        float distSlot0 = lightShadowAngleDistsList[lightIdxInPVS * SHADOW_ANGLE_DEG_BINS + slot0];
-        float distSlot1 = lightShadowAngleDistsList[lightIdxInPVS * SHADOW_ANGLE_DEG_BINS + slot1];
-        float shadowFactor0 = distSlot0 < distsq ? 0.0 : 1.0;
-        float shadowFactor_1 = distSlot_1 < distsq ? 0.0 : 1.0;
-        float shadowFactor1 = distSlot1 < distsq ? 0.0 : 1.0;
-        float t = fract(rad2deg(angleToLight));*/ /// fractional part for linear interpolation
-        float shadowFactor = 1.0; //mix(mix(shadowFactor_1, shadowFactor0, 1.0 - t), mix(shadowFactor0, shadowFactor1, t), 0.5);
-
+        // Shadow TODO
+        float shadowFactor = 1.0;
         if (debugValue == 1) lighting += vec3(shadowFactor, shadowFactor, shadowFactor);
         else if (debugValue == 2) lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff;
-        /*else*/ lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
+        else lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
 
     lighting += glowColor.rgb;

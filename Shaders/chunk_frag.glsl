@@ -18,7 +18,6 @@ const uint MATERIAL_IDX_MAX = 2048;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(location = 2) out vec4 outNormal;   // GL_COLOR_ATTACHMENT2
 
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -77,15 +76,16 @@ void main() {
 
     if (!gl_FrontFacing) adjustedNormal = -adjustedNormal;
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
+    outAlbedo.a = glowColor.r;
+    glowColor.r = (adjustedNormal.z + 1.0) * 0.5;
+    glowColor.a = (adjustedNormal.x + 1.0) * 0.5;
     vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
+    specColor.a = (adjustedNormal.y + 1.0) * 0.5;
     vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
                              uintBitsToFloat(packHalf2x16(vec2(FragPos.z,uintBitsToFloat(InstanceIndex)))),
                              uintBitsToFloat(packColor(glowColor)),
                              uintBitsToFloat(packColor(specColor)) );
     outWorldPos = worldPosPack;
-
-    outNormal.r = uintBitsToFloat(packHalf2x16(adjustedNormal.xy));
-    outNormal.g = uintBitsToFloat(packHalf2x16(vec2(adjustedNormal.z,0.0)));
     if (debugView == 1) {
         outAlbedo = albedoColor;
         outAlbedo.a = 1.0;
@@ -109,6 +109,5 @@ void main() {
         outAlbedo.a = 1.0;
     } else {
         outAlbedo.rgb = albedoColor.rgb * albedoColor.a;
-        outAlbedo.a = 1.0;
     }
 }

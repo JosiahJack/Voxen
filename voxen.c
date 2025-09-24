@@ -28,6 +28,10 @@
 #include "Shaders/ssr.compute.h"
 #include "Shaders/bluenoise64.cginc"
 
+// 238MB VRAM
+// 209MB  RAM
+// 1.5-1.6ms frametime
+
 // Window
 SDL_Window *window;
 bool inventoryMode = false;
@@ -63,8 +67,9 @@ float pauseRelativeTime = 0.0f;
 
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
-float cam_x = -20.4f, cam_y = -43.792f + 0.84f, cam_z = 10.2f; // Camera position Cornell box, added 0.84f for cam
-float cam_yaw = 90.0f;                                         // offset from player capsule center.
+int32_t cam_x = -2040, cam_y = -4379 + 84, cam_z = 1020;         // Added 0.84f for cam offset from center
+float cam_xf = -20.4f, cam_yf = -43.79f + 0.84f, cam_zf = 10.2f;
+float cam_yaw = 90.0f;
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
 Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
@@ -166,8 +171,7 @@ GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1,
 // ----------------------------------------------------------------------------
 // Input
 float mouse_sensitivity = 0.1f;
-float move_speed = 0.15f;
-float sprinting = 0.0f;
+int32_t move_speed = 16;
 bool noclip = false;
 bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
 uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
@@ -214,6 +218,7 @@ float cellNorth = 0.0f;
 float cellSouth = 0.0f;
 float cellEast = 0.0f;
 float cellWest = 0.0f;
+double time_PhysicsStep = 0.0;
 // ----------------------------------------------------------------------------
 // Diagnostics
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -495,7 +500,7 @@ void Screenshot() {
     if (!utc_time) { DualLog("Failed to get current time for screenshot!\n"); free(pixels); return; }
     
     strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_x, cam_y, cam_z,get_time());
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_xf, cam_yf, cam_zf,get_time());
     int32_t success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
     if (!success) DualLog("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
@@ -734,49 +739,6 @@ void UpdatePlayerFacingAngles() {
     cam_rightz = rotation[2];  // Right Z
     normalize_vector(&cam_forwardx, &cam_forwardy, &cam_forwardz); // Normalize forward
     normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
-}
-
-// Update camera position based on input
-void ProcessInput(void) {
-    if (gamePaused) return;
-    if (consoleActive) return;
-    
-    if (keys[SDL_SCANCODE_LSHIFT]) sprinting = 2.0f;
-    else sprinting = 0.0f;
-
-    float finalMoveSpeed = (move_speed + (sprinting * move_speed));
-    if (keys[SDL_SCANCODE_F]) {
-        cam_x += finalMoveSpeed * cam_forwardx; // Move forward
-        cam_y += finalMoveSpeed * cam_forwardy;
-        cam_z += finalMoveSpeed * cam_forwardz;
-    } else if (keys[SDL_SCANCODE_S]) {
-        cam_x -= finalMoveSpeed * cam_forwardx; // Move backward
-        cam_y -= finalMoveSpeed * cam_forwardy;
-        cam_z -= finalMoveSpeed * cam_forwardz;
-    }
-
-    if (keys[SDL_SCANCODE_D]) {
-        cam_x += finalMoveSpeed * cam_rightx; // Strafe right
-        cam_y += finalMoveSpeed * cam_righty;
-        cam_z += finalMoveSpeed * cam_rightz;
-    } else if (keys[SDL_SCANCODE_A]) {
-        cam_x -= finalMoveSpeed * cam_rightx; // Strafe left
-        cam_y -= finalMoveSpeed * cam_righty;
-        cam_z -= finalMoveSpeed * cam_rightz;
-    }
-
-//     if (noclip) {
-        if (keys[SDL_SCANCODE_V]) cam_y += finalMoveSpeed; // Move up
-        else if (keys[SDL_SCANCODE_C]) cam_y -= finalMoveSpeed; // Move down
-//     }
-
-    if (keys[SDL_SCANCODE_Q]) {
-        cam_roll += move_speed * 5.0f; // Move up
-        Input_MouselookApply();
-    } else if (keys[SDL_SCANCODE_T]) {
-        cam_roll -= move_speed * 5.0f; // Move down
-        Input_MouselookApply();
-    }
 }
 
 // ============================================================================
@@ -1098,17 +1060,15 @@ int32_t InitializeEnvironment(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
-    GenerateAndBindTexture(&inputNormalsID,           GL_RG32F, screen_width, screen_height,            GL_RG,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Normals");
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
     GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,          GL_FLOAT, GL_TEXTURE_2D, "SSR");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputNormalsID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-    glDrawBuffers(3, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         switch (status) {
@@ -1121,8 +1081,7 @@ int32_t InitializeEnvironment(void) {
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Double duty unlit raster and deferred lighting results, reused sequentially
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    glBindImageTexture(2, inputNormalsID, 0, GL_FALSE, 0, GL_READ_WRITE,   GL_RG32F);
-    //                 3 = depth
+    //                 2 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
@@ -1236,185 +1195,247 @@ int32_t ParticleSystemStep(void) {
     return 0;
 }
 
-void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
-    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
-    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
+static inline int32_t clampi(int32_t x, int32_t min, int32_t max) { return x < min ? min : (x > max ? max : x); }
+static inline int64_t clampi64(int64_t x, int64_t min, int64_t max) { return x < min ? min : (x > max ? max : x); }
+
+static inline IVector3 sub_vector3(IVector3 a, IVector3 b) {
+    int64_t subx = (int64_t)a.x - (int64_t)b.x;
+    subx = clampi64(subx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t suby = (int64_t)a.y - (int64_t)b.y;
+    suby = clampi64(suby,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t subz = (int64_t)a.z - (int64_t)b.z;
+    subz = clampi64(subz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    return (IVector3){ (int32_t)subx, (int32_t)suby, (int32_t)subz };
 }
 
-static inline Vector3 sub_vector3(Vector3 a, Vector3 b) {
-    Vector3 res = {a.x - b.x, a.y - b.y, a.z - b.z};
-    return res;
+static inline IVector3 add_vector3(IVector3 a, IVector3 b) {
+    int64_t addx = (int64_t)a.x + (int64_t)b.x;
+    addx = clampi64(addx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t addy = (int64_t)a.y + (int64_t)b.y;
+    addy = clampi64(addy,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t addz = (int64_t)a.z + (int64_t)b.z;
+    addz = clampi64(addz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    return (IVector3){ (int32_t)addx, (int32_t)addy, (int32_t)addz };
 }
 
-static inline Vector3 add_vector3(Vector3 a, Vector3 b) {
-    Vector3 res = {a.x + b.x, a.y + b.y, a.z + b.z};
-    return res;
+static inline IVector3 scale_vector3(IVector3 v, int32_t s) {
+    int64_t mulx = (int64_t)s * (int64_t)v.x;
+    mulx = clampi64(mulx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t muly = (int64_t)s * (int64_t)v.y;
+    muly = clampi64(muly,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t mulz = (int64_t)s * (int64_t)v.z;
+    mulz = clampi64(mulz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    return (IVector3){ (int32_t)mulx, (int32_t)muly, (int32_t)mulz };
 }
 
-static inline Vector3 scale_vector3(Vector3 v, float s) {
-    Vector3 res = {v.x * s, v.y * s, v.z * s};
-    return res;
+static inline int32_t dot_vector3(IVector3 a, IVector3 b) {
+    int64_t mulx = (int64_t)a.x * (int64_t)b.x;
+    int64_t muly = (int64_t)a.y * (int64_t)b.y;
+    int64_t mulz = (int64_t)a.z * (int64_t)b.z;
+    int64_t sum = (mulx + muly + mulz);
+    sum = clampi64(sum,(int64_t)INT32_MIN,(int64_t)INT32_MAX); // One clamp at the end.
+    return (int32_t)sum;
 }
 
-static inline float dot_vector3(Vector3 a, Vector3 b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+static inline int32_t dist_sq_vector3(IVector3 a, IVector3 b) { IVector3 d = sub_vector3(a, b); return dot_vector3(d, d); }
+
+static inline IVector3 cross_vector3(IVector3 a, IVector3 b) {
+    int64_t ax64 = (int64_t)a.x;
+    int64_t ay64 = (int64_t)a.y;
+    int64_t az64 = (int64_t)a.z;
+    int64_t bx64 = (int64_t)b.x;
+    int64_t by64 = (int64_t)b.y;
+    int64_t bz64 = (int64_t)b.z;
+    int64_t ay64bz64 = ay64 * bz64;
+    int64_t az64by64 = az64 * by64;
+    int64_t crossx = ay64bz64 - az64by64;
+    crossx = clampi64(crossx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    
+    int64_t az64bx64 = az64 * bx64;
+    int64_t ax64bz64 = ax64 * bz64;
+    int64_t crossy = az64bx64 - ax64bz64;
+    crossy = clampi64(crossy,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    
+    int64_t ax64by64 = ax64 * by64;
+    int64_t ay64bx64 = ay64 * bx64;
+    int64_t crossz = ax64by64 - ay64bx64;
+    crossz = clampi64(crossz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    return (IVector3){ crossx, crossy, crossz };
 }
 
-static inline float dist_sq_vector3(Vector3 a, Vector3 b) {
-    Vector3 d = sub_vector3(a, b);
-    return dot_vector3(d, d);
+static inline int32_t length_vector3(IVector3 v) {
+    int32_t dot = dot_vector3(v, v);
+    float len = sqrtf((float)dot);
+    if (isnan(len) || isinf(len)) return 0;
+    return (int32_t)clampi64((int64_t)len,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
 }
 
-static inline Vector3 cross_vector3(Vector3 a, Vector3 b) {
-    Vector3 res;
-    res.x = a.y * b.z - a.z * b.y;
-    res.y = a.z * b.x - a.x * b.z;
-    res.z = a.x * b.y - a.y * b.x;
-    return res;
+static inline IVector3 normalize_vector3(IVector3 v) {
+    int64_t len = (int64_t)length_vector3(v);
+    if (len == 0) return v; // Prevent divide by zero
+    
+    int64_t divx = (int64_t)v.x / len;
+    divx = clampi64(divx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t divy = (int64_t)v.y / len;
+    divy = clampi64(divy,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    int64_t divz = (int64_t)v.z / len;
+    divz = clampi64(divz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
+    return (IVector3){ (int32_t)divx, (int32_t)divy, (int32_t)divz };
 }
 
-static inline float length_vector3(Vector3 v) {
-    return sqrtf(dot_vector3(v, v));
-}
-
-static inline Vector3 normalize_vector3(Vector3 v) {
-    float len = length_vector3(v);
-    if (len > 1e-6f) {
-        v.x /= len; v.y /= len; v.z /= len;
-    }
-    return v;
-}
-
-static inline float clampf(float x, float a, float b) {
-    return x < a ? a : (x > b ? b : x);
-}
-
-static inline Vector3 mul_mat4_vector3(const float* mat, Vector3 v) {
-    // Assume homogeneous, w=1
+static inline IVector3 mul_mat4_vector3(const float* mat, Vector3 v) {
     Vector3 res;
     res.x = mat[0] * v.x + mat[4] * v.y + mat[8] * v.z + mat[12];
     res.y = mat[1] * v.x + mat[5] * v.y + mat[9] * v.z + mat[13];
     res.z = mat[2] * v.x + mat[6] * v.y + mat[10] * v.z + mat[14];
-    return res;
+    if (isnan(res.x) || isnan(res.y) || isnan(res.z) || isinf(res.x) || isinf(res.y) || isinf(res.z)) return (IVector3){0, 0, 0};
+
+    float sx = res.x * PHYS_FLOAT_TO_INT_SCALEF, sy = res.y * PHYS_FLOAT_TO_INT_SCALEF, sz = res.z * PHYS_FLOAT_TO_INT_SCALEF;
+    if (isnan(sx) || isnan(sy) || isnan(sz) || isinf(sx) || isinf(sy) || isinf(sz)) return (IVector3){0, 0, 0};
+
+    return (IVector3){ (int32_t)clampi64((int64_t)round(sx), INT32_MIN, INT32_MAX), (int32_t)clampi64((int64_t)round(sy), INT32_MIN, INT32_MAX), (int32_t)clampi64((int64_t)round(sz), INT32_MIN, INT32_MAX) };
 }
 
 // Point to segment squared distance, outputs closest points
-static float dist_point_segment_sq(Vector3 p, Vector3 a, Vector3 b, Vector3* closest_on_seg, Vector3* closest_on_p) {
-    Vector3 ab = sub_vector3(b, a);
-    float len2 = dot_vector3(ab, ab);
-    Vector3 ap = sub_vector3(p, a);
-    float proj = dot_vector3(ap, ab);
-    float t = 0.0f;
-    if (len2 > 1e-6f) {
-        t = clampf(proj / len2, 0.0f, 1.0f);
-    }
+static int32_t dist_point_segment_sq(IVector3 p, IVector3 a, IVector3 b, IVector3* closest_on_seg, IVector3* closest_on_p) {
+    IVector3 ab = sub_vector3(b, a);
+    int32_t len2 = dot_vector3(ab, ab);
+    IVector3 ap = sub_vector3(p, a);
+    int32_t proj = dot_vector3(ap, ab);
+    int32_t t = 0;
+    if (len2 != 0) t = clampi(proj / len2, 0, 100);
     *closest_on_seg = add_vector3(a, scale_vector3(ab, t));
     *closest_on_p = p;  // Point to itself
-    Vector3 diff = sub_vector3(p, *closest_on_seg);
+    IVector3 diff = sub_vector3(p, *closest_on_seg);
     return dot_vector3(diff, diff);
 }
 
 // Segment to segment squared distance (clamped)
-static float dist_segment_segment_sq(Vector3 a0, Vector3 a1, Vector3 b0, Vector3 b1, Vector3* closest_a, Vector3* closest_b) {
-    Vector3 d1 = sub_vector3(a1, a0);
-    Vector3 d2 = sub_vector3(b1, b0);
-    Vector3 d0 = sub_vector3(a0, b0);
-    float a = dot_vector3(d1, d1);
-    float e = dot_vector3(d2, d2);
-    float f = dot_vector3(d2, d1);
-    float c = dot_vector3(d1, d0);
-    float d = dot_vector3(d2, d0);
-    float det = a * e - f * f;
-    float s = 0.5f, t = 0.5f;
-    if (det > 1e-6f) {
-        s = clampf((f * d - e * c) / det, 0.0f, 1.0f);
-        t = clampf((a * d - f * c) / det, 0.0f, 1.0f);
+static int32_t dist_segment_segment_sq(IVector3 a0, IVector3 a1, IVector3 b0, IVector3 b1, IVector3* closest_a, IVector3* closest_b) {
+    IVector3 d1 = sub_vector3(a1, a0);
+    IVector3 d2 = sub_vector3(b1, b0);
+    IVector3 d0 = sub_vector3(a0, b0);
+    int32_t a = dot_vector3(d1, d1);
+    int32_t e = dot_vector3(d2, d2);
+    int32_t f = dot_vector3(d2, d1);
+    int32_t c = dot_vector3(d1, d0);
+    int32_t d = dot_vector3(d2, d0);
+    int32_t det = a * e - f * f;
+    int32_t s = 50, t = 50;
+    if (det != 0 && abs(det) > 1) {
+        s = clampi((f * d - e * c) / det, 0, 100);
+        t = clampi((a * d - f * c) / det, 0, 100);
     }
     *closest_a = add_vector3(a0, scale_vector3(d1, s));
     *closest_b = add_vector3(b0, scale_vector3(d2, t));
-    Vector3 diff = sub_vector3(*closest_a, *closest_b);
+    IVector3 diff = sub_vector3(*closest_a, *closest_b);
     return dot_vector3(diff, diff);
 }
 
 // Point to triangle squared distance (barycentric), outputs closest on tri
-static float point_tri_dist_sq(Vector3 p, Vector3 a, Vector3 b, Vector3 c, Vector3* closest) {
-    Vector3 ab = sub_vector3(b, a);
-    Vector3 ac = sub_vector3(c, a);
-    Vector3 ap = sub_vector3(p, a);
-    float d00 = dot_vector3(ab, ab);
-    float d01 = dot_vector3(ab, ac);
-    float d11 = dot_vector3(ac, ac);
-    float d20 = dot_vector3(ap, ab);
-    float d21 = dot_vector3(ap, ac);
-    float denom = d00 * d11 - d01 * d01;
-    float v = 0.0f, w = 0.0f;
-    if (fabsf(denom) > 1e-6f) {
-        v = clampf((d11 * d20 - d01 * d21) / denom, 0.0f, 1.0f);
-        w = clampf((d00 * d21 - d01 * d20) / denom, 0.0f, 1.0f);
-        if (v + w > 1.0f) {
-            float vv = (v + w - 1.0f);
-            v = clampf(v - vv, 0.0f, 1.0f);
-            w = clampf(w - vv, 0.0f, 1.0f);
+static int32_t point_tri_dist_sq(IVector3 p, IVector3 a, IVector3 b, IVector3 c, IVector3* closest) {
+    IVector3 ab = sub_vector3(b, a);
+    IVector3 ac = sub_vector3(c, a);
+    IVector3 ap = sub_vector3(p, a);
+    int32_t d00 = dot_vector3(ab, ab);
+    int32_t d01 = dot_vector3(ab, ac);
+    int32_t d11 = dot_vector3(ac, ac);
+    int32_t d20 = dot_vector3(ap, ab);
+    int32_t d21 = dot_vector3(ap, ac);
+    int32_t denom = d00 * d11 - d01 * d01;
+    int32_t v = 0, w = 0;
+    if (denom != 0 && abs(denom) > 1) {
+        v = clampi((d11 * d20 - d01 * d21) / denom, 0, 100);
+        w = clampi((d00 * d21 - d01 * d20) / denom, 0, 100);
+        if (v + w > 100) {
+            int32_t vv = (v + w - 100);
+            v = clampi(v - vv, 0, 100);
+            w = clampi(w - vv, 0, 100);
         }
     }
     *closest = add_vector3(a, add_vector3(scale_vector3(ab, v), scale_vector3(ac, w)));
-    Vector3 diff = sub_vector3(p, *closest);
+    IVector3 diff = sub_vector3(p, *closest);
     return dot_vector3(diff, diff);
 }
 
+// Backface proximity check: Returns true if capsule center is within dist_threshold of triangle's backface, pushes to front
+static bool check_backface_proximity(IVector3* cap_center, int32_t dist_threshold, IVector3 t0, IVector3 t1, IVector3 t2) {
+    IVector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
+    if (n.x == 0 && n.y == 0 && n.z == 0) return false;
+    
+    IVector3 closest;
+    int32_t dist_sq = point_tri_dist_sq(*cap_center, t0, t1, t2, &closest);
+    float dist = sqrtf((float)dist_sq);
+    if (isnan(dist) || isinf(dist)) return false;
+    
+    IVector3 to_center = sub_vector3(*cap_center, closest);
+    int32_t dot = dot_vector3(to_center, n);
+    if (dot <= 0 || (int32_t)dist < dist_threshold) return false;
+    
+    int32_t push_dist = dist_threshold - (int32_t)dist + 1;
+    *cap_center = add_vector3(*cap_center, scale_vector3(n, push_dist));
+    return true;
+}
+
 // Capsule vs triangle: Returns true if colliding, updates cap_center by pushing out
-static bool capsule_vs_tri(Vector3* cap_center, float half_h, float r, Vector3 t0, Vector3 t1, Vector3 t2) {
-    Vector3 cap_bot = {cap_center->x, cap_center->y - half_h, cap_center->z};
-    Vector3 cap_top = {cap_center->x, cap_center->y + half_h, cap_center->z};
-    Vector3 seg_closest, tri_closest;
-    float min_dist_sq = 1e30f;
+static bool capsule_vs_tri(IVector3* cap_center, int32_t half_h, int32_t r, IVector3 t0, IVector3 t1, IVector3 t2) {
+    IVector3 cap_bot = {cap_center->x, cap_center->y - half_h, cap_center->z};
+    IVector3 cap_top = {cap_center->x, cap_center->y + half_h, cap_center->z};
+    IVector3 seg_closest, tri_closest = t0; // Initialize tri_closest to t0 as a safe default
+    int32_t min_dist_sq = MAX_SQUARE_DIST_INT;
+    bool closest_updated = false; // Track if tri_closest was updated
 
     // Vert to segment (3)
-    Vector3 tris[3] = {t0, t1, t2};
+    IVector3 tris[3] = {t0, t1, t2};
     for (int i = 0; i < 3; i++) {
-        Vector3 dummy;
-        float d = dist_point_segment_sq(tris[i], cap_bot, cap_top, &seg_closest, &dummy);
+        IVector3 dummy;
+        int32_t d = dist_point_segment_sq(tris[i], cap_bot, cap_top, &seg_closest, &dummy);
         if (d < min_dist_sq) {
             min_dist_sq = d;
             tri_closest = tris[i];
+            closest_updated = true;
         }
     }
 
     // Edges to segment (3)
-    Vector3 edges[3][2] = {{t0, t1}, {t1, t2}, {t2, t0}};
+    IVector3 edges[3][2] = {{t0, t1}, {t1, t2}, {t2, t0}};
     for (int i = 0; i < 3; i++) {
-        Vector3 dummy_a, dummy_b;
-        float d = dist_segment_segment_sq(cap_bot, cap_top, edges[i][0], edges[i][1], &seg_closest, &dummy_b);
+        IVector3 dummy_b;
+        int32_t d = dist_segment_segment_sq(cap_bot, cap_top, edges[i][0], edges[i][1], &seg_closest, &dummy_b);
         if (d < min_dist_sq) {
             min_dist_sq = d;
             tri_closest = dummy_b;
+            closest_updated = true;
         }
     }
 
     // Segment to plane clamped (1)
-    Vector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
-    float d0 = dot_vector3(sub_vector3(cap_bot, t0), n);
-    float d1 = dot_vector3(sub_vector3(cap_top, t0), n);
-    if (fabsf(d0) > 1e-6f || fabsf(d1) > 1e-6f) {
-        float t = clampf(-d0 / (d1 - d0), 0.0f, 1.0f);
-        Vector3 foot = add_vector3(cap_bot, scale_vector3(sub_vector3(cap_top, cap_bot), t));
-        Vector3 cp;
-        float d = point_tri_dist_sq(foot, t0, t1, t2, &cp);
+    IVector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
+    if (n.x == 0 && n.y == 0 && n.z == 0) return false;
+    
+    int32_t d0 = dot_vector3(sub_vector3(cap_bot, t0), n);
+    int32_t d1 = dot_vector3(sub_vector3(cap_top, t0), n);
+    if (d0 != 0 || d1 != 0) {
+        int32_t t = clampi(-d0 / (d1 - d0), 0, 100);
+        IVector3 foot = add_vector3(cap_bot, scale_vector3(sub_vector3(cap_top, cap_bot), t));
+        IVector3 cp;
+        int32_t d = point_tri_dist_sq(foot, t0, t1, t2, &cp);
         if (d < min_dist_sq) {
             min_dist_sq = d;
             seg_closest = foot;
             tri_closest = cp;
+            closest_updated = true;
         }
     }
 
-    float min_dist = sqrtf(min_dist_sq);
-    if (min_dist > r) return false;  // No collision
+    int32_t min_dist = sqrtf(min_dist_sq);
+    if (min_dist > r || !closest_updated) return false; // No collision if no valid closest point
 
     // Resolve: Push along connecting vector
-    Vector3 push_dir = sub_vector3(seg_closest, tri_closest);
+    IVector3 push_dir = sub_vector3(seg_closest, tri_closest);
     push_dir = normalize_vector3(push_dir);
-    float pen = r - min_dist + 0.001f;  // Epsilon
-    *cap_center = add_vector3(*cap_center, scale_vector3(push_dir, pen));
+    int32_t pen = r - min_dist + 1; // Epsilon
+    if (!check_backface_proximity(cap_center, 46, t0, t1, t2)) { *cap_center = add_vector3(*cap_center, scale_vector3(push_dir, pen)); }
     return true;
 }
 
@@ -1427,14 +1448,57 @@ static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint3
     return abs(inst_x - player_x) <= 1 && abs(inst_z - player_z) <= 1;
 }
 
+// Update camera position based on input
+void ProcessInput(void) {
+    if (gamePaused) return;
+    if (consoleActive) return;
+    
+    int32_t finalMoveSpeed = move_speed;
+    if (keys[SDL_SCANCODE_LSHIFT]) finalMoveSpeed = 22;
+    if (keys[SDL_SCANCODE_F]) {
+        cam_x += (int32_t)round((float)finalMoveSpeed * cam_forwardx); // Move forward
+        cam_y += (int32_t)round((float)finalMoveSpeed * cam_forwardy);
+        cam_z += (int32_t)round((float)finalMoveSpeed * cam_forwardz);
+    } else if (keys[SDL_SCANCODE_S]) {
+        cam_x -= (int32_t)round((float)finalMoveSpeed * cam_forwardx); // Move backward
+        cam_y -= (int32_t)round((float)finalMoveSpeed * cam_forwardy);
+        cam_z -= (int32_t)round((float)finalMoveSpeed * cam_forwardz);
+    }
+
+    if (keys[SDL_SCANCODE_D]) {
+        cam_x += (int32_t)round((float)finalMoveSpeed * cam_rightx); // Strafe right
+        cam_y += (int32_t)round((float)finalMoveSpeed * cam_righty);
+        cam_z += (int32_t)round((float)finalMoveSpeed * cam_rightz);
+    } else if (keys[SDL_SCANCODE_A]) {
+        cam_x -= (int32_t)round((float)finalMoveSpeed * cam_rightx); // Strafe left
+        cam_y -= (int32_t)round((float)finalMoveSpeed * cam_righty);
+        cam_z -= (int32_t)round((float)finalMoveSpeed * cam_rightz);
+    }
+
+//     if (noclip) {
+        if (keys[SDL_SCANCODE_V]) cam_y += finalMoveSpeed; // Move up
+        else if (keys[SDL_SCANCODE_C]) cam_y -= finalMoveSpeed; // Move down
+//     }
+
+    if (keys[SDL_SCANCODE_Q]) {
+        cam_roll += move_speed * 5.0f; // Move up
+        Input_MouselookApply();
+    } else if (keys[SDL_SCANCODE_T]) {
+        cam_roll -= move_speed * 5.0f; // Move down
+        Input_MouselookApply();
+    }
+}
+
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
+    double physics_start_time = get_time();
 
     // Player Movement from Input
     if (window_has_focus) { // Move the player based on input first, then bound it below...
         UpdatePlayerFacingAngles();
         ProcessInput();
     }
+    return 0;
 
     // Player Physics: Capsule-triangle naive collision
     if (noclip) return 0;
@@ -1443,16 +1507,16 @@ int32_t Physics(void) {
 //     cam_y -= 0.08f;
     
     // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
-    float capsule_offset = 0.32f;  // Center below camera (1.84 below, 0.16 above)
-    Vector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};
-    float half_height = 0.32f;  // Half of 2.0f height
-    float radius = 0.16f;
+    int32_t capsule_offset = 48;  // Center below camera (1.84 below, 0.16 above)
+    IVector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};
+    int32_t half_height = 24;  // Half of 2.0f height
+    int32_t radius = 48;
     
     // Adjust for body state (e.g., standing adds height, but here fixed for simplicity)
-    float body_state_add = 0.0f;
+    float body_state_add = 0;
     if (currentLevel != LEVEL_CYBERSPACE) {
         switch (playerMovement.bodyState) {
-            case BodyState_Standing: body_state_add = (PLAYER_HEIGHT * 0.5f); break;
+            case BodyState_Standing: body_state_add = 48; break; // TODO: Should be 100!
             // Add cases for crouch/prone: adjust half_height, offset
         }
         // For now, assume fixed; extend as needed
@@ -1474,26 +1538,35 @@ int32_t Physics(void) {
             uint32_t i0 = modelTriangles[mid][t * 3 + 0] * VERTEX_ATTRIBUTES_COUNT;
             uint32_t i1 = modelTriangles[mid][t * 3 + 1] * VERTEX_ATTRIBUTES_COUNT;
             uint32_t i2 = modelTriangles[mid][t * 3 + 2] * VERTEX_ATTRIBUTES_COUNT;
+            float v0_x = modelVertices[mid][i0 + 0];
+            float v0_y = modelVertices[mid][i0 + 1];
+            float v0_z = modelVertices[mid][i0 + 2];
+            float v1_x = modelVertices[mid][i1 + 0];
+            float v1_y = modelVertices[mid][i1 + 1];
+            float v1_z = modelVertices[mid][i1 + 2];
+            float v2_x = modelVertices[mid][i2 + 0];
+            float v2_y = modelVertices[mid][i2 + 1];
+            float v2_z = modelVertices[mid][i2 + 2];
+            float edgeLength0_1 = squareDistance3D(v0_x, v0_y, v0_z, v1_x, v1_y, v1_z);
+            if (edgeLength0_1 < 0.0005f) continue; // Skip tiny unimportant tris.
             
-            // Transform positions to world
-            Vector3 v0 = mul_mat4_vector3(world_mat, (Vector3){
-                modelVertices[mid][i0 + 0], modelVertices[mid][i0 + 1], modelVertices[mid][i0 + 2]
-            });
-            Vector3 v1 = mul_mat4_vector3(world_mat, (Vector3){
-                modelVertices[mid][i1 + 0], modelVertices[mid][i1 + 1], modelVertices[mid][i1 + 2]
-            });
-            Vector3 v2 = mul_mat4_vector3(world_mat, (Vector3){
-                modelVertices[mid][i2 + 0], modelVertices[mid][i2 + 1], modelVertices[mid][i2 + 2]
-            });
+            float edgeLength0_2 = squareDistance3D(v0_x, v0_y, v0_z, v2_x, v2_y, v2_z);
+            if (edgeLength0_2 < 0.0005f) continue; // Skip tiny unimportant tris.
             
-            // Test and resolve
-            capsule_vs_tri(&cap_center, half_height, radius, v0, v1, v2);
+            float edgeLength1_2 = squareDistance3D(v1_x, v1_y, v1_z, v2_x, v2_y, v2_z);
+            if (edgeLength1_2 < 0.0005f) continue; // Skip tiny unimportant tris.
+            
+            IVector3 v0 = mul_mat4_vector3(world_mat, (Vector3){ v0_x, v0_y, v0_z }); // Transform positions to world
+            IVector3 v1 = mul_mat4_vector3(world_mat, (Vector3){ v1_x, v1_y, v1_z });
+            IVector3 v2 = mul_mat4_vector3(world_mat, (Vector3){ v2_x, v2_y, v2_z });
+            capsule_vs_tri(&cap_center, half_height + body_state_add, radius, v0, v1, v2); // Test and resolve
         }
     }
 
     cam_x = cap_center.x; // Update camera from resolved capsule center
     cam_y = cap_center.y + capsule_offset;  // Restore offset
     cam_z = cap_center.z;
+    time_PhysicsStep = get_time() - physics_start_time;
     return 0;
 }
 
@@ -1515,16 +1588,16 @@ int32_t EventExecute(Event* event) {
     return 99;
 }
 
-static const char* debugViewNames[] = {
-    "standard render", // 0
-    "unlit",           // 1
-    "surface normals", // 2
-    "depth",           // 3
-    "indices",         // 4
-    "worldpos",        // 5
-    "lightview",       // 6
-    "reflections"     // 7
-};
+// static const char* debugViewNames[] = {
+//     "standard render", // 0
+//     "unlit",           // 1
+//     "surface normals", // 2
+//     "depth",           // 3
+//     "indices",         // 4
+//     "worldpos",        // 5
+//     "lightview",       // 6
+//     "reflections"      // 7
+// };
 
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
     return x1 * x2 + y1 * y2 + z1 * z2;
@@ -1544,9 +1617,9 @@ void mat4_lookat(float* m) {
     m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
     m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
     m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
-    m[12] = -dot(right[0], right[1], right[2], cam_x, cam_y, cam_z);   // -dot(right, eye)
-    m[13] = -dot(up[0], up[1], up[2], cam_x, cam_y, cam_z);      // -dot(up, eye)
-    m[14] = dot(forward[0], forward[1], forward[2], cam_x, cam_y, cam_z);  // dot(forward, eye)
+    m[12] = -dot(right[0], right[1], right[2], cam_xf, cam_yf, cam_zf);   // -dot(right, eye)
+    m[13] = -dot(up[0], up[1], up[2], cam_xf, cam_yf, cam_zf);      // -dot(up, eye)
+    m[14] = dot(forward[0], forward[1], forward[2], cam_xf, cam_yf, cam_zf);  // dot(forward, eye)
     m[15] = 1.0f;
 }
 
@@ -1557,9 +1630,9 @@ typedef struct {
 } LightCandidate;
 
 bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
-    float to_inst_x = inst_x - cam_x; // Vector from camera to instance
-    float to_inst_y = inst_y - cam_y;
-    float to_inst_z = inst_z - cam_z;
+    float to_inst_x = inst_x - cam_xf; // Vector from camera to instance
+    float to_inst_y = inst_y - cam_yf;
+    float to_inst_z = inst_z - cam_zf;
     float distance = sqrtf(to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z);
     if (distance < 3.62038672f) return true; // Avoid division by zero.  Closer than corner of a cell (sqrt(2) * 2.56f)
 
@@ -1892,6 +1965,10 @@ int32_t main(int32_t argc, char* argv[]) {
         double frame_time = current_time - last_time;
         if (!gamePaused) pauseRelativeTime += frame_time;
         
+        cam_xf = (int32_t)(round((float)cam_x * 0.01f));
+        cam_yf = (int32_t)(round((float)cam_y * 0.01f));
+        cam_zf = (int32_t)(round((float)cam_z * 0.01f));
+        
         // Enqueue input events
         SDL_Event event;
         int32_t mouse_xrel = 0.0f, mouse_yrel = 0.0f;
@@ -1992,7 +2069,7 @@ int32_t main(int32_t argc, char* argv[]) {
         memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
+            float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_xf, cam_yf, cam_zf);
             if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
             if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
             
@@ -2060,7 +2137,7 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
-            glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
+            glUniform3f(camPosLoc_deferred, cam_xf, cam_yf, cam_zf);
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
             glUniform1f(fogColorBLoc_deferred, fogColorB);
@@ -2074,7 +2151,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-            glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
+            glUniform3f(camPosLoc_ssr, cam_xf, cam_yf, cam_zf);
             GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
             GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
             glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -2114,7 +2191,7 @@ int32_t main(int32_t argc, char* argv[]) {
         // 8. Render UI Text;
         int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
         int32_t leftPad = GetScreenRelativeX(0.0125f);
-//         RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
+//         RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_xf, cam_yf, cam_zf);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
@@ -2134,8 +2211,8 @@ int32_t main(int32_t argc, char* argv[]) {
         // Frame stats
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d",
-                            (time_now - last_time) * 1000.0,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d, Phys T: %.3f",
+                            (time_now - last_time) * 1000.0f,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS,time_PhysicsStep * 1000.0f);
         last_time = time_now;
         if ((time_now - lastFrameSecCountTime) >= 1.00) {
             lastFrameSecCountTime = time_now;
