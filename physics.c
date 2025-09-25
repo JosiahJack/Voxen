@@ -59,7 +59,7 @@ int32_t Input_KeyDown(int32_t scancode) {
 
     if (keys[SDL_SCANCODE_Y]) {
         debugValue++;
-        if (debugValue > 2) debugValue = 0;
+        if (debugValue > 3) debugValue = 0;
         glProgramUniform1i(deferredLightingShaderProgram, debugValueLoc_deferred, debugValue);
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
     }
@@ -183,6 +183,10 @@ static inline Vector3 add_vector3(Vector3 a, Vector3 b) {
 static inline Vector3 scale_vector3(Vector3 v, float s) {
     Vector3 res = {v.x * s, v.y * s, v.z * s};
     return res;
+}
+
+float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
+    return x1 * x2 + y1 * y2 + z1 * z2;
 }
 
 static inline float dot_vector3(Vector3 a, Vector3 b) {
@@ -394,14 +398,14 @@ int32_t Physics(void) {
     float radius = 0.16f;
     
     // Adjust for body state (e.g., standing adds height, but here fixed for simplicity)
-    float body_state_add = 0.0f;
-    if (currentLevel != LEVEL_CYBERSPACE) {
-        switch (playerMovement.bodyState) {
-            case BodyState_Standing: body_state_add = 0.32f; break;//(PLAYER_HEIGHT * 0.5f); break;
-            // Add cases for crouch/prone: adjust half_height, offset
-        }
-        // For now, assume fixed; extend as needed
-    }
+//     float body_state_add = 0.0f;
+//     if (currentLevel != LEVEL_CYBERSPACE) {
+//         switch (playerMovement.bodyState) {
+//             case BodyState_Standing: body_state_add = 0.32f; break;//(PLAYER_HEIGHT * 0.5f); break; TODO
+//             // Add cases for crouch/prone: adjust half_height, offset
+//         }
+//         // For now, assume fixed; extend as needed
+//     }
     
     // Naive loop over all instances and their triangles
     for (uint32_t i = 0; i < loadedInstances; i++) {  // Or INSTANCE_COUNT

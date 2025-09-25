@@ -173,8 +173,8 @@ int32_t LoadEntities(void);
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-#define MAX_VISIBLE_LIGHTS 16
-#define SHADOW_MAP_SIZE 64 
+#define MAX_VISIBLE_LIGHTS 90
+#define SHADOW_MAP_SIZE 256
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -430,7 +430,7 @@ extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern GLuint precomputedVisibleCellsFromHereID;
 extern GLuint cellIndexForInstanceID;
-extern bool lightDirty[MAX_VISIBLE_LIGHTS];
+extern bool lightDirty[LIGHT_COUNT];
 extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
 extern bool global_modIsCitadel;
@@ -462,6 +462,7 @@ int32_t GetScreenRelativeX(float percentage);
 int32_t GetScreenRelativeY(float percentage);
 int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTerminator);
 extern float uiOrthoProjection[16];
+float dot(float x1, float y1, float z1, float x2, float y2, float z2);
 void RenderUI(void);
 void RenderLoadingProgress(int32_t offset, const char* format, ...);
 void ConsoleEmulator(int32_t scancode);

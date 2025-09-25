@@ -6,10 +6,10 @@ const int LIGHT_COUNT = 1600;
 
 layout(rgba8,   binding =  0) uniform image2D inputImage;
 layout(rgba32f, binding =  1) uniform image2D inputWorldPos;
-layout(         binding =  3) uniform sampler2D depthTexture;
+// layout(         binding =  3) uniform sampler2D depthTexture; // Unused but slot taken
+layout(std430,  binding =  5) buffer ShadowMaps { float shadowMaps[]; };
 layout(std430,  binding =  6) buffer LightIndirectionIndices { uint lightIndirectionIndices[]; };
 layout(std430,  binding =  8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
-layout(         binding = 10) uniform samplerCubeArray shadowCubeMapArray;
 layout(std430,  binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430,  binding = 19) buffer LightIndices { float lights[]; };
 layout(std430,  binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };
@@ -103,6 +103,41 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
     return retval;
 }
 
+const int shadowMapSize = 256;
+
+float SampleShadowMap(uint lightIdx, vec3 shadowCoord, uint face) {
+    uint baseOffset = lightIdx * 6 * shadowMapSize * shadowMapSize;
+    uint faceOffset = baseOffset + face * shadowMapSize * shadowMapSize;
+
+    // Convert shadowCoord to cube map UV
+    vec3 absCoord = abs(shadowCoord);
+    float maxAxis = max(max(absCoord.x, absCoord.y), absCoord.z);
+    vec2 uv;
+    if (face == 0) { // +X
+        uv = vec2(-shadowCoord.z, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
+    } else if (face == 1) { // -X
+        uv = vec2(shadowCoord.z, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
+    } else if (face == 2) { // +Y
+        uv = vec2(shadowCoord.x, shadowCoord.z) / maxAxis * 0.5 + 0.5;
+    } else if (face == 3) { // -Y
+        uv = vec2(shadowCoord.x, -shadowCoord.z) / maxAxis * 0.5 + 0.5;
+    } else if (face == 4) { // +Z
+        uv = vec2(shadowCoord.x, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
+    } else { // -Z
+        uv = vec2(-shadowCoord.x, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
+    }
+
+    // Bilinear sampling
+    ivec2 texel = ivec2(uv * float(shadowMapSize));
+    if (texel.x >= shadowMapSize - 1 || texel.y >= shadowMapSize - 1 || texel.x < 0 || texel.y < 0) {
+        return 1.0; // Outside bounds, no shadow
+    }
+    uint offset = faceOffset + texel.y * shadowMapSize + texel.x;
+    float depth = shadowMaps[offset];
+    float bias = 0.005;
+    return (shadowCoord.z / maxAxis > depth + bias) ? 0.0 : 1.0;
+}
+
 // Main Compute Shader
 void main() {
     uvec2 pixelu = gl_GlobalInvocationID.xy;
@@ -189,15 +224,17 @@ void main() {
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
 
         // Shadows
-        float shadowFactor = 1.0;
-        uint shadowLightIndex = lightIndirectionIndices[lightIdxInPVS];
-        if (shadowLightIndex < LIGHT_COUNT) { // Process if a valid light, otherwise no shadowing
-            vec3 fragToLight = worldPos - lightPos;
-            float closestDepth = texture(shadowCubeMapArray, vec4(fragToLight, float(shadowLightIndex))).r * range;
-            float currentDepth = dist;
-            float bias = 0.05;
-            if (currentDepth - bias > closestDepth) shadowFactor = 0.0; // Fully in shadow
+        vec3 absToLight = abs(toLight);
+        float maxAxis = max(max(absToLight.x, absToLight.y), absToLight.z);
+        uint face;
+        if (absToLight.x >= absToLight.y && absToLight.x >= absToLight.z) {
+            face = toLight.x > 0.0 ? 0 : 1; // +X or -X
+        } else if (absToLight.y >= absToLight.x && absToLight.y >= absToLight.z) {
+            face = toLight.y > 0.0 ? 2 : 3; // +Y or -Y
+        } else {
+            face = toLight.z > 0.0 ? 4 : 5; // +Z or -Z
         }
+        float shadowFactor = SampleShadowMap(lightIdxInPVS, toLight, face);
         if (debugValue == 1) lighting += vec3(shadowFactor, shadowFactor, shadowFactor);
         else if (debugValue == 2) lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff;
         else lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;

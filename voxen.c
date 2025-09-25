@@ -75,6 +75,7 @@ uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsCulledArray[INSTANCE_COUNT];
 bool instanceIsLODArray[INSTANCE_COUNT];
+
 // ----------------------------------------------------------------------------
 // Shaders
 //    Chunk Geometery Unlit Raster Shader
@@ -83,11 +84,16 @@ GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1;
 
 //    Shadowmap Rastered Depth Shader
-GLuint shadowCubeMapArray;
+GLuint shadowCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
 GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1;
 GLuint lightIndirectionIndices[LIGHT_COUNT];
+GLuint shadowMapSSBO; // SSBO for storing all shadow maps
+bool shadowMapsRendered = false;
+bool lightIsDynamic[LIGHT_COUNT] = {0};
+uint16_t staticLightCount = 0;
+uint16_t staticLightIndices[LIGHT_COUNT];
 
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
@@ -117,7 +123,7 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
-bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
+bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
 GLuint lightsID, lightIndirectionIndicesID;
 // ----------------------------------------------------------------------------
 // Event System states
@@ -356,10 +362,9 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
     return dx * dx + dy * dy + dz * dz;
 }
 // ============================================================================
-void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, float rotx, float roty, float rotz, float rotw, float sclx, float scly, float sclz) {
+void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
     float rot[16];
-    Quaternion quat = { rotx, roty, rotz, rotw };
-    quat_to_matrix(&quat,rot);
+    quat_to_matrix(quat,rot);
     mat[0]  = rot[0] * -sclx; mat[1]  = rot[1] * -sclx; mat[2]  = rot[2] * -sclx; mat[3]  = 0.0f;
     mat[4]  = rot[4] * scly; mat[5]  = rot[5] * scly; mat[6]  = rot[6] * scly; mat[7]  = 0.0f;
     mat[8]  = rot[8] * sclz; mat[9]  = rot[9] * sclz; mat[10] = rot[10] * sclz; mat[11] = 0.0f;
@@ -371,9 +376,8 @@ void UpdateInstanceMatrix(int32_t i) {
     if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
 
     float mat[16]; // 4x4 matrix
-    SetUpdatedMatrix(mat, instances[i].position.x, instances[i].position.y, instances[i].position.z,
-                     instances[i].rotation.x, instances[i].rotation.y, instances[i].rotation.z, instances[i].rotation.w,
-                     instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
+    Quaternion quat = {instances[i].rotation.x, instances[i].rotation.y, instances[i].rotation.z, instances[i].rotation.w};
+    SetUpdatedMatrix(mat, instances[i].position.x, instances[i].position.y, instances[i].position.z, &quat,instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
 }
@@ -448,6 +452,21 @@ int32_t compareShadowEdges(const void* a, const void* b) {
     const ShadowEdge* edgeA = (const ShadowEdge*)a;
     const ShadowEdge* edgeB = (const ShadowEdge*)b;
     return edgeA->angle < edgeB->angle ? -1 : (edgeA->angle > edgeB->angle ? 1 : 0);
+}
+
+uint32_t* voxelLightListsRaw = NULL;
+uint32_t* voxelLightListIndices = NULL;
+
+typedef struct {
+    uint16_t index; // Original index in lights array
+    float distanceSquared; // Distance to camera squared
+    float score; // Priority score (lower distance, higher intensity = higher priority)
+} LightCandidate;
+
+int32_t compareLightCandidates(const void* a, const void* b) {
+    const LightCandidate* ca = (const LightCandidate*)a;
+    const LightCandidate* cb = (const LightCandidate*)b;
+    return (ca->score < cb->score) ? -1 : ((ca->score > cb->score) ? 1 : 0);
 }
 
 int32_t VoxelLists() {
@@ -575,6 +594,183 @@ int32_t VoxelLists() {
     malloc_trim(0);
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     return 0;
+}
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
+void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
+    float rotation[16];
+    quat_to_matrix(camRotation, rotation);
+
+    // Extract basis vectors (camera space axes)
+    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
+    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
+    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
+
+    // View matrix: inverse rotation (transpose) and inverse translation
+    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
+    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
+    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
+    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
+    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
+    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
+    m[15] = 1.0f;
+}
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
+void mat4_lookat(float* m) {
+    mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
+}
+
+float lightView[6][16];
+float lightViewProj[6][16];
+Quaternion orientationQuaternion[6] = {
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},      // +X: Rotate 90° around Y to face right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f},     // -X: Rotate -90° around Y to face left
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},      // +Y: Rotate -90° around X to face up
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f},     // -Y: Rotate 90° around X to face down
+    {0.0f, 0.0f, 0.0f, 1.0f},                      // +Z: No rotation (forward)
+    {0.0f, 1.0f, 0.0f, 0.0f}                       // -Z: Rotate 180° around Y to face backward
+};
+
+void RenderShadowmap(uint16_t lightIdx, uint32_t ssboOffset) {
+    float* lightData = &lights[lightIdx * LIGHT_DATA_SIZE];
+    float lightPosX = lightData[LIGHT_DATA_OFFSET_POSX];
+    float lightPosY = lightData[LIGHT_DATA_OFFSET_POSY];
+    float lightPosZ = lightData[LIGHT_DATA_OFFSET_POSZ];
+    float lightRadius = lightData[LIGHT_DATA_OFFSET_RANGE];
+
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    glUseProgram(shadowmapsShaderProgram);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_CULL_FACE);
+    glBindVertexArray(vao_chunk);
+
+    // Temporary buffer for depth data
+    float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
+
+    for (uint8_t face = 0; face < 6; face++) {
+        // Attach specific cube map face
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMap, 0);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            DualLogError("Shadow FBO incomplete for light %d, face %d, status: 0x%x\n", lightIdx, face, status);
+            continue;
+        }
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+        mat4_lookat_from(lightView[face], &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
+        mul_mat4(lightViewProj[face], shadowmapsPerspectiveProjection, lightView[face]);
+        for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
+            if (instances[j].modelIndex >= MODEL_COUNT) continue;
+            if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+
+            float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+            float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
+            if (distToLightSqrd > (lightRadius + radius) * (lightRadius + radius)) continue;
+
+            int16_t modelType = instanceIsLODArray[j] && instances[j].lodIndex < MODEL_COUNT ? instances[j].lodIndex : instances[j].modelIndex;
+            glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[j * 16]);
+            glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[face]);
+            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+            glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+            drawCallsRenderedThisFrame++;
+            staticLightCount++;
+            verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+        }
+
+        // Copy depth data to SSBO
+        glReadPixels(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT, depthData);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
+        glBufferSubData(GL_SHADER_STORAGE_BUFFER, ssboOffset + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), depthData);
+    }
+
+    free(depthData);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glViewport(0, 0, screen_width, screen_height);
+    CHECK_GL_ERROR();
+}
+    
+void RenderShadowmaps(void) {
+    // Render static lights once
+    for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
+        uint16_t lightIdx = staticLightIndices[i];
+        uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
+        RenderShadowmap(lightIdx, ssboOffset);
+    }
+    shadowMapsRendered = true;
+    DualLog("Rendered %d static shadow maps\n", staticLightCount);
+}
+
+void RenderDynamicShadowmaps(void) {
+    // Find dynamic lights within 35.0f of camera
+    uint16_t visibleLightCount = 0;
+//     uint16_t visibleLightIndices[MAX_VISIBLE_LIGHTS];
+    uint32_t uniqueLights[LIGHT_COUNT];
+    memset(uniqueLights, 0xFF, LIGHT_COUNT * sizeof(uint32_t));
+    uint32_t uniqueLightCount = 0;
+
+    float camCellX = (cam_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F;
+    float camCellZ = (cam_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F;
+    uint16_t minCellX = (uint16_t)fmax(0.0f, floorf(camCellX - (35.0f / WORLDCELL_WIDTH_F)));
+    uint16_t maxCellX = (uint16_t)fmin(63.0f, ceilf(camCellX + (35.0f / WORLDCELL_WIDTH_F)));
+    uint16_t minCellZ = (uint16_t)fmax(0.0f, floorf(camCellZ - (35.0f / WORLDCELL_WIDTH_F)));
+    uint16_t maxCellZ = (uint16_t)fmin(63.0f, ceilf(camCellZ + (35.0f / WORLDCELL_WIDTH_F)));
+
+    bool lightSeen[LIGHT_COUNT] = {0};
+    for (uint16_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+        for (uint16_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
+            uint16_t cellIndex = cellZ * 64 + cellX;
+            for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+                for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
+                    uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+                    uint32_t count = voxelLightListIndices[voxelIndex * 2 + 1];
+                    if (count == 0) continue;
+                    uint32_t offset = voxelLightListIndices[voxelIndex * 2];
+                    for (uint32_t k = 0; k < count; ++k) {
+                        uint32_t lightIdx = voxelLightListsRaw[offset + k];
+                        if (lightIsDynamic[lightIdx] && !lightSeen[lightIdx]) {
+                            lightSeen[lightIdx] = true;
+                            if (uniqueLightCount < LIGHT_COUNT) uniqueLights[uniqueLightCount++] = lightIdx;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Select top MAX_VISIBLE_LIGHTS dynamic lights
+    LightCandidate candidates[uniqueLightCount];
+    for (uint32_t k = 0; k < uniqueLightCount; ++k) {
+        uint32_t lightIdx = uniqueLights[k];
+        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+        float distSqrd = squareDistance3D(lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ], cam_x, cam_y, cam_z);
+        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        candidates[k].index = lightIdx;
+        candidates[k].distanceSquared = distSqrd;
+        candidates[k].score = distSqrd / (intensity + 0.1f);
+    }
+    qsort(candidates, uniqueLightCount, sizeof(LightCandidate), compareLightCandidates);
+
+    visibleLightCount = fmin(MAX_VISIBLE_LIGHTS - staticLightCount, (uint16_t)uniqueLightCount);
+    for (uint16_t k = 0; k < visibleLightCount; ++k) {
+        uint32_t lightIdx = candidates[k].index;
+        lightIndirectionIndices[lightIdx] = staticLightCount + k;
+//         visibleLightIndices[k] = lightIdx;
+        uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
+        RenderShadowmap(lightIdx, ssboOffset);
+    }
+
+    // Update light indirection buffer
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightIndirectionIndicesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(GLuint), lightIndirectionIndices, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightIndirectionIndicesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glViewport(0, 0, screen_width, screen_height);
+    CHECK_GL_ERROR();
 }
 
 float textQuadVertices[] = { // 2 triangles, text is applied as an image from SDL TTF
@@ -732,26 +928,43 @@ int32_t InitializeEnvironment(void) {
     DebugRAM("after Lights Buffer Init");
     
     // Shadowmaps
-    CHECK_GL_ERROR();
-    glGenTextures(1, &shadowCubeMapArray);
-    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, shadowCubeMapArray);
-    glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_DEPTH_COMPONENT24, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, MAX_VISIBLE_LIGHTS * 6, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, 0);
+    // Shadow map cube texture (single cube, 6 faces)
+    glGenTextures(1, &shadowCubeMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
+    for (int face = 0; face < 6; face++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_DEPTH_COMPONENT24, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
+    // Shadow FBO
     glGenFramebuffers(1, &shadowFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubeMapArray, 0);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubeMap, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { DualLogError("Shadow FBO incomplete\n"); return 1; }
-    
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        DualLogError("Shadow FBO incomplete, status: 0x%x\n", status);
+        return 1;
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // SSBO for shadow map data
+    glGenBuffers(1, &shadowMapSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    CHECK_GL_ERROR();
     DebugRAM("after shadow map setup");
-    
+
     // Input
     Input_MouselookApply();
     
@@ -847,41 +1060,6 @@ int32_t EventExecute(Event* event) {
     DualLogError("Unknown event %d\n",event->type);
     return 99;
 }
-
-float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
-    return x1 * x2 + y1 * y2 + z1 * z2;
-}
-
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
-    float rotation[16];
-    quat_to_matrix(camRotation, rotation);
-
-    // Extract basis vectors (camera space axes)
-    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
-    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
-    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
-
-    // View matrix: inverse rotation (transpose) and inverse translation
-    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
-    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
-    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
-    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
-    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
-    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
-    m[15] = 1.0f;
-}
-
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat(float* m) {
-    mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
-}
-
-typedef struct {
-    uint16_t index; // Original index in lights array
-    float distanceSquared; // Distance to camera squared
-    float score; // Priority score (lower distance, higher intensity = higher priority)
-} LightCandidate;
 
 bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     float to_inst_x = inst_x - cam_x; // Vector from camera to instance
@@ -1385,89 +1563,11 @@ int32_t main(int32_t argc, char* argv[]) {
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
         // ====================================================================
-        // 4. Shadowmaps
-        uint16_t visibleLightCount = 0;
-        uint16_t visibleLightIndices[MAX_VISIBLE_LIGHTS];
-        for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
-            lightIndirectionIndices[i] = UINT16_MAX;
-            if (visibleLightCount >= MAX_VISIBLE_LIGHTS) break;
-            
-            float* lightData = &lights[i * LIGHT_DATA_SIZE];
-            float spotAng = lightData[5];
-            if (spotAng > 0.0f) continue; // Skip spotlights for now
-            
-            float lightPosX = lightData[LIGHT_DATA_OFFSET_POSX];
-            float lightPosY = lightData[LIGHT_DATA_OFFSET_POSY];
-            float lightPosZ = lightData[LIGHT_DATA_OFFSET_POSZ];
-            float lightIntensity = lightData[LIGHT_DATA_OFFSET_INTENSITY];
-            float lightRadius = lightData[LIGHT_DATA_OFFSET_RANGE];
-            float distSqrd = squareDistance3D(lightPosX, lightPosY, lightPosZ, cam_x, cam_y, cam_z);
-            if (distSqrd > lightRadius * lightRadius || lightIntensity < 0.3f) continue;
-            
-            lightIndirectionIndices[i] = visibleLightCount;
-            visibleLightIndices[visibleLightCount++] = i;
-        }
-
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightIndirectionIndicesID);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(GLuint), lightIndirectionIndices, GL_DYNAMIC_DRAW);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightIndirectionIndicesID);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
-        float lightView[6][16];
-        float lightViewProj[6][16];
-        typedef struct { float x, y, z, w; } Quaternion;
-        Quaternion orientationQuaternion[6] = {
-            {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X
-            {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X
-            {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y
-            {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y
-            {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z
-            {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z
-        };
-
-        for (uint16_t l = 0; l < visibleLightCount; l++) {
-            uint16_t i = visibleLightIndices[l];
-            float* lightData = &lights[i * LIGHT_DATA_SIZE];
-            float lightPosX = lightData[0];
-            float lightPosY = lightData[1];
-            float lightPosZ = lightData[2];
-            glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-            glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glUseProgram(shadowmapsShaderProgram);
-            glEnable(GL_DEPTH_TEST);
-            glDisable(GL_CULL_FACE);
-            CHECK_GL_ERROR();
-            for (uint8_t face = 0; face < 6; face++) {
-                mat4_lookat_from(lightView[face], &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
-                mul_mat4(lightViewProj[face], shadowmapsPerspectiveProjection, lightView[face]);
-                glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubeMapArray, 0, l * 6 + face);
-                for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
-                    if (instanceIsCulledArray[j]) continue;
-                    if (instances[j].modelIndex >= MODEL_COUNT) continue;
-                    if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-
-                    float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-                    if (!IsSphereInFOVCone(instances[j].position.x, instances[j].position.y, instances[j].position.z, radius)) continue;
-
-                    int16_t modelType = instanceIsLODArray[j] && instances[j].lodIndex < MODEL_COUNT ? instances[j].lodIndex : instances[j].modelIndex;
-                    glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[j * 16]);
-                    glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[face]);
-                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-                    glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-                    drawCallsRenderedThisFrame++;
-                    verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
-                }
-            }
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, screen_width, screen_height);
-        CHECK_GL_ERROR();
-
+        // 4. Dynamic Shadowmaps
+        if (!shadowMapsRendered) RenderShadowmaps();
+//         RenderDynamicShadowmaps(); TODO
+        
         // 5. Deferred Lighting
-        glBindTextureUnit(10, shadowCubeMapArray); // Bind cube map array to texture unit 10
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
         if (debugView == 0 || debugView == 8) {

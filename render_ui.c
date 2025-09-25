@@ -207,7 +207,7 @@ static const char* debugViewNames[] = {
     "unlit",           // 1
     "surface normals", // 2
     "depth",           // 3
-    "indices",         // 4
+    "shadows",         // 4
     "worldpos",        // 5
     "lightview",       // 6
     "reflections"      // 7
