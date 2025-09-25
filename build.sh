@@ -29,6 +29,8 @@ gen_header ./Shaders/text_vert.glsl             textVertexShaderSource
 gen_header ./Shaders/text_frag.glsl             textFragmentShaderSource
 gen_header ./Shaders/composite_vert.glsl        quadVertexShaderSource
 gen_header ./Shaders/composite_frag.glsl        quadFragmentShaderSource
+gen_header ./Shaders/shadowmap_vert.glsl        shadowmapVertexShaderSource
+gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
 shader_end=$(now_ms)
 build_start=$(now_ms)
 echo "Shaders converted to string constants in $((shader_end - shader_start)) ms"
@@ -36,7 +38,7 @@ echo "Shaders converted to string constants in $((shader_end - shader_start)) ms
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
 LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lenet -lpthread -fopenmp -s"
-SOURCES="voxen.c data_textures.c data_parser.c audio.c dynamic_culling.c miniaudio.c citadel_playermovement.c"
+SOURCES="voxen.c render_ui.c data_textures.c data_parser.c audio.c physics.c dynamic_culling.c miniaudio.c citadel_playermovement.c"
 
 # Compile sources in parallel
 pids=()

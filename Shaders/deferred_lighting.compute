@@ -2,22 +2,26 @@
 // Compute shader for processing 
 #version 450 core
 layout(local_size_x = 32, local_size_y = 32) in;
+const int LIGHT_COUNT = 1600;
 
-layout(rgba8,   binding = 0) uniform image2D inputImage;
-layout(rgba32f, binding = 1) uniform image2D inputWorldPos;
-layout(rgba8ui, binding = 5) uniform uimage2D shadowOcclusion;
-layout(std430, binding = 8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
-layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
-layout(std430, binding = 19) buffer LightIndices { float lights[]; };
-layout(std430, binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };
-layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
-layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
-    
+layout(rgba8,   binding =  0) uniform image2D inputImage;
+layout(rgba32f, binding =  1) uniform image2D inputWorldPos;
+layout(         binding =  3) uniform sampler2D depthTexture;
+layout(std430,  binding =  6) buffer LightIndirectionIndices { uint lightIndirectionIndices[]; };
+layout(std430,  binding =  8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
+layout(         binding = 10) uniform samplerCubeArray shadowCubeMapArray;
+layout(std430,  binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
+layout(std430,  binding = 19) buffer LightIndices { float lights[]; };
+layout(std430,  binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };
+layout(std430,  binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
+layout(std430,  binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
+
 uniform uint totalLuxelCount;
 uniform uint screenWidth;
 uniform uint screenHeight;
 uniform uint modelCount;
 uniform mat4 viewProjection;
+uniform mat4 invViewProjection;
 uniform int debugView;
 uniform int debugValue;
 uniform float worldMin_x;
@@ -69,11 +73,12 @@ const int LIGHT_DATA_OFFSET_R = 10;
 const int LIGHT_DATA_OFFSET_G = 11;
 const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
-const int SHADOW_ANGLE_DEG_BINS = 360;
 const float VOXEL_SIZE = 0.32;
 const float CELLXHALF = 1.28;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
 const int SSR_RES = 4;
+const float FAR_PLANE = 71.68;
+const float NEAR_PLANE = 0.02;
     
 float rad2deg(float radians) { return radians * (180.0 / 3.1415926535); }
 
@@ -98,16 +103,17 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
     return retval;
 }
 
-    // Main Compute Shader
+// Main Compute Shader
 void main() {
-    uvec2 pixel = gl_GlobalInvocationID.xy;
+    uvec2 pixelu = gl_GlobalInvocationID.xy;
+    ivec2 pixel = ivec2(pixelu);
     if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
 
-    vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel));
+    vec4 worldPosPack = imageLoad(inputWorldPos, pixel);
     vec2 worldXY = unpackHalf2x16(floatBitsToUint(worldPosPack.r));
     vec2 worldZInst = unpackHalf2x16(floatBitsToUint(worldPosPack.g));
     vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
-    vec4 color = vec4(imageLoad(inputImage, ivec2(pixel)));
+    vec4 color = vec4(imageLoad(inputImage, pixel));
     float distToPixel = length(worldPos - camPos);
     vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
     vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
@@ -182,8 +188,16 @@ void main() {
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
 
-        // Shadow TODO
+        // Shadows
         float shadowFactor = 1.0;
+        uint shadowLightIndex = lightIndirectionIndices[lightIdxInPVS];
+        if (shadowLightIndex < LIGHT_COUNT) { // Process if a valid light, otherwise no shadowing
+            vec3 fragToLight = worldPos - lightPos;
+            float closestDepth = texture(shadowCubeMapArray, vec4(fragToLight, float(shadowLightIndex))).r * range;
+            float currentDepth = dist;
+            float bias = 0.05;
+            if (currentDepth - bias > closestDepth) shadowFactor = 0.0; // Fully in shadow
+        }
         if (debugValue == 1) lighting += vec3(shadowFactor, shadowFactor, shadowFactor);
         else if (debugValue == 2) lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff;
         else lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
@@ -203,5 +217,5 @@ void main() {
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
     lighting = mix(fogColor, lighting, 1.0 - fogFac);
-    imageStore(inputImage, ivec2(pixel), vec4(lighting, color.a));
+    imageStore(inputImage, pixel, vec4(lighting, 1.0));
 }

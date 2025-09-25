@@ -39,13 +39,11 @@ void main() {
     normal.z = (glowColor.r * 2.0) - 1.0;
     normal = normalize(normal);
 
-    vec3 viewDir = normalize(worldPos - camPos);
-    vec3 reflectDir = reflect(viewDir, normal);
+    vec3 viewDir = normalize(camPos - worldPos);
+    vec3 reflectDir = reflect(-viewDir, normal);
 
     // Compute Fresnel term (Schlick approximation)
     float cosTheta = max(dot(-viewDir, normal), 0.0);
-    vec3 F0 = specColor.rgb;
-    vec3 fresnel = F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
     vec2 hitUV = vec2(0.0);
     vec3 reflectionColor = vec3(0.0);
     float totalWeight = 0.0;
@@ -67,6 +65,16 @@ void main() {
         ivec2 samplePixel = ivec2(floor(hitUV * screenSize));
         samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
         vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * SSR_RES);
+        vec4 sampledGlowColor = unpackColor32(floatBitsToUint(sampledWorldPosPack.b));
+        vec4 sampledSpecColor = unpackColor32(floatBitsToUint(sampledWorldPosPack.a));
+        vec3 sampledNormal = normalize(vec3(
+            sampledGlowColor.a * 2.0 - 1.0,
+            sampledSpecColor.a * 2.0 - 1.0,
+            sampledGlowColor.r * 2.0 - 1.0
+        ));
+        sampledNormal = normalize(sampledNormal);
+        if (dot(reflectDir, sampledNormal) >= 0.0) continue;
+        
         vec2 s_worldXY = unpackHalf2x16(floatBitsToUint(sampledWorldPosPack.r));
         vec2 s_worldZInst = unpackHalf2x16(floatBitsToUint(sampledWorldPosPack.g));
         vec3 sampledWorldPos = vec3(s_worldXY.x, s_worldXY.y, s_worldZInst.x);
@@ -88,6 +96,6 @@ void main() {
     if (totalWeight < 0.01) return; // Avoid division by near-zero
 
     reflectionColor /= totalWeight; // Normalize by total weight
-    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * fresnel * 1.5);
+    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * 0.451);
     imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));
 }

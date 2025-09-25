@@ -16,14 +16,13 @@ typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 typedef struct { float r,g,b,a; } Color;
-typedef struct { int32_t x,y; } IVector2;
-typedef struct { int32_t x,y,z; } IVector3;
 
 // Generic Lib Includes TODO REDUCE AS MUCH AS POSSIBLE!!
-#include <SDL2/SDL.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <GL/glew.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 // #include <fluidlite.h> TODO Add midi support
 // #include <libxmi.h>
 
@@ -174,8 +173,9 @@ int32_t LoadEntities(void);
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-#define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_ANGLE_DEG_BINS 360
+#define MAX_VISIBLE_LIGHTS 16
+#define SHADOW_MAP_SIZE 64 
+#define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 
@@ -224,16 +224,12 @@ typedef struct {
     float payload2f; // Second one used for a 2nd value or for double via bitpacking
     uint8_t type;
 } Event;
-
 extern Event eventQueue[MAX_EVENTS_PER_FRAME];
 extern int32_t eventJournalIndex;
-
 // Journal buffer for event history to write into the log/demo file
 extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE];
-
 extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were
                 // already executed and walked away from the counter.
-
 extern int32_t eventQueueEnd; // End of the waiting line
 extern FILE* activeLogFile;
 extern bool log_playback;
@@ -244,7 +240,6 @@ extern uint32_t globalFrameNum;
 extern double last_time;
 extern double current_time;
 extern float pauseRelativeTime;
-
 int32_t EventExecute(Event* event);
 int32_t EventInit(void);
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
@@ -285,16 +280,7 @@ int32_t EventQueueProcess(void);
 #define CELL_CLOSEDWEST   32
 #define CELL_SEES_SUN     64
 #define CELL_SEES_SKYBOX 128
-extern uint16_t playerCellIdx;
-extern uint16_t playerCellIdx_x;
-extern uint16_t playerCellIdx_y;
-extern uint16_t playerCellIdx_z;
-extern int32_t cam_x;
-extern int32_t cam_y;
-extern int32_t cam_z;
-extern float cam_xf;
-extern float cam_yf;
-extern float cam_zf;
+extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
 extern float gridCellFloorHeight[ARRSIZE];
@@ -302,12 +288,14 @@ extern float gridCellCeilingHeight[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
-extern float worldMin_x;
-extern float worldMin_z;
+extern float worldMin_x, worldMin_z;
 int32_t Cull_Init(void);
 void CullCore(void);
 void Cull();
-
+// ----------------------------------------------------------------------------
+// Helper Functions
+static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
+static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
@@ -334,6 +322,7 @@ static inline bool XZPairInBounds(int32_t x, int32_t z) {
 #define MAX_DYNAMIC_ENTITIES 256
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
+extern double time_PhysicsStep;
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
@@ -367,9 +356,44 @@ static const uint8_t PhysicsLayer_Clip             = 26;
 //static const uint8_t PhysicsLayer_               = 27;
 //static const uint8_t PhysicsLayer_               = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
+int32_t ParticleSystemStep(void);
+void ProcessInput(void);
+int32_t Physics(void);
+void UpdateInstanceMatrix(int32_t i);
 
+// Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
+inline void quat_to_matrix(Quaternion* q, float* m) {
+    float x = q->x, y = q->y, z = q->z, w = q->w;
+    float x2 = x * x, y2 = y * y, z2 = z * z;
+    float xy = x * y, xz = x * z, yz = y * z;
+    float wx = w * x, wy = w * y, wz = w * z;
+
+    // Column-major rotation matrix for Unity (Y+ up, Z+ forward, X+ right)
+    m[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
+    m[1]  = 2.0f * (xy + wz);        // Right Y
+    m[2]  = 2.0f * (xz - wy);        // Right Z
+    m[3]  = 0.0f;
+    m[4]  = 2.0f * (xy - wz);        // Up X
+    m[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
+    m[6]  = 2.0f * (yz + wx);        // Up Z
+    m[7]  = 0.0f;
+    m[8]  = 2.0f * (xz + wy);        // Forward X
+    m[9]  = 2.0f * (yz - wx);        // Forward Y
+    m[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
+    m[11] = 0.0f;
+    m[12] = 0.0f;
+    m[13] = 0.0f;
+    m[14] = 0.0f;
+    m[15] = 1.0f;
+}
+// ----------------------------------------------------------------------------
+// Input
+extern bool keys[SDL_NUM_SCANCODES];
+extern bool window_has_focus;
 void Input_MouselookApply();
-
+int32_t Input_KeyDown(int32_t scancode);
+int32_t Input_KeyUp(int32_t scancode);
+int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 // ----------------------------------------------------------------------------
 // Rendering
 #define DEBUG_OPENGL
@@ -389,9 +413,19 @@ void Input_MouselookApply();
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
-
+#define TEXT_WHITE 0
+#define TEXT_YELLOW 1
+#define TEXT_DARK_YELLOW 2
+#define TEXT_GREEN 3
+#define TEXT_RED 4
+#define TEXT_ORANGE 5
+#define TEXT_BUFFER_SIZE 128
 extern uint16_t screen_width;
 extern uint16_t screen_height;
+extern int32_t debugView;
+extern int32_t debugValue;
+extern GLint debugViewLoc_chunk, debugViewLoc_deferred, debugValueLoc_deferred, debugViewLoc_quadblit, debugValueLoc_quadblit;
+extern float fogColorR, fogColorG, fogColorB;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern GLuint precomputedVisibleCellsFromHereID;
@@ -400,18 +434,96 @@ extern bool lightDirty[MAX_VISIBLE_LIGHTS];
 extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
 extern bool global_modIsCitadel;
-
+extern bool inventoryMode;
+extern bool noclip;
+extern bool consoleActive;
+extern int32_t cursorPosition_x, cursorPosition_y;
+extern float cam_x, cam_y, cam_z;
+extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
+extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
+extern Quaternion cam_rotation;
+extern float genericTextHeightFac;
+extern GLuint chunkShaderProgram;
+extern GLuint deferredLightingShaderProgram;
+extern GLuint textShaderProgram;
+extern GLuint imageBlitShaderProgram;
+extern TTF_Font* font;
+extern GLuint textVAO, textVBO;
+extern GLint projectionLoc_text;
+extern GLint textColorLoc_text;
+extern GLint textTextureLoc_text;
+extern GLint texelSizeLoc_text;
 float quat_angle_deg(Quaternion a, Quaternion b);
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);
+void ToggleConsole(void);
+bool CursorVisible(void);
+int32_t GetScreenRelativeX(float percentage);
+int32_t GetScreenRelativeY(float percentage);
+int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTerminator);
+extern float uiOrthoProjection[16];
+void RenderUI(void);
+void RenderLoadingProgress(int32_t offset, const char* format, ...);
+void ConsoleEmulator(int32_t scancode);
+void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* format, ...);
+void CenterStatusPrint(const char* fmt, ...);
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints
 extern FILE *console_log_file;
-void DualLog(const char *fmt, ...); // Logs both to log file and console, usage same as printf
-void DualLogWarn(const char *fmt, ...);
-void DualLogError(const char *fmt, ...);
-void print_bytes_no_newline(int32_t count);
+void DualLog(const char* fmt, ...);
+void DualLogWarn(const char* fmt, ...);
+void DualLogError(const char* fmt, ...);
 void DebugRAM(const char *context, ...);
-void RenderLoadingProgress(int32_t offset, const char* format, ...);
+#ifdef VOXEN_ENGINE_IMPLEMENTATION
+//     Logs both to log file and console, usage same as printf
+static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
+    va_list copy; va_copy(copy, args);
+    if (prefix) fprintf(stream, "%s\033[0m", prefix);
+    vfprintf(stream, fmt, args);
+    fprintf(stream, "\033[0m"); fflush(stream);
+    if (console_log_file) {
+        if (prefix) fprintf(console_log_file, "%s ", prefix);
+        vfprintf(console_log_file, fmt, copy);
+        fflush(console_log_file);
+    }
+    va_end(copy);
+}
+
+void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
+void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+
+// Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+void DebugRAM(const char *context, ...) {
+#ifdef DEBUG_RAM_OUTPUT
+    char formatted_context[STATUS_TEXT_MAX_LENGTH];
+    va_list args;
+    va_start(args, context);
+    vsnprintf(formatted_context, sizeof(formatted_context), context, args);
+    va_end(args);
+    struct mallinfo2 info = mallinfo2();
+    size_t uss_bytes = 0;
+    FILE *fp = fopen("/proc/self/smaps_rollup", "r");
+    if (fp) {
+        char line[256];
+        size_t val;
+        while (fgets(line, sizeof(line), fp)) {
+            if (sscanf(line, "Private_Clean: %zu kB", &val) == 1)      uss_bytes += val * 1024;
+            else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
+        }
+        fclose(fp);
+    } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
+
+    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
+            formatted_context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
+            uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
+#endif
+}
+#pragma GCC diagnostic pop
+
+void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
+#endif // VOXEN_ENGINE_IMPLEMENTATION
 // ----------------------------------------------------------------------------
 #endif // VOXEN_HEADER_H

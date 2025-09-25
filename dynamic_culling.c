@@ -242,7 +242,7 @@ int32_t DetermineClosedEdges() {
 bool UpdatedPlayerCell() {
     uint16_t lastX = playerCellIdx_x;
     uint16_t lastZ = playerCellIdx_z;
-    PosToCellCoords(cam_xf,cam_zf,&playerCellIdx_x,&playerCellIdx_z);
+    PosToCellCoords(cam_x,cam_z,&playerCellIdx_x,&playerCellIdx_z);
     playerCellIdx = (playerCellIdx_z * WORLDX) + playerCellIdx_x;
     if (playerCellIdx_x == lastX && playerCellIdx_z == lastZ) return false;
     return true;
@@ -731,7 +731,7 @@ int32_t Cull_Init(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
-
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
     malloc_trim(0);
     DualLog("Culling took %f seconds\n", get_time() - start_time);

@@ -85,6 +85,7 @@ void main() {
                              uintBitsToFloat(packHalf2x16(vec2(FragPos.z,uintBitsToFloat(InstanceIndex)))),
                              uintBitsToFloat(packColor(glowColor)),
                              uintBitsToFloat(packColor(specColor)) );
+
     outWorldPos = worldPosPack;
     if (debugView == 1) {
         outAlbedo = albedoColor;
@@ -97,7 +98,7 @@ void main() {
     } else if (debugView == 3) {
         float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug
         float clipDepth = ndcDepth / gl_FragCoord.w;
-        float linearDepth = (clipDepth - 0.02) / (100.0 - 0.02);
+        float linearDepth = (clipDepth - 0.02) / (71.68 - 0.02);
         outAlbedo = vec4(vec3(linearDepth), 1.0);
     } else if (debugView == 4) {
         outAlbedo.r = float(InstanceIndex) / 5500.0;
@@ -110,4 +111,23 @@ void main() {
     } else {
         outAlbedo.rgb = albedoColor.rgb * albedoColor.a;
     }
+
+//     vec3 toPixel = camPos - FragPos;
+//     float dist = length(toPixel);
+// 
+//     // R = albedo.rgb + normal.x
+//     vec4 outR = vec4(outAlbedo.rgb, normal.x);
+// 
+//     // G = normal.yz + InstanceIndex packed as half
+//     vec4 outG = vec4(packHalf2x16(vec2(normal.y, normal.z)), packHalf2x16(vec2(uintBitsToFloat(InstanceIndex), dist)));
+// 
+//     // B = distance + glowColor.rg packed as half
+//     vec4 outB = vec4(packHalf2x16(vec2(glowColor.rg, glowColor.b)), packHalf2x16(vec2(specColor.rg, specColor.b)));
+// 
+//     // A = glowColor.b + specColor.rgb
+//     vec4 outA = vec4(glowColor.b, specColor.rgb);
+//     FinalPack = vec4(vec4(outAlbedo.rgb,normal.x),
+//                      packHalf2x16(vec2(normal.yz,uintBitsToFloat(InstanceIndex)),
+//                      packHalf2x16(vec2(dist,vec2(glowColor.rg))),
+//                      vec4(glowColor.b,specColor.rgb));
 }

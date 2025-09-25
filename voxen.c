@@ -15,6 +15,7 @@
 #include <enet/enet.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
+#define VOXEN_ENGINE_IMPLEMENTATION
 #include "voxen.h"
 #include "citadel.h"
 
@@ -22,30 +23,18 @@
 #include "Shaders/text_frag.glsl.h"
 #include "Shaders/chunk_vert.glsl.h"
 #include "Shaders/chunk_frag.glsl.h"
+#include "Shaders/shadowmap_vert.glsl.h"
+#include "Shaders/shadowmap_frag.glsl.h"
 #include "Shaders/composite_vert.glsl.h"
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/deferred_lighting.compute.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/bluenoise64.cginc"
-
-// 238MB VRAM
-// 209MB  RAM
-// 1.5-1.6ms frametime
-
+// ----------------------------------------------------------------------------
 // Window
 SDL_Window *window;
 bool inventoryMode = false;
-bool consoleActive = false;
-#define STATUS_TEXT_MAX_LENGTH 1024
-char consoleEntryText[STATUS_TEXT_MAX_LENGTH] = "Enter a command...";
-char statusText[STATUS_TEXT_MAX_LENGTH];
-int statusTextLengthWithoutNullTerminator = 6;
-float statusTextDecayFinished = 0.0f;
-float genericTextHeightFac = 0.02f;
-int32_t currentEntryLength = 0;
 uint16_t screen_width = 1366, screen_height = 768;
-int32_t cursorPosition_x = 680, cursorPosition_y = 384;
-bool window_has_focus = false;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Instances
@@ -64,11 +53,10 @@ uint8_t currentLevel = 0;
 bool gamePaused = false;
 bool menuActive = false;
 float pauseRelativeTime = 0.0f;
-
+// ----------------------------------------------------------------------------
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
-int32_t cam_x = -2040, cam_y = -4379 + 84, cam_z = 1020;         // Added 0.84f for cam offset from center
-float cam_xf = -20.4f, cam_yf = -43.79f + 0.84f, cam_zf = 10.2f;
+float cam_x = -20.4f, cam_y = -43.79f + 0.84f, cam_z = 10.2f; // Added 0.84f for cam offset from center
 float cam_yaw = 90.0f;
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
@@ -76,29 +64,31 @@ Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
 float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
 float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
 float cam_fov = 65.0f;
-
-float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
-float rad2deg(float radians) { return radians * (180.0f / M_PI); }
-
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering
 SDL_GLContext gl_context;
-float uiOrthoProjection[16];
+int32_t debugView = 0;
+int32_t debugValue = 0;
 float rasterPerspectiveProjection[16];
-double lastFrameSecCountTime = 0.00;
-uint32_t lastFrameSecCount = 0;
-uint32_t framesPerLastSecond = 0;
-uint32_t worstFPS = UINT32_MAX;
+float shadowmapsPerspectiveProjection[16];
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsCulledArray[INSTANCE_COUNT];
 bool instanceIsLODArray[INSTANCE_COUNT];
-
+// ----------------------------------------------------------------------------
 // Shaders
+//    Chunk Geometery Unlit Raster Shader
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1;
-       
+
+//    Shadowmap Rastered Depth Shader
+GLuint shadowCubeMapArray;
+GLuint shadowFBO;
+GLuint shadowmapsShaderProgram;
+GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1;
+GLuint lightIndirectionIndices[LIGHT_COUNT];
+
 //    Deferred Lighting Compute Shader
 GLuint deferredLightingShaderProgram;
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
@@ -106,13 +96,12 @@ GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, debugValueLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, camPosLoc_deferred = -1,
       fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
-      viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1;
+      viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1,
+      invViewProjectionLoc_deferred = -1;
 
 GLuint blueNoiseBuffer;
       
-float fogColorR = 0.04f;
-float fogColorG = 0.04f;
-float fogColorB = 0.09f;
+float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
@@ -124,59 +113,12 @@ GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1,
       screenWidthLoc_imageBlit = -1, screenHeightLoc_imageBlit = -1;
-
+// ----------------------------------------------------------------------------
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
 bool lightDirty[MAX_VISIBLE_LIGHTS] = { [0 ... MAX_VISIBLE_LIGHTS-1] = true };
-GLuint lightsID;
-
-// UI
-//    Cursor
-bool cursorVisible = false;
-
-//    Text
-#define TEXT_WHITE 0
-#define TEXT_YELLOW 1
-#define TEXT_DARK_YELLOW 2
-#define TEXT_GREEN 3
-#define TEXT_RED 4
-#define TEXT_ORANGE 5
-#define TEXT_BUFFER_SIZE 128
-GLuint textShaderProgram;
-TTF_Font* font = NULL;
-GLuint textVAO, textVBO;
-SDL_Color textColWhite = {255, 255, 255, 255};
-SDL_Color textColRed = {255, 0, 0, 255};
-SDL_Color textColGreen = {20, 255, 30, 255};
-SDL_Color textColors[6] = {
-    {255, 255, 255, 255}, // 0 White 1.0f, 1.0f, 1.0f
-    {227, 223,   0, 255}, // 1 Yellow 0.8902f, 0.8745f, 0f
-    {159, 156,   0, 255}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
-    { 95, 167,  43, 255}, // 3 Green 0.3725f, 0.6549f, 0.1686f
-    {234,  35,  43, 255}, // 4 Red 0.9176f, 0.1373f, 0.1686f
-    {255, 127,   0, 255}  // 5 Orange 1f, 0.498f, 0f
-};
-
-float textQuadVertices[] = { // 2 triangles, text is applied as an image from SDL TTF
-    // Positions   // Tex Coords
-    0.0f, 0.0f,    0.0f, 0.0f, // Bottom-left
-    1.0f, 0.0f,    1.0f, 0.0f, // Bottom-right
-    1.0f, 1.0f,    1.0f, 1.0f, // Top-right
-    0.0f, 1.0f,    0.0f, 1.0f  // Top-left
-};
-
-char uiTextBuffer[TEXT_BUFFER_SIZE];
-GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
-// ----------------------------------------------------------------------------
-// Input
-float mouse_sensitivity = 0.1f;
-int32_t move_speed = 16;
-bool noclip = false;
-bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
-uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
-int32_t debugView = 0;
-int32_t debugValue = 0;
+GLuint lightsID, lightIndirectionIndicesID;
 // ----------------------------------------------------------------------------
 // Event System states
 int32_t maxEventCount_debug = 0;
@@ -194,7 +136,6 @@ int32_t eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
-double screenshotTimeout = 0.0;
 bool journalFirstWrite = true;
 // ----------------------------------------------------------------------------
 // Networking
@@ -211,90 +152,13 @@ ENetHost* server_host = NULL;
 ENetHost* client_host = NULL;
 ENetPeer* server_peer = NULL; // Client's connection to server
 // ----------------------------------------------------------------------------
-// Physics
-float cellFloorHeight = 0.0f;
-float cellCeilHeight = 0.0f;
-float cellNorth = 0.0f;
-float cellSouth = 0.0f;
-float cellEast = 0.0f;
-float cellWest = 0.0f;
-double time_PhysicsStep = 0.0;
-// ----------------------------------------------------------------------------
-// Diagnostics
-static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
-    va_list copy; va_copy(copy, args);
-    if (prefix) fprintf(stream, "%s\033[0m", prefix);
-    vfprintf(stream, fmt, args);
-    fprintf(stream, "\033[0m"); fflush(stream);
-    if (console_log_file) {
-        if (prefix) fprintf(console_log_file, "%s ", prefix);
-        vfprintf(console_log_file, fmt, copy);
-        fflush(console_log_file);
-    }
-    va_end(copy);
-}
-
-void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
-void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
-void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
-void CenterStatusPrint(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    statusTextLengthWithoutNullTerminator = vsnprintf(statusText, STATUS_TEXT_MAX_LENGTH, fmt, args);
-    va_end(args);
-    DualLog("%s\n",statusText);
-    statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.
-}
-// Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-void DebugRAM(const char *context, ...) {
-#ifdef DEBUG_RAM_OUTPUT
-    char formatted_context[STATUS_TEXT_MAX_LENGTH];
-    va_list args;
-    va_start(args, context);
-    vsnprintf(formatted_context, sizeof(formatted_context), context, args);
-    va_end(args);
-
-    struct mallinfo2 info = mallinfo2();
-    size_t uss_bytes = 0;
-    FILE *fp = fopen("/proc/self/smaps_rollup", "r");
-    if (fp) {
-        char line[256];
-        size_t val;
-        while (fgets(line, sizeof(line), fp)) {
-            if (sscanf(line, "Private_Clean: %zu kB", &val) == 1)      uss_bytes += val * 1024;
-            else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
-        }
-        fclose(fp);
-    } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
-
-    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
-            formatted_context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
-            uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
-#endif
-}
-#pragma GCC diagnostic pop
-
-void print_bytes_no_newline(int32_t count) {
-    DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f);
-}
-// ----------------------------------------------------------------------------
 // ============================================================================
 // OpenGL / Rendering Helper Functions
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target, const char *name) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
-    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    if (target == GL_TEXTURE_CUBE_MAP) {
-        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(target, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-    }
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(target, 0);
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) DualLogError("Failed to create texture %s: OpenGL error %d\n", name, error);
@@ -342,6 +206,11 @@ int32_t CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");            if (!vertShader) { return 1; }
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");    if (!chunkShaderProgram) { return 1; }
+    
+    // Shadowmaps Shader
+    vertShader = CompileShader(GL_VERTEX_SHADER, shadowmapVertexShaderSource, "Shadowmaps Vertex Shader");            if (!vertShader) { return 1; }
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, shadowmapFragmentShaderSource, "Shadowmaps Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
+    shadowmapsShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmaps Shader Program");    if (!shadowmapsShaderProgram) { return 1; }
 
     // Text Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }
@@ -375,6 +244,9 @@ int32_t CompileShaders(void) {
     normInstanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
 
+    modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
+    viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
+
     screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
     screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
     debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
@@ -385,7 +257,8 @@ int32_t CompileShaders(void) {
     fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
     fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
     fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
-    viewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "viewProjection");
+    viewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "invViewProjection");
+    invViewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "viewProjection");
     modelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "modelCount");
     totalLuxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "totalLuxelCount");
 
@@ -408,83 +281,6 @@ int32_t CompileShaders(void) {
     return 0;
 }
 
-// Renders text at x,y coordinates specified using pointer to the string array.
-void RenderText(float x, float y, const char *text, int32_t colorIdx) {
-    glDisable(GL_CULL_FACE); // Disable backface culling
-    if (!font) { DualLogError("Font is NULL\n"); return; }
-    if (!text) { DualLogError("Text is NULL\n"); return; }
-    
-    SDL_Surface *surface = TTF_RenderText_Solid(font, text, textColors[colorIdx]);
-    if (!surface) { DualLogError("TTF_RenderText_Solid failed: %s\n", TTF_GetError()); return; }
-    
-    SDL_Surface *rgba_surface = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_RGBA32, 0);
-    SDL_FreeSurface(surface);
-    if (!rgba_surface) { DualLogError("SDL_ConvertSurfaceFormat failed: %s\n", SDL_GetError()); return; }
-
-    GLuint texture;
-    glCreateTextures(GL_TEXTURE_2D, 1, &texture);
-    glTextureStorage2D(texture, 1, GL_RGBA8, rgba_surface->w, rgba_surface->h);
-    glTextureSubImage2D(texture, 0, 0, 0, rgba_surface->w, rgba_surface->h, GL_RGBA, GL_UNSIGNED_BYTE, rgba_surface->pixels);
-    glTextureParameteri(texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glUseProgram(textShaderProgram);
-    glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
-    float r = textColors[colorIdx].r / 255.0f;
-    float g = textColors[colorIdx].g / 255.0f;
-    float b = textColors[colorIdx].b / 255.0f;
-    float a = textColors[colorIdx].a / 255.0f;
-    glProgramUniform4f(textShaderProgram, textColorLoc_text, r, g, b, a);
-    glBindTextureUnit(0,texture);
-    glProgramUniform1i(textShaderProgram, textTextureLoc_text, 0);
-    float scaleX = (float)rgba_surface->w;
-    float scaleY = (float)rgba_surface->h;
-    glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / scaleX, 1.0f / scaleY);
-    glEnable(GL_BLEND); // Enable blending for text transparency
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST); // Disable depth test for 2D overlay
-    glBindVertexArray(textVAO);
-    float vertices[] = {
-        x,          y,          0.0f, 0.0f, // Bottom-left
-        x + scaleX, y,          1.0f, 0.0f, // Bottom-right
-        x + scaleX, y + scaleY, 1.0f, 1.0f, // Top-right
-        x,          y + scaleY, 0.0f, 1.0f  // Top-left
-    };
-    
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4); // Render quad (two triangles)
-    drawCallsRenderedThisFrame++;
-    verticesRenderedThisFrame+=6;
-
-    // Cleanup
-    glBindVertexArray(0);
-    glBindTextureUnit(0, 0);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST); // Re-enable depth test for 3D rendering
-    glUseProgram(0);
-    glDeleteTextures(1, &texture);
-    SDL_FreeSurface(rgba_surface);
-    glEnable(GL_CULL_FACE); // Reenable backface culling
-    CHECK_GL_ERROR();
-}
-
-void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
-    va_end(args);
-    RenderText(x, y, uiTextBuffer, color);
-}
-
-int32_t GetScreenRelativeX(float percentage) { return (int32_t)floorf((float)screen_width * percentage); }
-int32_t GetScreenRelativeY(float percentage) { return (int32_t)floorf((float)screen_height * percentage); }
-int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTerminator) {
-    float characterWidth = genericTextHeightFac * 0.75f * screen_height; // Measured some and found between 0.6 and 0.82 in Gimp for width to height ratio.
-    return (pointToCenterOn - (int32_t)( (float)numCharactersNoNullTerminator * 0.5f) * characterWidth); // This could be mid character ;)
-}
-
 void Screenshot() {
     struct stat st = {0};
     if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
@@ -500,7 +296,7 @@ void Screenshot() {
     if (!utc_time) { DualLog("Failed to get current time for screenshot!\n"); free(pixels); return; }
     
     strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_xf, cam_yf, cam_zf,get_time());
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_x, cam_y, cam_z, get_time());
     int32_t success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
     if (!success) DualLog("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
@@ -525,230 +321,35 @@ static inline void mul_mat4(float *out, const float *a, const float *b) {
         out[i] = result[i];
 }
 
-// ================================= Input ==================================
-// Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
-void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
-    float yaw = deg2rad(yaw_deg);   // Around Y (up)
-    float pitch = deg2rad(pitch_deg); // Around X (right)
-    float roll = deg2rad(roll_deg);  // Around Z (forward)
-    float cy = cosf(yaw * 0.5f);
-    float sy = sinf(yaw * 0.5f);
-    float cp = cosf(pitch * 0.5f);
-    float sp = sinf(pitch * 0.5f);
-    float cr = cosf(roll * 0.5f);
-    float sr = sinf(roll * 0.5f);
-    q->w = cy * cp * cr + sy * sp * sr;
-    q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
-    q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
-    q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
-    
-    // Normalize quaterrnion
-    float len = sqrt(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
-    if (len > 1e-6f) { q->x /= len; q->y /= len; q->z /= len; q->w /= len; }
-    else { q->x = 0.0f; q->y = 0.0f; q->z = 0.0f; q->w = 1.0f; }
-}
+// Invert an affine 4x4 matrix (last row = [0 0 0 1])
+// out = inverse(m)
+static inline void invertAffineMat4(float *out, const float *m) {
+    // Extract rotation 3x3
+    float r00 = m[0], r01 = m[1], r02 = m[2];
+    float r10 = m[4], r11 = m[5], r12 = m[6];
+    float r20 = m[8], r21 = m[9], r22 = m[10];
 
-void Input_MouselookApply() {
-    if (currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
-    else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
-}
+    // Transpose rotation
+    out[0] = r00; out[1] = r10; out[2] = r20; out[3] = 0.0f;
+    out[4] = r01; out[5] = r11; out[6] = r21; out[7] = 0.0f;
+    out[8] = r02; out[9] = r12; out[10] = r22; out[11] = 0.0f;
+    out[15] = 1.0f;
 
-bool inventoryModeWasActivePriorToConsole = false;
-void ToggleConsole() {
-    if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
-    consoleActive = !consoleActive; // Tilde
-    if (consoleActive) inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
-        inventoryMode = false;
-    } 
-}
-
-void ProcessConsoleCommand(const char* command) {
-    if (strcmp(command, "noclip") == 0) {
-        noclip = !noclip;
-        CenterStatusPrint("Noclip %s", noclip ? "enabled" : "disabled");
-        ToggleConsole();
-    }  else if (strcmp(command, "quit") == 0) {
-        EnqueueEvent_Simple(EV_QUIT);
-    } else {
-        CenterStatusPrint("Unknown command: %s", command);
-    }
-    
-    consoleEntryText[0] = '\0'; // Clear the input
-    currentEntryLength = 0;
-}
-
-void ConsoleEmulator(int32_t scancode) {
-    if (scancode == SDL_SCANCODE_U && keys[SDL_SCANCODE_LCTRL]) {
-        consoleEntryText[0] = '\0'; // Clear the input
-        currentEntryLength = 0;
-        return;
-    }
-    
-    if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) { // Handle alphabet keys (SDL scancodes 4-29 correspond to 'a' to 'z')
-        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) { // Ensure we don't overflow the buffer
-            char c = 'a' + (scancode - SDL_SCANCODE_A); // Map scancode to character
-            consoleEntryText[currentEntryLength] = c;
-            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
-            currentEntryLength++;
-        }
-    } else if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0) { // Handle number keys (SDL scancodes 30-39 correspond to '0' to '9')
-        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) {
-            char c;
-            if (scancode == SDL_SCANCODE_0) c = '0'; // Special case for '0'
-            else c = '1' + (scancode - SDL_SCANCODE_1); // Map 1-9 to '1'-'9'
-
-            consoleEntryText[currentEntryLength] = c;
-            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
-            currentEntryLength++;
-        }
-    } else if (scancode == SDL_SCANCODE_BACKSPACE && currentEntryLength > 0) { // Handle backspace
-        currentEntryLength--;
-        consoleEntryText[currentEntryLength] = '\0'; // Null-terminate
-    } else if (scancode == SDL_SCANCODE_SPACE) { // Handle other keys as needed (e.g., enter, space, etc.)
-        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) {
-            consoleEntryText[currentEntryLength] = ' ';
-            consoleEntryText[currentEntryLength + 1] = '\0';
-            currentEntryLength++;
-        }
-    } else if (scancode == SDL_SCANCODE_RETURN) {
-        // Handle command execution or clear the console
-        DualLog("Console command: %s\n", consoleEntryText);
-        ProcessConsoleCommand(consoleEntryText);
-    }
-}
-
-int32_t Input_KeyDown(int32_t scancode) {
-    keys[scancode] = true;    
-    if (keys[SDL_SCANCODE_ESCAPE]) gamePaused = !gamePaused;
-    if (keys[SDL_SCANCODE_GRAVE]) ToggleConsole();
-    if (consoleActive) { ConsoleEmulator(scancode); return 0; }
-    
-    if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
-    if (keys[SDL_SCANCODE_R]) {
-        debugView++;
-        if (debugView > 7) debugView = 0;
-        glProgramUniform1i(deferredLightingShaderProgram, debugViewLoc_deferred, debugView);
-        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
-        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
-    }
-
-    if (keys[SDL_SCANCODE_Y]) {
-        debugValue++;
-        if (debugValue > 2) debugValue = 0;
-        glProgramUniform1i(deferredLightingShaderProgram, debugValueLoc_deferred, debugValue);
-        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
-    }
-
-    if (keys[SDL_SCANCODE_E]) {
-        play_wav("./Audio/weapons/wpistol.wav",0.5f);
-    }
-    
-
-    if (keys[SDL_SCANCODE_1]) {
-        fogColorR += 0.01f;
-    } else if (keys[SDL_SCANCODE_2]) {
-        fogColorR -= 0.01f;
-    }
-    
-    if (keys[SDL_SCANCODE_3]) {
-        fogColorG += 0.01f;
-    } else if (keys[SDL_SCANCODE_4]) {
-        fogColorG -= 0.01f;
-    }
-    
-    if (keys[SDL_SCANCODE_5]) {
-        fogColorB += 0.01f;
-    } else if (keys[SDL_SCANCODE_6]) {
-        fogColorB -= 0.01f;
-    }
-
-    return 0;
-}
-
-int32_t Input_KeyUp(int32_t scancode) {
-    keys[scancode] = false;
-    return 0;
-}
-
-bool CursorVisible() {
-    return (inventoryMode || menuActive || gamePaused);
-}
-
-int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {    
-    if (CursorVisible()) {
-        int32_t newX = cursorPosition_x + xrel;
-        if (newX > screen_width) newX = screen_width;
-        if (newX < 0) newX = 0;
-        cursorPosition_x = newX;
-        int32_t newY = cursorPosition_y + yrel;
-        if (newY > screen_height) newY = screen_height;
-        if (newY < 0) newY = 0;
-        cursorPosition_y = newY;
-    }
-    
-    if (gamePaused || inventoryMode) return 0;
-    
-    cam_yaw += (float)xrel * mouse_sensitivity;
-    cam_pitch += (float)yrel * mouse_sensitivity;
-    if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
-    if (cam_pitch < -89.0f) cam_pitch = -89.0f;
-    Input_MouselookApply();
-    return 0;
-}
-
-void normalize_vector(float* x, float* y, float* z) {
-    float len = sqrtf(*x * *x + *y * *y + *z * *z);
-    if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } // Length check to avoid division by zero.
-}
-
-// Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
-inline void quat_to_matrix(Quaternion* q, float* m) {
-    float x = q->x, y = q->y, z = q->z, w = q->w;
-    float x2 = x * x, y2 = y * y, z2 = z * z;
-    float xy = x * y, xz = x * z, yz = y * z;
-    float wx = w * x, wy = w * y, wz = w * z;
-
-    // Column-major rotation matrix for Unity (Y+ up, Z+ forward, X+ right)
-    m[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
-    m[1]  = 2.0f * (xy + wz);        // Right Y
-    m[2]  = 2.0f * (xz - wy);        // Right Z
-    m[3]  = 0.0f;
-    m[4]  = 2.0f * (xy - wz);        // Up X
-    m[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
-    m[6]  = 2.0f * (yz + wx);        // Up Z
-    m[7]  = 0.0f;
-    m[8]  = 2.0f * (xz + wy);        // Forward X
-    m[9]  = 2.0f * (yz - wx);        // Forward Y
-    m[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
-    m[11] = 0.0f;
-    m[12] = 0.0f;
-    m[13] = 0.0f;
-    m[14] = 0.0f;
-    m[15] = 1.0f;
-}
-
-void UpdatePlayerFacingAngles() {
-    float rotation[16]; // Extract forward and right vectors from quaternion
-    quat_to_matrix(&cam_rotation, rotation);
-    cam_forwardx = rotation[8];  // Forward X
-    cam_forwardy = rotation[9];  // Forward Y
-    cam_forwardz = rotation[10]; // Forward Z
-    cam_rightx = rotation[0];  // Right X
-    cam_righty = rotation[1];  // Right Y
-    cam_rightz = rotation[2];  // Right Z
-    normalize_vector(&cam_forwardx, &cam_forwardy, &cam_forwardz); // Normalize forward
-    normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
+    // Invert translation
+    float tx = m[12], ty = m[13], tz = m[14];
+    out[12] = -(out[0]*tx + out[4]*ty + out[8]*tz);
+    out[13] = -(out[1]*tx + out[5]*ty + out[9]*tz);
+    out[14] = -(out[2]*tx + out[6]*ty + out[10]*tz);
 }
 
 // ============================================================================
-float squareDistance2D(float x1, float z1, float x2, float z2) {
+inline float squareDistance2D(float x1, float z1, float x2, float z2) {
     float dx = x2 - x1;
     float dz = z2 - z1;
     return dx * dx + dz * dz;
 }
 
-float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
+inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
     float dx = x2 - x1;
     float dy = y2 - y1;
     float dz = z2 - z1;
@@ -828,6 +429,14 @@ void UpdateScreenSize(void) {
     m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
     m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
+    
+    aspect = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
+    f = 1.0f / tan(SHADOWMAP_FOV * M_PI / 360.0f);
+    m = shadowmapsPerspectiveProjection;
+    m[0] = f / aspect; m[1] = 0.0f; m[2] =                                                  0.0f; m[3] =  0.0f;
+    m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
+    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
 }
 
 typedef struct {
@@ -956,12 +565,10 @@ int32_t VoxelLists() {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
     
     for (uint16_t i = 0; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     CHECK_GL_ERROR();    
@@ -969,6 +576,14 @@ int32_t VoxelLists() {
     DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
     return 0;
 }
+
+float textQuadVertices[] = { // 2 triangles, text is applied as an image from SDL TTF
+    // Positions   // Tex Coords
+    0.0f, 0.0f,    0.0f, 0.0f, // Bottom-left
+    1.0f, 0.0f,    1.0f, 0.0f, // Bottom-right
+    1.0f, 1.0f,    1.0f, 1.0f, // Top-right
+    0.0f, 1.0f,    0.0f, 1.0f  // Top-left
+};
 
 int32_t InitializeEnvironment(void) {
     double init_start_time = get_time();
@@ -1005,7 +620,7 @@ int32_t InitializeEnvironment(void) {
     SDL_GL_SetSwapInterval(vsync_enable);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
@@ -1060,7 +675,7 @@ int32_t InitializeEnvironment(void) {
     // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,            GL_UNSIGNED_INT, GL_TEXTURE_2D, "Raster Depth");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Depth");
     GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,          GL_FLOAT, GL_TEXTURE_2D, "SSR");
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
@@ -1081,7 +696,7 @@ int32_t InitializeEnvironment(void) {
     
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Double duty unlit raster and deferred lighting results, reused sequentially
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    //                 2 = depth
+    //                 3 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
@@ -1108,8 +723,34 @@ int32_t InitializeEnvironment(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
+    
+    glGenBuffers(1, &lightIndirectionIndicesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightIndirectionIndicesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightIndirectionIndicesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DebugRAM("after Lights Buffer Init");
+    
+    // Shadowmaps
+    CHECK_GL_ERROR();
+    glGenTextures(1, &shadowCubeMapArray);
+    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, shadowCubeMapArray);
+    glTexImage3D(GL_TEXTURE_CUBE_MAP_ARRAY, 0, GL_DEPTH_COMPONENT24, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, MAX_VISIBLE_LIGHTS * 6, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP_ARRAY, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, 0);
+
+    glGenFramebuffers(1, &shadowFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubeMapArray, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { DualLogError("Shadow FBO incomplete\n"); return 1; }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    DebugRAM("after shadow map setup");
     
     // Input
     Input_MouselookApply();
@@ -1189,387 +830,6 @@ int32_t InitializeEnvironment(void) {
     return 0;
 }
 
-int32_t ParticleSystemStep(void) {
-    if (gamePaused || menuActive) return 0; // No particle movement on the menu or paused
-    
-    return 0;
-}
-
-static inline int32_t clampi(int32_t x, int32_t min, int32_t max) { return x < min ? min : (x > max ? max : x); }
-static inline int64_t clampi64(int64_t x, int64_t min, int64_t max) { return x < min ? min : (x > max ? max : x); }
-
-static inline IVector3 sub_vector3(IVector3 a, IVector3 b) {
-    int64_t subx = (int64_t)a.x - (int64_t)b.x;
-    subx = clampi64(subx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t suby = (int64_t)a.y - (int64_t)b.y;
-    suby = clampi64(suby,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t subz = (int64_t)a.z - (int64_t)b.z;
-    subz = clampi64(subz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    return (IVector3){ (int32_t)subx, (int32_t)suby, (int32_t)subz };
-}
-
-static inline IVector3 add_vector3(IVector3 a, IVector3 b) {
-    int64_t addx = (int64_t)a.x + (int64_t)b.x;
-    addx = clampi64(addx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t addy = (int64_t)a.y + (int64_t)b.y;
-    addy = clampi64(addy,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t addz = (int64_t)a.z + (int64_t)b.z;
-    addz = clampi64(addz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    return (IVector3){ (int32_t)addx, (int32_t)addy, (int32_t)addz };
-}
-
-static inline IVector3 scale_vector3(IVector3 v, int32_t s) {
-    int64_t mulx = (int64_t)s * (int64_t)v.x;
-    mulx = clampi64(mulx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t muly = (int64_t)s * (int64_t)v.y;
-    muly = clampi64(muly,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t mulz = (int64_t)s * (int64_t)v.z;
-    mulz = clampi64(mulz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    return (IVector3){ (int32_t)mulx, (int32_t)muly, (int32_t)mulz };
-}
-
-static inline int32_t dot_vector3(IVector3 a, IVector3 b) {
-    int64_t mulx = (int64_t)a.x * (int64_t)b.x;
-    int64_t muly = (int64_t)a.y * (int64_t)b.y;
-    int64_t mulz = (int64_t)a.z * (int64_t)b.z;
-    int64_t sum = (mulx + muly + mulz);
-    sum = clampi64(sum,(int64_t)INT32_MIN,(int64_t)INT32_MAX); // One clamp at the end.
-    return (int32_t)sum;
-}
-
-static inline int32_t dist_sq_vector3(IVector3 a, IVector3 b) { IVector3 d = sub_vector3(a, b); return dot_vector3(d, d); }
-
-static inline IVector3 cross_vector3(IVector3 a, IVector3 b) {
-    int64_t ax64 = (int64_t)a.x;
-    int64_t ay64 = (int64_t)a.y;
-    int64_t az64 = (int64_t)a.z;
-    int64_t bx64 = (int64_t)b.x;
-    int64_t by64 = (int64_t)b.y;
-    int64_t bz64 = (int64_t)b.z;
-    int64_t ay64bz64 = ay64 * bz64;
-    int64_t az64by64 = az64 * by64;
-    int64_t crossx = ay64bz64 - az64by64;
-    crossx = clampi64(crossx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    
-    int64_t az64bx64 = az64 * bx64;
-    int64_t ax64bz64 = ax64 * bz64;
-    int64_t crossy = az64bx64 - ax64bz64;
-    crossy = clampi64(crossy,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    
-    int64_t ax64by64 = ax64 * by64;
-    int64_t ay64bx64 = ay64 * bx64;
-    int64_t crossz = ax64by64 - ay64bx64;
-    crossz = clampi64(crossz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    return (IVector3){ crossx, crossy, crossz };
-}
-
-static inline int32_t length_vector3(IVector3 v) {
-    int32_t dot = dot_vector3(v, v);
-    float len = sqrtf((float)dot);
-    if (isnan(len) || isinf(len)) return 0;
-    return (int32_t)clampi64((int64_t)len,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-}
-
-static inline IVector3 normalize_vector3(IVector3 v) {
-    int64_t len = (int64_t)length_vector3(v);
-    if (len == 0) return v; // Prevent divide by zero
-    
-    int64_t divx = (int64_t)v.x / len;
-    divx = clampi64(divx,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t divy = (int64_t)v.y / len;
-    divy = clampi64(divy,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    int64_t divz = (int64_t)v.z / len;
-    divz = clampi64(divz,(int64_t)INT32_MIN,(int64_t)INT32_MAX);
-    return (IVector3){ (int32_t)divx, (int32_t)divy, (int32_t)divz };
-}
-
-static inline IVector3 mul_mat4_vector3(const float* mat, Vector3 v) {
-    Vector3 res;
-    res.x = mat[0] * v.x + mat[4] * v.y + mat[8] * v.z + mat[12];
-    res.y = mat[1] * v.x + mat[5] * v.y + mat[9] * v.z + mat[13];
-    res.z = mat[2] * v.x + mat[6] * v.y + mat[10] * v.z + mat[14];
-    if (isnan(res.x) || isnan(res.y) || isnan(res.z) || isinf(res.x) || isinf(res.y) || isinf(res.z)) return (IVector3){0, 0, 0};
-
-    float sx = res.x * PHYS_FLOAT_TO_INT_SCALEF, sy = res.y * PHYS_FLOAT_TO_INT_SCALEF, sz = res.z * PHYS_FLOAT_TO_INT_SCALEF;
-    if (isnan(sx) || isnan(sy) || isnan(sz) || isinf(sx) || isinf(sy) || isinf(sz)) return (IVector3){0, 0, 0};
-
-    return (IVector3){ (int32_t)clampi64((int64_t)round(sx), INT32_MIN, INT32_MAX), (int32_t)clampi64((int64_t)round(sy), INT32_MIN, INT32_MAX), (int32_t)clampi64((int64_t)round(sz), INT32_MIN, INT32_MAX) };
-}
-
-// Point to segment squared distance, outputs closest points
-static int32_t dist_point_segment_sq(IVector3 p, IVector3 a, IVector3 b, IVector3* closest_on_seg, IVector3* closest_on_p) {
-    IVector3 ab = sub_vector3(b, a);
-    int32_t len2 = dot_vector3(ab, ab);
-    IVector3 ap = sub_vector3(p, a);
-    int32_t proj = dot_vector3(ap, ab);
-    int32_t t = 0;
-    if (len2 != 0) t = clampi(proj / len2, 0, 100);
-    *closest_on_seg = add_vector3(a, scale_vector3(ab, t));
-    *closest_on_p = p;  // Point to itself
-    IVector3 diff = sub_vector3(p, *closest_on_seg);
-    return dot_vector3(diff, diff);
-}
-
-// Segment to segment squared distance (clamped)
-static int32_t dist_segment_segment_sq(IVector3 a0, IVector3 a1, IVector3 b0, IVector3 b1, IVector3* closest_a, IVector3* closest_b) {
-    IVector3 d1 = sub_vector3(a1, a0);
-    IVector3 d2 = sub_vector3(b1, b0);
-    IVector3 d0 = sub_vector3(a0, b0);
-    int32_t a = dot_vector3(d1, d1);
-    int32_t e = dot_vector3(d2, d2);
-    int32_t f = dot_vector3(d2, d1);
-    int32_t c = dot_vector3(d1, d0);
-    int32_t d = dot_vector3(d2, d0);
-    int32_t det = a * e - f * f;
-    int32_t s = 50, t = 50;
-    if (det != 0 && abs(det) > 1) {
-        s = clampi((f * d - e * c) / det, 0, 100);
-        t = clampi((a * d - f * c) / det, 0, 100);
-    }
-    *closest_a = add_vector3(a0, scale_vector3(d1, s));
-    *closest_b = add_vector3(b0, scale_vector3(d2, t));
-    IVector3 diff = sub_vector3(*closest_a, *closest_b);
-    return dot_vector3(diff, diff);
-}
-
-// Point to triangle squared distance (barycentric), outputs closest on tri
-static int32_t point_tri_dist_sq(IVector3 p, IVector3 a, IVector3 b, IVector3 c, IVector3* closest) {
-    IVector3 ab = sub_vector3(b, a);
-    IVector3 ac = sub_vector3(c, a);
-    IVector3 ap = sub_vector3(p, a);
-    int32_t d00 = dot_vector3(ab, ab);
-    int32_t d01 = dot_vector3(ab, ac);
-    int32_t d11 = dot_vector3(ac, ac);
-    int32_t d20 = dot_vector3(ap, ab);
-    int32_t d21 = dot_vector3(ap, ac);
-    int32_t denom = d00 * d11 - d01 * d01;
-    int32_t v = 0, w = 0;
-    if (denom != 0 && abs(denom) > 1) {
-        v = clampi((d11 * d20 - d01 * d21) / denom, 0, 100);
-        w = clampi((d00 * d21 - d01 * d20) / denom, 0, 100);
-        if (v + w > 100) {
-            int32_t vv = (v + w - 100);
-            v = clampi(v - vv, 0, 100);
-            w = clampi(w - vv, 0, 100);
-        }
-    }
-    *closest = add_vector3(a, add_vector3(scale_vector3(ab, v), scale_vector3(ac, w)));
-    IVector3 diff = sub_vector3(p, *closest);
-    return dot_vector3(diff, diff);
-}
-
-// Backface proximity check: Returns true if capsule center is within dist_threshold of triangle's backface, pushes to front
-static bool check_backface_proximity(IVector3* cap_center, int32_t dist_threshold, IVector3 t0, IVector3 t1, IVector3 t2) {
-    IVector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
-    if (n.x == 0 && n.y == 0 && n.z == 0) return false;
-    
-    IVector3 closest;
-    int32_t dist_sq = point_tri_dist_sq(*cap_center, t0, t1, t2, &closest);
-    float dist = sqrtf((float)dist_sq);
-    if (isnan(dist) || isinf(dist)) return false;
-    
-    IVector3 to_center = sub_vector3(*cap_center, closest);
-    int32_t dot = dot_vector3(to_center, n);
-    if (dot <= 0 || (int32_t)dist < dist_threshold) return false;
-    
-    int32_t push_dist = dist_threshold - (int32_t)dist + 1;
-    *cap_center = add_vector3(*cap_center, scale_vector3(n, push_dist));
-    return true;
-}
-
-// Capsule vs triangle: Returns true if colliding, updates cap_center by pushing out
-static bool capsule_vs_tri(IVector3* cap_center, int32_t half_h, int32_t r, IVector3 t0, IVector3 t1, IVector3 t2) {
-    IVector3 cap_bot = {cap_center->x, cap_center->y - half_h, cap_center->z};
-    IVector3 cap_top = {cap_center->x, cap_center->y + half_h, cap_center->z};
-    IVector3 seg_closest, tri_closest = t0; // Initialize tri_closest to t0 as a safe default
-    int32_t min_dist_sq = MAX_SQUARE_DIST_INT;
-    bool closest_updated = false; // Track if tri_closest was updated
-
-    // Vert to segment (3)
-    IVector3 tris[3] = {t0, t1, t2};
-    for (int i = 0; i < 3; i++) {
-        IVector3 dummy;
-        int32_t d = dist_point_segment_sq(tris[i], cap_bot, cap_top, &seg_closest, &dummy);
-        if (d < min_dist_sq) {
-            min_dist_sq = d;
-            tri_closest = tris[i];
-            closest_updated = true;
-        }
-    }
-
-    // Edges to segment (3)
-    IVector3 edges[3][2] = {{t0, t1}, {t1, t2}, {t2, t0}};
-    for (int i = 0; i < 3; i++) {
-        IVector3 dummy_b;
-        int32_t d = dist_segment_segment_sq(cap_bot, cap_top, edges[i][0], edges[i][1], &seg_closest, &dummy_b);
-        if (d < min_dist_sq) {
-            min_dist_sq = d;
-            tri_closest = dummy_b;
-            closest_updated = true;
-        }
-    }
-
-    // Segment to plane clamped (1)
-    IVector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
-    if (n.x == 0 && n.y == 0 && n.z == 0) return false;
-    
-    int32_t d0 = dot_vector3(sub_vector3(cap_bot, t0), n);
-    int32_t d1 = dot_vector3(sub_vector3(cap_top, t0), n);
-    if (d0 != 0 || d1 != 0) {
-        int32_t t = clampi(-d0 / (d1 - d0), 0, 100);
-        IVector3 foot = add_vector3(cap_bot, scale_vector3(sub_vector3(cap_top, cap_bot), t));
-        IVector3 cp;
-        int32_t d = point_tri_dist_sq(foot, t0, t1, t2, &cp);
-        if (d < min_dist_sq) {
-            min_dist_sq = d;
-            seg_closest = foot;
-            tri_closest = cp;
-            closest_updated = true;
-        }
-    }
-
-    int32_t min_dist = sqrtf(min_dist_sq);
-    if (min_dist > r || !closest_updated) return false; // No collision if no valid closest point
-
-    // Resolve: Push along connecting vector
-    IVector3 push_dir = sub_vector3(seg_closest, tri_closest);
-    push_dir = normalize_vector3(push_dir);
-    int32_t pen = r - min_dist + 1; // Epsilon
-    if (!check_backface_proximity(cap_center, 46, t0, t1, t2)) { *cap_center = add_vector3(*cap_center, scale_vector3(push_dir, pen)); }
-    return true;
-}
-
-// Check if instance is in 3x3 grid around player
-static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint32_t playerCellIdx) {
-    int32_t inst_x = instanceCellIdx % WORLDX; // Convert 1D indices to 2D (x, z)
-    int32_t inst_z = instanceCellIdx / WORLDZ;
-    int32_t player_x = playerCellIdx % WORLDX;
-    int32_t player_z = playerCellIdx / WORLDZ;
-    return abs(inst_x - player_x) <= 1 && abs(inst_z - player_z) <= 1;
-}
-
-// Update camera position based on input
-void ProcessInput(void) {
-    if (gamePaused) return;
-    if (consoleActive) return;
-    
-    int32_t finalMoveSpeed = move_speed;
-    if (keys[SDL_SCANCODE_LSHIFT]) finalMoveSpeed = 22;
-    if (keys[SDL_SCANCODE_F]) {
-        cam_x += (int32_t)round((float)finalMoveSpeed * cam_forwardx); // Move forward
-        cam_y += (int32_t)round((float)finalMoveSpeed * cam_forwardy);
-        cam_z += (int32_t)round((float)finalMoveSpeed * cam_forwardz);
-    } else if (keys[SDL_SCANCODE_S]) {
-        cam_x -= (int32_t)round((float)finalMoveSpeed * cam_forwardx); // Move backward
-        cam_y -= (int32_t)round((float)finalMoveSpeed * cam_forwardy);
-        cam_z -= (int32_t)round((float)finalMoveSpeed * cam_forwardz);
-    }
-
-    if (keys[SDL_SCANCODE_D]) {
-        cam_x += (int32_t)round((float)finalMoveSpeed * cam_rightx); // Strafe right
-        cam_y += (int32_t)round((float)finalMoveSpeed * cam_righty);
-        cam_z += (int32_t)round((float)finalMoveSpeed * cam_rightz);
-    } else if (keys[SDL_SCANCODE_A]) {
-        cam_x -= (int32_t)round((float)finalMoveSpeed * cam_rightx); // Strafe left
-        cam_y -= (int32_t)round((float)finalMoveSpeed * cam_righty);
-        cam_z -= (int32_t)round((float)finalMoveSpeed * cam_rightz);
-    }
-
-//     if (noclip) {
-        if (keys[SDL_SCANCODE_V]) cam_y += finalMoveSpeed; // Move up
-        else if (keys[SDL_SCANCODE_C]) cam_y -= finalMoveSpeed; // Move down
-//     }
-
-    if (keys[SDL_SCANCODE_Q]) {
-        cam_roll += move_speed * 5.0f; // Move up
-        Input_MouselookApply();
-    } else if (keys[SDL_SCANCODE_T]) {
-        cam_roll -= move_speed * 5.0f; // Move down
-        Input_MouselookApply();
-    }
-}
-
-int32_t Physics(void) {
-    if (gamePaused || menuActive) return 0; // No physics on the menu or paused
-    double physics_start_time = get_time();
-
-    // Player Movement from Input
-    if (window_has_focus) { // Move the player based on input first, then bound it below...
-        UpdatePlayerFacingAngles();
-        ProcessInput();
-    }
-    return 0;
-
-    // Player Physics: Capsule-triangle naive collision
-    if (noclip) return 0;
-    
-    // Apply gravity to camera (affects bottom of capsule)
-//     cam_y -= 0.08f;
-    
-    // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
-    int32_t capsule_offset = 48;  // Center below camera (1.84 below, 0.16 above)
-    IVector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};
-    int32_t half_height = 24;  // Half of 2.0f height
-    int32_t radius = 48;
-    
-    // Adjust for body state (e.g., standing adds height, but here fixed for simplicity)
-    float body_state_add = 0;
-    if (currentLevel != LEVEL_CYBERSPACE) {
-        switch (playerMovement.bodyState) {
-            case BodyState_Standing: body_state_add = 48; break; // TODO: Should be 100!
-            // Add cases for crouch/prone: adjust half_height, offset
-        }
-        // For now, assume fixed; extend as needed
-    }
-    
-    // Naive loop over all instances and their triangles
-    for (uint32_t i = 0; i < loadedInstances; i++) {  // Or INSTANCE_COUNT
-        if (instances[i].modelIndex >= MODEL_COUNT) continue;
-        if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
-        
-        int32_t mid = instances[i].modelIndex;
-        if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
-        
-        // Ensure matrix is up-to-date (assume dirty handled elsewhere)
-        if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-        const float* world_mat = &modelMatrices[i * 16];
-        uint32_t num_tris = modelTriangleCounts[mid];
-        for (uint32_t t = 0; t < num_tris; t++) {
-            uint32_t i0 = modelTriangles[mid][t * 3 + 0] * VERTEX_ATTRIBUTES_COUNT;
-            uint32_t i1 = modelTriangles[mid][t * 3 + 1] * VERTEX_ATTRIBUTES_COUNT;
-            uint32_t i2 = modelTriangles[mid][t * 3 + 2] * VERTEX_ATTRIBUTES_COUNT;
-            float v0_x = modelVertices[mid][i0 + 0];
-            float v0_y = modelVertices[mid][i0 + 1];
-            float v0_z = modelVertices[mid][i0 + 2];
-            float v1_x = modelVertices[mid][i1 + 0];
-            float v1_y = modelVertices[mid][i1 + 1];
-            float v1_z = modelVertices[mid][i1 + 2];
-            float v2_x = modelVertices[mid][i2 + 0];
-            float v2_y = modelVertices[mid][i2 + 1];
-            float v2_z = modelVertices[mid][i2 + 2];
-            float edgeLength0_1 = squareDistance3D(v0_x, v0_y, v0_z, v1_x, v1_y, v1_z);
-            if (edgeLength0_1 < 0.0005f) continue; // Skip tiny unimportant tris.
-            
-            float edgeLength0_2 = squareDistance3D(v0_x, v0_y, v0_z, v2_x, v2_y, v2_z);
-            if (edgeLength0_2 < 0.0005f) continue; // Skip tiny unimportant tris.
-            
-            float edgeLength1_2 = squareDistance3D(v1_x, v1_y, v1_z, v2_x, v2_y, v2_z);
-            if (edgeLength1_2 < 0.0005f) continue; // Skip tiny unimportant tris.
-            
-            IVector3 v0 = mul_mat4_vector3(world_mat, (Vector3){ v0_x, v0_y, v0_z }); // Transform positions to world
-            IVector3 v1 = mul_mat4_vector3(world_mat, (Vector3){ v1_x, v1_y, v1_z });
-            IVector3 v2 = mul_mat4_vector3(world_mat, (Vector3){ v2_x, v2_y, v2_z });
-            capsule_vs_tri(&cap_center, half_height + body_state_add, radius, v0, v1, v2); // Test and resolve
-        }
-    }
-
-    cam_x = cap_center.x; // Update camera from resolved capsule center
-    cam_y = cap_center.y + capsule_offset;  // Restore offset
-    cam_z = cap_center.z;
-    time_PhysicsStep = get_time() - physics_start_time;
-    return 0;
-}
-
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.
 int32_t EventExecute(Event* event) {
@@ -1588,25 +848,14 @@ int32_t EventExecute(Event* event) {
     return 99;
 }
 
-// static const char* debugViewNames[] = {
-//     "standard render", // 0
-//     "unlit",           // 1
-//     "surface normals", // 2
-//     "depth",           // 3
-//     "indices",         // 4
-//     "worldpos",        // 5
-//     "lightview",       // 6
-//     "reflections"      // 7
-// };
-
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
     return x1 * x2 + y1 * y2 + z1 * z2;
 }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat(float* m) {
+void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
     float rotation[16];
-    quat_to_matrix(&cam_rotation, rotation);
+    quat_to_matrix(camRotation, rotation);
 
     // Extract basis vectors (camera space axes)
     float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
@@ -1617,10 +866,15 @@ void mat4_lookat(float* m) {
     m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
     m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
     m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
-    m[12] = -dot(right[0], right[1], right[2], cam_xf, cam_yf, cam_zf);   // -dot(right, eye)
-    m[13] = -dot(up[0], up[1], up[2], cam_xf, cam_yf, cam_zf);      // -dot(up, eye)
-    m[14] = dot(forward[0], forward[1], forward[2], cam_xf, cam_yf, cam_zf);  // dot(forward, eye)
+    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
+    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
+    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
     m[15] = 1.0f;
+}
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
+void mat4_lookat(float* m) {
+    mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
 }
 
 typedef struct {
@@ -1630,9 +884,9 @@ typedef struct {
 } LightCandidate;
 
 bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
-    float to_inst_x = inst_x - cam_xf; // Vector from camera to instance
-    float to_inst_y = inst_y - cam_yf;
-    float to_inst_z = inst_z - cam_zf;
+    float to_inst_x = inst_x - cam_x; // Vector from camera to instance
+    float to_inst_y = inst_y - cam_y;
+    float to_inst_z = inst_z - cam_z;
     float distance = sqrtf(to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z);
     if (distance < 3.62038672f) return true; // Avoid division by zero.  Closer than corner of a cell (sqrt(2) * 2.56f)
 
@@ -1964,11 +1218,7 @@ int32_t main(int32_t argc, char* argv[]) {
         current_time = get_time();
         double frame_time = current_time - last_time;
         if (!gamePaused) pauseRelativeTime += frame_time;
-        
-        cam_xf = (int32_t)(round((float)cam_x * 0.01f));
-        cam_yf = (int32_t)(round((float)cam_y * 0.01f));
-        cam_zf = (int32_t)(round((float)cam_z * 0.01f));
-        
+
         // Enqueue input events
         SDL_Event event;
         int32_t mouse_xrel = 0.0f, mouse_yrel = 0.0f;
@@ -2050,7 +1300,7 @@ int32_t main(int32_t argc, char* argv[]) {
         // 2. Pass instance data to GPU
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         
         // 3. Raterized Geometry
         //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -2061,7 +1311,9 @@ int32_t main(int32_t argc, char* argv[]) {
         float view[16]; // Set up view matrices
         mat4_lookat(view);
         float viewProj[16];
+        float invViewProj[16];
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
+        invertAffineMat4(invViewProj, viewProj);
         glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
         glBindVertexArray(vao_chunk);
         float lodRangeSqrd = 38.4f * 38.4f;
@@ -2069,7 +1321,7 @@ int32_t main(int32_t argc, char* argv[]) {
         memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
         for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
             if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_xf, cam_yf, cam_zf);
+            float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
             if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
             if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
             
@@ -2077,16 +1329,25 @@ int32_t main(int32_t argc, char* argv[]) {
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             
-            if (i >= startOfDoubleSidedInstances) {
+//             if (i >= startOfDoubleSidedInstances) {
+            if (isDoubleSided(instances[i].texIndex)) {
                 if (debugValue > 0) DualLog("For frame %d, enabling doublesided\n",globalFrameNum);
                 glDisable(GL_CULL_FACE);
+            } else {
+                glEnable(GL_CULL_FACE); // Reenable backface culling
             }
             
-            if (i >= startOfTransparentInstances) {
+//             if (i >= startOfTransparentInstances) {
+            if (entities[instances[i].index].transparent) {
                 if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
                 glEnable(GL_BLEND); // Enable blending for transparent instances
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
+            } else {
+                glDisable(GL_BLEND);
+                glDepthMask(GL_TRUE);
+                glEnable(GL_CULL_FACE); // Reenable backface culling
+                glEnable(GL_DEPTH_TEST);
             }
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
             if (instCellIdx < ARRSIZE) {
@@ -2124,24 +1385,105 @@ int32_t main(int32_t argc, char* argv[]) {
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
         // ====================================================================
-        
-        // 4. Deferred Lighting
+        // 4. Shadowmaps
+        uint16_t visibleLightCount = 0;
+        uint16_t visibleLightIndices[MAX_VISIBLE_LIGHTS];
+        for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
+            lightIndirectionIndices[i] = UINT16_MAX;
+            if (visibleLightCount >= MAX_VISIBLE_LIGHTS) break;
+            
+            float* lightData = &lights[i * LIGHT_DATA_SIZE];
+            float spotAng = lightData[5];
+            if (spotAng > 0.0f) continue; // Skip spotlights for now
+            
+            float lightPosX = lightData[LIGHT_DATA_OFFSET_POSX];
+            float lightPosY = lightData[LIGHT_DATA_OFFSET_POSY];
+            float lightPosZ = lightData[LIGHT_DATA_OFFSET_POSZ];
+            float lightIntensity = lightData[LIGHT_DATA_OFFSET_INTENSITY];
+            float lightRadius = lightData[LIGHT_DATA_OFFSET_RANGE];
+            float distSqrd = squareDistance3D(lightPosX, lightPosY, lightPosZ, cam_x, cam_y, cam_z);
+            if (distSqrd > lightRadius * lightRadius || lightIntensity < 0.3f) continue;
+            
+            lightIndirectionIndices[i] = visibleLightCount;
+            visibleLightIndices[visibleLightCount++] = i;
+        }
+
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightIndirectionIndicesID);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(GLuint), lightIndirectionIndices, GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightIndirectionIndicesID);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+        float lightView[6][16];
+        float lightViewProj[6][16];
+        typedef struct { float x, y, z, w; } Quaternion;
+        Quaternion orientationQuaternion[6] = {
+            {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X
+            {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X
+            {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y
+            {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y
+            {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z
+            {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z
+        };
+
+        for (uint16_t l = 0; l < visibleLightCount; l++) {
+            uint16_t i = visibleLightIndices[l];
+            float* lightData = &lights[i * LIGHT_DATA_SIZE];
+            float lightPosX = lightData[0];
+            float lightPosY = lightData[1];
+            float lightPosZ = lightData[2];
+            glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+            glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glUseProgram(shadowmapsShaderProgram);
+            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            CHECK_GL_ERROR();
+            for (uint8_t face = 0; face < 6; face++) {
+                mat4_lookat_from(lightView[face], &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
+                mul_mat4(lightViewProj[face], shadowmapsPerspectiveProjection, lightView[face]);
+                glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, shadowCubeMapArray, 0, l * 6 + face);
+                for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
+                    if (instanceIsCulledArray[j]) continue;
+                    if (instances[j].modelIndex >= MODEL_COUNT) continue;
+                    if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+
+                    float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+                    if (!IsSphereInFOVCone(instances[j].position.x, instances[j].position.y, instances[j].position.z, radius)) continue;
+
+                    int16_t modelType = instanceIsLODArray[j] && instances[j].lodIndex < MODEL_COUNT ? instances[j].lodIndex : instances[j].modelIndex;
+                    glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[j * 16]);
+                    glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[face]);
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                    glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+                }
+            }
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, screen_width, screen_height);
+        CHECK_GL_ERROR();
+
+        // 5. Deferred Lighting
+        glBindTextureUnit(10, shadowCubeMapArray); // Bind cube map array to texture unit 10
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
         if (debugView == 0 || debugView == 8) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
             glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
             glUseProgram(deferredLightingShaderProgram);
             glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
             glUniform1f(worldMin_zLoc_deferred, worldMin_z);
-            glUniform3f(camPosLoc_deferred, cam_xf, cam_yf, cam_zf);
+            glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
             glUniform1f(fogColorRLoc_deferred, fogColorR);
             glUniform1f(fogColorGLoc_deferred, fogColorG);
             glUniform1f(fogColorBLoc_deferred, fogColorB);
             glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
+            glUniformMatrix4fv(invViewProjectionLoc_deferred, 1, GL_FALSE, invViewProj);
             glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
             CHECK_GL_ERROR();
             glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -2151,7 +1493,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (debugView == 0 || debugView == 7) {
             glUseProgram(ssrShaderProgram);
             glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-            glUniform3f(camPosLoc_ssr, cam_xf, cam_yf, cam_zf);
+            glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
             GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
             GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
             glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -2162,7 +1504,7 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }
         
-        // 6. Render final meshes' results with full screen quad
+        // 7. Render final meshes' results with full screen quad
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputImageID);
@@ -2174,60 +1516,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_DEPTH_TEST);
         glBindTextureUnit(0, 0);
         glUseProgram(0);
-        uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
-        
-        // UI Common References
-        int screenCenterX = screen_width / 2;
-        int screenCenterY = screen_height / 2;
-        int32_t lineSpacing = GetScreenRelativeY(0.03f);
-//         int32_t characterWidth = (int32_t)floorf(genericTextHeightFac * 0.75f * screen_height);
-//         int32_t characterHeight = (int32_t)floorf(genericTextHeightFac * screen_height);
-        int32_t characterWidthHalf = (int32_t)floorf(genericTextHeightFac * 0.75f * screen_height * 0.5f);
-        int32_t characterHeightHalf = (int32_t)floorf(genericTextHeightFac * screen_height * 0.5f);
-        // 7. Render UI Images
-        //    Cursor
-        if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), TEXT_RED, "PAUSED");
-        
-        // 8. Render UI Text;
-        int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
-        int32_t leftPad = GetScreenRelativeX(0.0125f);
-//         RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_xf, cam_yf, cam_zf);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Floor: %.3f, Ceil: %.3f, N: %.3f, E: %.3f, S: %.3f, W: %.3f", cellFloorHeight < -1000.0f ? 0.0f : cellFloorHeight,
-//                                                                                                                                          cellCeilHeight  >  1000.0f ? 0.0f : cellCeilHeight,
-//                                                                                                                                          cellNorth       >  1000.0f ? 0.0f : cellNorth,
-//                                                                                                                                          cellEast        >  1000.0f ? 0.0f : cellEast,
-//                                                                                                                                          cellSouth       < -1000.0f ? 0.0f : cellSouth,
-//                                                                                                                                          cellWest        < -1000.0f ? 0.0f : cellWest);
-        if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
-
-        if (CursorVisible()) RenderFormattedText(cursorPosition_x - characterWidthHalf, cursorPosition_y - characterHeightHalf, TEXT_RED, "+");
-        else RenderFormattedText(screenCenterX - characterWidthHalf, screenCenterY - characterHeightHalf, TEXT_GREEN, "+");
-
-        // Frame stats
-        double time_now = get_time();
-        drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d, Phys T: %.3f",
-                            (time_now - last_time) * 1000.0f,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS,time_PhysicsStep * 1000.0f);
-        last_time = time_now;
-        if ((time_now - lastFrameSecCountTime) >= 1.00) {
-            lastFrameSecCountTime = time_now;
-            framesPerLastSecond = globalFrameNum - lastFrameSecCount;
-            if (framesPerLastSecond < worstFPS && globalFrameNum > 10) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
-            lastFrameSecCount = globalFrameNum;
-        }
-        
-        if (keys[SDL_SCANCODE_F12]) {
-            if (time_now > screenshotTimeout) {
-                Screenshot();
-                screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-            }
-        }
-
+        RenderUI();
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
