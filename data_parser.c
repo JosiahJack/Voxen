@@ -28,6 +28,7 @@ float * tempVertices;
 uint32_t * tempTriangles;
 uint32_t renderableCount = 0;
 uint32_t loadedInstances = 0;
+uint32_t loadedLights = 0;
 int32_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
 int32_t startOfTransparentInstances = INSTANCE_COUNT - 1;
 uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
@@ -956,16 +957,16 @@ int32_t LoadLevelLights(uint8_t curlevel) {
     parser_init(&lights_parser);
     if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
-    int32_t lightsCount = lights_parser.count;
-    DualLog("Loading  %d   lights for Level %d...",lightsCount,curlevel);
+    loadedLights = lights_parser.count;
+    DualLog("Loading  %d   lights for Level %d...",loadedLights,curlevel);
     float correctionLightX, correctionLightY, correctionLightZ;
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
-    for (int32_t i=0;i<lightsCount;++i) {
+    for (uint32_t i=0;i<loadedLights;++i) {
         uint16_t idx = (i * LIGHT_DATA_SIZE);
         lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].position.x + correctionLightX;
         lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].position.y + correctionLightY;
         lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].position.z + correctionLightZ;
-        lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
+        lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = i == 817 ? lights_parser.entries[i].intensity : 0.0f;
         lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
         lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights_parser.entries[i].type == 0 ? 0.0f : lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].rotation.x;

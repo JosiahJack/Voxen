@@ -621,24 +621,14 @@ void mat4_lookat(float* m) {
     mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
 }
 
-float lightView[6][16];
-float lightViewProj[6][16];
-Quaternion orientationQuaternion[6] = {
-    {0.0f, 0.707106781f, 0.0f, 0.707106781f},      // +X: Rotate 90° around Y to face right
-    {0.0f, -0.707106781f, 0.0f, 0.707106781f},     // -X: Rotate -90° around Y to face left
-    {0.707106781f, 0.0f, 0.0f, 0.707106781f},      // +Y: Rotate -90° around X to face up
-    {-0.707106781f, 0.0f, 0.0f, 0.707106781f},     // -Y: Rotate 90° around X to face down
-    {0.0f, 0.0f, 0.0f, 1.0f},                      // +Z: No rotation (forward)
-    {0.0f, 1.0f, 0.0f, 0.0f}                       // -Z: Rotate 180° around Y to face backward
-};
-
-void RenderShadowmap(uint16_t lightIdx, uint32_t ssboOffset) {
-    float* lightData = &lights[lightIdx * LIGHT_DATA_SIZE];
-    float lightPosX = lightData[LIGHT_DATA_OFFSET_POSX];
-    float lightPosY = lightData[LIGHT_DATA_OFFSET_POSY];
-    float lightPosZ = lightData[LIGHT_DATA_OFFSET_POSZ];
-    float lightRadius = lightData[LIGHT_DATA_OFFSET_RANGE];
-
+void RenderShadowmap(uint16_t lightIdx) {
+    DualLog("Starting shadowmap processing for %d\n", lightIdx);
+    uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+    float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+    float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+    float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+    float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+    float effectiveRadius = fmax(lightRadius, 15.36f);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
@@ -649,9 +639,41 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t ssboOffset) {
 
     // Temporary buffer for depth data
     float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
+    // Buffer for PNG output (RGBA, grayscale)
+    unsigned char* pixelData = (unsigned char*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 4 * sizeof(unsigned char));
+
+    uint16_t nearMeshes[INSTANCE_COUNT];
+    uint16_t nearbyMeshCount = 0;
+    for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
+        if (instances[j].modelIndex >= MODEL_COUNT) continue;
+        if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+        
+        float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+        float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
+        if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
+        
+        nearMeshes[nearbyMeshCount] = j;
+        nearbyMeshCount++;
+    }
+    
+    DualLog("Starting shadowmap render for light %d\n", lightIdx);
+    uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
+    
+    // Face names for debug output
+    const char* faceNames[6] = {"posX", "negX", "posY", "negY", "posZ", "negZ"};
+    
+    float lightView[6][16];
+    float lightViewProj[6][16];
+    Quaternion orientationQuaternion[6] = {
+        {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+        {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+        {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+        {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+        {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+        {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+    };
 
     for (uint8_t face = 0; face < 6; face++) {
-        // Attach specific cube map face
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMap, 0);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
             GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -662,22 +684,15 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t ssboOffset) {
         glClear(GL_DEPTH_BUFFER_BIT);
         mat4_lookat_from(lightView[face], &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj[face], shadowmapsPerspectiveProjection, lightView[face]);
-        for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
-            if (instances[j].modelIndex >= MODEL_COUNT) continue;
-            if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-
-            float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-            float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
-            if (distToLightSqrd > (lightRadius + radius) * (lightRadius + radius)) continue;
-
-            int16_t modelType = instanceIsLODArray[j] && instances[j].lodIndex < MODEL_COUNT ? instances[j].lodIndex : instances[j].modelIndex;
-            glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[j * 16]);
+        for (uint16_t j = 0; j < nearbyMeshCount; j++) {
+            int16_t meshIdx = nearMeshes[j];
+            int16_t modelType = instanceIsLODArray[meshIdx] && instances[meshIdx].lodIndex < MODEL_COUNT ? instances[meshIdx].lodIndex : instances[meshIdx].modelIndex;
+            glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[meshIdx * 16]);
             glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[face]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
-            staticLightCount++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
 
@@ -685,9 +700,56 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t ssboOffset) {
         glReadPixels(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT, depthData);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, ssboOffset + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), depthData);
+
+        // Save debug image for light 817
+        if (lightIdx == 817) {
+            float minDepth = 1.0f;
+            float maxDepth = 0.0f;
+            for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
+                if (depthData[i] < minDepth) minDepth = depthData[i];
+                if (depthData[i] > maxDepth) maxDepth = depthData[i];
+            }
+            float depthRange = maxDepth - minDepth;
+            if (depthRange < 0.001f) depthRange = 1.0f; // Avoid division by zero
+
+            for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
+            float normalized = (depthData[i] - minDepth) / depthRange;
+            unsigned char gray = (unsigned char)(normalized * 255.0f);
+            pixelData[i * 4 + 0] = gray; // R
+            pixelData[i * 4 + 1] = gray; // G
+            pixelData[i * 4 + 2] = gray; // B
+            pixelData[i * 4 + 3] = 255; // A
+            }
+
+            // Create Screenshots directory if it doesn't exist
+            struct stat st = {0};
+            if (stat("Screenshots", &st) == -1) {
+                if (mkdir("Screenshots", 0755) != 0) {
+                    DualLogError("Failed to create Screenshots folder: %s\n", strerror(errno));
+                    free(depthData);
+                    free(pixelData);
+                    return;
+                }
+            }
+
+            // Generate filename
+            char filename[96];
+            snprintf(filename, sizeof(filename), "Screenshots/test817_%u_%s.png", face, faceNames[face]);
+            
+            // Save PNG
+            int success = stbi_write_png(filename, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 4, pixelData, SHADOW_MAP_SIZE * 4);
+            if (success) {
+                DualLog("Saved shadow map for light %d, face %s to %s\n", lightIdx, faceNames[face], filename);
+            } else {
+                DualLogError("Failed to save shadow map for light %d, face %s\n", lightIdx, faceNames[face]);
+            }
+        }
     }
 
+    staticLightCount++;
+    DualLog("Finishing shadowmap render for light %d\n", lightIdx);
     free(depthData);
+    free(pixelData);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
@@ -697,10 +759,19 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t ssboOffset) {
 void RenderShadowmaps(void) {
     // Render static lights once
     for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
-        uint16_t lightIdx = staticLightIndices[i];
-        uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
-        RenderShadowmap(lightIdx, ssboOffset);
+        if (i != 817) continue; // Test only one light right by start with known good shadowing position.
+        if (i > loadedLights) break; // End of the list
+        
+        uint16_t litIdx = i * LIGHT_DATA_SIZE;
+        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        if (intensity < 0.1f) continue; // Not bright enough to cast meaningful shadows
+        
+        float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
+        if (spotAng > 1.0f) continue; // Skip spotlights
+        
+        RenderShadowmap(i);
     }
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     shadowMapsRendered = true;
     DualLog("Rendered %d static shadow maps\n", staticLightCount);
 }
@@ -708,7 +779,6 @@ void RenderShadowmaps(void) {
 void RenderDynamicShadowmaps(void) {
     // Find dynamic lights within 35.0f of camera
     uint16_t visibleLightCount = 0;
-//     uint16_t visibleLightIndices[MAX_VISIBLE_LIGHTS];
     uint32_t uniqueLights[LIGHT_COUNT];
     memset(uniqueLights, 0xFF, LIGHT_COUNT * sizeof(uint32_t));
     uint32_t uniqueLightCount = 0;
@@ -759,9 +829,7 @@ void RenderDynamicShadowmaps(void) {
     for (uint16_t k = 0; k < visibleLightCount; ++k) {
         uint32_t lightIdx = candidates[k].index;
         lightIndirectionIndices[lightIdx] = staticLightCount + k;
-//         visibleLightIndices[k] = lightIdx;
-        uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
-        RenderShadowmap(lightIdx, ssboOffset);
+        RenderShadowmap(lightIdx);
     }
 
     // Update light indirection buffer
@@ -959,7 +1027,10 @@ int32_t InitializeEnvironment(void) {
     // SSBO for shadow map data
     glGenBuffers(1, &shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
+    uint32_t depthMapBufferSize = LIGHT_COUNT * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
+    float* clearedShadowDepths = (float*)malloc(depthMapBufferSize);
+    memset(clearedShadowDepths,1.0f,depthMapBufferSize);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, clearedShadowDepths, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
@@ -1509,7 +1580,6 @@ int32_t main(int32_t argc, char* argv[]) {
             
 //             if (i >= startOfDoubleSidedInstances) {
             if (isDoubleSided(instances[i].texIndex)) {
-                if (debugValue > 0) DualLog("For frame %d, enabling doublesided\n",globalFrameNum);
                 glDisable(GL_CULL_FACE);
             } else {
                 glEnable(GL_CULL_FACE); // Reenable backface culling
@@ -1517,7 +1587,6 @@ int32_t main(int32_t argc, char* argv[]) {
             
 //             if (i >= startOfTransparentInstances) {
             if (entities[instances[i].index].transparent) {
-                if (debugValue > 0) DualLog("For frame %d, enabling transparents\n",globalFrameNum);
                 glEnable(GL_BLEND); // Enable blending for transparent instances
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
