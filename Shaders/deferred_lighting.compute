@@ -185,7 +185,7 @@ void main() {
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
-        if (spotAng > 0.0) {
+        if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.
             float quat_x = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRX];
             float quat_y = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRY];
             float quat_z = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTDIRZ];

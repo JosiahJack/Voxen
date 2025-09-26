@@ -25,7 +25,6 @@ void main() {
     if (debugValue > 0) return;
 
     ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
-
     if (debugView == 0) {
         // Get specular color from G-buffer
         vec4 worldPosPack = texelFetch(inputWorldPos, ivec2(TexCoord * vec2(screenWidth, screenHeight)), 0);
@@ -33,7 +32,7 @@ void main() {
         float specSum = specColor.r + specColor.g + specColor.b;
 
         // Compute blur radius based on specular sum
-        float maxRadius = 4.0; // For 9x9 kernel at specSum < 0.3
+        float maxRadius = 2.0; // For 5x5 kernel at specSum < 0.3
         float minRadius = 0.0; // For 1x1 kernel (no blur) at specSum > 2.4
         float radius = mix(maxRadius, minRadius, smoothstep(0.3, 2.4, specSum));
 
@@ -62,7 +61,7 @@ void main() {
                 float dist = length(vec2(x, y) / max(radius, 0.1)); // Avoid division by zero
                 float weight = exp(-dist * dist * 0.5) * weightScale; // Simplified Gaussian
                 vec3 sampleColor = imageLoad(outputImage, samplePixel).rgb;
-                reflectionColor.rgb += sampleColor * weight * 2.0; // Keep your *2.0 factor
+                reflectionColor.rgb += sampleColor * weight;
                 totalWeight += weight;
             }
         }
