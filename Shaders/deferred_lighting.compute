@@ -95,7 +95,7 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
     return retval;
 }
 
-const int shadowMapSize = 64;
+const int shadowMapSize = 128;
 
 float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel, ivec2 pixel) {
     vec3 toLight = worldPos - lightPos;
