@@ -87,6 +87,8 @@ GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debu
 GLuint shadowCubeMap;
 GLuint depthCubeMap;
 GLuint shadowFBO;
+GLuint pbo;
+float* mappedShadowData = NULL; 
 GLuint shadowmapsShaderProgram;
 GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1;
 GLuint lightIndirectionIndices[LIGHT_COUNT];
@@ -629,13 +631,6 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = fmax(lightRadius, 15.36f);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-    glUseProgram(shadowmapsShaderProgram);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    glDisable(GL_CULL_FACE);
-    glBindVertexArray(vao_chunk);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     uint16_t nearMeshes[INSTANCE_COUNT];
     uint16_t nearbyMeshCount = 0;
@@ -687,57 +682,9 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
         glReadPixels(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, GL_RED, GL_FLOAT, depthData);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, ssboOffset + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), depthData);
-
-//         // Save debug image for light 817
-//         if (lightIdx == 817) {
-//             unsigned char* pixelData = (unsigned char*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 4 * sizeof(unsigned char));
-//             const char* faceNames[6] = {"posX", "negX", "posY", "negY", "posZ", "negZ"};
-//             float minDepth = 15.36f;
-//             float maxDepth = 0.0f;
-//             for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
-//                 if (depthData[i] < minDepth && depthData[i] > 0.0f) minDepth = depthData[i];
-//                 if (depthData[i] > maxDepth) maxDepth = depthData[i];
-//             }
-//             float depthRange = maxDepth - minDepth;
-//             if (depthRange < 0.001f) depthRange = 1.0f;
-// 
-//             DualLog("When making screenshot, minDepth: %f, maxDepth: %f\n", minDepth, maxDepth);
-//             for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
-//                 float normalized = (depthData[i] - minDepth) / depthRange;
-//                 unsigned char gray = (unsigned char)(normalized * 255.0f);
-//                 pixelData[i * 4 + 0] = gray; // R
-//                 pixelData[i * 4 + 1] = gray; // G
-//                 pixelData[i * 4 + 2] = gray; // B
-//                 pixelData[i * 4 + 3] = 255; // A
-//             }
-// 
-//             struct stat st = {0};
-//             if (stat("Screenshots", &st) == -1) {
-//                 if (mkdir("Screenshots", 0755) != 0) {
-//                     DualLogError("Failed to create Screenshots folder: %s\n", strerror(errno));
-//                     free(depthData);
-//                     free(pixelData);
-//                     return;
-//                 }
-//             }
-// 
-//             char filename[96];
-//             snprintf(filename, sizeof(filename), "Screenshots/test817_%u_%s.png", face, faceNames[face]);
-//             int success = stbi_write_png(filename, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 4, pixelData, SHADOW_MAP_SIZE * 4);
-//             if (success) {
-//                 DualLog("Saved shadow map for light %d, face %s to %s\n", lightIdx, faceNames[face], filename);
-//             } else {
-//                 DualLogError("Failed to save shadow map for light %d, face %s\n", lightIdx, faceNames[face]);
-//             }
-//             free(pixelData);
-//         }
     }
 
     staticLightCount++;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glViewport(0, 0, screen_width, screen_height);
-    CHECK_GL_ERROR();
 }
     
 void RenderShadowmaps(void) {
@@ -783,13 +730,19 @@ void RenderShadowmaps(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
     uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(float);
-    float* clearedShadowDepths = (float*)malloc(depthMapBufferSize);
-    memset(clearedShadowDepths,1.0f,depthMapBufferSize);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, clearedShadowDepths, GL_STATIC_DRAW);
+//     float* clearedShadowDepths = (float*)malloc(depthMapBufferSize);
+//     memset(clearedShadowDepths,0.0f,depthMapBufferSize);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
     DebugRAM("after shadow map setup");
+    
+    // Initialize PBO for texture-to-SSBO transfer
+    glGenBuffers(1, &pbo);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
+    glBufferData(GL_PIXEL_PACK_BUFFER, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), NULL, GL_STREAM_READ);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
     
     // Render static lights once
     float thresh = 0.04f;
@@ -798,6 +751,13 @@ void RenderShadowmaps(void) {
     if (currentLevel == 8) thresh += 0.005f;
         // Temporary buffer for depth data
     float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    glUseProgram(shadowmapsShaderProgram);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_CULL_FACE);
+    glBindVertexArray(vao_chunk);
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint16_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
@@ -806,8 +766,13 @@ void RenderShadowmaps(void) {
         float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
         if (spotAng > 1.0f) continue; // Skip spotlights
         
-        RenderShadowmap(i,depthData);
+        RenderShadowmap(i,depthData); // <<<<<<<<<<<<<<<<<< ACTUAL SHADOWMAP RENDERS
     }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glViewport(0, 0, screen_width, screen_height);
+    CHECK_GL_ERROR();
     free(depthData);
     malloc_trim(0);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
