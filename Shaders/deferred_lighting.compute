@@ -97,70 +97,59 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
 
 const int shadowMapSize = 128;
 
-float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange) {
+float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel) {
     vec3 toLight = worldPos - lightPos;
     float dist = length(toLight);
-
-    // ----- slope-scaled bias -----
     float slope = max(0.0, 1.0 - dot(normalize(normal), normalize(lightDir)));
     float bias = 0.02 + slope * ((1.0 / shadowMapSize) + 0.4);
 
-    // ----- choose cubemap face -----
-    vec3 absToLight = abs(toLight);
-    uint face;
-    vec2 uv;
-    float ma = max(max(absToLight.x, absToLight.y), absToLight.z);
+    vec3 a = abs(toLight);
+    float ma = max(max(a.x, a.y), a.z);
     vec3 dir = toLight / ma;
-
-    if (absToLight.x >= absToLight.y && absToLight.x >= absToLight.z) {
-        face = toLight.x > 0.0 ? 0u : 1u;
-        uv = face == 0u ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
-    } else if (absToLight.y >= absToLight.x && absToLight.y >= absToLight.z) {
-        face = toLight.y > 0.0 ? 2u : 3u;
-        uv = face == 2u ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
-    } else {
-        face = toLight.z > 0.0 ? 4u : 5u;
-        uv = face == 4u ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
-    }
+    uint face; vec2 uv;
+    if (a.x >= a.y && a.x >= a.z) { face = toLight.x > 0.0 ? 0u : 1u; uv = face == 0u ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y); }
+    else if (a.y >= a.x && a.y >= a.z) { face = toLight.y > 0.0 ? 2u : 3u; uv = face == 2u ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z); }
+    else { face = toLight.z > 0.0 ? 4u : 5u; uv = face == 4u ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y); }
     uv = uv * 0.5 + 0.5;
 
-    // ----- setup offsets -----
-    uint baseOffset = lightIdx * 6u * uint(shadowMapSize) * uint(shadowMapSize);
-    uint faceOffset = baseOffset + face * uint(shadowMapSize) * uint(shadowMapSize);
-    ivec2 texelCenter = ivec2(floor(uv * float(shadowMapSize)));
+    uint base = lightIdx * 6u * uint(shadowMapSize) * uint(shadowMapSize);
+    uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
+    ivec2 tc = ivec2(floor(uv * float(shadowMapSize)));
+    uint centerIdx = faceOff + uint(tc.y) * uint(shadowMapSize) + uint(tc.x);
+    float centerDepth = shadowMaps[centerIdx];
 
-    // ----- center depth -----
-    uint centerOffset = faceOffset + uint(texelCenter.y) * uint(shadowMapSize) + uint(texelCenter.x);
-    float centerDepth = shadowMaps[centerOffset];
+    float depthDiff = max(0.0, dist - centerDepth);
+    float radiusF = clamp((depthDiff / lightRange) * 4.0, 1.0, 4.0);
 
-    // how far off are we?
-    float depthDiff = abs(centerDepth - dist);
-    // convert world-unit difference into texel units
-    float texelSize = 1.0; // 1 texel in integer space
-    int dynamicRadius = clamp(int(floor(depthDiff / lightRange)) + 1, 1, 4);
-
-    // ----- variable PCF -----
-    float result = 0.0;
-    int taps = 0;
-    for (int y = -dynamicRadius; y <= dynamicRadius; y++) {
-        for (int x = -dynamicRadius; x <= dynamicRadius; x++) {
-            ivec2 texel = texelCenter + ivec2(x, y);
-            if (texel.x < 0 || texel.y < 0 ||
-                texel.x >= shadowMapSize || texel.y >= shadowMapSize) {
-                result += 1.0;
-                taps++;
-                continue;
-            }
-
-            uint offset = faceOffset + uint(texel.y) * uint(shadowMapSize) + uint(texel.x);
-            float depth = shadowMaps[offset];
-            result += (depth < (dist - bias)) ? 0.0 : 1.0;
+    if (radiusF < 3.84) {
+        float sum = 0.0; int taps = 0;
+        for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+            ivec2 t = tc + ivec2(x,y);
+            if (t.x < 0 || t.y < 0 || t.x >= shadowMapSize || t.y >= shadowMapSize) { sum += 1.0; taps++; continue; }
+            uint idx = faceOff + uint(t.y) * uint(shadowMapSize) + uint(t.x);
+            float d = shadowMaps[idx];
+            sum += (d < (dist - bias)) ? 0.0 : 1.0;
             taps++;
         }
+        return sum / float(taps);
     }
 
-    return result / float(taps);
+    int r = int(floor(radiusF));
+    float frac = radiusF - float(r);
+    float res = 0.0, wsum = 0.0;
+    for (int y = -r - 1; y <= r + 1; y++) for (int x = -r - 1; x <= r + 1; x++) {
+        ivec2 t = tc + ivec2(x,y);
+        if (t.x < 0 || t.y < 0 || t.x >= shadowMapSize || t.y >= shadowMapSize) { res += 1.0; wsum += 1.0; continue; }
+        float d = length(vec2(x,y));
+        float w = smoothstep(float(r)+1.0, radiusF, d + frac);
+        uint idx = faceOff + uint(t.y) * uint(shadowMapSize) + uint(t.x);
+        float depth = shadowMaps[idx];
+        res += ((depth < (dist - bias)) ? 0.0 : 1.0) * w;
+        wsum += w;
+    }
+    return res / max(wsum, 1e-6);
 }
+
 
 // Main Compute Shader
 void main() {
@@ -244,7 +233,7 @@ void main() {
                                lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
-        float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos, normal, lightDir, range);
+        float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos, normal, lightDir, range, distToPixel);
         lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
 
