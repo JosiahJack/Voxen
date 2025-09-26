@@ -123,9 +123,9 @@ GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit =
 // ----------------------------------------------------------------------------
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
+GLuint lightsID;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
-GLuint lightsID, lightIndirectionIndicesID;
 // ----------------------------------------------------------------------------
 // Event System states
 int32_t maxEventCount_debug = 0;
@@ -757,13 +757,68 @@ void RenderShadowmap(uint16_t lightIdx) {
 }
     
 void RenderShadowmaps(void) {
+    // Shadow map cube texture (single cube, 6 faces)
+    glGenTextures(1, &shadowCubeMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
+    for (int face = 0; face < 6; face++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_FLOAT, NULL);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+    
+    // Create depth texture for cubemap
+    glGenTextures(1, &depthCubeMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubeMap);
+    for (int i = 0; i < 6; i++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+    // Shadow FBO
+    glGenFramebuffers(1, &shadowFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, depthCubeMap, 0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glReadBuffer(GL_NONE);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        DualLogError("Shadow FBO incomplete, status: 0x%x\n", status);
+        return 1;
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    // SSBO for shadow map data
+    glGenBuffers(1, &shadowMapSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
+    uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
+    uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(float);
+    float* clearedShadowDepths = (float*)malloc(depthMapBufferSize);
+    memset(clearedShadowDepths,1.0f,depthMapBufferSize);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, clearedShadowDepths, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    CHECK_GL_ERROR();
+    DebugRAM("after shadow map setup");
+    
     // Render static lights once
-    for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
-        if (i > loadedLights) break; // End of the list
-        
+    float thresh = 0.04f;
+    if (currentLevel >= 10) thresh += 0.015f;
+    if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
+    if (currentLevel == 8) thresh += 0.005f;
+    for (uint16_t i = 0; i < loadedLights; i++) {
         uint16_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        if (intensity < 0.1f) continue; // Not bright enough to cast meaningful shadows
+        if (intensity < thresh) continue; // Not bright enough to cast meaningful shadows
         
         float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
         if (spotAng > 1.0f) continue; // Skip spotlights
@@ -831,11 +886,6 @@ void RenderDynamicShadowmaps(void) {
         RenderShadowmap(lightIdx);
     }
 
-    // Update light indirection buffer
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightIndirectionIndicesID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(GLuint), lightIndirectionIndices, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightIndirectionIndicesID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     CHECK_GL_ERROR();
 }
@@ -986,67 +1036,6 @@ int32_t InitializeEnvironment(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-    
-    glGenBuffers(1, &lightIndirectionIndicesID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightIndirectionIndicesID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * sizeof(GLuint), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, lightIndirectionIndicesID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    DebugRAM("after Lights Buffer Init");
-    
-    // Shadowmaps
-    // Shadow map cube texture (single cube, 6 faces)
-    glGenTextures(1, &shadowCubeMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
-    for (int face = 0; face < 6; face++) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_FLOAT, NULL);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    
-    // Create depth texture for cubemap
-    glGenTextures(1, &depthCubeMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubeMap);
-    for (int i = 0; i < 6; i++) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-
-    // Shadow FBO
-    glGenFramebuffers(1, &shadowFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, depthCubeMap, 0);
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
-    glReadBuffer(GL_NONE);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        DualLogError("Shadow FBO incomplete, status: 0x%x\n", status);
-        return 1;
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
-    // SSBO for shadow map data
-    glGenBuffers(1, &shadowMapSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
-    uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
-    uint32_t depthMapBufferSize = (uint32_t)(LIGHT_COUNT) * shadowmapPixelCount * sizeof(float);
-    float* clearedShadowDepths = (float*)malloc(depthMapBufferSize);
-    memset(clearedShadowDepths,1.0f,depthMapBufferSize);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, clearedShadowDepths, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
-    DebugRAM("after shadow map setup");
 
     // Input
     Input_MouselookApply();
@@ -1475,6 +1464,7 @@ int32_t main(int32_t argc, char* argv[]) {
     lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
+    Input_MouselookApply();
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;
