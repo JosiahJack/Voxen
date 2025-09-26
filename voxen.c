@@ -1448,6 +1448,7 @@ int32_t main(int32_t argc, char* argv[]) {
     last_time = get_time();
     lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
+    RenderShadowmaps();
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
     Input_MouselookApply();
     while(1) {
@@ -1620,7 +1621,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
         // ====================================================================
         // 4. Dynamic Shadowmaps
-        if (!shadowMapsRendered) RenderShadowmaps();
 //         RenderDynamicShadowmaps(); TODO
         
         // 5. Deferred Lighting
