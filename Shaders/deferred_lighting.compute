@@ -181,22 +181,22 @@ void main() {
                              lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         vec3 toLight = lightPos - worldPos;
         float dist = length(toLight);
-//         if (dist > range) continue;
+        if (dist > range) continue;
 
         vec3 lightDir = normalize(toLight);
         float lambertian = max(dot(normal, lightDir), 0.0);
-//         if (lambertian < 0.25) continue;
+        if (lambertian < 0.25) continue;
 
-//         if (dist > 7.68) {
-//             uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
-//             uint checkCellIdx = cellIndexForInstance[pixelInstance];
-//             uint lightCellIdx1D = (lightCell.y * 64u) + lightCell.x;
-//             uint bitIndex = lightCellIdx1D * 4096u + checkCellIdx;
-//             uint wordIdx = bitIndex / 32u;
-//             uint bitPos = bitIndex % 32u;
-//             bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;
-//             if (!lightCanSeeCell) continue;
-//         }
+        if (dist > 7.68) {
+            uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
+            uint checkCellIdx = cellIndexForInstance[pixelInstance];
+            uint lightCellIdx1D = (lightCell.y * 64u) + lightCell.x;
+            uint bitIndex = lightCellIdx1D * 4096u + checkCellIdx;
+            uint wordIdx = bitIndex / 32u;
+            uint bitPos = bitIndex % 32u;
+            bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;
+            if (!lightCanSeeCell) continue;
+        }
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
@@ -222,8 +222,6 @@ void main() {
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
         float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos);
-        if (shadowFactor > 0.4 && shadowFactor < 0.6) return;
-        if (lightIdxInPVS != 817u) shadowFactor = 0.0; // placeholder while debugging with single test light near player start for now
         lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
 

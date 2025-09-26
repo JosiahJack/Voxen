@@ -704,46 +704,46 @@ void RenderShadowmap(uint16_t lightIdx) {
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, ssboOffset + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), depthData);
 
-        // Save debug image for light 817
-        if (lightIdx == 817) {
-            float minDepth = 15.36f;
-            float maxDepth = 0.0f;
-            for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
-                if (depthData[i] < minDepth && depthData[i] > 0.0f) minDepth = depthData[i];
-                if (depthData[i] > maxDepth) maxDepth = depthData[i];
-            }
-            float depthRange = maxDepth - minDepth;
-            if (depthRange < 0.001f) depthRange = 1.0f;
-
-            DualLog("When making screenshot, minDepth: %f, maxDepth: %f\n", minDepth, maxDepth);
-            for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
-                float normalized = (depthData[i] - minDepth) / depthRange;
-                unsigned char gray = (unsigned char)(normalized * 255.0f);
-                pixelData[i * 4 + 0] = gray; // R
-                pixelData[i * 4 + 1] = gray; // G
-                pixelData[i * 4 + 2] = gray; // B
-                pixelData[i * 4 + 3] = 255; // A
-            }
-
-            struct stat st = {0};
-            if (stat("Screenshots", &st) == -1) {
-                if (mkdir("Screenshots", 0755) != 0) {
-                    DualLogError("Failed to create Screenshots folder: %s\n", strerror(errno));
-                    free(depthData);
-                    free(pixelData);
-                    return;
-                }
-            }
-
-            char filename[96];
-            snprintf(filename, sizeof(filename), "Screenshots/test817_%u_%s.png", face, faceNames[face]);
-            int success = stbi_write_png(filename, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 4, pixelData, SHADOW_MAP_SIZE * 4);
-            if (success) {
-                DualLog("Saved shadow map for light %d, face %s to %s\n", lightIdx, faceNames[face], filename);
-            } else {
-                DualLogError("Failed to save shadow map for light %d, face %s\n", lightIdx, faceNames[face]);
-            }
-        }
+//         // Save debug image for light 817
+//         if (lightIdx == 817) {
+//             float minDepth = 15.36f;
+//             float maxDepth = 0.0f;
+//             for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
+//                 if (depthData[i] < minDepth && depthData[i] > 0.0f) minDepth = depthData[i];
+//                 if (depthData[i] > maxDepth) maxDepth = depthData[i];
+//             }
+//             float depthRange = maxDepth - minDepth;
+//             if (depthRange < 0.001f) depthRange = 1.0f;
+// 
+//             DualLog("When making screenshot, minDepth: %f, maxDepth: %f\n", minDepth, maxDepth);
+//             for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
+//                 float normalized = (depthData[i] - minDepth) / depthRange;
+//                 unsigned char gray = (unsigned char)(normalized * 255.0f);
+//                 pixelData[i * 4 + 0] = gray; // R
+//                 pixelData[i * 4 + 1] = gray; // G
+//                 pixelData[i * 4 + 2] = gray; // B
+//                 pixelData[i * 4 + 3] = 255; // A
+//             }
+// 
+//             struct stat st = {0};
+//             if (stat("Screenshots", &st) == -1) {
+//                 if (mkdir("Screenshots", 0755) != 0) {
+//                     DualLogError("Failed to create Screenshots folder: %s\n", strerror(errno));
+//                     free(depthData);
+//                     free(pixelData);
+//                     return;
+//                 }
+//             }
+// 
+//             char filename[96];
+//             snprintf(filename, sizeof(filename), "Screenshots/test817_%u_%s.png", face, faceNames[face]);
+//             int success = stbi_write_png(filename, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 4, pixelData, SHADOW_MAP_SIZE * 4);
+//             if (success) {
+//                 DualLog("Saved shadow map for light %d, face %s to %s\n", lightIdx, faceNames[face], filename);
+//             } else {
+//                 DualLogError("Failed to save shadow map for light %d, face %s\n", lightIdx, faceNames[face]);
+//             }
+//         }
     }
 
     staticLightCount++;
@@ -759,7 +759,6 @@ void RenderShadowmap(uint16_t lightIdx) {
 void RenderShadowmaps(void) {
     // Render static lights once
     for (uint16_t i = 0; i < LIGHT_COUNT; i++) {
-        if (i != 817) continue; // Test only one light right by start with known good shadowing position.
         if (i > loadedLights) break; // End of the list
         
         uint16_t litIdx = i * LIGHT_DATA_SIZE;

@@ -966,7 +966,7 @@ int32_t LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].position.x + correctionLightX;
         lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].position.y + correctionLightY;
         lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].position.z + correctionLightZ;
-        lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = i == 817 ? lights_parser.entries[i].intensity : 0.0f;
+        lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
         lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
         lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights_parser.entries[i].type == 0 ? 0.0f : lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].rotation.x;
