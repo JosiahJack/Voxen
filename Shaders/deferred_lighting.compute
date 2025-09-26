@@ -1,12 +1,10 @@
-// deferred_lighting.compute
-// Compute shader for processing 
+// deferred_lighting_debug_spot.compute
 #version 450 core
 layout(local_size_x = 32, local_size_y = 32) in;
 const int LIGHT_COUNT = 1600;
 
 layout(rgba8,   binding =  0) uniform image2D inputImage;
 layout(rgba32f, binding =  1) uniform image2D inputWorldPos;
-// layout(         binding =  3) uniform sampler2D depthTexture; // Unused but slot taken
 layout(std430,  binding =  5) buffer ShadowMaps { float shadowMaps[]; };
 layout(std430,  binding =  6) buffer LightIndirectionIndices { uint lightIndirectionIndices[]; };
 layout(std430,  binding =  8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
@@ -79,8 +77,6 @@ const vec3 baseDir = vec3(0.0, 0.0, 1.0);
 const int SSR_RES = 4;
 const float FAR_PLANE = 71.68;
 const float NEAR_PLANE = 0.02;
-    
-float rad2deg(float radians) { return radians * (180.0 / 3.1415926535); }
 
 uint GetVoxelIndex(vec3 worldPos) {
     float offsetX = worldPos.x - worldMin_x + (VOXEL_SIZE * 0.5);
@@ -103,47 +99,45 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
     return retval;
 }
 
-const int shadowMapSize = 512;
-const float LIGHT_RANGE_MAX = 15.36;
+const int shadowMapSize = 256;
+const float LIGHT_NEAR_PLANE = 0.02;
+const float LIGHT_FAR_PLANE = 15.36;
+const float SHADOWMAP_FOV = 90.0;
 
-float SampleShadowMap(uint lightIdx, vec3 shadowCoord, uint face, float dist) {
-    uint baseOffset = lightIdx * 6 * shadowMapSize * shadowMapSize;
-    uint faceOffset = baseOffset + face * shadowMapSize * shadowMapSize;
-    vec3 dir = normalize(shadowCoord);
-    vec3 absCoord = abs(dir);
-    float maxAxis = max(max(absCoord.x, absCoord.y), absCoord.z);
+float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos) {
+    vec3 toLight = worldPos - lightPos;
+    float dist = length(toLight);
+    vec3 absToLight = abs(toLight);
+    uint face;
     vec2 uv;
-    if (face == 0) { // +X
-        uv = vec2(-shadowCoord.z, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
-    } else if (face == 1) { // -X
-        uv = vec2(shadowCoord.z, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
-    } else if (face == 2) { // +Y
-        uv = vec2(shadowCoord.x, shadowCoord.z) / maxAxis * 0.5 + 0.5;
-    } else if (face == 3) { // -Y
-        
-        uv = vec2(shadowCoord.x, -shadowCoord.z) / maxAxis * 0.5 + 0.5;
-        
-    } else if (face == 4) { // +Z
-        uv = vec2(shadowCoord.x, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
-    } else { // -Z
-        uv = vec2(-shadowCoord.x, -shadowCoord.y) / maxAxis * 0.5 + 0.5;
+    float ma = max(max(absToLight.x, absToLight.y), absToLight.z); // Determine cube face using dominant axis
+    vec3 dir = toLight / ma; // Normalize by dominant axis
+    if (absToLight.x >= absToLight.y && absToLight.x >= absToLight.z) {
+        face = toLight.x > 0.0 ? 0u : 1u; // +X or -X
+        uv = face == 0u ? vec2(-dir.z, -dir.y) : vec2(dir.z, -dir.y);
+    } else if (absToLight.y >= absToLight.x && absToLight.y >= absToLight.z) {
+        face = toLight.y > 0.0 ? 2u : 3u; // +Y or -Y
+        uv = face == 2u ? vec2(dir.x, dir.z) : vec2(dir.x, -dir.z);
+    } else {
+        face = toLight.z > 0.0 ? 4u : 5u; // +Z or -Z
+        uv = face == 4u ? vec2(dir.x, -dir.y) : vec2(-dir.x, -dir.y);
     }
+    uv = uv * 0.5 + 0.5; // Map [-1, 1] to [0, 1]
+    uv = clamp(uv, 0.001, 0.999); // Avoid edge seams
 
-//     ivec2 texel = ivec2(uv * float(shadowMapSize));
+    // Sample shadow map
+    uint baseOffset = lightIdx * 6u * uint(shadowMapSize) * uint(shadowMapSize);
+    uint faceOffset = baseOffset + face * uint(shadowMapSize) * uint(shadowMapSize);
     ivec2 texel = ivec2(floor(uv * float(shadowMapSize)));
-//     texel.x = clamp(texel.x, 0, shadowMapSize-1);
-//     texel.y = clamp(texel.y, 0, shadowMapSize-1);
-//     texel.y = (shadowMapSize - 1) - texel.y; // flip Y
-    if (texel.x >= shadowMapSize - 1 || texel.y >= shadowMapSize - 1 || texel.x < 0 || texel.y < 0) return 1.0;
+    if (texel.x < 0 || texel.y < 0 || texel.x >= shadowMapSize || texel.y >= shadowMapSize) return 1.0; // No shadowing for out-of-bounds
 
-    uint offset = faceOffset + texel.y * shadowMapSize + texel.x;
+    uint offset = faceOffset + uint(texel.y) * uint(shadowMapSize) + uint(texel.x);
     float depth = shadowMaps[offset];
-    float closestDepth = 2.0 * depth - 1.0; // NDC to [-1,1]
-    closestDepth = (2.0 * NEAR_PLANE * 15.36) / (15.36 + NEAR_PLANE - closestDepth * (15.36 - NEAR_PLANE)); // Linearize
-
-    float bias = -0.020;
-    return (dist > closestDepth + bias) ? 0.0 : 1.0; // Use maxAxis for depth comparison
+    float bias = 0.02;
+    return (depth < dist + bias) ? 0.0 : 1.0;
 }
+
+float rad2deg(float radians) { return radians * (180.0 / 3.1415926535); }
 
 // Main Compute Shader
 void main() {
@@ -160,26 +154,24 @@ void main() {
     vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
     vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
     uint pixelInstance = floatBitsToUint(worldZInst.y);
-
-    // Regular lighting calculation
     uint voxelIdx = GetVoxelIndex(worldPos);
-    uint count  = voxelLightListIndices[voxelIdx * 2 + 1];    
+    uint count  = voxelLightListIndices[voxelIdx * 2 + 1];
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = vec3(0.0,0.0,1.0);
     uint listoffset = 0;
-    if (count > 0) {  
+    if (count > 0) {
         normal.x = (glowColor.a * 2.0) -1.0;
         normal.y = (specColor.a * 2.0) - 1.0;
-        normal.z = (glowColor.r * 2.0) - 1.0; // Get the normal.z back at good precision
+        normal.z = (glowColor.r * 2.0) - 1.0;
         normal = normalize(normal);
         listoffset = voxelLightListIndices[voxelIdx * 2];
     }
-    
-    glowColor.r = color.a; // Glow color doesn't suffer from precision issues like normal did.
-    
-    for (uint i = 0; i < count; i++) {
+
+    glowColor.r = color.a;
+
+    for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
-        uint lightIdx = lightIdxInPVS * LIGHT_DATA_SIZE;
+        uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
         if (intensity < 0.05) continue;
 
@@ -198,10 +190,10 @@ void main() {
         if (dist > 7.68) {
             uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
             uint checkCellIdx = cellIndexForInstance[pixelInstance];
-            uint lightCellIdx1D = (lightCell.y * 64) + lightCell.x;
-            uint bitIndex = lightCellIdx1D * 4096 + checkCellIdx;
-            uint wordIdx = bitIndex / 32;
-            uint bitPos = bitIndex % 32;
+            uint lightCellIdx1D = (lightCell.y * 64u) + lightCell.x;
+            uint bitIndex = lightCellIdx1D * 4096u + checkCellIdx;
+            uint wordIdx = bitIndex / 32u;
+            uint bitPos = bitIndex % 32u;
             bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;
             if (!lightCanSeeCell) continue;
         }
@@ -229,37 +221,24 @@ void main() {
                                lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
-
-        // Shadows
-        vec3 absToLight = abs(toLight);
-        float maxAxis = max(max(absToLight.x, absToLight.y), absToLight.z);
-        uint face;
-        if (absToLight.x >= absToLight.y && absToLight.x >= absToLight.z) {
-            face = toLight.x > 0.0 ? 0 : 1; // +X or -X
-        } else if (absToLight.y >= absToLight.x && absToLight.y >= absToLight.z) {
-            face = toLight.y > 0.0 ? 2 : 3; // +Y or -Y
-        } else {
-            face = toLight.z > 0.0 ? 4 : 5; // +Z or -Z
-        }
-        float shadowFactor = lightIdxInPVS == 817 ? SampleShadowMap(lightIdxInPVS, toLight, face, dist) : 1.0;
-        if (debugValue == 1) lighting += vec3(shadowFactor, shadowFactor, shadowFactor);
-        else if (debugValue == 2) lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff;
-        else lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
+        float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos);
+        if (lightIdxInPVS != 817u) shadowFactor = 0.0; // placeholder while debugging with single test light near player start for now
+        lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
 
     lighting += glowColor.rgb;
 
-    // Dither
+    // Dither + fog
     int blueNoiseTextureWidth = 64;
     int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;
     vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
     if (debugValue == 0) lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));
 
-    // Fog
     float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
     lighting = mix(fogColor, lighting, 1.0 - fogFac);
+
     imageStore(inputImage, pixel, vec4(lighting, 1.0));
 }
