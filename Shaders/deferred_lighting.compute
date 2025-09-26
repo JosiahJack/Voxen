@@ -1,15 +1,12 @@
 // deferred_lighting_debug_spot.compute
 #version 450 core
 layout(local_size_x = 32, local_size_y = 32) in;
-const int LIGHT_COUNT = 1600;
 
 layout(rgba8,   binding =  0) uniform image2D inputImage;
 layout(rgba32f, binding =  1) uniform image2D inputWorldPos;
 layout(std430,  binding =  5) buffer ShadowMaps { float shadowMaps[]; };
-layout(std430,  binding =  8) buffer PrecomputedVisibleCellsFromHere { uint precomputedVisibleCellsFromHere[]; };
 layout(std430,  binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430,  binding = 19) buffer LightIndices { float lights[]; };
-layout(std430,  binding = 20) buffer CellIndexForInstance { uint cellIndexForInstance[]; };
 layout(std430,  binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
 layout(std430,  binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
@@ -71,7 +68,6 @@ const int LIGHT_DATA_OFFSET_G = 11;
 const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
-const float CELLXHALF = 1.28;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
 
 uint GetVoxelIndex(vec3 worldPos) {
@@ -86,13 +82,6 @@ uint GetVoxelIndex(vec3 worldPos) {
     uint cellIndex = cellZ * 64 + cellX;
     uint voxelIndexInCell = voxelZ * 8 + voxelX;
     return cellIndex * 64 + voxelIndexInCell;
-}
-
-uvec2 PosToCellCoords(float pos_x, float pos_z) {
-    uvec2 retval;
-    retval.x = uint(int((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F));
-    retval.y = uint(int((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F));
-    return retval;
 }
 
 const int shadowMapSize = 128;
@@ -129,9 +118,7 @@ float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, 
     // 3x3 kernel with blue noise offset and soft depth comparison
     for (float y = -smearness; y <= smearness; y += 1.0) {
         for (float x = -smearness; x <= smearness; x += 1.0) {
-            // Apply blue noise offset, scaled by radiusF
-            vec2 noiseOffset = vec2(0.0);//bluenoise.xy * radiusF; // Increased spread
-            vec2 t = tc + vec2(x, y) + noiseOffset;
+            vec2 t = tc + vec2(x, y);
             uint utx = uint(clamp(t.x, 0.0, shadSizeF - 1.0));
             uint uty = uint(clamp(t.y, 0.0, shadSizeF - 1.0));
             uint idx = faceOff + uty * uint(shadowMapSize) + utx;
@@ -158,6 +145,8 @@ void main() {
     vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
     vec4 color = vec4(imageLoad(inputImage, pixel));
     float distToPixel = length(worldPos - camPos);
+    if (distToPixel > 71.66) return;
+    
     vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
     vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
     uint pixelInstance = floatBitsToUint(worldZInst.y);
@@ -193,17 +182,6 @@ void main() {
         vec3 lightDir = normalize(toLight);
         float lambertian = max(dot(normal, lightDir), 0.0);
         if (lambertian < 0.25) continue;
-
-        if (dist > 7.68) {
-            uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
-            uint checkCellIdx = cellIndexForInstance[pixelInstance];
-            uint lightCellIdx1D = (lightCell.y * 64u) + lightCell.x;
-            uint bitIndex = lightCellIdx1D * 4096u + checkCellIdx;
-            uint wordIdx = bitIndex / 32u;
-            uint bitPos = bitIndex % 32u;
-            bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;
-            if (!lightCanSeeCell) continue;
-        }
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;

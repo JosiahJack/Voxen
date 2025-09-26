@@ -719,20 +719,6 @@ int32_t Cull_Init(void) {
 //     PutMeshesInCells(4); // Static Saveable
     PutMeshesInCells(5); // Lights
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
-    uint32_t numBits = ARRSIZE * ARRSIZE;          // 4096 * 4096
-    uint32_t numUint32s = (numBits + 31) / 32;    // ceil(bits/32)
-    uint32_t numBytes = numUint32s * sizeof(uint32_t);    
-    glGenBuffers(1, &precomputedVisibleCellsFromHereID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, precomputedVisibleCellsFromHereID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, numBytes, precomputedVisibleCellsFromHere, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, precomputedVisibleCellsFromHereID);
-    
-    glGenBuffers(1, &cellIndexForInstanceID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 20, cellIndexForInstanceID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
     malloc_trim(0);
     DualLog("Culling took %f seconds\n", get_time() - start_time);
     DebugRAM("end of Cull_Init");

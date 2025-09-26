@@ -682,6 +682,8 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
         glReadPixels(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, GL_RED, GL_FLOAT, depthData);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
         glBufferSubData(GL_SHADER_STORAGE_BUFFER, ssboOffset + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), depthData);
+        glFlush();
+        glFinish();
     }
 
     staticLightCount++;
@@ -730,8 +732,6 @@ void RenderShadowmaps(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
     uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(float);
-//     float* clearedShadowDepths = (float*)malloc(depthMapBufferSize);
-//     memset(clearedShadowDepths,0.0f,depthMapBufferSize);
     glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -763,8 +763,8 @@ void RenderShadowmaps(void) {
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (intensity < thresh) continue; // Not bright enough to cast meaningful shadows
         
-        float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
-        if (spotAng > 1.0f) continue; // Skip spotlights
+//         float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG]; // Spot lights still get full cubemap for GI
+//         if (spotAng > 1.0f) continue; // Skip spotlights
         
         RenderShadowmap(i,depthData); // <<<<<<<<<<<<<<<<<< ACTUAL SHADOWMAP RENDERS
     }
@@ -1592,9 +1592,6 @@ int32_t main(int32_t argc, char* argv[]) {
         GLuint groupX = (screen_width + 31) / 32;
         GLuint groupY = (screen_height + 31) / 32;
         if (debugView == 0 || debugView == 8) {
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, cellIndexForInstanceID);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * sizeof(uint32_t), cellIndexForInstance, GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
             glUseProgram(deferredLightingShaderProgram);
             glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
             glUniform1f(worldMin_xLoc_deferred, worldMin_x);
