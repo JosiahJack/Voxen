@@ -95,16 +95,15 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
     return retval;
 }
 
-const int shadowMapSize = 256;
+const int shadowMapSize = 128;
 
-float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir) {
+float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange) {
     vec3 toLight = worldPos - lightPos;
     float dist = length(toLight);
 
     // ----- slope-scaled bias -----
     float slope = max(0.0, 1.0 - dot(normalize(normal), normalize(lightDir)));
-    float bias = 0.08 + slope * (1.0 / shadowMapSize); // pass in uniforms
-    // NOTE: later we’ll subtract this from dist
+    float bias = 0.02 + slope * ((1.0 / shadowMapSize) + 0.4);
 
     // ----- choose cubemap face -----
     vec3 absToLight = abs(toLight);
@@ -130,27 +129,31 @@ float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, 
     uint faceOffset = baseOffset + face * uint(shadowMapSize) * uint(shadowMapSize);
     ivec2 texelCenter = ivec2(floor(uv * float(shadowMapSize)));
 
-    // ----- 5x5 PCF -----
-    const int kernelRadius = 2;
+    // ----- center depth -----
+    uint centerOffset = faceOffset + uint(texelCenter.y) * uint(shadowMapSize) + uint(texelCenter.x);
+    float centerDepth = shadowMaps[centerOffset];
+
+    // how far off are we?
+    float depthDiff = abs(centerDepth - dist);
+    // convert world-unit difference into texel units
+    float texelSize = 1.0; // 1 texel in integer space
+    int dynamicRadius = clamp(int(floor(depthDiff / lightRange)) + 1, 1, 4);
+
+    // ----- variable PCF -----
     float result = 0.0;
     int taps = 0;
-
-    for (int y = -kernelRadius; y <= kernelRadius; y++) {
-        for (int x = -kernelRadius; x <= kernelRadius; x++) {
+    for (int y = -dynamicRadius; y <= dynamicRadius; y++) {
+        for (int x = -dynamicRadius; x <= dynamicRadius; x++) {
             ivec2 texel = texelCenter + ivec2(x, y);
             if (texel.x < 0 || texel.y < 0 ||
                 texel.x >= shadowMapSize || texel.y >= shadowMapSize) {
-                result += 1.0; // treat OOB as lit
+                result += 1.0;
                 taps++;
                 continue;
             }
 
-            uint offset = faceOffset +
-                          uint(texel.y) * uint(shadowMapSize) +
-                          uint(texel.x);
-
+            uint offset = faceOffset + uint(texel.y) * uint(shadowMapSize) + uint(texel.x);
             float depth = shadowMaps[offset];
-            // subtract bias here
             result += (depth < (dist - bias)) ? 0.0 : 1.0;
             taps++;
         }
@@ -158,7 +161,6 @@ float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, 
 
     return result / float(taps);
 }
-
 
 // Main Compute Shader
 void main() {
@@ -208,16 +210,16 @@ void main() {
         float lambertian = max(dot(normal, lightDir), 0.0);
         if (lambertian < 0.25) continue;
 
-        if (dist > 7.68) {
-            uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
-            uint checkCellIdx = cellIndexForInstance[pixelInstance];
-            uint lightCellIdx1D = (lightCell.y * 64u) + lightCell.x;
-            uint bitIndex = lightCellIdx1D * 4096u + checkCellIdx;
-            uint wordIdx = bitIndex / 32u;
-            uint bitPos = bitIndex % 32u;
-            bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;
-            if (!lightCanSeeCell) continue;
-        }
+//         if (dist > 7.68) {
+//             uvec2 lightCell = PosToCellCoords(lightPos.x, lightPos.z);
+//             uint checkCellIdx = cellIndexForInstance[pixelInstance];
+//             uint lightCellIdx1D = (lightCell.y * 64u) + lightCell.x;
+//             uint bitIndex = lightCellIdx1D * 4096u + checkCellIdx;
+//             uint wordIdx = bitIndex / 32u;
+//             uint bitPos = bitIndex % 32u;
+//             bool lightCanSeeCell = (precomputedVisibleCellsFromHere[wordIdx] & (1u << bitPos)) != 0u;
+//             if (!lightCanSeeCell) continue;
+//         }
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
@@ -242,7 +244,7 @@ void main() {
                                lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
-        float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos, normal, lightDir);
+        float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos, normal, lightDir, range);
         lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
 

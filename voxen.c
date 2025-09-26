@@ -622,7 +622,7 @@ void mat4_lookat(float* m) {
     mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
 }
 
-void RenderShadowmap(uint16_t lightIdx) {
+void RenderShadowmap(uint16_t lightIdx, float* depthData) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -637,11 +637,6 @@ void RenderShadowmap(uint16_t lightIdx) {
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
-
-    // Temporary buffer for depth data
-    float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
-    unsigned char* pixelData = (unsigned char*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 4 * sizeof(unsigned char));
-
     uint16_t nearMeshes[INSTANCE_COUNT];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
@@ -695,6 +690,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
 //         // Save debug image for light 817
 //         if (lightIdx == 817) {
+//             unsigned char* pixelData = (unsigned char*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 4 * sizeof(unsigned char));
 //             const char* faceNames[6] = {"posX", "negX", "posY", "negY", "posZ", "negZ"};
 //             float minDepth = 15.36f;
 //             float maxDepth = 0.0f;
@@ -733,12 +729,11 @@ void RenderShadowmap(uint16_t lightIdx) {
 //             } else {
 //                 DualLogError("Failed to save shadow map for light %d, face %s\n", lightIdx, faceNames[face]);
 //             }
+//             free(pixelData);
 //         }
     }
 
     staticLightCount++;
-    free(depthData);
-    free(pixelData);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
@@ -801,6 +796,8 @@ void RenderShadowmaps(void) {
     if (currentLevel >= 10) thresh += 0.015f;
     if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
     if (currentLevel == 8) thresh += 0.005f;
+        // Temporary buffer for depth data
+    float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint16_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
@@ -809,72 +806,74 @@ void RenderShadowmaps(void) {
         float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG];
         if (spotAng > 1.0f) continue; // Skip spotlights
         
-        RenderShadowmap(i);
+        RenderShadowmap(i,depthData);
     }
+    free(depthData);
+    malloc_trim(0);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     shadowMapsRendered = true;
     DualLog("Rendered %d static shadow maps\n", staticLightCount);
 }
 
-void RenderDynamicShadowmaps(void) {
-    // Find dynamic lights within 35.0f of camera
-    uint16_t visibleLightCount = 0;
-    uint32_t uniqueLights[LIGHT_COUNT];
-    memset(uniqueLights, 0xFF, LIGHT_COUNT * sizeof(uint32_t));
-    uint32_t uniqueLightCount = 0;
-
-    float camCellX = (cam_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F;
-    float camCellZ = (cam_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F;
-    uint16_t minCellX = (uint16_t)fmax(0.0f, floorf(camCellX - (35.0f / WORLDCELL_WIDTH_F)));
-    uint16_t maxCellX = (uint16_t)fmin(63.0f, ceilf(camCellX + (35.0f / WORLDCELL_WIDTH_F)));
-    uint16_t minCellZ = (uint16_t)fmax(0.0f, floorf(camCellZ - (35.0f / WORLDCELL_WIDTH_F)));
-    uint16_t maxCellZ = (uint16_t)fmin(63.0f, ceilf(camCellZ + (35.0f / WORLDCELL_WIDTH_F)));
-
-    bool lightSeen[LIGHT_COUNT] = {0};
-    for (uint16_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
-        for (uint16_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-            uint16_t cellIndex = cellZ * 64 + cellX;
-            for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
-                for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                    uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-                    uint32_t count = voxelLightListIndices[voxelIndex * 2 + 1];
-                    if (count == 0) continue;
-                    uint32_t offset = voxelLightListIndices[voxelIndex * 2];
-                    for (uint32_t k = 0; k < count; ++k) {
-                        uint32_t lightIdx = voxelLightListsRaw[offset + k];
-                        if (lightIsDynamic[lightIdx] && !lightSeen[lightIdx]) {
-                            lightSeen[lightIdx] = true;
-                            if (uniqueLightCount < LIGHT_COUNT) uniqueLights[uniqueLightCount++] = lightIdx;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Select top MAX_VISIBLE_LIGHTS dynamic lights
-    LightCandidate candidates[uniqueLightCount];
-    for (uint32_t k = 0; k < uniqueLightCount; ++k) {
-        uint32_t lightIdx = uniqueLights[k];
-        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-        float distSqrd = squareDistance3D(lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ], cam_x, cam_y, cam_z);
-        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        candidates[k].index = lightIdx;
-        candidates[k].distanceSquared = distSqrd;
-        candidates[k].score = distSqrd / (intensity + 0.1f);
-    }
-    qsort(candidates, uniqueLightCount, sizeof(LightCandidate), compareLightCandidates);
-
-    visibleLightCount = fmin(MAX_VISIBLE_LIGHTS - staticLightCount, (uint16_t)uniqueLightCount);
-    for (uint16_t k = 0; k < visibleLightCount; ++k) {
-        uint32_t lightIdx = candidates[k].index;
-        lightIndirectionIndices[lightIdx] = staticLightCount + k;
-        RenderShadowmap(lightIdx);
-    }
-
-    glViewport(0, 0, screen_width, screen_height);
-    CHECK_GL_ERROR();
-}
+// void RenderDynamicShadowmaps(void) {
+//     // Find dynamic lights within 35.0f of camera
+//     uint16_t visibleLightCount = 0;
+//     uint32_t uniqueLights[LIGHT_COUNT];
+//     memset(uniqueLights, 0xFF, LIGHT_COUNT * sizeof(uint32_t));
+//     uint32_t uniqueLightCount = 0;
+// 
+//     float camCellX = (cam_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F;
+//     float camCellZ = (cam_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F;
+//     uint16_t minCellX = (uint16_t)fmax(0.0f, floorf(camCellX - (35.0f / WORLDCELL_WIDTH_F)));
+//     uint16_t maxCellX = (uint16_t)fmin(63.0f, ceilf(camCellX + (35.0f / WORLDCELL_WIDTH_F)));
+//     uint16_t minCellZ = (uint16_t)fmax(0.0f, floorf(camCellZ - (35.0f / WORLDCELL_WIDTH_F)));
+//     uint16_t maxCellZ = (uint16_t)fmin(63.0f, ceilf(camCellZ + (35.0f / WORLDCELL_WIDTH_F)));
+// 
+//     bool lightSeen[LIGHT_COUNT] = {0};
+//     for (uint16_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
+//         for (uint16_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
+//             uint16_t cellIndex = cellZ * 64 + cellX;
+//             for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+//                 for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
+//                     uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+//                     uint32_t count = voxelLightListIndices[voxelIndex * 2 + 1];
+//                     if (count == 0) continue;
+//                     uint32_t offset = voxelLightListIndices[voxelIndex * 2];
+//                     for (uint32_t k = 0; k < count; ++k) {
+//                         uint32_t lightIdx = voxelLightListsRaw[offset + k];
+//                         if (lightIsDynamic[lightIdx] && !lightSeen[lightIdx]) {
+//                             lightSeen[lightIdx] = true;
+//                             if (uniqueLightCount < LIGHT_COUNT) uniqueLights[uniqueLightCount++] = lightIdx;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// 
+//     // Select top MAX_VISIBLE_LIGHTS dynamic lights
+//     LightCandidate candidates[uniqueLightCount];
+//     for (uint32_t k = 0; k < uniqueLightCount; ++k) {
+//         uint32_t lightIdx = uniqueLights[k];
+//         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+//         float distSqrd = squareDistance3D(lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ], cam_x, cam_y, cam_z);
+//         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+//         candidates[k].index = lightIdx;
+//         candidates[k].distanceSquared = distSqrd;
+//         candidates[k].score = distSqrd / (intensity + 0.1f);
+//     }
+//     qsort(candidates, uniqueLightCount, sizeof(LightCandidate), compareLightCandidates);
+// 
+//     visibleLightCount = fmin(MAX_VISIBLE_LIGHTS - staticLightCount, (uint16_t)uniqueLightCount);
+//     for (uint16_t k = 0; k < visibleLightCount; ++k) {
+//         uint32_t lightIdx = candidates[k].index;
+//         lightIndirectionIndices[lightIdx] = staticLightCount + k;
+//         RenderShadowmap(lightIdx);
+//     }
+// 
+//     glViewport(0, 0, screen_width, screen_height);
+//     CHECK_GL_ERROR();
+// }
 
 float textQuadVertices[] = { // 2 triangles, text is applied as an image from SDL TTF
     // Positions   // Tex Coords
