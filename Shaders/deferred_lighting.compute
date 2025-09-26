@@ -95,11 +95,18 @@ uvec2 PosToCellCoords(float pos_x, float pos_z) {
     return retval;
 }
 
-const int shadowMapSize = 128;
+const int shadowMapSize = 256;
 
 float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir) {
     vec3 toLight = worldPos - lightPos;
     float dist = length(toLight);
+
+    // ----- slope-scaled bias -----
+    float slope = max(0.0, 1.0 - dot(normalize(normal), normalize(lightDir)));
+    float bias = 0.08 + slope * (1.0 / shadowMapSize); // pass in uniforms
+    // NOTE: later we’ll subtract this from dist
+
+    // ----- choose cubemap face -----
     vec3 absToLight = abs(toLight);
     uint face;
     vec2 uv;
@@ -107,28 +114,51 @@ float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, 
     vec3 dir = toLight / ma;
 
     if (absToLight.x >= absToLight.y && absToLight.x >= absToLight.z) {
-        face = toLight.x > 0.0 ? 0u : 1u; // +X or -X
-        uv = face == 0u ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y); // Flip Y for consistency
+        face = toLight.x > 0.0 ? 0u : 1u;
+        uv = face == 0u ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
     } else if (absToLight.y >= absToLight.x && absToLight.y >= absToLight.z) {
-        face = toLight.y > 0.0 ? 2u : 3u; // +Y or -Y
-        uv = face == 2u ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z); // Flip Z for -Y
+        face = toLight.y > 0.0 ? 2u : 3u;
+        uv = face == 2u ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
     } else {
-        face = toLight.z > 0.0 ? 4u : 5u; // +Z or -Z
-        uv = face == 4u ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y); // Flip Y for consistency
+        face = toLight.z > 0.0 ? 4u : 5u;
+        uv = face == 4u ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
     }
     uv = uv * 0.5 + 0.5;
-    uv = clamp(uv, 0.001, 0.999);
 
+    // ----- setup offsets -----
     uint baseOffset = lightIdx * 6u * uint(shadowMapSize) * uint(shadowMapSize);
     uint faceOffset = baseOffset + face * uint(shadowMapSize) * uint(shadowMapSize);
-    ivec2 texel = ivec2(floor(uv * float(shadowMapSize)));
-    if (texel.x < 0 || texel.y < 0 || texel.x >= shadowMapSize || texel.y >= shadowMapSize) return 1.0;
+    ivec2 texelCenter = ivec2(floor(uv * float(shadowMapSize)));
 
-    uint offset = faceOffset + uint(texel.y) * uint(shadowMapSize) + uint(texel.x);
-    float depth = shadowMaps[offset];
-    float bias = min(-0.06, -0.16 * (1.0 - dot(normal, lightDir)));
-    return (depth < dist + bias) ? 0.0 : 1.0;
+    // ----- 5x5 PCF -----
+    const int kernelRadius = 2;
+    float result = 0.0;
+    int taps = 0;
+
+    for (int y = -kernelRadius; y <= kernelRadius; y++) {
+        for (int x = -kernelRadius; x <= kernelRadius; x++) {
+            ivec2 texel = texelCenter + ivec2(x, y);
+            if (texel.x < 0 || texel.y < 0 ||
+                texel.x >= shadowMapSize || texel.y >= shadowMapSize) {
+                result += 1.0; // treat OOB as lit
+                taps++;
+                continue;
+            }
+
+            uint offset = faceOffset +
+                          uint(texel.y) * uint(shadowMapSize) +
+                          uint(texel.x);
+
+            float depth = shadowMaps[offset];
+            // subtract bias here
+            result += (depth < (dist - bias)) ? 0.0 : 1.0;
+            taps++;
+        }
+    }
+
+    return result / float(taps);
 }
+
 
 // Main Compute Shader
 void main() {

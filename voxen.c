@@ -623,7 +623,6 @@ void mat4_lookat(float* m) {
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
-    DualLog("Starting shadowmap processing for %d\n", lightIdx);
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -637,8 +636,6 @@ void RenderShadowmap(uint16_t lightIdx) {
     glDepthMask(GL_TRUE);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
-
-    // Cache uniform locations
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
 
     // Temporary buffer for depth data
@@ -657,9 +654,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         nearbyMeshCount++;
     }
 
-    DualLog("Starting shadowmap render for light %d\n", lightIdx);
     uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
-    const char* faceNames[6] = {"posX", "negX", "posY", "negY", "posZ", "negZ"};
     Quaternion orientationQuaternion[6] = {
         {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
         {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
@@ -671,12 +666,6 @@ void RenderShadowmap(uint16_t lightIdx) {
 
     for (uint8_t face = 0; face < 6; face++) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMap, 0);
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-            DualLogError("Shadow FBO incomplete for light %d, face %d, status: 0x%x\n", lightIdx, face, status);
-            continue;
-        }
-
         glClearColor(15.36f, 0.0f, 0.0f, 0.0f); // Clear to far plane distance
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear both color and depth
         float lightView[16];
@@ -706,6 +695,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
 //         // Save debug image for light 817
 //         if (lightIdx == 817) {
+//             const char* faceNames[6] = {"posX", "negX", "posY", "negY", "posZ", "negZ"};
 //             float minDepth = 15.36f;
 //             float maxDepth = 0.0f;
 //             for (uint32_t i = 0; i < SHADOW_MAP_SIZE * SHADOW_MAP_SIZE; i++) {
@@ -747,7 +737,6 @@ void RenderShadowmap(uint16_t lightIdx) {
     }
 
     staticLightCount++;
-    DualLog("Finishing shadowmap render for light %d\n", lightIdx);
     free(depthData);
     free(pixelData);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -790,11 +779,8 @@ void RenderShadowmaps(void) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, depthCubeMap, 0);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glReadBuffer(GL_NONE);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        DualLogError("Shadow FBO incomplete, status: 0x%x\n", status);
-        return 1;
-    }
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("Shadow FBO incomplete, status: 0x%x\n", status); return; }
+    
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // SSBO for shadow map data
