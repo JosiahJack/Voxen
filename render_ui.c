@@ -88,38 +88,25 @@ void InitFontAtlas(const char *filename, float pixelHeight) {
     fseek(f, 0, SEEK_SET);
     unsigned char *ttf_buffer = malloc(ttf_size);
     size_t readSize = fread(ttf_buffer, 1, ttf_size, f);
-    if (readSize != ttf_size) { 
-        DualLogError("Could not read font %s\n",filename); 
-        free(ttf_buffer);
-        fclose(f);
-        return; 
-    }
+    if (readSize != ttf_size) { DualLogError("Could not read font %s\n",filename); free(ttf_buffer); fclose(f); return; }
+    
     fclose(f);
-
     unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 1, NULL)) {
-        fprintf(stderr,"Failed to initialize font packer\n");
-        free(ttf_buffer);
-        free(atlasBitmap);
-        return;
-    }
+    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 1, NULL)) { fprintf(stderr,"Failed to initialize font packer\n"); free(ttf_buffer); free(atlasBitmap); return; }
+    
     stbtt_PackSetOversampling(&pc, 2, 2);
-
     numPackedGlyphs = 0;
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs; // record start index in packed array
         for (int i = 0; i < fontRanges[r].count; i++) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
-            stbtt_PackFontRange(&pc, ttf_buffer, 0, pixelHeight,
-                                fontRanges[r].first + i, 1, &fontPackedChar[numPackedGlyphs]);
+            stbtt_PackFontRange(&pc, ttf_buffer, 0, pixelHeight, fontRanges[r].first + i, 1, &fontPackedChar[numPackedGlyphs]);
             numPackedGlyphs++;
         }
     }
 
     stbtt_PackEnd(&pc);
-
-    // Upload to OpenGL
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
     glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, atlasBitmap);
@@ -127,9 +114,9 @@ void InitFontAtlas(const char *filename, float pixelHeight) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     free(ttf_buffer);
     free(atlasBitmap);
+    DebugRAM("end of font init");
 }
 
 bool inventoryModeWasActivePriorToConsole = false;
@@ -239,29 +226,30 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glBindTextureUnit(6, fontAtlasTex);
     glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
     glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
-
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(textVAO);
-
     stbtt_aligned_quad q;
     float xpos = x, ypos = y + GetScreenRelativeY(0.016927f);
-
     const char *p = text;
+    float borderWidthPixels = 1.0f; // Adjust based on SDF scaling
+    float texelWidth = 1.0f / (float)FONT_ATLAS_SIZE; // Texel size in texture space
+    float borderTexels = borderWidthPixels * texelWidth; // Border size in texture space
     while (*p) {
         uint32_t codepoint = DecodeUTF8(&p);
         int idx = CodepointToPackedIndex(codepoint);
-        if (idx < 0) continue; // skip missing glyph
+        if (idx < 0) continue; // Skip missing glyph
 
         stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
 
+        // Expand quad to include border
         float textVertices[16] = {
-            q.x0, q.y0, q.s0, q.t0,
-            q.x1, q.y0, q.s1, q.t0,
-            q.x1, q.y1, q.s1, q.t1,
-            q.x0, q.y1, q.s0, q.t1
+            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
+            q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, q.s1 + borderTexels, q.t0 - borderTexels,
+            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
+            q.x0 - borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels
         };
 
         glNamedBufferData(textVBO, sizeof(textVertices), textVertices, GL_DYNAMIC_DRAW);

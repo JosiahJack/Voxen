@@ -9,6 +9,11 @@ uniform vec2 texelSize;
 
 void main() {
     float sdf = texture(textTexture, TexCoord).r;
-    float alpha = smoothstep(0.5-0.1, 0.5+0.1, sdf); // 0.1 controls smoothness
-    FragColor = vec4(textColor.rgb, alpha * textColor.a);
+    if (sdf >= 0.64) {
+        FragColor = vec4(textColor.rgb, 1.0);
+    } else if (sdf >= 0.003) {
+        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    } else {
+        FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+    }
 }
