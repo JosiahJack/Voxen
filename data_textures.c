@@ -41,6 +41,7 @@ typedef struct {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
 int32_t LoadTextures(void) {
+    CHECK_GL_ERROR();
     double start_time = get_time();
     DualLog("Loading textures");
     DebugRAM("start of LoadTextures");
@@ -133,15 +134,18 @@ int32_t LoadTextures(void) {
     glGenBuffers(1, &stagingBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, (((MAX_TEXTURE_DIMENSION * MAX_TEXTURE_DIMENSION) + 1) / 2) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+    CHECK_GL_ERROR();
 
     glGenBuffers(1, &texturePalettesID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColorsExtraSized * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
 
     glGenBuffers(1, &colorBufferID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
     int32_t colorBufferSize = ((58000000 + 1) / 2) * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, colorBufferSize, NULL, GL_STATIC_DRAW);
+    CHECK_GL_ERROR();
 
     ColorEntry* color_pool = malloc(textureCount * MAX_PALETTE_SIZE * sizeof(ColorEntry));
     uint32_t* pool_indices = malloc(textureCount * sizeof(uint32_t));
@@ -267,6 +271,7 @@ int32_t LoadTextures(void) {
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, totalPaletteColors * sizeof(uint32_t), texturePalettes);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 16, texturePalettesID);
     free(texturePalettes);
+    CHECK_GL_ERROR();
 
     // Upload texture offsets
     glGenBuffers(1, &textureOffsetsID);
@@ -274,6 +279,7 @@ int32_t LoadTextures(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, textureOffsetsID);
     free(textureOffsets);
+    CHECK_GL_ERROR();
 
     // Upload texture sizes
     glGenBuffers(1, &textureSizesID);
@@ -281,6 +287,7 @@ int32_t LoadTextures(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, textureSizesID);
     free(textureSizes);
+    CHECK_GL_ERROR();
 
     // Upload texture palette offsets
     glGenBuffers(1, &texturePaletteOffsetsID);
@@ -288,6 +295,7 @@ int32_t LoadTextures(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, textureCount * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 17, texturePaletteOffsetsID);
     free(texturePaletteOffsets);
+    CHECK_GL_ERROR();
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);

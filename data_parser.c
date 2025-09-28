@@ -958,7 +958,7 @@ int32_t LoadLevelLights(uint8_t curlevel) {
     if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
 
     loadedLights = lights_parser.count;
-    DualLog("Loading  %d   lights for Level %d...",loadedLights,curlevel);
+    DualLog("Loading  %d   statics lights for Level %d...",loadedLights,curlevel);
     float correctionLightX, correctionLightY, correctionLightZ;
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
     for (uint32_t i=0;i<loadedLights;++i) {
@@ -978,7 +978,7 @@ int32_t LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
     }
     
-    DualLog(" took %f seconds\n", get_time() - start_time);
+    DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of LoadLevelLights");
     return 0;
 }
@@ -1049,7 +1049,7 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
         }
     }
 
-    DualLog(" took %f seconds\n", get_time() - start_time);
+    DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of LoadLevelDynamicObjects");
     return 0;
 }

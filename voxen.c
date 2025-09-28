@@ -3,7 +3,7 @@
 #define VERSION_STRING "v0.7.0"
 #include <malloc.h>
 #include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+// #include <SDL2/SDL_ttf.h>
 #include <GL/glew.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -425,7 +425,7 @@ void UpdateScreenSize(void) {
     float* m;
     m = uiOrthoProjection;
     m[0] = 2.0f / (float)screen_width; m[1] =                           0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                       0.0f; m[5] = 2.0f / -((float)screen_height); m[6] =  0.0f; m[7] = 0.0f;
+    m[4] =                       0.0f; m[5] = -2.0f / ((float)screen_height); m[6] =  0.0f; m[7] = 0.0f;
     m[8] =                       0.0f; m[9] =                           0.0f; m[10]= -1.0f; m[11]= 0.0f;
     m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
@@ -749,7 +749,6 @@ void RenderShadowmaps(void) {
     if (currentLevel >= 10) thresh += 0.015f;
     if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
     if (currentLevel == 8) thresh += 0.005f;
-        // Temporary buffer for depth data
     float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -763,15 +762,13 @@ void RenderShadowmaps(void) {
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (intensity < thresh) continue; // Not bright enough to cast meaningful shadows
         
-//         float spotAng = lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG]; // Spot lights still get full cubemap for GI
-//         if (spotAng > 1.0f) continue; // Skip spotlights
-        
         RenderShadowmap(i,depthData); // <<<<<<<<<<<<<<<<<< ACTUAL SHADOWMAP RENDERS
     }
     
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
+    glEnable(GL_CULL_FACE);
     CHECK_GL_ERROR();
     free(depthData);
     malloc_trim(0);
@@ -780,80 +777,14 @@ void RenderShadowmaps(void) {
     DualLog("Rendered %d static shadow maps\n", staticLightCount);
 }
 
-// void RenderDynamicShadowmaps(void) {
-//     // Find dynamic lights within 35.0f of camera
-//     uint16_t visibleLightCount = 0;
-//     uint32_t uniqueLights[LIGHT_COUNT];
-//     memset(uniqueLights, 0xFF, LIGHT_COUNT * sizeof(uint32_t));
-//     uint32_t uniqueLightCount = 0;
-// 
-//     float camCellX = (cam_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F;
-//     float camCellZ = (cam_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F;
-//     uint16_t minCellX = (uint16_t)fmax(0.0f, floorf(camCellX - (35.0f / WORLDCELL_WIDTH_F)));
-//     uint16_t maxCellX = (uint16_t)fmin(63.0f, ceilf(camCellX + (35.0f / WORLDCELL_WIDTH_F)));
-//     uint16_t minCellZ = (uint16_t)fmax(0.0f, floorf(camCellZ - (35.0f / WORLDCELL_WIDTH_F)));
-//     uint16_t maxCellZ = (uint16_t)fmin(63.0f, ceilf(camCellZ + (35.0f / WORLDCELL_WIDTH_F)));
-// 
-//     bool lightSeen[LIGHT_COUNT] = {0};
-//     for (uint16_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
-//         for (uint16_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-//             uint16_t cellIndex = cellZ * 64 + cellX;
-//             for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
-//                 for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-//                     uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-//                     uint32_t count = voxelLightListIndices[voxelIndex * 2 + 1];
-//                     if (count == 0) continue;
-//                     uint32_t offset = voxelLightListIndices[voxelIndex * 2];
-//                     for (uint32_t k = 0; k < count; ++k) {
-//                         uint32_t lightIdx = voxelLightListsRaw[offset + k];
-//                         if (lightIsDynamic[lightIdx] && !lightSeen[lightIdx]) {
-//                             lightSeen[lightIdx] = true;
-//                             if (uniqueLightCount < LIGHT_COUNT) uniqueLights[uniqueLightCount++] = lightIdx;
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// 
-//     // Select top MAX_VISIBLE_LIGHTS dynamic lights
-//     LightCandidate candidates[uniqueLightCount];
-//     for (uint32_t k = 0; k < uniqueLightCount; ++k) {
-//         uint32_t lightIdx = uniqueLights[k];
-//         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-//         float distSqrd = squareDistance3D(lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ], cam_x, cam_y, cam_z);
-//         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-//         candidates[k].index = lightIdx;
-//         candidates[k].distanceSquared = distSqrd;
-//         candidates[k].score = distSqrd / (intensity + 0.1f);
-//     }
-//     qsort(candidates, uniqueLightCount, sizeof(LightCandidate), compareLightCandidates);
-// 
-//     visibleLightCount = fmin(MAX_VISIBLE_LIGHTS - staticLightCount, (uint16_t)uniqueLightCount);
-//     for (uint16_t k = 0; k < visibleLightCount; ++k) {
-//         uint32_t lightIdx = candidates[k].index;
-//         lightIndirectionIndices[lightIdx] = staticLightCount + k;
-//         RenderShadowmap(lightIdx);
-//     }
-// 
-//     glViewport(0, 0, screen_width, screen_height);
-//     CHECK_GL_ERROR();
-// }
+void RenderDynamicShadowmaps(void) {
 
-float textQuadVertices[] = { // 2 triangles, text is applied as an image from SDL TTF
-    // Positions   // Tex Coords
-    0.0f, 0.0f,    0.0f, 0.0f, // Bottom-left
-    1.0f, 0.0f,    1.0f, 0.0f, // Bottom-right
-    1.0f, 1.0f,    1.0f, 1.0f, // Top-right
-    0.0f, 1.0f,    0.0f, 1.0f  // Top-left
-};
+}
 
 int32_t InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");
-    if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
-    systemInitialized[SYS_TTF] = true;
-    DebugRAM("TTF init");
+//     if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
     
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
@@ -904,7 +835,7 @@ int32_t InitializeEnvironment(void) {
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
     glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
     glUseProgram(0);
-    
+        
     // Setup full screen quad for image blit for post processing effects like lighting.
     float vertices[] = {
          1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
@@ -967,18 +898,19 @@ int32_t InitializeEnvironment(void) {
     DebugRAM("setup gbuffer end");
     
     // Text Initialization
+    InitFontAtlas("./Fonts/SystemShockText.ttf",GetScreenRelativeY(genericTextHeightFac));
+    systemInitialized[SYS_TTF] = true;
+    DebugRAM("stb TTF init");
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
-    glNamedBufferData(textVBO, sizeof(textQuadVertices), textQuadVertices, GL_STATIC_DRAW);
-    glEnableVertexArrayAttrib(textVAO, 0); // DSA: Enable position attribute
-    glEnableVertexArrayAttrib(textVAO, 1); // DSA: Enable texture coordinate attribute
-    glVertexArrayAttribFormat(textVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Position (x, y)
-    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Texcoord (u, v)
-    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-    glVertexArrayAttribBinding(textVAO, 0, 0); // DSA: Bind position to binding index 0
-    glVertexArrayAttribBinding(textVAO, 1, 0); // DSA: Bind texcoord to binding index 0
-    font = TTF_OpenFont("./Fonts/SystemShockText.ttf", GetScreenRelativeY(genericTextHeightFac));
-    if (!font) { DualLogError("TTF_OpenFont failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
+    glEnableVertexArrayAttrib(textVAO, 0);
+    glEnableVertexArrayAttrib(textVAO, 1);
+    glVertexArrayAttribFormat(textVAO, 0, 2, GL_FLOAT, GL_FALSE, 0);                  // pos (x,y) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float));  // uv (s,t)
+    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 4 * sizeof(float));
+    glVertexArrayAttribBinding(textVAO, 0, 0);
+    glVertexArrayAttribBinding(textVAO, 1, 0);
+    
     DebugRAM("text init");
 
     // Lights buffer
@@ -1586,7 +1518,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
         // ====================================================================
         // 4. Dynamic Shadowmaps
-//         RenderDynamicShadowmaps(); TODO
+        RenderDynamicShadowmaps();
         
         // 5. Deferred Lighting
         GLuint groupX = (screen_width + 31) / 32;
