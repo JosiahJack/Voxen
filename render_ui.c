@@ -47,81 +47,89 @@ uint32_t worstFPS = UINT32_MAX;
 double screenshotTimeout = 0.0;
 double time_PhysicsStep = 0.0;
 
-#define FONT_ATLAS_WIDTH 512
-#define FONT_OUTLINE_RADIUS 2
-GLuint fontTexture;
-stbtt_packedchar fontChars[96]; // ASCII 32..127
-float fontAscent, fontDescent, fontLineGap, fontScale;
+#define FONT_ATLAS_SIZE 2048
+#define MAX_GLYPHS 8192      // Rough estimate for all ranges
+#define SDF_PADDING 8        // pixels around glyph for SDF / outline
+
+GLuint fontAtlasTex;
+stbtt_packedchar fontPackedChar[MAX_GLYPHS];
+int numPackedGlyphs = 0;
+
+typedef struct {
+    int first;   // first codepoint in range
+    int count;   // number of codepoints
+    int startIndex; // index into fontPackedChar where this range starts
+} GlyphRange;
+
+static GlyphRange fontRanges[] = {
+    {0x0020, 0x7E - 0x20+1, 0},       // ASCII
+    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
+    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
+    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
+    // add other ranges here
+};
+static int numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
+
+static int CodepointToPackedIndex(int codepoint) {
+    for (int i = 0; i < numFontRanges; i++) {
+        if (codepoint >= fontRanges[i].first && codepoint < fontRanges[i].first + fontRanges[i].count) {
+            return fontRanges[i].startIndex + (codepoint - fontRanges[i].first);
+        }
+    }
+    return -1; // not found
+}
 
 void InitFontAtlas(const char *filename, float pixelHeight) {
     // Load TTF into memory
     FILE *f = fopen(filename, "rb");
-    if (!f) { DualLogError("Failed to open font %s", filename); return; }
+    if (!f) { fprintf(stderr,"Failed to open font %s\n", filename); return; }
     fseek(f, 0, SEEK_END);
-    size_t size = ftell(f);
+    size_t ttf_size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    unsigned char *ttf_buffer = malloc(size);
-    if (fread(ttf_buffer, 1, size, f) != size) { DualLogError("Failed to read font %s", filename); fclose(f); free(ttf_buffer); return; }
+    unsigned char *ttf_buffer = malloc(ttf_size);
+    size_t readSize = fread(ttf_buffer, 1, ttf_size, f);
+    if (readSize != ttf_size) { 
+        DualLogError("Could not read font %s\n",filename); 
+        free(ttf_buffer);
+        fclose(f);
+        return; 
+    }
     fclose(f);
 
-    // Create the atlas bitmap
-    const int atlasW = FONT_ATLAS_WIDTH;
-    const int atlasH = FONT_ATLAS_WIDTH;
-    unsigned char *bitmap = calloc(atlasW * atlasH, 1);
-
-    // Pack font glyphs
+    unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    stbtt_PackBegin(&pc, bitmap, atlasW, atlasH, 0, 1, NULL);
+    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 1, NULL)) {
+        fprintf(stderr,"Failed to initialize font packer\n");
+        free(ttf_buffer);
+        free(atlasBitmap);
+        return;
+    }
     stbtt_PackSetOversampling(&pc, 2, 2);
-    stbtt_PackFontRange(&pc, ttf_buffer, 0, pixelHeight, 32, 95, fontChars);
-    stbtt_PackEnd(&pc);
 
-    // Optional: bake outline into the bitmap
-    unsigned char *outlineBitmap = calloc(atlasW * atlasH, 1);
-    for (int y = 0; y < atlasH; y++) {
-        for (int x = 0; x < atlasW; x++) {
-            if (bitmap[y*atlasW + x] > 0) {
-                // Original glyph pixel
-                outlineBitmap[y*atlasW + x] = bitmap[y*atlasW + x];
-                // Spread around for outline
-                for (int oy = -FONT_OUTLINE_RADIUS; oy <= FONT_OUTLINE_RADIUS; oy++) {
-                    for (int ox = -FONT_OUTLINE_RADIUS; ox <= FONT_OUTLINE_RADIUS; ox++) {
-                        int nx = x + ox;
-                        int ny = y + oy;
-                        if (nx >= 0 && nx < atlasW && ny >= 0 && ny < atlasH) {
-                            unsigned char *p = &outlineBitmap[ny*atlasW + nx];
-                            if (*p == 0) *p = 128; // half alpha for outline
-                        }
-                    }
-                }
-            }
+    numPackedGlyphs = 0;
+    for (int r = 0; r < numFontRanges; r++) {
+        fontRanges[r].startIndex = numPackedGlyphs; // record start index in packed array
+        for (int i = 0; i < fontRanges[r].count; i++) {
+            if (numPackedGlyphs >= MAX_GLYPHS) break;
+            stbtt_PackFontRange(&pc, ttf_buffer, 0, pixelHeight,
+                                fontRanges[r].first + i, 1, &fontPackedChar[numPackedGlyphs]);
+            numPackedGlyphs++;
         }
     }
 
-    // Get font metrics
-    stbtt_fontinfo info;
-    stbtt_InitFont(&info, ttf_buffer, stbtt_GetFontOffsetForIndex(ttf_buffer, 0));
-    int a, d, g;
-    stbtt_GetFontVMetrics(&info, &a, &d, &g);
-    fontScale = stbtt_ScaleForPixelHeight(&info, pixelHeight);
-    fontAscent = a * fontScale;
-    fontDescent = d * fontScale;
-    fontLineGap = g * fontScale;
+    stbtt_PackEnd(&pc);
 
     // Upload to OpenGL
-    glCreateTextures(GL_TEXTURE_2D, 1, &fontTexture);
-    glTextureStorage2D(fontTexture, 1, GL_R8, atlasW, atlasH);
-    glTextureSubImage2D(fontTexture, 0, 0, 0, atlasW, atlasH, GL_RED, GL_UNSIGNED_BYTE, outlineBitmap);
-    glTextureParameteri(fontTexture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTextureParameteri(fontTexture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTextureParameteri(fontTexture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTextureParameteri(fontTexture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
+    glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
+    glTextureSubImage2D(fontAtlasTex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, atlasBitmap);
+    glTextureParameteri(fontAtlasTex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(fontAtlasTex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    free(bitmap);
-    free(outlineBitmap);
     free(ttf_buffer);
-    malloc_trim(0);
-    CHECK_GL_ERROR();
+    free(atlasBitmap);
 }
 
 bool inventoryModeWasActivePriorToConsole = false;
@@ -193,6 +201,33 @@ void ConsoleEmulator(int32_t scancode) {
     }
 }
 
+static uint32_t DecodeUTF8(const char **p) {
+    const unsigned char *s = (const unsigned char *)*p;
+    uint32_t codepoint = 0;
+    if (*s < 0x80) {          // 1-byte ASCII
+        codepoint = *s++;
+    } else if ((*s & 0xE0) == 0xC0) { // 2-byte
+        codepoint  = (*s & 0x1F) << 6;
+        codepoint |= (s[1] & 0x3F);
+        s += 2;
+    } else if ((*s & 0xF0) == 0xE0) { // 3-byte
+        codepoint  = (*s & 0x0F) << 12;
+        codepoint |= (s[1] & 0x3F) << 6;
+        codepoint |= (s[2] & 0x3F);
+        s += 3;
+    } else if ((*s & 0xF8) == 0xF0) { // 4-byte
+        codepoint  = (*s & 0x07) << 18;
+        codepoint |= (s[1] & 0x3F) << 12;
+        codepoint |= (s[2] & 0x3F) << 6;
+        codepoint |= (s[3] & 0x3F);
+        s += 4;
+    } else {
+        s++; // invalid byte
+    }
+    *p = (const char *)s;
+    return codepoint;
+}
+
 void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glUseProgram(textShaderProgram);
     glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
@@ -201,30 +236,36 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     float b = textColors[colorIdx].b / 255.0f;
     float a = textColors[colorIdx].a / 255.0f;
     glProgramUniform4f(textShaderProgram, textColorLoc_text, r, g, b, a);
-    glBindTextureUnit(6, fontTexture);
-    glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_WIDTH, 1.0f / (float)FONT_ATLAS_WIDTH);
+    glBindTextureUnit(6, fontAtlasTex);
+    glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
     glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(textVAO);
-    stbtt_aligned_quad q;
-    float xpos = x, ypos = y + GetScreenRelativeY(0.016927f); // Global text Y stb_ttf offset correction to ensure center is actually center.
-    for (const char *p = text; *p; p++) {
-        if (*p >= 32 && *p < 127) {
-            stbtt_GetPackedQuad(fontChars, 512, 512, *p - 32, &xpos, &ypos, &q, 1);
-            
-            float textVertices[16] = {
-                q.x0, q.y0, q.s0, q.t0,
-                q.x1, q.y0, q.s1, q.t0,
-                q.x1, q.y1, q.s1, q.t1,
-                q.x0, q.y1, q.s0, q.t1
-            };
 
-            glNamedBufferData(textVBO, sizeof(textVertices), textVertices, GL_DYNAMIC_DRAW);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        }
+    stbtt_aligned_quad q;
+    float xpos = x, ypos = y + GetScreenRelativeY(0.016927f);
+
+    const char *p = text;
+    while (*p) {
+        uint32_t codepoint = DecodeUTF8(&p);
+        int idx = CodepointToPackedIndex(codepoint);
+        if (idx < 0) continue; // skip missing glyph
+
+        stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
+
+        float textVertices[16] = {
+            q.x0, q.y0, q.s0, q.t0,
+            q.x1, q.y0, q.s1, q.t0,
+            q.x1, q.y1, q.s1, q.t1,
+            q.x0, q.y1, q.s0, q.t1
+        };
+
+        glNamedBufferData(textVBO, sizeof(textVertices), textVertices, GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     }
 
     glBindVertexArray(0);
@@ -293,6 +334,7 @@ void RenderUI(void) {
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_GREEN, "Peak frame queue count: %d", maxEventCount_debug);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_RED, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_ORANGE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: ! % ^ ö ü é ó る。エレベーターでレベルを離れよ низкой гравитацией");
 
     if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
     if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);

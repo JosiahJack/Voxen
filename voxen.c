@@ -3,7 +3,6 @@
 #define VERSION_STRING "v0.7.0"
 #include <malloc.h>
 #include <SDL2/SDL.h>
-// #include <SDL2/SDL_ttf.h>
 #include <GL/glew.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -783,9 +782,7 @@ void RenderDynamicShadowmaps(void) {
 
 int32_t InitializeEnvironment(void) {
     double init_start_time = get_time();
-    DebugRAM("InitializeEnvironment start");
-//     if (TTF_Init() < 0) { DualLogError("TTF_Init failed: %s\n", TTF_GetError()); return SYS_TTF + 1; }
-    
+    DebugRAM("InitializeEnvironment start");    
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
     systemInitialized[SYS_WIN] = true;
