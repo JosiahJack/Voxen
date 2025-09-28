@@ -22,7 +22,6 @@ typedef struct { float r,g,b,a; } Color;
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <SDL2/SDL.h>
-// #include <SDL2/SDL_ttf.h>
 // #include <fluidlite.h> TODO Add midi support
 // #include <libxmi.h>
 
@@ -448,7 +447,6 @@ extern GLuint chunkShaderProgram;
 extern GLuint deferredLightingShaderProgram;
 extern GLuint textShaderProgram;
 extern GLuint imageBlitShaderProgram;
-// extern TTF_Font* font;
 extern GLuint textVAO, textVBO;
 extern GLint projectionLoc_text;
 extern GLint textColorLoc_text;
