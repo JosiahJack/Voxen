@@ -419,7 +419,6 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 #define TEXT_GREEN 3
 #define TEXT_RED 4
 #define TEXT_ORANGE 5
-#define TEXT_BUFFER_SIZE 128
 extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;

@@ -7,6 +7,8 @@
 #include "voxen.h"
 #include "citadel.h"
 
+#define TEXT_BUFFER_SIZE 1024
+
 // Cursor
 bool cursorVisible = false;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
@@ -254,6 +256,8 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
 
         glNamedBufferData(textVBO, sizeof(textVertices), textVertices, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        drawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += 16;
     }
 
     glBindVertexArray(0);
@@ -317,12 +321,27 @@ void RenderUI(void) {
     // 9. Render UI Text;
     int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
     int32_t leftPad = GetScreenRelativeX(0.0125f);
-    RenderFormattedText(leftPad, debugTextStartY, TEXT_DARK_YELLOW, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_YELLOW, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_GREEN, "Peak frame queue count: %d", maxEventCount_debug);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_RED, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_ORANGE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+    RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: ! % ^ ö ü é ó る。エレベーターでレベルを離れよ низкой гравитацией");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq\nua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 8), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq\nua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 9), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ali-\nqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 10), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna \naliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 11), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna \naliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 12), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 13), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 14), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 15), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 16), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 17), TEXT_WHITE, "17rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 18), TEXT_WHITE, "18rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 19), TEXT_WHITE, "19rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 20), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
 
     if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
     if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
