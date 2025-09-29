@@ -895,7 +895,7 @@ int32_t InitializeEnvironment(void) {
     DebugRAM("setup gbuffer end");
     
     // Text Initialization
-    InitFontAtlas("./Fonts/SystemShockText.ttf",GetScreenRelativeY(genericTextHeightFac));
+    InitFontAtlasses();
     systemInitialized[SYS_TTF] = true;
     DebugRAM("stb TTF init");
     glCreateBuffers(1, &textVBO);
@@ -971,24 +971,24 @@ int32_t InitializeEnvironment(void) {
     if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
     currentLevel = startLevel;
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
-    RenderLoadingProgress(52,"Loading textures...");
+    RenderLoadingProgress(100,"Loading textures...");
     DualLog("Window and GL Init took %f seconds\n", get_time() - init_start_time);
     if (LoadTextures()) return 1;
-    RenderLoadingProgress(50,"Loading models...");
+    RenderLoadingProgress(100,"Loading models...");
     if (LoadModels()) return 1;
-    RenderLoadingProgress(52,"Loading entities...");
+    RenderLoadingProgress(100,"Loading entities...");
     if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
-    RenderLoadingProgress(50,"Loading level data...");
+    RenderLoadingProgress(100,"Loading level data...");
     renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
-    RenderLoadingProgress(55,"Loading lighting data...");
+    RenderLoadingProgress(110,"Loading lighting data...");
     if (LoadLevelLights(currentLevel)) return 1;
-    RenderLoadingProgress(52,"Loading dynamic object data...");
+    RenderLoadingProgress(120,"Loading dynamic object data...");
     if (LoadLevelDynamicObjects(currentLevel)) return 1;
-    RenderLoadingProgress(52,"Loading cull system...");
+    RenderLoadingProgress(110,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level!
-    RenderLoadingProgress(70,"Loading voxel lighting data...");
+    RenderLoadingProgress(120,"Loading voxel lighting data...");
     if (VoxelLists()) return 1;
     DebugRAM("InitializeEnvironment end");
     return 0;

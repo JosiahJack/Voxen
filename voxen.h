@@ -173,7 +173,7 @@ int32_t LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE 256u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -451,7 +451,7 @@ extern GLint projectionLoc_text;
 extern GLint textColorLoc_text;
 extern GLint textTextureLoc_text;
 extern GLint texelSizeLoc_text;
-void InitFontAtlas(const char *filename, float pixelHeight);
+void InitFontAtlasses();
 float quat_angle_deg(Quaternion a, Quaternion b);
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);

@@ -84,13 +84,13 @@ uint GetVoxelIndex(vec3 worldPos) {
     return cellIndex * 64 + voxelIndexInCell;
 }
 
-const int shadowMapSize = 128;
+const int shadowMapSize = 256;
 
 float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel, ivec2 pixel) {
     vec3 toLight = worldPos - lightPos;
     float dist = length(toLight);
     float rangeFac = ((lightRange - dist) / lightRange);
-    float smearness = rangeFac * 5.0;
+    float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 6.0;
     float slope = max(0.0, 1.0 - dot(normalize(normal), normalize(lightDir)));
     float bias = slope * ((1.0 / float(shadowMapSize)) + (0.35 * (1.0 - rangeFac)));
     vec3 a = abs(toLight);
