@@ -16,16 +16,13 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 // Text
 GLuint textShaderProgram;
 GLuint textVAO, textVBO;
-SDL_Color textColWhite = {255, 255, 255, 255};
-SDL_Color textColRed = {255, 0, 0, 255};
-SDL_Color textColGreen = {20, 255, 30, 255};
-SDL_Color textColors[6] = {
-    {255, 255, 255, 255}, // 0 White 1.0f, 1.0f, 1.0f
-    {227, 223,   0, 255}, // 1 Yellow 0.8902f, 0.8745f, 0f
-    {159, 156,   0, 255}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
-    { 95, 167,  43, 255}, // 3 Green 0.3725f, 0.6549f, 0.1686f
-    {234,  35,  43, 255}, // 4 Red 0.9176f, 0.1373f, 0.1686f
-    {255, 127,   0, 255}  // 5 Orange 1f, 0.498f, 0f
+Color textColors[6] = {
+    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White 1.0f, 1.0f, 1.0f
+    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow 0.8902f, 0.8745f, 0f
+    { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
+    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green 0.3725f, 0.6549f, 0.1686f
+    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red 0.9176f, 0.1373f, 0.1686f
+    {         1.0f, 0.498039216f,          0.0f, 1.0f}  // 5 Orange 1f, 0.498f, 0f
 };
 
 float uiOrthoProjection[16];
@@ -51,11 +48,11 @@ double time_PhysicsStep = 0.0;
 
 #define FONT_ATLAS_SIZE 2048
 #define MAX_GLYPHS 8192      // Rough estimate for all ranges
-#define SDF_PADDING 8        // pixels around glyph for SDF / outline
 
 GLuint fontAtlasTex;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 int numPackedGlyphs = 0;
+float textTexelWidth;
 
 typedef struct {
     int first;   // first codepoint in range
@@ -95,7 +92,7 @@ void InitFontAtlas(const char *filename, float pixelHeight) {
     fclose(f);
     unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 1, NULL)) { fprintf(stderr,"Failed to initialize font packer\n"); free(ttf_buffer); free(atlasBitmap); return; }
+    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 4, NULL)) { fprintf(stderr,"Failed to initialize font packer\n"); free(ttf_buffer); free(atlasBitmap); return; }
     
     stbtt_PackSetOversampling(&pc, 2, 2);
     numPackedGlyphs = 0;
@@ -118,6 +115,7 @@ void InitFontAtlas(const char *filename, float pixelHeight) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     free(ttf_buffer);
     free(atlasBitmap);
+    textTexelWidth = 1.0f / (float)FONT_ATLAS_SIZE;
     DebugRAM("end of font init");
 }
 
@@ -220,11 +218,7 @@ static uint32_t DecodeUTF8(const char **p) {
 void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glUseProgram(textShaderProgram);
     glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
-    float r = textColors[colorIdx].r / 255.0f;
-    float g = textColors[colorIdx].g / 255.0f;
-    float b = textColors[colorIdx].b / 255.0f;
-    float a = textColors[colorIdx].a / 255.0f;
-    glProgramUniform4f(textShaderProgram, textColorLoc_text, r, g, b, a);
+    glProgramUniform4f(textShaderProgram, textColorLoc_text, textColors[colorIdx].r, textColors[colorIdx].g, textColors[colorIdx].b, textColors[colorIdx].a);
     glBindTextureUnit(6, fontAtlasTex);
     glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
     glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
@@ -233,32 +227,43 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(textVAO);
-    stbtt_aligned_quad q;
+
+    // Batch vertices for all glyphs
+    size_t len = strlen(text);
+    float* vertexData = malloc(len * 24 * sizeof(float)); // 6 vertices * 4 floats per glyph (for GL_TRIANGLES)
+    size_t vertexCount = 0;
+    const char* p = text;
     float xpos = x, ypos = y + GetScreenRelativeY(0.016927f);
-    const char *p = text;
-    float borderWidthPixels = 1.0f; // Adjust based on SDF scaling
-    float texelWidth = 1.0f / (float)FONT_ATLAS_SIZE; // Texel size in texture space
-    float borderTexels = borderWidthPixels * texelWidth; // Border size in texture space
+    stbtt_aligned_quad q;
     while (*p) {
         uint32_t codepoint = DecodeUTF8(&p);
         int idx = CodepointToPackedIndex(codepoint);
-        if (idx < 0) continue; // Skip missing glyph
-
+        if (idx < 0) continue;
         stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
-
-        // Expand quad to include border
-        float textVertices[16] = {
+        float borderWidthPixels = 2.0f * textTexelWidth;
+        float borderTexels = borderWidthPixels * textTexelWidth;
+        // Use raw UVs without border expansion to avoid distortion
+        float textVertices[24] = {
+            // Triangle 1: Bottom-left, Top-left, Top-right
             q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
             q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, q.s1 + borderTexels, q.t0 - borderTexels,
             q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
-            q.x0 - borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels
+            // Triangle 2: Bottom-left, Top-right, Bottom-right
+            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
+            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
+            q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels
         };
 
-        glNamedBufferData(textVBO, sizeof(textVertices), textVertices, GL_DYNAMIC_DRAW);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        drawCallsRenderedThisFrame++;
-        verticesRenderedThisFrame += 16;
+        memcpy(vertexData + vertexCount * 24, textVertices, sizeof(textVertices));
+        vertexCount++;
     }
+    if (vertexCount > 0) {
+        glNamedBufferData(textVBO, vertexCount * 24 * sizeof(float), vertexData, GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6); // 6 vertices per quad
+        drawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += vertexCount * 24;
+    }
+    free(vertexData);
 
     glBindVertexArray(0);
     glDisable(GL_BLEND);

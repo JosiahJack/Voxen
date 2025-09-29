@@ -9,9 +9,9 @@ uniform vec2 texelSize;
 
 void main() {
     float sdf = texture(textTexture, TexCoord).r;
-    if (sdf >= 0.64) {
+    if (sdf >= 0.9) {
         FragColor = vec4(textColor.rgb, 1.0);
-    } else if (sdf >= 0.003) {
+    } else if (sdf >= 0.1) {
         FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     } else {
         FragColor = vec4(0.0, 0.0, 0.0, 0.0);
