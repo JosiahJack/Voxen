@@ -7,8 +7,6 @@
 #include "voxen.h"
 #include "citadel.h"
 
-#define TEXT_BUFFER_SIZE 1024
-
 // Cursor
 bool cursorVisible = false;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
@@ -30,9 +28,8 @@ char uiTextBuffer[TEXT_BUFFER_SIZE];
 GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
 
 bool consoleActive = false;
-#define STATUS_TEXT_MAX_LENGTH 1024
-char consoleEntryText[STATUS_TEXT_MAX_LENGTH] = "Enter a command...";
-char statusText[STATUS_TEXT_MAX_LENGTH];
+char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
+char statusText[TEXT_BUFFER_SIZE];
 int statusTextLengthWithoutNullTerminator = 6;
 float statusTextDecayFinished = 0.0f;
 float genericTextHeightFac = 0.025f;
@@ -175,14 +172,14 @@ void ConsoleEmulator(int32_t scancode) {
     }
     
     if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) { // Handle alphabet keys (SDL scancodes 4-29 correspond to 'a' to 'z')
-        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) { // Ensure we don't overflow the buffer
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
             char c = 'a' + (scancode - SDL_SCANCODE_A); // Map scancode to character
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
             currentEntryLength++;
         }
     } else if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0) { // Handle number keys (SDL scancodes 30-39 correspond to '0' to '9')
-        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) {
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
             char c;
             if (scancode == SDL_SCANCODE_0) c = '0'; // Special case for '0'
             else c = '1' + (scancode - SDL_SCANCODE_1); // Map 1-9 to '1'-'9'
@@ -195,7 +192,7 @@ void ConsoleEmulator(int32_t scancode) {
         currentEntryLength--;
         consoleEntryText[currentEntryLength] = '\0'; // Null-terminate
     } else if (scancode == SDL_SCANCODE_SPACE) { // Handle other keys as needed (e.g., enter, space, etc.)
-        if (currentEntryLength < (STATUS_TEXT_MAX_LENGTH - 1)) {
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
             consoleEntryText[currentEntryLength] = ' ';
             consoleEntryText[currentEntryLength + 1] = '\0';
             currentEntryLength++;
@@ -320,7 +317,7 @@ int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTermi
 void CenterStatusPrint(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    statusTextLengthWithoutNullTerminator = vsnprintf(statusText, STATUS_TEXT_MAX_LENGTH, fmt, args);
+    statusTextLengthWithoutNullTerminator = vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
     va_end(args);
     DualLog("%s\n",statusText);
     statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.

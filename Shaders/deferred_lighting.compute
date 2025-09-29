@@ -84,15 +84,15 @@ uint GetVoxelIndex(vec3 worldPos) {
     return cellIndex * 64 + voxelIndexInCell;
 }
 
-const int shadowMapSize = 128;
+const float shadowMapSize = 256.0;
 
 float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel, ivec2 pixel) {
     vec3 toLight = worldPos - lightPos;
     float dist = length(toLight);
     float rangeFac = ((lightRange - dist) / lightRange);
-    float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 2.0;
+    float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 6.0;
     float slope = max(0.0, 1.0 - dot(normalize(normal), normalize(lightDir)));
-    float bias = slope * ((1.0 / float(shadowMapSize)) + (0.35 * (1.0 - rangeFac)));
+    float bias = slope * ((1.0 / shadowMapSize) + (0.35 * (1.0 - rangeFac)));
     vec3 a = abs(toLight);
     float maxAxis = max(max(a.x, a.y), a.z);
     vec3 dir = toLight / maxAxis;
@@ -107,20 +107,18 @@ float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, 
     }
     
     uv = uv * 0.5 + 0.5;
-    float shadSizeF = float(shadowMapSize);
     uint base = lightIdx * 6u * uint(shadowMapSize) * uint(shadowMapSize);
     uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
-    vec2 tc = uv * shadSizeF;
+    vec2 tc = uv * shadowMapSize;
     float sum = 0.0;
     float totalWeight = 0.0001;
-    float weight = 1.0 / 25.0;
+    float weight = 1.0 / smearness;
     float radiusF = 10.24;
-    // 3x3 kernel with blue noise offset and soft depth comparison
     for (float y = -smearness; y <= smearness; y += 1.0) {
         for (float x = -smearness; x <= smearness; x += 1.0) {
             vec2 t = tc + vec2(x, y);
-            uint utx = uint(clamp(t.x, 0.0, shadSizeF - 1.0));
-            uint uty = uint(clamp(t.y, 0.0, shadSizeF - 1.0));
+            uint utx = uint(clamp(t.x, 0.0, shadowMapSize - 1.0));
+            uint uty = uint(clamp(t.y, 0.0, shadowMapSize - 1.0));
             uint idx = faceOff + uty * uint(shadowMapSize) + utx;
             float d = shadowMaps[idx];
             float depthDiff = dist - d - bias; // Soft depth comparison

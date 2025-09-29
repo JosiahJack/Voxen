@@ -2,7 +2,7 @@
 #define VOXEN_HEADER_H
 
 // Debug and Compile Flags
-// #define DEBUG_RAM_OUTPUT
+#define DEBUG_RAM_OUTPUT
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
@@ -173,7 +173,7 @@ int32_t LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE 256u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -419,6 +419,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 #define TEXT_GREEN 3
 #define TEXT_RED 4
 #define TEXT_ORANGE 5
+#define TEXT_BUFFER_SIZE 1024
 extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
@@ -498,7 +499,7 @@ void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); Dua
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 void DebugRAM(const char *context, ...) {
 #ifdef DEBUG_RAM_OUTPUT
-    char formatted_context[STATUS_TEXT_MAX_LENGTH];
+    char formatted_context[TEXT_BUFFER_SIZE];
     va_list args;
     va_start(args, context);
     vsnprintf(formatted_context, sizeof(formatted_context), context, args);
