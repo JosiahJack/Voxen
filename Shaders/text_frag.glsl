@@ -11,7 +11,7 @@ void main() {
     float sdf = texture(textTexture, TexCoord).r;
     if (sdf >= 0.9) {
         FragColor = vec4(textColor.rgb, 1.0);
-    } else if (sdf >= 0.1) {
+    } else if (sdf >= 0.05) {
         FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     } else {
         FragColor = vec4(0.0, 0.0, 0.0, 0.0);

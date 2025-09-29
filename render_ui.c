@@ -35,7 +35,7 @@ char consoleEntryText[STATUS_TEXT_MAX_LENGTH] = "Enter a command...";
 char statusText[STATUS_TEXT_MAX_LENGTH];
 int statusTextLengthWithoutNullTerminator = 6;
 float statusTextDecayFinished = 0.0f;
-float genericTextHeightFac = 0.02f;
+float genericTextHeightFac = 0.025f;
 int32_t currentEntryLength = 0;
 
 // Diagnostics
@@ -78,30 +78,48 @@ static int CodepointToPackedIndex(int codepoint) {
     return -1; // not found
 }
 
+float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
+
 void InitFontAtlas(const char *filename, float pixelHeight) {
-    // Load TTF into memory
     FILE *f = fopen(filename, "rb");
-    if (!f) { fprintf(stderr,"Failed to open font %s\n", filename); return; }
+    if (!f) { fprintf(stderr, "Failed to open font %s\n", filename); return; }
     fseek(f, 0, SEEK_END);
     size_t ttf_size = ftell(f);
     fseek(f, 0, SEEK_SET);
     unsigned char *ttf_buffer = malloc(ttf_size);
     size_t readSize = fread(ttf_buffer, 1, ttf_size, f);
-    if (readSize != ttf_size) { DualLogError("Could not read font %s\n",filename); free(ttf_buffer); fclose(f); return; }
+    if (readSize != ttf_size) { DualLogError("Could not read font %s\n", filename); free(ttf_buffer); fclose(f); return; }
     
     fclose(f);
     unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 4, NULL)) { fprintf(stderr,"Failed to initialize font packer\n"); free(ttf_buffer); free(atlasBitmap); return; }
+    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 4, NULL)) {
+        fprintf(stderr, "Failed to initialize font packer\n");
+        free(ttf_buffer);
+        free(atlasBitmap);
+        return;
+    }
     
     stbtt_PackSetOversampling(&pc, 2, 2);
     numPackedGlyphs = 0;
     for (int r = 0; r < numFontRanges; r++) {
-        fontRanges[r].startIndex = numPackedGlyphs; // record start index in packed array
+        fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
             stbtt_PackFontRange(&pc, ttf_buffer, 0, pixelHeight, fontRanges[r].first + i, 1, &fontPackedChar[numPackedGlyphs]);
             numPackedGlyphs++;
+        }
+    }
+
+    // Calculate fixed advance width for digits (0-9)
+    fixedNumberAdvanceWidth = 0.0f;
+    for (int codepoint = '0'; codepoint <= '9'; codepoint++) {
+        int idx = CodepointToPackedIndex(codepoint);
+        if (idx >= 0) {
+            float advance = fontPackedChar[idx].xadvance;
+            if (advance > fixedNumberAdvanceWidth) {
+                fixedNumberAdvanceWidth = advance;
+            }
         }
     }
 
@@ -230,19 +248,27 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
 
     // Batch vertices for all glyphs
     size_t len = strlen(text);
-    float* vertexData = malloc(len * 24 * sizeof(float)); // 6 vertices * 4 floats per glyph (for GL_TRIANGLES)
+    float* vertexData = malloc(len * 24 * sizeof(float)); // 6 vertices * 4 floats per glyph
     size_t vertexCount = 0;
     const char* p = text;
     float xpos = x, ypos = y + GetScreenRelativeY(0.016927f);
+    float lineSpacing = GetScreenRelativeY(0.03f); // Match RenderUI
     stbtt_aligned_quad q;
+    int characterCount = 0;
     while (*p) {
         uint32_t codepoint = DecodeUTF8(&p);
+        characterCount++;
+        if (codepoint == '\n' || characterCount > 120) { // Handle newline
+            xpos = x;
+            ypos += lineSpacing;
+            characterCount = 0;
+            continue;
+        }
         int idx = CodepointToPackedIndex(codepoint);
         if (idx < 0) continue;
         stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         float borderWidthPixels = 2.0f * textTexelWidth;
         float borderTexels = borderWidthPixels * textTexelWidth;
-        // Use raw UVs without border expansion to avoid distortion
         float textVertices[24] = {
             // Triangle 1: Bottom-left, Top-left, Top-right
             q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
@@ -253,13 +279,16 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
             q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
             q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels
         };
-
         memcpy(vertexData + vertexCount * 24, textVertices, sizeof(textVertices));
         vertexCount++;
+        // Use fixed width for digits
+        if (codepoint >= '0' && codepoint <= '9') {
+            xpos = q.x0 + fixedNumberAdvanceWidth;
+        }
     }
     if (vertexCount > 0) {
         glNamedBufferData(textVBO, vertexCount * 24 * sizeof(float), vertexData, GL_DYNAMIC_DRAW);
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6); // 6 vertices per quad
+        glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertexCount * 24;
     }
@@ -313,7 +342,7 @@ void RenderUI(void) {
     // UI Common References
     int screenCenterX = screen_width / 2;
     int screenCenterY = screen_height / 2;
-    int32_t lineSpacing = GetScreenRelativeY(0.03f);
+    int32_t lineSpacing = GetScreenRelativeY(genericTextHeightFac * 1.0f);
     int32_t characterWidth = (int32_t)floorf(genericTextHeightFac * 0.75f * screen_height);
     int32_t characterHeight = (int32_t)floorf(genericTextHeightFac * screen_height);
     int32_t characterWidthHalf = characterWidth * 0.5f;
@@ -334,19 +363,33 @@ void RenderUI(void) {
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: ! % ^ ö ü é ó る。エレベーターでレベルを離れよ низкой гравитацией");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq\nua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 8), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq\nua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 9), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ali-\nqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 10), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna \naliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 11), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna \naliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 12), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 13), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 14), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 15), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 8), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq\nua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 9), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna ali-\nqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 10), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna \naliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 11), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna \naliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 12), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 13), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 14), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 15), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 16), TEXT_WHITE, "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 17), TEXT_WHITE, "17rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 18), TEXT_WHITE, "18rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 19), TEXT_WHITE, "19rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 20), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 21), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 22), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 23), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 24), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 25), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 26), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 27), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 28), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 29), TEXT_WHITE, "20rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 30), TEXT_WHITE, "30rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 31), TEXT_WHITE, "31rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 32), TEXT_WHITE, "32rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 33), TEXT_WHITE, "33rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 34), TEXT_WHITE, "34rem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliq");
 
     if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
     if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
