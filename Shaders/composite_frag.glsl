@@ -33,24 +33,12 @@ void main() {
 
         // Compute blur radius based on specular sum
         float maxRadius = 2.0; // For 5x5 kernel at specSum < 0.3
-        float minRadius = 0.0; // For 1x1 kernel (no blur) at specSum > 2.4
-        float radius = mix(maxRadius, minRadius, smoothstep(0.3, 2.4, specSum));
-
-        // Gaussian weights for up to 9x9 kernel (simplified for dynamic sizing)
-        float weights[25] = float[](
-            0.027, 0.110, 0.194, 0.110, 0.027,
-            0.110, 0.451, 0.794, 0.451, 0.110,
-            0.194, 0.794, 1.398, 0.794, 0.194,
-            0.110, 0.451, 0.794, 0.451, 0.110,
-            0.027, 0.110, 0.194, 0.110, 0.027
-        ); // Normalized later
-
+        float minRadius = 0.0; // For 1x1 kernel (no blur) at specSum > 2.2
+        float radius = mix(maxRadius, minRadius, smoothstep(0.3, 2.2, specSum));
         vec4 reflectionColor = vec4(0.0);
         float totalWeight = 0.0001; // Avoid division by zero
         int kernelSize = int(ceil(radius)) * 2 + 1; // e.g., 9 for radius = 4, 1 for radius = 0
         float weightScale = 1.0 / (1.398 * float(kernelSize * kernelSize)); // Normalize weights
-
-        // Dynamic kernel loop
         for (int y = -int(radius); y <= int(radius); y++) {
             for (int x = -int(radius); x <= int(radius); x++) {
                 ivec2 offset = ivec2(x, y);

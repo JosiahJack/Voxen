@@ -86,49 +86,80 @@ uint GetVoxelIndex(vec3 worldPos) {
 
 const float shadowMapSize = 256.0;
 
-float SampleShadowMap(uint lightIdx, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel, ivec2 pixel) {
+// Small Poisson disk for stochastic PCF.
+// 12 samples gives good quality when temporally accumulated.
+const int PCF_SAMPLES = 12;
+const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
+    vec2(-0.326212f, -0.405810f),
+    vec2(-0.840144f, -0.073580f),
+    vec2(-0.695914f,  0.457137f),
+    vec2(-0.203345f,  0.620716f),
+    vec2( 0.962340f, -0.194983f),
+    vec2( 0.473434f, -0.480026f),
+    vec2( 0.519456f,  0.767022f),
+    vec2( 0.185461f, -0.893124f),
+    vec2( 0.507431f,  0.064425f),
+    vec2( 0.896420f,  0.412458f),
+    vec2(-0.321942f,  0.932615f),
+    vec2(-0.791559f,  0.597710f)
+);
+
+// Inline stochastic PCF. Uses fixed sample count.
+// smearness controls the scale of the poisson offsets in texel units.
+float ComputeShadowFactor(uint lightIdxInPVS, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel, ivec2 pixel) {
+    // transform to light-space cube-face coords
     vec3 toLight = worldPos - lightPos;
     float dist = length(toLight);
     float rangeFac = ((lightRange - dist) / lightRange);
-    float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 6.0;
-    float slope = max(0.0, 1.0 - dot(normalize(normal), normalize(lightDir)));
-    float bias = slope * ((1.0 / shadowMapSize) + (0.35 * (1.0 - rangeFac)));
+    float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 4.0 + 2.0;
+    smearness = max(smearness, 0.001); // avoid zero scale
+    // slope bias: use dot(normal, lightDir) directly (lightDir expected normalized)
+    float slope = max(0.0, 1.0 - dot(normal, lightDir));
+    float bias = slope * ((1.0 / shadowMapSize) + (0.72 * (1.0 - rangeFac)));
+
     vec3 a = abs(toLight);
     float maxAxis = max(max(a.x, a.y), a.z);
-    vec3 dir = toLight / maxAxis;
+    // avoid division by zero
+    float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;
+    vec3 dir = toLight * invMax;
     uint face;
     vec2 uv;
     if (a.x >= a.y && a.x >= a.z) {
-        face = toLight.x > 0.0 ? 0u : 1u; uv = face == 0u ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
+        face = toLight.x > 0.0 ? 0u : 1u; uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
     } else if (a.y >= a.x && a.y >= a.z) {
-        face = toLight.y > 0.0 ? 2u : 3u; uv = face == 2u ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
+        face = toLight.y > 0.0 ? 2u : 3u; uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
     } else {
-        face = toLight.z > 0.0 ? 4u : 5u; uv = face == 4u ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
-    }
-    
-    uv = uv * 0.5 + 0.5;
-    uint base = lightIdx * 6u * uint(shadowMapSize) * uint(shadowMapSize);
-    uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
-    vec2 tc = uv * shadowMapSize;
-    float sum = 0.0;
-    float totalWeight = 0.0001;
-    float weight = 1.0 / smearness;
-    float radiusF = 10.24;
-    for (float y = -smearness; y <= smearness; y += 1.0) {
-        for (float x = -smearness; x <= smearness; x += 1.0) {
-            vec2 t = tc + vec2(x, y);
-            uint utx = uint(clamp(t.x, 0.0, shadowMapSize - 1.0));
-            uint uty = uint(clamp(t.y, 0.0, shadowMapSize - 1.0));
-            uint idx = faceOff + uty * uint(shadowMapSize) + utx;
-            float d = shadowMaps[idx];
-            float depthDiff = dist - d - bias; // Soft depth comparison
-            float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0); // Softer transition
-            sum += shadowContrib * weight;
-            totalWeight += weight;
-        }
+        face = toLight.z > 0.0 ? 4u : 5u; uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
     }
 
-    return sum / totalWeight;
+    uv = uv * 0.5 + 0.5;
+    uint base = lightIdxInPVS * 6u * uint(shadowMapSize) * uint(shadowMapSize);
+    uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
+    vec2 tc = uv * shadowMapSize;
+
+    // stochastic PCF sampling
+    float sum = 0.0;
+    float invSamples = 1.0 / float(PCF_SAMPLES);
+
+    // scale poisson disk from [-1,1] to texel offsets; smearness is multiplied by a small factor
+    // tune scaleFactor to taste; 1.0 maps smearness=6 to ~6 texels max.
+    float scaleFactor = 1.0;
+    for (int si = 0; si < PCF_SAMPLES; ++si) {
+        vec2 off = poissonDisk[si] * (smearness * scaleFactor);
+        vec2 t = tc + off;
+        // clamp and integerize once
+        float tx = clamp(t.x, 0.0, shadowMapSize);
+        float ty = clamp(t.y, 0.0, shadowMapSize);
+        uint utx = uint(tx);
+        uint uty = uint(ty);
+        uint idx = faceOff + uty * uint(shadowMapSize) + utx;
+        float d = shadowMaps[idx];
+        float depthDiff = dist - d - bias;
+        float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
+        sum += shadowContrib * invSamples;
+    }
+
+    return sum;
 }
 
 // Main Compute Shader
@@ -144,7 +175,7 @@ void main() {
     vec4 color = vec4(imageLoad(inputImage, pixel));
     float distToPixel = length(worldPos - camPos);
     if (distToPixel > 71.66) return;
-    
+
     vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
     vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
     uint pixelInstance = floatBitsToUint(worldZInst.y);
@@ -201,8 +232,10 @@ void main() {
 
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
-        float shadowFactor = SampleShadowMap(lightIdxInPVS, worldPos, lightPos, normal, lightDir, range, distToPixel, pixel);
+
+        float shadowFactor = ComputeShadowFactor(lightIdxInPVS, worldPos, lightPos, normal, lightDir, range, distToPixel, pixel);
         if (debugValue == 2) shadowFactor = 1.0;
+
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
@@ -220,6 +253,5 @@ void main() {
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
     lighting = mix(fogColor, lighting, 1.0 - fogFac);
-
     imageStore(inputImage, pixel, vec4(lighting, 1.0));
 }

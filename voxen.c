@@ -623,7 +623,7 @@ void mat4_lookat(float* m) {
     mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
 }
 
-void RenderShadowmap(uint16_t lightIdx, float* depthData) {
+void RenderShadowmap(uint16_t lightIdx) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -631,6 +631,8 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = fmax(lightRadius, 15.36f);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
+    GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
+    GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
     uint16_t nearMeshes[INSTANCE_COUNT];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
@@ -643,7 +645,6 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
         nearbyMeshCount++;
     }
 
-    uint32_t ssboOffset = lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float);
     Quaternion orientationQuaternion[6] = {
         {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
         {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
@@ -655,16 +656,18 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
 
     for (uint8_t face = 0; face < 6; face++) {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMap, 0);
-        glClearColor(15.36f, 0.0f, 0.0f, 0.0f); // Clear to far plane distance
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear both color and depth
+        glClearColor(15.36f, 0.0f, 0.0f, 0.0f);
+        glClearDepth(1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         float lightView[16];
         float lightViewProj[16];
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
         glUniform3f(lightPosLoc, lightPosX, lightPosY, lightPosZ);
+        glUniform1i(lightIdxLoc, lightIdx);
+        glUniform1i(faceIdxLoc, face);
         glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[0]); // Reset for first mesh
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
-
         for (uint16_t j = 0; j < nearbyMeshCount; j++) {
             int16_t meshIdx = nearMeshes[j];
             int16_t modelType = instanceIsLODArray[meshIdx] && instances[meshIdx].lodIndex < MODEL_COUNT ? instances[meshIdx].lodIndex : instances[meshIdx].modelIndex;
@@ -675,20 +678,15 @@ void RenderShadowmap(uint16_t lightIdx, float* depthData) {
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
-
-        // Read linear depth from color buffer
-        glReadBuffer(GL_COLOR_ATTACHMENT0);
-        glReadPixels(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, GL_RED, GL_FLOAT, depthData);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, ssboOffset + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), depthData);
-        glFlush();
-        glFinish();
     }
 
+    glFlush();
+    glFinish();
     staticLightCount++;
 }
-    
+
 void RenderShadowmaps(void) {
+    DebugRAM("Start of RenderShadowmaps");
     // Shadow map cube texture (single cube, 6 faces)
     glGenTextures(1, &shadowCubeMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
@@ -719,13 +717,9 @@ void RenderShadowmaps(void) {
     glGenFramebuffers(1, &shadowFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, depthCubeMap, 0);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
-    glReadBuffer(GL_NONE);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("Shadow FBO incomplete, status: 0x%x\n", status); return; }
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
+   
     // SSBO for shadow map data
     glGenBuffers(1, &shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
@@ -735,7 +729,6 @@ void RenderShadowmaps(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
-    DebugRAM("after shadow map setup");
     
     // Initialize PBO for texture-to-SSBO transfer
     glGenBuffers(1, &pbo);
@@ -748,32 +741,32 @@ void RenderShadowmaps(void) {
     if (currentLevel >= 10) thresh += 0.015f;
     if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
     if (currentLevel == 8) thresh += 0.005f;
-    float* depthData = (float*)malloc(SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float));
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
+    malloc_trim(0);
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint16_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (intensity < thresh) continue; // Not bright enough to cast meaningful shadows
         
-        RenderShadowmap(i,depthData); // <<<<<<<<<<<<<<<<<< ACTUAL SHADOWMAP RENDERS
+        RenderShadowmap(i);
+        malloc_trim(0);
     }
-    
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
+    glFlush();
+    glFinish();
     CHECK_GL_ERROR();
-    free(depthData);
     malloc_trim(0);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     shadowMapsRendered = true;
     DualLog("Rendered %d static shadow maps\n", staticLightCount);
+    DebugRAM("After rendering all shadowmaps");
 }
 
 void RenderDynamicShadowmaps(void) {

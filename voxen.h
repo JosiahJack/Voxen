@@ -2,7 +2,7 @@
 #define VOXEN_HEADER_H
 
 // Debug and Compile Flags
-#define DEBUG_RAM_OUTPUT
+// #define DEBUG_RAM_OUTPUT
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
