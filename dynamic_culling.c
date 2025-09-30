@@ -8,8 +8,8 @@
 #include "citadel.h"
 
 uint8_t gridCellStates[ARRSIZE];
-float gridCellFloorHeight[ARRSIZE];
-float gridCellCeilingHeight[ARRSIZE];
+// float gridCellFloorHeight[ARRSIZE];
+// float gridCellCeilingHeight[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
 uint16_t cellIndexForLight[LIGHT_COUNT];
@@ -37,38 +37,66 @@ static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
 void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
-    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = -FLT_MAX;
-    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = FLT_MAX;
     for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
         
         PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
+        
         cellIdx = (z * WORLDX) + x;
+        if (!(gridCellStates[cellIdx] & CELL_OPEN)) {
+            // Spiral search for nearest open cell
+            bool found = false;
+            const int maxRadius = 3; // Search up to 3 cells away (adjust as needed)
+            for (int r = 1; r <= maxRadius && !found; ++r) {
+                for (int dz = -r; dz <= r && !found; ++dz) {
+                    for (int dx = -r; dx <= r && !found; ++dx) {
+                        if (dx == 0 && dz == 0) continue; // Skip original cell
+                        uint16_t nx = x + dx;
+                        uint16_t nz = z + dz;
+                        // Check bounds
+                        if (nx < WORLDX && nz < WORLDZ) {
+                            uint16_t newCellIdx = (nz * WORLDX) + nx;
+                            if (gridCellStates[newCellIdx] & CELL_OPEN) {
+                                // Nudge position to center of open cell
+                                instances[c].position.x = nx * 2.56 + 1.28; // Center of cell
+                                instances[c].position.z = nz * 2.56 + 1.28;
+                                cellIdx = newCellIdx;
+                                found = true;
+                            }
+                        }
+                    }
+                }
+            }
+            // Optional: Handle case where no open cell is found (e.g., keep original or log error)
+            if (!found) {
+                cellIdx = UINT16_MAX; // Mark as invalid or handle differently
+            }
+        }
         cellIndexForInstance[c] = (uint32_t)cellIdx;
 
-        if (!entities[instances[c].index].cardchunk) continue; // Only set ceiling and floor height from cards.
-        Quaternion quat = {instances[c].rotation.x, instances[c].rotation.y, instances[c].rotation.z, instances[c].rotation.w};
-        Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
-        float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
-        Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
-        float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
-        float floorHeight = (floorangle <= 30.0f) ? instances[c].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
-        if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
-        float ceilHeight = (ceilangle <= 30.0f) ? instances[c].position.y + 1.28f : FLT_MAX;
-        if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
+//         if (!entities[instances[c].index].cardchunk) continue; // Only set ceiling and floor height from cards.
+//         Quaternion quat = {instances[c].rotation.x, instances[c].rotation.y, instances[c].rotation.z, instances[c].rotation.w};
+//         Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
+//         float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
+//         Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
+//         float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
+//         float floorHeight = (floorangle <= 30.0f) ? instances[c].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
+//         if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
+//         float ceilHeight = (ceilangle <= 30.0f) ? instances[c].position.y + 1.28f : FLT_MAX;
+//         if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
     }
     
-    float levelMinFloor = FLT_MAX;
-    float levelMaxCeil = -FLT_MAX;
-    for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
-        if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
-        if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
-    }
-    
-    DualLog("Min floor level for %d: %f, Max ceil %f\n",currentLevel,levelMinFloor, levelMaxCeil);
-    for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
-        if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
-        if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
-    }
+//     float levelMinFloor = FLT_MAX;
+//     float levelMaxCeil = -FLT_MAX;
+//     for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
+//         if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
+//         if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
+//     }
+//     
+//     DualLog("Min floor level for %d: %f, Max ceil %f\n",currentLevel,levelMinFloor, levelMaxCeil);
+//     for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
+//         if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
+//         if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
+//     }
     
 //     for (int i=0;i<ARRSIZE;++i) {
 //         DualLog("gridCellFloorHeight[%d]: %f\n",i,gridCellFloorHeight[i]);
