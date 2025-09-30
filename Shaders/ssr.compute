@@ -57,6 +57,7 @@ void main() {
         marchPos += rayStep;
         traveled += 0.26; // stepSize
         if (traveled > 50.0) break;
+        
         vec4 clipPos = viewProjection * vec4(marchPos, 1.0);
         vec2 ndc = clipPos.xy / clipPos.w;
         hitUV = ndc * 0.5 + 0.5;

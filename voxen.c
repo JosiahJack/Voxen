@@ -748,7 +748,6 @@ void RenderShadowmaps(void) {
     glBindVertexArray(vao_chunk);
     malloc_trim(0);
     for (uint16_t i = 0; i < loadedLights; i++) {
-        uint16_t litIdx = i * LIGHT_DATA_SIZE;
         RenderShadowmap(i);
         malloc_trim(0);
     }
