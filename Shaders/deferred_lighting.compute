@@ -104,64 +104,6 @@ const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
     vec2(-0.791559f,  0.597710f)
 );
 
-// Inline stochastic PCF. Uses fixed sample count.
-// smearness controls the scale of the poisson offsets in texel units.
-float ComputeShadowFactor(uint lightIdxInPVS, vec3 worldPos, vec3 lightPos, vec3 normal, vec3 lightDir, float lightRange, float distToPixel, ivec2 pixel) {
-    // transform to light-space cube-face coords
-    vec3 toLight = worldPos - lightPos;
-    float dist = length(toLight);
-    float rangeFac = ((lightRange - dist) / lightRange);
-    float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 4.0 + 2.0;
-    smearness = max(smearness, 0.001); // avoid zero scale
-    // slope bias: use dot(normal, lightDir) directly (lightDir expected normalized)
-    float slope = max(0.0, 1.0 - dot(normal, lightDir));
-    float bias = slope * ((1.0 / shadowMapSize) + (0.72 * (1.0 - rangeFac)));
-
-    vec3 a = abs(toLight);
-    float maxAxis = max(max(a.x, a.y), a.z);
-    // avoid division by zero
-    float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;
-    vec3 dir = toLight * invMax;
-    uint face;
-    vec2 uv;
-    if (a.x >= a.y && a.x >= a.z) {
-        face = toLight.x > 0.0 ? 0u : 1u; uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
-    } else if (a.y >= a.x && a.y >= a.z) {
-        face = toLight.y > 0.0 ? 2u : 3u; uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
-    } else {
-        face = toLight.z > 0.0 ? 4u : 5u; uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
-    }
-
-    uv = uv * 0.5 + 0.5;
-    uint base = lightIdxInPVS * 6u * uint(shadowMapSize) * uint(shadowMapSize);
-    uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
-    vec2 tc = uv * shadowMapSize;
-
-    // stochastic PCF sampling
-    float sum = 0.0;
-    float invSamples = 1.0 / float(PCF_SAMPLES);
-
-    // scale poisson disk from [-1,1] to texel offsets; smearness is multiplied by a small factor
-    // tune scaleFactor to taste; 1.0 maps smearness=6 to ~6 texels max.
-    float scaleFactor = 1.0;
-    for (int si = 0; si < PCF_SAMPLES; ++si) {
-        vec2 off = poissonDisk[si] * (smearness * scaleFactor);
-        vec2 t = tc + off;
-        // clamp and integerize once
-        float tx = clamp(t.x, 0.0, shadowMapSize);
-        float ty = clamp(t.y, 0.0, shadowMapSize);
-        uint utx = uint(tx);
-        uint uty = uint(ty);
-        uint idx = faceOff + uty * uint(shadowMapSize) + utx;
-        float d = shadowMaps[idx];
-        float depthDiff = dist - d - bias;
-        float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
-        sum += shadowContrib * invSamples;
-    }
-
-    return sum;
-}
-
 // Main Compute Shader
 void main() {
     uvec2 pixelu = gl_GlobalInvocationID.xy;
@@ -224,6 +166,7 @@ void main() {
             float spotdot = dot(spotDir, -lightDir);
             float cosAngle = cos(radians(spotAng / 2.0));
             if (spotdot < cosAngle) continue;
+            
             float cosOuterAngle = cos(radians(spotAng / 2.0));
             float cosInnerAngle = cos(radians(spotAng * 0.8 / 2.0));
             spotFalloff = smoothstep(cosOuterAngle, cosInnerAngle, spotdot);
@@ -232,10 +175,58 @@ void main() {
 
         float distOverRange = dist / range;
         float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
+        float shadowFactor = 1.0;
+        if (debugValue != 2) {
+            float rangeFac = ((range - dist) / range);
+            float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 8.0 + 2.0;
+            smearness = max(smearness, 0.001); // avoid zero scale
+            // slope bias: use dot(normal, lightDir) directly (lightDir expected normalized)
+            float slope = max(0.0, 1.0 - dot(normal, lightDir));
+            float bias = slope * ((1.0 / shadowMapSize) + (0.72 * (1.0 - rangeFac)));
 
-        float shadowFactor = ComputeShadowFactor(lightIdxInPVS, worldPos, lightPos, normal, lightDir, range, distToPixel, pixel);
-        if (debugValue == 2) shadowFactor = 1.0;
+            vec3 a = abs(-toLight);
+            float maxAxis = max(max(a.x, a.y), a.z);
+            float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
+            vec3 dir = -toLight * invMax;
+            uint face;
+            vec2 uv;
+            if (a.x >= a.y && a.x >= a.z) {
+                face = -toLight.x > 0.0 ? 0u : 1u; uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
+            } else if (a.y >= a.x && a.y >= a.z) {
+                face = -toLight.y > 0.0 ? 2u : 3u; uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
+            } else {
+                face = -toLight.z > 0.0 ? 4u : 5u; uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
+            }
 
+            uv = uv * 0.5 + 0.5;
+            uint base = lightIdxInPVS * 6u * uint(shadowMapSize) * uint(shadowMapSize);
+            uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
+            vec2 tc = uv * shadowMapSize;
+
+            // stochastic PCF sampling
+            float sum = 0.0;
+            float invSamples = 1.0 / float(PCF_SAMPLES);
+
+            // scale poisson disk from [-1,1] to texel offsets; smearness is multiplied by a small factor
+            // tune scaleFactor to taste; 1.0 maps smearness=6 to ~6 texels max.
+            float scaleFactor = 1.0;
+            for (int si = 0; si < PCF_SAMPLES; ++si) {
+                vec2 off = poissonDisk[si] * (smearness * scaleFactor);
+                vec2 t = tc + off;
+                // clamp and integerize once
+                float tx = clamp(t.x, 0.0, shadowMapSize - 1.0);
+                float ty = clamp(t.y, 0.0, shadowMapSize - 1.0);
+                uint utx = uint(tx);
+                uint uty = uint(ty);
+                uint idx = faceOff + uty * uint(shadowMapSize) + utx;
+                float d = shadowMaps[idx];
+                float depthDiff = dist - d - bias;
+                float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
+                sum += shadowContrib * invSamples;
+            }
+
+            shadowFactor = sum;
+        }
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
@@ -244,9 +235,9 @@ void main() {
 
     // Dither + fog
     int blueNoiseTextureWidth = 64;
-    int pixelIndex = int(((int(pixel.y) % blueNoiseTextureWidth) * blueNoiseTextureWidth + (int(pixel.x) % blueNoiseTextureWidth))) * 3;
+    int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
     vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
-    if (debugValue == 0) lighting += ((bluenoise.rgb * 1.0/255.0) - (0.5/255.0));
+    lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
 
     float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));

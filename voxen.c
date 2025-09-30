@@ -749,9 +749,6 @@ void RenderShadowmaps(void) {
     malloc_trim(0);
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint16_t litIdx = i * LIGHT_DATA_SIZE;
-        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        if (intensity < thresh) continue; // Not bright enough to cast meaningful shadows
-        
         RenderShadowmap(i);
         malloc_trim(0);
     }

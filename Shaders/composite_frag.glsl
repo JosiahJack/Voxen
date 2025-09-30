@@ -30,6 +30,7 @@ void main() {
         vec4 worldPosPack = texelFetch(inputWorldPos, ivec2(TexCoord * vec2(screenWidth, screenHeight)), 0);
         vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
         float specSum = specColor.r + specColor.g + specColor.b;
+//         if (specSum < 0.0001) return;
 
         // Compute blur radius based on specular sum
         float maxRadius = 2.0; // For 5x5 kernel at specSum < 0.3
