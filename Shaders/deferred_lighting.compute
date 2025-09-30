@@ -136,6 +136,7 @@ void main() {
 
     glowColor.r = color.a;
 
+//     vec3 gi_fake = vec3(0.0);
     for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
@@ -227,11 +228,18 @@ void main() {
 
             shadowFactor = sum;
         }
+        
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
+//         vec3 addPriorToShadow = color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff;
+//         if (shadowFactor < 1.0) { // Works but is to aggressive.
+//             gi_fake += addPriorToShadow * 0.05 * (1.0 - shadowFactor);
+//         }
+//         lighting += addPriorToShadow * shadowFactor;
         lighting += color.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
 
     lighting += glowColor.rgb;
+//     lighting += gi_fake;
 
     // Dither + fog
     int blueNoiseTextureWidth = 64;
