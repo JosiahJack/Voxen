@@ -134,7 +134,8 @@ void main() {
         listoffset = voxelLightListIndices[voxelIdx * 2];
     }
 
-    glowColor.r = color.a;
+    if (color.a < 0.005) glowColor.r = color.a;
+    else glowColor.r = 0.0;
 
 //     vec3 gi_fake = vec3(0.0);
     for (uint i = 0u; i < count; i++) {

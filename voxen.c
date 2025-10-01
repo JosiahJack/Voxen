@@ -1472,7 +1472,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
                 if (i >= startOfTransparentInstances) {
                     glEnable(GL_BLEND); // Enable blending for transparent instances
-                    glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
+                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
                     glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
                 }
                 int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;

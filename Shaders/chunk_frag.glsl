@@ -75,7 +75,7 @@ void main() {
     }
 
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
-    outAlbedo.a = glowColor.r;
+    float glowR = glowColor.r;
     glowColor.r = (adjustedNormal.z + 1.0) * 0.5;
     glowColor.a = (adjustedNormal.x + 1.0) * 0.5;
     vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
@@ -109,6 +109,9 @@ void main() {
         outAlbedo.a = 1.0;
     } else {
         if (albedoColor.a < 1.0 && albedoColor.a > 0.05) outAlbedo = vec4(albedoColor.rgb, albedoColor.a);
-        else outAlbedo.rgb = albedoColor.rgb;
+        else {
+            outAlbedo.rgb = albedoColor.rgb;
+            outAlbedo.a = glowR;
+        }
     }
 }
