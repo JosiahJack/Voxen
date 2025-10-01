@@ -179,7 +179,7 @@ void main() {
         float shadowFactor = 1.0;
         if (debugValue != 2) {
             float rangeFac = ((range - dist) / range);
-            float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 8.0 + 2.0;
+            float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 16.0 + 0.0;
             smearness = max(smearness, 0.001); // avoid zero scale
             // slope bias: use dot(normal, lightDir) directly (lightDir expected normalized)
             float slope = max(0.0, 1.0 - dot(normal, lightDir));

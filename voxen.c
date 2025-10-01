@@ -17,7 +17,6 @@
 #define VOXEN_ENGINE_IMPLEMENTATION
 #include "voxen.h"
 #include "citadel.h"
-
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
 #include "Shaders/chunk_vert.glsl.h"
@@ -1500,16 +1499,16 @@ int32_t main(int32_t argc, char* argv[]) {
             }
 
             // 6. SSR (Screen Space Reflections)
-//             if (debugView == 0 || debugView == 7) {
-//                 glUseProgram(ssrShaderProgram);
-//                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-//                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
-//                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
-//                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
-//                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-//                 CHECK_GL_ERROR();
-//                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-//             }
+            if (debugView == 0 || debugView == 7) {
+                glUseProgram(ssrShaderProgram);
+                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+                glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
+                GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
+                GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
+                glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+                CHECK_GL_ERROR();
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            }
         } else { // END !PAUSED BLOCK -------------------------------------------------
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }
