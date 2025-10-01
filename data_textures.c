@@ -29,8 +29,14 @@ bool* doubleSidedTexture = NULL;
 bool* transparentTexture = NULL;
 unsigned char** image_data = NULL;
 
-bool isDoubleSided(uint32_t texIndexToCheck) { return doubleSidedTexture[texIndexToCheck]; }
-bool isTransparent(uint32_t texIndexToCheck) { return transparentTexture[texIndexToCheck]; }
+bool isDoubleSided(uint32_t texIndexToCheck) {
+    if (texIndexToCheck > textureCount) return false;
+    return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
+}
+bool isTransparent(uint32_t texIndexToCheck) {
+    if (texIndexToCheck > textureCount) return false;
+    return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
+}
 
 typedef struct {
     uint32_t color;
@@ -62,13 +68,13 @@ int32_t LoadTextures(void) {
     if (textureCount > MAX_TEXTURE_COUNT) { DualLogError("Too many textures in parser count %d, greater than 2048!\n", textureCount); return 1; }
     if (textureCount == 0) { DualLogError("No textures found in textures.txt\n"); return 1; }
 
-    DualLog("(%d) with max index %d, using stb_image version: 2.28...", textureCount, maxIndex);
+    DualLog("(%d) with max index %d, using stb_image version:  2.28...", textureCount, maxIndex);
     image_data = malloc(textureCount * sizeof(unsigned char*));
     textureOffsets = malloc(textureCount * sizeof(uint32_t));
     textureSizes = malloc(textureCount * 2 * sizeof(int));
     texturePaletteOffsets = malloc(textureCount * sizeof(uint32_t));
-    doubleSidedTexture = malloc(textureCount * sizeof(bool));
-    transparentTexture = malloc(textureCount * sizeof(bool));
+    doubleSidedTexture = calloc(textureCount,sizeof(bool));
+    transparentTexture = calloc(textureCount,sizeof(bool));
     size_t maxFileSize = 2760000;
     uint32_t totalPaletteColorsExtraSized = 180000;
     texturePalettes = malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
@@ -118,10 +124,10 @@ int32_t LoadTextures(void) {
             image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, STBI_rgb_alpha);
             if (!image_data[i]) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, stbi_failure_reason()); continue; }
             
-            widths[i] = w;
-            heights[i] = h;
-            doubleSidedTexture[i] = texture_parser.entries[matchedParserIdxes[i]].doublesided;
-            transparentTexture[i] = texture_parser.entries[matchedParserIdxes[i]].transparent;
+            widths[matchedParserIdxes[i]] = w;
+            heights[matchedParserIdxes[i]] = h;
+            doubleSidedTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].doublesided > 0 ? 1 : 0;
+            transparentTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].transparent > 0 ? 1 : 0;
         }
     }
 

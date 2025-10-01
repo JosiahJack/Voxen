@@ -359,7 +359,10 @@ void RenderUI(void) {
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: ! % ^ ö ü é ó る。エレベーターでレベルを離れよ низкой гравитацией");
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, "FOV Cone Checks: %u, %u, %u, %u",numberOfFOVConeChecks0,numberOfFOVConeChecks1,numberOfFOVConeChecks2,numberOfFOVConeChecks3);
 
+    
+    
     if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
     if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
 

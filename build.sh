@@ -36,9 +36,8 @@ build_start=$(now_ms)
 echo "Shaders converted to string constants in $((shader_end - shader_start)) ms"
 
 CC=gcc
-CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
-# LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -lSDL2 -lSDL2_ttf -lGLEW -lGL -lm -lrt -lenet -lpthread -fopenmp -s"
-LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -lSDL2 -lGLEW -lGL -lm -lrt -lenet -lpthread -fopenmp -s"
+CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -g -D_POSIX_C_SOURCE=199309L"
+LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -lSDL2 -lGLEW -lGL -lm -lrt -lenet -lpthread -fopenmp"
 SOURCES="voxen.c render_ui.c data_textures.c data_parser.c audio.c physics.c dynamic_culling.c miniaudio.c citadel_playermovement.c"
 
 # Compile sources in parallel

@@ -1629,9 +1629,12 @@ texture: 1251
 #item_beaker
 index: 309
 model: 14
+texture: 36
+spectexture: 1242
 #item_beverage
 index: 310
 model: 18
+texture: 37
 #item_skull
 index: 311
 model: 593
@@ -1641,6 +1644,7 @@ model: 7
 #item_audiolog
 index: 313
 model: 11
+texture: 52
 #weapon_grenadefrag
 index: 314
 model: 182
@@ -1748,6 +1752,7 @@ model: 638
 #weapon_dartgun
 index: 345
 model: 640
+texture: 876
 #weapon_flechette
 index: 346
 model: 642
@@ -1809,6 +1814,8 @@ model: 45
 #item_flask
 index: 365
 model: 145
+texture: 36
+spectexture: 1242
 #item_chipset_bitflag
 index: 366
 model: 45
@@ -1821,6 +1828,8 @@ model: 209
 #item_testtube
 index: 369
 model: 622
+texture: 36
+spectexture: 1242
 #weapon_grenadefrag_live
 index: 370
 model: 182

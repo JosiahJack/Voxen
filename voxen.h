@@ -73,8 +73,6 @@ typedef struct {
     uint8_t metadata; // padding, TODO fix!
     char path[MAX_PATH]; // Parsing only, TODO Remove
 } Entity;
-// Includes subfields for parsing from text files, e.g. x,y,z need to parse "position.x" one "field":
-#define ENTITY_FIELD_COUNT 41
 
 typedef struct {
     Vector3 mins;
@@ -190,6 +188,7 @@ int32_t LoadLevels();
 int32_t LoadLevelGeometry(uint8_t curlevel);
 int32_t LoadLevelLights(uint8_t curlevel);
 int32_t LoadLevelDynamicObjects(uint8_t curlevel);
+void SortInstances();
 // ----------------------------------------------------------------------------
 // Event System
 #define EV_NULL 0u
@@ -280,6 +279,10 @@ int32_t EventQueueProcess(void);
 #define CELL_CLOSEDWEST   32
 #define CELL_SEES_SUN     64
 #define CELL_SEES_SKYBOX 128
+extern uint16_t numberOfFOVConeChecks0; // 5049
+extern uint16_t numberOfFOVConeChecks1; // 5030
+extern uint16_t numberOfFOVConeChecks2; // 2687
+extern uint16_t numberOfFOVConeChecks3; // 2687
 extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
@@ -316,6 +319,19 @@ static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16
 
 static inline bool XZPairInBounds(int32_t x, int32_t z) {
     return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
+}
+
+inline float squareDistance2D(float x1, float z1, float x2, float z2) {
+    float dx = x2 - x1;
+    float dz = z2 - z1;
+    return dx * dx + dz * dz;
+}
+
+inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float dz = z2 - z1;
+    return dx * dx + dy * dy + dz * dz;
 }
 // ----------------------------------------------------------------------------
 // Physics

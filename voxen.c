@@ -349,20 +349,6 @@ static inline void invertAffineMat4(float *out, const float *m) {
     out[13] = -(out[1]*tx + out[5]*ty + out[9]*tz);
     out[14] = -(out[2]*tx + out[6]*ty + out[10]*tz);
 }
-
-// ============================================================================
-inline float squareDistance2D(float x1, float z1, float x2, float z2) {
-    float dx = x2 - x1;
-    float dz = z2 - z1;
-    return dx * dx + dz * dz;
-}
-
-inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
-    float dx = x2 - x1;
-    float dy = y2 - y1;
-    float dz = z2 - z1;
-    return dx * dx + dy * dy + dz * dz;
-}
 // ============================================================================
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
     float rot[16];
@@ -472,7 +458,7 @@ int32_t compareLightCandidates(const void* a, const void* b) {
 }
 
 int32_t VoxelLists() {
-    DualLog("Generating voxel lighting data...\n");
+    DualLog("Generating voxel lighting data...");
     double start_time = get_time();
     uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     uint32_t* voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -520,7 +506,7 @@ int32_t VoxelLists() {
         }
     }
 
-    if (totalLightAssignments > VOXEL_COUNT * 4) { DualLogError("Total light assignments (%u) exceed voxelLightListsRaw capacity (%u)\n", totalLightAssignments, VOXEL_COUNT * 4); return 1; }
+    if (totalLightAssignments > VOXEL_COUNT * 4) { DualLogError("\nTotal light assignments (%u) exceed voxelLightListsRaw capacity (%u)\n", totalLightAssignments, VOXEL_COUNT * 4); return 1; }
 
     // Assign offsets and populate voxelLightListsRaw
     uint32_t head = 0;
@@ -594,7 +580,7 @@ int32_t VoxelLists() {
     glFlush();
     CHECK_GL_ERROR();    
     malloc_trim(0);
-    DualLog("Light voxel lists processing took %f seconds, total list size: %u\n", get_time() - start_time, head);
+    DualLog(" took %f seconds, total list size: %u\n", get_time() - start_time, head);
     return 0;
 }
 
@@ -686,6 +672,8 @@ void RenderShadowmap(uint16_t lightIdx) {
 }
 
 void RenderShadowmaps(void) {
+    double start_time = get_time();
+    DualLog("Rendering shadowmaps...");
     DebugRAM("Start of RenderShadowmaps");
     // Shadow map cube texture (single cube, 6 faces)
     glGenTextures(1, &shadowCubeMap);
@@ -718,7 +706,7 @@ void RenderShadowmaps(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("Shadow FBO incomplete, status: 0x%x\n", status); return; }
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("\nShadow FBO incomplete, status: 0x%x\n", status); return; }
    
     // SSBO for shadow map data
     glGenBuffers(1, &shadowMapSSBO);
@@ -761,7 +749,7 @@ void RenderShadowmaps(void) {
     CHECK_GL_ERROR();
     malloc_trim(0);
     shadowMapsRendered = true;
-    DualLog("Rendered %d static shadow maps\n", staticLightCount);
+    DualLog(" took %f seconds to render %d static shadow maps\n", get_time() - start_time, staticLightCount);
     DebugRAM("After rendering all shadowmaps");
 }
 
@@ -975,8 +963,9 @@ int32_t InitializeEnvironment(void) {
     if (LoadLevelLights(currentLevel)) return 1;
     RenderLoadingProgress(120,"Loading dynamic object data...");
     if (LoadLevelDynamicObjects(currentLevel)) return 1;
+    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
-    if (Cull_Init()) return 1; // Must be after level!
+    if (Cull_Init()) return 1; // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     if (VoxelLists()) return 1;
     DebugRAM("InitializeEnvironment end");
@@ -1001,27 +990,46 @@ int32_t EventExecute(Event* event) {
     return 99;
 }
 
+uint16_t numberOfFOVConeChecks0 = 0;
+uint16_t numberOfFOVConeChecks1 = 0;
+uint16_t numberOfFOVConeChecks2 = 0;
+uint16_t numberOfFOVConeChecks3 = 0;
 bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
-    float to_inst_x = inst_x - cam_x; // Vector from camera to instance
+    // Vector from camera to instance
+    float to_inst_x = inst_x - cam_x;
     float to_inst_y = inst_y - cam_y;
     float to_inst_z = inst_z - cam_z;
-    float distance = sqrtf(to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z);
-    if (distance < 3.62038672f) return true; // Avoid division by zero.  Closer than corner of a cell (sqrt(2) * 2.56f)
 
-    to_inst_x /= distance; // Normalize direction to instance
-    to_inst_y /= distance;
-    to_inst_z /= distance;
-    float dotFac = dot(cam_forwardx,cam_forwardy,cam_forwardz, to_inst_x,to_inst_y,to_inst_z);
-    float fovAdjusted = cam_fov * 2.5f;
-    float half_fov_rad = deg2rad(fovAdjusted * 0.5f); // Compare against cosine of half the FOV (cam_fov is in degrees, convert to radians)
-    float cos_half_fov = cosf(half_fov_rad);
-    if (dotFac >= cos_half_fov) return true; // Center is within FOV cone
+    // Compute squared distance
+    float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
+    numberOfFOVConeChecks0++; // Reporting 5049
+    if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
 
-    if (radius > 0.0f && distance > radius) {
-        float adjusted_dot = dotFac - (radius / distance); // Approximate sphere extent
+    // Precompute FOV constants (assuming cam_fov is constant per frame)
+    static float cos_half_fov = 0.0f;
+    static float last_cam_fov = -1.0f;
+    if (cam_fov != last_cam_fov) {
+        float fovAdjusted = cam_fov * 2.5f;
+        float half_fov_rad = fovAdjusted * 0.5f * (M_PI / 180.0f); // deg2rad
+        cos_half_fov = cosf(half_fov_rad);
+        last_cam_fov = cam_fov;
+    }
+
+    // Compute dot product without normalization
+    float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
+    float dist = sqrtf(dist_sq); // Only compute sqrt once
+    float dot_normalized = dot / dist; // Normalize dot product
+
+    numberOfFOVConeChecks1++; // Reporting 5030
+    if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
+
+    if (radius > 0.0f && dist_sq > (radius * radius)) {
+        float adjusted_dot = dot_normalized - (radius / dist); // Approximate sphere extent
+        numberOfFOVConeChecks2++;  // Reporting 2687
         if (adjusted_dot >= cos_half_fov) return true; // Part of sphere may be in view
     }
 
+    numberOfFOVConeChecks3++; // Reporting 2687
     return false; // Outside FOV cone
 }
 
@@ -1329,11 +1337,11 @@ int32_t main(int32_t argc, char* argv[]) {
 
     double last_physics_time = get_time();
     last_time = get_time();
-    lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
     RenderShadowmaps();
-    DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
     Input_MouselookApply();
+    lastJournalWriteTime = get_time();
+    DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;
@@ -1414,128 +1422,119 @@ int32_t main(int32_t argc, char* argv[]) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
 
         if (!gamePaused) { // !PAUSED BLOCK -------------------------------------------------
-        // 1. Culling
-        Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
-        
-        // 2. Pass instance data to GPU
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-        
-        // 3. Raterized Geometry
-        //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-        glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-        glUseProgram(chunkShaderProgram);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        float view[16]; // Set up view matrices
-        mat4_lookat(view);
-        float viewProj[16];
-        float invViewProj[16];
-        mul_mat4(viewProj, rasterPerspectiveProjection, view);
-        invertAffineMat4(invViewProj, viewProj);
-        glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
-        glBindVertexArray(vao_chunk);
-        float lodRangeSqrd = 38.4f * 38.4f;
-        memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
-        memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
-        for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
-            if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
-            if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
-            if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
+            // 1. Culling
+            Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
             
-            if (instanceIsCulledArray[i]) continue; // Culled by distance
-            if (instances[i].modelIndex >= MODEL_COUNT) continue;
-            if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+            // 2. Pass instance data to GPU
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
             
-//             if (i >= startOfDoubleSidedInstances) {
-            if (isDoubleSided(instances[i].texIndex)) {
-                glDisable(GL_CULL_FACE);
-            } else {
-                glEnable(GL_CULL_FACE); // Reenable backface culling
-            }
-            
-//             if (i >= startOfTransparentInstances) {
-            if (entities[instances[i].index].transparent) {
-                glEnable(GL_BLEND); // Enable blending for transparent instances
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
-                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
-            } else {
-                glDisable(GL_BLEND);
-                glDepthMask(GL_TRUE);
-                glEnable(GL_CULL_FACE); // Reenable backface culling
-                glEnable(GL_DEPTH_TEST);
-            }
-            uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
-            if (instCellIdx < ARRSIZE) {
-                if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
-            }
-            
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-            if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
-            
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
-            uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-            glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
-            uint32_t specdex = (uint32_t)instances[i].specIndex;
-            specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
-            uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
-            uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
-            nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
-            uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
-            glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
-            glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
-            glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);
-            glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
-            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-            glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-            CHECK_GL_ERROR();
-            drawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
-        }
-        
-        glDisable(GL_BLEND);
-        glDepthMask(GL_TRUE);
-        glEnable(GL_CULL_FACE); // Reenable backface culling
-        glEnable(GL_DEPTH_TEST);
+            // 3. Raterized Geometry
+            //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
+            glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+            glUseProgram(chunkShaderProgram);
+            glEnable(GL_DEPTH_TEST);
+            glEnable(GL_CULL_FACE);
+            float view[16]; // Set up view matrices
+            mat4_lookat(view);
+            float viewProj[16];
+            float invViewProj[16];
+            mul_mat4(viewProj, rasterPerspectiveProjection, view);
+            invertAffineMat4(invViewProj, viewProj);
+            glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
+            glBindVertexArray(vao_chunk);
+            float lodRangeSqrd = 38.4f * 38.4f;
+            memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
+            memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
+            numberOfFOVConeChecks0 = 0;
+            numberOfFOVConeChecks1 = 0;
+            numberOfFOVConeChecks2 = 0;
+            numberOfFOVConeChecks3 = 0;
+            for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
+                if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+                float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
+                if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
+                if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
+                
+                if (instanceIsCulledArray[i]) continue; // Culled by distance
+                if (instances[i].modelIndex >= MODEL_COUNT) continue;
+                if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
-        // ====================================================================
-        // 4. Dynamic Shadowmaps
-        RenderDynamicShadowmaps();
-        
-        // 5. Deferred Lighting
-        GLuint groupX = (screen_width + 31) / 32;
-        GLuint groupY = (screen_height + 31) / 32;
-        if (debugView == 0 || debugView == 8) {
-            glUseProgram(deferredLightingShaderProgram);
-            glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
-            glUniform1f(worldMin_xLoc_deferred, worldMin_x);
-            glUniform1f(worldMin_zLoc_deferred, worldMin_z);
-            glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
-            glUniform1f(fogColorRLoc_deferred, fogColorR);
-            glUniform1f(fogColorGLoc_deferred, fogColorG);
-            glUniform1f(fogColorBLoc_deferred, fogColorB);
-            glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
-            glUniformMatrix4fv(invViewProjectionLoc_deferred, 1, GL_FALSE, invViewProj);
-            glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
+                uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
+                if (instCellIdx < ARRSIZE) {
+                    if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
+                }
+                
+                float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+                if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
+                
+                if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
+                if (i >= startOfTransparentInstances) {
+                    glEnable(GL_BLEND); // Enable blending for transparent instances
+                    glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive blending: src * srcAlpha + dst
+                    glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
+                }
+                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+                glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
+                uint32_t specdex = (uint32_t)instances[i].specIndex;
+                specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
+                uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
+                uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
+                nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
+                uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
+                glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+                glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+                glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);
+                glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+                glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                drawCallsRenderedThisFrame++;
+                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+            }
+            
+            glDisable(GL_BLEND);
+            glDepthMask(GL_TRUE);
+            glEnable(GL_CULL_FACE); // Reenable backface culling
+            glEnable(GL_DEPTH_TEST);
             CHECK_GL_ERROR();
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        }
+            glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
+            // ====================================================================
+            // 4. Dynamic Shadowmaps
+            RenderDynamicShadowmaps();
+            
+            // 5. Deferred Lighting
+            GLuint groupX = (screen_width + 31) / 32;
+            GLuint groupY = (screen_height + 31) / 32;
+            if (debugView == 0 || debugView == 8) {
+                glUseProgram(deferredLightingShaderProgram);
+                glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
+                glUniform1f(worldMin_xLoc_deferred, worldMin_x);
+                glUniform1f(worldMin_zLoc_deferred, worldMin_z);
+                glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
+                glUniform1f(fogColorRLoc_deferred, fogColorR);
+                glUniform1f(fogColorGLoc_deferred, fogColorG);
+                glUniform1f(fogColorBLoc_deferred, fogColorB);
+                glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
+                glUniformMatrix4fv(invViewProjectionLoc_deferred, 1, GL_FALSE, invViewProj);
+                glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
+                CHECK_GL_ERROR();
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            }
 
-        // 6. SSR (Screen Space Reflections)
-        if (debugView == 0 || debugView == 7) {
-            glUseProgram(ssrShaderProgram);
-            glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-            glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
-            GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
-            GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
-            glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-            CHECK_GL_ERROR();
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        }
+            // 6. SSR (Screen Space Reflections)
+//             if (debugView == 0 || debugView == 7) {
+//                 glUseProgram(ssrShaderProgram);
+//                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+//                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
+//                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
+//                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
+//                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+//                 CHECK_GL_ERROR();
+//                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//             }
         } else { // END !PAUSED BLOCK -------------------------------------------------
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }
