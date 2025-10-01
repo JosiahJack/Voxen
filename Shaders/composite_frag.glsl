@@ -15,6 +15,8 @@ const int SSR_RES = 4;
 uniform float chromaticAberrationStrength = 1.72; // Base strength for chromatic aberration
 uniform float aaStrength = 2.0; // Controls the radius of AA sampling (in pixels)
 uniform float aaThreshold = 0.2; // Gradient threshold for applying AA
+uniform float crtScanlineStrength = 0.9;//0.5; Good value, off for testing.
+uniform float lensWarpStrength = 0.05; // Controls lens warp intensity (0.0 to 0.3 for subtle)
 
 vec4 unpackColor32(uint color) {
     return vec4(float((color >> 24) & 0xFF) / 255.0,  // r
@@ -60,8 +62,17 @@ void main() {
         reflectionColor.rgb /= totalWeight;
         FragColor += reflectionColor;
 
-        // Chromatic Aberration
+        // Lens Warp
         vec2 uv = TexCoord;
+        vec2 center = vec2(0.5, 0.5);
+        vec2 delta = uv - center;
+        float r2 = dot(delta, delta); // Squared distance from center
+        float warpFactor = 1.0 + lensWarpStrength * r2; // Barrel distortion
+        uv = center + delta * warpFactor; // Apply warp
+        uv = clamp(uv, vec2(0.0), vec2(1.0)); // Prevent sampling outside texture
+
+        // Chromatic Aberration
+//         vec2 uv = TexCoord;
         vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
         float aberrationStrength = chromaticAberrationStrength;
 
@@ -121,6 +132,11 @@ void main() {
             // Dynamic blending based on edge contrast
             float blendFactor = clamp(gradientMag * 0.5, 2.0, 4.0); // Adjust blend based on edge strength
             aaColor = mix(color, sampleColor, blendFactor);
+        }
+
+        // CRT Scanline effect
+        if (mod(TexCoord.y * float(screenHeight), 2.0) < 1.0) {
+            aaColor *= crtScanlineStrength; // Darken by up to 20% (0.8 at strength=0.5)
         }
 
         // Combine with original alpha
