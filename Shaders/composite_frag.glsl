@@ -15,8 +15,9 @@ const int SSR_RES = 4;
 uniform float chromaticAberrationStrength = 1.72; // Base strength for chromatic aberration
 uniform float aaStrength = 2.0; // Controls the radius of AA sampling (in pixels)
 uniform float aaThreshold = 0.2; // Gradient threshold for applying AA
-uniform float crtScanlineStrength = 0.9;//0.5; Good value, off for testing.
-uniform float lensWarpStrength = 0.05; // Controls lens warp intensity (0.0 to 0.3 for subtle)
+uniform float crtScanlineStrength = 1.0;//0.9; Good value, off for testing.
+uniform float lensWarpStrength = 0.3; // Controls lens warp intensity (0.0 to 0.3 for subtle)
+uniform float gamma = 1.0; // 0.85 to 1.25 or so seems fine
 
 vec4 unpackColor32(uint color) {
     return vec4(float((color >> 24) & 0xFF) / 255.0,  // r
@@ -31,6 +32,41 @@ void main() {
 
     ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
     if (debugView == 0) {
+        // Lens Warp
+        vec2 uv = TexCoord;
+//         vec2 center = vec2(0.5, 0.5);
+//         vec2 delta = uv - center;
+//         float r2 = dot(delta, delta); // Squared distance from center
+//         float warpFactor = 1.0 + lensWarpStrength * r2 * smoothstep(0.7, 0.0, sqrt(r2)); // Barrel distortion with edge falloff
+//         uv = center + delta * warpFactor; // Apply warp
+//         uv = clamp(uv, vec2(0.0), vec2(1.0)); // Prevent sampling outside texture
+
+        // Chromatic Aberration
+//         vec2 uv = TexCoord;
+        vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
+        float aberrationStrength = chromaticAberrationStrength;
+
+        // Modulate aberration strength based on distance from screen center
+        float distFromCenter = length(TexCoord - vec2(0.5)); // Distance from (0.5, 0.5)
+        float centerFade = smoothstep(0.0, 0.7, distFromCenter); // 0 at center, 1 at edges
+        aberrationStrength *= centerFade; // Reduce strength near center
+
+        // Dither with blue noise
+        int blueNoiseTextureWidth = 64;
+        int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
+        vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
+        aberrationStrength += ((bluenoise.r * 0.1) - 0.05); // Adjusted to keep dither subtle
+        
+        // Sample each color channel with a slight offset
+        vec2 redOffset = vec2(aberrationStrength, 0.0); // Red shifts right
+        vec2 greenOffset = vec2(0.0, 0.0);              // Green stays centered
+        vec2 blueOffset = vec2(-aberrationStrength, 0.0); // Blue shifts left
+        
+        vec3 color;
+        color.r = texture(tex, uv + redOffset * pixelSize).r;
+        color.g = texture(tex, uv + greenOffset * pixelSize).g;
+        color.b = texture(tex, uv + blueOffset * pixelSize).b;
+
         // Get specular color from G-buffer
         vec4 worldPosPack = texelFetch(inputWorldPos, ivec2(TexCoord * vec2(screenWidth, screenHeight)), 0);
         vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
@@ -60,42 +96,7 @@ void main() {
         }
 
         reflectionColor.rgb /= totalWeight;
-        FragColor += reflectionColor;
-
-        // Lens Warp
-        vec2 uv = TexCoord;
-        vec2 center = vec2(0.5, 0.5);
-        vec2 delta = uv - center;
-        float r2 = dot(delta, delta); // Squared distance from center
-        float warpFactor = 1.0 + lensWarpStrength * r2; // Barrel distortion
-        uv = center + delta * warpFactor; // Apply warp
-        uv = clamp(uv, vec2(0.0), vec2(1.0)); // Prevent sampling outside texture
-
-        // Chromatic Aberration
-//         vec2 uv = TexCoord;
-        vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
-        float aberrationStrength = chromaticAberrationStrength;
-
-        // Modulate aberration strength based on distance from screen center
-        float distFromCenter = length(TexCoord - vec2(0.5)); // Distance from (0.5, 0.5)
-        float centerFade = smoothstep(0.0, 0.7, distFromCenter); // 0 at center, 1 at edges
-        aberrationStrength *= centerFade; // Reduce strength near center
-
-        // Dither with blue noise
-        int blueNoiseTextureWidth = 64;
-        int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
-        vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
-        aberrationStrength += ((bluenoise.r * 0.1) - 0.05); // Adjusted to keep dither subtle
-        
-        // Sample each color channel with a slight offset
-        vec2 redOffset = vec2(aberrationStrength, 0.0); // Red shifts right
-        vec2 greenOffset = vec2(0.0, 0.0);              // Green stays centered
-        vec2 blueOffset = vec2(-aberrationStrength, 0.0); // Blue shifts left
-        
-        vec3 color;
-        color.r = texture(tex, uv + redOffset * pixelSize).r;
-        color.g = texture(tex, uv + greenOffset * pixelSize).g;
-        color.b = texture(tex, uv + blueOffset * pixelSize).b;
+        color += reflectionColor.rgb;
 
         // SMAA-Inspired Edge-Directed Antialiasing
         // Compute luminance for edge detection
@@ -138,6 +139,8 @@ void main() {
         if (mod(TexCoord.y * float(screenHeight), 2.0) < 1.0) {
             aaColor *= crtScanlineStrength; // Darken by up to 20% (0.8 at strength=0.5)
         }
+
+        aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / gamma));
 
         // Combine with original alpha
         FragColor = vec4(aaColor, FragColor.a);
