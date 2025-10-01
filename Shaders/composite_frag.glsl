@@ -1,6 +1,4 @@
 // composite.glsl
-// Full screen quad unlit textured for presenting image buffers such as results
-// from compute shaders, image effects, post-processing, etc..
 #version 450 core
 in vec2 TexCoord;
 out vec4 FragColor;
@@ -11,7 +9,12 @@ uniform int debugValue;
 uniform uint screenWidth;
 uniform uint screenHeight;
 layout(rgba8, binding = 4) uniform image2D outputImage;
+layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 const int SSR_RES = 4;
+
+uniform float chromaticAberrationStrength = 1.72; // Base strength for chromatic aberration
+uniform float aaStrength = 2.0; // Controls the radius of AA sampling (in pixels)
+uniform float aaThreshold = 0.2; // Gradient threshold for applying AA
 
 vec4 unpackColor32(uint color) {
     return vec4(float((color >> 24) & 0xFF) / 255.0,  // r
@@ -30,7 +33,6 @@ void main() {
         vec4 worldPosPack = texelFetch(inputWorldPos, ivec2(TexCoord * vec2(screenWidth, screenHeight)), 0);
         vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
         float specSum = specColor.r + specColor.g + specColor.b;
-//         if (specSum < 0.0001) return;
 
         // Compute blur radius based on specular sum
         float maxRadius = 2.0; // For 5x5 kernel at specSum < 0.3
@@ -57,6 +59,72 @@ void main() {
 
         reflectionColor.rgb /= totalWeight;
         FragColor += reflectionColor;
+
+        // Chromatic Aberration
+        vec2 uv = TexCoord;
+        vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
+        float aberrationStrength = chromaticAberrationStrength;
+
+        // Modulate aberration strength based on distance from screen center
+        float distFromCenter = length(TexCoord - vec2(0.5)); // Distance from (0.5, 0.5)
+        float centerFade = smoothstep(0.0, 0.7, distFromCenter); // 0 at center, 1 at edges
+        aberrationStrength *= centerFade; // Reduce strength near center
+
+        // Dither with blue noise
+        int blueNoiseTextureWidth = 64;
+        int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
+        vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
+        aberrationStrength += ((bluenoise.r * 0.1) - 0.05); // Adjusted to keep dither subtle
+        
+        // Sample each color channel with a slight offset
+        vec2 redOffset = vec2(aberrationStrength, 0.0); // Red shifts right
+        vec2 greenOffset = vec2(0.0, 0.0);              // Green stays centered
+        vec2 blueOffset = vec2(-aberrationStrength, 0.0); // Blue shifts left
+        
+        vec3 color;
+        color.r = texture(tex, uv + redOffset * pixelSize).r;
+        color.g = texture(tex, uv + greenOffset * pixelSize).g;
+        color.b = texture(tex, uv + blueOffset * pixelSize).b;
+
+        // SMAA-Inspired Edge-Directed Antialiasing
+        // Compute luminance for edge detection
+        vec3 centerColor = texture(tex, uv).rgb;
+        float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114)); // Luminance (Rec. 601)
+        vec3 dx = texture(tex, uv + vec2(pixelSize.x, 0.0)).rgb - texture(tex, uv - vec2(pixelSize.x, 0.0)).rgb;
+        vec3 dy = texture(tex, uv + vec2(0.0, pixelSize.y)).rgb - texture(tex, uv - vec2(0.0, pixelSize.y)).rgb;
+        float lumaDx = dot(abs(dx), vec3(0.299, 0.587, 0.114));
+        float lumaDy = dot(abs(dy), vec3(0.299, 0.587, 0.114));
+        float gradientMag = lumaDx + lumaDy; // Luminance-based gradient magnitude
+
+        vec3 aaColor = color; // Default to chromatic aberration result
+        if (gradientMag > aaThreshold) {
+            // Determine edge direction
+            vec2 edgeDir = vec2(lumaDx, lumaDy);
+            edgeDir = normalize(edgeDir + 1e-6); // Avoid division by zero
+            vec2 orthoDir = vec2(-edgeDir.y, edgeDir.x); // Perpendicular to edge
+
+            // Sample along the edge (up to ±5 pixels)
+            vec3 sampleColor = vec3(0.0);
+            float aaWeightSum = 0.0;
+            const int sampleCount = 5; // Samples per side (total 11 samples: -5 to +5)
+            float maxDist = aaStrength; // Max sampling distance in pixels
+            for (int i = -sampleCount; i <= sampleCount; i++) {
+                float t = float(i) / float(sampleCount); // Normalized position [-1, 1]
+                float dist = t * maxDist; // Distance along edge
+                float weight = exp(-abs(t) * 2.0); // Gaussian weight (sigma = 0.5)
+                vec2 sampleUV = uv + orthoDir * dist * pixelSize;
+                sampleColor += texture(tex, sampleUV).rgb * weight;
+                aaWeightSum += weight;
+            }
+            sampleColor /= aaWeightSum;
+
+            // Dynamic blending based on edge contrast
+            float blendFactor = clamp(gradientMag * 0.5, 2.0, 4.0); // Adjust blend based on edge strength
+            aaColor = mix(color, sampleColor, blendFactor);
+        }
+
+        // Combine with original alpha
+        FragColor = vec4(aaColor, FragColor.a);
     } else if (debugView == 7 || debugView == 10) {
         FragColor = imageLoad(outputImage, pixel);
     }

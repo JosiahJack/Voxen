@@ -668,6 +668,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     staticLightCount++;
 }
 
+// Renders all static shadowmaps at level load
 void RenderShadowmaps(void) {
     double start_time = get_time();
     DualLog("Rendering shadowmaps...");
