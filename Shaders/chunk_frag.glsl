@@ -8,6 +8,7 @@ in vec3 Normal;
 in vec3 FragPos;
 
 uniform int debugView;
+uniform int debugValue;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -18,8 +19,8 @@ const uint MATERIAL_IDX_MAX = 2048;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
+layout(std430,  binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
@@ -49,12 +50,13 @@ uint packColor(vec4 color) {
 
 void main() {
     int texIndexChecked = 0;
-    if (TexIndex >= 0) texIndexChecked = int(TexIndex);
+    if (TexIndex >= 0) texIndexChecked = int(TexIndex); 
     ivec2 texSize = textureSizes[texIndexChecked];
     vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V, OpenGL convention vs import
     int x = int(floor(uv.x * float(texSize.x)));
     int y = int(floor(uv.y * float(texSize.y)));
-    vec4 albedoColor = getTextureColor(texIndexChecked,ivec2(x,y));
+    ivec2 texUV = ivec2(x,y);
+    vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;

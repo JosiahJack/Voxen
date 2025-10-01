@@ -80,7 +80,8 @@ bool instanceIsLODArray[INSTANCE_COUNT];
 //    Chunk Geometery Unlit Raster Shader
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
-GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1;
+GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, debugValueLoc_chunk = -1, 
+      glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1;
 
 //    Shadowmap Rastered Depth Shader
 GLuint shadowCubeMap;
@@ -251,6 +252,7 @@ int32_t CompileShaders(void) {
     glowSpecIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowSpecIndex");
     normInstanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
+    debugValueLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugValue");
 
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");

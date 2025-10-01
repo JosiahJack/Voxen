@@ -441,7 +441,7 @@ extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
 extern int32_t debugValue;
-extern GLint debugViewLoc_chunk, debugViewLoc_deferred, debugValueLoc_deferred, debugViewLoc_quadblit, debugValueLoc_quadblit;
+extern GLint debugViewLoc_chunk, debugViewLoc_deferred, debugValueLoc_chunk, debugValueLoc_deferred, debugViewLoc_quadblit, debugValueLoc_quadblit;
 extern float fogColorR, fogColorG, fogColorB;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;

@@ -62,6 +62,7 @@ int32_t Input_KeyDown(int32_t scancode) {
         if (debugValue > 3) debugValue = 0;
         glProgramUniform1i(deferredLightingShaderProgram, debugValueLoc_deferred, debugValue);
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
+        glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
     }
 
     if (keys[SDL_SCANCODE_E]) {
