@@ -609,6 +609,15 @@ void mat4_lookat(float* m) {
     mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
 }
 
+Quaternion orientationQuaternion[6] = {
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+};
+
 void RenderShadowmap(uint16_t lightIdx) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -619,32 +628,22 @@ void RenderShadowmap(uint16_t lightIdx) {
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
     GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
-    uint16_t nearMeshes[INSTANCE_COUNT];
+    uint16_t nearMeshes[startOfTransparentInstances];
     uint16_t nearbyMeshCount = 0;
-    for (uint16_t j = 0; j < INSTANCE_COUNT; j++) {
+    for (uint16_t j = 0; j < startOfTransparentInstances; j++) {
         if (instances[j].modelIndex >= MODEL_COUNT) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+        if (IsDynamicObject(instances[j].index)) continue;
+        
         float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
         if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
+        
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
     }
 
-    Quaternion orientationQuaternion[6] = {
-        {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
-        {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
-        {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
-        {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
-        {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
-        {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
-    };
-
     for (uint8_t face = 0; face < 6; face++) {
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, shadowCubeMap, 0);
-        glClearColor(15.36f, 0.0f, 0.0f, 0.0f);
-        glClearDepth(1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         float lightView[16];
         float lightViewProj[16];
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
@@ -666,8 +665,6 @@ void RenderShadowmap(uint16_t lightIdx) {
         }
     }
 
-    glFlush();
-    glFinish();
     staticLightCount++;
 }
 
@@ -675,25 +672,9 @@ void RenderShadowmaps(void) {
     double start_time = get_time();
     DualLog("Rendering shadowmaps...");
     DebugRAM("Start of RenderShadowmaps");
-    // Shadow map cube texture (single cube, 6 faces)
     glGenTextures(1, &shadowCubeMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
-    for (int face = 0; face < 6; face++) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_FLOAT, NULL);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-    
-    // Create depth texture for cubemap
-    glGenTextures(1, &depthCubeMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, depthCubeMap);
-    for (int i = 0; i < 6; i++) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    }
+    for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -701,11 +682,10 @@ void RenderShadowmaps(void) {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-    // Shadow FBO
     glGenFramebuffers(1, &shadowFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glDrawBuffer(0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("\nShadow FBO incomplete, status: 0x%x\n", status); return; }
    
     // SSBO for shadow map data
@@ -734,18 +714,10 @@ void RenderShadowmaps(void) {
     glUseProgram(shadowmapsShaderProgram);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
-    malloc_trim(0);
-    for (uint16_t i = 0; i < loadedLights; i++) {
-        RenderShadowmap(i);
-        malloc_trim(0);
-    }
-
+    for (uint16_t i = 0; i < loadedLights; i++) RenderShadowmap(i);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
-    glFlush();
-    glFinish();
     CHECK_GL_ERROR();
     malloc_trim(0);
     shadowMapsRendered = true;

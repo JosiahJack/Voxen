@@ -297,6 +297,7 @@ void CullCore(void);
 void Cull();
 // ----------------------------------------------------------------------------
 // Helper Functions
+bool IsDynamicObject(uint16_t constIndex);
 static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {

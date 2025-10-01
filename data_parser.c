@@ -1023,6 +1023,17 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
     return 0;
 }
 
+bool IsDynamicObject(uint16_t constIndex) {
+    return (constIndex >= 307 && constIndex <= 404)
+            || (constIndex >= 402 && constIndex <= 404)
+            ||  constIndex == 417
+            || (constIndex >= 419 && constIndex <= 428)
+            || (constIndex >= 430 && constIndex <= 437)
+            || (constIndex >= 440 && constIndex <= 442)
+            || (constIndex >= 458 && constIndex <= 463)
+            || (constIndex >= 465 && constIndex <= 476);
+}
+
 void SortInstances() {
     DualLog("Sorting instances...");
     double start_time = get_time();
@@ -1079,15 +1090,7 @@ void SortInstances() {
     
     // Populate Physics Objects AFTER indices are reordered
     for (uint32_t idx = 0u;idx < loadedInstances;++idx) {
-        if (   (instances[idx].index >= 307 && instances[idx].index <= 404)
-            || (instances[idx].index >= 402 && instances[idx].index <= 404)
-            ||  instances[idx].index == 417
-            || (instances[idx].index >= 419 && instances[idx].index <= 428)
-            || (instances[idx].index >= 430 && instances[idx].index <= 437)
-            || (instances[idx].index >= 440 && instances[idx].index <= 442)
-            || (instances[idx].index >= 458 && instances[idx].index <= 463)
-            || (instances[idx].index >= 472 && instances[idx].index <= 476)) {
-            
+        if (IsDynamicObject(instances[idx].index)) {
             physObjects[physHead] = instances[idx];
             physObjects[physHead].index = idx;
             physHead++;
