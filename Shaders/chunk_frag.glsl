@@ -67,14 +67,13 @@ void main() {
         if (uvArea > 1e-4) {
             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
             vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
-            mat3 TBN3x3 = mat3(t, b, Normal);
+            mat3 TBN3x3 = mat3(t, b, adjustedNormal);
             vec3 normalColor = normalize(getTextureColor(NormalIndex,ivec2(x,y)).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
         }
     }
 
-    if (!gl_FrontFacing) adjustedNormal = -adjustedNormal;
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
     outAlbedo.a = glowColor.r;
     glowColor.r = (adjustedNormal.z + 1.0) * 0.5;
@@ -109,25 +108,7 @@ void main() {
         outAlbedo.rgb = worldPosPack.xyz;
         outAlbedo.a = 1.0;
     } else {
-        outAlbedo.rgb = albedoColor.rgb * albedoColor.a;
+        if (albedoColor.a < 1.0 && albedoColor.a > 0.05) outAlbedo = vec4(albedoColor.rgb, albedoColor.a);
+        else outAlbedo.rgb = albedoColor.rgb;
     }
-
-//     vec3 toPixel = camPos - FragPos;
-//     float dist = length(toPixel);
-// 
-//     // R = albedo.rgb + normal.x
-//     vec4 outR = vec4(outAlbedo.rgb, normal.x);
-// 
-//     // G = normal.yz + InstanceIndex packed as half
-//     vec4 outG = vec4(packHalf2x16(vec2(normal.y, normal.z)), packHalf2x16(vec2(uintBitsToFloat(InstanceIndex), dist)));
-// 
-//     // B = distance + glowColor.rg packed as half
-//     vec4 outB = vec4(packHalf2x16(vec2(glowColor.rg, glowColor.b)), packHalf2x16(vec2(specColor.rg, specColor.b)));
-// 
-//     // A = glowColor.b + specColor.rgb
-//     vec4 outA = vec4(glowColor.b, specColor.rgb);
-//     FinalPack = vec4(vec4(outAlbedo.rgb,normal.x),
-//                      packHalf2x16(vec2(normal.yz,uintBitsToFloat(InstanceIndex)),
-//                      packHalf2x16(vec2(dist,vec2(glowColor.rg))),
-//                      vec4(glowColor.b,specColor.rgb));
 }
