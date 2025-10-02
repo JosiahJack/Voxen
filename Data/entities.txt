@@ -857,7 +857,7 @@ model: 262
 cardchunk: 1
 texture: 499
 spectexture: 1236
-normtexture: 1254
+normtexture: 498
 #chunk_med1_7_slice14_64
 index: 163
 model: 263

@@ -10,12 +10,8 @@ layout(std430,  binding = 19) buffer LightIndices { float lights[]; };
 layout(std430,  binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
 layout(std430,  binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
-uniform uint totalLuxelCount;
 uniform uint screenWidth;
 uniform uint screenHeight;
-uniform uint modelCount;
-uniform mat4 viewProjection;
-uniform mat4 invViewProjection;
 uniform int debugView;
 uniform int debugValue;
 uniform float worldMin_x;

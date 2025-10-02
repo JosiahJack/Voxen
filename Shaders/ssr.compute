@@ -26,17 +26,18 @@ void main() {
 
     imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));
     vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * SSR_RES));
+    vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
+    if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;
+    
     vec2 worldXY = unpackHalf2x16(floatBitsToUint(worldPosPack.r));
     vec2 worldZInst = unpackHalf2x16(floatBitsToUint(worldPosPack.g));
     vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
-    vec4 glowColor = unpackColor32(floatBitsToUint(worldPosPack.b));
-    vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
-    if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;
-
+    
+    vec4 normalPack = unpackColor32(floatBitsToUint(worldPosPack.b));
     vec3 normal = vec3(0.0,0.0,1.0);
-    normal.x = (glowColor.a * 2.0) -1.0;
-    normal.y = (specColor.a * 2.0) - 1.0;
-    normal.z = (glowColor.r * 2.0) - 1.0;
+    normal.x = (normalPack.r * 2.0) -1.0;
+    normal.y = (normalPack.g * 2.0) - 1.0;
+    normal.z = (normalPack.b * 2.0) - 1.0;
     normal = normalize(normal);
 
     vec3 viewDir = normalize(camPos - worldPos);
@@ -66,12 +67,11 @@ void main() {
         ivec2 samplePixel = ivec2(floor(hitUV * screenSize));
         samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
         vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * SSR_RES);
-        vec4 sampledGlowColor = unpackColor32(floatBitsToUint(sampledWorldPosPack.b));
-        vec4 sampledSpecColor = unpackColor32(floatBitsToUint(sampledWorldPosPack.a));
+        vec4 sampledNormalPack = unpackColor32(floatBitsToUint(sampledWorldPosPack.b));
         vec3 sampledNormal = normalize(vec3(
-            sampledGlowColor.a * 2.0 - 1.0,
-            sampledSpecColor.a * 2.0 - 1.0,
-            sampledGlowColor.r * 2.0 - 1.0
+            sampledNormalPack.r * 2.0 - 1.0,
+            sampledNormalPack.g * 2.0 - 1.0,
+            sampledNormalPack.b * 2.0 - 1.0
         ));
         sampledNormal = normalize(sampledNormal);
         if (dot(reflectDir, sampledNormal) >= 0.0) continue;

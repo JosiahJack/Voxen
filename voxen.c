@@ -80,7 +80,9 @@ bool instanceIsLODArray[INSTANCE_COUNT];
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, debugValueLoc_chunk = -1, 
-      glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1;
+      glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1, screenWidthLoc_chunk = -1, screenHeightLoc_chunk = -1, 
+      worldMin_xLoc_chunk = -1, worldMin_zLoc_chunk = -1, camPosLoc_chunk = -1, fogColorRLoc_chunk = -1, fogColorGLoc_chunk = -1,
+      fogColorBLoc_chunk = -1;
 
 //    Shadowmap Rastered Depth Shader
 GLuint shadowCubeMap;
@@ -103,9 +105,7 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID;
 GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, debugValueLoc_deferred = -1,
       worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, camPosLoc_deferred = -1,
-      fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1,
-      viewProjectionLoc_deferred = -1, modelCountLoc_deferred = -1, totalLuxelCountLoc_deferred = -1,
-      invViewProjectionLoc_deferred = -1;
+      fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1;
 
 GLuint blueNoiseBuffer;
       
@@ -252,7 +252,15 @@ int32_t CompileShaders(void) {
     normInstanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
     debugValueLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugValue");
-
+    screenWidthLoc_chunk = glGetUniformLocation(chunkShaderProgram, "screenWidth");
+    screenHeightLoc_chunk = glGetUniformLocation(chunkShaderProgram, "screenHeight");
+    worldMin_xLoc_chunk = glGetUniformLocation(chunkShaderProgram, "worldMin_x");
+    worldMin_zLoc_chunk = glGetUniformLocation(chunkShaderProgram, "worldMin_z");
+    camPosLoc_chunk = glGetUniformLocation(chunkShaderProgram, "camPos");
+    fogColorRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorR");
+    fogColorGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorG");
+    fogColorBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorB");
+    
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
 
@@ -266,10 +274,6 @@ int32_t CompileShaders(void) {
     fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
     fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
     fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
-    viewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "invViewProjection");
-    invViewProjectionLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "viewProjection");
-    modelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "modelCount");
-    totalLuxelCountLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "totalLuxelCount");
 
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -629,9 +633,10 @@ void RenderShadowmap(uint16_t lightIdx) {
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
     GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
-    uint16_t nearMeshes[startOfTransparentInstances];
+    uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
-    for (uint16_t j = 0; j < startOfTransparentInstances; j++) {
+    uint16_t startOfNearbyTransparents = 0;
+    for (uint16_t j = 0; j < loadedInstances; j++) {
         if (instances[j].modelIndex >= MODEL_COUNT) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
         if (IsDynamicObject(instances[j].index)) continue;
@@ -640,6 +645,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
         if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
         
+        if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
     }
@@ -660,6 +666,12 @@ void RenderShadowmap(uint16_t lightIdx) {
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[meshIdx * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+            if (j >= startOfNearbyTransparents) {
+                glEnable(GL_CULL_FACE);
+                glEnable(GL_BLEND); // Enable blending for transparent instances
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
+                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances   
+            }
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
@@ -774,10 +786,9 @@ int32_t InitializeEnvironment(void) {
     glUniform1ui(screenWidthLoc_imageBlit, screen_width);
     glUniform1ui(screenHeightLoc_imageBlit, screen_height);
 
-    glUseProgram(deferredLightingShaderProgram);
-    glUniform1ui(screenWidthLoc_deferred, screen_width);
-    glUniform1ui(screenHeightLoc_deferred, screen_height);
-    glUniform1ui(modelCountLoc_deferred, MODEL_COUNT);
+    glUseProgram(chunkShaderProgram);
+    glUniform1ui(screenWidthLoc_chunk, screen_width);
+    glUniform1ui(screenHeightLoc_chunk, screen_height);
 
     glUseProgram(ssrShaderProgram);
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
@@ -1417,6 +1428,12 @@ int32_t main(int32_t argc, char* argv[]) {
             mul_mat4(viewProj, rasterPerspectiveProjection, view);
             invertAffineMat4(invViewProj, viewProj);
             glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
+            glUniform1f(worldMin_xLoc_chunk, worldMin_x);
+            glUniform1f(worldMin_zLoc_chunk, worldMin_z);
+            glUniform3f(camPosLoc_chunk, cam_x, cam_y, cam_z);
+            glUniform1f(fogColorRLoc_chunk, fogColorR);
+            glUniform1f(fogColorGLoc_chunk, fogColorG);
+            glUniform1f(fogColorBLoc_chunk, fogColorB);
             glBindVertexArray(vao_chunk);
             float lodRangeSqrd = 38.4f * 38.4f;
             memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
@@ -1445,6 +1462,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 
                 if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
                 if (i >= startOfTransparentInstances) {
+                    glEnable(GL_CULL_FACE);
                     glEnable(GL_BLEND); // Enable blending for transparent instances
                     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
                     glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
@@ -1477,28 +1495,27 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
             // ====================================================================
             // 4. Dynamic Shadowmaps
-            RenderDynamicShadowmaps();
+//             RenderDynamicShadowmaps();
             
             // 5. Deferred Lighting
-            GLuint groupX = (screen_width + 31) / 32;
-            GLuint groupY = (screen_height + 31) / 32;
-            if (debugView == 0 || debugView == 8) {
-                glUseProgram(deferredLightingShaderProgram);
-                glUniform1ui(totalLuxelCountLoc_deferred, 64u * 64u * renderableCount);
-                glUniform1f(worldMin_xLoc_deferred, worldMin_x);
-                glUniform1f(worldMin_zLoc_deferred, worldMin_z);
-                glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
-                glUniform1f(fogColorRLoc_deferred, fogColorR);
-                glUniform1f(fogColorGLoc_deferred, fogColorG);
-                glUniform1f(fogColorBLoc_deferred, fogColorB);
-                glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
-                glUniformMatrix4fv(invViewProjectionLoc_deferred, 1, GL_FALSE, invViewProj);
-                glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
-                CHECK_GL_ERROR();
-                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-            }
-
-            // 6. SSR (Screen Space Reflections)
+//             GLuint groupX = (screen_width + 31) / 32;
+//             GLuint groupY = (screen_height + 31) / 32;
+//             if (debugView == 0 || debugView == 8) {
+//                 glUseProgram(deferredLightingShaderProgram);
+//                 glUniform1f(worldMin_xLoc_deferred, worldMin_x);
+//                 glUniform1f(worldMin_zLoc_deferred, worldMin_z);
+//                 glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
+//                 glUniform1f(fogColorRLoc_deferred, fogColorR);
+//                 glUniform1f(fogColorGLoc_deferred, fogColorG);
+//                 glUniform1f(fogColorBLoc_deferred, fogColorB);
+//                 glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
+//                 glUniformMatrix4fv(invViewProjectionLoc_deferred, 1, GL_FALSE, invViewProj);
+//                 glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
+//                 CHECK_GL_ERROR();
+//                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//             }
+// 
+//             // 6. SSR (Screen Space Reflections)
             if (debugView == 0 || debugView == 7) {
                 glUseProgram(ssrShaderProgram);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
