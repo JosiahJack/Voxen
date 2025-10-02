@@ -712,12 +712,6 @@ void RenderShadowmaps(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();
     
-    // Initialize PBO for texture-to-SSBO transfer
-    glGenBuffers(1, &pbo);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
-    glBufferData(GL_PIXEL_PACK_BUFFER, SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * sizeof(float), NULL, GL_STREAM_READ);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-    
     // Render static lights once
     float thresh = 0.04f;
     if (currentLevel >= 10) thresh += 0.015f;
@@ -1374,7 +1368,7 @@ int32_t main(int32_t argc, char* argv[]) {
         }
         
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
-        if (timeSinceLastPhysicsTick > 0.016666666f) { // 60fps fixed tick rate
+        if (timeSinceLastPhysicsTick > 0.006944444f) { // 144fps fixed tick rate
             last_physics_time = current_time;
             EnqueueEvent_Simple(EV_PHYSICS_TICK);
         }
@@ -1528,9 +1522,11 @@ int32_t main(int32_t argc, char* argv[]) {
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
-        if (globalFrameNum == 4) DebugRAM("after 4 frames of running");
-        else if (globalFrameNum == 100) DebugRAM("after 100 frames of running");
-        else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
+        #ifdef DEBUG_RAM_OUTPUT
+            if (globalFrameNum == 4) DebugRAM("after 4 frames of running");
+            else if (globalFrameNum == 100) DebugRAM("after 100 frames of running");
+            else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
+        #endif
     }
 
     return 0;

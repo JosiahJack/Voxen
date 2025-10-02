@@ -4,8 +4,8 @@
 #include "citadel.h"
 // ----------------------------------------------------------------------------
 // Physics
-float move_speed = 0.16;
-bool noclip = true;
+float move_speed = 0.06;
+bool noclip = false;
 
 // ----------------------------------------------------------------------------
 // Input
@@ -411,6 +411,7 @@ int32_t Physics(void) {
     // Naive loop over all instances and their triangles
     for (uint32_t i = 0; i < loadedInstances; i++) {
         if (instances[i].modelIndex >= MODEL_COUNT) continue;
+        if (IsDynamicObject(instances[i].index)) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         
         int32_t mid = instances[i].modelIndex;
