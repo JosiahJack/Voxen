@@ -378,7 +378,7 @@ void RenderUI(void) {
     if ((time_now - lastFrameSecCountTime) >= 1.00) {
         lastFrameSecCountTime = time_now;
         framesPerLastSecond = globalFrameNum - lastFrameSecCount;
-        if (framesPerLastSecond < worstFPS && globalFrameNum > 10) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
+        if (framesPerLastSecond < worstFPS && globalFrameNum > 2000) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
         lastFrameSecCount = globalFrameNum;
     }
     

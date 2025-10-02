@@ -5,7 +5,7 @@
 // ----------------------------------------------------------------------------
 // Physics
 float move_speed = 0.16;
-bool noclip = false;
+bool noclip = true;
 
 // ----------------------------------------------------------------------------
 // Input
@@ -409,7 +409,7 @@ int32_t Physics(void) {
 //     }
     
     // Naive loop over all instances and their triangles
-    for (uint32_t i = 0; i < loadedInstances; i++) {  // Or INSTANCE_COUNT
+    for (uint32_t i = 0; i < loadedInstances; i++) {
         if (instances[i].modelIndex >= MODEL_COUNT) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         

@@ -578,9 +578,9 @@ int32_t VoxelLists() {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
     
-    for (uint16_t i = 0; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
+    for (uint16_t i = 0; i < loadedInstances; i++) UpdateInstanceMatrix(i);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     CHECK_GL_ERROR();    
@@ -1412,7 +1412,7 @@ int32_t main(int32_t argc, char* argv[]) {
             
             // 2. Pass instance data to GPU
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
             
             // 3. Raterized Geometry
@@ -1442,7 +1442,7 @@ int32_t main(int32_t argc, char* argv[]) {
             numberOfFOVConeChecks1 = 0;
             numberOfFOVConeChecks2 = 0;
             numberOfFOVConeChecks3 = 0;
-            for (uint16_t i=0;i<INSTANCE_COUNT;i++) {
+            for (uint16_t i=0;i<loadedInstances;i++) {
                 if (dirtyInstances[i]) UpdateInstanceMatrix(i);
                 float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
                 if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
