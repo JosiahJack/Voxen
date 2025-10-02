@@ -241,7 +241,6 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
     glBindVertexArray(textVAO);
 
     // Batch vertices for all glyphs
@@ -249,7 +248,7 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     float* vertexData = malloc(len * 24 * sizeof(float)); // 6 vertices * 4 floats per glyph
     size_t vertexCount = 0;
     const char* p = text;
-    float xpos = x, ypos = y + GetScreenRelativeY(0.016927f);
+    float xpos = x, ypos = y + GetScreenRelativeY(0.0211f);
     float lineSpacing = GetScreenRelativeY(0.03f); // Match RenderUI
     stbtt_aligned_quad q;
     int characterCount = 0;
@@ -268,14 +267,15 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
         float borderWidthPixels = 2.0f * textTexelWidth;
         float borderTexels = borderWidthPixels * textTexelWidth;
         float textVertices[24] = {
-            // Triangle 1: Bottom-left, Top-left, Top-right
+            // Triangle 1: Bottom-left, Top-right, Top-left
             q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
-            q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, q.s1 + borderTexels, q.t0 - borderTexels,
             q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
+            q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, q.s1 + borderTexels, q.t0 - borderTexels,
+            
             // Triangle 2: Bottom-left, Top-right, Bottom-right
             q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
-            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
-            q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels
+            q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels,
+            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels
         };
         memcpy(vertexData + vertexCount * 24, textVertices, sizeof(textVertices));
         vertexCount++;
@@ -360,9 +360,6 @@ void RenderUI(void) {
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: ! % ^ ö ü é ó る。エレベーターでレベルを離れよ низкой гравитацией");
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, "FOV Cone Checks: %u, %u, %u, %u",numberOfFOVConeChecks0,numberOfFOVConeChecks1,numberOfFOVConeChecks2,numberOfFOVConeChecks3);
-
-    
-    
     if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
     if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
 

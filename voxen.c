@@ -1414,6 +1414,9 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
             glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+            // 3. Dynamic Shadowmaps
+            RenderDynamicShadowmaps();      
             
             // 3. Raterized Geometry
             //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1494,28 +1497,7 @@ int32_t main(int32_t argc, char* argv[]) {
             CHECK_GL_ERROR();
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
             // ====================================================================
-            // 4. Dynamic Shadowmaps
-//             RenderDynamicShadowmaps();
-            
-            // 5. Deferred Lighting
-//             GLuint groupX = (screen_width + 31) / 32;
-//             GLuint groupY = (screen_height + 31) / 32;
-//             if (debugView == 0 || debugView == 8) {
-//                 glUseProgram(deferredLightingShaderProgram);
-//                 glUniform1f(worldMin_xLoc_deferred, worldMin_x);
-//                 glUniform1f(worldMin_zLoc_deferred, worldMin_z);
-//                 glUniform3f(camPosLoc_deferred, cam_x, cam_y, cam_z);
-//                 glUniform1f(fogColorRLoc_deferred, fogColorR);
-//                 glUniform1f(fogColorGLoc_deferred, fogColorG);
-//                 glUniform1f(fogColorBLoc_deferred, fogColorB);
-//                 glUniformMatrix4fv(viewProjectionLoc_deferred, 1, GL_FALSE, viewProj);
-//                 glUniformMatrix4fv(invViewProjectionLoc_deferred, 1, GL_FALSE, invViewProj);
-//                 glDispatchCompute(groupX, groupY, 1); // Dispatch compute shader
-//                 CHECK_GL_ERROR();
-//                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-//             }
-// 
-//             // 6. SSR (Screen Space Reflections)
+            // 6. SSR (Screen Space Reflections)
             if (debugView == 0 || debugView == 7) {
                 glUseProgram(ssrShaderProgram);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
