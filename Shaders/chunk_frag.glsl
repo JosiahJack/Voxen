@@ -27,7 +27,7 @@ const uint MATERIAL_IDX_MAX = 2048;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(std430,  binding =  5) buffer ShadowMaps { float shadowMaps[]; };
+layout(std430,  binding =  5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430,  binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -255,8 +255,12 @@ void main() {
                 float ty = clamp(t.y, 0.0, shadowMapSize - 1.0);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
-                uint idx = faceOff + uty * uint(shadowMapSize) + utx;
-                float d = shadowMaps[idx];
+                uint ssbo_index = faceOff + uty * uint(shadowMapSize) + utx;
+                uint packedIndex = ssbo_index >> 1;
+                bool upper       = false;//(ssbo_index & 1u) == 1u;
+                uint packedVal = shadowMaps[packedIndex];
+                uint q = upper ? (packedVal >> 16) & 0xFFFFu : packedVal & 0x0000FFFFu;
+                float d = (float(q) / 65535) * 15.36;
                 float depthDiff = dist - d;
                 float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
                 sum += shadowContrib * invSamples;

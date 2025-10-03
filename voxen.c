@@ -681,7 +681,9 @@ void RenderShadowmaps(void) {
     glGenBuffers(1, &shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
-    uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(float);
+//     uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint16_t);
+    uint32_t packedPixelCount = shadowmapPixelCount / 2; // 2 pixels per uint
+    uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * packedPixelCount * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
