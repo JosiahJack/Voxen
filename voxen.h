@@ -8,8 +8,6 @@
 
 // Generic Constants
 #define M_PI 3.141592653f
-#define M_PI_2 1.57079632679489661923f
-#define MATH_EPSILON 0.00001f
 
 // Global Types
 typedef struct { float x,y; } Vector2;
@@ -340,6 +338,7 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
 extern double time_PhysicsStep;
+extern double physicsProcessingTime;
 extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
@@ -441,7 +440,7 @@ extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
 extern int32_t debugValue;
-extern GLint debugViewLoc_chunk, debugViewLoc_deferred, debugValueLoc_chunk, debugValueLoc_deferred, debugViewLoc_quadblit, debugValueLoc_quadblit;
+extern GLint debugViewLoc_chunk, debugValueLoc_chunk, debugViewLoc_quadblit, debugValueLoc_quadblit;
 extern float fogColorR, fogColorG, fogColorB;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
@@ -461,7 +460,6 @@ extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, c
 extern Quaternion cam_rotation;
 extern float genericTextHeightFac;
 extern GLuint chunkShaderProgram;
-extern GLuint deferredLightingShaderProgram;
 extern GLuint textShaderProgram;
 extern GLuint imageBlitShaderProgram;
 extern GLuint textVAO, textVBO;

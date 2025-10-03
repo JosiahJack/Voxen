@@ -6,6 +6,7 @@
 // Physics
 float move_speed = 0.06;
 bool noclip = false;
+double physicsProcessingTime = 0.0;
 
 // ----------------------------------------------------------------------------
 // Input
@@ -52,7 +53,6 @@ int32_t Input_KeyDown(int32_t scancode) {
     if (keys[SDL_SCANCODE_R]) {
         debugView++;
         if (debugView > 7) debugView = 0;
-        glProgramUniform1i(deferredLightingShaderProgram, debugViewLoc_deferred, debugView);
         glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
     }
@@ -60,7 +60,6 @@ int32_t Input_KeyDown(int32_t scancode) {
     if (keys[SDL_SCANCODE_Y]) {
         debugValue++;
         if (debugValue > 3) debugValue = 0;
-        glProgramUniform1i(deferredLightingShaderProgram, debugValueLoc_deferred, debugValue);
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
         glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
     }
@@ -68,7 +67,6 @@ int32_t Input_KeyDown(int32_t scancode) {
     if (keys[SDL_SCANCODE_E]) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
     }
-    
 
     if (keys[SDL_SCANCODE_1]) {
         fogColorR += 0.01f;
@@ -379,6 +377,8 @@ static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint3
 // ================================= Physics ==================================
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
+    
+    double start_time = get_time();
 
     // Player Movement from Input
     if (window_has_focus) { // Move the player based on input first, then bound it below...
@@ -445,5 +445,6 @@ int32_t Physics(void) {
     cam_x = cap_center.x; // Update camera from resolved capsule center
     cam_y = cap_center.y + capsule_offset;  // Restore offset
     cam_z = cap_center.z;
+    physicsProcessingTime = get_time() - start_time;
     return 0;
 }

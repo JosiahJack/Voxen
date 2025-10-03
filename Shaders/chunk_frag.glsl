@@ -140,7 +140,7 @@ void main() {
     int texIndexChecked = 0;
     if (TexIndex >= 0) texIndexChecked = int(TexIndex); 
     ivec2 texSize = textureSizes[texIndexChecked];
-    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V, OpenGL convention vs import
+    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
     ivec2 pixel = ivec2(uv);
     int x = int(floor(uv.x * float(texSize.x)));
     int y = int(floor(uv.y * float(texSize.y)));
@@ -168,11 +168,11 @@ void main() {
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
     vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
     vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
-    vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
-                             uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
-                             uintBitsToFloat(packColor(normalPack)),
-                             uintBitsToFloat(packColor(specColor)) );
-    outWorldPos = worldPosPack;
+//     vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
+//                              uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
+//                              uintBitsToFloat(packColor(normalPack)),
+//                              uintBitsToFloat(packColor(specColor)) );
+//     outWorldPos = worldPosPack;
 
     uint pixelInstance = InstanceIndex;
     uint voxelIdx = GetVoxelIndex(worldPos);
@@ -224,10 +224,7 @@ void main() {
         if (debugValue != 2) {
             float rangeFac = ((range - dist) / range);
             float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 16.0 + 0.0;
-            smearness = max(smearness, 0.001); // avoid zero scale
             float slope = max(0.0, 1.0 - dot(normal, lightDir));
-            float bias = slope * ((1.0 / shadowMapSize) + (0.72 * (1.0 - rangeFac)));
-
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -247,24 +244,20 @@ void main() {
             uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
             vec2 tc = uv * shadowMapSize;
 
-            // stochastic PCF sampling
+            // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
             float invSamples = 1.0 / float(PCF_SAMPLES);
-
-            // scale poisson disk from [-1,1] to texel offsets; smearness is multiplied by a small factor
-            // tune scaleFactor to taste; 1.0 maps smearness=6 to ~6 texels max.
             float scaleFactor = 1.0;
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * (smearness * scaleFactor);
                 vec2 t = tc + off;
-                // clamp and integerize once
                 float tx = clamp(t.x, 0.0, shadowMapSize - 1.0);
                 float ty = clamp(t.y, 0.0, shadowMapSize - 1.0);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
                 uint idx = faceOff + uty * uint(shadowMapSize) + utx;
                 float d = shadowMaps[idx];
-                float depthDiff = dist - d - bias;
+                float depthDiff = dist - d;
                 float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
                 sum += shadowContrib * invSamples;
             }
@@ -272,6 +265,7 @@ void main() {
             shadowFactor = sum;
         }
         
+        if (shadowFactor < 0.005) continue;
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         lighting += albedoColor.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor;
     }
@@ -279,10 +273,10 @@ void main() {
     lighting += glowColor.rgb;
 
     // Dither + fog
-    int blueNoiseTextureWidth = 64;
-    int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
-    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
-    lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
+//     int blueNoiseTextureWidth = 64;
+//     int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
+//     vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
+//     lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
 
     float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
@@ -309,7 +303,7 @@ void main() {
         outAlbedo.b = float(texIndexChecked) / 1231.0;
         outAlbedo.a = 1.0;
     } else if (debugView == 5) { // Worldpos debug
-        outAlbedo.rgb = worldPosPack.xyz;
+        outAlbedo.rgb = vec3(1.0);//worldPosPack.xyz;
         outAlbedo.a = 1.0;
     } else {
         outAlbedo = vec4(lighting.rgb, albedoColor.a);

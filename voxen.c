@@ -25,7 +25,6 @@
 #include "Shaders/shadowmap_frag.glsl.h"
 #include "Shaders/composite_vert.glsl.h"
 #include "Shaders/composite_frag.glsl.h"
-#include "Shaders/deferred_lighting.compute.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/bluenoise64.cginc"
 // ----------------------------------------------------------------------------
@@ -73,6 +72,7 @@ uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsCulledArray[INSTANCE_COUNT];
 bool instanceIsLODArray[INSTANCE_COUNT];
+GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 
 // ----------------------------------------------------------------------------
 // Shaders
@@ -83,6 +83,8 @@ GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debu
       glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1, screenWidthLoc_chunk = -1, screenHeightLoc_chunk = -1, 
       worldMin_xLoc_chunk = -1, worldMin_zLoc_chunk = -1, camPosLoc_chunk = -1, fogColorRLoc_chunk = -1, fogColorGLoc_chunk = -1,
       fogColorBLoc_chunk = -1;
+GLuint blueNoiseBuffer;
+float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
 //    Shadowmap Rastered Depth Shader
 GLuint shadowCubeMap;
@@ -98,18 +100,6 @@ bool shadowMapsRendered = false;
 bool lightIsDynamic[LIGHT_COUNT] = {0};
 uint16_t staticLightCount = 0;
 uint16_t staticLightIndices[LIGHT_COUNT];
-
-//    Deferred Lighting Compute Shader
-GLuint deferredLightingShaderProgram;
-GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
-GLuint precomputedVisibleCellsFromHereID, cellIndexForInstanceID;
-GLint screenWidthLoc_deferred = -1, screenHeightLoc_deferred = -1, debugViewLoc_deferred = -1, debugValueLoc_deferred = -1,
-      worldMin_xLoc_deferred = -1, worldMin_zLoc_deferred = -1, camPosLoc_deferred = -1,
-      fogColorRLoc_deferred = -1, fogColorGLoc_deferred = -1, fogColorBLoc_deferred = -1;
-
-GLuint blueNoiseBuffer;
-      
-float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
@@ -225,10 +215,6 @@ int32_t CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
 
-    // Deferred Lighting Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, deferredLighting_computeShader, "Deferred Lighting Compute Shader"); if (!computeShader) { return 1; }
-    deferredLightingShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Deferred Lighting Shader Program");        if (!deferredLightingShaderProgram) { return 1; }
-
     // Screen Space Reflections Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader"); if (!computeShader) { return 1; }
     ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");        if (!ssrShaderProgram) { return 1; }
@@ -263,17 +249,6 @@ int32_t CompileShaders(void) {
     
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
-
-    screenWidthLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenWidth");
-    screenHeightLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "screenHeight");
-    debugViewLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugView");
-    debugValueLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "debugValue");
-    worldMin_xLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_x");
-    worldMin_zLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "worldMin_z");
-    camPosLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "camPos");
-    fogColorRLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorR");
-    fogColorGLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorG");
-    fogColorBLoc_deferred = glGetUniformLocation(deferredLightingShaderProgram, "fogColorB");
 
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -841,7 +816,7 @@ int32_t InitializeEnvironment(void) {
         }
     }
     
-    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Double duty unlit raster and deferred lighting results, reused sequentially
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     //                 3 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
@@ -1492,16 +1467,16 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
-            if (debugView == 0 || debugView == 7) {
-                glUseProgram(ssrShaderProgram);
-                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-                glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
-                GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
-                GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
-                glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-                CHECK_GL_ERROR();
-                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-            }
+//             if (debugView == 0 || debugView == 7) {
+//                 glUseProgram(ssrShaderProgram);
+//                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+//                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
+//                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
+//                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
+//                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+//                 CHECK_GL_ERROR();
+//                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//             }
         } else { // END !PAUSED BLOCK -------------------------------------------------
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }

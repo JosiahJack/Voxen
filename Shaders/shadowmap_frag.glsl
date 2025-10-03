@@ -13,7 +13,7 @@ void main() {
                  face * 65536/*SHADOW_MAP_SIZE * SHADOW_MAP_SIZE*/ +
                  texelCoord.y * 256/*SHADOW_MAP_SIZE*/ + texelCoord.x;
 
-    if (depthData[index] <= 0.00001) depthData[index] = 15.36; // Keep GL driver from increasing RAM by 1gb by clearing it here.
+    if (depthData[index] <= 0.00001) depthData[index] = 15.36; // Keep GL driver from increasing RAM by 1gb by clearing it here instead of on CPU call.
     float dist = length(WorldPos - lightPos); // Linear distance in world space
     if (index > 0 && dist < depthData[index]) depthData[index] = dist;
 }

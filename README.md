@@ -198,22 +198,19 @@ blurrier, voxel results.  Also called SSR.
 
 #### Rendering System:
 
-Rendering uses a multipass system with deferred lighting.
-Pass 1: Unlit Rasterization - gets albedo, normals, depth
-                              world position, indices.
-                              This is standard vert+frag.
+Rendering uses a multipass system with forward+ lighting with voxel light clusters.
+Pass 1: Forward+ Rasterization - gets albedo, normals, depth
+                                 world position, indices.
+                                 This is standard vert+frag.
+                                 Applies shadows and lighting.
 
-Pass 2: Deferred Lighting - compute shader that determines
-                            many lights' contributions and
-                            combines with VXGI results.
-
-Pass 3: Screen Space Reflections (SSR): Compute shader full
+DISABLED FOR NOW Pass 2: Screen Space Reflections (SSR): Compute shader full
                                         screen effect that
                                         is subtle.
 
-Pass 4: Final Blit - Takes the results of the compute
+Pass 3: Final Blit -  Takes the results of the compute
                       shaders and renders image as full
-                      screen quad.
+                      screen quad.  Applies Antialiasing and Post Processing.
 
 Rendering leverages static buffers for minimal CPU->GPU
 data transfers and maximal performance with minimal state

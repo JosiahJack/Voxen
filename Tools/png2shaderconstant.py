@@ -1,7 +1,7 @@
 from PIL import Image
 import numpy as np
 
-# Used to generate the blue noise color buffer for the deferred lighting compute shader
+# Used to generate the blue noise color buffer for use in shaders
 # so as to not balloon the number of unique colors unnecessarily and have bundled with
 # the engine instead of requiring mods to include it since I consider it a necessity
 # for proper smooth lighting results.

@@ -370,7 +370,7 @@ void RenderUI(void) {
     double time_now = get_time();
     drawCallsRenderedThisFrame++; // Add one more for this text render ;)
     RenderFormattedText(leftPad, debugTextStartY - lineSpacing, TEXT_WHITE, "Frame time: %.6f (FPS: %d), Draw calls: %d [Geo %d, UI %d Shad %d], Verts: %d, Worst FPS: %d, Phys T: %.3f",
-                        (time_now - last_time) * 1000.0f,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal - 0,verticesRenderedThisFrame,worstFPS,time_PhysicsStep * 1000.0f);
+                        (time_now - last_time) * 1000.0f,framesPerLastSecond,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal - 0,verticesRenderedThisFrame,worstFPS,physicsProcessingTime);
     last_time = time_now;
     if ((time_now - lastFrameSecCountTime) >= 1.00) {
         lastFrameSecCountTime = time_now;
