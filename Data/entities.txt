@@ -916,7 +916,7 @@ index: 174
 model: 269
 cardchunk: 1
 texture: 505
-spectexture: 1238
+spectexture: 1242
 #chunk_med1_9d_ofs112_90
 index: 176
 model: 270
