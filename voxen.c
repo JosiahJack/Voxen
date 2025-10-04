@@ -90,14 +90,12 @@ float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 GLuint shadowCubeMap;
 GLuint depthCubeMap;
 GLuint shadowFBO;
-GLuint pbo;
-float* mappedShadowData = NULL; 
 GLuint shadowmapsShaderProgram;
-GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1;
-GLuint lightIndirectionIndices[LIGHT_COUNT];
+GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1, texIndexLoc_shadowmaps = -1;
 GLuint shadowMapSSBO; // SSBO for storing all shadow maps
+GLuint reflectionProbeSSBO; // SSBO for storing the albedo colors for reflections
 bool shadowMapsRendered = false;
-bool lightIsDynamic[LIGHT_COUNT] = {0};
+uint32_t lightIsDynamic[LIGHT_COUNT + 31 / 32] = {0};
 uint16_t staticLightCount = 0;
 uint16_t staticLightIndices[LIGHT_COUNT];
 
@@ -105,6 +103,7 @@ uint16_t staticLightIndices[LIGHT_COUNT];
 #define SSR_RES 4 // 25% of render resolution.
 GLuint ssrShaderProgram;
 GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, camPosLoc_ssr = -1;
+GLuint reflectionCubeMap;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -249,6 +248,7 @@ int32_t CompileShaders(void) {
     
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
+    texIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "texIndex");
 
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -641,6 +641,7 @@ void RenderShadowmap(uint16_t lightIdx) {
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[meshIdx * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+            glUniform1ui(texIndexLoc_shadowmaps, instances[j].texIndex);
             if (j >= startOfNearbyTransparents) {
                 glEnable(GL_CULL_FACE);
                 glEnable(GL_BLEND); // Enable blending for transparent instances
@@ -663,7 +664,7 @@ void RenderShadowmaps(void) {
     DebugRAM("Start of RenderShadowmaps");
     glGenTextures(1, &shadowCubeMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
-    for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_FLOAT, NULL);
+    for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_RGBA8, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -686,14 +687,16 @@ void RenderShadowmaps(void) {
     uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * packedPixelCount * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
+    
+    // Reflection Colors SSBO
+    glGenBuffers(1, &reflectionProbeSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, reflectionProbeSSBO);
+    uint32_t reflectionMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint32_t); // RGBA packed as 4 bytes
+    glBufferData(GL_SHADER_STORAGE_BUFFER, reflectionMapBufferSize, NULL, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, reflectionProbeSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
     
     // Render static lights once
-    float thresh = 0.04f;
-    if (currentLevel >= 10) thresh += 0.015f;
-    if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
-    if (currentLevel == 8) thresh += 0.005f;
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);

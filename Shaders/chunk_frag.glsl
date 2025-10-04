@@ -27,16 +27,17 @@ const uint MATERIAL_IDX_MAX = 2048;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(std430,  binding =  5) buffer ShadowMaps { uint shadowMaps[]; };
+layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
+layout(std430,  binding = 6) buffer ReflectionMaps { uint reflectionColors[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
-layout(std430,  binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
+layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
-layout(std430,  binding = 19) buffer LightIndices { float lights[]; };
-layout(std430,  binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
-layout(std430,  binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
+layout(std430, binding = 19) buffer LightIndices { float lights[]; };
+layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
+layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
 const int LIGHT_DATA_SIZE = 13;
 const int LIGHT_DATA_OFFSET_POSX = 0;
@@ -70,7 +71,7 @@ uint GetVoxelIndex(vec3 worldPos) {
     return cellIndex * 64 + voxelIndexInCell;
 }
 
-const float shadowMapSize = 256.0;
+const float SHADOW_MAP_SIZE = 128.0;
 
 // Small Poisson disk for stochastic PCF.
 // 12 samples gives good quality when temporally accumulated.
@@ -240,9 +241,9 @@ void main() {
             }
 
             uv = uv * 0.5 + 0.5;
-            uint base = lightIdxInPVS * 6u * uint(shadowMapSize) * uint(shadowMapSize);
-            uint faceOff = base + face * uint(shadowMapSize) * uint(shadowMapSize);
-            vec2 tc = uv * shadowMapSize;
+            uint base = lightIdxInPVS * 6u * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
+            uint faceOff = base + face * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
+            vec2 tc = uv * SHADOW_MAP_SIZE;
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
@@ -251,11 +252,11 @@ void main() {
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * (smearness * scaleFactor);
                 vec2 t = tc + off;
-                float tx = clamp(t.x, 0.0, shadowMapSize - 1.0);
-                float ty = clamp(t.y, 0.0, shadowMapSize - 1.0);
+                float tx = clamp(t.x, 0.0, SHADOW_MAP_SIZE - 1.0);
+                float ty = clamp(t.y, 0.0, SHADOW_MAP_SIZE - 1.0);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
-                uint ssbo_index = faceOff + uty * uint(shadowMapSize) + utx;
+                uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
                 uint packedIndex = ssbo_index >> 1;
                 bool upper       = false;//(ssbo_index & 1u) == 1u;
                 uint packedVal = shadowMaps[packedIndex];
