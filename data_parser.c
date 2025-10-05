@@ -227,6 +227,17 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     return true;
 }
 
+// TODO: Figure out how to handle info_ressurection_points that needed to live outside the levels:
+// Level R -27.386 -55.488 26.5941
+// Level 1 40.903 -42.372 -30.78
+// Level 2 30.67407 -25.832 10.21412
+// Level 3 38.26813 -15.498 20.37825
+// Level 4 -19.48 -7.928 22.954
+// Level 5 -24.358 12.5956 31.8497
+// Level 6 -22.3568 33.7845 -30.728
+// Level 7 2.228084 50.95243 7.532025
+// Level 9.1_resdest 2.303 106.77 -38.554 (I don't remember what this is for, cheat spawn from `load 9`??)
+
 bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum) {
     *is_comment = false;
     *is_eof = false;
