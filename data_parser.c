@@ -215,7 +215,7 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "type") == 0) {
         if ((strcmp(trimmed_value, "Spot") == 0)) entry->type = 1u;
-        else if ((strcmp(trimmed_value, "Directional") == 0)) entry->type = 2u;
+        else if ((strcmp(trimmed_value, "Directional") == 0)) entry->gtype = 2u;
         else entry->type = 0u;
     }
     else if (strcmp(trimmed_key, "color.r") == 0)         entry->color.r = parse_float(trimmed_value, line, lineNum);
