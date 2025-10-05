@@ -89,12 +89,13 @@ void main() {
     int x = int(floor(uv.x * float(texSize.x)));
     int y = int(floor(uv.y * float(texSize.y)));
     ivec2 texUV = ivec2(x,y);
-    vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
-    if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
-
     int ssbo_index = (lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + // Note: Slight performance boost hardcoding it
                  face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE +
                  texelCoord.y * SHADOW_MAP_SIZE + texelCoord.x;
+
+    reflectionColors[ssbo_index] = packColor(vec4(0.0,0.0,0.0,1.0));
+    vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
+    if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     int packedIndex = ssbo_index >> 1;           // two values per uint
     bool upper      = false;//(ssbo_index & 1) == 1;

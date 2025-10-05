@@ -204,12 +204,6 @@ void main() {
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
     vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
     vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
-//     vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
-//                              uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
-//                              uintBitsToFloat(packColor(normalPack)),
-//                              uintBitsToFloat(packColor(specColor)) );
-//     outWorldPos = worldPosPack;
-
     uint pixelInstance = InstanceIndex;
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count  = voxelLightListIndices[voxelIdx * 2 + 1];
@@ -306,50 +300,53 @@ void main() {
             shadowFactor = sum;
 
             // Reflection sampling with parallax correction
-            vec3 reflectDir = parallaxCorrectedReflection(worldPos, normal, viewDir, lightPos, range);
-            vec3 reflectAbs = abs(reflectDir);
-            float reflectMaxAxis = max(max(reflectAbs.x, reflectAbs.y), reflectAbs.z);
-            float reflectInvMax = (reflectMaxAxis > 0.0) ? (1.0 / reflectMaxAxis) : 0.0;
-            vec3 reflectNorm = reflectDir * reflectInvMax;
-            uint reflectFace;
-            vec2 reflectUV;
-            if (reflectAbs.x >= reflectAbs.y && reflectAbs.x >= reflectAbs.z) {
-                reflectFace = reflectDir.x > 0.0 ? 0u : 1u;
-                reflectUV = (reflectFace == 0u) ? vec2(-reflectNorm.z, reflectNorm.y) : vec2(reflectNorm.z, reflectNorm.y);
-            } else if (reflectAbs.y >= reflectAbs.x && reflectAbs.y >= reflectAbs.z) {
-                reflectFace = reflectDir.y > 0.0 ? 2u : 3u;
-                reflectUV = (reflectFace == 2u) ? vec2(reflectNorm.x, -reflectNorm.z) : vec2(reflectNorm.x, reflectNorm.z);
-            } else {
-                reflectFace = reflectDir.z > 0.0 ? 4u : 5u;
-                reflectUV = (reflectFace == 4u) ? vec2(reflectNorm.x, reflectNorm.y) : vec2(-reflectNorm.x, reflectNorm.y);
-            }
+            if (shadowFactor < 1.0) {
+                vec3 reflectDir = parallaxCorrectedReflection(worldPos, normal, viewDir, lightPos, range);
+                vec3 reflectAbs = abs(reflectDir);
+                float reflectMaxAxis = max(max(reflectAbs.x, reflectAbs.y), reflectAbs.z);
+                float reflectInvMax = (reflectMaxAxis > 0.0) ? (1.0 / reflectMaxAxis) : 0.0;
+                vec3 reflectNorm = reflectDir * reflectInvMax;
+                uint reflectFace;
+                vec2 reflectUV;
+                if (reflectAbs.x >= reflectAbs.y && reflectAbs.x >= reflectAbs.z) {
+                    reflectFace = reflectDir.x > 0.0 ? 0u : 1u;
+                    reflectUV = (reflectFace == 0u) ? vec2(-reflectNorm.z, reflectNorm.y) : vec2(reflectNorm.z, reflectNorm.y);
+                } else if (reflectAbs.y >= reflectAbs.x && reflectAbs.y >= reflectAbs.z) {
+                    reflectFace = reflectDir.y > 0.0 ? 2u : 3u;
+                    reflectUV = (reflectFace == 2u) ? vec2(reflectNorm.x, -reflectNorm.z) : vec2(reflectNorm.x, reflectNorm.z);
+                } else {
+                    reflectFace = reflectDir.z > 0.0 ? 4u : 5u;
+                    reflectUV = (reflectFace == 4u) ? vec2(reflectNorm.x, reflectNorm.y) : vec2(-reflectNorm.x, reflectNorm.y);
+                }
 
-            reflectUV = reflectUV * 0.5 + 0.5;
-            vec2 reflectTC = reflectUV * SHADOW_MAP_SIZE;
-            float reflectTx = clamp(reflectTC.x, 0.0, SHADOW_MAP_SIZE - 1.0);
-            float reflectTy = clamp(reflectTC.y, 0.0, SHADOW_MAP_SIZE - 1.0);
-            uint reflectUtx = uint(reflectTx);
-            uint reflectUty = uint(reflectTy);
-            uint reflectBase = lightIdxInPVS * 6u * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-            uint reflectFaceOff = reflectBase + reflectFace * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-            uint reflectSsboIndex = reflectFaceOff + reflectUty * uint(SHADOW_MAP_SIZE) + reflectUtx;
-            reflectColor = unpackColor32(reflectionColors[reflectSsboIndex]).rgb;
+                reflectUV = reflectUV * 0.5 + 0.5;
+                vec2 reflectTC = reflectUV * SHADOW_MAP_SIZE;
+                float reflectTx = clamp(reflectTC.x, 0.0, SHADOW_MAP_SIZE - 1.0);
+                float reflectTy = clamp(reflectTC.y, 0.0, SHADOW_MAP_SIZE - 1.0);
+                uint reflectUtx = uint(reflectTx);
+                uint reflectUty = uint(reflectTy);
+                uint reflectFaceOff = base + reflectFace * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
+                uint reflectSsboIndex = reflectFaceOff + reflectUty * uint(SHADOW_MAP_SIZE) + reflectUtx;
+                reflectColor = unpackColor32(reflectionColors[reflectSsboIndex]).rgb;// * specColor.rgb; // Ok so this line
+                if (reflectColor.r > 0.99 && reflectColor.g > 0.99 && reflectColor.b > 0.99) reflectColor = vec3(0.0); // And this line are making it such that only 1 reflection contributes, else things overlap and balloon to pure white immediately and look very very weird.
+            }
         }
 
-        vec3 specular = specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0 ? reflectColor : vec3(0.0);// * specColor.rgb;
-        lighting += specular;
+        vec3 specular = specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0 ? reflectColor : vec3(0.0);
+        lighting += specular * 0.5;
         if (shadowFactor < 0.005) continue;
-//         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
-//         lighting += (albedoColor.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor) + specular;
+
+        vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
+        lighting += (albedoColor.rgb * (intensity * 0.4) * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor);
     }
 
-//     lighting += glowColor.rgb;
+    lighting += glowColor.rgb;
 
     // Dither + fog
-//     int blueNoiseTextureWidth = 64;
-//     int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
-//     vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
-//     lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
+    int blueNoiseTextureWidth = 64;
+    int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
+    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
+    lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
 
     float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));

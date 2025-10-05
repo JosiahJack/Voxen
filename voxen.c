@@ -91,7 +91,7 @@ GLuint shadowCubeMap;
 GLuint depthCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
-GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1, texIndexLoc_shadowmaps = -1;
+GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1, texIndexLoc_shadowmaps = -1, glowSpecIndexLoc_shadowmaps = -1, normInstanceIndexLoc_shadowmaps = -1;
 GLuint shadowMapSSBO; // SSBO for storing all shadow maps
 GLuint reflectionProbeSSBO; // SSBO for storing the albedo colors for reflections
 bool shadowMapsRendered = false;
@@ -249,6 +249,8 @@ int32_t CompileShaders(void) {
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
     texIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "texIndex");
+    glowSpecIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "glowSpecIndex");
+    normInstanceIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "normInstanceIndex");
 
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -603,27 +605,27 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-    float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-    float effectiveRadius = fmax(lightRadius, 15.36f);
+//     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+//     float effectiveRadius = fmax(lightRadius, 15.36f);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
     GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
-    uint16_t nearMeshes[loadedInstances];
-    uint16_t nearbyMeshCount = 0;
-    uint16_t startOfNearbyTransparents = 0;
-    for (uint16_t j = 0; j < loadedInstances; j++) {
-        if (instances[j].modelIndex >= MODEL_COUNT) continue;
-        if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-        if (IsDynamicObject(instances[j].index)) continue;
-        
-        float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-        float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
-        if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
-        
-        if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
-        nearMeshes[nearbyMeshCount] = j;
-        nearbyMeshCount++;
-    }
+//     uint16_t nearMeshes[loadedInstances];
+//     uint16_t nearbyMeshCount = 0;
+//     uint16_t startOfNearbyTransparents = 0;
+//     for (uint16_t j = 0; j < loadedInstances; j++) {
+//         if (instances[j].modelIndex >= MODEL_COUNT) continue;
+//         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+//         if (IsDynamicObject(instances[j].index)) continue;
+//         
+//         float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+//         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
+//         if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
+//         
+//         if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
+//         nearMeshes[nearbyMeshCount] = j;
+//         nearbyMeshCount++;
+//     }
 
     for (uint8_t face = 0; face < 6; face++) {
         float lightView[16];
@@ -633,21 +635,33 @@ void RenderShadowmap(uint16_t lightIdx) {
         glUniform3f(lightPosLoc, lightPosX, lightPosY, lightPosZ);
         glUniform1i(lightIdxLoc, lightIdx);
         glUniform1i(faceIdxLoc, face);
-        glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[0]); // Reset for first mesh
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
-        for (uint16_t j = 0; j < nearbyMeshCount; j++) {
-            int16_t meshIdx = nearMeshes[j];
-            int16_t modelType = instanceIsLODArray[meshIdx] && instances[meshIdx].lodIndex < MODEL_COUNT ? instances[meshIdx].lodIndex : instances[meshIdx].modelIndex;
-            glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[meshIdx * 16]);
-            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-            glUniform1ui(texIndexLoc_shadowmaps, instances[j].texIndex);
-            if (j >= startOfNearbyTransparents) {
+        for (uint16_t i = 0; i < loadedInstances; ++i) {
+            if (instances[i].modelIndex >= MODEL_COUNT) continue;
+            if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+
+            if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
+            if (i >= startOfTransparentInstances) {
                 glEnable(GL_CULL_FACE);
                 glEnable(GL_BLEND); // Enable blending for transparent instances
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
-                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances   
+                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
             }
+            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+            uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+            glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
+            uint32_t specdex = (uint32_t)instances[i].specIndex;
+            specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
+            uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
+            uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
+            nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
+            uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
+            glUniform1ui(glowSpecIndexLoc_shadowmaps, glowSpecPack);
+            glUniform1ui(normInstanceIndexLoc_shadowmaps, normInstancePack);
+            glUniform1ui(texIndexLoc_shadowmaps, instances[i].texIndex);
+            glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
+            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
@@ -692,7 +706,10 @@ void RenderShadowmaps(void) {
     glGenBuffers(1, &reflectionProbeSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, reflectionProbeSSBO);
     uint32_t reflectionMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint32_t); // RGBA packed as 4 bytes
-    glBufferData(GL_SHADER_STORAGE_BUFFER, reflectionMapBufferSize, NULL, GL_STATIC_DRAW);
+    uint32_t* nullColors = (uint32_t*)malloc(reflectionMapBufferSize);
+    memset(nullColors,0u,reflectionMapBufferSize);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, reflectionMapBufferSize, nullColors, GL_STATIC_DRAW);
+    free(nullColors);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, reflectionProbeSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
@@ -982,7 +999,7 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     numberOfFOVConeChecks1++; // Reporting 5030
     if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
 
-    if (radius > 0.0f && dist_sq > (radius * radius)) {
+    if (radius > 0.0f && dist_sq > (radius * radius)) { // TODO: Remove this if statement??  Never returns true?
         float adjusted_dot = dot_normalized - (radius / dist); // Approximate sphere extent
         numberOfFOVConeChecks2++;  // Reporting 2687
         if (adjusted_dot >= cos_half_fov) return true; // Part of sphere may be in view
