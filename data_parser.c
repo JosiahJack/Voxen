@@ -186,7 +186,7 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
         return true;
     }
 
-            if (strcmp(trimmed_key, "index") == 0)           entry->index = parse_numberu16(trimmed_value, line, lineNum);
+         if (strcmp(trimmed_key, "index") == 0)           entry->index = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "constIndex") == 0)      entry->index = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "model") == 0)           entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "texture") == 0)         entry->texIndex = parse_numberu16(trimmed_value, line, lineNum);
@@ -213,7 +213,11 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "range") == 0)           entry->range = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "type") == 0)            entry->type = (strcmp(trimmed_value, "Spot") == 0) ? 1u : 0u;
+    else if (strcmp(trimmed_key, "type") == 0) {
+        if ((strcmp(trimmed_value, "Spot") == 0)) entry->type = 1u;
+        else if ((strcmp(trimmed_value, "Directional") == 0)) entry->type = 2u;
+        else entry->type = 0u;
+    }
     else if (strcmp(trimmed_key, "color.r") == 0)         entry->color.r = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "color.g") == 0)         entry->color.g = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "color.b") == 0)         entry->color.b = parse_float(trimmed_value, line, lineNum);
@@ -957,7 +961,11 @@ int32_t LoadLevelLights(uint8_t curlevel) {
         lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].position.z + correctionLightZ;
         lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
         lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = lights_parser.entries[i].type == 0 ? 0.0f : lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
+        float ang = 0.0f;
+        if (lights_parser.entries[i].type == 2) ang = 1000.0f; // Indicate this is directional light
+        else if (lights_parser.entries[i].type == 1) ang = lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
+        
+        lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = ang;
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].rotation.x;
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights_parser.entries[i].rotation.y;
         lights[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights_parser.entries[i].rotation.z;
