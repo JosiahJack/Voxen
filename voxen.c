@@ -82,7 +82,7 @@ GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, debugValueLoc_chunk = -1, 
       glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1, screenWidthLoc_chunk = -1, screenHeightLoc_chunk = -1, 
       worldMin_xLoc_chunk = -1, worldMin_zLoc_chunk = -1, camPosLoc_chunk = -1, fogColorRLoc_chunk = -1, fogColorGLoc_chunk = -1,
-      fogColorBLoc_chunk = -1;
+      fogColorBLoc_chunk = -1, reflectionCubemapIdxLoc_chunk = -1;
 GLuint blueNoiseBuffer;
 float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
@@ -245,6 +245,7 @@ int32_t CompileShaders(void) {
     fogColorRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorR");
     fogColorGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorG");
     fogColorBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorB");
+    reflectionCubemapIdxLoc_chunk = glGetUniformLocation(chunkShaderProgram, "reflectionCubemapIdx");
     
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
@@ -409,8 +410,8 @@ void UpdateScreenSize(void) {
     m = shadowmapsPerspectiveProjection;
     m[0] = f / aspect; m[1] = 0.0f; m[2] =                                                  0.0f; m[3] =  0.0f;
     m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
-    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
+    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
 }
 
 typedef struct {
@@ -606,13 +607,13 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-    float effectiveRadius = fmax(lightRadius, 15.36f);
+    float effectiveRadius = fmax(lightRadius, 35.0f);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
     GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
-    uint16_t startOfNearbyTransparents = 0;
+//     uint16_t startOfNearbyTransparents = 0;
     for (uint16_t j = 0; j < loadedInstances; j++) {
         if (instances[j].modelIndex >= MODEL_COUNT) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
@@ -622,7 +623,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
         if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
         
-        if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
+//         if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
     }
@@ -720,7 +721,7 @@ void RenderShadowmaps(void) {
     glUseProgram(shadowmapsShaderProgram);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
-    for (uint16_t i = 0; i < loadedLights; i++) RenderShadowmap(i);
+    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
@@ -1474,6 +1475,21 @@ int32_t main(int32_t argc, char* argv[]) {
                 glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
                 glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
                 glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);
+                uint16_t cubemapIdx = 0;
+                float dist, distToCurrent;
+                distToCurrent = 99999.0f;
+                for (uint16_t j=0;j<loadedLights;++j) {
+                    uint16_t lightIdxCube = j * LIGHT_DATA_SIZE;
+                    float cubemapPosX = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSX];
+                    float cubemapPosY = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSY];
+                    float cubemapPosZ = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSZ];
+                    dist = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z, cubemapPosX,cubemapPosY,cubemapPosZ);
+                    if (dist < distToCurrent) {
+                        cubemapIdx = j;
+                        distToCurrent = dist;
+                    }
+                }
+                glUniform1ui(reflectionCubemapIdxLoc_chunk, cubemapIdx);
                 glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);

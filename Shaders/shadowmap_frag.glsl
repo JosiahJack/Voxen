@@ -105,8 +105,8 @@ void main() {
 
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
-    dist = clamp(dist, 0.0, 15.36);              // clip to max distance
-    uint q = uint((dist / 15.36) * 65535.0 + 0.5);
+    dist = clamp(dist, 0.0, 35.0);              // clip to max distance
+    uint q = uint((dist / 35.0) * 65535.0 + 0.5);
     if (q < stored || stored == 0xFFFFu) {            // closer or uninitialized
         if (upper) oldVal = (oldVal & 0x0000FFFFu) | (q << 16);
         else       oldVal = (oldVal & 0xFFFF0000u) | q;
