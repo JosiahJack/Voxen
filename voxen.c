@@ -605,27 +605,27 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-//     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//     float effectiveRadius = fmax(lightRadius, 15.36f);
+    float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+    float effectiveRadius = fmax(lightRadius, 15.36f);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
     GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
-//     uint16_t nearMeshes[loadedInstances];
-//     uint16_t nearbyMeshCount = 0;
-//     uint16_t startOfNearbyTransparents = 0;
-//     for (uint16_t j = 0; j < loadedInstances; j++) {
-//         if (instances[j].modelIndex >= MODEL_COUNT) continue;
-//         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-//         if (IsDynamicObject(instances[j].index)) continue;
-//         
-//         float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-//         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
-//         if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
-//         
-//         if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
-//         nearMeshes[nearbyMeshCount] = j;
-//         nearbyMeshCount++;
-//     }
+    uint16_t nearMeshes[loadedInstances];
+    uint16_t nearbyMeshCount = 0;
+    uint16_t startOfNearbyTransparents = 0;
+    for (uint16_t j = 0; j < loadedInstances; j++) {
+        if (instances[j].modelIndex >= MODEL_COUNT) continue;
+        if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+        if (IsDynamicObject(instances[j].index)) continue;
+        
+        float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+        float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
+        if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
+        
+        if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
+        nearMeshes[nearbyMeshCount] = j;
+        nearbyMeshCount++;
+    }
 
     for (uint8_t face = 0; face < 6; face++) {
         float lightView[16];
@@ -636,7 +636,8 @@ void RenderShadowmap(uint16_t lightIdx) {
         glUniform1i(lightIdxLoc, lightIdx);
         glUniform1i(faceIdxLoc, face);
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
-        for (uint16_t i = 0; i < loadedInstances; ++i) {
+        for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
+            int i = nearMeshes[j];
             if (instances[i].modelIndex >= MODEL_COUNT) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
 
