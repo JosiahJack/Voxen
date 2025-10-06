@@ -18,7 +18,7 @@ uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCel
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
 
-static inline bool get_cull_bit(const uint32_t* arr, size_t idx) {
+bool get_cull_bit(const uint32_t* arr, size_t idx) {
     size_t word = idx / 32;
     size_t bit = idx % 32;
     return ((arr[word] & (1U << bit)) != 0);

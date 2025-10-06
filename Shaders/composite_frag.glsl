@@ -8,7 +8,7 @@ uniform int debugView;
 uniform int debugValue;
 uniform uint screenWidth;
 uniform uint screenHeight;
-layout(rgba8, binding = 4) uniform image2D outputImage;
+uniform sampler2D outputImage;
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 const int SSR_RES = 4;
 
@@ -25,8 +25,6 @@ vec4 unpackColor32(uint color) {
 
 void main() {
     vec3 color = texture(tex, TexCoord).rgb;
-//     if (debugValue > 0) return;
-
     ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
     if (debugView == 0) {
         vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
@@ -36,32 +34,34 @@ void main() {
         float specSum = specColor.r + specColor.g + specColor.b;
 
         // Compute blur radius based on specular sum
-//         if (debugValue == 0) {
-//             float maxRadius = 2.0; // For 5x5 kernel at specSum < 0.3
-//             float minRadius = 0.0; // For 1x1 kernel (no blur) at specSum > 2.2
-//             float radius = mix(maxRadius, minRadius, smoothstep(0.3, 2.2, specSum));
-//             vec4 reflectionColor = vec4(0.0);
-//             float totalWeight = 0.0001; // Avoid division by zero
-//             int kernelSize = int(ceil(radius)) * 2 + 1; // e.g., 9 for radius = 4, 1 for radius = 0
-//             float weightScale = 1.0 / (1.398 * float(kernelSize * kernelSize)); // Normalize weights
-//             for (int y = -int(radius); y <= int(radius); y++) {
-//                 for (int x = -int(radius); x <= int(radius); x++) {
-//                     ivec2 offset = ivec2(x, y);
-//                     ivec2 samplePixel = pixel + offset;
-//                     samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth/SSR_RES)-1, int(screenHeight/SSR_RES)-1));
-//                     
-//                     // Compute Gaussian weight based on distance
-//                     float dist = length(vec2(x, y) / max(radius, 0.1)); // Avoid division by zero
-//                     float weight = exp(-dist * dist * 0.5) * weightScale; // Simplified Gaussian
-//                     vec3 sampleColor = imageLoad(outputImage, samplePixel).rgb;
-//                     reflectionColor.rgb += sampleColor * weight;
-//                     totalWeight += weight;
-//                 }
-//             }
-// 
-//             reflectionColor.rgb /= totalWeight;
-//             color += reflectionColor.rgb;
-//         }
+        if (debugValue == 0) {
+            float maxRadius = 1.0; // For 5x5 kernel at specSum < 0.3
+            float minRadius = 0.0; // For 1x1 kernel (no blur) at specSum > 2.2
+            float radius = mix(maxRadius, minRadius, smoothstep(0.3, 2.2, specSum));
+            vec4 reflectionColor = vec4(0.0);
+            float totalWeight = 0.0001; // Avoid division by zero
+            int kernelSize = int(ceil(radius)) * 2 + 1; // e.g., 9 for radius = 4, 1 for radius = 0
+            float weightScale = 1.0 / (1.398 * float(kernelSize * kernelSize)); // Normalize weights
+            for (int y = -int(radius); y <= int(radius); y++) {
+                for (int x = -int(radius); x <= int(radius); x++) {
+                    ivec2 offset = ivec2(x, y);
+                    ivec2 samplePixel = pixel + offset;
+                    samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth/SSR_RES)-1, int(screenHeight/SSR_RES)-1));
+                    
+                    // Compute Gaussian weight based on distance
+                    float dist = length(vec2(x, y) / max(radius, 0.1)); // Avoid division by zero
+                    float weight = exp(-dist * dist * 0.5) * weightScale; // Simplified Gaussian
+
+                    vec2 sampleUV = (vec2(samplePixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+                    vec3 sampleColor = texture(outputImage, sampleUV).rgb;
+                    reflectionColor.rgb += sampleColor * weight;
+                    totalWeight += weight;
+                }
+            }
+
+            reflectionColor.rgb /= totalWeight;
+            color += reflectionColor.rgb;
+        }
 
         // SMAA-Inspired Edge-Directed Antialiasing
         // Compute luminance for edge detection
@@ -103,6 +103,7 @@ void main() {
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / gamma));
         FragColor = vec4(aaColor, 1.0);
     } else if (debugView == 7 || debugView == 10) {
-        FragColor = imageLoad(outputImage, pixel);
+        vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+        FragColor = texture(outputImage, sampleUV);
     }
 }

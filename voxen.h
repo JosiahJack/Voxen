@@ -293,6 +293,7 @@ extern float worldMin_x, worldMin_z;
 int32_t Cull_Init(void);
 void CullCore(void);
 void Cull();
+bool get_cull_bit(const uint32_t* arr, size_t idx);
 // ----------------------------------------------------------------------------
 // Helper Functions
 bool IsDynamicObject(uint16_t constIndex);

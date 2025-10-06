@@ -479,7 +479,8 @@ int32_t VoxelLists() {
                         float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
 
-                        if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
+                        if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) { // TOOD Check if performance is much better with this and make separate cubemap range and voxels instead if needed
+//                         if (distSqrd < 35.0 && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
                             voxelLightListIndices[voxelIndex * 2 + 1]++; // Increment light count
                             totalLightAssignments++;
                         }
@@ -650,16 +651,16 @@ void RenderShadowmap(uint16_t lightIdx) {
                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
             }
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
-            uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-            glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
-            uint32_t specdex = (uint32_t)instances[i].specIndex;
-            specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
-            uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
-            uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
-            nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
-            uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
-            glUniform1ui(glowSpecIndexLoc_shadowmaps, glowSpecPack);
-            glUniform1ui(normInstanceIndexLoc_shadowmaps, normInstancePack);
+//             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+//             glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
+//             uint32_t specdex = (uint32_t)instances[i].specIndex;
+//             specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
+//             uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
+//             uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
+//             nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
+//             uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
+//             glUniform1ui(glowSpecIndexLoc_shadowmaps, glowSpecPack);
+//             glUniform1ui(normInstanceIndexLoc_shadowmaps, normInstancePack);
             glUniform1ui(texIndexLoc_shadowmaps, instances[i].texIndex);
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -705,15 +706,15 @@ void RenderShadowmaps(void) {
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
     
     // Reflection Colors SSBO
-    glGenBuffers(1, &reflectionProbeSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, reflectionProbeSSBO);
-    uint32_t reflectionMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint32_t); // RGBA packed as 4 bytes
-    uint32_t* nullColors = (uint32_t*)malloc(reflectionMapBufferSize);
-    memset(nullColors,0u,reflectionMapBufferSize);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, reflectionMapBufferSize, nullColors, GL_STATIC_DRAW);
-    free(nullColors);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, reflectionProbeSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     glGenBuffers(1, &reflectionProbeSSBO);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, reflectionProbeSSBO);
+//     uint32_t reflectionMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint32_t); // RGBA packed as 4 bytes
+//     uint32_t* nullColors = (uint32_t*)malloc(reflectionMapBufferSize);
+//     memset(nullColors,0u,reflectionMapBufferSize);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, reflectionMapBufferSize, nullColors, GL_STATIC_DRAW);
+//     free(nullColors);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, reflectionProbeSSBO);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     // Render static lights once
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
@@ -819,10 +820,18 @@ int32_t InitializeEnvironment(void) {
 
     // Create Framebuffer
     // First pass gbuffer images
-    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA,           GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
-    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,                   GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,                   GL_FLOAT, GL_TEXTURE_2D, "Raster Depth");
-    GenerateAndBindTexture(&outputImageID,            GL_RGBA8, screen_width / SSR_RES, screen_height / SSR_RES, GL_RGBA,          GL_FLOAT, GL_TEXTURE_2D, "SSR");
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D, "Raster Depth");
+    
+    glGenTextures(1, &outputImageID);
+    glBindTexture(GL_TEXTURE_2D, outputImageID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) DualLogError("Failed to create texture SSR: OpenGL error %d\n", error);
+    
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -843,9 +852,11 @@ int32_t InitializeEnvironment(void) {
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
     glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
     //                 3 = depth
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
+//     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
     glBindTexture(GL_TEXTURE_2D, inputDepthID);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     DebugRAM("setup gbuffer end");
     
@@ -1483,6 +1494,12 @@ int32_t main(int32_t argc, char* argv[]) {
                     float cubemapPosX = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSX];
                     float cubemapPosY = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSY];
                     float cubemapPosZ = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSZ];
+                    uint16_t x,z;
+                    PosToCellCoords(cubemapPosX, cubemapPosZ, &x, &z);
+                    uint16_t cellIdx = (z * WORLDX) + x;
+                    if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) continue;
+//                     if (!get_cull_bit(precomputedVisibleCellsFromHere,cellIdx)) continue;
+                    
                     dist = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z, cubemapPosX,cubemapPosY,cubemapPosZ);
                     if (dist < distToCurrent) {
                         cubemapIdx = j;
@@ -1506,16 +1523,16 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
-//             if (debugView == 0 || debugView == 7) {
-//                 glUseProgram(ssrShaderProgram);
-//                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-//                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
-//                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
-//                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
-//                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-//                 CHECK_GL_ERROR();
-//                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-//             }
+            if (debugView == 0 || debugView == 7) {
+                glUseProgram(ssrShaderProgram);
+                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+                glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
+                GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
+                GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
+                glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+                CHECK_GL_ERROR();
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            }
         } else { // END !PAUSED BLOCK -------------------------------------------------
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }
@@ -1524,6 +1541,9 @@ int32_t main(int32_t argc, char* argv[]) {
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputImageID);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, outputImageID);
+        glProgramUniform1i(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "outputImage"), 4);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);

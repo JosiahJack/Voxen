@@ -210,7 +210,7 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     else if (strcmp(trimmed_key, "localScale.x") == 0)    entry->scale.x = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "localScale.y") == 0)    entry->scale.y = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "localScale.z") == 0)    entry->scale.z = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum) * 0.4; // Adjustment, globally applied from Citadel Unity conversion.
     else if (strcmp(trimmed_key, "range") == 0)           entry->range = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "type") == 0) {
