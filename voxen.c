@@ -82,18 +82,16 @@ GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, debugValueLoc_chunk = -1, 
       glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1, screenWidthLoc_chunk = -1, screenHeightLoc_chunk = -1, 
       worldMin_xLoc_chunk = -1, worldMin_zLoc_chunk = -1, camPosLoc_chunk = -1, fogColorRLoc_chunk = -1, fogColorGLoc_chunk = -1,
-      fogColorBLoc_chunk = -1, reflectionCubemapIdxLoc_chunk = -1;
+      fogColorBLoc_chunk = -1;
 GLuint blueNoiseBuffer;
 float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
 //    Shadowmap Rastered Depth Shader
 GLuint shadowCubeMap;
-GLuint depthCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
 GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1, texIndexLoc_shadowmaps = -1, glowSpecIndexLoc_shadowmaps = -1, normInstanceIndexLoc_shadowmaps = -1;
 GLuint shadowMapSSBO; // SSBO for storing all shadow maps
-GLuint reflectionProbeSSBO; // SSBO for storing the albedo colors for reflections
 bool shadowMapsRendered = false;
 uint32_t lightIsDynamic[LIGHT_COUNT + 31 / 32] = {0};
 uint16_t staticLightCount = 0;
@@ -103,7 +101,6 @@ uint16_t staticLightIndices[LIGHT_COUNT];
 #define SSR_RES 4 // 25% of render resolution.
 GLuint ssrShaderProgram;
 GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, camPosLoc_ssr = -1;
-GLuint reflectionCubeMap;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -245,7 +242,6 @@ int32_t CompileShaders(void) {
     fogColorRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorR");
     fogColorGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorG");
     fogColorBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorB");
-    reflectionCubemapIdxLoc_chunk = glGetUniformLocation(chunkShaderProgram, "reflectionCubemapIdx");
     
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
@@ -478,9 +474,7 @@ int32_t VoxelLists() {
                         float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
                         float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-
-                        if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) { // TOOD Check if performance is much better with this and make separate cubemap range and voxels instead if needed
-//                         if (distSqrd < 35.0 && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
+                        if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
                             voxelLightListIndices[voxelIndex * 2 + 1]++; // Increment light count
                             totalLightAssignments++;
                         }
@@ -1460,27 +1454,6 @@ int32_t main(int32_t argc, char* argv[]) {
                 glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
                 glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
                 glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);
-                uint16_t cubemapIdx = 0;
-                float dist, distToCurrent;
-                distToCurrent = 99999.0f;
-                for (uint16_t j=0;j<loadedLights;++j) {
-                    uint16_t lightIdxCube = j * LIGHT_DATA_SIZE;
-                    float cubemapPosX = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSX];
-                    float cubemapPosY = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSY];
-                    float cubemapPosZ = lights[lightIdxCube + LIGHT_DATA_OFFSET_POSZ];
-                    uint16_t x,z;
-                    PosToCellCoords(cubemapPosX, cubemapPosZ, &x, &z);
-                    uint16_t cellIdx = (z * WORLDX) + x;
-                    if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) continue;
-//                     if (!get_cull_bit(precomputedVisibleCellsFromHere,cellIdx)) continue;
-                    
-                    dist = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z, cubemapPosX,cubemapPosY,cubemapPosZ);
-                    if (dist < distToCurrent) {
-                        cubemapIdx = j;
-                        distToCurrent = dist;
-                    }
-                }
-                glUniform1ui(reflectionCubemapIdxLoc_chunk, cubemapIdx);
                 glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
                 glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                 glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);

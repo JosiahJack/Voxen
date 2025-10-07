@@ -17,7 +17,6 @@ uniform vec3 camPos;
 uniform float fogColorR;
 uniform float fogColorG;
 uniform float fogColorB;
-uniform uint reflectionCubemapIdx;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -29,7 +28,6 @@ const uint MATERIAL_IDX_MAX = 2048;
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { float shadowMaps[]; };
-layout(std430,  binding = 6) buffer ReflectionMaps { uint reflectionColors[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -134,39 +132,6 @@ uint packColor(vec4 color) {
     return (c.r << 24) | (c.g << 16) | (c.b << 8) | c.a;
 }
 
-vec3 parallaxCorrectedReflection(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 cubeMapPos, float range) {
-    vec3 reflectDir = reflect(-viewDir, normal); // Reflect viewDir around normal
-    vec3 toCube = fragPos - cubeMapPos; // Vector from fragment to cubemap center
-    
-    // Cubemap box size scaled to light range
-    vec3 boxSize = vec3(range); // Use light range for box size
-    float t = 1.0; // Default far plane intersection
-    vec3 absReflect = abs(reflectDir);
-    float maxAxis = max(max(absReflect.x, absReflect.y), absReflect.z);
-    
-    if (maxAxis > 0.0) {
-        vec3 tMax = (boxSize * 0.5 - toCube) / reflectDir;
-        vec3 tMin = (-boxSize * 0.5 - toCube) / reflectDir;
-        float tNear = max(max(min(tMax.x, tMin.x), min(tMax.y, tMin.y)), min(tMax.z, tMin.z));
-        float tFar = min(min(max(tMax.x, tMin.x), max(tMax.y, tMin.y)), max(tMax.z, tMin.z));
-        if (tNear > 0.0 && tNear < tFar) {
-            t = tNear;
-        } else if (tFar > 0.0) {
-            t = tFar;
-        }
-    }
-    
-    vec3 correctedDir = toCube + reflectDir * t;
-    return normalize(correctedDir);
-}
-
-vec4 unpackColor32(uint color) {
-    return vec4(float((color >> 24) & 0xFF) / 255.0,
-                float((color >> 16) & 0xFF) / 255.0,
-                float((color >>  8) & 0xFF) / 255.0,
-                float((color      ) & 0xFF) / 255.0);
-}
-
 void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
@@ -217,81 +182,11 @@ void main() {
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = adjustedNormal;
     uint listoffset = 0;
-    float totalReflectWeight = 0.0;
-    vec3 reflectColorAccum = vec3(0.0);
     if (count > 0) listoffset = voxelLightListIndices[voxelIdx * 2];
-// //     else {
-//         uint cubemapIdx = reflectionCubemapIdx * uint(LIGHT_DATA_SIZE);
-//         if (cubemapIdx > 0) {
-//             // Apply cubemap reflection for nearest
-//             vec3 cubemapPos = vec3(lights[cubemapIdx + LIGHT_DATA_OFFSET_POSX], lights[cubemapIdx + LIGHT_DATA_OFFSET_POSY], lights[cubemapIdx + LIGHT_DATA_OFFSET_POSZ]);
-//             vec3 reflectDir = parallaxCorrectedReflection(worldPos, normal, viewDir, cubemapPos, 5.0);
-//             vec3 reflectAbs = abs(reflectDir);
-//             float reflectMaxAxis = max(max(reflectAbs.x, reflectAbs.y), reflectAbs.z);
-//             float reflectInvMax = (reflectMaxAxis > 0.0) ? (1.0 / reflectMaxAxis) : 0.0;
-//             vec3 reflectNorm = reflectDir * reflectInvMax;
-//             uint reflectFace;
-//             vec2 reflectUV;
-//             if (reflectAbs.x >= reflectAbs.y && reflectAbs.x >= reflectAbs.z) {
-//                 reflectFace = reflectDir.x > 0.0 ? 0u : 1u;
-//                 reflectUV = (reflectFace == 0u) ? vec2(-reflectNorm.z, reflectNorm.y) : vec2(reflectNorm.z, reflectNorm.y);
-//             } else if (reflectAbs.y >= reflectAbs.x && reflectAbs.y >= reflectAbs.z) {
-//                 reflectFace = reflectDir.y > 0.0 ? 2u : 3u;
-//                 reflectUV = (reflectFace == 2u) ? vec2(reflectNorm.x, -reflectNorm.z) : vec2(reflectNorm.x, reflectNorm.z);
-//             } else {
-//                 reflectFace = reflectDir.z > 0.0 ? 4u : 5u;
-//                 reflectUV = (reflectFace == 4u) ? vec2(reflectNorm.x, reflectNorm.y) : vec2(-reflectNorm.x, reflectNorm.y);
-//             }
-//             reflectUV = reflectUV * 0.5 + 0.5;
-//             vec2 reflectTC = reflectUV * SHADOW_MAP_SIZE;
-//             float reflectTx = clamp(reflectTC.x, 0.0, SHADOW_MAP_SIZE - 1.0);
-//             float reflectTy = clamp(reflectTC.y, 0.0, SHADOW_MAP_SIZE - 1.0);
-//             uint reflectUtx = uint(reflectTx);
-//             uint reflectUty = uint(reflectTy);
-//             uint reflectBase = reflectionCubemapIdx * 6u * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-//             uint reflectFaceOff = reflectBase + reflectFace * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-//             uint reflectSsboIndex = reflectFaceOff + reflectUty * uint(SHADOW_MAP_SIZE) + reflectUtx;
-//             vec3 reflectColor = unpackColor32(reflectionColors[reflectSsboIndex]).rgb;
-//             reflectColorAccum += reflectColor;// * (specColor.rgb + vec3(0.05)) * 0.2;
-//         }
-// //     }
-
     for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
         vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
-
-        // Always apply reflection cubemap regardless of if light can actually affect this pixel.
-        // Voxel light lists currently updated to use the larger 35.0 cubemap range.
-//         vec3 reflectDir = parallaxCorrectedReflection(worldPos, normal, viewDir, lightPos, 15.36);
-//         vec3 reflectAbs = abs(reflectDir);
-//         float reflectMaxAxis = max(max(reflectAbs.x, reflectAbs.y), reflectAbs.z);
-//         float reflectInvMax = (reflectMaxAxis > 0.0) ? (1.0 / reflectMaxAxis) : 0.0;
-//         vec3 reflectNorm = reflectDir * reflectInvMax;
-//         uint reflectFace;
-//         vec2 reflectUV;
-//         if (reflectAbs.x >= reflectAbs.y && reflectAbs.x >= reflectAbs.z) {
-//             reflectFace = reflectDir.x > 0.0 ? 0u : 1u;
-//             reflectUV = (reflectFace == 0u) ? vec2(-reflectNorm.z, reflectNorm.y) : vec2(reflectNorm.z, reflectNorm.y);
-//         } else if (reflectAbs.y >= reflectAbs.x && reflectAbs.y >= reflectAbs.z) {
-//             reflectFace = reflectDir.y > 0.0 ? 2u : 3u;
-//             reflectUV = (reflectFace == 2u) ? vec2(reflectNorm.x, -reflectNorm.z) : vec2(reflectNorm.x, reflectNorm.z);
-//         } else {
-//             reflectFace = reflectDir.z > 0.0 ? 4u : 5u;
-//             reflectUV = (reflectFace == 4u) ? vec2(reflectNorm.x, reflectNorm.y) : vec2(-reflectNorm.x, reflectNorm.y);
-//         }
-//         reflectUV = reflectUV * 0.5 + 0.5;
-//         vec2 reflectTC = reflectUV * SHADOW_MAP_SIZE;
-//         float reflectTx = clamp(reflectTC.x, 0.0, SHADOW_MAP_SIZE - 1.0);
-//         float reflectTy = clamp(reflectTC.y, 0.0, SHADOW_MAP_SIZE - 1.0);
-//         uint reflectUtx = uint(reflectTx);
-//         uint reflectUty = uint(reflectTy);
-//         uint reflectBase = lightIdxInPVS * 6u * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-//         uint reflectFaceOff = reflectBase + reflectFace * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-//         uint reflectSsboIndex = reflectFaceOff + reflectUty * uint(SHADOW_MAP_SIZE) + reflectUtx;
-//         vec3 reflectColor = unpackColor32(reflectionColors[reflectSsboIndex]).rgb;
-//         reflectColorAccum += reflectColor * (specColor.rgb + vec3(0.05)) * 0.1;
-
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
         if (intensity < 0.05) continue;
 
@@ -376,7 +271,6 @@ void main() {
         lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor);
     }
 
-//     lighting += reflectColorAccum; // Adjust final contribution
     lighting += glowColor.rgb;
 
     // Dither + fog
