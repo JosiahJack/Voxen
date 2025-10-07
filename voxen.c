@@ -31,7 +31,7 @@
 // Window
 SDL_Window *window;
 bool inventoryMode = false;
-uint16_t screen_width = 1366, screen_height = 768;
+uint16_t screen_width = 800, screen_height = 600;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Instances
@@ -608,13 +608,11 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-    float effectiveRadius = fmax(lightRadius, 35.0f);
+    float effectiveRadius = fmin(lightRadius, 15.36f);
     GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
-    GLint lightIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightIdx");
-    GLint faceIdxLoc = glGetUniformLocation(shadowmapsShaderProgram, "face");
+    GLint ssbo_indexBaseLoc = glGetUniformLocation(shadowmapsShaderProgram, "ssbo_indexBase");
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
-//     uint16_t startOfNearbyTransparents = 0;
     for (uint16_t j = 0; j < loadedInstances; j++) {
         if (instances[j].modelIndex >= MODEL_COUNT) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
@@ -624,7 +622,6 @@ void RenderShadowmap(uint16_t lightIdx) {
         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
         if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
         
-//         if (j >= startOfTransparentInstances) startOfNearbyTransparents = j;
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
     }
@@ -635,8 +632,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
         glUniform3f(lightPosLoc, lightPosX, lightPosY, lightPosZ);
-        glUniform1i(lightIdxLoc, lightIdx);
-        glUniform1i(faceIdxLoc, face);
+        glUniform1i(ssbo_indexBaseLoc, lightIdx * 98304 + face * 16384); // 128
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -651,17 +647,6 @@ void RenderShadowmap(uint16_t lightIdx) {
                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
             }
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
-//             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-//             glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
-//             uint32_t specdex = (uint32_t)instances[i].specIndex;
-//             specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
-//             uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
-//             uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
-//             nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
-//             uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
-//             glUniform1ui(glowSpecIndexLoc_shadowmaps, glowSpecPack);
-//             glUniform1ui(normInstanceIndexLoc_shadowmaps, normInstancePack);
-            glUniform1ui(texIndexLoc_shadowmaps, instances[i].texIndex);
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
@@ -670,6 +655,8 @@ void RenderShadowmap(uint16_t lightIdx) {
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
+
+    glFlush();
 
     staticLightCount++;
 }
@@ -681,7 +668,7 @@ void RenderShadowmaps(void) {
     DebugRAM("Start of RenderShadowmaps");
     glGenTextures(1, &shadowCubeMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
-    for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_RGBA8, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R8, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -699,22 +686,9 @@ void RenderShadowmaps(void) {
     glGenBuffers(1, &shadowMapSSBO);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
-//     uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint16_t);
-    uint32_t packedPixelCount = shadowmapPixelCount / 2; // 2 pixels per uint
-    uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * packedPixelCount * sizeof(uint32_t);
+    uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(float);
     glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
-    
-    // Reflection Colors SSBO
-//     glGenBuffers(1, &reflectionProbeSSBO);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, reflectionProbeSSBO);
-//     uint32_t reflectionMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(uint32_t); // RGBA packed as 4 bytes
-//     uint32_t* nullColors = (uint32_t*)malloc(reflectionMapBufferSize);
-//     memset(nullColors,0u,reflectionMapBufferSize);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, reflectionMapBufferSize, nullColors, GL_STATIC_DRAW);
-//     free(nullColors);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, reflectionProbeSSBO);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     
     // Render static lights once
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
@@ -726,7 +700,6 @@ void RenderShadowmaps(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
-    CHECK_GL_ERROR();
     malloc_trim(0);
     shadowMapsRendered = true;
     DualLog(" took %f seconds to render %d static shadow maps\n", get_time() - start_time, staticLightCount);
@@ -827,7 +800,8 @@ int32_t InitializeEnvironment(void) {
     glGenTextures(1, &outputImageID);
     glBindTexture(GL_TEXTURE_2D, outputImageID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_FLOAT, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
     GLenum error = glGetError();
     if (error != GL_NO_ERROR) DualLogError("Failed to create texture SSR: OpenGL error %d\n", error);
@@ -1519,18 +1493,17 @@ int32_t main(int32_t argc, char* argv[]) {
             glDepthMask(GL_TRUE);
             glEnable(GL_CULL_FACE); // Reenable backface culling
             glEnable(GL_DEPTH_TEST);
-            CHECK_GL_ERROR();
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
             if (debugView == 0 || debugView == 7) {
                 glUseProgram(ssrShaderProgram);
+                glProgramUniform1i(ssrShaderProgram, glGetUniformLocation(ssrShaderProgram, "outputImage"), 4);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-                CHECK_GL_ERROR();
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
         } else { // END !PAUSED BLOCK -------------------------------------------------

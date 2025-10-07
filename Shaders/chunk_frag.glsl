@@ -28,7 +28,7 @@ const uint MATERIAL_IDX_MAX = 2048;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
+layout(std430, binding = 5) buffer ShadowMaps { float shadowMaps[]; };
 layout(std430,  binding = 6) buffer ReflectionMaps { uint reflectionColors[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
@@ -361,12 +361,8 @@ void main() {
                 uint utx = uint(tx);
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
-                uint packedIndex = ssbo_index >> 1;
-                bool upper       = false;//(ssbo_index & 1u) == 1u;
-                uint packedVal = shadowMaps[packedIndex];
-                uint q = upper ? (packedVal >> 16) & 0xFFFFu : packedVal & 0x0000FFFFu;
-                float d = (float(q) / 65535) * 15.36;
-                float depthDiff = dist - d - 0.02;
+                float d = shadowMaps[ssbo_index];
+                float depthDiff = dist - d - 0.12;
                 float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
                 sum += shadowContrib * invSamples;
             }
@@ -374,7 +370,6 @@ void main() {
             shadowFactor = sum;
         }
 
-//         lighting += reflectColorAccum; // Adjust final contribution
         if (shadowFactor < 0.005) continue;
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
