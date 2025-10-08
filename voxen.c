@@ -35,10 +35,11 @@ uint16_t screen_width = 800, screen_height = 600;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Reflections = 0u;
-uint8_t settings_Shadows = 1u;
+uint8_t settings_Reflections = 1u;
+uint8_t settings_Shadows = 2u;
 uint8_t settings_AntiAliasing = 1u;
 uint8_t settings_Brightness = 100u;
+float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
 // Instances
 Entity instances[INSTANCE_COUNT];
@@ -76,7 +77,6 @@ float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
 uint32_t verticesRenderedThisFrame = 0;
-bool instanceIsCulledArray[INSTANCE_COUNT];
 bool instanceIsLODArray[INSTANCE_COUNT];
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 
@@ -748,7 +748,6 @@ int32_t InitializeEnvironment(void) {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glViewport(0, 0, screen_width, screen_height);
-    CHECK_GL_ERROR();
 
     if (CompileShaders()) return SYS_COUNT + 1;
     glUseProgram(imageBlitShaderProgram);
@@ -955,19 +954,12 @@ int32_t EventExecute(Event* event) {
     return 99;
 }
 
-uint16_t numberOfFOVConeChecks0 = 0;
-uint16_t numberOfFOVConeChecks1 = 0;
-uint16_t numberOfFOVConeChecks2 = 0;
-uint16_t numberOfFOVConeChecks3 = 0;
-bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
+bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
     // Vector from camera to instance
     float to_inst_x = inst_x - cam_x;
     float to_inst_y = inst_y - cam_y;
     float to_inst_z = inst_z - cam_z;
-
-    // Compute squared distance
     float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
-    numberOfFOVConeChecks0++; // Reporting 5049
     if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
 
     // Precompute FOV constants (assuming cam_fov is constant per frame)
@@ -984,17 +976,7 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z, float radius) {
     float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
     float dist = sqrtf(dist_sq); // Only compute sqrt once
     float dot_normalized = dot / dist; // Normalize dot product
-
-    numberOfFOVConeChecks1++; // Reporting 5030
     if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
-
-    if (radius > 0.0f && dist_sq > (radius * radius)) { // TODO: Remove this if statement??  Never returns true?
-        float adjusted_dot = dot_normalized - (radius / dist); // Approximate sphere extent
-        numberOfFOVConeChecks2++;  // Reporting 2687
-        if (adjusted_dot >= cos_half_fov) return true; // Part of sphere may be in view
-    }
-
-    numberOfFOVConeChecks3++; // Reporting 2687
     return false; // Outside FOV cone
 }
 
@@ -1420,20 +1402,9 @@ int32_t main(int32_t argc, char* argv[]) {
             glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "reflectionsEnabled"), settings_Reflections);
             glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "shadowsEnabled"), settings_Shadows);
             glBindVertexArray(vao_chunk);
-            float lodRangeSqrd = 38.4f * 38.4f;
-            memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
-            numberOfFOVConeChecks0 = 0;
-            numberOfFOVConeChecks1 = 0;
-            numberOfFOVConeChecks2 = 0;
-            numberOfFOVConeChecks3 = 0;
             for (uint16_t i=0;i<loadedInstances;i++) {
-                if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-                float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
-                if (distSqrd < FAR_PLANE_SQUARED) instanceIsCulledArray[i] = false;
-                if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
-                
-                if (instanceIsCulledArray[i]) continue; // Culled by distance
+                if (dirtyInstances[i]) UpdateInstanceMatrix(i); // Done before cull early outs as subsequent shaders need these updated, e.g. for shadows
                 if (instances[i].modelIndex >= MODEL_COUNT) continue;
                 if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
 
@@ -1441,9 +1412,10 @@ int32_t main(int32_t argc, char* argv[]) {
                 if (instCellIdx < ARRSIZE) {
                     if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
                 }
-                
-                float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-                if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue; // Cone Frustum Culling
+
+                float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
+                if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue; // Cone Frustum Culling
                 
                 if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
                 if (i >= startOfTransparentInstances) {
@@ -1452,15 +1424,13 @@ int32_t main(int32_t argc, char* argv[]) {
                     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
                     glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
                 }
+
+                if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
                 int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
                 uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-                glowdex = glowdex >= MATERIAL_IDX_MAX ? 41 : glowdex;
                 uint32_t specdex = (uint32_t)instances[i].specIndex;
-                specdex = specdex >= MATERIAL_IDX_MAX ? 41 : specdex;
                 uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
-                uint32_t nordex = (uint32_t)instances[i].normIndex & 0xFFFFu;
-                nordex = nordex >= MATERIAL_IDX_MAX ? 41 : nordex;
-                uint32_t normInstancePack = nordex | (((uint32_t)i & 0xFFFFu) << 16);
+                uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
                 glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
                 glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
                 glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);

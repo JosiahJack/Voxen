@@ -24,8 +24,6 @@ flat in uint TexIndex;
 flat in uint GlowIndex;
 flat in uint SpecIndex;
 flat in uint NormalIndex;
-flat in uint InstanceIndex;
-const uint MATERIAL_IDX_MAX = 2048;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -103,8 +101,6 @@ vec3 quat_rotate(vec4 q, vec3 v) {
 }
 
 vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
-    if (texIndex >= MATERIAL_IDX_MAX) return vec4(0.0,0.0,0.0,1.0);
-
     uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;
     uint slotIndex = pixelOffset / 2;
     uint packedIdx = colors[slotIndex];
@@ -143,7 +139,7 @@ void main() {
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
-    if (NormalIndex < MATERIAL_IDX_MAX && NormalIndex > 0 && NormalIndex != 41) {
+    if (NormalIndex != 41) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -170,7 +166,6 @@ void main() {
         outWorldPos = worldPosPack;
     }
 
-    uint pixelInstance = InstanceIndex;
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count  = voxelLightListIndices[voxelIdx * 2 + 1];
     vec3 lighting = vec3(0.0, 0.0, 0.0);
@@ -216,7 +211,8 @@ void main() {
         float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
         float attenuation = rangeFacSqrd * lambertian;
         float shadowFactor = 1.0;
-        if (debugValue != 2 && shadowsEnabled > 0) {
+//         if (debugValue != 2 && shadowsEnabled > 0) {
+        if (shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
             float bias = clamp(((0.24 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.025,1.0);
             vec3 a = abs(-toLight);
@@ -289,28 +285,28 @@ void main() {
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
     lighting = mix(fogColor, lighting, 1.0 - fogFac);
 
-    if (debugView == 1) {
-        outAlbedo = albedoColor;
-        outAlbedo.a = 1.0;
-    } else if (debugView == 2) {
-        outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;
-        outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;
-        outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;
-        outAlbedo.a = 1.0;
-    } else if (debugView == 3) {
-        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug
-        float clipDepth = ndcDepth / gl_FragCoord.w;
-        float linearDepth = (clipDepth - 0.02) / (71.68 - 0.02);
-        outAlbedo = vec4(vec3(linearDepth), 1.0);
-    } else if (debugView == 4) {
-        outAlbedo.r = float(InstanceIndex) / 5500.0;
-        outAlbedo.g = 0.0;
-        outAlbedo.b = float(texIndexChecked) / 1231.0;
-        outAlbedo.a = 1.0;
-    } else if (debugView == 5) { // Worldpos debug
-        outAlbedo.rgb = vec3(1.0);//worldPosPack.xyz;
-        outAlbedo.a = 1.0;
-    } else {
+//     if (debugView == 1) {
+//         outAlbedo = albedoColor;
+//         outAlbedo.a = 1.0;
+//     } else if (debugView == 2) {
+//         outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;
+//         outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;
+//         outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;
+//         outAlbedo.a = 1.0;
+//     } else if (debugView == 3) {
+//         float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug
+//         float clipDepth = ndcDepth / gl_FragCoord.w;
+//         float linearDepth = (clipDepth - 0.02) / (71.68 - 0.02);
+//         outAlbedo = vec4(vec3(linearDepth), 1.0);
+//     } else if (debugView == 4) {
+//         outAlbedo.r = float(InstanceIndex) / 5500.0;
+//         outAlbedo.g = 0.0;
+//         outAlbedo.b = float(texIndexChecked) / 1231.0;
+//         outAlbedo.a = 1.0;
+//     } else if (debugView == 5) { // Worldpos debug
+//         outAlbedo.rgb = vec3(1.0);//worldPosPack.xyz;
+//         outAlbedo.a = 1.0;
+//     } else {
         outAlbedo = vec4(lighting.rgb, albedoColor.a);
-    }
+//     }
 }

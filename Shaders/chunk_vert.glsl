@@ -20,7 +20,6 @@ flat out uint TexIndex;
 flat out uint GlowIndex;
 flat out uint SpecIndex;
 flat out uint NormalIndex;
-flat out uint InstanceIndex;
 
 void main() {
     FragPos = vec3(matrix * vec4(aPos, 1.0)); // Convert vertex from the model's local space into world space
@@ -29,7 +28,6 @@ void main() {
     TexIndex = texIndex;
     GlowIndex = glowSpecIndex & 0xFFFFu;
     SpecIndex = (glowSpecIndex >> 16) & 0xFFFFu;
-    NormalIndex = normInstanceIndex & 0xFFFFu;
-    InstanceIndex = (normInstanceIndex >> 16) & 0xFFFFu;
+    NormalIndex = normInstanceIndex;
     gl_Position = viewProjection * vec4(FragPos, 1.0);
 }

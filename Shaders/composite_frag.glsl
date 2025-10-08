@@ -17,10 +17,10 @@ uniform float aaThreshold = 0.2; // Gradient threshold for applying AA
 
 void main() {
     vec3 color = texture(tex, TexCoord).rgb;
-    if (debugValue > 0) { FragColor = vec4(color, 1.0); return; }
+//     if (debugValue > 0) { FragColor = vec4(color, 1.0); return; }
 
     ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
-    if (debugView == 0) {
+//     if (debugView == 0) {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec3 reflectionColor = texture(outputImage, sampleUV).rgb;
@@ -67,8 +67,8 @@ void main() {
 
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
         FragColor = vec4(aaColor, 1.0);
-    } else if (debugView == 7 || debugView == 10) {
-        vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-        FragColor = texture(outputImage, sampleUV);
-    }
+//     } else if (debugView == 7 || debugView == 10) {
+//         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+//         FragColor = texture(outputImage, sampleUV);
+//     }
 }

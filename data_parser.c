@@ -900,50 +900,16 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
         if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
+        if (instances[idx].glowIndex >= MATERIAL_IDX_MAX) instances[idx].glowIndex = 41;
         instances[idx].specIndex = entities[entIdx].specIndex;
+        if (instances[idx].specIndex >= MATERIAL_IDX_MAX) instances[idx].specIndex = 41;
         instances[idx].normIndex = entities[entIdx].normIndex;
+        if (instances[idx].normIndex >= MATERIAL_IDX_MAX) instances[idx].normIndex = 41;
         instances[idx].lodIndex = entities[entIdx].lodIndex;
         instances[idx].position.x += correctionX;
         instances[idx].position.y += correctionY;
         instances[idx].position.z += correctionZ;
-//         if (isTransparent(instances[idx].texIndex)) {
-//             DualLogWarn("Adding transparent mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
-//             transparentInstances[transparentInstancesHead] = idx;
-//             transparentInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
-//         } else if (isDoubleSided(instances[idx].texIndex) || instances[idx].scale.x < 0.0f || instances[idx].scale.y < 0.0f || instances[idx].scale.z < 0.0f) {
-//             DualLogWarn("Adding doublesided mesh with model index %d and texture index %d to list\n",instances[idx].modelIndex,instances[idx].texIndex);
-//             doubleSidedInstances[doubleSidedInstancesHead] = idx;
-//             doubleSidedInstancesHead++; // Already sized to INSTANCE_COUNT, no need for bounds check.
-//         }
     }
-
-//     startOfDoubleSidedInstances = gameObjectCount - doubleSidedInstancesHead - transparentInstancesHead; // e.g., 5453 - 19 - 42 = 5392
-//     startOfTransparentInstances = gameObjectCount - doubleSidedInstancesHead;
-//     int32_t maxValidIdx = startOfDoubleSidedInstances;
-//     for (int32_t i = 0; i < doubleSidedInstancesHead; ++i) {
-//         int32_t idx = doubleSidedInstances[i];
-//         if (idx < 0 || idx >= gameObjectCount) continue;
-// 
-//         Entity tempInstance = instances[maxValidIdx];
-//         instances[maxValidIdx] = instances[idx];
-//         instances[idx] = tempInstance;
-//         maxValidIdx++;
-//     }
-// 
-//     for (int32_t i = 0; i < transparentInstancesHead; ++i) {
-//         int32_t idx = transparentInstances[i];
-//         if (idx < 0 || idx >= gameObjectCount) continue;
-// 
-//         Entity tempInstance = instances[maxValidIdx];
-//         instances[maxValidIdx] = instances[idx];
-//         instances[idx] = tempInstance;
-//         maxValidIdx++;
-//     }
-    
-//     DualLog("Final instances[%d] table::\n",maxValidIdx);
-//     for (int32_t i=0;i<maxValidIdx;++i) {
-//         DualLog("Instances[%d] loaded: model %d, texture %d, doublesided %d, transparent %d\n",i,instances[i].modelIndex,instances[i].texIndex,isDoubleSided(instances[i].texIndex),isTransparent(instances[i].texIndex));
-//     }
 
     // Instances uploaded after loading statics and dynamics in next functions...
     DualLog(" took %f seconds\n", get_time() - start_time);
@@ -1029,8 +995,11 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
         if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
+        if (instances[idx].glowIndex >= MATERIAL_IDX_MAX) instances[idx].glowIndex = 41;
         instances[idx].specIndex = entities[entIdx].specIndex;
+        if (instances[idx].specIndex >= MATERIAL_IDX_MAX) instances[idx].specIndex = 41;
         instances[idx].normIndex = entities[entIdx].normIndex;
+        if (instances[idx].normIndex >= MATERIAL_IDX_MAX) instances[idx].normIndex = 41;
         instances[idx].lodIndex = entities[entIdx].lodIndex;
         instances[idx].position.x += correctionX;
         instances[idx].position.y += correctionY;
@@ -1107,8 +1076,7 @@ void SortInstances() {
         maxValidIdx++;
     }
     
-    // Populate Physics Objects AFTER indices are reordered
-    for (uint32_t idx = 0u;idx < loadedInstances;++idx) {
+    for (uint32_t idx = 0u;idx < loadedInstances;++idx) { // Populate Physics Objects AFTER indices are reordered
         if (IsDynamicObject(instances[idx].index)) {
             physObjects[physHead] = instances[idx];
             physObjects[physHead].index = idx;
