@@ -17,6 +17,8 @@ uniform vec3 camPos;
 uniform float fogColorR;
 uniform float fogColorG;
 uniform float fogColorB;
+uniform uint reflectionsEnabled;
+uniform uint shadowsEnabled;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -70,24 +72,14 @@ uint GetVoxelIndex(vec3 worldPos) {
     return cellIndex * 64 + voxelIndexInCell;
 }
 
-const float SHADOW_MAP_SIZE = 128.0;
+const float SHADOW_MAP_SIZE = 256.0;
 
 // Small Poisson disk for stochastic PCF.
 // 12 samples gives good quality when temporally accumulated.
-const int PCF_SAMPLES = 12;
-const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2(-0.326212f, -0.405810f),
-    vec2(-0.840144f, -0.073580f),
-    vec2(-0.695914f,  0.457137f),
-    vec2(-0.203345f,  0.620716f),
-    vec2( 0.962340f, -0.194983f),
-    vec2( 0.473434f, -0.480026f),
-    vec2( 0.519456f,  0.767022f),
-    vec2( 0.185461f, -0.893124f),
-    vec2( 0.507431f,  0.064425f),
-    vec2( 0.896420f,  0.412458f),
-    vec2(-0.321942f,  0.932615f),
-    vec2(-0.791559f,  0.597710f)
+const int PCF_SAMPLES = 6;
+const vec2 poissonDisk[6] = vec2[](
+    vec2(-0.04, -0.04), vec2(0.07, -0.07), vec2(-0.10, -0.10),
+    vec2(0.04, 0.04), vec2(0.07, 0.07), vec2(0.10, 0.10)
 );
 
 vec3 quat_rotate(vec4 q, vec3 v) {
@@ -168,13 +160,15 @@ void main() {
     }
 
     vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
-    vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
-    vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
-    vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
-                             uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
-                             uintBitsToFloat(packColor(normalPack)),
-                             uintBitsToFloat(packColor(specColor)) );
-    outWorldPos = worldPosPack;
+    if (reflectionsEnabled > 0) {
+        vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
+        vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
+        vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
+                                uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
+                                uintBitsToFloat(packColor(normalPack)),
+                                uintBitsToFloat(packColor(specColor)) );
+        outWorldPos = worldPosPack;
+    }
 
     uint pixelInstance = InstanceIndex;
     uint voxelIdx = GetVoxelIndex(worldPos);
@@ -219,12 +213,12 @@ void main() {
         }
 
         float distOverRange = dist / range;
-        float attenuation = (1.0 - (distOverRange * distOverRange)) * lambertian;
+        float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
+        float attenuation = rangeFacSqrd * lambertian;
         float shadowFactor = 1.0;
-        if (debugValue != 2) {
-            float rangeFac = ((range - dist) / range);
-            float smearness = (1.0 - rangeFac) * (1.0 - rangeFac) * 16.0 + 0.0;
-            float slope = max(0.0, 1.0 - dot(normal, lightDir));
+        if (debugValue != 2 && shadowsEnabled > 0) {
+            float smearness = attenuation * attenuation * 38.0;
+            float bias = clamp(((0.24 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.025,1.0);
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -244,28 +238,38 @@ void main() {
             uint faceOff = base + face * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
             vec2 tc = uv * SHADOW_MAP_SIZE;
 
-            // Pseudo-Stochastic PCF sampling
-            float sum = 0.0;
-            float invSamples = 1.0 / float(PCF_SAMPLES);
-            float scaleFactor = 1.0;
-            for (int si = 0; si < PCF_SAMPLES; ++si) {
-                vec2 off = poissonDisk[si] * (smearness * scaleFactor);
-                vec2 t = tc + off;
-                float tx = clamp(t.x, 0.0, SHADOW_MAP_SIZE - 1.0);
-                float ty = clamp(t.y, 0.0, SHADOW_MAP_SIZE - 1.0);
+            if (shadowsEnabled > 1) {
+                // Pseudo-Stochastic PCF sampling
+                float sum = 0.0;
+                float invSamples = 1.0 / float(PCF_SAMPLES);
+                for (int si = 0; si < PCF_SAMPLES; ++si) {
+                    vec2 off = poissonDisk[si] * smearness;
+                    vec2 t = tc + off;
+                    float tx = clamp(t.x, 0.0, SHADOW_MAP_SIZE - 1.0);
+                    float ty = clamp(t.y, 0.0, SHADOW_MAP_SIZE - 1.0);
+                    uint utx = uint(tx);
+                    uint uty = uint(ty);
+                    uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
+                    float d = shadowMaps[ssbo_index];
+                    float depthDiff = dist - d - bias;
+                    float shadowContrib = depthDiff > 0.0 ? 0.0 : 1.0;
+                    sum += shadowContrib * invSamples;
+                }
+
+                shadowFactor = sum;
+            } else {
+                float tx = clamp(tc.x, 0.0, SHADOW_MAP_SIZE - 1.0);
+                float ty = clamp(tc.y, 0.0, SHADOW_MAP_SIZE - 1.0);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
                 float d = shadowMaps[ssbo_index];
-                float depthDiff = dist - d - 0.12;
-                float shadowContrib = clamp(1.0 - depthDiff / 0.16, 0.0, 1.0);
-                sum += shadowContrib * invSamples;
+                float depthDiff = dist - d - bias;
+                shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
             }
 
-            shadowFactor = sum;
+            if (shadowFactor < 0.005) continue;
         }
-
-        if (shadowFactor < 0.005) continue;
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor);

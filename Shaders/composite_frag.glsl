@@ -8,6 +8,7 @@ uniform int debugValue;
 uniform uint screenWidth;
 uniform uint screenHeight;
 uniform sampler2D outputImage;
+uniform uint reflectionsEnabled;
 const int SSR_RES = 4;
 
 uniform float aaStrength = 2.0; // Controls the radius of AA sampling (in pixels)
@@ -20,9 +21,11 @@ void main() {
 
     ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
     if (debugView == 0) {
-        vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-        vec3 reflectionColor = texture(outputImage, sampleUV).rgb;
-        color += reflectionColor;
+        if (reflectionsEnabled > 0) {
+            vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+            vec3 reflectionColor = texture(outputImage, sampleUV).rgb;
+            color += reflectionColor;
+        }
 
         // SMAA-Inspired Edge-Directed Antialiasing
         // Compute luminance for edge detection

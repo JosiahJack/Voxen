@@ -39,6 +39,9 @@ void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
 void CleanupAudio();
 // ----------------------------------------------------------------------------
+// Settings
+extern uint8_t settings_Reflections;
+// ----------------------------------------------------------------------------
 // Data Parsing
 #define MAX_ENTRIES 6000
 #define MAX_PATH 128
@@ -169,7 +172,7 @@ int32_t LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE 256u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];

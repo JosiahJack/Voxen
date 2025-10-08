@@ -34,6 +34,10 @@ bool inventoryMode = false;
 uint16_t screen_width = 800, screen_height = 600;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
+// Settings
+uint8_t settings_Reflections = 1u;
+uint8_t settings_Shadows = 1u;
+// ----------------------------------------------------------------------------
 // Instances
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -626,7 +630,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
         glUniform3f(lightPosLoc, lightPosX, lightPosY, lightPosZ);
-        glUniform1i(ssbo_indexBaseLoc, lightIdx * 98304 + face * 16384); // 128
+        glUniform1i(ssbo_indexBaseLoc, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); // 128
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -635,7 +639,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
             if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
             if (i >= startOfTransparentInstances) {
-                glEnable(GL_CULL_FACE);
+                glDisable(GL_CULL_FACE);
                 glEnable(GL_BLEND); // Enable blending for transparent instances
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
@@ -657,6 +661,8 @@ void RenderShadowmap(uint16_t lightIdx) {
 
 // Renders all static shadowmaps at level load
 void RenderShadowmaps(void) {
+    if (settings_Shadows < 1u) return;
+
     double start_time = get_time();
     DualLog("Rendering shadowmaps...");
     DebugRAM("Start of RenderShadowmaps");
@@ -1409,6 +1415,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1f(fogColorRLoc_chunk, fogColorR);
             glUniform1f(fogColorGLoc_chunk, fogColorG);
             glUniform1f(fogColorBLoc_chunk, fogColorB);
+            glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "reflectionsEnabled"), settings_Reflections);
+            glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "shadowsEnabled"), settings_Shadows);
             glBindVertexArray(vao_chunk);
             float lodRangeSqrd = 38.4f * 38.4f;
             memset(instanceIsCulledArray,true,INSTANCE_COUNT * sizeof(bool)); // All culled.
@@ -1469,7 +1477,7 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
-            if (debugView == 0 || debugView == 7) {
+            if ((debugView == 0 || debugView == 7) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
                 glProgramUniform1i(ssrShaderProgram, glGetUniformLocation(ssrShaderProgram, "outputImage"), 4);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
@@ -1490,6 +1498,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, outputImageID);
         glProgramUniform1i(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "outputImage"), 4);
+        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "reflectionsEnabled"), settings_Reflections);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
