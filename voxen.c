@@ -35,8 +35,10 @@ uint16_t screen_width = 800, screen_height = 600;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Reflections = 1u;
+uint8_t settings_Reflections = 0u;
 uint8_t settings_Shadows = 1u;
+uint8_t settings_AntiAliasing = 1u;
+uint8_t settings_Brightness = 100u;
 // ----------------------------------------------------------------------------
 // Instances
 Entity instances[INSTANCE_COUNT];
@@ -1499,6 +1501,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindTexture(GL_TEXTURE_2D, outputImageID);
         glProgramUniform1i(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "outputImage"), 4);
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "reflectionsEnabled"), settings_Reflections);
+        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "aaEnabled"), settings_AntiAliasing);
+        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting"), settings_Brightness);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
