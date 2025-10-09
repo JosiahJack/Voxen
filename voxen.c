@@ -35,10 +35,10 @@ uint16_t screen_width = 800, screen_height = 600;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Reflections = 1u;
-uint8_t settings_Shadows = 2u;
-uint8_t settings_AntiAliasing = 1u;
-uint8_t settings_Brightness = 100u;
+uint8_t settings_Reflections = 1u; // Default 1
+uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
+uint8_t settings_AntiAliasing = 1u; // Default 1
+uint8_t settings_Brightness = 100u; // Default 100 (for %)
 float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
 // Instances

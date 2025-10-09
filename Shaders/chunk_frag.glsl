@@ -19,6 +19,7 @@ uniform float fogColorG;
 uniform float fogColorB;
 uniform uint reflectionsEnabled;
 uniform uint shadowsEnabled;
+uniform uint ditherEnabled;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -29,7 +30,7 @@ layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { float shadowMaps[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
-layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
+// layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
@@ -140,21 +141,21 @@ void main() {
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
-    if (NormalIndex != 41) {
-        vec3 dp1 = dFdx(FragPos);
-        vec3 dp2 = dFdy(FragPos);
-        vec2 duv1 = dFdx(TexCoord);
-        vec2 duv2 = dFdy(TexCoord);
-        float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
-        if (uvArea > 1e-4) {
-            vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
-            vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
-            mat3 TBN3x3 = mat3(t, b, adjustedNormal);
-            vec3 normalColor = (getTextureColor(NormalIndex,texUV).rgb * 2.0 - 1.0);
-            normalColor.g = -normalColor.g;
-            adjustedNormal = normalize(TBN3x3 * normalColor);
-        }
-    }
+//     if (NormalIndex != 41) {
+//         vec3 dp1 = dFdx(FragPos);
+//         vec3 dp2 = dFdy(FragPos);
+//         vec2 duv1 = dFdx(TexCoord);
+//         vec2 duv2 = dFdy(TexCoord);
+//         float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
+//         if (uvArea > 1e-4) {
+//             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
+//             vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
+//             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
+//             vec3 normalColor = (getTextureColor(NormalIndex,texUV).rgb * 2.0 - 1.0);
+//             normalColor.g = -normalColor.g;
+//             adjustedNormal = normalize(TBN3x3 * normalColor);
+//         }
+//     }
 
     vec4 glowColor = getTextureColor(GlowIndex,texUV);
     if (reflectionsEnabled > 0) {
@@ -216,6 +217,7 @@ void main() {
         if (shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
             float bias = clamp(((0.24 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.025,1.0);
+            float normalBias = 0.0;//clamp(0.01 * (1.0 - dot(normal, lightDir)), 0.0, 0.05);
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -248,7 +250,7 @@ void main() {
                     uint uty = uint(ty);
                     uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
                     float d = shadowMaps[ssbo_index];
-                    float depthDiff = dist - d - bias;
+                    float depthDiff = dist - d - (bias + normalBias);
                     float shadowContrib = depthDiff > 0.0 ? 0.0 : 1.0;
                     sum += shadowContrib * invSamples;
                 }
@@ -261,7 +263,7 @@ void main() {
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
                 float d = shadowMaps[ssbo_index];
-                float depthDiff = dist - d - bias;
+                float depthDiff = dist - d - (bias + normalBias);
                 shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
             }
 
@@ -274,12 +276,7 @@ void main() {
 
     lighting += glowColor.rgb;
 
-//     // Dither + fog
-//     int blueNoiseTextureWidth = 64;
-//     int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
-//     vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
-//     lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
-
+    // Fog
     float fogFac = clamp(distToPixel * INV_FOG_DIST, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
