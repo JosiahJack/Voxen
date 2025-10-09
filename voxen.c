@@ -1424,7 +1424,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 uint16_t count = modelTypeCountsOpaque[modelIdx];
 
                 // Filter visible instances
-                uint16_t visibleInstances[INSTANCE_COUNT];
+                uint16_t visibleInstances[start + count];
                 uint16_t visibleCount = 0;
                 for (uint16_t i = start; i < start + count && i < startOfDoubleSidedInstances; i++) {
                     uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
@@ -1470,7 +1470,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 uint16_t count = modelTypeCountsDoubleSided[modelIdx];
 
                 // Filter visible instances
-                uint16_t visibleInstances[INSTANCE_COUNT];
+                uint16_t visibleInstances[start + count];
                 uint16_t visibleCount = 0;
                 for (uint16_t i = start; i < start + count && i < startOfTransparentInstances; i++) {
                     uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
@@ -1520,7 +1520,7 @@ int32_t main(int32_t argc, char* argv[]) {
 
                 // Filter and sort visible instances by depth (back-to-front)
                 typedef struct { uint16_t index; float depth; } DepthSort;
-                DepthSort visibleInstances[INSTANCE_COUNT];
+                DepthSort visibleInstances[start + count];
                 uint16_t visibleCount = 0;
                 for (uint16_t i = start; i < start + count && i < loadedInstances - invalidModelIndexCount; i++) {
                     uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
