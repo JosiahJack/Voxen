@@ -141,21 +141,21 @@ void main() {
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
-//     if (NormalIndex != 41) {
-//         vec3 dp1 = dFdx(FragPos);
-//         vec3 dp2 = dFdy(FragPos);
-//         vec2 duv1 = dFdx(TexCoord);
-//         vec2 duv2 = dFdy(TexCoord);
-//         float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
-//         if (uvArea > 1e-4) {
-//             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
-//             vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
-//             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
-//             vec3 normalColor = (getTextureColor(NormalIndex,texUV).rgb * 2.0 - 1.0);
-//             normalColor.g = -normalColor.g;
-//             adjustedNormal = normalize(TBN3x3 * normalColor);
-//         }
-//     }
+    if (NormalIndex != 41) {
+        vec3 dp1 = dFdx(FragPos);
+        vec3 dp2 = dFdy(FragPos);
+        vec2 duv1 = dFdx(TexCoord);
+        vec2 duv2 = dFdy(TexCoord);
+        float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
+        if (uvArea > 0.0000001) {
+            vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
+            vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
+            mat3 TBN3x3 = mat3(t, b, adjustedNormal);
+            vec3 normalColor = (getTextureColor(NormalIndex,texUV).rgb * 2.0 - 1.0);
+            normalColor.g = -normalColor.g;
+            adjustedNormal = normalize(TBN3x3 * normalColor);
+        }
+    }
 
     vec4 glowColor = getTextureColor(GlowIndex,texUV);
     if (reflectionsEnabled > 0) {
@@ -237,7 +237,7 @@ void main() {
             uint faceOff = base + face * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
             vec2 tc = uv * SHADOW_MAP_SIZE;
 
-            if (shadowsEnabled > 1) {
+            if (shadowsEnabled > 1 && distToPixel < 10.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
                 float invSamples = 1.0 / float(PCF_SAMPLES);

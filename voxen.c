@@ -26,7 +26,7 @@
 #include "Shaders/composite_vert.glsl.h"
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
-#include "Shaders/bluenoise64.cginc"
+// #include "Shaders/bluenoise64.cginc"
 // ----------------------------------------------------------------------------
 // Window
 SDL_Window *window;
@@ -227,11 +227,11 @@ int32_t CompileShaders(void) {
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program"); if (!imageBlitShaderProgram) { return 1; }
 
-    glGenBuffers(1, &blueNoiseBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, blueNoiseBuffer); // Use binding point 13
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//     glGenBuffers(1, &blueNoiseBuffer);
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
+//     glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
+//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, blueNoiseBuffer); // Use binding point 13
+//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Cache uniform locations after shader compile!
     viewProjLoc_chunk = glGetUniformLocation(chunkShaderProgram, "viewProjection");
@@ -744,6 +744,8 @@ int32_t InitializeEnvironment(void) {
     SDL_GL_SetSwapInterval(vsync_enable);
     SDL_SetRelativeMouseMode(SDL_TRUE);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_MULTISAMPLE);
+    glMinSampleShading(0.0f);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
