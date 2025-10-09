@@ -1420,10 +1420,6 @@ int32_t main(int32_t argc, char* argv[]) {
                 if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             }
 
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-
             // Opaque Pass
             for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
                 if (modelTypeCountsOpaque[modelIdx] == 0) continue;
@@ -1437,28 +1433,29 @@ int32_t main(int32_t argc, char* argv[]) {
                 for (uint16_t i = start; i < start + count && i < startOfDoubleSidedInstances; i++) {
                     uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
                     if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
-
                     float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
                     if (distSqrd >= FAR_PLANE_SQUARED) continue;
                     if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue;
-
                     visibleInstances[visibleCount++] = i;
+                    instanceIsLODArray[i] = (distSqrd >= lodRangeSqrd);
                 }
                 if (visibleCount == 0) continue;
 
-                // Group by texIndex to minimize texture binds
+                // Set texture-related uniforms once per model type
+                uint16_t firstInstance = visibleInstances[0]; // Safe since visibleCount > 0
+                uint32_t texIndex = instances[firstInstance].texIndex;
+                uint32_t glowdex = (uint32_t)instances[firstInstance].glowIndex;
+                uint32_t specdex = (uint32_t)instances[firstInstance].specIndex;
+                uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+                uint32_t normInstancePack = (uint32_t)instances[firstInstance].normIndex;
+                glUniform1ui(texIndexLoc_chunk, texIndex);
+                glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+                glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+
+                // Render instances
                 for (uint16_t j = 0; j < visibleCount; j++) {
                     uint16_t i = visibleInstances[j];
-                    uint32_t texIndex = instances[i].texIndex;
-                    uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-                    uint32_t specdex = (uint32_t)instances[i].specIndex;
-                    uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
-                    uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
-                    instanceIsLODArray[i] = (squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z) >= lodRangeSqrd);
                     int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
-                    glUniform1ui(texIndexLoc_chunk, texIndex);
-                    glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
-                    glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
                     glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
                     glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
@@ -1485,22 +1482,25 @@ int32_t main(int32_t argc, char* argv[]) {
                     if (distSqrd >= FAR_PLANE_SQUARED) continue;
                     if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue;
                     visibleInstances[visibleCount++] = i;
+                    instanceIsLODArray[i] = (distSqrd >= lodRangeSqrd);
                 }
                 if (visibleCount == 0) continue;
 
-                // Group by texIndex to minimize texture binds
+                // Set texture-related uniforms once per model type
+                uint16_t firstInstance = visibleInstances[0];
+                uint32_t texIndex = instances[firstInstance].texIndex;
+                uint32_t glowdex = (uint32_t)instances[firstInstance].glowIndex;
+                uint32_t specdex = (uint32_t)instances[firstInstance].specIndex;
+                uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+                uint32_t normInstancePack = (uint32_t)instances[firstInstance].normIndex;
+                glUniform1ui(texIndexLoc_chunk, texIndex);
+                glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+                glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+
+                // Render instances
                 for (uint16_t j = 0; j < visibleCount; j++) {
                     uint16_t i = visibleInstances[j];
-                    uint32_t texIndex = instances[i].texIndex;
-                    uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-                    uint32_t specdex = (uint32_t)instances[i].specIndex;
-                    uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
-                    uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
-                    instanceIsLODArray[i] = (squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z) >= lodRangeSqrd);
                     int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
-                    glUniform1ui(texIndexLoc_chunk, texIndex);
-                    glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
-                    glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
                     glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
                     glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
