@@ -927,7 +927,7 @@ int32_t InitializeEnvironment(void) {
     if (LoadLevelLights(currentLevel)) return 1;
     RenderLoadingProgress(120,"Loading dynamic object data...");
     if (LoadLevelDynamicObjects(currentLevel)) return 1;
-    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
+    if (SortInstances()) return 1; // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
@@ -1224,6 +1224,17 @@ int32_t EventQueueProcess(void) {
     return 0;
 }
 
+typedef struct {
+    uint16_t index;
+    float depth;
+} DepthSort;
+
+int32_t compareDepthSort(const void* a, const void* b) {
+    const DepthSort* da = (const DepthSort*)a;
+    const DepthSort* db = (const DepthSort*)b;
+    return da->depth > db->depth ? -1 : (da->depth < db->depth ? 1 : 0);
+}
+
 int32_t main(int32_t argc, char* argv[]) {
     double programStartTime = get_time();
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
@@ -1386,7 +1397,7 @@ int32_t main(int32_t argc, char* argv[]) {
             glUseProgram(chunkShaderProgram);
             glEnable(GL_DEPTH_TEST);
             glEnable(GL_CULL_FACE);
-            float view[16]; // Set up view matrices
+            float view[16];
             mat4_lookat(view);
             float viewProj[16];
             float invViewProj[16];
@@ -1403,50 +1414,158 @@ int32_t main(int32_t argc, char* argv[]) {
             glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "shadowsEnabled"), settings_Shadows);
             glBindVertexArray(vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
-            for (uint16_t i=0;i<loadedInstances;i++) {
-                if (dirtyInstances[i]) UpdateInstanceMatrix(i); // Done before cull early outs as subsequent shaders need these updated, e.g. for shadows
-                if (instances[i].modelIndex >= MODEL_COUNT) continue;
-                if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
 
-                uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
-                if (instCellIdx < ARRSIZE) {
-                    if (!(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue; // Culled by being in a cell outside player PVS
-                }
-
-                float distSqrd = squareDistance3D(instances[i].position.x,instances[i].position.y,instances[i].position.z,cam_x, cam_y, cam_z);
-                if (distSqrd >= FAR_PLANE_SQUARED) continue;
-                if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue; // Cone Frustum Culling
-                
-                if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
-                if (i >= startOfTransparentInstances) {
-                    glEnable(GL_CULL_FACE);
-                    glEnable(GL_BLEND); // Enable blending for transparent instances
-                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
-                    glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
-                }
-
-                if (distSqrd < lodRangeSqrd) instanceIsLODArray[i] = false; // Use full detail up close.
-                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
-                uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-                uint32_t specdex = (uint32_t)instances[i].specIndex;
-                uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);        
-                uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
-                glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
-                glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
-                glUniform1ui(texIndexLoc_chunk, instances[i].texIndex);
-                glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
-                glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
-                drawCallsRenderedThisFrame++;
-                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+            // Update instance matrices and upload to GPU
+            for (uint16_t i = 0; i < loadedInstances; i++) {
+                if (dirtyInstances[i]) UpdateInstanceMatrix(i);
             }
-            
+
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
+            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+            // Opaque Pass
+            for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+                if (modelTypeCountsOpaque[modelIdx] == 0) continue;
+
+                uint16_t start = modelTypeOffsetsOpaque[modelIdx];
+                uint16_t count = modelTypeCountsOpaque[modelIdx];
+
+                // Filter visible instances
+                uint16_t visibleInstances[INSTANCE_COUNT];
+                uint16_t visibleCount = 0;
+                for (uint16_t i = start; i < start + count && i < startOfDoubleSidedInstances; i++) {
+                    uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
+                    if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+
+                    float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
+                    if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                    if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue;
+
+                    visibleInstances[visibleCount++] = i;
+                }
+                if (visibleCount == 0) continue;
+
+                // Group by texIndex to minimize texture binds
+                for (uint16_t j = 0; j < visibleCount; j++) {
+                    uint16_t i = visibleInstances[j];
+                    uint32_t texIndex = instances[i].texIndex;
+                    uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+                    uint32_t specdex = (uint32_t)instances[i].specIndex;
+                    uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+                    uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
+                    instanceIsLODArray[i] = (squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z) >= lodRangeSqrd);
+                    int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                    glUniform1ui(texIndexLoc_chunk, texIndex);
+                    glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+                    glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                    glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+                }
+            }
+
+            // Double-Sided Pass
+            glDisable(GL_CULL_FACE);
+            for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+                if (modelTypeCountsDoubleSided[modelIdx] == 0) continue;
+                uint16_t start = modelTypeOffsetsDoubleSided[modelIdx];
+                uint16_t count = modelTypeCountsDoubleSided[modelIdx];
+
+                // Filter visible instances
+                uint16_t visibleInstances[INSTANCE_COUNT];
+                uint16_t visibleCount = 0;
+                for (uint16_t i = start; i < start + count && i < startOfTransparentInstances; i++) {
+                    uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
+                    if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+                    float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
+                    if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                    if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue;
+                    visibleInstances[visibleCount++] = i;
+                }
+                if (visibleCount == 0) continue;
+
+                // Group by texIndex to minimize texture binds
+                for (uint16_t j = 0; j < visibleCount; j++) {
+                    uint16_t i = visibleInstances[j];
+                    uint32_t texIndex = instances[i].texIndex;
+                    uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+                    uint32_t specdex = (uint32_t)instances[i].specIndex;
+                    uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+                    uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
+                    instanceIsLODArray[i] = (squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z) >= lodRangeSqrd);
+                    int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                    glUniform1ui(texIndexLoc_chunk, texIndex);
+                    glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+                    glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                    glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+                }
+            }
+
+            // Transparent Pass
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE);
+            for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+                if (modelTypeCountsTransparent[modelIdx] == 0) continue;
+                uint16_t start = modelTypeOffsetsTransparent[modelIdx];
+                uint16_t count = modelTypeCountsTransparent[modelIdx];
+
+                // Filter and sort visible instances by depth (back-to-front)
+                typedef struct { uint16_t index; float depth; } DepthSort;
+                DepthSort visibleInstances[INSTANCE_COUNT];
+                uint16_t visibleCount = 0;
+                for (uint16_t i = start; i < start + count && i < loadedInstances - invalidModelIndexCount; i++) {
+                    uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
+                    if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+                    float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
+                    if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                    if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue;
+                    visibleInstances[visibleCount].index = i;
+                    visibleInstances[visibleCount].depth = distSqrd;
+                    visibleCount++;
+                }
+                if (visibleCount == 0) continue;
+
+                // Sort by depth (descending for back-to-front)
+                qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort);
+
+                // Render sorted instances
+                for (uint16_t j = 0; j < visibleCount; j++) {
+                    uint16_t i = visibleInstances[j].index;
+                    uint32_t texIndex = instances[i].texIndex;
+                    uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+                    uint32_t specdex = (uint32_t)instances[i].specIndex;
+                    uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+                    uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
+                    instanceIsLODArray[i] = (squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z) >= lodRangeSqrd);
+                    int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                    glUniform1ui(texIndexLoc_chunk, texIndex);
+                    glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+                    glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+                    glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
+                    glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+                    glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                    drawCallsRenderedThisFrame++;
+                    verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+                }
+            }
+
             glDisable(GL_BLEND);
             glDepthMask(GL_TRUE);
-            glEnable(GL_CULL_FACE); // Reenable backface culling
-            glEnable(GL_DEPTH_TEST);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0); // Ok, turn off temporary framebuffer so we can draw to screen now.
+            glEnable(GL_CULL_FACE);
+            glBindVertexArray(0);
+            glUseProgram(0);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 7) && settings_Reflections > 0) {

@@ -323,16 +323,16 @@ void CenterStatusPrint(const char* fmt, ...) {
     statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.
 }
 
-static const char* debugViewNames[] = {
-    "standard render", // 0
-    "unlit",           // 1
-    "surface normals", // 2
-    "depth",           // 3
-    "shadows",         // 4
-    "worldpos",        // 5
-    "lightview",       // 6
-    "reflections"      // 7
-};
+// static const char* debugViewNames[] = {
+//     "standard render", // 0
+//     "unlit",           // 1
+//     "surface normals", // 2
+//     "depth",           // 3
+//     "shadows",         // 4
+//     "worldpos",        // 5
+//     "lightview",       // 6
+//     "reflections"      // 7
+// };
 
 void RenderUI(void) {
     uint32_t drawCallsNormal = drawCallsRenderedThisFrame;

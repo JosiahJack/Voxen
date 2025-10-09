@@ -18,6 +18,17 @@
 
 uint32_t modelVertexCounts[MODEL_COUNT];
 uint32_t modelTriangleCounts[MODEL_COUNT];
+uint16_t modelTypeCountsOpaque[MODEL_COUNT];
+uint16_t modelTypeCountsDoubleSided[MODEL_COUNT];
+uint16_t modelTypeCountsTransparent[MODEL_COUNT];
+uint16_t invalidModelIndexCount;
+uint16_t modelTypeOffsetsOpaque[INSTANCE_COUNT];
+uint16_t modelTypeOffsetsDoubleSided[INSTANCE_COUNT];
+uint16_t modelTypeOffsetsTransparent[INSTANCE_COUNT];
+uint16_t opaqueInstances[INSTANCE_COUNT];
+uint16_t doubleSidedInstances[INSTANCE_COUNT];
+uint16_t transparentInstances[INSTANCE_COUNT];
+uint16_t opaqueInstancesHead = 0;
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
 GLuint vbos[MODEL_COUNT];
@@ -1022,69 +1033,199 @@ bool IsDynamicObject(uint16_t constIndex) {
             || (constIndex >= 465 && constIndex <= 476);
 }
 
-void SortInstances() {
-    DualLog("Sorting instances...");
+int32_t clamp(int32_t val, int32_t min, int32_t max) {
+    if (val > max) return max;
+    if (val < min) return min;
+    return val;
+}
+
+int32_t SortInstances(void) {
     double start_time = get_time();
-    transparentInstancesHead = 0u;
-    doubleSidedInstancesHead = 0u;
+    DualLog("Sorting instances...");
+
+    // Zero out all arrays and counters
+    memset(modelTypeCountsOpaque, 0, MODEL_COUNT * sizeof(uint16_t));
+    memset(modelTypeCountsDoubleSided, 0, MODEL_COUNT * sizeof(uint16_t));
+    memset(modelTypeCountsTransparent, 0, MODEL_COUNT * sizeof(uint16_t));
+    memset(modelTypeOffsetsOpaque, 0, MODEL_COUNT * sizeof(uint16_t));
+    memset(modelTypeOffsetsDoubleSided, 0, MODEL_COUNT * sizeof(uint16_t));
+    memset(modelTypeOffsetsTransparent, 0, MODEL_COUNT * sizeof(uint16_t));
+    memset(opaqueInstances, 0, INSTANCE_COUNT * sizeof(uint16_t));
+    memset(doubleSidedInstances, 0, INSTANCE_COUNT * sizeof(uint16_t));
+    memset(transparentInstances, 0, INSTANCE_COUNT * sizeof(uint16_t));
+    opaqueInstancesHead = 0;
+    doubleSidedInstancesHead = 0;
+    transparentInstancesHead = 0;
+    invalidModelIndexCount = 0;
+
+    // Step 1: Categorize instances and count model types per category
     for (uint32_t i = 0; i < loadedInstances; i++) {
         if (instances[i].texIndex >= textureCount && instances[i].texIndex != UINT16_MAX) {
-            DualLogError("\nInvalid texIndex %u for instance %u\n", instances[i].texIndex, i);
+            DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i);
+            invalidModelIndexCount++;
             continue;
         }
-        if (entities[instances[i].index].transparent || isTransparent(instances[i].texIndex)) {
+        if (instances[i].modelIndex >= MODEL_COUNT || instances[i].modelIndex == UINT16_MAX) {
+            invalidModelIndexCount++;
+//             DualLog("Instance %u is non-renderable (modelIndex %u)\n", i, instances[i].modelIndex);
+            continue;
+        }
+        if (instances[i].index >= MAX_ENTITIES) {
+            DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i);
+            invalidModelIndexCount++;
+            continue;
+        }
+
+        bool is_double_sided = isDoubleSided(instances[i].texIndex) ||
+                              instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
+        if (isTransparent(instances[i].texIndex)) {
+            if (transparentInstancesHead >= INSTANCE_COUNT) {
+                DualLogError("Transparent instances overflow at index %u\n", i);
+                invalidModelIndexCount++;
+                continue;
+            }
+//             DualLog("Instance %u is transparent (modelIndex %u, texIndex %u, entity.transparent %d)\n", i, instances[i].modelIndex, instances[i].texIndex, entities[instances[i].index].transparent);
             transparentInstances[transparentInstancesHead++] = i;
-        } else if (isDoubleSided(instances[i].texIndex) || 
-                   instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) {
+            modelTypeCountsTransparent[instances[i].modelIndex]++;
+        } else if (is_double_sided) {
+            if (doubleSidedInstancesHead >= INSTANCE_COUNT) {
+                DualLogError("Double-sided instances overflow at index %u\n", i);
+                invalidModelIndexCount++;
+                continue;
+            }
+//             DualLog("Instance %u is double-sided (modelIndex %u, texIndex %u)\n", i, instances[i].modelIndex, instances[i].texIndex);
             doubleSidedInstances[doubleSidedInstancesHead++] = i;
+            modelTypeCountsDoubleSided[instances[i].modelIndex]++;
+        } else {
+            if (opaqueInstancesHead >= INSTANCE_COUNT) {
+                DualLogError("Opaque instances overflow at index %u\n", i);
+                invalidModelIndexCount++;
+                continue;
+            }
+//             DualLog("Instance %u is opaque (modelIndex %u, texIndex %u)\n", i, instances[i].modelIndex, instances[i].texIndex);
+            opaqueInstances[opaqueInstancesHead++] = i;
+            modelTypeCountsOpaque[instances[i].modelIndex]++;
         }
     }
 
-    // Sort transparent instances by depth (back-to-front)
-    for (uint16_t i = 0u; i < transparentInstancesHead - 1u; i++) {
-        for (uint16_t j = 0u; j < transparentInstancesHead - i - 1u; j++) {
-            uint32_t idx1 = transparentInstances[j];
-            uint32_t idx2 = transparentInstances[j + 1];
-            float dist1 = squareDistance3D(instances[idx1].position.x, instances[idx1].position.y, instances[idx1].position.z, cam_x, cam_y, cam_z);
-            float dist2 = squareDistance3D(instances[idx2].position.x, instances[idx2].position.y, instances[idx2].position.z, cam_x, cam_y, cam_z);
-            if (dist1 < dist2) { // Back-to-front
-                uint32_t temp = transparentInstances[j];
-                transparentInstances[j] = transparentInstances[j + 1];
-                transparentInstances[j + 1] = temp;
+    // Step 2: Compute offsets
+    uint16_t currentOffset = 0;
+    for (uint16_t i = 0; i < MODEL_COUNT; i++) {
+        modelTypeOffsetsOpaque[i] = currentOffset;
+        currentOffset += modelTypeCountsOpaque[i];
+    }
+    startOfDoubleSidedInstances = currentOffset;
+    for (uint16_t i = 0; i < MODEL_COUNT; i++) {
+        modelTypeOffsetsDoubleSided[i] = currentOffset;
+        currentOffset += modelTypeCountsDoubleSided[i];
+    }
+    startOfTransparentInstances = currentOffset;
+    for (uint16_t i = 0; i < MODEL_COUNT; i++) {
+        modelTypeOffsetsTransparent[i] = currentOffset;
+        currentOffset += modelTypeCountsTransparent[i];
+    }
+
+    // Check for overflow
+    if ((uint32_t)(startOfTransparentInstances + transparentInstancesHead) > (uint32_t)(loadedInstances - invalidModelIndexCount)) {
+        DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount);
+        return 1;
+    }
+
+    // Step 3: Reorder instances
+    Entity tempInstances[INSTANCE_COUNT];
+    memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
+    uint16_t targetIdx = 0;
+
+    // Copy opaque instances
+    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+        for (uint16_t j = 0; j < opaqueInstancesHead; j++) {
+            uint16_t i = opaqueInstances[j];
+            if (tempInstances[i].modelIndex == modelIdx) {
+                if (targetIdx >= startOfDoubleSidedInstances) {
+                    DualLogError("Opaque instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx);
+                    return 1;
+                }
+                instances[targetIdx] = tempInstances[i];
+//                 DualLog("Placing opaque instance %u (modelIndex %u, texIndex %u) at %u\n",i, instances[targetIdx].modelIndex, instances[targetIdx].texIndex, targetIdx);
+                targetIdx++;
             }
         }
     }
 
-    startOfDoubleSidedInstances = loadedInstances - doubleSidedInstancesHead - transparentInstancesHead;
-    startOfTransparentInstances = loadedInstances - transparentInstancesHead;
-    uint32_t maxValidIdx = startOfDoubleSidedInstances;
-    for (uint16_t i = 0u; i < doubleSidedInstancesHead; i++) {
-        uint16_t idx = doubleSidedInstances[i];
-        if (idx >= loadedInstances) continue;
-        Entity tempInstance = instances[maxValidIdx];
-        instances[maxValidIdx] = instances[idx];
-        instances[idx] = tempInstance;
-        maxValidIdx++;
-    }
-
-    for (uint16_t i = 0u; i < transparentInstancesHead; i++) {
-        uint16_t idx = transparentInstances[i];
-        if (idx >= loadedInstances) continue;
-        Entity tempInstance = instances[maxValidIdx];
-        instances[maxValidIdx] = instances[idx];
-        instances[idx] = tempInstance;
-        maxValidIdx++;
-    }
-    
-    for (uint32_t idx = 0u;idx < loadedInstances;++idx) { // Populate Physics Objects AFTER indices are reordered
-        if (IsDynamicObject(instances[idx].index)) {
-            physObjects[physHead] = instances[idx];
-            physObjects[physHead].index = idx;
-            physHead++;
-            if (physHead > MAX_DYNAMIC_ENTITIES) { DualLogError( "\nToo many physics entities! %d greater than %d\n",physHead,MAX_DYNAMIC_ENTITIES); return; }
+    // Copy double-sided instances
+    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+        for (uint16_t j = 0; j < doubleSidedInstancesHead; j++) {
+            uint16_t i = doubleSidedInstances[j];
+            if (tempInstances[i].modelIndex == modelIdx) {
+                if (targetIdx >= startOfTransparentInstances) {
+                    DualLogError("Double-sided instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx);
+                    return 1;
+                }
+                instances[targetIdx] = tempInstances[i];
+//                 DualLog("Placing double-sided instance %u (modelIndex %u, texIndex %u) at %u\n",i, instances[targetIdx].modelIndex, instances[targetIdx].texIndex, targetIdx);
+                targetIdx++;
+            }
         }
     }
-    
+
+    // Copy transparent instances
+    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+        for (uint16_t j = 0; j < transparentInstancesHead; j++) {
+            uint16_t i = transparentInstances[j];
+            if (tempInstances[i].modelIndex == modelIdx) {
+                if (targetIdx >= loadedInstances - invalidModelIndexCount) {
+                    DualLogError("Transparent instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx);
+                    return 1;
+                }
+                instances[targetIdx] = tempInstances[i];
+//                 DualLog("Placing transparent instance %u (modelIndex %u, texIndex %u) at %u\n",i, instances[targetIdx].modelIndex, instances[targetIdx].texIndex, targetIdx);
+                targetIdx++;
+            }
+        }
+    }
+
+    // Verify instance ordering
+    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+        uint16_t start = modelTypeOffsetsOpaque[modelIdx];
+        uint16_t count = modelTypeCountsOpaque[modelIdx];
+        for (uint16_t i = start; i < start + count && i < startOfDoubleSidedInstances; i++) {
+            if (instances[i].modelIndex != modelIdx) {
+                DualLogError("Verification failed: Opaque instance %u has modelIndex %u (expected %u)\n",i, instances[i].modelIndex, modelIdx);
+            }
+        }
+    }
+    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+        uint16_t start = modelTypeOffsetsDoubleSided[modelIdx];
+        uint16_t count = modelTypeCountsDoubleSided[modelIdx];
+        for (uint16_t i = start; i < start + count && i < startOfTransparentInstances; i++) {
+            if (instances[i].modelIndex != modelIdx) {
+                DualLogError("Verification failed: Double-sided instance %u has modelIndex %u (expected %u)\n",i, instances[i].modelIndex, modelIdx);
+            }
+        }
+    }
+    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+        uint16_t start = modelTypeOffsetsTransparent[modelIdx];
+        uint16_t count = modelTypeCountsTransparent[modelIdx];
+        for (uint16_t i = start; i < start + count && i < loadedInstances - invalidModelIndexCount; i++) {
+            if (instances[i].modelIndex != modelIdx) {
+                DualLogError("Verification failed: Transparent instance %u has modelIndex %u (expected %u)\n",i, instances[i].modelIndex, modelIdx);
+            }
+        }
+    }
+
+    // Update cellIndexForInstance
+    for (uint16_t i = 0; i < loadedInstances; i++) {
+        float x = instances[i].position.x;
+        float z = instances[i].position.z;
+        int32_t cellX = (int32_t)floorf((x - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t cellZ = (int32_t)floorf((z - worldMin_z) / WORLDCELL_WIDTH_F);
+        cellX = clamp(cellX, 0, 63);
+        cellZ = clamp(cellZ, 0, 63);
+        cellIndexForInstance[i] = cellZ * 64 + cellX;
+    }
+
     DualLog(" took %f secs\n", get_time() - start_time);
-    DualLog("startOfDoubleSidedInstances %u, startOfTransparentInstances %u\n", startOfDoubleSidedInstances, startOfTransparentInstances);
+    DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invalid: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
+    DualLog("startOfDoubleSidedInstances %u, startOfTransparentInstances %u, invalidModelIndexCount %u\n", startOfDoubleSidedInstances, startOfTransparentInstances, invalidModelIndexCount);
+    return 0;
 }

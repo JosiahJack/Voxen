@@ -138,6 +138,19 @@ int32_t LoadModels(void);
 #define INSTANCE_COUNT 7400 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 extern Entity entities[MAX_ENTITIES];
 extern Entity instances[INSTANCE_COUNT];
+extern uint16_t modelTypeCountsOpaque[MODEL_COUNT];
+extern uint16_t modelTypeCountsDoubleSided[MODEL_COUNT];
+extern uint16_t modelTypeCountsTransparent[MODEL_COUNT];
+extern uint16_t invalidModelIndexCount;
+extern uint16_t modelTypeOffsetsOpaque[INSTANCE_COUNT];
+extern uint16_t modelTypeOffsetsDoubleSided[INSTANCE_COUNT];
+extern uint16_t modelTypeOffsetsTransparent[INSTANCE_COUNT];
+extern uint16_t opaqueInstances[INSTANCE_COUNT];
+extern uint16_t doubleSidedInstances[INSTANCE_COUNT];
+extern uint16_t transparentInstances[INSTANCE_COUNT];
+extern uint16_t opaqueInstancesHead;
+extern uint16_t doubleSidedInstancesHead;
+extern uint16_t transparentInstancesHead;
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern GLuint instancesBuffer;
@@ -189,7 +202,7 @@ int32_t LoadLevels();
 int32_t LoadLevelGeometry(uint8_t curlevel);
 int32_t LoadLevelLights(uint8_t curlevel);
 int32_t LoadLevelDynamicObjects(uint8_t curlevel);
-void SortInstances();
+int32_t SortInstances();
 // ----------------------------------------------------------------------------
 // Event System
 #define EV_NULL 0u
@@ -338,7 +351,7 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
 }
 // ----------------------------------------------------------------------------
 // Physics
-#define MAX_DYNAMIC_ENTITIES 256
+#define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
 extern double time_PhysicsStep;
@@ -451,8 +464,6 @@ extern uint32_t verticesRenderedThisFrame;
 extern GLuint precomputedVisibleCellsFromHereID;
 extern GLuint cellIndexForInstanceID;
 extern bool lightDirty[LIGHT_COUNT];
-extern uint16_t doubleSidedInstancesHead;
-extern uint16_t transparentInstancesHead;
 extern bool global_modIsCitadel;
 extern bool inventoryMode;
 extern bool noclip;
