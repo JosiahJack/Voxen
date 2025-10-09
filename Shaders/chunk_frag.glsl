@@ -71,6 +71,7 @@ uint GetVoxelIndex(vec3 worldPos) {
 }
 
 const float SHADOW_MAP_SIZE = 256.0;
+const float INV_FOG_DIST = 1.0 / 71.68;
 
 // Small Poisson disk for stochastic PCF.
 // 12 samples gives good quality when temporally accumulated.
@@ -149,16 +150,16 @@ void main() {
             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
             vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
-            vec3 normalColor = normalize(getTextureColor(NormalIndex,ivec2(x,y)).rgb * 2.0 - 1.0);
+            vec3 normalColor = (getTextureColor(NormalIndex,texUV).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
         }
     }
 
-    vec4 glowColor = getTextureColor(GlowIndex,ivec2(x,y));
+    vec4 glowColor = getTextureColor(GlowIndex,texUV);
     if (reflectionsEnabled > 0) {
         vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
-        vec4 specColor = getTextureColor(SpecIndex,ivec2(x,y));
+        vec4 specColor = getTextureColor(SpecIndex,texUV);
         vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
                                 uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
                                 uintBitsToFloat(packColor(normalPack)),
@@ -167,7 +168,7 @@ void main() {
     }
 
     uint voxelIdx = GetVoxelIndex(worldPos);
-    uint count  = voxelLightListIndices[voxelIdx * 2 + 1];
+    uint count  = min(voxelLightListIndices[voxelIdx * 2 + 1],16u);
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = adjustedNormal;
     uint listoffset = 0;
@@ -273,13 +274,13 @@ void main() {
 
     lighting += glowColor.rgb;
 
-    // Dither + fog
-    int blueNoiseTextureWidth = 64;
-    int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
-    vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
-    lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
+//     // Dither + fog
+//     int blueNoiseTextureWidth = 64;
+//     int pixelIndex = ((pixel.y & (blueNoiseTextureWidth - 1)) * blueNoiseTextureWidth + (pixel.x & (blueNoiseTextureWidth - 1))) * 3;
+//     vec4 bluenoise = vec4(blueNoiseColors[pixelIndex], blueNoiseColors[pixelIndex + 1], blueNoiseColors[pixelIndex + 2], 1.0);
+//     lighting += ((bluenoise.rgb * 0.003921569) - 0.001960784);
 
-    float fogFac = clamp(distToPixel / 71.68, 0.0, 1.0);
+    float fogFac = clamp(distToPixel * INV_FOG_DIST, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);

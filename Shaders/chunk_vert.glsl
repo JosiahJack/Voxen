@@ -22,12 +22,13 @@ flat out uint SpecIndex;
 flat out uint NormalIndex;
 
 void main() {
-    FragPos = vec3(matrix * vec4(aPos, 1.0)); // Convert vertex from the model's local space into world space
+    vec4 worldPos = matrix * vec4(aPos, 1.0);
+    FragPos = vec3(worldPos);
+    gl_Position = viewProjection * worldPos;
     Normal = mat3(transpose(inverse(matrix))) * aNormal;
     TexCoord = aTexCoord; // Pass along data to each vertex, shared for whole tri's pixels.
     TexIndex = texIndex;
     GlowIndex = glowSpecIndex & 0xFFFFu;
-    SpecIndex = (glowSpecIndex >> 16) & 0xFFFFu;
+    SpecIndex = (glowSpecIndex >> 16);
     NormalIndex = normInstanceIndex;
-    gl_Position = viewProjection * vec4(FragPos, 1.0);
 }
