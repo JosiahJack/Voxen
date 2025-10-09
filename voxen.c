@@ -136,6 +136,7 @@ int32_t eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
 double current_time = 0.0;
+double cpuTime = 0.0;
 bool journalFirstWrite = true;
 // ----------------------------------------------------------------------------
 // Networking
@@ -1415,11 +1416,6 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindVertexArray(vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
 
-            // Update instance matrices and upload to GPU
-            for (uint16_t i = 0; i < loadedInstances; i++) {
-                if (dirtyInstances[i]) UpdateInstanceMatrix(i);
-            }
-
             // Opaque Pass
             for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
                 if (modelTypeCountsOpaque[modelIdx] == 0) continue;
@@ -1456,6 +1452,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 for (uint16_t j = 0; j < visibleCount; j++) {
                     uint16_t i = visibleInstances[j];
                     int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                    if (dirtyInstances[i]) UpdateInstanceMatrix(i);
                     glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
                     glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
@@ -1501,6 +1498,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 for (uint16_t j = 0; j < visibleCount; j++) {
                     uint16_t i = visibleInstances[j];
                     int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                    if (dirtyInstances[i]) UpdateInstanceMatrix(i);
                     glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
                     glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
                     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
@@ -1512,6 +1510,7 @@ int32_t main(int32_t argc, char* argv[]) {
 
             // Transparent Pass
             glEnable(GL_BLEND);
+            glEnable(GL_CULL_FACE);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glDepthMask(GL_FALSE);
             for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
@@ -1548,6 +1547,7 @@ int32_t main(int32_t argc, char* argv[]) {
                     uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
                     instanceIsLODArray[i] = (squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z) >= lodRangeSqrd);
                     int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+                    if (dirtyInstances[i]) UpdateInstanceMatrix(i);
                     glUniform1ui(texIndexLoc_chunk, texIndex);
                     glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
                     glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
@@ -1601,6 +1601,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindTextureUnit(0, 0);
         glUseProgram(0);
         RenderUI();
+        cpuTime = get_time() - current_time;
         SDL_GL_SwapWindow(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;

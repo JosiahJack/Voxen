@@ -247,6 +247,7 @@ extern int32_t eventQueueEnd; // End of the waiting line
 extern FILE* activeLogFile;
 extern bool log_playback;
 extern double lastJournalWriteTime;
+extern double cpuTime;
 extern const char* manualLogName;
 extern int32_t maxEventCount_debug;
 extern uint32_t globalFrameNum;
