@@ -934,6 +934,7 @@ int32_t InitializeEnvironment(void) {
     RenderLoadingProgress(110,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
+    glClearColor(1.0f, 0.0f, 1.0f, 0.0f);
     if (VoxelLists()) return 1;
     DebugRAM("InitializeEnvironment end");
     return 0;
@@ -1595,6 +1596,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "aaEnabled"), settings_AntiAliasing);
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting"), settings_Brightness);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
+        glUniform3f(glGetUniformLocation(imageBlitShaderProgram, "camRot"), deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+        glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "timeVal"), (float)current_time);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);

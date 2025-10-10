@@ -106,14 +106,14 @@ vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;
     uint slotIndex = pixelOffset / 2;
     uint packedIdx = colors[slotIndex];
-    uint paletteIndex = (pixelOffset % 2 == 0) ? (packedIdx & 0xFFFF) : (packedIdx >> 16);
+    uint paletteIndex = (pixelOffset % 2 == 0) ? (packedIdx & 0xFFFFu) : (packedIdx >> 16);
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
     return vec4(
-        float((color >> 24) & 0xFF) / 255.0,
-        float((color >> 16) & 0xFF) / 255.0,
-        float((color >> 8) & 0xFF) / 255.0,
-        float(color & 0xFF) / 255.0
+        float((color >> 24) & 0xFFu) / 255.0,
+        float((color >> 16) & 0xFFu) / 255.0,
+        float((color >> 8) & 0xFFu) / 255.0,
+        float(color & 0xFFu) / 255.0
     );
 }
 
@@ -126,7 +126,7 @@ void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
     float distToPixel = length(viewDir);
-    if (distToPixel > 71.66) discard; // TODO: Skybox
+    if (distToPixel > 71.66) return;
 
     viewDir = normalize(viewDir);
     int texIndexChecked = 0;
