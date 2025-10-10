@@ -15,7 +15,7 @@ uniform mat4 viewProjection;
 out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
-
+out vec3 Barycentric;
 flat out uint TexIndex;
 flat out uint GlowIndex;
 flat out uint SpecIndex;
@@ -31,4 +31,9 @@ void main() {
     GlowIndex = glowSpecIndex & 0xFFFFu;
     SpecIndex = (glowSpecIndex >> 16);
     NormalIndex = normInstanceIndex;
+
+    Barycentric = vec3(0.0);
+    if (gl_VertexID % 3 == 0) Barycentric.x = 1.0;
+    else if (gl_VertexID % 3 == 1) Barycentric.y = 1.0;
+    else Barycentric.z = 1.0;
 }

@@ -6,6 +6,7 @@
 in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;
+in vec3 Barycentric;
 
 uniform int debugView;
 uniform int debugValue;
@@ -141,6 +142,34 @@ void main() {
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
+
+    // Bevel Shader: Compute distance to nearest edge using barycentric coordinates
+    float bevelWidth = 0.02; // Adjust for bevel size
+    float edgeDist = min(min(Barycentric.x, Barycentric.y), Barycentric.z); // Distance to nearest edge
+    float bevelFactor = smoothstep(0.0, bevelWidth, edgeDist); // 0 near edge, 1 in center (fixed negative sign)
+
+    // Compute geometric normal for flat surfaces
+    vec3 dp1 = dFdx(FragPos);
+    vec3 dp2 = dFdy(FragPos);
+    vec3 geometricNormal = normalize(cross(dp1, dp2));
+
+    // Estimate edge hardness by checking normal variance
+    vec3 normalDx = dFdx(Normal);
+    vec3 normalDy = dFdy(Normal);
+    float normalVariance = length(normalDx) + length(normalDy); // Magnitude of normal gradient
+    float hardnessThreshold = 0.9; // Adjust to control sensitivity (0.05 to 0.5)
+    float edgeHardness = smoothstep(0.0, hardnessThreshold, normalVariance); // 1 for hard edges, 0 for smooth
+
+    // Alternative: Compare vertex normal to geometric normal
+    float normalDiff = 1.0 - dot(Normal, geometricNormal); // 0 if normals are similar, >0 if different
+    float normalHardness = smoothstep(0.0, 0.2, normalDiff); // Adjust threshold (0.1 to 0.3)
+    edgeHardness = max(edgeHardness, normalHardness); // Combine both metrics for robustness
+
+    // Apply bevel only on hard edges
+    vec3 edgeDir = normalize(dFdx(Barycentric) + dFdy(Barycentric)); // Approximate edge direction
+    vec3 bevelDir = normalize(Normal + edgeDir * 0.5 + viewDir * 0.2); // Perturb normal
+    adjustedNormal = normalize(mix(bevelDir, Normal, bevelFactor * edgeHardness)); // Modulate by edge hardness
+
     if (NormalIndex != 41) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
@@ -188,7 +217,7 @@ void main() {
 
         vec3 lightDir = normalize(toLight);
         float lambertian = max(dot(normal, lightDir), 0.0);
-        if (lambertian < 0.25) continue;
+//         if (lambertian < 0.25) continue;
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
