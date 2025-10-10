@@ -90,7 +90,7 @@ vec3 starField(vec2 uv, float density, float brightness) {
     float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5; // Primary layer
     densityMod = mix(0.0, 2.5, densityMod); // Stronger variation
     float densityMod2 = snoise(noiseUV * 10.5 + vec2(10.0)) * 0.5 + 0.5; // Higher frequency, phase-shifted
-    densityMod = mix(densityMod, 0.0, densityMod2 * 3.6); // Stronger dark patches
+    densityMod = mix(densityMod, 0.0, densityMod2 * 3.2); // Stronger dark patches
     return cellularStar(noiseUV, 40.0, brightness, timeVal, densityMod) * density;
 }
 
@@ -107,7 +107,7 @@ vec3 milkyWay(vec2 uv) {
     intensity *= (snoise(noiseUV * 0.8) * 0.2 + 0.8);
     float tintNoise = snoise(noiseUV * 0.3 + vec2(5.0)) * 0.5 + 0.5;
     vec3 tint = mix(vec3(1.0, 0.85, 0.6), vec3(1.0, 0.95, 0.9), tintNoise);
-    return vec3(intensity) * tint * 0.06;
+    return vec3(intensity) * tint * 0.04;
 }
 
 void main() {
@@ -119,8 +119,8 @@ void main() {
         vec3 viewDir = normalize(vec3(ndc.x * aspect, ndc.y, -1.0));
 
         // Apply camera rotation
-        float cy = cos(camRot.x);
-        float sy = sin(camRot.x);
+        float cy = cos(camRot.x + timeVal/100.0);
+        float sy = sin(camRot.x + timeVal/100.0);
         float cp = cos(camRot.y);
         float sp = sin(camRot.y);
         float cr = cos(camRot.z);
@@ -140,6 +140,9 @@ void main() {
         // Generate procedural sky
         vec3 skyColor = vec3(0.034, 0.02, 0.05);
         skyColor += starField(uv, 0.5, 2.0);
+        skyColor.r = clamp(skyColor.r, 0.034, 1.0);
+        skyColor.g = clamp(skyColor.g, 0.02, 1.0);
+        skyColor.b = clamp(skyColor.b, 0.05, 1.0);
         skyColor += milkyWay(uv);
 
         // Debug modes
