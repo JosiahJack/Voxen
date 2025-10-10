@@ -17,8 +17,7 @@ uniform float timeVal;
 
 const int SSR_RES = 4;
 const float PI = 3.14159265359;
-
-uniform float aaThreshold = 0.2; // Gradient threshold for applying AA
+uniform float aaThreshold = 0.2;
 
 // Simplex noise implementation (2D)
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -48,51 +47,67 @@ float snoise(vec2 v) {
     return 130.0 * dot(m, g);
 }
 
-// Cellular noise for star field
-float cellularStar(vec2 uv, float scale, float brightness, float time) {
-    vec2 p = uv * scale; // Scale to control star density
+// Cellular noise for star field with density and size variation
+vec3 cellularStar(vec2 uv, float scale, float brightness, float time, float densityMod) {
+    vec2 p = uv * scale;
     vec2 i = floor(p);
     vec2 f = fract(p);
-    float minDist = 1.0; // Minimum distance to nearest star
+    float minDist = 1.0;
     vec2 starPos;
+    vec3 starColor = vec3(1.0);
+    float sizeMod = 0.1;
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
             vec2 neighbor = vec2(float(x), float(y));
-            vec2 point = vec2(snoise(i + neighbor)) * 0.5 + 0.5; // Random point in cell
+            vec2 point = vec2(
+                snoise(i + neighbor + vec2(0.0, 0.0)),
+                snoise(i + neighbor + vec2(1.0, 1.0))
+            ) * 0.5 + 0.5;
             vec2 diff = neighbor + point - f;
             float dist = length(diff);
             if (dist < minDist) {
                 minDist = dist;
                 starPos = point;
+                float colorNoise = snoise(i + neighbor + vec2(2.0, 2.0)) * 0.5 + 0.5;
+                starColor = mix(vec3(0.8, 0.8, 1.0), vec3(1.0, 0.9, 0.7), colorNoise);
+                sizeMod = mix(0.05, 0.15, snoise(i + neighbor + vec2(3.0, 3.0)) * 0.5 + 0.5);
             }
         }
     }
-    // Circular star shape with radial falloff
-    float star = smoothstep(0.1, 0.0, minDist) * brightness;
-    // Twinkle using Simplex noise
-    float twinkle = snoise(i * 0.5 + vec2(time * 0.5));
+    float star = smoothstep(sizeMod, 0.0, minDist) * brightness * densityMod;
+    float twinkle = snoise(i * 0.5 + vec2(time * 0.5)) * 0.8;
     twinkle = 0.5 + 0.5 * twinkle;
     star *= twinkle;
-    return star;
+    return starColor * star;
 }
 
-// Star field generation
+// Star field generation with density variation
 vec3 starField(vec2 uv, float density, float brightness) {
-    vec2 spherical = uv * vec2(2.0 * PI, PI); // Map to [0,2PI] x [0,PI]
-    float star = cellularStar(spherical, 20.0, brightness, timeVal); // Scale for density
-    return vec3(star) * density;
+    vec2 spherical = uv * vec2(2.0 * PI, PI);
+    float phi = uv.y * PI;
+    vec2 noiseUV = vec2(spherical.x, spherical.y); // Simplified to reduce polar smearing
+    // Layered Simplex noise for density variation
+    float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5; // Primary layer
+    densityMod = mix(0.0, 2.5, densityMod); // Stronger variation
+    float densityMod2 = snoise(noiseUV * 10.5 + vec2(10.0)) * 0.5 + 0.5; // Higher frequency, phase-shifted
+    densityMod = mix(densityMod, 0.0, densityMod2 * 3.6); // Stronger dark patches
+    return cellularStar(noiseUV, 40.0, brightness, timeVal, densityMod) * density;
 }
 
 // Milky Way generation
 vec3 milkyWay(vec2 uv) {
-    float theta = uv.x * 2.0 * PI;
-    float phi = uv.y * PI;
-    float milkyWayAngle = 0.3 * PI;
-    // Use cos for smooth periodic wave to avoid seam
-    float phiMilky = abs(phi - (0.5 * PI + cos(theta) * 0.2));
-    float intensity = exp(-phiMilky * phiMilky * 5.0);
-    intensity *= (snoise(uv * 5.0) * 0.5 + 0.5);
-    return vec3(intensity) * 0.15; // Adjusted for balance
+    vec2 spherical = uv * vec2(2.0 * PI, PI);
+    float theta = spherical.x;
+    float phi = spherical.y;
+    vec2 noiseUV = vec2(spherical.x, spherical.y); // Simplified to reduce polar smearing
+    float tiltAngle = 60.0 * PI / 180.0;
+    float phiTilted = phi - tiltAngle * cos(theta);
+    float phiMilky = abs(phiTilted - (0.5 * PI + cos(theta * 2.0) * 0.1));
+    float intensity = exp(-phiMilky * phiMilky * 4.0);
+    intensity *= (snoise(noiseUV * 0.8) * 0.2 + 0.8);
+    float tintNoise = snoise(noiseUV * 0.3 + vec2(5.0)) * 0.5 + 0.5;
+    vec3 tint = mix(vec3(1.0, 0.85, 0.6), vec3(1.0, 0.95, 0.9), tintNoise);
+    return vec3(intensity) * tint * 0.06;
 }
 
 void main() {
@@ -116,14 +131,14 @@ void main() {
         mat3 rotMatrix = yawMatrix * pitchMatrix * rollMatrix;
         viewDir = rotMatrix * viewDir;
 
-        // Convert viewDir to equirectangular UVs
-        float theta = atan(viewDir.x, viewDir.z);
+        // Convert viewDir to equirectangular UVs with seamless theta
+        float theta = atan(viewDir.z, viewDir.x); // GLSL atan(y, x) for [0, 2PI]
         float phi = acos(viewDir.y);
-        vec2 uv = vec2(theta / (2.0 * PI) + 0.5, phi / PI);
+        vec2 uv = vec2((theta + PI) / (2.0 * PI), phi / PI);
         uv = clamp(uv, 0.0, 1.0);
 
         // Generate procedural sky
-        vec3 skyColor = vec3(0.0);
+        vec3 skyColor = vec3(0.034, 0.02, 0.05);
         skyColor += starField(uv, 0.5, 2.0);
         skyColor += milkyWay(uv);
 
@@ -134,11 +149,20 @@ void main() {
             skyColor = starField(uv, 0.5, 2.0); // Stars only
         } else if (debugView == 3) {
             skyColor = milkyWay(uv); // Milky Way only
+        } else if (debugView == 4) {
+            vec2 spherical = uv * vec2(2.0 * PI, PI);
+            vec2 noiseUV = vec2(spherical.x, spherical.y);
+            float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5;
+            densityMod = mix(0.0, 2.5, densityMod);
+            float densityMod2 = snoise(noiseUV * 1.5 + vec2(10.0)) * 0.5 + 0.5;
+            densityMod = mix(densityMod, 0.0, densityMod2 * 0.6);
+            skyColor = vec3(densityMod); // Visualize density modulation
         }
 
         FragColor = vec4(skyColor, 1.0);
         return;
     }
+
 
 //     if (debugValue > 0) { FragColor = vec4(color, 1.0); return; }
 

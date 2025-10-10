@@ -354,7 +354,7 @@ void RenderUI(void) {
     int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
     int32_t leftPad = GetScreenRelativeX(0.0125f);
 //     RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
-//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
