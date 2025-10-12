@@ -323,16 +323,16 @@ void CenterStatusPrint(const char* fmt, ...) {
     statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.
 }
 
-// static const char* debugViewNames[] = {
-//     "standard render", // 0
-//     "unlit",           // 1
-//     "surface normals", // 2
-//     "depth",           // 3
-//     "shadows",         // 4
-//     "worldpos",        // 5
-//     "lightview",       // 6
-//     "reflections"      // 7
-// };
+static const char* debugViewNames[] = {
+    "standard render", // 0
+    "unlit",           // 1
+    "surface normals", // 2
+    "depth",           // 3
+    "shadows",         // 4
+    "worldpos",        // 5
+    "lightview",       // 6
+    "reflections"      // 7
+};
 
 void RenderUI(void) {
     uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
@@ -356,7 +356,7 @@ void RenderUI(void) {
 //     RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-//     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 //     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: ! % ^ ö ü é ó る。エレベーターでレベルを離れよ низкой гравитацией");
     if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);

@@ -31,6 +31,7 @@ index: 1
 model: 178
 cardchunk: 1
 texture: 1230
+spectexture: 1242
 #chunk_bridg1_1
 index: 2
 model: 661
@@ -635,6 +636,7 @@ glowtexture: 446
 index: 123
 model: 178
 texture: 1230
+spectexture: 1242
 #chunk_maint1_9
 index: 124
 cardchunk: 1

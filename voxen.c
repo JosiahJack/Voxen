@@ -31,13 +31,13 @@
 // Window
 SDL_Window *window;
 bool inventoryMode = false;
-uint16_t screen_width = 800, screen_height = 600;
+uint16_t screen_width = 1366, screen_height = 768;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Reflections = 0u; // Default 1
+uint8_t settings_Reflections = 1u; // Default 1
 uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
-uint8_t settings_AntiAliasing = 0u; // Default 1
+uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
 float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
@@ -934,7 +934,7 @@ int32_t InitializeEnvironment(void) {
     RenderLoadingProgress(110,"Loading cull system...");
     if (Cull_Init()) return 1; // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    glClearColor(1.0f, 0.0f, 1.0f, 0.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.2f);
     if (VoxelLists()) return 1;
     DebugRAM("InitializeEnvironment end");
     return 0;

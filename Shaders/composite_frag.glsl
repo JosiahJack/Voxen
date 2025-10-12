@@ -111,16 +111,18 @@ vec3 milkyWay(vec2 uv) {
 }
 
 void main() {
-    vec3 color = texture(tex, TexCoord).rgb;
-    if (color.r > 0.6 && color.g < 0.25 && color.b > 0.6) { // Hot pink clear color
+    vec4 color = texture(tex, TexCoord).rgba;
+    bool isJustSky = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
+//     bool isWindow = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
+    if (isJustSky) {
         // Convert screen-space TexCoord to view direction
         vec2 ndc = TexCoord * 2.0 - 1.0;
         float aspect = float(screenWidth) / float(screenHeight);
         vec3 viewDir = normalize(vec3(ndc.x * aspect, ndc.y, -1.0));
 
         // Apply camera rotation
-        float cy = cos(camRot.x + timeVal/100.0);
-        float sy = sin(camRot.x + timeVal/100.0);
+        float cy = cos(camRot.x + timeVal * 0.05);
+        float sy = sin(camRot.x + timeVal * 0.05);
         float cp = cos(camRot.y);
         float sp = sin(camRot.y);
         float cr = cos(camRot.z);
@@ -162,22 +164,26 @@ void main() {
             skyColor = vec3(densityMod); // Visualize density modulation
         }
 
-        FragColor = vec4(skyColor, 1.0);
-        return;
+        FragColor = vec4((color.rgb * color.a) + skyColor, 1.0); // Add window alpha weighted color tint
     }
 
 
-//     if (debugValue > 0) { FragColor = vec4(color, 1.0); return; }
+//     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
     ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
 //     if (debugView == 0) {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec3 reflectionColor = texture(outputImage, sampleUV).rgb;
-            color += reflectionColor;
+            if (isJustSky) {
+                FragColor.rgb += reflectionColor;
+                return;
+            }
+
+            color.rgb += reflectionColor;
         }
 
-        vec3 aaColor = color; // Default to chromatic aberration result
+        vec3 aaColor = color.rgb; // Default to chromatic aberration result
         if (aaEnabled > 0) {
             // SMAA-Inspired Edge-Directed Antialiasing
             // Compute luminance for edge detection
@@ -211,7 +217,7 @@ void main() {
 
                 // Dynamic blending based on edge contrast
                 float blendFactor = clamp(gradientMag * 0.5, 2.0, 4.0); // Adjust blend based on edge strength
-                aaColor = mix(color, sampleColor, blendFactor);
+                aaColor = mix(color.rgb, sampleColor, blendFactor);
             }
         }
 

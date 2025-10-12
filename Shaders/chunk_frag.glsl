@@ -127,7 +127,7 @@ void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
     float distToPixel = length(viewDir);
-    if (distToPixel > 71.66) return;
+//     if (distToPixel > 71.66) return;
 
     viewDir = normalize(viewDir);
     int texIndexChecked = 0;
@@ -141,55 +141,71 @@ void main() {
     vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
+    if (albedoColor.a > 0.21 && albedoColor.a < 0.19) albedoColor.a = 0.20; // Force it to not be the sky hack alpha, this is an actual rendered object!
+    if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
 
     // Bevel Shader: Compute distance to nearest edge using barycentric coordinates
-    float bevelWidth = 0.02; // Adjust for bevel size
-    float edgeDist = min(min(Barycentric.x, Barycentric.y), Barycentric.z); // Distance to nearest edge
-    float bevelFactor = smoothstep(0.0, bevelWidth, edgeDist); // 0 near edge, 1 in center (fixed negative sign)
+    if (debugValue == 2) {
+        float bevelWidth = 0.02; // Adjust for bevel size
+        float edgeDist = min(min(Barycentric.x, Barycentric.y), Barycentric.z); // Distance to nearest edge
+        float bevelFactor = smoothstep(0.0, bevelWidth, edgeDist); // 0 near edge, 1 in center (fixed negative sign)
 
-    // Compute geometric normal for flat surfaces
-    vec3 dp1 = dFdx(FragPos);
-    vec3 dp2 = dFdy(FragPos);
-    vec3 geometricNormal = normalize(cross(dp1, dp2));
+        // Compute geometric normal for flat surfaces
+        vec3 dp1 = dFdx(FragPos);
+        vec3 dp2 = dFdy(FragPos);
+        vec3 geometricNormal = normalize(cross(dp1, dp2));
 
-    // Estimate edge hardness by checking normal variance
-    vec3 normalDx = dFdx(Normal);
-    vec3 normalDy = dFdy(Normal);
-    float normalVariance = length(normalDx) + length(normalDy); // Magnitude of normal gradient
-    float hardnessThreshold = 0.9; // Adjust to control sensitivity (0.05 to 0.5)
-    float edgeHardness = smoothstep(0.0, hardnessThreshold, normalVariance); // 1 for hard edges, 0 for smooth
+        // Estimate edge hardness by checking normal variance
+        vec3 normalDx = dFdx(Normal);
+        vec3 normalDy = dFdy(Normal);
+        float normalVariance = length(normalDx) + length(normalDy); // Magnitude of normal gradient
+        float hardnessThreshold = 0.9; // Adjust to control sensitivity (0.05 to 0.5)
+        float edgeHardness = smoothstep(0.0, hardnessThreshold, normalVariance); // 1 for hard edges, 0 for smooth
 
-    // Alternative: Compare vertex normal to geometric normal
-    float normalDiff = 1.0 - dot(Normal, geometricNormal); // 0 if normals are similar, >0 if different
-    float normalHardness = smoothstep(0.0, 0.2, normalDiff); // Adjust threshold (0.1 to 0.3)
-    edgeHardness = max(edgeHardness, normalHardness); // Combine both metrics for robustness
+        // Alternative: Compare vertex normal to geometric normal
+        float normalDiff = 1.0 - dot(Normal, geometricNormal); // 0 if normals are similar, >0 if different
+        float normalHardness = smoothstep(0.0, 0.2, normalDiff); // Adjust threshold (0.1 to 0.3)
+        edgeHardness = max(edgeHardness, normalHardness); // Combine both metrics for robustness
 
-    // Apply bevel only on hard edges
-    vec3 edgeDir = normalize(dFdx(Barycentric) + dFdy(Barycentric)); // Approximate edge direction
-    vec3 bevelDir = normalize(Normal + edgeDir * 0.5 + viewDir * 0.2); // Perturb normal
-    adjustedNormal = normalize(mix(bevelDir, Normal, bevelFactor * edgeHardness)); // Modulate by edge hardness
+        // Apply bevel only on hard edges
+        vec3 edgeDir = normalize(dFdx(Barycentric) + dFdy(Barycentric)); // Approximate edge direction
+        vec3 bevelDir = normalize(Normal + edgeDir * 0.5 + viewDir * 0.2); // Perturb normal
+        adjustedNormal = normalize(mix(bevelDir, Normal, bevelFactor * edgeHardness)); // Modulate by edge hardness
+    }
 
-    if (NormalIndex != 41) {
+    if (NormalIndex != 41 && debugValue < 1) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
         vec2 duv2 = dFdy(TexCoord);
-        float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
-        if (uvArea > 0.0000001) {
-            vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
-            vec3 b = normalize(-dp1 * duv2.x + dp2 * duv1.x);
-            mat3 TBN3x3 = mat3(t, b, adjustedNormal);
-            vec3 normalColor = (getTextureColor(NormalIndex,texUV).rgb * 2.0 - 1.0);
-            normalColor.g = -normalColor.g;
-            adjustedNormal = normalize(TBN3x3 * normalColor);
-        }
+        vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
+        vec3 b = normalize(dp1 * duv2.x - dp2 * duv1.x);
+        mat3 TBN3x3 = mat3(t, b, adjustedNormal);
+        ivec2 texSizeNorm = textureSizes[NormalIndex];
+        vec2 uvNorm = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+        int xNorm = int(floor(uvNorm.x * float(texSizeNorm.x)));
+        int yNorm = int(floor(uvNorm.y * float(texSizeNorm.y)));
+        ivec2 texUVNorm = ivec2(xNorm,yNorm);
+        vec3 normalColor = (getTextureColor(NormalIndex,texUVNorm).rgb * 2.0 - 1.0);
+        normalColor.g = -normalColor.g;
+        adjustedNormal = normalize(TBN3x3 * normalColor);
     }
 
-    vec4 glowColor = getTextureColor(GlowIndex,texUV);
+    ivec2 texSizeGlow = textureSizes[GlowIndex];
+    vec2 uvGlow = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+    int xGlow = int(floor(uvGlow.x * float(texSizeGlow.x)));
+    int yGlow = int(floor(uvGlow.y * float(texSizeGlow.y)));
+    ivec2 texUVGlow = ivec2(xGlow,yGlow);
+    vec4 glowColor = getTextureColor(GlowIndex,texUVGlow);
     if (reflectionsEnabled > 0) {
         vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
-        vec4 specColor = getTextureColor(SpecIndex,texUV);
+        ivec2 texSizeSpec = textureSizes[SpecIndex];
+        vec2 uvSpec = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+        int xSpec = int(floor(uvSpec.x * float(texSizeSpec.x)));
+        int ySpec = int(floor(uvSpec.y * float(texSizeSpec.y)));
+        ivec2 texUVSpec = ivec2(xSpec,ySpec);
+        vec4 specColor = getTextureColor(SpecIndex,texUVSpec);
         vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
                                 uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
                                 uintBitsToFloat(packColor(normalPack)),
