@@ -59,7 +59,7 @@ int32_t Input_KeyDown(int32_t scancode) {
 
     if (keys[SDL_SCANCODE_Y]) {
         debugValue++;
-        if (debugValue > 2) debugValue = 0;
+        if (debugValue > 6) debugValue = 0;
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
         glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
     }

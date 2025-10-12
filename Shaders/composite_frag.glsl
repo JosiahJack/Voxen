@@ -47,6 +47,10 @@ float snoise(vec2 v) {
     return 130.0 * dot(m, g);
 }
 
+float dither(vec2 uv, float scale, float fac, float finalMultiplier) {
+    return fract(snoise(uv * vec2(screenWidth, screenHeight) * 0.5) * 0.025) * finalMultiplier;
+}
+
 // Cellular noise for star field with density and size variation
 vec3 cellularStar(vec2 uv, float scale, float brightness, float time, float densityMod) {
     vec2 p = uv * scale;
@@ -75,9 +79,9 @@ vec3 cellularStar(vec2 uv, float scale, float brightness, float time, float dens
         }
     }
     float star = smoothstep(sizeMod, 0.0, minDist) * brightness * densityMod;
-    float twinkle = snoise(i * 0.5 + vec2(time * 0.5)) * 0.8;
-    twinkle = 0.5 + 0.5 * twinkle;
-    star *= twinkle;
+//     float twinkle = snoise(i * 0.5 + vec2(time * 0.5)) * 0.8;
+//     twinkle = 0.5 + 0.5 * twinkle;
+//     star *= twinkle;
     return starColor * star;
 }
 
@@ -91,7 +95,7 @@ vec3 starField(vec2 uv, float density, float brightness) {
     densityMod = mix(0.0, 2.5, densityMod); // Stronger variation
     float densityMod2 = snoise(noiseUV * 10.5 + vec2(10.0)) * 0.5 + 0.5; // Higher frequency, phase-shifted
     densityMod = mix(densityMod, 0.0, densityMod2 * 3.2); // Stronger dark patches
-    return cellularStar(noiseUV, 40.0, brightness, timeVal, densityMod) * density;
+    return cellularStar(noiseUV, 40.0, brightness, timeVal * 0.1, densityMod) * density;
 }
 
 // Milky Way generation
@@ -107,13 +111,12 @@ vec3 milkyWay(vec2 uv) {
     intensity *= (snoise(noiseUV * 0.8) * 0.2 + 0.8);
     float tintNoise = snoise(noiseUV * 0.3 + vec2(5.0)) * 0.5 + 0.5;
     vec3 tint = mix(vec3(1.0, 0.85, 0.6), vec3(1.0, 0.95, 0.9), tintNoise);
-    return vec3(intensity) * tint * 0.04;
+    return vec3(intensity) * tint * 0.04 + vec3(dither(noiseUV,0.2,0.015,0.01),dither(noiseUV,0.2,0.015,0.01),dither(noiseUV,0.2,0.015,0.01));
 }
 
 void main() {
     vec4 color = texture(tex, TexCoord).rgba;
     bool isJustSky = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
-//     bool isWindow = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
     if (isJustSky) {
         // Convert screen-space TexCoord to view direction
         vec2 ndc = TexCoord * 2.0 - 1.0;
@@ -146,27 +149,8 @@ void main() {
         skyColor.g = clamp(skyColor.g, 0.02, 1.0);
         skyColor.b = clamp(skyColor.b, 0.05, 1.0);
         skyColor += milkyWay(uv);
-
-        // Debug modes
-        if (debugView == 1) {
-            skyColor = vec3(uv, 0.0); // Visualize UVs
-        } else if (debugView == 2) {
-            skyColor = starField(uv, 0.5, 2.0); // Stars only
-        } else if (debugView == 3) {
-            skyColor = milkyWay(uv); // Milky Way only
-        } else if (debugView == 4) {
-            vec2 spherical = uv * vec2(2.0 * PI, PI);
-            vec2 noiseUV = vec2(spherical.x, spherical.y);
-            float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5;
-            densityMod = mix(0.0, 2.5, densityMod);
-            float densityMod2 = snoise(noiseUV * 1.5 + vec2(10.0)) * 0.5 + 0.5;
-            densityMod = mix(densityMod, 0.0, densityMod2 * 0.6);
-            skyColor = vec3(densityMod); // Visualize density modulation
-        }
-
         FragColor = vec4((color.rgb * color.a) + skyColor, 1.0); // Add window alpha weighted color tint
     }
-
 
 //     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 

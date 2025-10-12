@@ -1307,7 +1307,7 @@ int32_t main(int32_t argc, char* argv[]) {
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;
-        if (!gamePaused) pauseRelativeTime += frame_time;
+        if (!gamePaused) pauseRelativeTime += (float)frame_time;
 
         // Enqueue input events
         SDL_Event event;
@@ -1597,7 +1597,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting"), settings_Brightness);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glUniform3f(glGetUniformLocation(imageBlitShaderProgram, "camRot"), deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-        glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "timeVal"), (float)current_time);
+        glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "timeVal"), pauseRelativeTime * 0.1);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
