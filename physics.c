@@ -5,7 +5,7 @@
 // ----------------------------------------------------------------------------
 // Physics
 float move_speed = 0.06;
-bool noclip = true;
+bool noclip = false;
 double physicsProcessingTime = 0.0;
 
 // ----------------------------------------------------------------------------
@@ -392,13 +392,13 @@ int32_t Physics(void) {
     if (noclip) return 0;
     
     // Apply gravity to camera (affects bottom of capsule)
-//     cam_y -= 0.08f;
+    cam_y -= 0.02f;
     
     // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
-    float capsule_offset = 0.32f;  // Center below camera (1.84 below, 0.16 above)
+    float capsule_offset = 0.84f;  // Center below camera (1.84 below, 0.16 above)
     Vector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};
-    float half_height = 0.32f;  // Half of 2.0f height
-    float radius = 0.16f;
+    float radius = 0.48f;
+    float half_height = (2.0f - (radius * 2.0f)) * 0.5f;  // Half of 2.0f height
     
     // Adjust for body state (e.g., standing adds height, but here fixed for simplicity)
 //     float body_state_add = 0.0f;
