@@ -13,6 +13,7 @@ uniform uint reflectionsEnabled;
 uniform uint aaEnabled;
 uniform uint brightnessSetting;
 uniform vec3 camRot;
+uniform float fov;
 uniform float timeVal;
 
 const int SSR_RES = 4;
@@ -74,22 +75,20 @@ vec3 cellularStar(vec2 uv, float scale, float brightness, float time, float dens
                 starPos = point;
                 float colorNoise = snoise(i + neighbor + vec2(2.0, 2.0)) * 0.5 + 0.5;
                 starColor = mix(vec3(0.8, 0.8, 1.0), vec3(1.0, 0.9, 0.7), colorNoise);
-                sizeMod = mix(0.05, 0.15, snoise(i + neighbor + vec2(3.0, 3.0)) * 0.5 + 0.5);
+                sizeMod = mix(0.02, 0.15, snoise(i + neighbor + vec2(3.0, 3.0)) * 0.5 + 0.5);
             }
         }
     }
     float star = smoothstep(sizeMod, 0.0, minDist) * brightness * densityMod;
-//     float twinkle = snoise(i * 0.5 + vec2(time * 0.5)) * 0.8;
-//     twinkle = 0.5 + 0.5 * twinkle;
-//     star *= twinkle;
     return starColor * star;
 }
 
-// Star field generation with density variation
-vec3 starField(vec2 uv, float density, float brightness) {
-    vec2 spherical = uv * vec2(2.0 * PI, PI);
-    float phi = uv.y * PI;
-    vec2 noiseUV = vec2(spherical.x, spherical.y); // Simplified to reduce polar smearing
+// Star field generation with density variation in polar coordinates
+vec3 starField(vec3 dir, float density, float brightness) {
+    // Convert direction to polar coordinates
+    float theta = atan(dir.z, dir.x); // Azimuth [0, 2PI]
+    float phi = acos(dir.y); // Elevation [0, PI]
+    vec2 noiseUV = vec2(theta, phi); // Use raw polar coords for noise
     // Layered Simplex noise for density variation
     float densityMod = snoise(noiseUV * 0.5) * 0.5 + 0.5; // Primary layer
     densityMod = mix(0.0, 2.5, densityMod); // Stronger variation
@@ -98,57 +97,49 @@ vec3 starField(vec2 uv, float density, float brightness) {
     return cellularStar(noiseUV, 40.0, brightness, timeVal * 0.1, densityMod) * density;
 }
 
-// Milky Way generation
-vec3 milkyWay(vec2 uv) {
-    vec2 spherical = uv * vec2(2.0 * PI, PI);
-    float theta = spherical.x;
-    float phi = spherical.y;
-    vec2 noiseUV = vec2(spherical.x, spherical.y); // Simplified to reduce polar smearing
+// Milky Way generation in polar coordinates
+vec3 milkyWay(vec3 dir) {
+    float phi = acos(dir.y); // Elevation [0, PI]
+    float theta = atan(dir.z, dir.x); // Azimuth [0, 2PI]
+    // Blend across theta = ±π to avoid seam
+    float seamBlend = smoothstep(PI - 0.2, PI, abs(theta)); // Fade near ±π
+    vec2 noiseUV = vec2(theta * 0.5, phi); // Scale theta for smoother noise
     float tiltAngle = 60.0 * PI / 180.0;
     float phiTilted = phi - tiltAngle * cos(theta);
     float phiMilky = abs(phiTilted - (0.5 * PI + cos(theta * 2.0) * 0.1));
     float intensity = exp(-phiMilky * phiMilky * 4.0);
-    intensity *= (snoise(noiseUV * 0.8) * 0.2 + 0.8);
-    float tintNoise = snoise(noiseUV * 0.3 + vec2(5.0)) * 0.5 + 0.5;
-    vec3 tint = mix(vec3(1.0, 0.85, 0.6), vec3(1.0, 0.95, 0.9), tintNoise);
-    return vec3(intensity) * tint * 0.04 + vec3(dither(noiseUV,0.2,0.015,0.01),dither(noiseUV,0.2,0.015,0.01),dither(noiseUV,0.2,0.015,0.01));
+    float poleFade = smoothstep(0.0, 2.0, phi) * smoothstep(0.0, 2.0, PI - phi);
+    intensity *= (snoise(noiseUV * 0.6) * 0.2 + 0.8); // 2D noise, softer scale
+    intensity *= poleFade * (1.0 - seamBlend * 0.5); // Apply seam and pole fade
+    float tintNoise = clamp(snoise(noiseUV * 0.3 + vec2(5.0)) * 0.5 + 0.5, 0.0, 1.0);
+    vec3 tint = mix(vec3(0.7, 0.85, 0.7), vec3(1.0, 0.95, 0.99), tintNoise);
+    float ditherVal = dither(noiseUV, 0.2, 0.015, 0.01);
+    return vec3(intensity) * tint * 0.06 + vec3(ditherVal);
 }
 
 void main() {
     vec4 color = texture(tex, TexCoord).rgba;
     bool isJustSky = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
     if (isJustSky) {
-        // Convert screen-space TexCoord to view direction
         vec2 ndc = TexCoord * 2.0 - 1.0;
         float aspect = float(screenWidth) / float(screenHeight);
-        vec3 viewDir = normalize(vec3(ndc.x * aspect, ndc.y, -1.0));
-
-        // Apply camera rotation
-        float cy = cos(camRot.x + timeVal * 0.05);
+        float fovRad = fov * PI / 180.0; // Convert FOV to radians
+        float tanHalfFov = tan(fovRad * 0.5);
+        vec3 viewDir = normalize(vec3(ndc.x * tanHalfFov * aspect, ndc.y * tanHalfFov, -1.0));
+        float cy = cos(camRot.x + timeVal * 0.05); // Yaw + time-based rotation
         float sy = sin(camRot.x + timeVal * 0.05);
-        float cp = cos(camRot.y);
+        float cp = cos(camRot.y); // Pitch
         float sp = sin(camRot.y);
-        float cr = cos(camRot.z);
-        float sr = sin(camRot.z);
         mat3 yawMatrix = mat3(cy, 0.0, sy, 0.0, 1.0, 0.0, -sy, 0.0, cy);
         mat3 pitchMatrix = mat3(1.0, 0.0, 0.0, 0.0, cp, -sp, 0.0, sp, cp);
-        mat3 rollMatrix = mat3(cr, -sr, 0.0, sr, cr, 0.0, 0.0, 0.0, 1.0);
-        mat3 rotMatrix = yawMatrix * pitchMatrix * rollMatrix;
-        viewDir = rotMatrix * viewDir;
-
-        // Convert viewDir to equirectangular UVs with seamless theta
-        float theta = atan(viewDir.z, viewDir.x); // GLSL atan(y, x) for [0, 2PI]
-        float phi = acos(viewDir.y);
-        vec2 uv = vec2((theta + PI) / (2.0 * PI), phi / PI);
-        uv = clamp(uv, 0.0, 1.0);
-
-        // Generate procedural sky
-        vec3 skyColor = vec3(0.034, 0.02, 0.05);
-        skyColor += starField(uv, 0.5, 2.0);
-        skyColor.r = clamp(skyColor.r, 0.034, 1.0);
-        skyColor.g = clamp(skyColor.g, 0.02, 1.0);
-        skyColor.b = clamp(skyColor.b, 0.05, 1.0);
-        skyColor += milkyWay(uv);
+        mat3 skyRotMatrix = yawMatrix * pitchMatrix; // Combine yaw and pitch
+        vec3 skyDir = skyRotMatrix * viewDir; // Yaw and pitch for sky
+        vec3 microwaveBackground = vec3(0.034, 0.02, 0.05); // Not really but sounds cool.
+        vec3 skyColor = microwaveBackground + starField(skyDir, 0.5, 1.8);
+        skyColor.r = clamp(skyColor.r, microwaveBackground.r, 1.0); // Prevent black spots where noise pulls below base color of background.
+        skyColor.g = clamp(skyColor.g, microwaveBackground.g, 1.0);
+        skyColor.b = clamp(skyColor.b, microwaveBackground.b, 1.0);
+        skyColor += milkyWay(skyDir);
         FragColor = vec4((color.rgb * color.a) + skyColor, 1.0); // Add window alpha weighted color tint
     }
 

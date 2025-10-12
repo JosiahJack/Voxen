@@ -1595,6 +1595,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "reflectionsEnabled"), settings_Reflections);
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "aaEnabled"), settings_AntiAliasing);
         glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting"), settings_Brightness);
+        glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "fov"), cam_fov);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glUniform3f(glGetUniformLocation(imageBlitShaderProgram, "camRot"), deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
         glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "timeVal"), pauseRelativeTime * 0.1);

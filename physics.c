@@ -109,6 +109,8 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     if (gamePaused || inventoryMode) return 0;
     
     cam_yaw += (float)xrel * mouse_sensitivity;
+    if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
+    if (cam_yaw < 0.0f) cam_yaw += 360.0f;
     cam_pitch += (float)yrel * mouse_sensitivity;
     if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
     if (cam_pitch < -89.0f) cam_pitch = -89.0f;
