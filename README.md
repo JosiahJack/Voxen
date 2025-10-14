@@ -13,19 +13,26 @@ information using a voxel format that is an invisible 3D layer of data
 overlayed with the normal full 3D polygonal mesh world such that lighting
 calculations for bounce lighting (GI), reflections, and other effects leverage 
 the spacial voxel data to optimize lighting calculations for high fidelity at
-high speed with low RAM usage.  The voxel volume is limited to a local space
-and moves with the player camera, updating only the voxels that change at the
-edges of the volume (for similar technique, see SEGI).  This engine is focused
-on interior spaces similar to Quake, Half-Life, and other classic games.  The
-voxel volume may work fine for outdoor environments but Voxen is not intended
-to be used for large open world games.
+high speed with low RAM usage.  The voxel volume is limited to a space that is
+a world cell region 64x64x18 with each cell sized to 2.56x2.56x2.56. Voxels are
+subtended as 8x8 regions on the x,z plane (for now) and used as light clusters
+for Forward+ rendering pipeline. This engine is focused on interior spaces similar
+to Quake, Half-Life, and other classic games.  The voxel volume may work fine for
+outdoor environments but Voxen is not intended to be used for large open world games.
+Further, the procedural sky is hardcoded and not intended to be a general sky system.
+Modifications are of course welcome, however.  The hope is that everything is quite
+straightforward.
 
 Based on SDL2 and OpenGL 4.5+, this engine attempts to leverage low latency and
 GPU driven rendering methods with minimal state changes and maximum flexibility
-with user customizable entities.
+with user customizable entities.  Heavy use of SSBOs is made though this is still
+compatible with old hardware and GL drivers from 15yrs ago; further very few GL
+extensions are used to further widen compatibility.  Careful handling of CPU to GPU
+transfers is made to minimize VRAM and to prevent naughty GL drivers duplicating
+that VRAM into the CPU RAM space which is also kept minimal.
 
-All texture and model and audio data is loaded from disk directly for ease of
-development and full mod support by design.
+All texture and model data is loaded from disk directly for ease of development
+and full mod support by design.  Any intermediate format is internal to the engine.
 
 The engine uses a unified event system queue for debuggability, logging, and
 log file playback in a very similar manner to Quake 1 demo files.  This engine
@@ -56,15 +63,18 @@ Build by calling ./build.sh build script.
 
 ### Prerequisites
 
-Project must be linked against the following libraries which your system must install
+Project must be linked against the following libraries which your system must install.  I'll continue to reduce these as much as I can:
  * -lSDL2 (`sudo apt install libsdl2-dev`)
  * -lSDL2_ttf (`sudo apt install libsdl2-ttf-dev`)
  * -lSDL2_image (`sudo apt install libsdl2-image-dev`)
  * -lGLEW (`sudo apt install libglew-dev`)
  * -lGL (`sudo apt install libgl1-mesa-dev`)
- * -lm (`sudo apt install libsdl2-dev`)
- * -lrt (`sudo apt install libsdl2-dev`)
- * -lassimp (`sudo apt install libassimp-dev`)
+ * -lm
+ * -lrt
+ * -lpthread (for multithread support)
+ * -lenet (for networking with Enet)
+ * -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ (Prebuilt, included in ./External/, for model loading from .fbx (for now))
+ * -fopenmp (Will hopefully remove after only loading needed items for current level at a time)
 
 Single command:
 
@@ -198,13 +208,13 @@ blurrier, voxel results.  Also called SSR.
 
 #### Rendering System:
 
-Rendering uses a multipass system with forward+ lighting with voxel light clusters.
+Rendering uses a multipass system with forward+ lighting with voxel light clusters (x,z voxel columns).
 Pass 1: Forward+ Rasterization - gets albedo, normals, depth
                                  world position, indices.
                                  This is standard vert+frag.
                                  Applies shadows and lighting.
 
-DISABLED FOR NOW Pass 2: Screen Space Reflections (SSR): Compute shader full
+Pass 2: Screen Space Reflections (SSR): Compute shader full
                                         screen effect that
                                         is subtle.
 
@@ -231,7 +241,7 @@ buffer of texture palette indices offsets.
 #### Mesh System:
 
 Models are loaded into one unified flat vertex buffer with
-minimal data, just position, normal, and uv.
+minimal data, just position, normal, and uv.  Meshes are indexed triangles.
 
 ---
 
