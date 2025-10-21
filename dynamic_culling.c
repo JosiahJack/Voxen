@@ -95,7 +95,7 @@ void PutMeshesInCells(int32_t type) {
     }
 }
 
-int32_t DetermineClosedEdges() {
+void DetermineClosedEdges() {
     DebugRAM("Start of DetermineClosedEdges");
     size_t maxFileSize = 500000; // 0.5MB
     uint8_t* file_buffer = malloc(maxFileSize);
@@ -107,18 +107,18 @@ int32_t DetermineClosedEdges() {
     char filename2[256];
     sprintf(filename2,"./Data/worldcellopen_%d.png",currentLevel);
     fp = fopen(filename2, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename2); return 1; }
+    if (!fp) { DualLogError("Failed to open %s\n", filename2); exit(1); }
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); return 1; }
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); exit(1); }
     
     fseek(fp, 0, SEEK_SET);
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); return 1; }
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); exit(1); }
     unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
-	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); return 1; }
+	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); exit(1); }
  
     unsigned char openData_r, openData_g, openData_b;
     uint16_t totalOpenCells = 0;
@@ -149,19 +149,19 @@ int32_t DetermineClosedEdges() {
     sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
 
     fp = fopen(filename, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename); return 1; }
+    if (!fp) { DualLogError("Failed to open %s\n", filename); exit(1); }
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); return 1; }
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); exit(1); }
     
     fseek(fp, 0, SEEK_SET);
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); return 1; }
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); exit(1); }
 
     unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
-    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); return 1; }
+    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); exit(1); }
 
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
     uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
@@ -203,18 +203,18 @@ int32_t DetermineClosedEdges() {
     char filename3[256];
     sprintf(filename3,"./Data/worldcellskyvis_%d.png",currentLevel);
     fp = fopen(filename3, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename3); return 1; }
+    if (!fp) { DualLogError("Failed to open %s\n", filename3); exit(1); }
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); return 1; }
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); exit(1); }
     
     fseek(fp, 0, SEEK_SET);
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); return 1; }
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); exit(1); }
     unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
-    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); return 1; }
+    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); exit(1); }
 
     unsigned char skyData_r, skyData_g, skyData_b;
     for (int32_t x=0;x<WORLDX;++x) {
@@ -232,11 +232,9 @@ int32_t DetermineClosedEdges() {
     }
     
     stbi_image_free(skyPixels);
-    malloc_trim(0);
     free(file_buffer);
     malloc_trim(0);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
-    return 0;
 }
 
 bool UpdatedPlayerCell() {
@@ -641,7 +639,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     }
 }
 
-int32_t Cull_Init(void) {
+void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling...");
     DebugRAM("start of Cull_Init");    
@@ -663,8 +661,7 @@ int32_t Cull_Init(void) {
     
     worldMin_x -= 2.56f; // Add one cell gap around edges
     worldMin_z -= 2.56f;
-    if (DetermineClosedEdges()) return 1;
-
+    DetermineClosedEdges();
     PutChunksInCells();
     
     // For each cell, get the visibility as though player were there and put into gridCellStates
@@ -723,7 +720,6 @@ int32_t Cull_Init(void) {
     malloc_trim(0);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("end of Cull_Init");
-    return 0;
 }
 
 void CullCore(void) {    

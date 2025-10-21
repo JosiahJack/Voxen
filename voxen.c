@@ -155,14 +155,13 @@ ENetPeer* server_peer = NULL; // Client's connection to server
 // ----------------------------------------------------------------------------
 // ============================================================================
 // OpenGL / Rendering Helper Functions
-void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target, const char *name) {
+void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
     glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(target, 0);
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) DualLogError("Failed to create texture %s: OpenGL error %d\n", name, error);
+    CHECK_GL_ERROR();
 }
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
@@ -171,13 +170,7 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     glCompileShader(shader);
     GLint success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetShaderInfoLog(shader, 512, NULL, infoLog);
-        DualLogError("%s Compilation Failed: %s\n", shaderName, infoLog);
-        glDeleteShader(shader);
-        return 0;
-    }
+    if (!success) { char infoLog[512]; glGetShaderInfoLog(shader, 512, NULL, infoLog); DualLogError("%s Compilation Failed: %s\n", shaderName, infoLog); exit(1); }
     return shader;
 }
 
@@ -188,44 +181,38 @@ GLuint LinkProgram(GLuint *shaders, int32_t count, const char *programName) {
 
     GLint success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success) {
-        char infoLog[512];
-        glGetProgramInfoLog(program, 512, NULL, infoLog);
-        DualLogError("%s Linking Failed: %s\n", programName, infoLog);
-        glDeleteProgram(program);
-        return 0;
-    }
+    if (!success) { char infoLog[512]; glGetProgramInfoLog(program, 512, NULL, infoLog); DualLogError("%s Linking Failed: %s\n", programName, infoLog); exit(1); }
 
     for (int32_t i = 0; i < count; i++) glDeleteShader(shaders[i]);
     return program;
 }
 
-int32_t CompileShaders(void) {
+void CompileShaders(void) {
     GLuint vertShader, fragShader, computeShader;
 
     // Chunk Shader
-    vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");            if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");    if (!chunkShaderProgram) { return 1; }
+    vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader");
+    chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");
     
     // Shadowmaps Shader
-    vertShader = CompileShader(GL_VERTEX_SHADER, shadowmapVertexShaderSource, "Shadowmaps Vertex Shader");            if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, shadowmapFragmentShaderSource, "Shadowmaps Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    shadowmapsShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmaps Shader Program");    if (!shadowmapsShaderProgram) { return 1; }
+    vertShader = CompileShader(GL_VERTEX_SHADER, shadowmapVertexShaderSource, "Shadowmaps Vertex Shader");
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, shadowmapFragmentShaderSource, "Shadowmaps Fragment Shader");
+    shadowmapsShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmaps Shader Program");
 
     // Text Shader
-    vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");       if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader"); if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");    if (!textShaderProgram) { return 1; }
+    vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader");
+    textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");
 
     // Screen Space Reflections Compute Shader Program
-    computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader"); if (!computeShader) { return 1; }
-    ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");        if (!ssrShaderProgram) { return 1; }
+    computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader");
+    ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
 
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
-    vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");     if (!vertShader) { return 1; }
-    fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");   if (!fragShader) { glDeleteShader(vertShader); return 1; }
-    imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program"); if (!imageBlitShaderProgram) { return 1; }
+    vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");
+    imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
 
 //     glGenBuffers(1, &blueNoiseBuffer);
 //     glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
@@ -272,13 +259,12 @@ int32_t CompileShaders(void) {
     textTextureLoc_text = glGetUniformLocation(textShaderProgram, "textTexture");
     texelSizeLoc_text = glGetUniformLocation(textShaderProgram, "texelSize");
     CHECK_GL_ERROR();
-    return 0;
 }
 
 void Screenshot() {
     struct stat st = {0};
     if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
-        if (mkdir("Screenshots", 0755) != 0) { DualLog("Failed to create Screenshots folder: %s\n", strerror(errno)); return; }
+        if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
     }
     
     unsigned char* pixels = (unsigned char*)malloc(screen_width * screen_height * 4);
@@ -365,17 +351,15 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) {
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glEnable(GL_DEPTH_TEST);
     glBindTextureUnit(0, 0);
     glUseProgram(0);
-
     char buffer[256];
     va_list args;
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-
     RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
+    glEnable(GL_DEPTH_TEST);
     SDL_GL_SwapWindow(window);
 }
 // ============================================================================
@@ -697,6 +681,7 @@ void RenderShadowmaps(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
+    glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
     for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
@@ -709,30 +694,27 @@ void RenderShadowmaps(void) {
     DebugRAM("After rendering all shadowmaps");
 }
 
-void RenderDynamicShadowmaps(void) {
+void RenderDynamicShadowmaps(void) {}
 
-}
-
-int32_t InitializeEnvironment(void) {
+void InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");    
     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
-    if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); return SYS_WIN + 1; }
+    if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); exit(SYS_WIN + 1); }
     systemInitialized[SYS_WIN] = true;
     UpdateScreenSize();
     DebugRAM("window init");
 
     gl_context = SDL_GL_CreateContext(window);
-    if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); return SYS_CTX + 1; }    
+    if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); exit(SYS_CTX + 1); }    
     systemInitialized[SYS_CTX] = true;
     DebugRAM("GL init");
     
     stbi_flip_vertically_on_write(1);
-
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_ShowCursor(SDL_DISABLE);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
-    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); return SYS_CTX + 1; }
+    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(SYS_CTX + 1); }
 
     // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
@@ -751,8 +733,7 @@ int32_t InitializeEnvironment(void) {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glViewport(0, 0, screen_width, screen_height);
-
-    if (CompileShaders()) return SYS_COUNT + 1;
+    CompileShaders();
     glUseProgram(imageBlitShaderProgram);
     glUniform1ui(screenWidthLoc_imageBlit, screen_width);
     glUniform1ui(screenHeightLoc_imageBlit, screen_height);
@@ -797,9 +778,9 @@ int32_t InitializeEnvironment(void) {
 
     // Create Framebuffer
     // First pass gbuffer images
-    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D, "Lit Raster");
-    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D, "Raster World Positions");
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D, "Raster Depth");
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
     
     glGenTextures(1, &outputImageID);
     glBindTexture(GL_TEXTURE_2D, outputImageID);
@@ -864,15 +845,15 @@ int32_t InitializeEnvironment(void) {
     Input_MouselookApply();
     
     // Network
-    if (enet_initialize() != 0) { DualLogError("ENet initialization failed\n"); return -1; }
+    if (enet_initialize() != 0) { DualLogError("ENet initialization failed\n"); exit(1); }
     ENetAddress address;
     enet_address_set_host(&address, server_address);
     address.port = server_port;
     client_host = enet_host_create(NULL, 1, 2, 0, 0);
-    if (!client_host) { DualLogError("Failed to create ENet client host\n"); return -1; }
+    if (!client_host) { DualLogError("Failed to create ENet client host\n"); exit(1); }
 
     server_peer = enet_host_connect(client_host, &address, 2, 0);
-    if (!server_peer) { DualLogError("Failed to connect to server\n"); return -1; }
+    if (!server_peer) { DualLogError("Failed to connect to server\n"); exit(1); }
     systemInitialized[SYS_NET] = true;
     
     // Audio
@@ -888,7 +869,7 @@ int32_t InitializeEnvironment(void) {
     Entity entry;
     init_data_entry(&entry);
     FILE *gamedatfile = fopen(filename, "r");
-    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); return 1; }
+    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); exit(1); }
     
     uint32_t lineNum = 0;
     bool is_eof;
@@ -917,27 +898,26 @@ int32_t InitializeEnvironment(void) {
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
     RenderLoadingProgress(100,"Loading textures...");
     DualLog("Window and GL Init took %f seconds\n", get_time() - init_start_time);
-    if (LoadTextures()) return 1;
+    LoadTextures();
     RenderLoadingProgress(100,"Loading models...");
-    if (LoadModels()) return 1;
+    LoadModels();
     RenderLoadingProgress(100,"Loading entities...");
-    if (LoadEntities()) return 1; // Must be after models and textures else entity types can't be validated.
+    LoadEntities(); // Must be after models and textures else entity types can't be validated.
     RenderLoadingProgress(100,"Loading level data...");
     renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    if (LoadLevelGeometry(currentLevel)) return 1; // Must be after entities!
+    LoadLevelGeometry(currentLevel); // Must be after entities!
     RenderLoadingProgress(110,"Loading lighting data...");
-    if (LoadLevelLights(currentLevel)) return 1;
+    LoadLevelLights(currentLevel);
     RenderLoadingProgress(120,"Loading dynamic object data...");
-    if (LoadLevelDynamicObjects(currentLevel)) return 1;
-    if (SortInstances()) return 1; // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
+    LoadLevelDynamicObjects(currentLevel);
+    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
-    if (Cull_Init()) return 1; // Must be after level! MUST BE AFTER SortInstances!!
+    CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     glClearColor(0.0f, 0.0f, 0.0f, 0.2f);
-    if (VoxelLists()) return 1;
+    VoxelLists();
     DebugRAM("InitializeEnvironment end");
-    return 0;
 }
 
 // All core engine operations run through the EventExecute as an Event processed
@@ -982,18 +962,6 @@ bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
     float dot_normalized = dot / dist; // Normalize dot product
     if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
     return false; // Outside FOV cone
-}
-
-int32_t EventInit(void) {
-    journalFirstWrite = true;
-
-    // Initialize the eventQueue as empty
-    clear_ev_queue();
-    clear_ev_journal(); // Initialize the event journal as empty.
-    eventQueue[eventIndex].type = EV_NULL;
-    eventQueue[eventIndex].timestamp = get_time();
-    eventQueue[eventIndex].deltaTime_ns = 0.0;
-    return 0;
 }
 
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f) {
@@ -1114,19 +1082,12 @@ int32_t ReadActiveLog() {
 }
 
 // Convert the binary .dem file into human readable text
-int32_t JournalDump(const char* dem_file) {
+void JournalDump(const char* dem_file) {
     FILE* fpR = fopen(dem_file, "rb");
-    if (!fpR) {
-        DualLogError("Failed to open .dem file\n");
-        return -1;
-    }
+    if (!fpR) { DualLogError("Failed to open .dem file\n"); exit(1); }
 
     FILE* fpW = fopen("./log_dump.txt", "wb");
-    if (!fpW) {
-        fclose(fpR); // Close .dem file that we were reading.
-        DualLogError("Failed to open voxen.dem\n");
-        return -1;
-    }
+    if (!fpW) { DualLogError("Failed to open voxen.dem\n"); exit(1); }
 
     Event event;
     while (fread(&event, sizeof(Event), 1, fpR) == 1) {
@@ -1142,7 +1103,6 @@ int32_t JournalDump(const char* dem_file) {
 
     fclose(fpW);
     fclose(fpR);
-    return 0;
 }
 
 // Queue was processed for the frame, clear it so next frame starts fresh.
@@ -1223,6 +1183,18 @@ int32_t EventQueueProcess(void) {
     }
 
     clear_ev_queue();
+    return 0;
+}
+
+int32_t EventInit(void) {
+    journalFirstWrite = true;
+
+    // Initialize the eventQueue as empty
+    clear_ev_queue();
+    clear_ev_journal(); // Initialize the event journal as empty.
+    eventQueue[eventIndex].type = EV_NULL;
+    eventQueue[eventIndex].timestamp = get_time();
+    eventQueue[eventIndex].deltaTime_ns = 0.0;
     return 0;
 }
 
@@ -1380,10 +1352,8 @@ int32_t main(int32_t argc, char* argv[]) {
     } else if (argc == 3 && strcmp(argv[1], "record") == 0) { // Log record
         manualLogName = argv[2];
     }
-    
-    DebugRAM("prior init events queued");
-    if (InitializeEnvironment()) return 1;
 
+    InitializeEnvironment();
     double last_physics_time = get_time();
     last_time = get_time();
     DebugRAM("prior to game loop");
@@ -1504,7 +1474,6 @@ int32_t main(int32_t argc, char* argv[]) {
             glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "shadowsEnabled"), settings_Shadows);
             glBindVertexArray(vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
-            glEnable(GL_DEPTH_TEST); // All normal objects get depth tested
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers

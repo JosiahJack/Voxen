@@ -37,9 +37,10 @@ GLuint modelBoundsID;
 float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 float * tempVertices;
 uint32_t * tempTriangles;
-uint32_t renderableCount = 0;
-uint32_t loadedInstances = 0;
-uint32_t loadedLights = 0;
+uint16_t renderableCount = 0;
+uint16_t loadedInstances = 0;
+uint16_t loadedModels = 0;
+uint16_t loadedLights = 0;
 uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
 uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
 uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
@@ -431,17 +432,19 @@ bool parse_data_file(DataParser *parser, const char *filename, int32_t type) {
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
-int32_t LoadModels(void) {
+void LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
+    loadedModels = 0;
     parser_init(&model_parser);
-    if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) { DualLogError("Could not parse ./Data/models.txt!\n"); return 1; }
+    if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
 
     int32_t maxIndex = -1;
     for (int32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
+    loadedModels = maxIndex;
     DualLog("Loading   models( %d) with max index  %d, using    Assimp version: %d.%d.%d...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch());
     int32_t totalVertCount = 0;
     int32_t totalBounds = 0;
@@ -645,7 +648,6 @@ int32_t LoadModels(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
-    return 0;
 }
 
 //--------------------------------- Entities -------------------------------------
@@ -656,16 +658,16 @@ DataParser entity_parser;
 // Suppress -Wformat-truncation for LoadEntities so it can share 256 length "path" and truncate it into 32 length "name".
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
-int32_t LoadEntities(void) {
+void LoadEntities(void) {
     double start_time = get_time();
     
     // Initialize parser with entity-specific keys
     parser_init(&entity_parser);
-    if (!parse_data_file(&entity_parser, "./Data/entities.txt",0)) { DualLogError("Could not parse ./Data/entities.txt!\n"); return 1; }
+    if (!parse_data_file(&entity_parser, "./Data/entities.txt",0)) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
     
     entityCount = entity_parser.count;
-    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); return 1; }
-    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); return 1; }
+    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); exit(1); }
+    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); exit(1); }
 
     DualLog("Loading  %d entities...", entityCount);
 
@@ -696,7 +698,6 @@ int32_t LoadEntities(void) {
 
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("after loading all entities");
-    return 0;
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning
 
@@ -865,11 +866,10 @@ float quat_angle_deg(Quaternion a, Quaternion b) {
 }
 
 //----------------------------------- Level -----------------------------------
-int32_t LoadLevelGeometry(uint8_t curlevel) {
+void LoadLevelGeometry(uint8_t curlevel) {
     double start_time = get_time();
     memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances
-    int32_t idx;
-    for (idx = 0;idx<INSTANCE_COUNT;idx++) {
+    for (uint16_t idx = 0;idx<INSTANCE_COUNT;idx++) {
         instances[idx].modelIndex = MODEL_IDX_MAX;
         instances[idx].texIndex = UINT16_MAX;
         instances[idx].glowIndex = MATERIAL_IDX_MAX;
@@ -889,23 +889,23 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     DebugRAM("end of SetupInstances");
-    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
 
     DebugRAM("start of LoadLevelGeometry");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_geometry_level%d.txt", curlevel);
     parser_init(&level_parser);
-    if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
+    if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
 
-    int32_t gameObjectCount = level_parser.count;
+    uint16_t gameObjectCount = level_parser.count;
     DualLog("Loading %d geometry chunks for Level %d...",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    for (int32_t idx=loadedInstances;idx<gameObjectCount;++idx) {
+    for (uint16_t idx=loadedInstances;idx<gameObjectCount;++idx) {
         loadedInstances++;
         instances[idx] = level_parser.entries[idx];
-        int32_t entIdx = level_parser.entries[idx].index;
-        if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",idx,entIdx,MAX_ENTITIES); continue; }
+        uint16_t entIdx = level_parser.entries[idx].index;
+        if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",idx,entIdx,MAX_ENTITIES); exit(1); }
         
         instances[idx].modelIndex = entities[entIdx].modelIndex;
         if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
@@ -925,18 +925,17 @@ int32_t LoadLevelGeometry(uint8_t curlevel) {
     // Instances uploaded after loading statics and dynamics in next functions...
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("end of LoadLevelGeometry");
-    return 0;
 }
 
-int32_t LoadLevelLights(uint8_t curlevel) {
+void LoadLevelLights(uint8_t curlevel) {
     double start_time = get_time();
-    if (curlevel >= numLevels) { DualLogError("Cannot load level lights, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+    if (curlevel >= numLevels) { DualLogError("Cannot load level lights, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
 
     DebugRAM("start of LoadLevelLights");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_lights_level%d.txt", curlevel);
     parser_init(&lights_parser);
-    if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
+    if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
 
     loadedLights = lights_parser.count;
     DualLog("Loading  %d  statics lights for Level %d...",loadedLights,curlevel);
@@ -965,12 +964,11 @@ int32_t LoadLevelLights(uint8_t curlevel) {
     
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of LoadLevelLights");
-    return 0;
 }
 
-int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
+void LoadLevelDynamicObjects(uint8_t curlevel) {
     double start_time = get_time();
-    if (curlevel >= numLevels) { DualLogError("Cannot load level dynamic objects, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); return 1; }
+    if (curlevel >= numLevels) { DualLogError("Cannot load level dynamic objects, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
 
     DebugRAM("start of LoadLevelDynamicObjects");
     char filename[64];
@@ -988,7 +986,7 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
     
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_dynamics_level%d.txt", curlevel);
     parser_init(&dynamics_parser);
-    if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); return 1; }
+    if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
 
     int32_t dynamicObjectCount = dynamics_parser.count;
     DualLog("Loading  %d dynamic objects for Level %d...",dynamicObjectCount,curlevel);
@@ -999,7 +997,7 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
     for (int32_t idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
         loadedInstances++;
         int32_t entIdx = dynamics_parser.entries[i].index;
-        if (entIdx >= MAX_ENTITIES) {DualLogError("Entity index when loading dynamic object %d was %d, exceeds max entity count of %d\n",(idx - startingIdx),entIdx,MAX_ENTITIES); continue; }
+        if (entIdx >= MAX_ENTITIES) { DualLogError("Entity index when loading dynamic object %d was %d, exceeds max entity count of %d\n",(idx - startingIdx),entIdx,MAX_ENTITIES); exit(1); }
         
         instances[idx] = dynamics_parser.entries[i];
         instances[idx].modelIndex = entities[entIdx].modelIndex;
@@ -1019,7 +1017,6 @@ int32_t LoadLevelDynamicObjects(uint8_t curlevel) {
 
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of LoadLevelDynamicObjects");
-    return 0;
 }
 
 bool IsDynamicObject(uint16_t constIndex) {
@@ -1039,7 +1036,7 @@ int32_t clamp(int32_t val, int32_t min, int32_t max) {
     return val;
 }
 
-int32_t SortInstances(void) {
+void SortInstances(void) {
     double start_time = get_time();
     DualLog("Sorting instances...");
 
@@ -1060,49 +1057,25 @@ int32_t SortInstances(void) {
 
     // Step 1: Categorize instances and count model types per category
     for (uint32_t i = 0; i < loadedInstances; i++) {
-        if (instances[i].texIndex >= textureCount && instances[i].texIndex != UINT16_MAX) {
-            DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i);
-            invalidModelIndexCount++;
-            continue;
-        }
-        if (instances[i].modelIndex >= MODEL_COUNT || instances[i].modelIndex == UINT16_MAX) {
-            invalidModelIndexCount++;
-//             DualLog("Instance %u is non-renderable (modelIndex %u)\n", i, instances[i].modelIndex);
-            continue;
-        }
-        if (instances[i].index >= MAX_ENTITIES) {
-            DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i);
-            invalidModelIndexCount++;
-            continue;
-        }
+        if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != UINT16_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
+        if (instances[i].modelIndex >= MODEL_COUNT || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
+        if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
 
         bool is_double_sided = isDoubleSided(instances[i].texIndex) ||
                               instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
         if (isTransparent(instances[i].texIndex)) {
-            if (transparentInstancesHead >= INSTANCE_COUNT) {
-                DualLogError("Transparent instances overflow at index %u\n", i);
-                invalidModelIndexCount++;
-                continue;
-            }
-//             DualLog("Instance %u is transparent (modelIndex %u, texIndex %u, entity.transparent %d)\n", i, instances[i].modelIndex, instances[i].texIndex, entities[instances[i].index].transparent);
+            if (transparentInstancesHead >= INSTANCE_COUNT) { DualLogError("Transparent instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
+
             transparentInstances[transparentInstancesHead++] = i;
             modelTypeCountsTransparent[instances[i].modelIndex]++;
         } else if (is_double_sided) {
-            if (doubleSidedInstancesHead >= INSTANCE_COUNT) {
-                DualLogError("Double-sided instances overflow at index %u\n", i);
-                invalidModelIndexCount++;
-                continue;
-            }
-//             DualLog("Instance %u is double-sided (modelIndex %u, texIndex %u)\n", i, instances[i].modelIndex, instances[i].texIndex);
+            if (doubleSidedInstancesHead >= INSTANCE_COUNT) { DualLogError("Double-sided instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
+
             doubleSidedInstances[doubleSidedInstancesHead++] = i;
             modelTypeCountsDoubleSided[instances[i].modelIndex]++;
         } else {
-            if (opaqueInstancesHead >= INSTANCE_COUNT) {
-                DualLogError("Opaque instances overflow at index %u\n", i);
-                invalidModelIndexCount++;
-                continue;
-            }
-//             DualLog("Instance %u is opaque (modelIndex %u, texIndex %u)\n", i, instances[i].modelIndex, instances[i].texIndex);
+            if (opaqueInstancesHead >= INSTANCE_COUNT) { DualLogError("Opaque instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
+
             opaqueInstances[opaqueInstancesHead++] = i;
             modelTypeCountsOpaque[instances[i].modelIndex]++;
         }
@@ -1114,22 +1087,20 @@ int32_t SortInstances(void) {
         modelTypeOffsetsOpaque[i] = currentOffset;
         currentOffset += modelTypeCountsOpaque[i];
     }
+    
     startOfDoubleSidedInstances = currentOffset;
     for (uint16_t i = 0; i < MODEL_COUNT; i++) {
         modelTypeOffsetsDoubleSided[i] = currentOffset;
         currentOffset += modelTypeCountsDoubleSided[i];
     }
+    
     startOfTransparentInstances = currentOffset;
     for (uint16_t i = 0; i < MODEL_COUNT; i++) {
         modelTypeOffsetsTransparent[i] = currentOffset;
         currentOffset += modelTypeCountsTransparent[i];
     }
 
-    // Check for overflow
-    if ((uint32_t)(startOfTransparentInstances + transparentInstancesHead) > (uint32_t)(loadedInstances - invalidModelIndexCount)) {
-        DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount);
-        return 1;
-    }
+    if ((uint32_t)(startOfTransparentInstances + transparentInstancesHead) > (uint32_t)(loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
 
     // Step 3: Reorder instances
     Entity tempInstances[INSTANCE_COUNT];
@@ -1141,12 +1112,9 @@ int32_t SortInstances(void) {
         for (uint16_t j = 0; j < opaqueInstancesHead; j++) {
             uint16_t i = opaqueInstances[j];
             if (tempInstances[i].modelIndex == modelIdx) {
-                if (targetIdx >= startOfDoubleSidedInstances) {
-                    DualLogError("Opaque instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx);
-                    return 1;
-                }
+                if (targetIdx >= startOfDoubleSidedInstances) { DualLogError("Opaque instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
+                
                 instances[targetIdx] = tempInstances[i];
-//                 DualLog("Placing opaque instance %u (modelIndex %u, texIndex %u) at %u\n",i, instances[targetIdx].modelIndex, instances[targetIdx].texIndex, targetIdx);
                 targetIdx++;
             }
         }
@@ -1157,12 +1125,9 @@ int32_t SortInstances(void) {
         for (uint16_t j = 0; j < doubleSidedInstancesHead; j++) {
             uint16_t i = doubleSidedInstances[j];
             if (tempInstances[i].modelIndex == modelIdx) {
-                if (targetIdx >= startOfTransparentInstances) {
-                    DualLogError("Double-sided instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx);
-                    return 1;
-                }
+                if (targetIdx >= startOfTransparentInstances) { DualLogError("Double-sided instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
+                
                 instances[targetIdx] = tempInstances[i];
-//                 DualLog("Placing double-sided instance %u (modelIndex %u, texIndex %u) at %u\n",i, instances[targetIdx].modelIndex, instances[targetIdx].texIndex, targetIdx);
                 targetIdx++;
             }
         }
@@ -1173,42 +1138,10 @@ int32_t SortInstances(void) {
         for (uint16_t j = 0; j < transparentInstancesHead; j++) {
             uint16_t i = transparentInstances[j];
             if (tempInstances[i].modelIndex == modelIdx) {
-                if (targetIdx >= loadedInstances - invalidModelIndexCount) {
-                    DualLogError("Transparent instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx);
-                    return 1;
-                }
+                if (targetIdx >= loadedInstances - invalidModelIndexCount) { DualLogError("Transparent instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
+                
                 instances[targetIdx] = tempInstances[i];
-//                 DualLog("Placing transparent instance %u (modelIndex %u, texIndex %u) at %u\n",i, instances[targetIdx].modelIndex, instances[targetIdx].texIndex, targetIdx);
                 targetIdx++;
-            }
-        }
-    }
-
-    // Verify instance ordering
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
-        uint16_t start = modelTypeOffsetsOpaque[modelIdx];
-        uint16_t count = modelTypeCountsOpaque[modelIdx];
-        for (uint16_t i = start; i < start + count && i < startOfDoubleSidedInstances; i++) {
-            if (instances[i].modelIndex != modelIdx) {
-                DualLogError("Verification failed: Opaque instance %u has modelIndex %u (expected %u)\n",i, instances[i].modelIndex, modelIdx);
-            }
-        }
-    }
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
-        uint16_t start = modelTypeOffsetsDoubleSided[modelIdx];
-        uint16_t count = modelTypeCountsDoubleSided[modelIdx];
-        for (uint16_t i = start; i < start + count && i < startOfTransparentInstances; i++) {
-            if (instances[i].modelIndex != modelIdx) {
-                DualLogError("Verification failed: Double-sided instance %u has modelIndex %u (expected %u)\n",i, instances[i].modelIndex, modelIdx);
-            }
-        }
-    }
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
-        uint16_t start = modelTypeOffsetsTransparent[modelIdx];
-        uint16_t count = modelTypeCountsTransparent[modelIdx];
-        for (uint16_t i = start; i < start + count && i < loadedInstances - invalidModelIndexCount; i++) {
-            if (instances[i].modelIndex != modelIdx) {
-                DualLogError("Verification failed: Transparent instance %u has modelIndex %u (expected %u)\n",i, instances[i].modelIndex, modelIdx);
             }
         }
     }
@@ -1227,5 +1160,4 @@ int32_t SortInstances(void) {
     DualLog(" took %f secs\n", get_time() - start_time);
     DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invalid: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
     DualLog("startOfDoubleSidedInstances %u, startOfTransparentInstances %u, invalidModelIndexCount %u\n", startOfDoubleSidedInstances, startOfTransparentInstances, invalidModelIndexCount);
-    return 0;
 }

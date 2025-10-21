@@ -80,23 +80,19 @@ float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
 void InitFontAtlasses() {
     const char* filename = "./Fonts/SystemShockText.ttf";
     FILE *f = fopen(filename, "rb");
-    if (!f) { fprintf(stderr, "Failed to open font %s\n", filename); return; }
+    if (!f) { DualLogError("Failed to open font %s\n", filename); exit(1); }
+
     fseek(f, 0, SEEK_END);
     size_t ttf_size = ftell(f);
     fseek(f, 0, SEEK_SET);
     unsigned char *ttf_buffer = malloc(ttf_size);
     size_t readSize = fread(ttf_buffer, 1, ttf_size, f);
-    if (readSize != ttf_size) { DualLogError("Could not read font %s\n", filename); free(ttf_buffer); fclose(f); return; }
+    if (readSize != ttf_size) { DualLogError("Could not read font %s\n", filename); exit(1); }
     
     fclose(f);
     unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 4, NULL)) {
-        fprintf(stderr, "Failed to initialize font packer\n");
-        free(ttf_buffer);
-        free(atlasBitmap);
-        return;
-    }
+    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 4, NULL)) { DualLogError("Failed to initialize font packer\n"); exit(1); }
     
     stbtt_PackSetOversampling(&pc, 2, 2);
     numPackedGlyphs = 0;
@@ -231,6 +227,8 @@ static uint32_t DecodeUTF8(const char **p) {
     return codepoint;
 }
 
+float textVertexData[4096]; // Reusable buffer for text vertices.  Most text only needs ~3000
+
 void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glUseProgram(textShaderProgram);
     glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
@@ -238,14 +236,9 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glBindTextureUnit(6, fontAtlasTex);
     glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
     glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_DEPTH_TEST);
     glBindVertexArray(textVAO);
 
     // Batch vertices for all glyphs
-    size_t len = strlen(text);
-    float* vertexData = malloc(len * 24 * sizeof(float)); // 6 vertices * 4 floats per glyph
     size_t vertexCount = 0;
     const char* p = text;
     float xpos = x, ypos = y + GetScreenRelativeY(0.0211f);
@@ -277,7 +270,7 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
             q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels,
             q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels
         };
-        memcpy(vertexData + vertexCount * 24, textVertices, sizeof(textVertices));
+        memcpy(textVertexData + vertexCount * 24, textVertices, sizeof(textVertices));
         vertexCount++;
         // Use fixed width for digits
         if (codepoint >= '0' && codepoint <= '9') {
@@ -285,18 +278,13 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
         }
     }
     if (vertexCount > 0) {
-        glNamedBufferData(textVBO, vertexCount * 24 * sizeof(float), vertexData, GL_DYNAMIC_DRAW);
+        glNamedBufferData(textVBO, vertexCount * 24 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertexCount * 24;
     }
-    free(vertexData);
-
+    
     glBindVertexArray(0);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glUseProgram(0);
 }
 
 void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* format, ...) {
@@ -335,6 +323,9 @@ static const char* debugViewNames[] = {
 };
 
 void RenderUI(void) {
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
 
     // UI Common References
@@ -384,4 +375,9 @@ void RenderUI(void) {
             screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
         }
     }
+    
+    glUseProgram(0);
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
 }

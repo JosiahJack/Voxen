@@ -99,10 +99,9 @@ bool parse_data_file(DataParser *parser, const char *filename, int type);
 #define MAX_PALETTE_SIZE 9000
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 extern GLuint colorBufferID;
-extern uint16_t textureCount;
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
-int32_t LoadTextures(void);
+void LoadTextures(void);
 
 // Models
 #define MODEL_COUNT 680
@@ -128,10 +127,13 @@ extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
 
 extern GLuint vbos[MODEL_COUNT];
 extern GLuint tbos[MODEL_COUNT];
-extern uint32_t renderableCount;
-extern uint32_t loadedInstances;
-extern int32_t gameObjectCount;
-int32_t LoadModels(void);
+extern uint16_t renderableCount;
+extern uint16_t loadedInstances;
+extern uint16_t loadedTextures;
+extern uint16_t loadedModels;
+extern uint16_t loadedLights;
+extern uint16_t gameObjectCount;
+void LoadModels(void);
 
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
@@ -158,7 +160,7 @@ extern GLuint matricesBuffer;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
 int32_t SetupInstances(void);
-int32_t LoadEntities(void);
+void LoadEntities(void);
 
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
@@ -189,7 +191,6 @@ int32_t LoadEntities(void);
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-extern uint32_t loadedLights;
 
 // Levels / Game Management
 extern char global_modname[256];
@@ -198,11 +199,11 @@ extern uint8_t numLevels; // Can be set by gamedata.txt
 extern uint8_t currentLevel;
 extern bool gamePaused;
 extern bool menuActive;
-int32_t LoadLevels();
-int32_t LoadLevelGeometry(uint8_t curlevel);
-int32_t LoadLevelLights(uint8_t curlevel);
-int32_t LoadLevelDynamicObjects(uint8_t curlevel);
-int32_t SortInstances();
+void LoadLevels();
+void LoadLevelGeometry(uint8_t curlevel);
+void LoadLevelLights(uint8_t curlevel);
+void LoadLevelDynamicObjects(uint8_t curlevel);
+void SortInstances();
 // ----------------------------------------------------------------------------
 // Event System
 #define EV_NULL 0u
@@ -264,9 +265,6 @@ int32_t EnqueueEvent_Float(uint8_t type, float payload1f);
 int32_t EnqueueEvent_Simple(uint8_t type);
 void clear_ev_journal(void);
 void JournalLog(void);
-int32_t ReadActiveLog();
-int32_t JournalDump(const char* dem_file);
-void clear_ev_queue(void);
 double get_time(void);
 int32_t EventQueueProcess(void);
 // ----------------------------------------------------------------------------
@@ -307,7 +305,7 @@ extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
 extern float worldMin_x, worldMin_z;
-int32_t Cull_Init(void);
+void CullInit(void);
 void CullCore(void);
 void Cull();
 bool get_cull_bit(const uint32_t* arr, size_t idx);
@@ -433,15 +431,8 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
 #define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-#define CHECK_GL_ERROR_HERE(msg) \
-    do { \
-        GLenum err = glGetError(); \
-        if (err != GL_NO_ERROR) \
-            DualLogError("GL Error at %s:%d (%s): %d\n", __FILE__, __LINE__, msg, err); \
-    } while(0)
 #else
 #define CHECK_GL_ERROR() do {} while(0)
-#define CHECK_GL_ERROR_HERE() do {} while(0)
 #endif
     
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
