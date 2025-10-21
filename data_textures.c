@@ -61,8 +61,7 @@ void LoadTextures(void) {
         }
     }
 
-    loadedTextures = maxIndex;
-    if (loadedTextures > MAX_TEXTURE_COUNT) { DualLogError("Too many textures in parser count %d, greater than 2048!\n", loadedTextures); exit(1); }
+    loadedTextures = maxIndex + 1;
     if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
 
     DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);

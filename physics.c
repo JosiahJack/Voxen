@@ -412,11 +412,12 @@ int32_t Physics(void) {
     
     // Naive loop over all instances and their triangles
     for (uint32_t i = 0; i < loadedInstances; i++) {
-        if (instances[i].modelIndex >= MODEL_COUNT) continue;
+        if (instances[i].modelIndex > loadedModels) continue;
         if (IsDynamicObject(instances[i].index)) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         
         int32_t mid = instances[i].modelIndex;
+        if (mid > loadedModels || mid < 0) continue;
         if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
 
         const float* world_mat = &modelMatrices[i * 16];

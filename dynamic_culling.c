@@ -8,11 +8,10 @@
 #include "citadel.h"
 
 uint8_t gridCellStates[ARRSIZE];
-float gridCellFloorHeight[ARRSIZE];
-float gridCellCeilingHeight[ARRSIZE];
+// float gridCellFloorHeight[ARRSIZE];
+// float gridCellCeilingHeight[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
-uint16_t cellIndexForLight[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
 uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
 uint16_t numCellsVisible = 0u;
@@ -37,8 +36,8 @@ static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
 void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
-    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = -FLT_MAX;
-    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = FLT_MAX;
+//     for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = -FLT_MAX;
+//     for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = FLT_MAX;
     for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
         
         PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
@@ -46,30 +45,30 @@ void PutChunksInCells() {
         if (!(gridCellStates[cellIdx] & CELL_OPEN)) cellIdx = 0;
         cellIndexForInstance[c] = (uint32_t)cellIdx;
 
-        if (!entities[instances[c].index].cardchunk) continue; // Only set ceiling and floor height from cards.
-        Quaternion quat = {instances[c].rotation.x, instances[c].rotation.y, instances[c].rotation.z, instances[c].rotation.w};
-        Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
-        float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
-        Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
-        float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
-        float floorHeight = (floorangle <= 30.0f) ? instances[c].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
-        if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
-        float ceilHeight = (ceilangle <= 30.0f) ? instances[c].position.y + 1.28f : FLT_MAX;
-        if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
+//         if (!entities[instances[c].index].cardchunk) continue; // Only set ceiling and floor height from cards.
+//         Quaternion quat = {instances[c].rotation.x, instances[c].rotation.y, instances[c].rotation.z, instances[c].rotation.w};
+//         Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
+//         float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
+//         Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
+//         float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
+//         float floorHeight = (floorangle <= 30.0f) ? instances[c].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
+//         if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
+//         float ceilHeight = (ceilangle <= 30.0f) ? instances[c].position.y + 1.28f : FLT_MAX;
+//         if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
     }
     
-    float levelMinFloor = FLT_MAX;
-    float levelMaxCeil = -FLT_MAX;
-    for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
-        if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
-        if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
-    }
-    
-    DualLog("Min floor level for %d: %f, Max ceil %f\n",currentLevel,levelMinFloor, levelMaxCeil);
-    for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
-        if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
-        if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
-    }
+//     float levelMinFloor = FLT_MAX;
+//     float levelMaxCeil = -FLT_MAX;
+//     for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
+//         if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
+//         if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
+//     }
+//     
+//     DualLog("Min floor level for %d: %f, Max ceil %f\n",currentLevel,levelMinFloor, levelMaxCeil);
+//     for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
+//         if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
+//         if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
+//     }
     
 //     for (int i=0;i<ARRSIZE;++i) {
 //         DualLog("gridCellFloorHeight[%d]: %f\n",i,gridCellFloorHeight[i]);
@@ -77,23 +76,19 @@ void PutChunksInCells() {
 //     }
 }
 
-void PutMeshesInCells(int32_t type) {
-    int32_t count = 0;
-    switch(type) {
-        case 5: count = LIGHT_COUNT; break; // Lights
-    }
-
-    for (int32_t index=0;index<count;index++) {
-        uint16_t x,z;
-        switch(type) {
-            case 5: // Lights
-                int32_t lightIdx = (index * LIGHT_DATA_SIZE);
-                PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
-                cellIndexForLight[index] = (z * WORLDX) + x;
-                break;
-        }
-    }
-}
+// void PutMeshesInCells(int32_t type) {
+//     int32_t count = 0;
+//     switch(type) {
+//         case 5: count = loadedLights; break; // Lights
+//     }
+// 
+//     for (int32_t index=0;index<count;index++) {
+//         uint16_t x,z;
+//         switch(type) {
+//             
+//         }
+//     }
+// }
 
 void DetermineClosedEdges() {
     DebugRAM("Start of DetermineClosedEdges");
@@ -715,7 +710,6 @@ void CullInit(void) {
 //     PutMeshesInCells(2); // Doors
 //     PutMeshesInCells(3); // NPCs
 //     PutMeshesInCells(4); // Static Saveable
-    PutMeshesInCells(5); // Lights
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     malloc_trim(0);
     DualLog(" took %f seconds\n", get_time() - start_time);

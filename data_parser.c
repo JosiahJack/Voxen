@@ -16,25 +16,22 @@
 #include "voxen.h"
 #include "citadel.h"
 
-uint32_t modelVertexCounts[MODEL_COUNT];
-uint32_t modelTriangleCounts[MODEL_COUNT];
-uint16_t modelTypeCountsOpaque[MODEL_COUNT];
-uint16_t modelTypeCountsDoubleSided[MODEL_COUNT];
-uint16_t modelTypeCountsTransparent[MODEL_COUNT];
+uint32_t* modelVertexCounts = NULL;
+uint32_t* modelTriangleCounts = NULL;
+uint16_t* modelTypeCountsOpaque = NULL;
+uint16_t* modelTypeCountsDoubleSided = NULL;
+uint16_t* modelTypeCountsTransparent = NULL;
 uint16_t invalidModelIndexCount;
-uint16_t modelTypeOffsetsOpaque[INSTANCE_COUNT];
-uint16_t modelTypeOffsetsDoubleSided[INSTANCE_COUNT];
-uint16_t modelTypeOffsetsTransparent[INSTANCE_COUNT];
-uint16_t opaqueInstances[INSTANCE_COUNT];
-uint16_t doubleSidedInstances[INSTANCE_COUNT];
-uint16_t transparentInstances[INSTANCE_COUNT];
+uint16_t* modelTypeOffsetsOpaque = NULL;
+uint16_t* modelTypeOffsetsDoubleSided = NULL;
+uint16_t* modelTypeOffsetsTransparent = NULL;
 uint16_t opaqueInstancesHead = 0;
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
-GLuint vbos[MODEL_COUNT];
-GLuint tbos[MODEL_COUNT];
+GLuint* vbos = NULL;
+GLuint* tbos = NULL;
 GLuint modelBoundsID;
-float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+float* modelBounds = NULL;
 float * tempVertices;
 uint32_t * tempTriangles;
 uint16_t renderableCount = 0;
@@ -43,15 +40,12 @@ uint16_t loadedModels = 0;
 uint16_t loadedLights = 0;
 uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
 uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
-uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
 uint16_t doubleSidedInstancesHead = 0;
-uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.
 uint16_t transparentInstancesHead = 0;
 DataParser model_parser;
 DataParser level_parser;
 DataParser lights_parser;
 DataParser dynamics_parser;
-Entity physObjects[MAX_DYNAMIC_ENTITIES];
 uint16_t physHead = 0;
 
 void parser_init(DataParser *parser) {
@@ -444,7 +438,7 @@ void LoadModels(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
-    loadedModels = maxIndex;
+    loadedModels = maxIndex + 1;
     DualLog("Loading   models( %d) with max index  %d, using    Assimp version: %d.%d.%d...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch());
     int32_t totalVertCount = 0;
     int32_t totalBounds = 0;
@@ -453,8 +447,11 @@ void LoadModels(void) {
         uint32_t largestVertCount = 0;
         uint32_t largestTriangleCount = 0;
     #endif
-    modelVertices = (float**)malloc(MODEL_COUNT * sizeof(float*));
-    modelTriangles = (uint32_t**)malloc(MODEL_COUNT * sizeof(uint32_t*));
+    modelVertexCounts = (uint32_t*)malloc(loadedModels * sizeof(uint32_t*));
+    modelTriangleCounts = (uint32_t*)malloc(loadedModels * sizeof(uint32_t*));
+    modelVertices = (float**)malloc(loadedModels * sizeof(float*));
+    modelTriangles = (uint32_t**)malloc(loadedModels * sizeof(uint32_t*));
+    modelBounds = (float*)malloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float*));
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
@@ -466,7 +463,7 @@ void LoadModels(void) {
     #pragma omp parallel
     {
         #pragma omp for
-        for (uint32_t i = 0; i < MODEL_COUNT; i++) {
+        for (uint32_t i = 0; i < loadedModels; i++) {
             modelVertices[i] = NULL;
             modelTriangles[i] = NULL;
             int32_t matchedParserIdx = -1;
@@ -597,31 +594,31 @@ void LoadModels(void) {
         }
     }
 
-    for (uint32_t i = 0; i < MODEL_COUNT; i++) { // Sequential phase
+    vbos = (GLuint*)malloc(loadedModels * sizeof(GLuint*));
+    tbos = (GLuint*)malloc(loadedModels * sizeof(GLuint*));
+    for (uint32_t i = 0; i < loadedModels; i++) { // Sequential phase
         if (modelVertexCounts[i] == 0 || modelTriangleCounts[i] == 0) continue;
 
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
-        if (modelTriangleCounts[i] > 0) { // Upload to GPU
-            size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-            glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
-            void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, modelVertices[i], vertSize);
-            glUnmapBuffer(GL_ARRAY_BUFFER);
-            glGenBuffers(1, &vbos[i]);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertSize);
+        size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+        glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
+        void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        memcpy(mapped_buffer, modelVertices[i], vertSize);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+        glGenBuffers(1, &vbos[i]);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
+        glBufferData(GL_COPY_WRITE_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
+        glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertSize);
 
-            size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
-            mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-            memcpy(mapped_buffer, modelTriangles[i], triSize);
-            glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-            glGenBuffers(1, &tbos[i]);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
-            glBufferData(GL_COPY_WRITE_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-            glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triSize);
-        }
+        size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
+        mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        memcpy(mapped_buffer, modelTriangles[i], triSize);
+        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        glGenBuffers(1, &tbos[i]);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
+        glBufferData(GL_COPY_WRITE_BUFFER, triSize, NULL, GL_STATIC_DRAW);
+        glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triSize);
     }
 
     glDeleteBuffers(1, &stagingVBO);
@@ -643,7 +640,7 @@ void LoadModels(void) {
 
     glGenBuffers(1, &modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" took %f seconds\n", get_time() - start_time);
@@ -908,7 +905,7 @@ void LoadLevelGeometry(uint8_t curlevel) {
         if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",idx,entIdx,MAX_ENTITIES); exit(1); }
         
         instances[idx].modelIndex = entities[entIdx].modelIndex;
-        if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
+        if (instances[idx].modelIndex < loadedModels) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
         if (instances[idx].glowIndex >= MATERIAL_IDX_MAX) instances[idx].glowIndex = 41;
@@ -972,18 +969,6 @@ void LoadLevelDynamicObjects(uint8_t curlevel) {
 
     DebugRAM("start of LoadLevelDynamicObjects");
     char filename[64];
-    memset(physObjects,0,MAX_DYNAMIC_ENTITIES * sizeof(Entity));
-    for (int32_t idx = 0;idx<MAX_DYNAMIC_ENTITIES;idx++) {
-        physObjects[idx].modelIndex = MODEL_IDX_MAX;
-        physObjects[idx].texIndex = UINT16_MAX;
-        physObjects[idx].glowIndex = MATERIAL_IDX_MAX;
-        physObjects[idx].specIndex = MATERIAL_IDX_MAX;
-        physObjects[idx].normIndex = MATERIAL_IDX_MAX;
-        physObjects[idx].lodIndex = UINT16_MAX;
-        physObjects[idx].scale.x = physObjects[idx].scale.y = physObjects[idx].scale.z = 1.0f; // Default scale
-        physObjects[idx].rotation.w = 1.0f; // Quaternion identity
-    }
-    
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_dynamics_level%d.txt", curlevel);
     parser_init(&dynamics_parser);
     if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
@@ -1001,7 +986,7 @@ void LoadLevelDynamicObjects(uint8_t curlevel) {
         
         instances[idx] = dynamics_parser.entries[i];
         instances[idx].modelIndex = entities[entIdx].modelIndex;
-        if (instances[idx].modelIndex < MODEL_COUNT) renderableCount++;
+        if (instances[idx].modelIndex < loadedModels) renderableCount++;
         instances[idx].texIndex = entities[entIdx].texIndex;
         instances[idx].glowIndex = entities[entIdx].glowIndex;
         if (instances[idx].glowIndex >= MATERIAL_IDX_MAX) instances[idx].glowIndex = 41;
@@ -1039,17 +1024,15 @@ int32_t clamp(int32_t val, int32_t min, int32_t max) {
 void SortInstances(void) {
     double start_time = get_time();
     DualLog("Sorting instances...");
-
-    // Zero out all arrays and counters
-    memset(modelTypeCountsOpaque, 0, MODEL_COUNT * sizeof(uint16_t));
-    memset(modelTypeCountsDoubleSided, 0, MODEL_COUNT * sizeof(uint16_t));
-    memset(modelTypeCountsTransparent, 0, MODEL_COUNT * sizeof(uint16_t));
-    memset(modelTypeOffsetsOpaque, 0, MODEL_COUNT * sizeof(uint16_t));
-    memset(modelTypeOffsetsDoubleSided, 0, MODEL_COUNT * sizeof(uint16_t));
-    memset(modelTypeOffsetsTransparent, 0, MODEL_COUNT * sizeof(uint16_t));
-    memset(opaqueInstances, 0, INSTANCE_COUNT * sizeof(uint16_t));
-    memset(doubleSidedInstances, 0, INSTANCE_COUNT * sizeof(uint16_t));
-    memset(transparentInstances, 0, INSTANCE_COUNT * sizeof(uint16_t));
+    modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
+    modelTypeCountsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
+    modelTypeCountsTransparent = calloc(loadedModels,sizeof(uint16_t));
+    modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16_t));
+    modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
+    modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
+    uint16_t opaqueInstances[INSTANCE_COUNT] = {0};
+    uint16_t doubleSidedInstances[INSTANCE_COUNT] = {0};
+    uint16_t transparentInstances[INSTANCE_COUNT] = {0};
     opaqueInstancesHead = 0;
     doubleSidedInstancesHead = 0;
     transparentInstancesHead = 0;
@@ -1058,11 +1041,10 @@ void SortInstances(void) {
     // Step 1: Categorize instances and count model types per category
     for (uint32_t i = 0; i < loadedInstances; i++) {
         if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != UINT16_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
-        if (instances[i].modelIndex >= MODEL_COUNT || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
+        if (instances[i].modelIndex >= loadedModels || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
         if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
 
-        bool is_double_sided = isDoubleSided(instances[i].texIndex) ||
-                              instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
+        bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
         if (isTransparent(instances[i].texIndex)) {
             if (transparentInstancesHead >= INSTANCE_COUNT) { DualLogError("Transparent instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
 
@@ -1083,19 +1065,19 @@ void SortInstances(void) {
 
     // Step 2: Compute offsets
     uint16_t currentOffset = 0;
-    for (uint16_t i = 0; i < MODEL_COUNT; i++) {
+    for (uint16_t i = 0; i < loadedModels; i++) {
         modelTypeOffsetsOpaque[i] = currentOffset;
         currentOffset += modelTypeCountsOpaque[i];
     }
     
     startOfDoubleSidedInstances = currentOffset;
-    for (uint16_t i = 0; i < MODEL_COUNT; i++) {
+    for (uint16_t i = 0; i < loadedModels; i++) {
         modelTypeOffsetsDoubleSided[i] = currentOffset;
         currentOffset += modelTypeCountsDoubleSided[i];
     }
     
     startOfTransparentInstances = currentOffset;
-    for (uint16_t i = 0; i < MODEL_COUNT; i++) {
+    for (uint16_t i = 0; i < loadedModels; i++) {
         modelTypeOffsetsTransparent[i] = currentOffset;
         currentOffset += modelTypeCountsTransparent[i];
     }
@@ -1108,7 +1090,7 @@ void SortInstances(void) {
     uint16_t targetIdx = 0;
 
     // Copy opaque instances
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         for (uint16_t j = 0; j < opaqueInstancesHead; j++) {
             uint16_t i = opaqueInstances[j];
             if (tempInstances[i].modelIndex == modelIdx) {
@@ -1121,7 +1103,7 @@ void SortInstances(void) {
     }
 
     // Copy double-sided instances
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         for (uint16_t j = 0; j < doubleSidedInstancesHead; j++) {
             uint16_t i = doubleSidedInstances[j];
             if (tempInstances[i].modelIndex == modelIdx) {
@@ -1134,7 +1116,7 @@ void SortInstances(void) {
     }
 
     // Copy transparent instances
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         for (uint16_t j = 0; j < transparentInstancesHead; j++) {
             uint16_t i = transparentInstances[j];
             if (tempInstances[i].modelIndex == modelIdx) {
@@ -1158,6 +1140,6 @@ void SortInstances(void) {
     }
 
     DualLog(" took %f secs\n", get_time() - start_time);
-    DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invalid: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
-    DualLog("startOfDoubleSidedInstances %u, startOfTransparentInstances %u, invalidModelIndexCount %u\n", startOfDoubleSidedInstances, startOfTransparentInstances, invalidModelIndexCount);
+    DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invisible: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
+//     DualLog("startOfDoubleSidedInstances %u, startOfTransparentInstances %u, invalidModelIndexCount %u\n", startOfDoubleSidedInstances, startOfTransparentInstances, invalidModelIndexCount);
 }

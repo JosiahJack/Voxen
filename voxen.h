@@ -94,7 +94,6 @@ void parser_init(DataParser *parser);
 bool parse_data_file(DataParser *parser, const char *filename, int type);
 
 // Textures
-#define MAX_TEXTURE_COUNT 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 9000
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
@@ -109,8 +108,8 @@ void LoadTextures(void);
 #define MAX_VERT_COUNT 40000
 #define MAX_TRI_COUNT 32768
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
-extern uint32_t modelVertexCounts[MODEL_COUNT];
-extern uint32_t modelTriangleCounts[MODEL_COUNT];
+extern uint32_t* modelVertexCounts;
+extern uint32_t* modelTriangleCounts;
 extern float** modelVertices;
 extern uint32_t** modelTriangles;
 
@@ -123,10 +122,10 @@ extern uint32_t** modelTriangles;
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 extern GLuint modelBoundsID;
-extern float modelBounds[MODEL_COUNT * BOUNDS_ATTRIBUTES_COUNT];
+extern float* modelBounds;
 
-extern GLuint vbos[MODEL_COUNT];
-extern GLuint tbos[MODEL_COUNT];
+extern GLuint* vbos;
+extern GLuint* tbos;
 extern uint16_t renderableCount;
 extern uint16_t loadedInstances;
 extern uint16_t loadedTextures;
@@ -140,16 +139,13 @@ void LoadModels(void);
 #define INSTANCE_COUNT 7400 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 extern Entity entities[MAX_ENTITIES];
 extern Entity instances[INSTANCE_COUNT];
-extern uint16_t modelTypeCountsOpaque[MODEL_COUNT];
-extern uint16_t modelTypeCountsDoubleSided[MODEL_COUNT];
-extern uint16_t modelTypeCountsTransparent[MODEL_COUNT];
+extern uint16_t* modelTypeCountsOpaque;
+extern uint16_t* modelTypeCountsDoubleSided;
+extern uint16_t* modelTypeCountsTransparent;
 extern uint16_t invalidModelIndexCount;
-extern uint16_t modelTypeOffsetsOpaque[INSTANCE_COUNT];
-extern uint16_t modelTypeOffsetsDoubleSided[INSTANCE_COUNT];
-extern uint16_t modelTypeOffsetsTransparent[INSTANCE_COUNT];
-extern uint16_t opaqueInstances[INSTANCE_COUNT];
-extern uint16_t doubleSidedInstances[INSTANCE_COUNT];
-extern uint16_t transparentInstances[INSTANCE_COUNT];
+extern uint16_t* modelTypeOffsetsOpaque;
+extern uint16_t* modelTypeOffsetsDoubleSided;
+extern uint16_t* modelTypeOffsetsTransparent;
 extern uint16_t opaqueInstancesHead;
 extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
@@ -303,7 +299,6 @@ extern uint8_t gridCellStates[ARRSIZE];
 // extern float gridCellCeilingHeight[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
-extern uint16_t cellIndexForLight[LIGHT_COUNT];
 extern float worldMin_x, worldMin_z;
 void CullInit(void);
 void CullCore(void);
@@ -355,7 +350,6 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
 extern double time_PhysicsStep;
 extern double physicsProcessingTime;
-extern Entity physObjects[MAX_DYNAMIC_ENTITIES];
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;

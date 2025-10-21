@@ -332,7 +332,7 @@ void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion
 }
 
 void UpdateInstanceMatrix(int32_t i) {
-    if (instances[i].modelIndex >= MODEL_COUNT) { dirtyInstances[i] = false; return; } // No model
+    if (instances[i].modelIndex >= loadedModels) { dirtyInstances[i] = false; return; } // No model
     if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
 
     float mat[16]; // 4x4 matrix
@@ -599,7 +599,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 0; j < loadedInstances; j++) {
-        if (instances[j].modelIndex >= MODEL_COUNT) continue;
+        if (instances[j].modelIndex >= loadedModels) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
         if (IsDynamicObject(instances[j].index)) continue;
         
@@ -621,7 +621,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
-            if (instances[i].modelIndex >= MODEL_COUNT) continue;
+            if (instances[i].modelIndex >= loadedModels) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
 
             if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
@@ -631,7 +631,7 @@ void RenderShadowmap(uint16_t lightIdx) {
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
                 glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
             }
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
@@ -716,7 +716,6 @@ void InitializeEnvironment(void) {
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(SYS_CTX + 1); }
 
-    // Diagnostic: Print OpenGL version and renderer
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     DualLog("OpenGL Version: %s\n", version ? (const char*)version : "unknown");
@@ -1242,7 +1241,7 @@ void RenderInstances(uint8_t type) {
     
     if (countsArray == NULL) { DualLogError("Invalid type %u passed to RenderInstances\n",type); return; }
     
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_COUNT; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         if (countsArray[modelIdx] == 0) continue;
 
         uint16_t start = offsetsArray[modelIdx];
@@ -1281,7 +1280,7 @@ void RenderInstances(uint8_t type) {
         glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_COUNT ? instances[i].lodIndex : instances[i].modelIndex;
+            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
