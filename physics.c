@@ -392,7 +392,7 @@ int32_t Physics(void) {
     if (noclip) return 0;
     
     // Apply gravity to camera (affects bottom of capsule)
-    cam_y -= 0.02f;
+    cam_y -= 0.01f;
     
     // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
     float capsule_offset = 0.84f;  // Center below camera (1.84 below, 0.16 above)
@@ -418,9 +418,7 @@ int32_t Physics(void) {
         
         int32_t mid = instances[i].modelIndex;
         if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
-        
-        // Ensure matrix is up-to-date (assume dirty handled elsewhere)
-        if (dirtyInstances[i]) UpdateInstanceMatrix(i);
+
         const float* world_mat = &modelMatrices[i * 16];
         uint32_t num_tris = modelTriangleCounts[mid];
         for (uint32_t t = 0; t < num_tris; t++) {

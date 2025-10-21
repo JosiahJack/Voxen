@@ -40,8 +40,8 @@ uint32_t * tempTriangles;
 uint32_t renderableCount = 0;
 uint32_t loadedInstances = 0;
 uint32_t loadedLights = 0;
-int32_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
-int32_t startOfTransparentInstances = INSTANCE_COUNT - 1;
+uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
+uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
 uint16_t doubleSidedInstances[INSTANCE_COUNT]; // Needs to be large for cyberspace.
 uint16_t doubleSidedInstancesHead = 0;
 uint16_t transparentInstances[INSTANCE_COUNT]; // Could probably be like 16, ah well.

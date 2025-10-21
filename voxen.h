@@ -155,8 +155,8 @@ extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern GLuint instancesBuffer;
 extern GLuint matricesBuffer;
-extern int32_t startOfDoubleSidedInstances;
-extern int32_t startOfTransparentInstances;
+extern uint16_t startOfDoubleSidedInstances;
+extern uint16_t startOfTransparentInstances;
 int32_t SetupInstances(void);
 int32_t LoadEntities(void);
 
