@@ -64,7 +64,7 @@ Build by calling ./build.sh build script.
 ### Prerequisites
 
 Project must be linked against the following libraries which your system must install.  I'll continue to reduce these as much as I can:
- * -lSDL2 (`sudo apt install libsdl2-dev`)
+ * -lglfw (`sudo apt install libglfw3-dev`)
  * -lGLEW (`sudo apt install libglew-dev`)
  * -lGL (`sudo apt install libgl1-mesa-dev`)
  * -lm
@@ -77,7 +77,7 @@ Project must be linked against the following libraries which your system must in
 Single command:
 
 ```bash
-sudo apt install libsdl2-dev libsdl2-ttf-dev libsdl2-image-dev libglew-dev libgl1-mesa-dev libassimp-dev
+sudo apt install libglfw3-dev libglew-dev libgl1-mesa-dev libassimp-dev
 ```
 
 ## System Architecture
@@ -90,7 +90,7 @@ Parses all game/mod scripts
 Initializes data handling systems and parsers using all above data
 Level Load using gamedata definition to pick starting level
 Starts game loop:
-  Polls SDL2 input and enqueues input Events
+  Polls GLFW input and enqueues input Events
   Processes input and sets key states, mouselook
   Iterates over all queued Server events (Physics, Game Logic scripts (VM))
   Client-side rendering

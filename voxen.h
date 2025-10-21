@@ -2,7 +2,7 @@
 #define VOXEN_HEADER_H
 
 // Debug and Compile Flags
-#define DEBUG_RAM_OUTPUT
+// #define DEBUG_RAM_OUTPUT
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
@@ -21,7 +21,6 @@ typedef struct { float r,g,b,a; } Color;
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-// #include <SDL2/SDL.h>
 // #include <fluidlite.h> TODO Add midi support
 // #include <libxmi.h>
 

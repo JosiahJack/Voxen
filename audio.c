@@ -14,7 +14,6 @@
     #define MA_NO_NEON
 #endif
 
-// #include <SDL2/SDL.h>
 #include "voxen.h"
 #include "External/miniaudio.h"
 

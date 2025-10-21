@@ -2,7 +2,6 @@
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #define VERSION_STRING "v0.7.1"
 #include <malloc.h>
-// #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -30,7 +29,6 @@
 // #include "Shaders/bluenoise64.cginc"
 // ----------------------------------------------------------------------------
 // Window
-// SDL_Window *window;
 GLFWwindow *window;
 bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
@@ -73,7 +71,6 @@ float cam_fov = 65.0f;
 double last_mouse_x = 0.0, last_mouse_y = 0.0;
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering
-// SDL_GLContext gl_context;
 int32_t debugView = 0;
 int32_t debugValue = 0;
 float rasterPerspectiveProjection[16];
@@ -405,7 +402,6 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) {
     va_end(args);
     RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
     glEnable(GL_DEPTH_TEST);
-//     SDL_GL_SwapWindow(window);
     glfwSwapBuffers(window);
 }
 // ============================================================================
@@ -721,8 +717,6 @@ void RenderDynamicShadowmaps(void) {}
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");    
-//     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
-//     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); exit(1); }
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); exit(1); }
     
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -736,10 +730,10 @@ void InitializeEnvironment(void) {
     UpdateScreenSize();
     DebugRAM("window init");
     int monitor_count = 0;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitor_count);
+    /*GLFWmonitor** monitors = */glfwGetMonitors(&monitor_count);
     if (monitor_count > 0) {
         GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
-        // Optional: Make configurable, e.g., via argc/argv: int target_idx = 0; /* parse from args */; target_monitor = monitors[target_idx];
+        // TODO: Make configurable, e.g., via argc/argv: int target_idx = 0; /* parse from args */; target_monitor = monitors[target_idx];
         if (target_monitor) {
             const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
             int mx, my;
@@ -751,15 +745,9 @@ void InitializeEnvironment(void) {
             DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\n", glfwGetMonitorName(target_monitor), xpos, ypos);
         }
     }
-
-//     gl_context = SDL_GL_CreateContext(window);
-//     if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); exit(1); }    
-//     DebugRAM("GL init");
     
     stbi_flip_vertically_on_write(1);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-//     SDL_GL_MakeCurrent(window, gl_context);
-//     SDL_ShowCursor(SDL_DISABLE);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(1); }
 
@@ -769,8 +757,6 @@ void InitializeEnvironment(void) {
     DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
     int32_t vsync_enable = 0;//1; // Set to 0 for false.
-//     SDL_GL_SetSwapInterval(vsync_enable);
-//     SDL_SetRelativeMouseMode(SDL_TRUE);
     glfwSwapInterval(vsync_enable);
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
@@ -1416,49 +1402,8 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!gamePaused) pauseRelativeTime += (float)frame_time;
 
         // Enqueue input events
-//         SDL_Event event;
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
-        
-//         int32_t mouse_xrel = 0.0f, mouse_yrel = 0.0f;
-//         while (SDL_PollEvent(&event)) {
-//             if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT); // [x] button
-//             else if (event.type == SDL_KEYDOWN) {
-//                 if (event.key.keysym.sym == SDLK_F10) {
-//                     if (log_playback) {
-//                         log_playback = false;
-//                         DualLog("Exited log playback manually.  Control returned\n");                           
-//                     } else EnqueueEvent_Simple(EV_QUIT); // <<< THAT"S ALL FOLKS!
-//                 } else {
-//                     if (!log_playback) {
-//                         EnqueueEvent_Int(EV_KEYDOWN,event.key.keysym.scancode);
-//                     } else {
-//                         // Handle pause, rewind, fastforward of logs here
-//                     }
-//                 }
-//             } else if (event.type == SDL_KEYUP && !log_playback) {
-//                 EnqueueEvent_Int(EV_KEYUP,event.key.keysym.scancode);
-//             } else if (event.type == SDL_MOUSEMOTION && window_has_focus && !log_playback) {
-//                 mouse_xrel += event.motion.xrel; // Cast from int32_t
-//                 mouse_yrel += event.motion.yrel; // Cast from int32_t
-// 
-//             // These aren't really events so just handle them here.
-//             } else if (event.type == SDL_WINDOWEVENT) {
-//                 if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-//                     window_has_focus = true;
-//                     SDL_SetRelativeMouseMode(SDL_TRUE);
-//                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-//                     window_has_focus = false;
-//                     SDL_SetRelativeMouseMode(SDL_FALSE);
-//                 }
-//             }
-//         }
-        
-        // After polling, enqueue a single mouse motion event if there was movement
-//         if (!log_playback && (mouse_xrel != 0.0f || mouse_yrel != 0.0f)) {
-//             EnqueueEvent_IntInt(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
-//         }
-        
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
         if (timeSinceLastPhysicsTick > 0.006944444f) { // 144fps fixed tick rate
             last_physics_time = current_time;
@@ -1571,7 +1516,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glUseProgram(0);
         RenderUI();
         cpuTime = get_time() - current_time;
-//         SDL_GL_SwapWindow(window); // Present frame
         glfwSwapBuffers(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
