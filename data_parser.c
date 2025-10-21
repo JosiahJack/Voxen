@@ -1,4 +1,5 @@
-#include <SDL2/SDL.h>
+// #include <SDL2/SDL.h>
+#include <ctype.h>
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>

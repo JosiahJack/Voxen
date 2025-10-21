@@ -2,7 +2,7 @@
 #define VOXEN_HEADER_H
 
 // Debug and Compile Flags
-// #define DEBUG_RAM_OUTPUT
+#define DEBUG_RAM_OUTPUT
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
@@ -16,10 +16,12 @@ typedef struct { float x,y,z,w; } Quaternion;
 typedef struct { float r,g,b,a; } Color;
 
 // Generic Lib Includes TODO REDUCE AS MUCH AS POSSIBLE!!
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <GL/glew.h>
-#include <SDL2/SDL.h>
+#include <GLFW/glfw3.h>
+// #include <SDL2/SDL.h>
 // #include <fluidlite.h> TODO Add midi support
 // #include <libxmi.h>
 
@@ -414,7 +416,8 @@ inline void quat_to_matrix(Quaternion* q, float* m) {
 }
 // ----------------------------------------------------------------------------
 // Input
-extern bool keys[SDL_NUM_SCANCODES];
+#define NUM_KEYS 350
+extern bool keys[NUM_KEYS];
 extern bool window_has_focus;
 void Input_MouselookApply();
 int32_t Input_KeyDown(int32_t scancode);

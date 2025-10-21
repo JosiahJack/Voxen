@@ -1,6 +1,6 @@
-#include <stdint.h>
-#include <stdbool.h>
 #include "voxen.h"
+#include <math.h>
+#include <stdlib.h>
 #include "citadel.h"
 // ----------------------------------------------------------------------------
 // Physics
@@ -12,7 +12,7 @@ double physicsProcessingTime = 0.0;
 // Input
 bool window_has_focus = false;
 float mouse_sensitivity = 0.1f;
-bool keys[SDL_NUM_SCANCODES] = {0}; // SDL_NUM_SCANCODES 512b, covers all keys
+bool keys[NUM_KEYS] = {0};
 uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
 
 // ================================= Input ==================================
@@ -43,54 +43,54 @@ void Input_MouselookApply() {
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
-int32_t Input_KeyDown(int32_t scancode) {
-    keys[scancode] = true;    
-    if (keys[SDL_SCANCODE_ESCAPE]) gamePaused = !gamePaused;
-    if (keys[SDL_SCANCODE_GRAVE]) ToggleConsole();
-    if (consoleActive) { ConsoleEmulator(scancode); return 0; }
+int32_t Input_KeyDown(int32_t keycode) {
+    if (keycode >= 0 && keycode < NUM_KEYS) keys[keycode] = true;    
+    if (keys[GLFW_KEY_ESCAPE]) gamePaused = !gamePaused;
+    if (keys[GLFW_KEY_GRAVE_ACCENT]) ToggleConsole();
+    if (consoleActive) { ConsoleEmulator(keycode); return 0; }
     
-    if (keys[SDL_SCANCODE_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
-    if (keys[SDL_SCANCODE_R]) {
+    if (keys[GLFW_KEY_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
+    if (keys[GLFW_KEY_R]) {
         debugView++;
         if (debugView > 7) debugView = 0;
         glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
     }
 
-    if (keys[SDL_SCANCODE_Y]) {
+    if (keys[GLFW_KEY_Y]) {
         debugValue++;
         if (debugValue > 6) debugValue = 0;
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
         glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
     }
 
-    if (keys[SDL_SCANCODE_E]) {
+    if (keys[GLFW_KEY_E]) {
         play_wav("./Audio/weapons/wpistol.wav",0.5f);
     }
 
-    if (keys[SDL_SCANCODE_1]) {
+    if (keys[GLFW_KEY_1]) {
         fogColorR += 0.01f;
-    } else if (keys[SDL_SCANCODE_2]) {
+    } else if (keys[GLFW_KEY_2]) {
         fogColorR -= 0.01f;
     }
     
-    if (keys[SDL_SCANCODE_3]) {
+    if (keys[GLFW_KEY_3]) {
         fogColorG += 0.01f;
-    } else if (keys[SDL_SCANCODE_4]) {
+    } else if (keys[GLFW_KEY_4]) {
         fogColorG -= 0.01f;
     }
     
-    if (keys[SDL_SCANCODE_5]) {
+    if (keys[GLFW_KEY_5]) {
         fogColorB += 0.01f;
-    } else if (keys[SDL_SCANCODE_6]) {
+    } else if (keys[GLFW_KEY_6]) {
         fogColorB -= 0.01f;
     }
 
     return 0;
 }
 
-int32_t Input_KeyUp(int32_t scancode) {
-    keys[scancode] = false;
+int32_t Input_KeyUp(int32_t keycode) {
+    if (keycode >= 0 && keycode < NUM_KEYS) keys[keycode] = false;
     return 0;
 }
 
@@ -123,36 +123,36 @@ void ProcessInput(void) {
     if (gamePaused || consoleActive) return;
     
     float finalMoveSpeed = move_speed;
-    if (keys[SDL_SCANCODE_LSHIFT]) finalMoveSpeed = move_speed * 1.75f;
-    if (keys[SDL_SCANCODE_F]) {
+    if (keys[GLFW_KEY_LEFT_SHIFT]) finalMoveSpeed = move_speed * 1.75f;
+    if (keys[GLFW_KEY_F]) {
         cam_x += finalMoveSpeed * cam_forwardx; // Move forward
         cam_y += finalMoveSpeed * cam_forwardy;
         cam_z += finalMoveSpeed * cam_forwardz;
-    } else if (keys[SDL_SCANCODE_S]) {
+    } else if (keys[GLFW_KEY_S]) {
         cam_x -= finalMoveSpeed * cam_forwardx; // Move backward
         cam_y -= finalMoveSpeed * cam_forwardy;
         cam_z -= finalMoveSpeed * cam_forwardz;
     }
 
-    if (keys[SDL_SCANCODE_D]) {
+    if (keys[GLFW_KEY_D]) {
         cam_x += finalMoveSpeed * cam_rightx; // Strafe right
         cam_y += finalMoveSpeed * cam_righty;
         cam_z += finalMoveSpeed * cam_rightz;
-    } else if (keys[SDL_SCANCODE_A]) {
+    } else if (keys[GLFW_KEY_A]) {
         cam_x -= finalMoveSpeed * cam_rightx; // Strafe left
         cam_y -= finalMoveSpeed * cam_righty;
         cam_z -= finalMoveSpeed * cam_rightz;
     }
 
 //     if (noclip) { Temporarily allow noclip like flying for now to solidify physics
-        if (keys[SDL_SCANCODE_V]) cam_y += finalMoveSpeed; // Move up
-        else if (keys[SDL_SCANCODE_C]) cam_y -= finalMoveSpeed; // Move down
+        if (keys[GLFW_KEY_V]) cam_y += finalMoveSpeed; // Move up
+        else if (keys[GLFW_KEY_C]) cam_y -= finalMoveSpeed; // Move down
 //     }
 
-    if (keys[SDL_SCANCODE_Q]) {
+    if (keys[GLFW_KEY_Q]) {
         cam_roll += move_speed * 5.0f; // Move up
         Input_MouselookApply();
-    } else if (keys[SDL_SCANCODE_T]) {
+    } else if (keys[GLFW_KEY_T]) {
         cam_roll -= move_speed * 5.0f; // Move down
         Input_MouselookApply();
     }

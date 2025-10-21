@@ -13,9 +13,8 @@
     #define MA_NO_FLAC
     #define MA_NO_NEON
 #endif
-#include <stdint.h>
-#include <stdbool.h>
-#include <SDL2/SDL.h>
+
+// #include <SDL2/SDL.h>
 #include "voxen.h"
 #include "External/miniaudio.h"
 

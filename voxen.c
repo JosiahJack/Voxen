@@ -1,9 +1,10 @@
 // File: voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#define VERSION_STRING "v0.7.0"
+#define VERSION_STRING "v0.7.1"
 #include <malloc.h>
-#include <SDL2/SDL.h>
+// #include <SDL2/SDL.h>
 #include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,7 +30,8 @@
 // #include "Shaders/bluenoise64.cginc"
 // ----------------------------------------------------------------------------
 // Window
-SDL_Window *window;
+// SDL_Window *window;
+GLFWwindow *window;
 bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
 FILE* console_log_file = NULL;
@@ -68,9 +70,10 @@ Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
 float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
 float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
 float cam_fov = 65.0f;
+double last_mouse_x = 0.0, last_mouse_y = 0.0;
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering
-SDL_GLContext gl_context;
+// SDL_GLContext gl_context;
 int32_t debugView = 0;
 int32_t debugValue = 0;
 float rasterPerspectiveProjection[16];
@@ -153,6 +156,48 @@ ENetHost* server_host = NULL;
 ENetHost* client_host = NULL;
 ENetPeer* server_peer = NULL; // Client's connection to server
 // ----------------------------------------------------------------------------
+// ============================================================================
+// GLFW Callbacks
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
+        if (log_playback) {
+            log_playback = false;
+            DualLog("Exited log playback manually.  Control returned\n");
+        } else {
+            EnqueueEvent_Simple(EV_QUIT);
+        }
+        return;
+    }
+    if (!log_playback) {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+            EnqueueEvent_Int(EV_KEYDOWN, key);
+        } else if (action == GLFW_RELEASE) {
+            EnqueueEvent_Int(EV_KEYUP, key);
+        }
+    }
+}
+
+static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (!log_playback && window_has_focus) {
+        int32_t dx = (int32_t)(xpos - last_mouse_x);
+        int32_t dy = (int32_t)(ypos - last_mouse_y);
+        last_mouse_x = xpos;
+        last_mouse_y = ypos;
+        if (globalFrameNum > 1) EnqueueEvent_IntInt(EV_MOUSEMOVE, dx, dy);
+    }
+}
+#pragma GCC diagnostic pop
+
+static void window_focus_callback(GLFWwindow* window, int focused) {
+    window_has_focus = focused != 0;
+    if (window_has_focus) {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    } else {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+}
 // ============================================================================
 // OpenGL / Rendering Helper Functions
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
@@ -360,22 +405,10 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) {
     va_end(args);
     RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
     glEnable(GL_DEPTH_TEST);
-    SDL_GL_SwapWindow(window);
+//     SDL_GL_SwapWindow(window);
+    glfwSwapBuffers(window);
 }
 // ============================================================================
-
-typedef enum {
-    SYS_SDL = 0,
-    SYS_TTF,
-    SYS_WIN,
-    SYS_CTX,
-    SYS_NET,
-    SYS_AUD,
-    SYS_COUNT // Number of subsystems
-} SystemType;
-
-bool systemInitialized[SYS_COUNT] = { [0 ... SYS_COUNT - 1] = false };
-
 void UpdateScreenSize(void) {
     float* m;
     m = uiOrthoProjection;
@@ -399,17 +432,6 @@ void UpdateScreenSize(void) {
     m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
     m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
     m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
-}
-
-typedef struct {
-    float angle; // In radians
-    float distSq; // Squared distance
-} ShadowEdge;
-
-int32_t compareShadowEdges(const void* a, const void* b) {
-    const ShadowEdge* edgeA = (const ShadowEdge*)a;
-    const ShadowEdge* edgeB = (const ShadowEdge*)b;
-    return edgeA->angle < edgeB->angle ? -1 : (edgeA->angle > edgeB->angle ? 1 : 0);
 }
 
 uint32_t* voxelLightListsRaw = NULL;
@@ -699,22 +721,47 @@ void RenderDynamicShadowmaps(void) {}
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");    
-    window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
-    if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); exit(SYS_WIN + 1); }
-    systemInitialized[SYS_WIN] = true;
+//     window = SDL_CreateWindow("Voxen, the OpenGL Voxel Lit Engine", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, screen_width, screen_height, SDL_WINDOW_OPENGL);
+//     if (!window) { DualLogError("SDL_CreateWindow failed: %s\n", SDL_GetError()); exit(1); }
+    if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); exit(1); }
+    
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
+    if (!window) { DualLogError("glfwCreateWindow failed\n"); glfwTerminate(); exit(1); }
+    
+    glfwMakeContextCurrent(window);
     UpdateScreenSize();
     DebugRAM("window init");
+    int monitor_count = 0;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitor_count);
+    if (monitor_count > 0) {
+        GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
+        // Optional: Make configurable, e.g., via argc/argv: int target_idx = 0; /* parse from args */; target_monitor = monitors[target_idx];
+        if (target_monitor) {
+            const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
+            int mx, my;
+            glfwGetMonitorPos(target_monitor, &mx, &my);
+            // Center the window on the monitor (windowed mode)
+            int xpos = mx + (mode->width - screen_width) / 2;
+            int ypos = my + (mode->height - screen_height) / 2;
+            glfwSetWindowPos(window, xpos, ypos);
+            DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\n", glfwGetMonitorName(target_monitor), xpos, ypos);
+        }
+    }
 
-    gl_context = SDL_GL_CreateContext(window);
-    if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); exit(SYS_CTX + 1); }    
-    systemInitialized[SYS_CTX] = true;
-    DebugRAM("GL init");
+//     gl_context = SDL_GL_CreateContext(window);
+//     if (!gl_context) { DualLogError("SDL_GL_CreateContext failed: %s\n", SDL_GetError()); exit(1); }    
+//     DebugRAM("GL init");
     
     stbi_flip_vertically_on_write(1);
-    SDL_GL_MakeCurrent(window, gl_context);
-    SDL_ShowCursor(SDL_DISABLE);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+//     SDL_GL_MakeCurrent(window, gl_context);
+//     SDL_ShowCursor(SDL_DISABLE);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
-    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(SYS_CTX + 1); }
+    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(1); }
 
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
@@ -722,8 +769,12 @@ void InitializeEnvironment(void) {
     DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
 
     int32_t vsync_enable = 0;//1; // Set to 0 for false.
-    SDL_GL_SetSwapInterval(vsync_enable);
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+//     SDL_GL_SetSwapInterval(vsync_enable);
+//     SDL_SetRelativeMouseMode(SDL_TRUE);
+    glfwSwapInterval(vsync_enable);
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    glfwSetWindowFocusCallback(window, window_focus_callback);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
     glMinSampleShading(0.0f);
@@ -820,7 +871,6 @@ void InitializeEnvironment(void) {
     
     // Text Initialization
     InitFontAtlasses();
-    systemInitialized[SYS_TTF] = true;
     DebugRAM("stb TTF init");
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
@@ -853,13 +903,10 @@ void InitializeEnvironment(void) {
 
     server_peer = enet_host_connect(client_host, &address, 2, 0);
     if (!server_peer) { DualLogError("Failed to connect to server\n"); exit(1); }
-    systemInitialized[SYS_NET] = true;
     
     // Audio
     InitializeAudio();
     DebugRAM("audio init");
-    systemInitialized[SYS_AUD] = true;
-
     RenderLoadingProgress(50,"Loading...");
 
     // Load Game/Mod Definition
@@ -1305,7 +1352,7 @@ int32_t main(int32_t argc, char* argv[]) {
         printf("-----------------------------------------------------------\n");
         printf("Voxen "
                VERSION_STRING
-               "8/15/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT-0 licensed\n\n\n");
+               "10/20/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT-0 licensed\n\n\n");
         return 0;
     }
 
@@ -1338,6 +1385,9 @@ int32_t main(int32_t argc, char* argv[]) {
     globalFrameNum = 0;
     activeLogFile = 0;
     DebugRAM("prior to event system init");
+    DualLog("Voxen "
+            VERSION_STRING
+            " by W. Josiah Jack, MIT-0 licensed\n");
     if (EventInit()) return 1;
 
     if (argc == 3 && strcmp(argv[1], "play") == 0) { // Log playback
@@ -1366,45 +1416,48 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!gamePaused) pauseRelativeTime += (float)frame_time;
 
         // Enqueue input events
-        SDL_Event event;
-        int32_t mouse_xrel = 0.0f, mouse_yrel = 0.0f;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT); // [x] button
-            else if (event.type == SDL_KEYDOWN) {
-                if (event.key.keysym.sym == SDLK_F10) {
-                    if (log_playback) {
-                        log_playback = false;
-                        DualLog("Exited log playback manually.  Control returned\n");                           
-                    } else EnqueueEvent_Simple(EV_QUIT); // <<< THAT"S ALL FOLKS!
-                } else {
-                    if (!log_playback) {
-                        EnqueueEvent_Int(EV_KEYDOWN,event.key.keysym.scancode);
-                    } else {
-                        // Handle pause, rewind, fastforward of logs here
-                    }
-                }
-            } else if (event.type == SDL_KEYUP && !log_playback) {
-                EnqueueEvent_Int(EV_KEYUP,event.key.keysym.scancode);
-            } else if (event.type == SDL_MOUSEMOTION && window_has_focus && !log_playback) {
-                mouse_xrel += event.motion.xrel; // Cast from int32_t
-                mouse_yrel += event.motion.yrel; // Cast from int32_t
-
-            // These aren't really events so just handle them here.
-            } else if (event.type == SDL_WINDOWEVENT) {
-                if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
-                    window_has_focus = true;
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
-                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                    window_has_focus = false;
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
-                }
-            }
-        }
+//         SDL_Event event;
+        glfwPollEvents();
+        if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
+        
+//         int32_t mouse_xrel = 0.0f, mouse_yrel = 0.0f;
+//         while (SDL_PollEvent(&event)) {
+//             if (event.type == SDL_QUIT) EnqueueEvent_Simple(EV_QUIT); // [x] button
+//             else if (event.type == SDL_KEYDOWN) {
+//                 if (event.key.keysym.sym == SDLK_F10) {
+//                     if (log_playback) {
+//                         log_playback = false;
+//                         DualLog("Exited log playback manually.  Control returned\n");                           
+//                     } else EnqueueEvent_Simple(EV_QUIT); // <<< THAT"S ALL FOLKS!
+//                 } else {
+//                     if (!log_playback) {
+//                         EnqueueEvent_Int(EV_KEYDOWN,event.key.keysym.scancode);
+//                     } else {
+//                         // Handle pause, rewind, fastforward of logs here
+//                     }
+//                 }
+//             } else if (event.type == SDL_KEYUP && !log_playback) {
+//                 EnqueueEvent_Int(EV_KEYUP,event.key.keysym.scancode);
+//             } else if (event.type == SDL_MOUSEMOTION && window_has_focus && !log_playback) {
+//                 mouse_xrel += event.motion.xrel; // Cast from int32_t
+//                 mouse_yrel += event.motion.yrel; // Cast from int32_t
+// 
+//             // These aren't really events so just handle them here.
+//             } else if (event.type == SDL_WINDOWEVENT) {
+//                 if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+//                     window_has_focus = true;
+//                     SDL_SetRelativeMouseMode(SDL_TRUE);
+//                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+//                     window_has_focus = false;
+//                     SDL_SetRelativeMouseMode(SDL_FALSE);
+//                 }
+//             }
+//         }
         
         // After polling, enqueue a single mouse motion event if there was movement
-        if (!log_playback && (mouse_xrel != 0.0f || mouse_yrel != 0.0f)) {
-            EnqueueEvent_IntInt(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
-        }
+//         if (!log_playback && (mouse_xrel != 0.0f || mouse_yrel != 0.0f)) {
+//             EnqueueEvent_IntInt(EV_MOUSEMOVE, mouse_xrel, mouse_yrel);
+//         }
         
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
         if (timeSinceLastPhysicsTick > 0.006944444f) { // 144fps fixed tick rate
@@ -1518,7 +1571,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glUseProgram(0);
         RenderUI();
         cpuTime = get_time() - current_time;
-        SDL_GL_SwapWindow(window); // Present frame
+//         SDL_GL_SwapWindow(window); // Present frame
+        glfwSwapBuffers(window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT
@@ -1527,6 +1581,6 @@ int32_t main(int32_t argc, char* argv[]) {
             else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
         #endif
     }
-
+    glfwTerminate();
     return 0;
 }

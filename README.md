@@ -23,7 +23,7 @@ Further, the procedural sky is hardcoded and not intended to be a general sky sy
 Modifications are of course welcome, however.  The hope is that everything is quite
 straightforward.
 
-Based on SDL2 and OpenGL 4.5+, this engine attempts to leverage low latency and
+Based on GLFW and OpenGL 4.3+, this engine attempts to leverage low latency and
 GPU driven rendering methods with minimal state changes and maximum flexibility
 with user customizable entities.  Heavy use of SSBOs is made though this is still
 compatible with old hardware and GL drivers from 15yrs ago; further very few GL
@@ -65,8 +65,6 @@ Build by calling ./build.sh build script.
 
 Project must be linked against the following libraries which your system must install.  I'll continue to reduce these as much as I can:
  * -lSDL2 (`sudo apt install libsdl2-dev`)
- * -lSDL2_ttf (`sudo apt install libsdl2-ttf-dev`)
- * -lSDL2_image (`sudo apt install libsdl2-image-dev`)
  * -lGLEW (`sudo apt install libglew-dev`)
  * -lGL (`sudo apt install libgl1-mesa-dev`)
  * -lm

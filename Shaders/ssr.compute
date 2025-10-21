@@ -1,6 +1,6 @@
 // ssr.compute
 // Compute shader for processing 
-#version 450 core
+#version 430 core
 layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba8,   binding = 0) readonly uniform image2D inputImage;

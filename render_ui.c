@@ -160,40 +160,44 @@ void ProcessConsoleCommand(const char* command) {
     currentEntryLength = 0;
 }
 
-void ConsoleEmulator(int32_t scancode) {
-    if (scancode == SDL_SCANCODE_U && keys[SDL_SCANCODE_LCTRL]) {
+void ConsoleEmulator(int32_t keycode) {
+    if (keycode == GLFW_KEY_U && keys[GLFW_KEY_LEFT_CONTROL]) {
         consoleEntryText[0] = '\0'; // Clear the input
         currentEntryLength = 0;
         return;
     }
     
-    if (scancode >= SDL_SCANCODE_A && scancode <= SDL_SCANCODE_Z) { // Handle alphabet keys (SDL scancodes 4-29 correspond to 'a' to 'z')
+    if (keycode >= GLFW_KEY_A && keycode <= GLFW_KEY_Z) { // Handle alphabet keys
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
-            char c = 'a' + (scancode - SDL_SCANCODE_A); // Map scancode to character
+            char c = 'a' + (keycode - GLFW_KEY_A); // Map keycode to lowercase character
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
             currentEntryLength++;
         }
-    } else if (scancode >= SDL_SCANCODE_1 && scancode <= SDL_SCANCODE_0) { // Handle number keys (SDL scancodes 30-39 correspond to '0' to '9')
+    } else if (keycode >= GLFW_KEY_1 && keycode <= GLFW_KEY_9) { // Handle number keys 1-9
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            char c;
-            if (scancode == SDL_SCANCODE_0) c = '0'; // Special case for '0'
-            else c = '1' + (scancode - SDL_SCANCODE_1); // Map 1-9 to '1'-'9'
+            char c = '1' + (keycode - GLFW_KEY_1); // Map to '1'-'9'
 
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
             currentEntryLength++;
         }
-    } else if (scancode == SDL_SCANCODE_BACKSPACE && currentEntryLength > 0) { // Handle backspace
+    } else if (keycode == GLFW_KEY_0) { // Handle '0'
+        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
+            consoleEntryText[currentEntryLength] = '0';
+            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
+            currentEntryLength++;
+        }
+    } else if (keycode == GLFW_KEY_BACKSPACE && currentEntryLength > 0) { // Handle backspace
         currentEntryLength--;
         consoleEntryText[currentEntryLength] = '\0'; // Null-terminate
-    } else if (scancode == SDL_SCANCODE_SPACE) { // Handle other keys as needed (e.g., enter, space, etc.)
+    } else if (keycode == GLFW_KEY_SPACE) { // Handle space
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
             consoleEntryText[currentEntryLength] = ' ';
             consoleEntryText[currentEntryLength + 1] = '\0';
             currentEntryLength++;
         }
-    } else if (scancode == SDL_SCANCODE_RETURN) {
+    } else if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER) { // Handle enter (main and keypad)
         // Handle command execution or clear the console
         DualLog("Console command: %s\n", consoleEntryText);
         ProcessConsoleCommand(consoleEntryText);
@@ -369,7 +373,7 @@ void RenderUI(void) {
         lastFrameSecCount = globalFrameNum;
     }
     
-    if (keys[SDL_SCANCODE_F12]) {
+    if (keys[GLFW_KEY_F12]) {
         if (time_now > screenshotTimeout) {
             Screenshot();
             screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
