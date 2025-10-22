@@ -27,21 +27,9 @@ typedef struct { float r,g,b,a; } Color;
 // ----------------------------------------------------------------------------
 // Audio
 #include "./External/miniaudio.h"
-#define MAX_CHANNELS 64
-extern ma_engine audio_engine;
-// extern fluid_synth_t* midi_synth; TODO Add midi support
-extern ma_sound mp3_sounds[2]; // For crossfading
-extern ma_sound wav_sounds[MAX_CHANNELS];
-extern int32_t wav_count;
-// int32_t InitializeAudio(const char* soundfont_path); TODO Add midi support
-int32_t InitializeAudio();
 // void play_midi(const char* midi_path); TODO Add midi support
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
-void CleanupAudio();
-// ----------------------------------------------------------------------------
-// Settings
-extern uint8_t settings_Reflections;
 // ----------------------------------------------------------------------------
 // Data Parsing
 #define MAX_ENTRIES 6000
@@ -96,7 +84,7 @@ bool parse_data_file(DataParser *parser, const char *filename, int type);
 
 // Textures
 #define MAX_TEXTURE_DIMENSION 2048
-#define MAX_PALETTE_SIZE 9000
+#define MAX_PALETTE_SIZE 256
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 extern GLuint colorBufferID;
 bool isDoubleSided(uint32_t texIndexToCheck);
@@ -184,7 +172,7 @@ void LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 256u
+#define SHADOW_MAP_SIZE 128u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];

@@ -522,6 +522,7 @@ void LoadModels(void) {
                 totalTriCount += triCount;
             }
 
+//             DualLog("Allocating vertex buffer sized at %u for model %u, and triangle buffer sized %u\n",vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float),i,triCount * 3 * sizeof(uint32_t));
             modelVertices[i] = (float*)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             modelTriangles[i] = (uint32_t*)malloc(triCount * 3 * sizeof(uint32_t));
 
@@ -601,9 +602,11 @@ void LoadModels(void) {
 
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+//         DualLog("segfault marker 001 for loaded model %u and modelVertices[i] = %d with vertSize of %u\n", i, modelVertices[i], vertSize);
         glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
         void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         memcpy(mapped_buffer, modelVertices[i], vertSize);
+//         DualLog("segfault marker 002 for loaded model %u\n", i);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glGenBuffers(1, &vbos[i]);
         glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
@@ -620,9 +623,8 @@ void LoadModels(void) {
         glBufferData(GL_COPY_WRITE_BUFFER, triSize, NULL, GL_STATIC_DRAW);
         glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triSize);
     }
+    DualLog("segfault marker 003\n");
 
-    glDeleteBuffers(1, &stagingVBO);
-    glDeleteBuffers(1, &stagingTBO);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
@@ -643,6 +645,8 @@ void LoadModels(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glDeleteBuffers(1, &stagingVBO);
+    glDeleteBuffers(1, &stagingTBO);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
 }
@@ -1069,7 +1073,6 @@ void SortInstances(void) {
         modelTypeOffsetsOpaque[i] = currentOffset;
         currentOffset += modelTypeCountsOpaque[i];
     }
-    
     startOfDoubleSidedInstances = currentOffset;
     for (uint16_t i = 0; i < loadedModels; i++) {
         modelTypeOffsetsDoubleSided[i] = currentOffset;

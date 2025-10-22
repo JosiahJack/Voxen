@@ -21,6 +21,8 @@ uniform float fogColorB;
 uniform uint reflectionsEnabled;
 uniform uint shadowsEnabled;
 uniform uint ditherEnabled;
+uniform float shadowmapSize;
+
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -72,7 +74,6 @@ uint GetVoxelIndex(vec3 worldPos) {
     return cellIndex * 64 + voxelIndexInCell;
 }
 
-const float SHADOW_MAP_SIZE = 256.0;
 const float INV_FOG_DIST = 1.0 / 71.68;
 
 // Small Poisson disk for stochastic PCF.
@@ -104,16 +105,17 @@ vec3 quat_rotate(vec4 q, vec3 v) {
 }
 
 vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
-    uint pixelOffset = textureOffsets[texIndex] + texCoord.y * textureSizes[texIndex].x + texCoord.x;
-    uint slotIndex = pixelOffset / 2;
+    uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
+    uint slotIndex = pixelOffset / 4u;
     uint packedIdx = colors[slotIndex];
-    uint paletteIndex = (pixelOffset % 2 == 0) ? (packedIdx & 0xFFFFu) : (packedIdx >> 16);
+    uint localOffset = pixelOffset % 4u;
+    uint paletteIndex = (packedIdx >> (8u * localOffset)) & 0xFFu;
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
     return vec4(
-        float((color >> 24) & 0xFFu) / 255.0,
-        float((color >> 16) & 0xFFu) / 255.0,
-        float((color >> 8) & 0xFFu) / 255.0,
+        float((color >> 24u) & 0xFFu) / 255.0,
+        float((color >> 16u) & 0xFFu) / 255.0,
+        float((color >> 8u) & 0xFFu) / 255.0,
         float(color & 0xFFu) / 255.0
     );
 }
@@ -233,7 +235,7 @@ void main() {
         if (shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
             float bias = clamp(((0.24 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.025,1.0);
-            float normalBias = 0.0;//clamp(0.01 * (1.0 - dot(normal, lightDir)), 0.0, 0.05);
+            float normalBias = 0.04;//clamp(0.01 * (1.0 - dot(normal, lightDir)), 0.0, 0.05);
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -249,9 +251,9 @@ void main() {
             }
 
             uv = uv * 0.5 + 0.5;
-            uint base = lightIdxInPVS * 6u * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-            uint faceOff = base + face * uint(SHADOW_MAP_SIZE) * uint(SHADOW_MAP_SIZE);
-            vec2 tc = uv * SHADOW_MAP_SIZE;
+            uint base = lightIdxInPVS * 6u * uint(shadowmapSize) * uint(shadowmapSize);
+            uint faceOff = base + face * uint(shadowmapSize) * uint(shadowmapSize);
+            vec2 tc = uv * shadowmapSize;
 
             if (shadowsEnabled > 1 && distToPixel < 10.0) {
                 // Pseudo-Stochastic PCF sampling
@@ -260,11 +262,11 @@ void main() {
                 for (int si = 0; si < PCF_SAMPLES; ++si) {
                     vec2 off = poissonDisk[si] * smearness;
                     vec2 t = tc + off;
-                    float tx = clamp(t.x, 0.0, SHADOW_MAP_SIZE - 1.0);
-                    float ty = clamp(t.y, 0.0, SHADOW_MAP_SIZE - 1.0);
+                    float tx = clamp(t.x, 0.0, shadowmapSize - 1.0);
+                    float ty = clamp(t.y, 0.0, shadowmapSize - 1.0);
                     uint utx = uint(tx);
                     uint uty = uint(ty);
-                    uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
+                    uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
                     float d = shadowMaps[ssbo_index];
                     float depthDiff = dist - d - (bias + normalBias);
                     float shadowContrib = depthDiff > 0.0 ? 0.0 : 1.0;
@@ -273,11 +275,11 @@ void main() {
 
                 shadowFactor = sum;
             } else {
-                float tx = clamp(tc.x, 0.0, SHADOW_MAP_SIZE - 1.0);
-                float ty = clamp(tc.y, 0.0, SHADOW_MAP_SIZE - 1.0);
+                float tx = clamp(tc.x, 0.0, shadowmapSize - 1.0);
+                float ty = clamp(tc.y, 0.0, shadowmapSize - 1.0);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
-                uint ssbo_index = faceOff + uty * uint(SHADOW_MAP_SIZE) + utx;
+                uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
                 float d = shadowMaps[ssbo_index];
                 float depthDiff = dist - d - (bias + normalBias);
                 shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;

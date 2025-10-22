@@ -909,10 +909,6 @@ index: 407
 index: 408
 #Textures/isolinearchipset.png
 index: 409
-#Textures/isotopex21_glow.png
-index: 410
-#Textures/isotopex21.png
-index: 411
 #Textures/isotopex22_glow.png
 index: 412
 #Textures/isotopex22.png
@@ -1139,8 +1135,6 @@ index: 522
 index: 523
 #Textures/med2_4_specular.png
 index: 524
-#Textures/med2_5_glass.png
-index: 525
 transparent: 1
 #Textures/med2_5_glow.png
 index: 526
@@ -1523,8 +1517,6 @@ index: 717
 index: 718
 #Textures/reac6_3.png
 index: 719
-#Textures/saturn-ring.png
-index: 720
 #Textures/sci1_1d.png
 index: 721
 #Textures/sci1_1.png
@@ -1875,20 +1867,6 @@ index: 897
 index: 898
 #Textures/UI/ammopane_red.png
 index: 899
-#Textures/UI/berserk01.png
-index: 900
-#Textures/UI/berserk02.png
-index: 901
-#Textures/UI/berserk03.png
-index: 902
-#Textures/UI/berserk04.png
-index: 903
-#Textures/UI/berserk05.png
-index: 904
-#Textures/UI/berserk06.png
-index: 905
-#Textures/UI/berserk07.png
-index: 906
 #Textures/UI/biomonitorplaceholder.png
 index: 907
 #Textures/UI/buttonborder_orange.png
@@ -1897,12 +1875,8 @@ index: 908
 index: 909
 #Textures/UI/checkbox.png
 index: 910
-#Textures/UI/checkmarkbloom.png
-index: 911
 #Textures/UI/checkmark.png
 index: 912
-#Textures/UI/checkmarkssao.png
-index: 913
 #Textures/UI/circle_blue.png
 index: 914
 #Textures/UI/circle_green.png
@@ -2055,8 +2029,6 @@ index: 987
 index: 988
 #Textures/UI/hud_hwico_biostats_off.png
 index: 989
-#Textures/UI/hud_hwico_biostats.png
-index: 990
 #Textures/UI/hud_hwico_biostats_v1.png
 index: 991
 #Textures/UI/hud_hwico_biostats_v2.png
@@ -2085,8 +2057,6 @@ index: 1002
 index: 1003
 #Textures/UI/hud_hwico_lantern_off.png
 index: 1004
-#Textures/UI/hud_hwico_lantern.png
-index: 1005
 #Textures/UI/hud_hwico_lantern_v1.png
 index: 1006
 #Textures/UI/hud_hwico_lantern_v2.png
@@ -2095,8 +2065,6 @@ index: 1007
 index: 1008
 #Textures/UI/hud_hwico_sensaround_off.png
 index: 1009
-#Textures/UI/hud_hwico_sensaround.png
-index: 1010
 #Textures/UI/hud_hwico_sensaround_v1.png
 index: 1011
 #Textures/UI/hud_hwico_sensaround_v2.png
@@ -2113,8 +2081,6 @@ index: 1016
 index: 1017
 #Textures/UI/hud_hwico_shield_on_v4.png
 index: 1018
-#Textures/UI/hud_hwico_shield.png
-index: 1019
 #Textures/UI/hud_shootmode.png
 index: 1020
 #Textures/UI/hudtab1.png
@@ -2203,24 +2169,6 @@ index: 1062
 index: 1063
 #Textures/UI/num_slash.png
 index: 1064
-#Textures/UI/painstatic_blue1.png
-index: 1065
-#Textures/UI/painstatic_blue2.png
-index: 1066
-#Textures/UI/painstatic_blue3.png
-index: 1067
-#Textures/UI/painstatic_blue4.png
-index: 1068
-#Textures/UI/painstatic_red1.png
-index: 1069
-#Textures/UI/painstatic_red2.png
-index: 1070
-#Textures/UI/painstatic_red3.png
-index: 1071
-#Textures/UI/painstatic_red4.png
-index: 1072
-#Textures/UI/painstatic_red_line.png
-index: 1073
 #Textures/UI/searchfx.png
 index: 1074
 #Textures/UI/selection_box.png
