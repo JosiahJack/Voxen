@@ -124,6 +124,7 @@ vec3 lerp(vec3 a, vec3 b, float t) {
 void main() {
     vec4 color = texture(tex, TexCoord).rgba;
     bool isJustSky = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
+    float mappedLat = 0.0;
     if (isJustSky) {
         vec2 ndc = TexCoord * 2.0 - 1.0;
         float aspect = float(screenWidth) / float(screenHeight);
@@ -145,7 +146,7 @@ void main() {
         skyColor.b = clamp(skyColor.b, microwaveBackground.b, 1.0);
         skyColor += milkyWay(skyDir);
 
-        // Procedural Saturn with improved stripes
+        // Procedural Saturn
         vec3 saturnCenter = normalize(vec3(0.0, -0.3, sqrt(1.0 - 0.3*0.3))); // Lower position for below horizon
         vec3 saturnPole = vec3(0.0, 1.0, 0.0); // Pole along world up for horizontal stripes
         float planetRadius = 0.48; // Angular radius
@@ -153,65 +154,43 @@ void main() {
         float ringOuter = 1.76;
         float cosPlanet = cos(planetRadius);
         float dd = dot(skyDir, saturnCenter);
-        vec3 mainColor1 = vec3(0.95, 0.85, 0.6); // Light tan
-        vec3 mainColor2 = vec3(0.8, 0.7, 0.5); // Medium
-        vec3 darkColor = vec3(0.6, 0.45, 0.25); // Dark brown
-        vec3 ringColor = mainColor2; // Orange as fixed by user
+        vec3 mainColor1 = vec3(0.85, 0.78, 0.6);
+        vec3 mainColor2 = vec3(0.82, 0.74, 0.62);
+        vec3 darkColor = vec3(0.81, 0.73, 0.55);
+        vec3 ringColor = mainColor2;
         if (dd > cosPlanet) {
-            float latitude = asin(clamp(dot(skyDir, saturnPole), -1.0, 1.0));
-            float stretchedLat = latitude * 0.62 + 0.2; // Offset a little to put brighter band near center.
-            vec2 noiseUV1 = vec2((stretchedLat) * 8.0, timeVal * 0.05);
-            vec2 noiseUV2 = vec2((stretchedLat) * 12.0, timeVal * 0.08);
-            float colorDecision1 = snoise(noiseUV1) * 0.5 + 0.5;
-            float colorDecision2 = snoise(noiseUV2) * 0.5 + 0.5;
-            vec3 planetColor = lerp(mainColor1, darkColor, smoothstep(0.4, 0.6, colorDecision1));
-            planetColor = lerp(planetColor, mainColor2, smoothstep(0.2, 0.8, colorDecision2));
-            float sphericalDarkeningFactor = pow(clamp(dd, 0.0, 1.0), 24.0); // stronger falloff
+            float t = cosPlanet / max(dot(skyDir, saturnCenter), 0.001);
+            vec3 rayDir = normalize(skyDir);
+            vec3 surfacePoint = saturnCenter + rayDir * (cosPlanet / sin(planetRadius)) * t;
+            vec3 tiltedPole = normalize(vec3(saturnPole.x, saturnPole.y - saturnPole.z, saturnPole.y + saturnPole.z));
+            vec3 planetNormal = normalize(surfacePoint - saturnCenter);
+            float latitude = asin(clamp(dot(planetNormal, tiltedPole), -0.9999, 0.9999));
+            mappedLat = latitude / (PI * 0.5); // Normalize to [-1, 1]
+            mappedLat = clamp(mappedLat, -1.0, 1.0);
+            float tGrad = (mappedLat + 1.0) * 0.5; // Map [-1, 1] to [0, 1]
+            vec3 baseColor = mix(darkColor, mainColor2, smoothstep(0.3, 0.5, tGrad));
+            baseColor = mix(baseColor, mainColor1, smoothstep(0.5, 0.7, tGrad));
+            vec2 noiseUV1 = vec2(mappedLat * 18.0, 0.0);
+            vec2 noiseUV2 = vec2(mappedLat * 24.0, 0.0);
+            float noise1 = snoise(noiseUV1) * 0.5 + 0.5;
+            float noise2 = snoise(noiseUV2) * 0.5 + 0.5;
+            vec3 stripeColor = mix(baseColor, mix(darkColor, mainColor1, smoothstep(0.4, 0.6, noise1)), smoothstep(0.2, 0.8, noise2));
+            float concavity = 1.0 - abs(mappedLat);
+            vec3 planetColor = stripeColor * mix(0.7, 1.0, concavity);
+            float viewLat = dot(planetNormal, tiltedPole);
+            float curvature = viewLat * smoothstep(0.1, 0.5, abs(mappedLat)) * 0.7;
+            planetColor *= mix(0.95, 1.05, curvature);
+            float sphericalDarkeningFactor = pow(clamp(dd, 0.0, 1.0), 24.0);
             planetColor *= sphericalDarkeningFactor;
-
-            // Disk mask with crisper edge
             float alpha = acos(dd);
             float aa_width = 0.0045;
             float edge_dist = planetRadius - alpha;
             float diskMask = smoothstep(0.0, aa_width, edge_dist);
-
-            // Composite planet over sky
             skyColor = mix(skyColor, planetColor, diskMask);
         }
 
         // Saturn Rings - projected on planet equatorial plane.
-        vec3 ringNormal = normalize(saturnPole); // use planet's equator orientation
-        vec3 ringU = normalize(cross(ringNormal, vec3(0.0, 0.0, 1.0)));
-        if (length(ringU) < 1e-3) ringU = normalize(cross(ringNormal, vec3(1.0, 0.0, 0.0)));
-        vec3 ringV = normalize(cross(ringNormal, ringU));
-
-        // direction from planet center to skyDir, expressed in planet's local frame
-        vec3 toDir = normalize(skyDir);
-        float angFromCenter = acos(dot(toDir, saturnCenter)); // angular offset from planet center
-        vec3 tangent = normalize(toDir - saturnCenter * dot(toDir, saturnCenter)); // local tangent around planet
-        vec2 local = vec2(dot(tangent, ringU), dot(tangent, ringV)) * (angFromCenter / planetRadius);
-
-        // ring radius in planet-local angular space
-        float proj_r = length(local);
-        float a_i = 1.15;
-        float a_o = 1.95;
-        float r_norm = clamp((proj_r - a_i) / (a_o - a_i), 0.0, 1.0);
-
-        // visible only within ring bounds and on the same hemisphere as planet
-        if (dot(toDir, saturnCenter) > cos(planetRadius * 1.3) && proj_r >= a_i && proj_r <= a_o) {
-            float density1 = snoise(vec2(r_norm * 80.0, timeVal * 0.05)) * 0.5 + 0.5;
-            float density2 = snoise(vec2(r_norm * 160.0 + 10.0, timeVal * 0.08)) * 0.5 + 0.5;
-            float density = mix(density1, density2, 0.45);
-            density = smoothstep(0.25, 0.75, density);
-
-            float foreshort = clamp(0.5 + 0.8 * abs(dot(ringNormal, toDir)), 0.2, 1.0);
-            vec3 ringBase = mix(ringColor, mainColor2, 0.35);
-            ringBase = mix(ringBase, vec3(0.95, 0.9, 0.8), 0.08);
-            float innerFade = smoothstep(0.0, 0.06, r_norm);
-            float outerFade = 1.0 - smoothstep(0.94, 1.0, r_norm);
-            float ringDensity = density * innerFade * outerFade * foreshort;
-            skyColor += ringBase * ringDensity * 1.05;
-        }
+        // TODO
 
         FragColor = vec4((color.rgb * color.a) + skyColor, 1.0); // Add window alpha weighted color tint
     }
