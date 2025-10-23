@@ -1,3 +1,4 @@
+#include <malloc.h>
 #include <ctype.h>
 #include <string.h>
 #include <stdint.h>
@@ -453,38 +454,35 @@ void LoadModels(void) {
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
-    glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
-    glBufferData(GL_ARRAY_BUFFER, MAX_VERT_COUNT * VERTEX_ATTRIBUTES_COUNT * sizeof(float), NULL, GL_DYNAMIC_COPY);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, MAX_TRI_COUNT * 3 * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-
+    int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
+    for (int32_t k = 0; k < model_parser.count; k++) {
+        if (model_parser.entries[k].index != UINT16_MAX) {
+            indexToParser[model_parser.entries[k].index] = k;
+        }
+    }
+    
+    struct aiPropertyStore* props = aiCreatePropertyStore();
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 16);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
     #pragma omp parallel
     {
-        #pragma omp for
+        #pragma omp for schedule(dynamic)
         for (uint32_t i = 0; i < loadedModels; i++) {
-            modelVertices[i] = NULL;
-            modelTriangles[i] = NULL;
-            int32_t matchedParserIdx = -1;
-            for (int32_t k = 0; k < model_parser.count; k++) {
-                if (model_parser.entries[k].index == i) { matchedParserIdx = k; break; }
-            }
+            int32_t matchedParserIdx = indexToParser[i];
+            if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue; // Perfectly fine to skip unused indices between 0 and max.
 
-            if (matchedParserIdx < 0 || !model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue; // Perfectly fine to skip unused indices between 0 and max.
-
-            struct aiPropertyStore* props = aiCreatePropertyStore();
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1);
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
-            aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0);
-            aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
-            aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
-            aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 16);
-            aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
-            aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
-            aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
+            
             const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
             if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); exit(1); }
 
@@ -494,8 +492,7 @@ void LoadModels(void) {
                 triCount += scene->mMeshes[m]->mNumFaces;
             }
 
-            if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); aiReleaseImport(scene); aiReleasePropertyStore(props); exit(1); }
-            if (vertexCount < 1 || triCount < 1) { DualLogError("Model %s has no tris!\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); aiReleasePropertyStore(props); exit(1); }
+            if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT || vertexCount < 1 || triCount < 1) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); exit(1); }
 
             modelVertexCounts[i] = vertexCount;
             modelTriangleCounts[i] = triCount;
@@ -550,18 +547,21 @@ void LoadModels(void) {
                 globalVertexOffset += mesh->mNumVertices;
             }
 
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINY] = miny;
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINZ] = minz;
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-            modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
+            uint32_t boundsBase = (i * BOUNDS_ATTRIBUTES_COUNT);
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MINX] = minx;
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MINY] = miny;
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MINZ] = minz;
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
             aiReleaseImport(scene);
-            aiReleasePropertyStore(props);
+            malloc_trim(0);
         }
     }
 
+    aiReleasePropertyStore(props);
+    malloc_trim(0);
     vbos = calloc(loadedModels, sizeof(GLuint));
     tbos = calloc(loadedModels, sizeof(GLuint));
     for (uint32_t i = 0; i < loadedModels; i++) { // Sequential phase
@@ -570,6 +570,7 @@ void LoadModels(void) {
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
         glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
+        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_DYNAMIC_COPY);
         void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         memcpy(mapped_buffer, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
@@ -580,6 +581,7 @@ void LoadModels(void) {
 
         size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_DYNAMIC_COPY);
         mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         memcpy(mapped_buffer, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
@@ -613,6 +615,8 @@ void LoadModels(void) {
     glDeleteBuffers(1, &stagingTBO);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
+    free(indexToParser);
+    malloc_trim(0);
 }
 
 //--------------------------------- Entities -------------------------------------

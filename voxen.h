@@ -159,7 +159,7 @@ void LoadModels(void);
 
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define INSTANCE_COUNT 7400 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 8000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 extern Entity entities[MAX_ENTITIES];
 extern Entity instances[INSTANCE_COUNT];
 extern uint16_t* modelTypeCountsOpaque;
