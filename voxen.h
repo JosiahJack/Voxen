@@ -122,7 +122,6 @@ bool parse_data_file(DataParser *parser, const char *filename, int type);
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
-extern GLuint colorBufferID;
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
@@ -146,7 +145,6 @@ extern uint32_t** modelTriangles;
 #define BOUNDS_DATA_OFFSET_MAXY 4
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
-extern GLuint modelBoundsID;
 extern float* modelBounds;
 
 extern GLuint* vbos;
@@ -176,8 +174,6 @@ extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
-extern GLuint instancesBuffer;
-extern GLuint matricesBuffer;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
 int32_t SetupInstances(void);
@@ -208,7 +204,7 @@ void LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE 192u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -469,12 +465,9 @@ extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
 extern int32_t debugValue;
-extern GLint debugViewLoc_chunk, debugValueLoc_chunk, debugViewLoc_quadblit, debugValueLoc_quadblit;
 extern float fogColorR, fogColorG, fogColorB;
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
-extern GLuint precomputedVisibleCellsFromHereID;
-extern GLuint cellIndexForInstanceID;
 extern bool lightDirty[LIGHT_COUNT];
 extern bool global_modIsCitadel;
 extern bool inventoryMode;
@@ -485,15 +478,10 @@ extern float cam_x, cam_y, cam_z;
 extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
 extern Quaternion cam_rotation;
-extern float genericTextHeightFac;
 extern GLuint chunkShaderProgram;
-extern GLuint textShaderProgram;
 extern GLuint imageBlitShaderProgram;
-extern GLuint textVAO, textVBO;
-extern GLint projectionLoc_text;
-extern GLint textColorLoc_text;
-extern GLint textTextureLoc_text;
-extern GLint texelSizeLoc_text;
+extern GLint debugViewLoc_quadblit, debugValueLoc_quadblit;
+extern GLint debugViewLoc_chunk, debugValueLoc_chunk;
 void InitFontAtlasses();
 float quat_angle_deg(Quaternion a, Quaternion b);
 void CacheUniformLocationsForShaders(void);

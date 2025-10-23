@@ -79,7 +79,7 @@ void PutChunksInCells() {
 // void PutMeshesInCells(int32_t type) {
 //     int32_t count = 0;
 //     switch(type) {
-//         case 5: count = loadedLights; break; // Lights
+//         case 5: count = loadedLights; break; // Lights // Done with voxels now, hence the whole Voxen thing ya know
 //     }
 // 
 //     for (int32_t index=0;index<count;index++) {

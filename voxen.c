@@ -91,10 +91,8 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 //    Chunk Geometery Unlit Raster Shader
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
-GLint viewProjLoc_chunk = -1, matrixLoc_chunk = -1, texIndexLoc_chunk = -1, debugViewLoc_chunk = -1, debugValueLoc_chunk = -1, 
-      glowSpecIndexLoc_chunk = -1, normInstanceIndexLoc_chunk = -1, screenWidthLoc_chunk = -1, screenHeightLoc_chunk = -1, 
-      worldMin_xLoc_chunk = -1, worldMin_zLoc_chunk = -1, camPosLoc_chunk = -1, fogColorRLoc_chunk = -1, fogColorGLoc_chunk = -1,
-      fogColorBLoc_chunk = -1;
+GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowSpecIndexLoc_chunk, normInstanceIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
+      worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk;
 GLuint blueNoiseBuffer;
 float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
@@ -102,7 +100,7 @@ float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 GLuint shadowCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
-GLint modelMatrixLoc_shadowmaps = -1, viewProjMatrixLoc_shadowmaps = -1, texIndexLoc_shadowmaps = -1, glowSpecIndexLoc_shadowmaps = -1, normInstanceIndexLoc_shadowmaps = -1;
+GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightPosLoc_shadowmaps, ssbo_indexBaseLoc_shadowmaps, shadowmapSizeLoc_shadowmaps;
 GLuint shadowMapSSBO; // SSBO for storing all shadow maps
 bool shadowMapsRendered = false;
 uint32_t lightIsDynamic[LIGHT_COUNT + 31 / 32] = {0};
@@ -112,13 +110,13 @@ uint16_t staticLightIndices[LIGHT_COUNT];
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
 GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr = -1, screenHeightLoc_ssr = -1, viewProjectionLoc_ssr = -1, camPosLoc_ssr = -1;
+GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
-GLint texLoc_quadblit = -1, debugViewLoc_quadblit = -1, debugValueLoc_quadblit = -1,
-      screenWidthLoc_imageBlit = -1, screenHeightLoc_imageBlit = -1;
+GLint texLoc_quadblit, debugViewLoc_quadblit, debugValueLoc_quadblit, screenWidthLoc_imageBlit, screenHeightLoc_imageBlit, outputImageLoc_imageBlit, skyVisibleLoc_imageBlit, planetaryBodiesVisibleLoc_imageBlit,
+      groveShieldVisibleLoc_imageBlit, stationShieldVisibleLoc_imageBlit, reflectionsEnabledLoc_imageBlit, aaEnabledLoc_imageBlit, brightnessSettingLoc_imageBlit, fovLoc_imageBlit, camRotLoc_imageBlit, timeValLoc_imageBlit;
 // ----------------------------------------------------------------------------
 // UI Cursor
 bool cursorVisible = false;
@@ -148,7 +146,7 @@ Color textColors[6] = {
 
 float uiOrthoProjection[16];
 char uiTextBuffer[TEXT_BUFFER_SIZE];
-GLint projectionLoc_text = -1, textColorLoc_text = -1, textTextureLoc_text = -1, texelSizeLoc_text = -1; // uniform locations
+GLint projectionLoc_text, textColorLoc_text, textTextureLoc_text, texelSizeLoc_text;
 
 bool consoleActive = false;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
@@ -365,23 +363,41 @@ void CompileShaders(void) {
     fogColorRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorR");
     fogColorGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorG");
     fogColorBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorB");
+    shadowmapSizeLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowmapSize");
+    reflectionsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "reflectionsEnabled");
+    shadowsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowsEnabled");
     
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
     texIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "texIndex");
     glowSpecIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "glowSpecIndex");
     normInstanceIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "normInstanceIndex");
+    lightPosLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
+    ssbo_indexBaseLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "ssbo_indexBase");
+    shadowmapSizeLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "shadowmapSize");
 
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
     camPosLoc_ssr = glGetUniformLocation(ssrShaderProgram, "camPos");
+    outputImageLoc_ssr = glGetUniformLocation(ssrShaderProgram, "outputImage");
     
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
     debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
     screenWidthLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "screenWidth");
     screenHeightLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "screenHeight");
+    outputImageLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "outputImage");
+    skyVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "skyVisible");
+    planetaryBodiesVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "planetaryBodiesVisible");
+    groveShieldVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "groveShieldVisible");
+    stationShieldVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "stationShieldVisible");
+    reflectionsEnabledLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "reflectionsEnabled");
+    aaEnabledLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "aaEnabled");
+    brightnessSettingLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting");
+    fovLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "fov");
+    camRotLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "camRot");
+    timeValLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "timeVal");
     
     projectionLoc_text = glGetUniformLocation(textShaderProgram, "projection");
     textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
@@ -645,13 +661,14 @@ int32_t VoxelLists() {
     free(voxelLightListsRaw);
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
     
     for (uint16_t i = 0; i < loadedInstances; i++) UpdateInstanceMatrix(i);
+    glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glFlush();
     CHECK_GL_ERROR();    
     malloc_trim(0);
     DualLog(" took %f seconds, total list size: %u\n", get_time() - start_time, head);
@@ -699,8 +716,6 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = fmin(lightRadius, 15.36f);
-    GLint lightPosLoc = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
-    GLint ssbo_indexBaseLoc = glGetUniformLocation(shadowmapsShaderProgram, "ssbo_indexBase");
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 0; j < loadedInstances; j++) {
@@ -721,8 +736,8 @@ void RenderShadowmap(uint16_t lightIdx) {
         float lightViewProj[16];
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
-        glUniform3f(lightPosLoc, lightPosX, lightPosY, lightPosZ);
-        glUniform1i(ssbo_indexBaseLoc, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); // 128
+        glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
+        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); // 128
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -786,7 +801,7 @@ void RenderShadowmaps(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
-    glProgramUniform1i(shadowmapsShaderProgram, glGetUniformLocation(shadowmapsShaderProgram, "shadowmapSize"), (int32_t)(SHADOW_MAP_SIZE));
+    glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glBindVertexArray(vao_chunk);
@@ -1240,11 +1255,12 @@ void InitializeEnvironment(void) {
     glUseProgram(chunkShaderProgram);
     glUniform1ui(screenWidthLoc_chunk, screen_width);
     glUniform1ui(screenHeightLoc_chunk, screen_height);
-    glProgramUniform1f(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "shadowmapSize"), (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1f(chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
 
     glUseProgram(ssrShaderProgram);
     glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
     glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
+    glProgramUniform1i(ssrShaderProgram, outputImageLoc_ssr, 4);
     glUseProgram(0);
         
     // Setup full screen quad for image blit for post processing effects like lighting.
@@ -1930,8 +1946,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1f(fogColorRLoc_chunk, fogColorR);
             glUniform1f(fogColorGLoc_chunk, fogColorG);
             glUniform1f(fogColorBLoc_chunk, fogColorB);
-            glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "reflectionsEnabled"), settings_Reflections);
-            glProgramUniform1ui(chunkShaderProgram, glGetUniformLocation(chunkShaderProgram, "shadowsEnabled"), settings_Shadows);
+            glProgramUniform1ui(chunkShaderProgram, reflectionsEnabledLoc_chunk, settings_Reflections);
+            glProgramUniform1ui(chunkShaderProgram, shadowsEnabledLoc_chunk, settings_Shadows);
             glBindVertexArray(vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
@@ -1944,7 +1960,6 @@ int32_t main(int32_t argc, char* argv[]) {
             // 6. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 7) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
-                glProgramUniform1i(ssrShaderProgram, glGetUniformLocation(ssrShaderProgram, "outputImage"), 4);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
@@ -1962,23 +1977,23 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindTexture(GL_TEXTURE_2D, inputImageID);
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, outputImageID);
-        glProgramUniform1i(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "outputImage"), 4);
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "skyVisible"), 1u);
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "planetaryBodiesVisible"), 1u);
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "groveShieldVisible"), (currentLevel >= 10 && currentLevel < 13) ? 1u : 0u);
+        glProgramUniform1i(imageBlitShaderProgram, outputImageLoc_imageBlit, 4);
+        glProgramUniform1ui(imageBlitShaderProgram, skyVisibleLoc_imageBlit, 1u);
+        glProgramUniform1ui(imageBlitShaderProgram, planetaryBodiesVisibleLoc_imageBlit, 1u);
+        glProgramUniform1ui(imageBlitShaderProgram, groveShieldVisibleLoc_imageBlit, (currentLevel >= 10 && currentLevel < 13) ? 1u : 0u);
         uint32_t shieldOnType = 0u; // No shield green tint.
         if (questData.ShieldActivated) {
             if (currentLevel == 6 || currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
             else if (currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
         }
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "stationShieldVisible"), shieldOnType);
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "reflectionsEnabled"), settings_Reflections);
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "aaEnabled"), settings_AntiAliasing);
-        glProgramUniform1ui(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting"), settings_Brightness);
-        glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "fov"), cam_fov);
+        glProgramUniform1ui(imageBlitShaderProgram, stationShieldVisibleLoc_imageBlit, shieldOnType);
+        glProgramUniform1ui(imageBlitShaderProgram, reflectionsEnabledLoc_imageBlit, settings_Reflections);
+        glProgramUniform1ui(imageBlitShaderProgram, aaEnabledLoc_imageBlit, settings_AntiAliasing);
+        glProgramUniform1ui(imageBlitShaderProgram, brightnessSettingLoc_imageBlit, settings_Brightness);
+        glProgramUniform1f(imageBlitShaderProgram, fovLoc_imageBlit, cam_fov);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
-        glUniform3f(glGetUniformLocation(imageBlitShaderProgram, "camRot"), deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-        glProgramUniform1f(imageBlitShaderProgram, glGetUniformLocation(imageBlitShaderProgram, "timeVal"), pauseRelativeTime * 0.1);
+        glUniform3f(camRotLoc_imageBlit, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+        glProgramUniform1f(imageBlitShaderProgram, timeValLoc_imageBlit, pauseRelativeTime * 0.1);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);

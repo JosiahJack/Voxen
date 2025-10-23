@@ -144,10 +144,11 @@ void main() {
         mat3 skyRotMatrix = yawMatrix * pitchMatrix; // Combine yaw and pitch
         vec3 skyDir = skyRotMatrix * viewDir; // Yaw and pitch for sky
         vec3 microwaveBackground = vec3(0.034, 0.02, 0.05); // Not really the mbr but sounds cool.
-        vec3 shieldColor = vec3(0.0, 0.0, 0.00);
+        vec3 shieldColor = vec3(0.0, 0.0, 0.0);
         vec3 saturnCenterWorld = vec3(0.0, -6.0, 456.0);
         vec3 saturnCenter = normalize(vec3(0.0, -0.1, sqrt(1.0 - 0.1*0.1))); // Lower position for below horizon
         if (stationShieldVisible > 0 || groveShieldVisible > 0) {
+
             vec3 viewDirNorm = normalize(skyDir);
             vec3 sunDir = normalize(-saturnCenter);
             vec3 saturnDir = normalize(saturnCenter);
@@ -161,6 +162,10 @@ void main() {
             vec3 baseColor = vec3(0.01, 0.08, 0.015);
             vec3 glowColor = vec3(0.2, 0.5, 0.25);
             shieldColor = mix(baseColor, glowColor, intensity) * 0.451;
+            if (stationShieldVisible >= 2) { // Level is above shield
+                float shieldDot = dot(skyDir, vec3(0.0,-1.0,0.0));
+                if (shieldDot < 0.4) shieldColor = vec3(0.0,0.0,0.0);
+            }
             microwaveBackground += shieldColor;
         }
 

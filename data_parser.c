@@ -885,10 +885,6 @@ void LoadLevelGeometry(uint8_t curlevel) {
     }
 
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    glGenBuffers(1, &matricesBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, INSTANCE_COUNT * 16 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, matricesBuffer);
     DebugRAM("end of SetupInstances");
     if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
 
