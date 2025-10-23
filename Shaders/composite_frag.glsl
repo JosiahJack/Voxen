@@ -15,6 +15,10 @@ uniform uint brightnessSetting;
 uniform vec3 camRot;
 uniform float fov;
 uniform float timeVal;
+uniform uint skyVisible;
+uniform uint planetaryBodiesVisible;
+uniform uint groveShieldVisible;
+uniform uint stationShieldVisible;
 
 const int SSR_RES = 4;
 const float PI = 3.14159265359;
@@ -123,9 +127,9 @@ vec3 lerp(vec3 a, vec3 b, float t) {
 
 void main() {
     vec4 color = texture(tex, TexCoord).rgba;
-    bool isJustSky = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
+    bool isSky = (color.a > 0.19 && color.a < 0.21 && skyVisible > 0); // Sky hack alpha
     float mappedLat = 0.0;
-    if (isJustSky) {
+    if (isSky) {
         vec2 ndc = TexCoord * 2.0 - 1.0;
         float aspect = float(screenWidth) / float(screenHeight);
         float fovRad = fov * PI / 180.0; // Convert FOV to radians
@@ -139,58 +143,119 @@ void main() {
         mat3 pitchMatrix = mat3(1.0, 0.0, 0.0, 0.0, cp, -sp, 0.0, sp, cp);
         mat3 skyRotMatrix = yawMatrix * pitchMatrix; // Combine yaw and pitch
         vec3 skyDir = skyRotMatrix * viewDir; // Yaw and pitch for sky
-        vec3 microwaveBackground = vec3(0.034, 0.02, 0.05); // Not really but sounds cool.
+        vec3 microwaveBackground = vec3(0.034, 0.02, 0.05); // Not really the mbr but sounds cool.
+        vec3 shieldColor = vec3(0.0, 0.0, 0.00);
+        vec3 saturnCenterWorld = vec3(0.0, -6.0, 456.0);
+        vec3 saturnCenter = normalize(vec3(0.0, -0.1, sqrt(1.0 - 0.1*0.1))); // Lower position for below horizon
+        if (stationShieldVisible > 0 || groveShieldVisible > 0) {
+            vec3 viewDirNorm = normalize(skyDir);
+            vec3 sunDir = normalize(-saturnCenter);
+            vec3 saturnDir = normalize(saturnCenter);
+            vec3 upDir = vec3(0.0, 1.0, 0.0);
+            float base = 0.2;
+            float sunHighlight = pow(max(dot(viewDirNorm, sunDir), 0.0), 32.0);
+            float saturnHighlight = pow(max(dot(viewDirNorm, saturnDir), 0.0), 16.0);
+            float fres = pow(1.0 - abs(dot(viewDirNorm, upDir)), 1.5) * 0.15;
+            float intensity = base + sunHighlight * 0.5 + saturnHighlight * 1.35 + fres;
+            intensity = clamp(intensity, 0.0, 1.0);
+            vec3 baseColor = vec3(0.01, 0.08, 0.015);
+            vec3 glowColor = vec3(0.2, 0.5, 0.25);
+            shieldColor = mix(baseColor, glowColor, intensity) * 0.451;
+            microwaveBackground += shieldColor;
+        }
+
         vec3 skyColor = microwaveBackground + starField(skyDir, 0.5, 1.8);
         skyColor.r = clamp(skyColor.r, microwaveBackground.r, 1.0); // Prevent black spots where noise pulls below base color of background.
         skyColor.g = clamp(skyColor.g, microwaveBackground.g, 1.0);
         skyColor.b = clamp(skyColor.b, microwaveBackground.b, 1.0);
-        skyColor += milkyWay(skyDir);
+        if (planetaryBodiesVisible > 0) { // No milkyway, saturn, rings, or sun for cyberspace... just stars.
+            skyColor += milkyWay(skyDir);
 
-        // Procedural Saturn
-        vec3 saturnCenter = normalize(vec3(0.0, -0.3, sqrt(1.0 - 0.3*0.3))); // Lower position for below horizon
-        vec3 saturnPole = vec3(0.0, 1.0, 0.0); // Pole along world up for horizontal stripes
-        float planetRadius = 0.48; // Angular radius
-        float ringInner = 0.90; // Increased for gap
-        float ringOuter = 1.76;
-        float cosPlanet = cos(planetRadius);
-        float dd = dot(skyDir, saturnCenter);
-        vec3 mainColor1 = vec3(0.85, 0.78, 0.6);
-        vec3 mainColor2 = vec3(0.82, 0.74, 0.62);
-        vec3 darkColor = vec3(0.81, 0.73, 0.55);
-        vec3 ringColor = mainColor2;
-        if (dd > cosPlanet) {
-            float t = cosPlanet / max(dot(skyDir, saturnCenter), 0.001);
+            // Procedural Saturn
+            vec3 saturnPole = vec3(0.0, 1.0, 0.0);
+            float planetRadius = 0.451;
+            float cosPlanet = cos(planetRadius);
+            float dd = dot(skyDir, saturnCenter);
+            vec3 mainColor1 = vec3(0.85, 0.78, 0.6);
+            vec3 mainColor2 = vec3(0.82, 0.74, 0.62);
+            vec3 darkColor = vec3(0.81, 0.73, 0.55);
+            vec3 ringColor = darkColor;
+            vec3 tiltedPole = normalize(vec3(saturnPole.x, saturnPole.y - saturnPole.z * 0.5, saturnPole.y * 0.5 + saturnPole.z));
             vec3 rayDir = normalize(skyDir);
-            vec3 surfacePoint = saturnCenter + rayDir * (cosPlanet / sin(planetRadius)) * t;
-            vec3 tiltedPole = normalize(vec3(saturnPole.x, saturnPole.y - saturnPole.z, saturnPole.y + saturnPole.z));
-            vec3 planetNormal = normalize(surfacePoint - saturnCenter);
-            float latitude = asin(clamp(dot(planetNormal, tiltedPole), -0.9999, 0.9999));
-            mappedLat = latitude / (PI * 0.5); // Normalize to [-1, 1]
-            mappedLat = clamp(mappedLat, -1.0, 1.0);
-            float tGrad = (mappedLat + 1.0) * 0.5; // Map [-1, 1] to [0, 1]
-            vec3 baseColor = mix(darkColor, mainColor2, smoothstep(0.3, 0.5, tGrad));
-            baseColor = mix(baseColor, mainColor1, smoothstep(0.5, 0.7, tGrad));
-            vec2 noiseUV1 = vec2(mappedLat * 18.0, 0.0);
-            vec2 noiseUV2 = vec2(mappedLat * 24.0, 0.0);
-            float noise1 = snoise(noiseUV1) * 0.5 + 0.5;
-            float noise2 = snoise(noiseUV2) * 0.5 + 0.5;
-            vec3 stripeColor = mix(baseColor, mix(darkColor, mainColor1, smoothstep(0.4, 0.6, noise1)), smoothstep(0.2, 0.8, noise2));
-            float concavity = 1.0 - abs(mappedLat);
-            vec3 planetColor = stripeColor * mix(0.7, 1.0, concavity);
-            float viewLat = dot(planetNormal, tiltedPole);
-            float curvature = viewLat * smoothstep(0.1, 0.5, abs(mappedLat)) * 0.7;
-            planetColor *= mix(0.95, 1.05, curvature);
-            float sphericalDarkeningFactor = pow(clamp(dd, 0.0, 1.0), 24.0);
-            planetColor *= sphericalDarkeningFactor;
-            float alpha = acos(dd);
-            float aa_width = 0.0045;
-            float edge_dist = planetRadius - alpha;
-            float diskMask = smoothstep(0.0, aa_width, edge_dist);
-            skyColor = mix(skyColor, planetColor, diskMask);
-        }
+            bool pixelLiesOnPlanet = (dd > cosPlanet);
+            if (pixelLiesOnPlanet) {
+                float t = cosPlanet / max(dot(skyDir, saturnCenter), 0.001);
+                vec3 surfacePoint = saturnCenter + rayDir * (cosPlanet / sin(planetRadius)) * t;
+                vec3 planetNormal = normalize(surfacePoint - saturnCenter);
+                float latitude = asin(clamp(dot(planetNormal, tiltedPole), -0.9999, 0.9999));
+                mappedLat = latitude / (PI * 0.5); // Normalize to [-1, 1]
+                mappedLat = clamp(mappedLat, -1.0, 1.0);
+                float tGrad = (mappedLat + 1.0) * 0.5; // Map [-1, 1] to [0, 1]
+                vec3 baseColor = mix(darkColor, mainColor2, smoothstep(0.3, 0.5, tGrad));
+                baseColor = mix(baseColor, mainColor1, smoothstep(0.5, 0.7, tGrad));
+                vec2 noiseUV1 = vec2(mappedLat * 18.0, 0.0);
+                vec2 noiseUV2 = vec2(mappedLat * 24.0, 0.0);
+                float noise1 = snoise(noiseUV1) * 0.5 + 0.5;
+                float noise2 = snoise(noiseUV2) * 0.5 + 0.5;
+                vec3 stripeColor = mix(baseColor, mix(darkColor, mainColor1, smoothstep(0.4, 0.6, noise1)), smoothstep(0.2, 0.8, noise2));
+                float concavity = 1.0 - abs(mappedLat);
+                vec3 planetColor = stripeColor * mix(0.7, 1.0, concavity);
+                float viewLat = dot(planetNormal, tiltedPole);
+                float sphericalDarkeningFactor = pow(clamp(dd, 0.0, 1.0), 16.0);
+                planetColor *= sphericalDarkeningFactor;
+                float alpha = acos(dd);
+                float aa_width = 0.0045;
+                float edge_dist = planetRadius - alpha;
+                float diskMask = smoothstep(0.0, aa_width, edge_dist);
+                skyColor = mix(skyColor, planetColor + shieldColor, diskMask);
+            } else {
+                // Saturn Rings - fixed world plane at y = -300
+                float ringPlaneY = -35.0;
+                vec3 ringNormal = vec3(0.0, 1.0, 0.0); // world up plane
+                vec3 ringU = normalize(vec3(1.0, 0.0, 0.0));
+                vec3 ringV = normalize(cross(ringNormal, ringU));
 
-        // Saturn Rings - projected on planet equatorial plane.
-        // TODO
+                // intersection of view ray with world plane
+                float denom = dot(rayDir, ringNormal);
+                if (abs(denom) > 1e-6) {
+                    float t = (ringPlaneY) / denom;
+                    if (t > 0.0) {
+                        vec3 hitPos = rayDir * t;
+
+                        // position relative to Saturn center (for concentric rings)
+                        vec3 rel = hitPos - saturnCenterWorld;
+                        float u = dot(rel, ringU);
+                        float v = dot(rel, ringV);
+                        float proj_r = length(vec2(u, v));
+                        float a_i = 400.0; // radii in world units
+                        float a_o = 580.0;
+                        float r_norm = clamp((proj_r - a_i) / (a_o - a_i), 0.0, 1.0);
+                        if (proj_r >= a_i && proj_r <= a_o) {
+                            float density1 = snoise(vec2(r_norm * 16.0, timeVal * 0.05)) * 0.5 + 0.5;
+                            float density2 = snoise(vec2(r_norm * 4.0, timeVal * 0.08)) * 0.5 + 0.5;
+                            float density = mix(density1, density2, 0.45);
+                            density = smoothstep(0.25, 0.75, density);
+                            float foreshort = clamp(0.5 + 0.8 * abs(dot(ringNormal, rayDir)), 0.2, 1.0);
+                            vec3 ringBase = mix(ringColor, mainColor1, 0.35);
+                            ringBase = mix(ringBase, vec3(0.95, 0.9, 0.8), 0.08);
+                            float innerFade = smoothstep(0.0, 0.06, r_norm);
+                            float outerFade = 1.0 - smoothstep(0.94, 1.0, r_norm);
+                            float ringDensity = density * innerFade * outerFade * foreshort;
+                            skyColor += ringBase * ringDensity * 1.05;
+                        }
+                    }
+                }
+            }
+
+            // Sun
+            vec3 sunDir = normalize(-saturnCenter);
+            float sunSize = 0.009;
+            float sunDist = acos(dot(skyDir, sunDir));
+            float sunMask = smoothstep(sunSize, sunSize * 0.8, sunDist);
+            vec3 sunColor = vec3(1.0, 0.97, 0.85);
+            float corona = exp(-pow(sunDist / (sunSize * 1.5), 2.0)) * 1.2;
+            skyColor += sunColor * (sunMask * 3.0 + corona * 1.5);
+        }
 
         FragColor = vec4((color.rgb * color.a) + skyColor, 1.0); // Add window alpha weighted color tint
     }
@@ -202,7 +267,7 @@ void main() {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec3 reflectionColor = texture(outputImage, sampleUV).rgb;
-            if (isJustSky) {
+            if (isSky) {
                 FragColor.rgb += reflectionColor;
                 return;
             }

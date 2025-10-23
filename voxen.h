@@ -76,6 +76,42 @@ typedef struct {
     int32_t capacity;
 } DataParser;
 
+typedef struct {
+	int lev1SecCode;
+	int lev2SecCode;
+	int lev3SecCode;
+	int lev4SecCode;
+	int lev5SecCode;
+	int lev6SecCode;
+	bool lev1SecCodeLocked;
+	bool lev2SecCodeLocked;
+	bool lev3SecCodeLocked;
+	bool lev4SecCodeLocked;
+	bool lev5SecCodeLocked;
+	bool lev6SecCodeLocked;
+	bool RobotSpawnDeactivated;
+	bool IsotopeInstalled;
+	bool ShieldActivated;
+	bool LaserSafetyOverriden;
+	bool LaserDestroyed;
+	bool BetaGroveCyberUnlocked;
+	bool GroveAlphaJettisonEnabled;
+	bool GroveBetaJettisonEnabled;
+	bool GroveDeltaJettisonEnabled;
+	bool MasterJettisonBroken;
+	bool Relay428Fixed;
+	bool MasterJettisonEnabled;
+	bool BetaGroveJettisoned;
+	bool AntennaNorthDestroyed;
+	bool AntennaSouthDestroyed;
+	bool AntennaEastDestroyed;
+	bool AntennaWestDestroyed;
+	bool SelfDestructActivated;
+	bool BridgeSeparated;
+	bool IsolinearChipsetInstalled;
+} QuestBits;
+extern QuestBits questData;
+
 void init_data_entry(Entity *entry);
 bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum);
 bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum);
