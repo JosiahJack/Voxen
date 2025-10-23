@@ -32,6 +32,7 @@
 #include "Shaders/composite_vert.glsl.h"
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
+#include "Shaders/shadowmaps_clear.compute.h"
 // #include "Shaders/bluenoise64.cginc"
 // ----------------------------------------------------------------------------
 // Window
@@ -39,6 +40,14 @@ GLFWwindow *window;
 bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
 FILE* console_log_file = NULL;
+// ----------------------------------------------------------------------------
+// Diagnostics
+double lastFrameSecCountTime = 0.00;
+uint32_t lastFrameSecCount = 0;
+uint32_t framesPerLastSecond = 0;
+uint32_t worstFPS = UINT32_MAX;
+double screenshotTimeout = 0.0;
+double time_PhysicsStep = 0.0;
 // ----------------------------------------------------------------------------
 // Settings
 uint8_t settings_Reflections = 1u; // Default 1
@@ -92,7 +101,8 @@ GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, 
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowSpecIndexLoc_chunk, normInstanceIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
-      worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk;
+      worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk,
+      isUILoc_chunk, unlitLoc_chunk;
 GLuint blueNoiseBuffer;
 float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
@@ -112,6 +122,9 @@ uint16_t staticLightIndices[LIGHT_COUNT];
 GLuint ssrShaderProgram;
 GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr;
 
+//    Shadowmaps Clear
+GLuint shadowmapsClearShaderProgram;
+
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
@@ -122,13 +135,19 @@ GLint texLoc_quadblit, debugViewLoc_quadblit, debugValueLoc_quadblit, screenWidt
 bool cursorVisible = false;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 // ----------------------------------------------------------------------------
-// Diagnostics
-double lastFrameSecCountTime = 0.00;
-uint32_t lastFrameSecCount = 0;
-uint32_t framesPerLastSecond = 0;
-uint32_t worstFPS = UINT32_MAX;
-double screenshotTimeout = 0.0;
-double time_PhysicsStep = 0.0;
+// UI Images
+#define MAX_UI_IMAGES 1024 // Adjust based on needs
+
+typedef struct {
+    float x, y;        // Top-left corner in screen space (pixels)
+    float width, height; // Size in screen space (pixels)
+    uint32_t texIndex; // Index into textureOffsets for palettized texture
+    bool visible;      // Whether to render this image
+} UIImage;
+
+UIImage uiImages[MAX_UI_IMAGES];
+uint32_t uiImageCount = 0;
+GLuint uiImageVAO, uiImageVBO;
 // ----------------------------------------------------------------------------
 // Text
 #define FONT_ATLAS_SIZE 2048
@@ -335,6 +354,10 @@ void CompileShaders(void) {
     // Screen Space Reflections Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader");
     ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
+    
+    // Shadowmaps Clear Compute Shader Program
+    computeShader = CompileShader(GL_COMPUTE_SHADER, shadowmaps_clear_computeShader, "Shadowmaps Clear Compute Shader");
+    shadowmapsClearShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Shadowmaps Clear Shader Program");
 
     // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
@@ -366,6 +389,8 @@ void CompileShaders(void) {
     shadowmapSizeLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowmapSize");
     reflectionsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "reflectionsEnabled");
     shadowsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowsEnabled");
+    isUILoc_chunk = glGetUniformLocation(chunkShaderProgram, "isUI");
+    unlitLoc_chunk = glGetUniformLocation(chunkShaderProgram, "unlit");
     
     modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
     viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
@@ -412,7 +437,7 @@ void Screenshot() {
         if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
     }
     
-    unsigned char* pixels = (unsigned char*)malloc(screen_width * screen_height * 4);
+    unsigned char* pixels = calloc(screen_width * screen_height * 4, sizeof(char));
     glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     char timestamp[32];
     char filename[96];
@@ -737,20 +762,13 @@ void RenderShadowmap(uint16_t lightIdx) {
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
         glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE); // 128
+        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
             if (instances[i].modelIndex >= loadedModels) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
 
-            if (i >= startOfDoubleSidedInstances) glDisable(GL_CULL_FACE);
-            if (i >= startOfTransparentInstances) {
-                glDisable(GL_CULL_FACE);
-                glEnable(GL_BLEND); // Enable blending for transparent instances
-                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Additive blending: src * srcAlpha + dst
-                glDepthMask(GL_FALSE); // Disable depth writes for transparent instances
-            }
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -760,8 +778,6 @@ void RenderShadowmap(uint16_t lightIdx) {
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
-
-    glFlush();
 
     staticLightCount++;
 }
@@ -790,12 +806,26 @@ void RenderShadowmaps(void) {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("\nShadow FBO incomplete, status: 0x%x\n", status); return; }
    
     // SSBO for shadow map data
-    glGenBuffers(1, &shadowMapSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, shadowMapSSBO);
+    GLuint tempSSBO;
+    glGenBuffers(1, &tempSSBO);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, tempSSBO);
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
-    uint32_t depthMapBufferSize = (uint32_t)(loadedLights) * shadowmapPixelCount * sizeof(float);
+    uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
+    uint32_t totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
+    uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
     glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
+    glGenBuffers(1, &shadowMapSSBO);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, shadowMapSSBO); // destination
+    glBufferData(GL_COPY_WRITE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_COPY_READ_BUFFER, tempSSBO);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, depthMapBufferSize);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
+    glDeleteBuffers(1, &tempSSBO);
+    glUseProgram(shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    malloc_trim(0);
     
     // Render static lights once
     glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
@@ -804,6 +834,7 @@ void RenderShadowmaps(void) {
     glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
     for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -870,6 +901,18 @@ void InitFontAtlasses() {
     free(atlasBitmap);
     textTexelWidth = 1.0f / (float)FONT_ATLAS_SIZE;
     DebugRAM("end of font init");
+}
+
+void InitUIImages() {
+    glCreateBuffers(1, &uiImageVBO);
+    glCreateVertexArrays(1, &uiImageVAO);
+    glEnableVertexArrayAttrib(uiImageVAO, 0);
+    glEnableVertexArrayAttrib(uiImageVAO, 1);
+    glVertexArrayAttribFormat(uiImageVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // Position (x, y)
+    glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // UV (s, t)
+    glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 4 * sizeof(float));
+    glVertexArrayAttribBinding(uiImageVAO, 0, 0);
+    glVertexArrayAttribBinding(uiImageVAO, 1, 0);
 }
 
 bool inventoryModeWasActivePriorToConsole = false;
@@ -1337,6 +1380,7 @@ void InitializeEnvironment(void) {
     
     // Text Initialization
     InitFontAtlasses();
+    InitUIImages();
     DebugRAM("stb TTF init");
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
@@ -1946,6 +1990,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1f(fogColorRLoc_chunk, fogColorR);
             glUniform1f(fogColorGLoc_chunk, fogColorG);
             glUniform1f(fogColorBLoc_chunk, fogColorB);
+            glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 0u);
+            glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk,0u);
             glProgramUniform1ui(chunkShaderProgram, reflectionsEnabledLoc_chunk, settings_Reflections);
             glProgramUniform1ui(chunkShaderProgram, shadowsEnabledLoc_chunk, settings_Shadows);
             glBindVertexArray(vao_chunk);
@@ -2027,7 +2073,7 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // 9. Render UI Text;
         if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), TEXT_RED, "PAUSED");
-        int32_t debugTextStartY = GetScreenRelativeY(0.0583333f);
+        int32_t debugTextStartY = GetScreenRelativeY(0.075f);
         int32_t leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);

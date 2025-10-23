@@ -22,6 +22,7 @@ gen_header() {
 
 # List shaders and their C variable names
 gen_header ./Shaders/ssr.compute                ssr_computeShader
+gen_header ./Shaders/shadowmaps_clear.compute   shadowmaps_clear_computeShader
 gen_header ./Shaders/chunk_vert.glsl            vertexShaderSource
 gen_header ./Shaders/chunk_frag.glsl            fragmentShaderTraditional
 gen_header ./Shaders/text_vert.glsl             textVertexShaderSource

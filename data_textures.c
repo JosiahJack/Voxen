@@ -65,18 +65,17 @@ void LoadTextures(void) {
     if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
 
     DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);
-    image_data = malloc(loadedTextures * sizeof(unsigned char*));
-    textureOffsets = malloc(loadedTextures * sizeof(uint32_t));
-    textureSizes = malloc(loadedTextures * 2 * sizeof(int));
-    texturePaletteOffsets = malloc(loadedTextures * sizeof(uint32_t));
-    doubleSidedTexture = calloc(loadedTextures,sizeof(bool));
-    transparentTexture = calloc(loadedTextures,sizeof(bool));
+    image_data            =   malloc(loadedTextures * sizeof(unsigned char*));
+    textureOffsets        = calloc(loadedTextures, sizeof(uint32_t));
+    textureSizes          = calloc(loadedTextures * 2, sizeof(int));
+    texturePaletteOffsets = calloc(loadedTextures, sizeof(uint32_t));
+    doubleSidedTexture    = calloc(loadedTextures,sizeof(bool));
+    transparentTexture    = calloc(loadedTextures,sizeof(bool));
     size_t maxFileSize = 512000;
     uint32_t totalPaletteColorsExtraSized = 80000;
-    texturePalettes = malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
-
-    int32_t* widths = malloc(loadedTextures * sizeof(int32_t));
-    int32_t* heights = malloc(loadedTextures * sizeof(int32_t));
+    texturePalettes             = malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
+    int32_t* widths             = malloc(loadedTextures * sizeof(int32_t));
+    int32_t* heights            = malloc(loadedTextures * sizeof(int32_t));
     int32_t* matchedParserIdxes = malloc(loadedTextures * sizeof(int32_t));
 
     // Initialize arrays

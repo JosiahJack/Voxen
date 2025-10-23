@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include <malloc.h>
 #include <GL/glew.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
@@ -275,14 +274,13 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
     int32_t entry_count = 0;
     uint32_t max_index = 0;
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
-        lineNum++;
-        if (line[0] == '#') { entry_count++; continue; }
-        
+        lineNum++;        
         char *start = line;
         while (isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
         while (end > start && isspace((unsigned char)*end)) *end-- = '\0';
         if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
+        if (line[0] == '#') { entry_count++; continue; }
 
         char *colon = strchr(start, ':');
         if (colon && strncmp(start, "index", colon - start) == 0) {
@@ -447,11 +445,11 @@ void LoadModels(void) {
         uint32_t largestVertCount = 0;
         uint32_t largestTriangleCount = 0;
     #endif
-    modelVertexCounts = (uint32_t*)malloc(loadedModels * sizeof(uint32_t*));
-    modelTriangleCounts = (uint32_t*)malloc(loadedModels * sizeof(uint32_t*));
-    modelVertices = (float**)malloc(loadedModels * sizeof(float*));
-    modelTriangles = (uint32_t**)malloc(loadedModels * sizeof(uint32_t*));
-    modelBounds = (float*)malloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float*));
+    modelVertexCounts   = calloc(loadedModels, sizeof(uint32_t));
+    modelTriangleCounts = calloc(loadedModels, sizeof(uint32_t));
+    modelVertices       = calloc(loadedModels, sizeof(float*));
+    modelTriangles      = calloc(loadedModels, sizeof(uint32_t*));
+    modelBounds         = calloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT, sizeof(float));
     GLuint stagingVBO, stagingTBO;
     glGenBuffers(1, &stagingVBO);
     glGenBuffers(1, &stagingTBO);
@@ -471,7 +469,7 @@ void LoadModels(void) {
                 if (model_parser.entries[k].index == i) { matchedParserIdx = k; break; }
             }
 
-            if (matchedParserIdx < 0 || !model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue;
+            if (matchedParserIdx < 0 || !model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue; // Perfectly fine to skip unused indices between 0 and max.
 
             struct aiPropertyStore* props = aiCreatePropertyStore();
             aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1);
@@ -488,10 +486,7 @@ void LoadModels(void) {
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
             aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
             const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
-            if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-                #pragma omp critical
-                DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); continue;
-            }
+            if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); exit(1); }
 
             uint32_t vertexCount = 0, triCount = 0;
             for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
@@ -499,21 +494,13 @@ void LoadModels(void) {
                 triCount += scene->mMeshes[m]->mNumFaces;
             }
 
-            if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) {
-                #pragma omp critical
-                DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); aiReleaseImport(scene); aiReleasePropertyStore(props); continue;
-            }
-            
-            if (vertexCount < 1 || triCount < 1) {
-                #pragma omp critical
-                DualLogError("Model %s has no tris!\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); aiReleasePropertyStore(props); continue;
-            }
+            if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); aiReleaseImport(scene); aiReleasePropertyStore(props); exit(1); }
+            if (vertexCount < 1 || triCount < 1) { DualLogError("Model %s has no tris!\n", model_parser.entries[matchedParserIdx].path); aiReleaseImport(scene); aiReleasePropertyStore(props); exit(1); }
 
             modelVertexCounts[i] = vertexCount;
             modelTriangleCounts[i] = triCount;
-
             #pragma omp critical
-            {
+            { // Ensure that the total is atomic
                 #ifdef DEBUG_MODEL_LOAD_DATA
                     if (vertexCount > largestVertCount) largestVertCount = vertexCount;
                     if (triCount > largestTriangleCount) largestTriangleCount = triCount;
@@ -522,17 +509,14 @@ void LoadModels(void) {
                 totalTriCount += triCount;
             }
 
-//             DualLog("Allocating vertex buffer sized at %u for model %u, and triangle buffer sized %u\n",vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float),i,triCount * 3 * sizeof(uint32_t));
-            modelVertices[i] = (float*)malloc(vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            modelTriangles[i] = (uint32_t*)malloc(triCount * 3 * sizeof(uint32_t));
-
+            modelVertices[i]  = calloc(vertexCount * VERTEX_ATTRIBUTES_COUNT,sizeof(float));
+            modelTriangles[i] = calloc(triCount * 3,sizeof(uint32_t));
             uint32_t vertexIndex = 0;
             float minx = 1E9f, miny = 1E9f, minz = 1E9f;
             float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
             uint32_t triangleIndex = 0;
             uint32_t globalVertexOffset = 0;
-            bool load_failed = false;
-            for (uint32_t m = 0; m < scene->mNumMeshes && !load_failed; m++) {
+            for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
                 struct aiMesh* mesh = scene->mMeshes[m];
                 for (uint32_t v = 0; v < mesh->mNumVertices; v++) {
                     modelVertices[i][vertexIndex++] = mesh->mVertices[v].x;
@@ -555,12 +539,7 @@ void LoadModels(void) {
 
                 for (uint32_t f = 0; f < mesh->mNumFaces; f++) {
                     struct aiFace* face = &mesh->mFaces[f];
-                    if (face->mNumIndices != 3) {
-                        #pragma omp critical
-                        DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f);
-                        load_failed = true;
-                        break;
-                    }
+                    if (face->mNumIndices != 3) { DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); exit(1); }
                     
                     uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
                     modelTriangles[i][triangleIndex++] = v[0];
@@ -569,18 +548,6 @@ void LoadModels(void) {
                 }
                 
                 globalVertexOffset += mesh->mNumVertices;
-            }
-
-            if (load_failed) {
-                free(modelVertices[i]);
-                modelVertices[i] = NULL;
-                free(modelTriangles[i]);
-                modelTriangles[i] = NULL;
-                modelVertexCounts[i] = 0;
-                modelTriangleCounts[i] = 0;
-                aiReleaseImport(scene);
-                aiReleasePropertyStore(props);
-                continue;
             }
 
             modelBounds[(i * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_MINX] = minx;
@@ -595,18 +562,16 @@ void LoadModels(void) {
         }
     }
 
-    vbos = (GLuint*)malloc(loadedModels * sizeof(GLuint*));
-    tbos = (GLuint*)malloc(loadedModels * sizeof(GLuint*));
+    vbos = calloc(loadedModels, sizeof(GLuint));
+    tbos = calloc(loadedModels, sizeof(GLuint));
     for (uint32_t i = 0; i < loadedModels; i++) { // Sequential phase
         if (modelVertexCounts[i] == 0 || modelTriangleCounts[i] == 0) continue;
 
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-//         DualLog("segfault marker 001 for loaded model %u and modelVertices[i] = %d with vertSize of %u\n", i, modelVertices[i], vertSize);
         glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
         void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
         memcpy(mapped_buffer, modelVertices[i], vertSize);
-//         DualLog("segfault marker 002 for loaded model %u\n", i);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glGenBuffers(1, &vbos[i]);
         glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
@@ -623,7 +588,6 @@ void LoadModels(void) {
         glBufferData(GL_COPY_WRITE_BUFFER, triSize, NULL, GL_STATIC_DRAW);
         glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triSize);
     }
-    DualLog("segfault marker 003\n");
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);

@@ -6,7 +6,6 @@
 in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;
-in vec3 Barycentric;
 
 uniform int debugView;
 uniform int debugValue;
@@ -22,7 +21,7 @@ uniform uint reflectionsEnabled;
 uniform uint shadowsEnabled;
 uniform uint ditherEnabled;
 uniform float shadowmapSize;
-
+uniform uint unlit;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -31,7 +30,7 @@ flat in uint NormalIndex;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(std430, binding = 5) buffer ShadowMaps { float shadowMaps[]; };
+layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 // layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -188,6 +187,7 @@ void main() {
 
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count  = min(voxelLightListIndices[voxelIdx * 2 + 1],16u);
+    if (unlit > 0) count = 0;
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = adjustedNormal;
     uint listoffset = 0;
@@ -234,8 +234,8 @@ void main() {
 //         if (debugValue != 2 && shadowsEnabled > 0) {
         if (shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
-            float bias = clamp(((0.24 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.025,1.0);
-            float normalBias = 0.04;//clamp(0.01 * (1.0 - dot(normal, lightDir)), 0.0, 0.05);
+            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0);
+            float normalBias = 0.02;//clamp(0.01 * (1.0 - dot(normal, lightDir)), 0.0, 0.16);
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -254,7 +254,6 @@ void main() {
             uint base = lightIdxInPVS * 6u * uint(shadowmapSize) * uint(shadowmapSize);
             uint faceOff = base + face * uint(shadowmapSize) * uint(shadowmapSize);
             vec2 tc = uv * shadowmapSize;
-
             if (shadowsEnabled > 1 && distToPixel < 10.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
@@ -267,7 +266,8 @@ void main() {
                     uint utx = uint(tx);
                     uint uty = uint(ty);
                     uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
-                    float d = shadowMaps[ssbo_index];
+                    uint distInt = shadowMaps[ssbo_index];
+                    float d = float(distInt) / 10000.0;
                     float depthDiff = dist - d - (bias + normalBias);
                     float shadowContrib = depthDiff > 0.0 ? 0.0 : 1.0;
                     sum += shadowContrib * invSamples;
@@ -280,7 +280,8 @@ void main() {
                 uint utx = uint(tx);
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
-                float d = shadowMaps[ssbo_index];
+                uint distInt = shadowMaps[ssbo_index];
+                float d = float(distInt) / 10000.0;
                 float depthDiff = dist - d - (bias + normalBias);
                 shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
             }
@@ -292,6 +293,7 @@ void main() {
         lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor);
     }
 
+    if (unlit > 0) lighting = albedoColor.rgb;
     lighting += glowColor.rgb;
 
     // Fog

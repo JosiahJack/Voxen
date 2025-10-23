@@ -148,12 +148,6 @@ Entity definition is loaded first to populate the
 types list.  The Instances are populated after as
 a product of the level load system.
 
-
-#### Scripting Virtual Machine (VM):
-
-TODO
-
-
 #### Level Load System:
 
 Levels are specified in sets of files for each level data
