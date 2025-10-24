@@ -2302,26 +2302,9 @@ int32_t main(int32_t argc, char* argv[]) {
         if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         
+        //    Shoot mode button
         AddUIImage(GetScreenRelativeX(0.5f) - 32.0f, 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 1.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 2.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 3.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 4.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f - (64.0f * 1.0f), 0.0f, UI_LAYER_2, 64.0f, 64.0f, 1020);
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f - (64.0f * 2.0f), 0.0f, UI_LAYER_2, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f, UI_LAYER_3, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 4.0f), 0.0f, UI_LAYER_3, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 1.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 2.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 3.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 4.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 1.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 2.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 4.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - (64.0f * 2.25f), 0.0f + (64.0f * 0.8f), UI_LAYER_1, 64.0f, 64.0f, 997);
 
-        // Shoot mode button
         glEnable(GL_BLEND);
         glDepthMask(GL_TRUE);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
@@ -2339,14 +2322,14 @@ int32_t main(int32_t argc, char* argv[]) {
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
-        RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
-        RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
-        RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
-        RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
-        RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
+//         RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
+//         RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
+//         RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
+//         RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
+//         RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, "%s",statusText);
 
