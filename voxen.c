@@ -92,6 +92,9 @@ int32_t debugValue = 0;
 float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
+uint32_t textDrawCallsRenderedThisFrame = 0;
+uint32_t uiImageDrawCallsRenderedThisFrame = 0;
+uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsLODArray[INSTANCE_COUNT];
 GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
@@ -754,11 +757,10 @@ void RenderShadowmap(uint16_t lightIdx) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
+            shadowDrawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
-
-    staticLightCount++;
 }
 
 // Renders all static shadowmaps at level load
@@ -815,7 +817,7 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
+    for (uint16_t i = 0; i < loadedLights; ++i) { RenderShadowmap(i); staticLightCount++; }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
@@ -885,8 +887,8 @@ void InitFontAtlasses() {
     DebugRAM("end of font init");
 }
 
-void AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
-    if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return; }
+uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
+    if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return 0; }
     
     uiImages[uiImageCount].x = x;
     uiImages[uiImageCount].y = y;
@@ -896,6 +898,7 @@ void AddUIImage(float x, float y, float z, float width, float height, uint32_t t
     uiImages[uiImageCount].texIndex = texIndex;
     uiImages[uiImageCount].visible = true;
     uiImageCount++;
+    return uiImageCount - 1; // Return index of this just now created image for use on making buttons.
 }
 
 float uiImageVertexData[4096]; // Reusable buffer, adjust size as needed
@@ -908,8 +911,7 @@ void RenderUIImages() {
     glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk, 1u);
     glProgramUniformMatrix4fv(chunkShaderProgram, viewProjLoc_chunk, 1, GL_FALSE, uiOrthoProjection);
 
-    // Sort images by texIndex to minimize state changes
-    // Simple bubble sort for small N
+    // Sort images by texIndex to minimize state changes.  Simple bubble sort for small N
     for (uint32_t i = 0; i < uiImageCount; i++) {
         for (uint32_t j = i + 1; j < uiImageCount; j++) {
             if (uiImages[j].texIndex < uiImages[i].texIndex) {
@@ -924,14 +926,9 @@ void RenderUIImages() {
     while (start < uiImageCount) {
         uint32_t currentTex = uiImages[start].texIndex;
         uint32_t end = start;
-
-        // Find range with same texIndex
-        while (end < uiImageCount && uiImages[end].texIndex == currentTex && uiImages[end].visible)
-            end++;
-
-        // Build vertex buffer for this batch
+        while (end < uiImageCount && uiImages[end].texIndex == currentTex && uiImages[end].visible) end++; // Find range with same texIndex
         size_t vertexCount = 0;
-        for (uint32_t i = start; i < end; i++) {
+        for (uint32_t i = start; i < end; i++) {  // Build vertex buffer for this batch
             if (!uiImages[i].visible) continue;
 
             float x0 = uiImages[i].x;
@@ -953,18 +950,14 @@ void RenderUIImages() {
         }
 
         if (vertexCount > 0) {
-            // Set texture ONCE per batch
             glUniform1ui(texIndexLoc_chunk, currentTex);
             glUniform1ui(glowSpecIndexLoc_chunk, 41);
             glUniform1ui(normInstanceIndexLoc_chunk, 41);
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, (float[16]){1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1});
-
             glNamedBufferData(uiImageVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
-            CHECK_GL_ERROR();
             glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
-            CHECK_GL_ERROR();
-
             drawCallsRenderedThisFrame++;
+            uiImageDrawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += vertexCount * 6;
         }
 
@@ -1129,7 +1122,8 @@ void RenderText(float x, float y, float z, const char *text, int32_t colorIdx) {
         glNamedBufferData(textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
         drawCallsRenderedThisFrame++;
-        verticesRenderedThisFrame += vertexCount * 24;
+        textDrawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += vertexCount * 6;
     }
     
     glBindVertexArray(0);
@@ -1152,6 +1146,8 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) {
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    drawCallsRenderedThisFrame++;
+    verticesRenderedThisFrame += 4;
     glBindTextureUnit(0, 0);
     glUseProgram(0);
     char buffer[256];
@@ -1919,7 +1915,7 @@ void RenderInstances(uint8_t type) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+            verticesRenderedThisFrame += modelVertexCounts[modelType];
         }
     }
     
@@ -2043,6 +2039,9 @@ int32_t main(int32_t argc, char* argv[]) {
         // ====================================================================
         // Client Render
         drawCallsRenderedThisFrame = 0; // Reset per frame
+        textDrawCallsRenderedThisFrame = 0;
+        uiImageDrawCallsRenderedThisFrame = 0;
+        shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
         
         // 0. Clear Frame Buffers and Depth
@@ -2134,6 +2133,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        drawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += 4;
         glEnable(GL_DEPTH_TEST); // Turn on for UI Images
         glBindTextureUnit(0, 0);
         glUseProgram(0);
@@ -2184,7 +2185,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDisable(GL_CULL_FACE);
         RenderUIImages();
-//         glDisable(GL_DEPTH_TEST);
 
         // 9. Render UI Text;
         if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), UI_LAYER_5, TEXT_RED, "PAUSED");
@@ -2196,8 +2196,8 @@ int32_t main(int32_t argc, char* argv[]) {
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#$%^&*()-=+\\/|<> ö ü é ó ...");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...123456789る。エレベーターでレベルを離れよ низкой гравитацией [{end test}]");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
         RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
         RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
@@ -2210,8 +2210,9 @@ int32_t main(int32_t argc, char* argv[]) {
         // Frame stats
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, "Frame time: %.6f (FPS: %d), CPU time: %.6f, Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d",
-                            (time_now - last_time) * 1000.0f,framesPerLastSecond, cpuTime * 1000.0f,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
+        textDrawCallsRenderedThisFrame++;
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, "ms: %.2f, CPU %.2f (FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d",
+                            (time_now - last_time) * 1000.0f,cpuTime * 1000.0f,framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame);
         // End ALL rendering
         // ------------------------------------
         // ====================================
