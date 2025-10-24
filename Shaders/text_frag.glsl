@@ -10,10 +10,10 @@ uniform vec2 texelSize;
 void main() {
     float sdf = texture(textTexture, TexCoord).r;
     if (sdf >= 0.9) {
-        FragColor = vec4(textColor.rgb, 1.0);
-    } else if (sdf >= 0.05) {
-        FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        FragColor = vec4(textColor.rgb, 1.0); // The glyph with textColor
+    } else if (sdf >= 0.00001) {
+        FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Black outline ~1 to 2 pixel width
     } else {
-        FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+        FragColor = vec4(0.0, 0.0, 0.0, 0.0); // Transparent region around glyph
     }
 }

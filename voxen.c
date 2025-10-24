@@ -1,6 +1,6 @@
 // File: voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#define VERSION_STRING "v0.7.1"
+#define VERSION_STRING "v0.7.2"
 #include <malloc.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -20,6 +20,7 @@
 #include "External/stb_image_write.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
+#include <fontconfig/fontconfig.h>
 #define VOXEN_ENGINE_IMPLEMENTATION
 #include "voxen.h"
 #include "citadel.h"
@@ -34,6 +35,13 @@
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
 // #include "Shaders/bluenoise64.cginc"
+static char *xstrdup(const char *s) {
+    size_t len = strlen(s) + 1;
+    char *p = malloc(len);
+    if (p) memcpy(p, s, len);
+    return p;
+}
+#define strdup xstrdup
 // ----------------------------------------------------------------------------
 // Window
 GLFWwindow *window;
@@ -153,8 +161,8 @@ uint32_t uiImageCount = 0;
 GLuint uiImageVAO, uiImageVBO;
 // ----------------------------------------------------------------------------
 // Text
-#define FONT_ATLAS_SIZE 2048
-#define MAX_GLYPHS 8192      // Rough estimate for all ranges
+#define FONT_ATLAS_SIZE 4096
+#define MAX_GLYPHS 16384      // Rough estimate for all ranges
 GLuint textShaderProgram;
 GLuint textVAO, textVBO;
 Color textColors[6] = {
@@ -833,42 +841,152 @@ float GetScreenRelativeY(float percentage) { return (float)screen_height * perce
 void RenderDynamicShadowmaps(void) {}
 // ============================================================================
 // UI Rendering and Text
-void InitFontAtlasses() {
+#define MAX_FALLBACK_FONTS 16
+
+typedef struct {
+    char *path;
+    unsigned char *data;
+    size_t size;
+    stbtt_fontinfo info;
+} LoadedFont;
+
+static stbtt_fontinfo primaryFontInfo;
+static unsigned char *primaryFontData;
+static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
+static int numFallbackFonts = 0;
+
+static char *FindFontFileForCodepoint(uint32_t codepoint) {
+    FcInit();
+    FcCharSet *cs = FcCharSetCreate();
+    FcCharSetAddChar(cs, (FcChar32)codepoint);
+    FcPattern *pat = FcPatternCreate();
+    FcPatternAddCharSet(pat, FC_CHARSET, cs);
+    FcPatternAddInteger(pat, FC_WEIGHT, FC_WEIGHT_BOLD);
+    FcConfigSubstitute(NULL, pat, FcMatchPattern);
+    FcDefaultSubstitute(pat);
+    FcResult result;
+    FcPattern *match = FcFontMatch(NULL, pat, &result);
+    char *file = NULL;
+    if (match) {
+        FcChar8 *file8 = NULL;
+        if (FcPatternGetString(match, FC_FILE, 0, &file8) == FcResultMatch) file = strdup((const char*)file8);
+        FcPatternDestroy(match);
+    }
+    
+    FcPatternDestroy(pat);
+    FcCharSetDestroy(cs);
+    return file;
+}
+
+static LoadedFont *LoadFallbackFont(const char *path) {
+    // Check cache first
+    for (int i = 0; i < numFallbackFonts; i++) {
+        if (strcmp(fallbackFonts[i].path, path) == 0)
+            return &fallbackFonts[i];
+    }
+
+    if (numFallbackFonts >= MAX_FALLBACK_FONTS) return NULL;
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    
+    fseek(f, 0, SEEK_END);
+    size_t size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    unsigned char *data = malloc(size);
+    if (!data) { fclose(f); return NULL; }
+    if (fread(data, 1, size, f) != size) { fclose(f); free(data); return NULL; }
+    
+    fclose(f);
+
+    stbtt_fontinfo info;
+    if (!stbtt_InitFont(&info, data, 0)) { free(data); return NULL; }
+
+    LoadedFont *lf = &fallbackFonts[numFallbackFonts++];
+    lf->path = strdup(path);
+    lf->data = data;
+    lf->size = size;
+    lf->info = info;
+    return lf;
+}
+
+static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont) {
+    int glyph = stbtt_FindGlyphIndex(&primaryFontInfo, codepoint);
+    if (glyph) { *outFont = &primaryFontInfo; return glyph; }
+
+    for (int i = 0; i < numFallbackFonts; i++) {
+        glyph = stbtt_FindGlyphIndex(&fallbackFonts[i].info, codepoint);
+        if (glyph) { *outFont = &fallbackFonts[i].info; return glyph; }
+    }
+
+    char *fontfile = FindFontFileForCodepoint(codepoint);
+    if (!fontfile) return 0;
+    
+    LoadedFont *lf = LoadFallbackFont(fontfile);
+    free(fontfile);
+    if (!lf) return 0;
+
+    glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
+    if (glyph) { *outFont = &lf->info; return glyph; }
+
+    return 0;
+}
+
+void InitFontAtlasses(void) {
     const char* filename = "./Fonts/SystemShockText.ttf";
     FILE *f = fopen(filename, "rb");
     if (!f) { DualLogError("Failed to open font %s\n", filename); exit(1); }
-
     fseek(f, 0, SEEK_END);
-    size_t ttf_size = ftell(f);
+    size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
-    unsigned char *ttf_buffer = malloc(ttf_size);
-    size_t readSize = fread(ttf_buffer, 1, ttf_size, f);
-    if (readSize != ttf_size) { DualLogError("Could not read font %s\n", filename); exit(1); }
+    primaryFontData = malloc(size);
+    if (!primaryFontData) { DualLogError("OOM\n"); exit(1); }
+    if (fread(primaryFontData, 1, size, f) != size) { DualLogError("Read failed\n"); exit(1); }
     
     fclose(f);
+    if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Font init failed\n"); exit(1); }
+
     unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    if (!stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 4, NULL)) { DualLogError("Failed to initialize font packer\n"); exit(1); }
-    
-    stbtt_PackSetOversampling(&pc, 2, 2);
+    stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
+    stbtt_PackSetOversampling(&pc, 8, 8);
     numPackedGlyphs = 0;
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
-            stbtt_PackFontRange(&pc, ttf_buffer, 0, GetScreenRelativeY(genericTextHeightFac), fontRanges[r].first + i, 1, &fontPackedChar[numPackedGlyphs]);
-            numPackedGlyphs++;
-        }
-    }
 
-    // Calculate fixed advance width for digits (0-9)
-    fixedNumberAdvanceWidth = 0.0f;
-    for (int codepoint = '0'; codepoint <= '9'; codepoint++) {
-        int idx = CodepointToPackedIndex(codepoint);
-        if (idx >= 0) {
-            float advance = fontPackedChar[idx].xadvance;
-            if (advance > fixedNumberAdvanceWidth) {
-                fixedNumberAdvanceWidth = advance;
+            uint32_t codepoint = fontRanges[r].first + i;
+            stbtt_fontinfo *font = NULL;
+            int glyph = GetGlyphAndFont(codepoint, &font);
+            if (!glyph) continue;
+
+            float pixelHeight = GetScreenRelativeY(genericTextHeightFac);
+            unsigned char *fontData = (font == &primaryFontInfo) ? primaryFontData
+                : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
+
+            // Scale fallback fonts
+            if (font != &primaryFontInfo) {
+                float fallbackScale = 1.2f; // slightly bigger than primary
+                pixelHeight *= fallbackScale;
+
+                // Compute baseline offset
+                int ascent, descent, lineGap;
+                stbtt_GetFontVMetrics(font, &ascent, &descent, &lineGap);
+                float scale = stbtt_ScaleForPixelHeight(font, pixelHeight);
+                float baselineOffset = scale * (ascent - 2); // lift up by ~2px
+                fontPackedChar[numPackedGlyphs].y0 -= (int)baselineOffset;
+                fontPackedChar[numPackedGlyphs].y1 -= (int)baselineOffset;
+            }
+
+            stbtt_PackFontRange(&pc, fontData, 0, pixelHeight, codepoint, 1, &fontPackedChar[numPackedGlyphs]);
+            int idx = numPackedGlyphs;
+            numPackedGlyphs++;
+
+            if (codepoint >= '0' && codepoint <= '9') {
+                float advance = fontPackedChar[idx].xadvance;
+                if (advance > fixedNumberAdvanceWidth)
+                    fixedNumberAdvanceWidth = advance;
             }
         }
     }
@@ -881,8 +999,15 @@ void InitFontAtlasses() {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    free(ttf_buffer);
     free(atlasBitmap);
+    for (int i = 0; i < numFallbackFonts; i++) {
+        free(fallbackFonts[i].data);
+        free(fallbackFonts[i].path);
+    }
+    numFallbackFonts = 0;
+    free(primaryFontData);
+    primaryFontData = NULL;
+    malloc_trim(0);
     textTexelWidth = 1.0f / (float)FONT_ATLAS_SIZE;
     DebugRAM("end of font init");
 }
@@ -1086,34 +1211,52 @@ void RenderText(float x, float y, float z, const char *text, int32_t colorIdx) {
     float lineSpacing = GetScreenRelativeY(0.03f); // Match RenderUI
     stbtt_aligned_quad q;
     int characterCount = 0;
+    // Define padding for SDF outline (in pixels)
+    float paddingPixels = 12.0f;
+    float paddingUV = paddingPixels / (float)FONT_ATLAS_SIZE;
+    float borderWidthPixels = 2.0f;
+
     while (*p) {
         uint32_t codepoint = DecodeUTF8(&p);
         characterCount++;
-        if (codepoint == '\n' || characterCount > 120) { // Handle newline
+        if (codepoint == '\n' || characterCount > 120) {
             xpos = x;
             ypos += lineSpacing;
             characterCount = 0;
             continue;
         }
+
         int idx = CodepointToPackedIndex(codepoint);
         if (idx < 0) continue;
+
         stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
-        float borderWidthPixels = 2.0f * textTexelWidth;
-        float borderTexels = borderWidthPixels * textTexelWidth;
+
+        // Expand vertex quad
+        float vx0 = q.x0 - borderWidthPixels;
+        float vy0 = q.y0 - borderWidthPixels;
+        float vx1 = q.x1 + borderWidthPixels;
+        float vy1 = q.y1 + borderWidthPixels;
+
+        // Expand UVs by padding
+        float s0 = q.s0 - paddingUV;
+        float t0 = q.t0 - paddingUV;
+        float s1 = q.s1 + paddingUV;
+        float t1 = q.t1 + paddingUV;
+
         float textVertices[30] = {
-            // Triangle 1: Bottom-left, Top-right, Top-left
-            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, z, q.s0 - borderTexels, q.t0 - borderTexels,
-            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, z, q.s1 + borderTexels, q.t1 + borderTexels,
-            q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, z, q.s1 + borderTexels, q.t0 - borderTexels,
-            
-            // Triangle 2: Bottom-left, Top-right, Bottom-right
-            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, z, q.s0 - borderTexels, q.t0 - borderTexels,
-            q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, z, q.s0 - borderTexels, q.t1 + borderTexels,
-            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, z, q.s1 + borderTexels, q.t1 + borderTexels
+            // Triangle 1
+            vx0, vy0, z, s0, t0,
+            vx1, vy1, z, s1, t1,
+            vx1, vy0, z, s1, t0,
+            // Triangle 2
+            vx0, vy0, z, s0, t0,
+            vx0, vy1, z, s0, t1,
+            vx1, vy1, z, s1, t1
         };
+
         memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
         vertexCount++;
-        // Use fixed width for digits
+
         if (codepoint >= '0' && codepoint <= '9') {
             xpos = q.x0 + fixedNumberAdvanceWidth;
         }
