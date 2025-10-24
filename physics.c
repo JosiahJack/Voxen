@@ -367,13 +367,13 @@ static bool capsule_vs_tri(Vector3* cap_center, float half_h, float r, Vector3 t
     return true;
 }
 
-// Check if instance is in 3x3 grid around player
-static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint32_t playerCellIdx) {
+// Check if instance is in 3x3 grid around object
+static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint32_t objectCellIdx) {
     int32_t inst_x = instanceCellIdx % WORLDX; // Convert 1D indices to 2D (x, z)
     int32_t inst_z = instanceCellIdx / WORLDZ;
-    int32_t player_x = playerCellIdx % WORLDX;
-    int32_t player_z = playerCellIdx / WORLDZ;
-    return abs(inst_x - player_x) <= 1 && abs(inst_z - player_z) <= 1;
+    int32_t object_x = objectCellIdx % WORLDX;
+    int32_t object_z = objectCellIdx / WORLDZ;
+    return abs(inst_x - object_x) <= 1 && abs(inst_z - object_z) <= 1;
 }
 
 // ================================= Physics ==================================

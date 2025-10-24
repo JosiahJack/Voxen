@@ -164,12 +164,16 @@ void main() {
         adjustedNormal = normalize(TBN3x3 * normalColor);
     }
 
-    ivec2 texSizeGlow = textureSizes[GlowIndex];
-    vec2 uvGlow = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
-    int xGlow = int(floor(uvGlow.x * float(texSizeGlow.x)));
-    int yGlow = int(floor(uvGlow.y * float(texSizeGlow.y)));
-    ivec2 texUVGlow = ivec2(xGlow,yGlow);
-    vec4 glowColor = getTextureColor(GlowIndex,texUVGlow);
+    vec4 glowColor = vec4(0.0,0.0,0.0,0.0);
+    if (GlowIndex != 41) {
+        ivec2 texSizeGlow = textureSizes[GlowIndex];
+        vec2 uvGlow = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+        int xGlow = int(floor(uvGlow.x * float(texSizeGlow.x)));
+        int yGlow = int(floor(uvGlow.y * float(texSizeGlow.y)));
+        ivec2 texUVGlow = ivec2(xGlow,yGlow);
+        glowColor = getTextureColor(GlowIndex,texUVGlow);
+    }
+
     if (reflectionsEnabled > 0) {
         vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
         ivec2 texSizeSpec = textureSizes[SpecIndex];
@@ -294,7 +298,7 @@ void main() {
     }
 
     if (unlit > 0) lighting = albedoColor.rgb;
-    lighting += glowColor.rgb;
+    else lighting += glowColor.rgb;
 
     // Fog
     float fogFac = clamp(distToPixel * INV_FOG_DIST, 0.0, 1.0);

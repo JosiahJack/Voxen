@@ -983,12 +983,6 @@ bool IsDynamicObject(uint16_t constIndex) {
             || (constIndex >= 465 && constIndex <= 476);
 }
 
-int32_t clamp(int32_t val, int32_t min, int32_t max) {
-    if (val > max) return max;
-    if (val < min) return min;
-    return val;
-}
-
 void SortInstances(void) {
     double start_time = get_time();
     DualLog("Sorting instances...");

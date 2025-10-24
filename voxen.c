@@ -139,7 +139,7 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 #define MAX_UI_IMAGES 1024 // Adjust based on needs
 
 typedef struct {
-    float x, y;        // Top-left corner in screen space (pixels)
+    float x, y, z;        // Top-left corner in screen space (pixels)
     float width, height; // Size in screen space (pixels)
     uint32_t texIndex; // Index into textureOffsets for palettized texture
     bool visible;      // Whether to render this image
@@ -903,16 +903,94 @@ void InitFontAtlasses() {
     DebugRAM("end of font init");
 }
 
-void InitUIImages() {
-    glCreateBuffers(1, &uiImageVBO);
-    glCreateVertexArrays(1, &uiImageVAO);
-    glEnableVertexArrayAttrib(uiImageVAO, 0);
-    glEnableVertexArrayAttrib(uiImageVAO, 1);
-    glVertexArrayAttribFormat(uiImageVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // Position (x, y)
-    glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // UV (s, t)
-    glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 4 * sizeof(float));
-    glVertexArrayAttribBinding(uiImageVAO, 0, 0);
-    glVertexArrayAttribBinding(uiImageVAO, 1, 0);
+void AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
+    if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return; }
+    
+    uiImages[uiImageCount].x = x;
+    uiImages[uiImageCount].y = y;
+    uiImages[uiImageCount].z = z;
+    uiImages[uiImageCount].width = width;
+    uiImages[uiImageCount].height = height;
+    uiImages[uiImageCount].texIndex = texIndex;
+    uiImages[uiImageCount].visible = true;
+    uiImageCount++;
+}
+
+float uiImageVertexData[4096]; // Reusable buffer, adjust size as needed
+void RenderUIImages() {
+    if (uiImageCount == 0) return;
+
+    glUseProgram(chunkShaderProgram);
+    glBindVertexArray(uiImageVAO);
+    glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 1u);
+    glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk, 1u);
+    glProgramUniformMatrix4fv(chunkShaderProgram, viewProjLoc_chunk, 1, GL_FALSE, uiOrthoProjection);
+
+    // Sort images by texIndex to minimize state changes
+    // Simple bubble sort for small N
+    for (uint32_t i = 0; i < uiImageCount; i++) {
+        for (uint32_t j = i + 1; j < uiImageCount; j++) {
+            if (uiImages[j].texIndex < uiImages[i].texIndex) {
+                UIImage temp = uiImages[i];
+                uiImages[i] = uiImages[j];
+                uiImages[j] = temp;
+            }
+        }
+    }
+
+    uint32_t start = 0;
+    while (start < uiImageCount) {
+        uint32_t currentTex = uiImages[start].texIndex;
+        uint32_t end = start;
+
+        // Find range with same texIndex
+        while (end < uiImageCount && uiImages[end].texIndex == currentTex && uiImages[end].visible)
+            end++;
+
+        // Build vertex buffer for this batch
+        size_t vertexCount = 0;
+        for (uint32_t i = start; i < end; i++) {
+            if (!uiImages[i].visible) continue;
+
+            float x0 = uiImages[i].x;
+            float y0 = uiImages[i].y;
+            float z0 = uiImages[i].z;
+            float x1 = x0 + uiImages[i].width;
+            float y1 = y0 + uiImages[i].height;
+            float vertices[30] = {
+                x0, y1, z0, 0.0f, 0.0f,
+                x1, y0, z0, 1.0f, 1.0f,
+                x1, y1, z0, 1.0f, 0.0f,
+                x0, y1, z0, 0.0f, 0.0f,
+                x0, y0, z0, 0.0f, 1.0f,
+                x1, y0, z0, 1.0f, 1.0f
+            };
+
+            memcpy(uiImageVertexData + vertexCount * 30, vertices, sizeof(vertices));
+            vertexCount++;
+        }
+
+        if (vertexCount > 0) {
+            // Set texture ONCE per batch
+            glUniform1ui(texIndexLoc_chunk, currentTex);
+            glUniform1ui(glowSpecIndexLoc_chunk, 41);
+            glUniform1ui(normInstanceIndexLoc_chunk, 41);
+            glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, (float[16]){1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1});
+
+            glNamedBufferData(uiImageVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
+            CHECK_GL_ERROR();
+            glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
+            CHECK_GL_ERROR();
+
+            drawCallsRenderedThisFrame++;
+            verticesRenderedThisFrame += vertexCount * 6;
+        }
+
+        start = end;
+    }
+
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
 
 bool inventoryModeWasActivePriorToConsole = false;
@@ -1334,6 +1412,18 @@ void InitializeEnvironment(void) {
     for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
     glBindVertexArray(0);
     DebugRAM("after vao chunk bind");
+    
+    // VAO for UI Images
+    glCreateBuffers(1, &uiImageVBO);
+    glCreateVertexArrays(1, &uiImageVAO);
+    glEnableVertexArrayAttrib(uiImageVAO, 0);
+    glEnableVertexArrayAttrib(uiImageVAO, 1);
+    glVertexArrayAttribFormat(uiImageVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
+    glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // UV
+    glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 5 * sizeof(float));
+    glVertexArrayAttribBinding(uiImageVAO, 0, 0);
+    glVertexArrayAttribBinding(uiImageVAO, 1, 0);
+    DebugRAM("after ui image vao chunk bind");
 
     // Create Framebuffer
     // First pass gbuffer images
@@ -1380,7 +1470,6 @@ void InitializeEnvironment(void) {
     
     // Text Initialization
     InitFontAtlasses();
-    InitUIImages();
     DebugRAM("stb TTF init");
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
@@ -1774,7 +1863,6 @@ void RenderInstances(uint8_t type) {
                                offsetsArray = modelTypeOffsetsDoubleSided;
                                startOfNextType = startOfTransparentInstances; break;
         case REND_TRANSPARENT: glEnable(GL_BLEND);
-                               glDepthMask(GL_TRUE);
                                glEnable(GL_CULL_FACE);
                                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                                glDepthMask(GL_FALSE);
@@ -1928,7 +2016,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
         double timeSinceLastPhysicsTick = current_time - last_physics_time;
-        if (timeSinceLastPhysicsTick > 0.006944444f) { // 144fps fixed tick rate
+        if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
             last_physics_time = current_time;
             EnqueueEvent_Simple(EV_PHYSICS_TICK);
         }
@@ -1959,8 +2047,9 @@ int32_t main(int32_t argc, char* argv[]) {
         // 0. Clear Frame Buffers and Depth
         if (!gamePaused) glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
-
-        if (!gamePaused) { // !PAUSED BLOCK -------------------------------------------------
+        uiImageCount = 0;
+        
+        if (!gamePaused && !menuActive) { // !PAUSED BLOCK -------------------------------------------------
             // 1. Culling
             Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
             
@@ -2044,7 +2133,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST); // Turn on for UI Images
         glBindTextureUnit(0, 0);
         glUseProgram(0);
         // End world rendering
@@ -2052,25 +2141,49 @@ int32_t main(int32_t argc, char* argv[]) {
         // ====================================
         // HUD
         // UI Common GL traits
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
 
         // UI Common References
         int screenCenterX = screen_width / 2;
         int screenCenterY = screen_height / 2;
         int32_t lineSpacing = GetScreenRelativeY(genericTextHeightFac * 1.0f);
-        int32_t characterWidth = (int32_t)floorf(genericTextHeightFac * 0.75f * screen_height);
-        int32_t characterHeight = (int32_t)floorf(genericTextHeightFac * screen_height);
-        int32_t characterWidthHalf = characterWidth * 0.5f;
-        int32_t characterHeightHalf = characterHeight * 0.5f;
         
         // 8. Render UI Images
-        //    Cursor TODO: Using text + for now until I have UI image system
-        if (CursorVisible()) RenderFormattedText(cursorPosition_x - characterWidthHalf, cursorPosition_y - characterHeightHalf, TEXT_RED, "+");
-        else RenderFormattedText(screenCenterX - characterWidthHalf, screenCenterY - characterHeightHalf, TEXT_GREEN, "+");
+        //    Cursor
+        uint16_t cursorTexture = 1260;
+        if (gamePaused || menuActive) cursorTexture = 1261;
+        float cursorSize = (float)screen_width * CURSOR_SCREEN_PERCENTAGE;
+        float cursorHalfSize = cursorSize * 0.5f;
+        if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
+        else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f, 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 1.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 2.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 3.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 4.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 1.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 2.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 4.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 1.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 2.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 3.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 4.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 1.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 2.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - (64.0f * 2.25f), 0.0f + (64.0f * 0.8f), UI_LAYER_1, 64.0f, 64.0f, 997);
+
+        // Shoot mode button
+        glEnable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
+        RenderUIImages();
+//         glDisable(GL_DEPTH_TEST);
+
         // 9. Render UI Text;
         if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), TEXT_RED, "PAUSED");
         int32_t debugTextStartY = GetScreenRelativeY(0.075f);

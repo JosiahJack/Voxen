@@ -26,12 +26,13 @@ void main() {
     GlowIndex = glowSpecIndex & 0xFFFFu;
     SpecIndex = (glowSpecIndex >> 16);
     NormalIndex = normInstanceIndex;
-    TexCoord = aTexCoord;
     if (isUI > 0) {
-        FragPos = vec3(aPos.xy, 0.02);
-        gl_Position = viewProjection * vec4(aPos.xy, 0.0, 1.0);
+        TexCoord = aNormal.xy; // uiImageVAO only has pos and uvs so uvs are at location 1 (2nd)
+        FragPos = vec3(aPos);
+        gl_Position = viewProjection * vec4(aPos, 1.0);
         Normal = vec3(0.0, 0.0, 1.0);
     } else {
+        TexCoord = aTexCoord;
         vec4 worldPos = matrix * vec4(aPos, 1.0);
         FragPos = vec3(worldPos);
         gl_Position = viewProjection * worldPos;

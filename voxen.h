@@ -335,6 +335,12 @@ static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* 
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
 }
 
+static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
+    if (val > max) return max;
+    if (val < min) return min;
+    return val;
+}
+
 static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
     int32_t max = WORLDX - 1; // 63
     int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
@@ -473,7 +479,15 @@ extern bool global_modIsCitadel;
 extern bool inventoryMode;
 extern bool noclip;
 extern bool consoleActive;
+#define CURSOR_SCREEN_PERCENTAGE 0.05f
 extern int32_t cursorPosition_x, cursorPosition_y;
+#define UI_LAYER_TOP 1.0f
+#define UI_LAYER_5 0.5f
+#define UI_LAYER_4 0.4f
+#define UI_LAYER_3 0.3f
+#define UI_LAYER_2 0.2f
+#define UI_LAYER_1 0.1f
+#define UI_LAYER_0 0.0f
 extern float cam_x, cam_y, cam_z;
 extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
