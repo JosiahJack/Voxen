@@ -502,15 +502,9 @@ void CacheUniformLocationsForShaders(void);
 void Screenshot(void);
 void ToggleConsole(void);
 bool CursorVisible(void);
-int32_t GetScreenRelativeX(float percentage);
-int32_t GetScreenRelativeY(float percentage);
-int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTerminator);
 extern float uiOrthoProjection[16];
 float dot(float x1, float y1, float z1, float x2, float y2, float z2);
-void RenderUI(void);
-void RenderLoadingProgress(int32_t offset, const char* format, ...);
 void ConsoleEmulator(int32_t scancode);
-void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* format, ...);
 void CenterStatusPrint(const char* fmt, ...);
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints

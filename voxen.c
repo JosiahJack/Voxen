@@ -511,27 +511,6 @@ void UpdateInstanceMatrix(int32_t i) {
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
 }
-
-void RenderLoadingProgress(int32_t offset, const char* format, ...) {
-    glUseProgram(imageBlitShaderProgram);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, inputImageID);
-    glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
-    glBindVertexArray(quadVAO);
-    glDisable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    glBindTextureUnit(0, 0);
-    glUseProgram(0);
-    char buffer[256];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-    RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, TEXT_WHITE, buffer);
-    glEnable(GL_DEPTH_TEST);
-    glfwSwapBuffers(window);
-}
 // ============================================================================
 void UpdateScreenSize(void) {
     float* m;
@@ -846,6 +825,9 @@ void RenderShadowmaps(void) {
     DebugRAM("After rendering all shadowmaps");
 }
 
+float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
+float GetScreenRelativeY(float percentage) { return (float)screen_height * percentage; }
+
 void RenderDynamicShadowmaps(void) {}
 // ============================================================================
 // UI Rendering and Text
@@ -1095,7 +1077,7 @@ static uint32_t DecodeUTF8(const char **p) {
 
 float textVertexData[4096]; // Reusable buffer for text vertices.  Most text only needs ~3000
 
-void RenderText(float x, float y, const char *text, int32_t colorIdx) {
+void RenderText(float x, float y, float z, const char *text, int32_t colorIdx) {
     glUseProgram(textShaderProgram);
     glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
     glProgramUniform4f(textShaderProgram, textColorLoc_text, textColors[colorIdx].r, textColors[colorIdx].g, textColors[colorIdx].b, textColors[colorIdx].a);
@@ -1125,18 +1107,18 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
         stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         float borderWidthPixels = 2.0f * textTexelWidth;
         float borderTexels = borderWidthPixels * textTexelWidth;
-        float textVertices[24] = {
+        float textVertices[30] = {
             // Triangle 1: Bottom-left, Top-right, Top-left
-            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
-            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels,
-            q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, q.s1 + borderTexels, q.t0 - borderTexels,
+            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, z, q.s0 - borderTexels, q.t0 - borderTexels,
+            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, z, q.s1 + borderTexels, q.t1 + borderTexels,
+            q.x1 + borderWidthPixels, q.y0 - borderWidthPixels, z, q.s1 + borderTexels, q.t0 - borderTexels,
             
             // Triangle 2: Bottom-left, Top-right, Bottom-right
-            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, q.s0 - borderTexels, q.t0 - borderTexels,
-            q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, q.s0 - borderTexels, q.t1 + borderTexels,
-            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, q.s1 + borderTexels, q.t1 + borderTexels
+            q.x0 - borderWidthPixels, q.y0 - borderWidthPixels, z, q.s0 - borderTexels, q.t0 - borderTexels,
+            q.x0 + borderWidthPixels, q.y1 + borderWidthPixels, z, q.s0 - borderTexels, q.t1 + borderTexels,
+            q.x1 + borderWidthPixels, q.y1 + borderWidthPixels, z, q.s1 + borderTexels, q.t1 + borderTexels
         };
-        memcpy(textVertexData + vertexCount * 24, textVertices, sizeof(textVertices));
+        memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
         vertexCount++;
         // Use fixed width for digits
         if (codepoint >= '0' && codepoint <= '9') {
@@ -1144,7 +1126,7 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
         }
     }
     if (vertexCount > 0) {
-        glNamedBufferData(textVBO, vertexCount * 24 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
+        glNamedBufferData(textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertexCount * 24;
@@ -1153,19 +1135,38 @@ void RenderText(float x, float y, const char *text, int32_t colorIdx) {
     glBindVertexArray(0);
 }
 
-void RenderFormattedText(int32_t x, int32_t y, uint32_t color, const char* format, ...) {
+void RenderFormattedText(float x, float y, float z, uint32_t color, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
     va_end(args);
-    RenderText(x, y, uiTextBuffer, color);
+    RenderText(x, y, z, uiTextBuffer, color);
 }
 
-int32_t GetScreenRelativeX(float percentage) { return (int32_t)floorf((float)screen_width * percentage); }
-int32_t GetScreenRelativeY(float percentage) { return (int32_t)floorf((float)screen_height * percentage); }
-int32_t GetTextHCenter(int32_t pointToCenterOn, int32_t numCharactersNoNullTerminator) {
+void RenderLoadingProgress(int32_t offset, const char* format, ...) {
+    glUseProgram(imageBlitShaderProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, inputImageID);
+    glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
+    glBindVertexArray(quadVAO);
+    glDisable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glBindTextureUnit(0, 0);
+    glUseProgram(0);
+    char buffer[256];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+    RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, UI_LAYER_5, TEXT_WHITE, buffer);
+    glEnable(GL_DEPTH_TEST);
+    glfwSwapBuffers(window);
+}
+
+float GetTextHCenter(float pointToCenterOn, int32_t numCharactersNoNullTerminator) {
     float characterWidth = genericTextHeightFac * 0.75f * screen_height; // Measured some and found between 0.6 and 0.82 in Gimp for width to height ratio.
-    return (pointToCenterOn - (int32_t)( (float)numCharactersNoNullTerminator * 0.5f) * characterWidth); // This could be mid character ;)
+    return (pointToCenterOn - ((float)numCharactersNoNullTerminator * 0.5f) * characterWidth); // This could be mid character ;)
 }
 
 void CenterStatusPrint(const char* fmt, ...) {
@@ -1419,7 +1420,7 @@ void InitializeEnvironment(void) {
     glEnableVertexArrayAttrib(uiImageVAO, 0);
     glEnableVertexArrayAttrib(uiImageVAO, 1);
     glVertexArrayAttribFormat(uiImageVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // UV
+    glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // UV (vec2)
     glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 5 * sizeof(float));
     glVertexArrayAttribBinding(uiImageVAO, 0, 0);
     glVertexArrayAttribBinding(uiImageVAO, 1, 0);
@@ -1475,9 +1476,9 @@ void InitializeEnvironment(void) {
     glCreateVertexArrays(1, &textVAO);    
     glEnableVertexArrayAttrib(textVAO, 0);
     glEnableVertexArrayAttrib(textVAO, 1);
-    glVertexArrayAttribFormat(textVAO, 0, 2, GL_FLOAT, GL_FALSE, 0);                  // pos (x,y) 4 floats per vertex, stride = 4*sizeof(float)
-    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float));  // uv (s,t)
-    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 4 * sizeof(float));
+    glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
+    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
     glVertexArrayAttribBinding(textVAO, 0, 0);
     glVertexArrayAttribBinding(textVAO, 1, 0);
     
@@ -2144,9 +2145,9 @@ int32_t main(int32_t argc, char* argv[]) {
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
 
         // UI Common References
-        int screenCenterX = screen_width / 2;
-        int screenCenterY = screen_height / 2;
-        int32_t lineSpacing = GetScreenRelativeY(genericTextHeightFac * 1.0f);
+        float screenCenterX = (float)screen_width / 2;
+        float screenCenterY = (float)screen_height / 2;
+        float lineSpacing = GetScreenRelativeY(genericTextHeightFac * 1.0f);
         
         // 8. Render UI Images
         //    Cursor
@@ -2157,15 +2158,15 @@ int32_t main(int32_t argc, char* argv[]) {
         if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f, 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 1.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 2.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 3.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 4.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 1.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 2.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 4.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f, 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 1.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 2.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 3.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f + (64.0f * 4.0f), 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f - (64.0f * 1.0f), 0.0f, UI_LAYER_2, 64.0f, 64.0f, 1020);
+        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f - (64.0f * 2.0f), 0.0f, UI_LAYER_2, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f, UI_LAYER_3, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 4.0f), 0.0f, UI_LAYER_3, 64.0f, 64.0f, 1020);
         AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 1.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
         AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 2.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
         AddUIImage(((float)screen_width * 0.5f) - 32.0f + (64.0f * 3.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
@@ -2173,6 +2174,7 @@ int32_t main(int32_t argc, char* argv[]) {
         AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 1.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
         AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 2.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
         AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 3.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
+        AddUIImage(((float)screen_width * 0.5f) - 32.0f - (64.0f * 4.0f), 0.0f + (64.0f * 1.0f), UI_LAYER_0, 64.0f, 64.0f, 1020);
         AddUIImage(((float)screen_width * 0.5f) - (64.0f * 2.25f), 0.0f + (64.0f * 0.8f), UI_LAYER_1, 64.0f, 64.0f, 997);
 
         // Shoot mode button
@@ -2185,29 +2187,30 @@ int32_t main(int32_t argc, char* argv[]) {
 //         glDisable(GL_DEPTH_TEST);
 
         // 9. Render UI Text;
-        if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), TEXT_RED, "PAUSED");
-        int32_t debugTextStartY = GetScreenRelativeY(0.075f);
-        int32_t leftPad = GetScreenRelativeX(0.0125f);
-        RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#$%^&*()-=+\\/|<> ö ü é ó ...");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, "  ...123456789る。エレベーターでレベルを離れよ низкой гравитацией [{end test}]");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), TEXT_WHITE, "Color test:");
-        RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), TEXT_YELLOW, "ylw");
-        RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), TEXT_DARK_YELLOW, "dk ylw");
-        RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), TEXT_GREEN, "grn");
-        RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), TEXT_RED, "red");
-        RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), TEXT_ORANGE, "orng");
-        if (consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, "%s",statusText);
+        if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), UI_LAYER_5, TEXT_RED, "PAUSED");
+
+        float debugTextStartY = GetScreenRelativeY(0.075f);
+        float leftPad = GetScreenRelativeX(0.0125f);
+        RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#$%^&*()-=+\\/|<> ö ü é ó ...");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...123456789る。エレベーターでレベルを離れよ низкой гравитацией [{end test}]");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
+        RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
+        RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
+        RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
+        RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
+        RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
+        if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, "] %s",consoleEntryText);
+        if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, "%s",statusText);
 
         // Frame stats
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, TEXT_WHITE, "Frame time: %.6f (FPS: %d), CPU time: %.6f, Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d",
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, "Frame time: %.6f (FPS: %d), CPU time: %.6f, Draw calls: %d [Geo %d, UI %d], Verts: %d, Worst FPS: %d",
                             (time_now - last_time) * 1000.0f,framesPerLastSecond, cpuTime * 1000.0f,drawCallsRenderedThisFrame,drawCallsNormal, drawCallsRenderedThisFrame - drawCallsNormal,verticesRenderedThisFrame,worstFPS);
         // End ALL rendering
         // ------------------------------------
