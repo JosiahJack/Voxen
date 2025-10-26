@@ -1,8 +1,6 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
-
-// Debug and Compile Flags
-// #define DEBUG_RAM_OUTPUT
+// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
@@ -21,13 +19,10 @@ typedef struct { float r,g,b,a; } Color;
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
-// #include <fluidlite.h> TODO Add midi support
-// #include <libxmi.h>
 
 // ----------------------------------------------------------------------------
 // Audio
 #include "./External/miniaudio.h"
-// void play_midi(const char* midi_path); TODO Add midi support
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
 // ----------------------------------------------------------------------------
@@ -467,6 +462,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 #define TEXT_RED 4
 #define TEXT_ORANGE 5
 #define TEXT_BUFFER_SIZE 1024
+#define BTN_SHOOT_MODE 10
 extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
@@ -479,7 +475,7 @@ extern bool global_modIsCitadel;
 extern bool inventoryMode;
 extern bool noclip;
 extern bool consoleActive;
-#define CURSOR_SCREEN_PERCENTAGE 0.05f
+#define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 #define UI_LAYER_TOP 1.0f
 #define UI_LAYER_5 0.5f
@@ -497,7 +493,6 @@ extern GLuint imageBlitShaderProgram;
 extern GLint debugViewLoc_quadblit, debugValueLoc_quadblit;
 extern GLint debugViewLoc_chunk, debugValueLoc_chunk;
 void InitFontAtlasses();
-float quat_angle_deg(Quaternion a, Quaternion b);
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);
 void ToggleConsole(void);

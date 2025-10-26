@@ -32,7 +32,6 @@ layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
-// layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
@@ -305,7 +304,7 @@ void main() {
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
-    lighting = mix(fogColor, lighting, 1.0 - fogFac);
+    if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac);
 
 //     if (debugView == 1) {
 //         outAlbedo = albedoColor;

@@ -824,16 +824,6 @@ void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float*
     }
 }
 
-static inline float quat_dot(Quaternion a, Quaternion b) {
-    return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
-}
-
-float quat_angle_deg(Quaternion a, Quaternion b) {
-    float d = fabsf(quat_dot(a, b));
-    if (d > 1.0f) d = 1.0f;
-    return acosf(d) * 2.0f * (180.0f / (float)M_PI);
-}
-
 //----------------------------------- Level -----------------------------------
 void LoadLevelGeometry(uint8_t curlevel) {
     double start_time = get_time();

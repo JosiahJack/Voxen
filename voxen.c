@@ -1,7 +1,6 @@
 // File: voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #define VERSION_STRING "v0.7.2"
-#include <malloc.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -14,8 +13,6 @@
 #include <time.h>
 #include <enet/enet.h>
 #include "External/miniaudio.h"
-// #include <fluidlite.h> // Temporarily disabled midi support until wav+mp3 is working.
-// #include <libxmi.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -34,7 +31,6 @@
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
-// #include "Shaders/bluenoise64.cginc"
 static char *xstrdup(const char *s) {
     size_t len = strlen(s) + 1;
     char *p = malloc(len);
@@ -62,6 +58,7 @@ uint8_t settings_Reflections = 1u; // Default 1
 uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
+bool settings_Vsync = false;
 float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
 // Instances
@@ -105,7 +102,7 @@ uint32_t uiImageDrawCallsRenderedThisFrame = 0;
 uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsLODArray[INSTANCE_COUNT];
-GLuint inputImageID, inputNormalsID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
+GLuint inputImageID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 // ----------------------------------------------------------------------------
 // Shaders
 //    Chunk Geometery Unlit Raster Shader
@@ -114,7 +111,6 @@ GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowSpecIndexLoc_chunk, normInstanceIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
       worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk,
       isUILoc_chunk, unlitLoc_chunk;
-GLuint blueNoiseBuffer;
 float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 
 //    Shadowmap Rastered Depth Shader
@@ -124,9 +120,7 @@ GLuint shadowmapsShaderProgram;
 GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightPosLoc_shadowmaps, ssbo_indexBaseLoc_shadowmaps, shadowmapSizeLoc_shadowmaps;
 GLuint shadowMapSSBO; // SSBO for storing all shadow maps
 bool shadowMapsRendered = false;
-uint32_t lightIsDynamic[LIGHT_COUNT + 31 / 32] = {0};
-uint16_t staticLightCount = 0;
-uint16_t staticLightIndices[LIGHT_COUNT];
+uint32_t lightIsDynamic[LIGHT_COUNT + 31 / 32] = {0}; // TODO  Handle dynamic animated lights; and their shadowmaps
 
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
@@ -162,7 +156,7 @@ GLuint uiImageVAO, uiImageVBO;
 // ----------------------------------------------------------------------------
 // Text
 #define FONT_ATLAS_SIZE 4096
-#define MAX_GLYPHS 16384      // Rough estimate for all ranges
+#define MAX_GLYPHS 8192      // Rough estimate for all ranges
 GLuint textShaderProgram;
 GLuint textVAO, textVBO;
 Color textColors[6] = {
@@ -177,7 +171,6 @@ Color textColors[6] = {
 float uiOrthoProjection[16];
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 GLint projectionLoc_text, textColorLoc_text, textTextureLoc_text, texelSizeLoc_text;
-
 bool consoleActive = false;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
 char statusText[TEXT_BUFFER_SIZE];
@@ -185,7 +178,6 @@ int statusTextLengthWithoutNullTerminator = 6;
 float statusTextDecayFinished = 0.0f;
 float genericTextHeightFac = 0.025f;
 int32_t currentEntryLength = 0;
-
 GLuint fontAtlasTex;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 int numPackedGlyphs = 0;
@@ -204,13 +196,12 @@ static GlyphRange fontRanges[] = {
     {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
     // add other ranges here
 };
+
 static int numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
 
 static int CodepointToPackedIndex(int codepoint) {
     for (int i = 0; i < numFontRanges; i++) {
-        if (codepoint >= fontRanges[i].first && codepoint < fontRanges[i].first + fontRanges[i].count) {
-            return fontRanges[i].startIndex + (codepoint - fontRanges[i].first);
-        }
+        if (codepoint >= fontRanges[i].first && codepoint < fontRanges[i].first + fontRanges[i].count) return fontRanges[i].startIndex + (codepoint - fontRanges[i].first);
     }
     return -1; // not found
 }
@@ -233,8 +224,7 @@ bool log_playback = false;
 Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
 Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
 int32_t eventJournalIndex;
-int32_t eventIndex; // Event that made it to the counter.  Indices below this were
-                // already executed and walked away from the counter.
+int32_t eventIndex; // Event that made it to the counter.  Indices below this were already executed and walked away from the counter.
 int32_t eventQueueEnd; // End of the waiting line
 const double time_step = 1.0 / 60.0; // 60fps
 double last_time = 0.0;
@@ -244,15 +234,11 @@ bool journalFirstWrite = true;
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_CHANNELS 64
-// fluid_synth_t* midi_synth;
 ma_engine audio_engine;
 ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
-
-// Usage:
-//play_mp3("./Audio/music/looped/track1.mp3",0.08f,0); // WORKED!
-//play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); // WORKED!
+// Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 // ----------------------------------------------------------------------------
 // Networking
 typedef enum {
@@ -318,7 +304,6 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, in
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
     glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture(target, 0);
-    CHECK_GL_ERROR();
 }
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
@@ -374,12 +359,6 @@ void CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
-
-//     glGenBuffers(1, &blueNoiseBuffer);
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, blueNoiseBuffer);
-//     glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
-//     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, blueNoiseBuffer); // Use binding point 13
-//     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
     // Cache uniform locations after shader compile!
     viewProjLoc_chunk = glGetUniformLocation(chunkShaderProgram, "viewProjection");
@@ -825,13 +804,13 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    for (uint16_t i = 0; i < loadedLights; ++i) { RenderShadowmap(i); staticLightCount++; }
+    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
     malloc_trim(0);
     shadowMapsRendered = true;
-    DualLog(" took %f seconds to render %d static shadow maps\n", get_time() - start_time, staticLightCount);
+    DualLog(" took %f seconds to render %d static shadow maps\n", get_time() - start_time, loadedLights);
     DebugRAM("After rendering all shadowmaps");
 }
 
@@ -855,8 +834,16 @@ static unsigned char *primaryFontData;
 static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
 static int numFallbackFonts = 0;
 
+static FcConfig *fontCfg = NULL;
+static void ShutdownFontconfig(void) {
+    if (fontCfg) {
+        FcConfigDestroy(fontCfg);
+        fontCfg = NULL;
+    }
+}
+
 static char *FindFontFileForCodepoint(uint32_t codepoint) {
-    FcInit();
+    if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
     FcCharSet *cs = FcCharSetCreate();
     FcCharSetAddChar(cs, (FcChar32)codepoint);
     FcPattern *pat = FcPatternCreate();
@@ -879,10 +866,8 @@ static char *FindFontFileForCodepoint(uint32_t codepoint) {
 }
 
 static LoadedFont *LoadFallbackFont(const char *path) {
-    // Check cache first
-    for (int i = 0; i < numFallbackFonts; i++) {
-        if (strcmp(fallbackFonts[i].path, path) == 0)
-            return &fallbackFonts[i];
+    for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
+        if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
     }
 
     if (numFallbackFonts >= MAX_FALLBACK_FONTS) return NULL;
@@ -898,7 +883,6 @@ static LoadedFont *LoadFallbackFont(const char *path) {
     if (fread(data, 1, size, f) != size) { fclose(f); free(data); return NULL; }
     
     fclose(f);
-
     stbtt_fontinfo info;
     if (!stbtt_InitFont(&info, data, 0)) { free(data); return NULL; }
 
@@ -933,6 +917,7 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont) {
 }
 
 void InitFontAtlasses(void) {
+    double font_start_time = get_time();
     const char* filename = "./Fonts/SystemShockText.ttf";
     FILE *f = fopen(filename, "rb");
     if (!f) { DualLogError("Failed to open font %s\n", filename); exit(1); }
@@ -982,11 +967,9 @@ void InitFontAtlasses(void) {
             stbtt_PackFontRange(&pc, fontData, 0, pixelHeight, codepoint, 1, &fontPackedChar[numPackedGlyphs]);
             int idx = numPackedGlyphs;
             numPackedGlyphs++;
-
             if (codepoint >= '0' && codepoint <= '9') {
                 float advance = fontPackedChar[idx].xadvance;
-                if (advance > fixedNumberAdvanceWidth)
-                    fixedNumberAdvanceWidth = advance;
+                if (advance > fixedNumberAdvanceWidth) fixedNumberAdvanceWidth = advance;
             }
         }
     }
@@ -1000,6 +983,7 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     free(atlasBitmap);
+    ShutdownFontconfig();
     for (int i = 0; i < numFallbackFonts; i++) {
         free(fallbackFonts[i].data);
         free(fallbackFonts[i].path);
@@ -1010,6 +994,7 @@ void InitFontAtlasses(void) {
     malloc_trim(0);
     textTexelWidth = 1.0f / (float)FONT_ATLAS_SIZE;
     DebugRAM("end of font init");
+    DualLog("font init took %f\n",get_time() - font_start_time);
 }
 
 uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
@@ -1093,14 +1078,16 @@ void RenderUIImages() {
     glUseProgram(0);
 }
 
-bool inventoryModeWasActivePriorToConsole = false;
 void ToggleConsole(void) {
+    static bool inventoryModeWasActivePriorToConsole = false;
     if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
     consoleActive = !consoleActive; // Tilde
     if (consoleActive) inventoryMode = true;
     else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
         inventoryMode = false;
-    } 
+        cursorPosition_x = (float)screen_width * 0.5f;
+        cursorPosition_y = (float)screen_height * 0.5f;
+    }
 }
 
 bool CursorVisible(void) {
@@ -1318,7 +1305,6 @@ void CenterStatusPrint(const char* fmt, ...) {
 }
 // ============================================================================
 // Audio
-// void InitializeAudio(const char* soundfont_path) {
 int32_t InitializeAudio() {
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
@@ -1329,35 +1315,8 @@ int32_t InitializeAudio() {
         DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
         return 1;
     }
-    
-//     fluid_settings_t* settings = new_fluid_settings();
-//     midi_synth = new_fluid_synth(settings);
-//     fluid_synth_sfopen(midi_synth, soundfont_path); // e.g., "./SoundFonts/FluidR3_GM.sf2"
     return 0;
 }
-
-// Temporarily disabled midi support until wav+mp3 is working.
-// void play_midi(const char* midi_path) {
-//     // Convert XMI to MIDI if needed
-//     void* midi_data; size_t midi_size;
-//     if (strstr(midi_path, ".xmi")) {
-//         xmi2midi(midi_path, &midi_data, &midi_size);
-//     } else {
-//         // Load MIDI directly
-//         FILE* f = fopen(midi_path, "rb");
-//         fseek(f, 0, SEEK_END);
-//         midi_size = ftell(f);
-//         rewind(f);
-//         midi_data = malloc(midi_size);
-//         fread(midi_data, 1, midi_size, f);
-//         fclose(f);
-//     }
-//     // Render MIDI to PCM, feed to miniaudio
-//     short pcm[44100 * 2]; // Stereo, 1 second
-//     fluid_synth_write_s16(midi_synth, 44100, pcm, 0, 2, pcm, 1, 2);
-//     ma_sound_init_from_data_source(&audio_engine, pcm, sizeof(pcm), NULL, NULL);
-//     free(midi_data);
-// }
 
 void play_mp3(const char* path, float volume, int32_t fade_in_ms) {
     static int32_t current_sound = 0;
@@ -1453,6 +1412,13 @@ void NewGame(void) {
     VoxelLists();    
 }
 
+static const float quadBlit_vertices[] = {
+     1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
+     1.0f,  1.0f, 1.0f, 1.0f, // Top-right
+    -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
+    -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
+};
+
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");    
@@ -1464,26 +1430,20 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
     if (!window) { DualLogError("glfwCreateWindow failed\n"); glfwTerminate(); exit(1); }
-    
     glfwMakeContextCurrent(window);
     UpdateScreenSize();
     DebugRAM("window init");
-    int monitor_count = 0;
-    /*GLFWmonitor** monitors = */glfwGetMonitors(&monitor_count);
-    if (monitor_count > 0) {
-        GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
-        // TODO: Make configurable, e.g., via argc/argv: int target_idx = 0; /* parse from args */; target_monitor = monitors[target_idx];
-        if (target_monitor) {
-            const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
-            int mx, my;
-            glfwGetMonitorPos(target_monitor, &mx, &my);
-            // Center the window on the monitor (windowed mode)
-            int xpos = mx + (mode->width - screen_width) / 2;
-            int ypos = my + (mode->height - screen_height) / 2;
-            glfwSetWindowPos(window, xpos, ypos);
-            DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\n", glfwGetMonitorName(target_monitor), xpos, ypos);
-        }
-    }
+    GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
+    if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
+        const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
+        int mx, my;
+        glfwGetMonitorPos(target_monitor, &mx, &my);
+        // Center the window on the monitor (windowed mode)
+        int xpos = mx + (mode->width - screen_width) / 2;
+        int ypos = my + (mode->height - screen_height) / 2;
+        glfwSetWindowPos(window, xpos, ypos);
+        DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\n", glfwGetMonitorName(target_monitor), xpos, ypos);
+    } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
     
     stbi_flip_vertically_on_write(1);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -1492,11 +1452,11 @@ void InitializeEnvironment(void) {
 
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
-    DualLog("OpenGL Version: %s\n", version ? (const char*)version : "unknown");
-    DualLog("Renderer: %s\n", renderer ? (const char*)renderer : "unknown");
-
-    int32_t vsync_enable = 0;//1; // Set to 0 for false.
-    glfwSwapInterval(vsync_enable);
+    if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
+    
+    DualLog("OpenGL Version: %s\n", (const char*)version);
+    DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");
+    glfwSwapInterval(settings_Vsync ? 1 : 0);
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
     glfwSetWindowFocusCallback(window, window_focus_callback);
@@ -1525,15 +1485,8 @@ void InitializeEnvironment(void) {
     glUseProgram(0);
         
     // Setup full screen quad for image blit for post processing effects like lighting.
-    float vertices[] = {
-         1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
-         1.0f,  1.0f, 1.0f, 1.0f, // Top-right
-        -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
-        -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
-    };
-    
     glCreateBuffers(1, &quadVBO);
-    glNamedBufferData(quadVBO, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
     glCreateVertexArrays(1, &quadVAO);
     glEnableVertexArrayAttrib(quadVAO, 0);
     glEnableVertexArrayAttrib(quadVAO, 1);
@@ -1570,16 +1523,12 @@ void InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    
     glGenTextures(1, &outputImageID);
     glBindTexture(GL_TEXTURE_2D, outputImageID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR) DualLogError("Failed to create texture SSR: OpenGL error %d\n", error);
-    
     glGenFramebuffers(1, &gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
@@ -1958,18 +1907,6 @@ int32_t EventQueueProcess(void) {
     return 0;
 }
 
-int32_t EventInit(void) {
-    journalFirstWrite = true;
-
-    // Initialize the eventQueue as empty
-    clear_ev_queue();
-    clear_ev_journal(); // Initialize the event journal as empty.
-    eventQueue[eventIndex].type = EV_NULL;
-    eventQueue[eventIndex].timestamp = get_time();
-    eventQueue[eventIndex].deltaTime_ns = 0.0;
-    return 0;
-}
-
 typedef struct {
     uint16_t index;
     float depth;
@@ -2125,8 +2062,12 @@ int32_t main(int32_t argc, char* argv[]) {
     DualLog("Voxen "
             VERSION_STRING
             " by W. Josiah Jack, MIT-0 licensed\n");
-    if (EventInit()) return 1;
-
+    journalFirstWrite = true;
+    clear_ev_queue();  // Initialize the eventQueue as empty
+    clear_ev_journal(); // Initialize the event journal as empty.
+    eventQueue[eventIndex].type = EV_NULL;
+    eventQueue[eventIndex].timestamp = get_time();
+    eventQueue[eventIndex].deltaTime_ns = 0.0;
     if (argc == 3 && strcmp(argv[1], "play") == 0) { // Log playback
         DualLog("Playing log: %s\n", argv[2]);
         activeLogFile = fopen(argv[2], "rb");
@@ -2136,7 +2077,7 @@ int32_t main(int32_t argc, char* argv[]) {
             log_playback = true; // Perform log playback.
         }
     } else if (argc == 3 && strcmp(argv[1], "record") == 0) { // Log record
-        manualLogName = argv[2];
+        manualLogName = argv[2]; // TODO: Add manual log naming support from cli arg.
     }
 
     InitializeEnvironment();
@@ -2302,16 +2243,23 @@ int32_t main(int32_t argc, char* argv[]) {
         if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         
-        //    Shoot mode button
-        AddUIImage(GetScreenRelativeX(0.5f) - 32.0f, 0.0f, UI_LAYER_0, 64.0f, 64.0f, 1020);
-
+        float shootModePos_x = GetScreenRelativeX(0.5f) - 32.0f, shootModePos_y = 0.0f, shootModeWidth = 22.4f, shootModeHeight = 22.4f;
+        AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, 22.4f, 22.4f, 1020); // Shoot mode button
+        if (inventoryMode) {
+            if (cursorPosition_x <= shootModePos_x + shootModeWidth && cursorPosition_x >= shootModePos_x
+                && cursorPosition_y <= shootModePos_y + shootModeHeight && cursorPosition_y >= shootModePos_y) {
+                if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+                    DualLog("Clicked the Shoot Mode button %u\n", globalFrameNum);
+                }
+            }
+        }
         glEnable(GL_BLEND);
         glDepthMask(GL_TRUE);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDisable(GL_CULL_FACE);
         RenderUIImages();
-
+        
         // 9. Render UI Text;
         if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), UI_LAYER_5, TEXT_RED, "PAUSED");
 
@@ -2322,14 +2270,14 @@ int32_t main(int32_t argc, char* argv[]) {
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
-//         RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
-//         RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
-//         RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
-//         RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
-//         RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
+        RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
+        RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
+        RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
+        RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
+        RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, "%s",statusText);
 
