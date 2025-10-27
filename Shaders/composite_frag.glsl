@@ -19,6 +19,15 @@ uniform uint skyVisible;
 uniform uint planetaryBodiesVisible;
 uniform uint groveShieldVisible;
 uniform uint stationShieldVisible;
+uniform uint empEffectActive;
+const float vhsBlurAmount = 0.65;
+const float vhsRadiusMax = 3.0;         // e.g. 6.0 (max pixel radius in px)
+const float staticIntensity = 0.0;      // 0.0 .. 1.0
+const float staticBandThickness = 0.005;  // 0.0 .. 1.0 (percent of screen height)
+const float staticScrollSpeedX = 200.0;    // px/sec or normalized units
+const float staticScrollSpeedY = 4.0;    // px/sec or normalized units
+const vec3  staticColor = vec3(1.0, 0.0, 0.0);          // color of static (rgb)
+const float staticNoiseScale = 5.4;     // noise frequency for per-band noise
 
 const int SSR_RES = 4;
 const float PI = 3.14159265359;
@@ -125,12 +134,128 @@ vec3 lerp(vec3 a, vec3 b, float t) {
     return mix(a, b, clamp(t, 0.0, 1.0));
 }
 
+vec3 rgb2yuv(vec3 c) {
+    float y = dot(c, vec3(0.299, 0.587, 0.114));
+    float u = c.b - y;
+    float v = c.r - y;
+    return vec3(y, u, v);
+}
+vec3 yuv2rgb(vec3 yuv) {
+    float y = yuv.x;
+    float r = y + yuv.z;
+    float g = (y - 0.299*y - 0.114*y + 0.587*y); // approximate fallback
+    // better convert directly:
+    r = y + yuv.z;
+    float b = y + yuv.y;
+    float gg = (y - 0.2126*r - 0.0722*b) / 0.7152; // fallback safe-ish
+    // simpler and robust:
+    return vec3(r, clamp(gg, 0.0, 1.0), b);
+}
+
+// A cheap separable VHS-like kernel. No subpixel sampling. Tuned for horizontal smear.
+vec3 vhsBlur(vec2 uv) {
+    // pixel size
+    vec2 px = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
+    float radiusPx = vhsRadiusMax * vhsBlurAmount; // 0..vhsRadiusMax px
+    if (radiusPx < 0.5) return texture(tex, uv).rgb;
+
+    // sample offsets (symmetric but with stronger horizontal lobes)
+    // relative offsets in px
+    const int N = 7;
+    float offs[N] = float[N]( -4.0, -2.0, -1.0, 0.0, 1.0, 2.0, 4.0 );
+    float w[N]    = float[N](  0.05, 0.12, 0.20, 0.26, 0.20, 0.12, 0.05 );
+
+    // normalize weights in case radius small
+    float wsum = 0.0;
+    for (int i=0;i<N;i++) wsum += w[i];
+    for (int i=0;i<N;i++) w[i] /= wsum;
+
+    // do luma + chroma different radii
+    float chromaScale = 1.9; // chroma blur wider (VHS)
+    vec3 accumY = vec3(0.0);
+    vec2 uvH = uv;
+    vec2 uvV = uv;
+
+    // horizontal dominant pass
+    for (int i=0;i<N;i++) {
+        float o = offs[i] * (radiusPx / 4.0); // scale offsets by radius
+        vec2 sampleUV = uv + vec2(o * px.x, 0.0);
+        vec3 s = texture(tex, sampleUV).rgb;
+        vec3 yuv = rgb2yuv(s);
+        // apply different weight to chroma
+        accumY += vec3(yuv.x, yuv.y * chromaScale, yuv.z * chromaScale) * w[i];
+    }
+
+    // small vertical softening to avoid hard horizontal streaks
+    // 3-tap vertical
+    float vW0 = 0.5, vW1 = 0.25, vW2 = 0.25;
+    vec3 vertAccum = vec3(0.0);
+    vertAccum += rgb2yuv(texture(tex, uv + vec2(0.0, -1.0 * px.y)).rgb) * vW1;
+    vertAccum += rgb2yuv(texture(tex, uv).rgb) * vW0;
+    vertAccum += rgb2yuv(texture(tex, uv + vec2(0.0, 1.0 * px.y)).rgb) * vW2;
+
+    // combine horizontal dominant chroma and vertical luma blend
+    // convert accumY back to rgb approximately
+    vec3 combined;
+    // accumY.x is luma-like, but we used chroma scaled in y and z channels of accumY vector
+    vec3 reconstructYUV = vec3(accumY.x, (accumY.y + vertAccum.y) * 0.5, (accumY.z + vertAccum.z) * 0.5);
+    combined = yuv2rgb(reconstructYUV);
+    return clamp(combined, 0.0, 1.0);
+}
+
+float bandNoise(vec2 uv, float bandIndex) {
+    // coarse noise per band
+    float n = snoise(vec2(bandIndex * 0.5, uv.x * staticNoiseScale + timeVal * 0.05));
+    // high freq speckle inside band
+    float speck = snoise(uv * 200.0 + timeVal * 10.0) * 0.5 + 0.5;
+    return clamp(n * 0.6 + speck * 0.4, 0.0, 1.0);
+}
+
+vec3 bandedStatic(vec2 uv) {
+    float baseThickness = clamp(staticBandThickness, 0.001, 1.0);
+    float screenY = uv.y * float(screenHeight);
+    float scroll = timeVal * staticScrollSpeedX;
+    float thicknessPx = baseThickness * float(screenHeight);
+
+    // vertical band index (scrolls)
+    float bandCoord = (screenY + scroll) / thicknessPx;
+    float bandIndex = floor(bandCoord);
+
+    // use staticIntensity to reduce gaps (higher intensity → smaller gaps)
+    float cluster = snoise(vec2(bandIndex * 0.05, timeVal * 5.2));
+    float minGap = 0.1; // min empty space fraction
+    float maxGap = 0.9; // max empty space fraction
+    float gapFrac = mix(maxGap, minGap, staticIntensity); 
+    cluster = smoothstep(0.0, 1.0, cluster);
+    cluster = step(gapFrac, cluster); // band visible if cluster > gapFrac
+
+    // per-band horizontal modulation
+    float horiz = snoise(vec2(uv.x * 2.0 * staticScrollSpeedY, bandIndex * 0.5 + timeVal * 0.1)) * 0.5 + 0.5;
+
+    // vertical drift
+    float verticalDrift = snoise(vec2(bandIndex * 0.15, timeVal * 0.03)) * 400.0;
+    float driftedBandCoord = (screenY + scroll + verticalDrift) / thicknessPx;
+    float driftedFrac = fract(driftedBandCoord);
+
+    // soft edges
+    float edgeSoft = smoothstep(0.0, 0.1, driftedFrac) * (1.0 - smoothstep(0.9, 1.0, driftedFrac));
+
+    float speck = snoise(uv * 200.0 + timeVal * 10.0) * 0.5 + 0.5;
+    float bandNoiseVal = snoise(vec2(bandIndex * 0.3, uv.x * 5.0 + timeVal * 0.1));
+    float intensity = mix(bandNoiseVal, speck, 0.6) * edgeSoft * cluster * horiz;
+
+    return staticColor * intensity;
+}
+
 void main() {
-    vec4 color = texture(tex, TexCoord).rgba;
+    vec2 texCoordUsed = TexCoord;
+    if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0;
+    vec4 color = texture(tex, texCoordUsed).rgba;
+    
     bool isSky = (color.a > 0.19 && color.a < 0.21 && skyVisible > 0); // Sky hack alpha
     float mappedLat = 0.0;
     if (isSky) {
-        vec2 ndc = TexCoord * 2.0 - 1.0;
+        vec2 ndc = texCoordUsed * 2.0 - 1.0;
         float aspect = float(screenWidth) / float(screenHeight);
         float fovRad = fov * PI / 180.0; // Convert FOV to radians
         float tanHalfFov = tan(fovRad * 0.5);
@@ -267,7 +392,7 @@ void main() {
 
 //     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
-    ivec2 pixel = ivec2(TexCoord * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
+    ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
 //     if (debugView == 0) {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
@@ -285,10 +410,10 @@ void main() {
             // SMAA-Inspired Edge-Directed Antialiasing
             // Compute luminance for edge detection
             vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
-            vec3 centerColor = texture(tex, TexCoord).rgb;
+            vec3 centerColor = texture(tex, texCoordUsed).rgb;
             float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114)); // Luminance (Rec. 601)
-            vec3 dx = texture(tex, TexCoord + vec2(pixelSize.x, 0.0)).rgb - texture(tex, TexCoord - vec2(pixelSize.x, 0.0)).rgb;
-            vec3 dy = texture(tex, TexCoord + vec2(0.0, pixelSize.y)).rgb - texture(tex, TexCoord - vec2(0.0, pixelSize.y)).rgb;
+            vec3 dx = texture(tex, texCoordUsed + vec2(pixelSize.x, 0.0)).rgb - texture(tex, texCoordUsed - vec2(pixelSize.x, 0.0)).rgb;
+            vec3 dy = texture(tex, texCoordUsed + vec2(0.0, pixelSize.y)).rgb - texture(tex, texCoordUsed - vec2(0.0, pixelSize.y)).rgb;
             float lumaDx = dot(abs(dx), vec3(0.299, 0.587, 0.114));
             float lumaDy = dot(abs(dy), vec3(0.299, 0.587, 0.114));
             float gradientMag = lumaDx + lumaDy; // Luminance-based gradient magnitude
@@ -306,7 +431,7 @@ void main() {
                     float t = float(i) / float(sampleCount); // Normalized position [-1, 1]
                     float dist = t * 2.0; // Distance along edge
                     float weight = exp(-abs(t) * 2.0); // Gaussian weight (sigma = 0.5)
-                    vec2 sampleUV = TexCoord + orthoDir * dist * pixelSize;
+                    vec2 sampleUV = texCoordUsed + orthoDir * dist * pixelSize;
                     sampleColor += texture(tex, sampleUV).rgb * weight;
                     aaWeightSum += weight;
                 }
@@ -318,7 +443,18 @@ void main() {
             }
         }
 
+        // VHS Blur
+        if (vhsBlurAmount > 0.0) {
+            vec3 blurred = vhsBlur(texCoordUsed);
+            aaColor = mix(aaColor, blurred, clamp(vhsBlurAmount, 0.0, 1.0));
+        }
+
+        // Banded Static
+        if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed);
+
+        // Gamma/Brightness Setting
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
+
         FragColor = vec4(aaColor, 1.0);
 //     } else if (debugView == 7 || debugView == 10) {
 //         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);

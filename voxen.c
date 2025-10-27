@@ -72,6 +72,7 @@ uint8_t settings_Reflections = 1u; // Default 1
 uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
+uint8_t settings_VolumeMusic = 20u;
 bool settings_Vsync = false;
 float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
@@ -820,7 +821,7 @@ float GetScreenRelativeY(float percentage) { return (float)screen_height * perce
 void RenderDynamicShadowmaps(void) {}
 // ============================================================================
 // UI Rendering and Text
-#define MAX_FALLBACK_FONTS 16
+#define MAX_FALLBACK_FONTS 32
 
 typedef struct {
     char *path;
@@ -835,12 +836,6 @@ static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
 static int numFallbackFonts = 0;
 
 static FcConfig *fontCfg = NULL;
-static void ShutdownFontconfig(void) {
-    if (fontCfg) {
-        FcConfigDestroy(fontCfg);
-        fontCfg = NULL;
-    }
-}
 
 static char *FindFontFileForCodepoint(uint32_t codepoint) {
     if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
@@ -912,7 +907,6 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont) {
 
     glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
     if (glyph) { *outFont = &lf->info; return glyph; }
-
     return 0;
 }
 
@@ -983,7 +977,7 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     free(atlasBitmap);
-    ShutdownFontconfig();
+    if (fontCfg) { FcConfigDestroy(fontCfg); fontCfg = NULL; }
     for (int i = 0; i < numFallbackFonts; i++) {
         free(fallbackFonts[i].data);
         free(fallbackFonts[i].path);
@@ -1406,7 +1400,8 @@ void NewGame(void) {
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     glClearColor(0.0f, 0.0f, 0.0f, 0.2f);
-    VoxelLists();    
+    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
+    VoxelLists();
 }
 
 static const float quadBlit_vertices[] = {
@@ -1587,6 +1582,7 @@ void InitializeEnvironment(void) {
     LoadModels();
     RenderLoadingProgress(100,"Loading entities...");
     LoadEntities(); // Must be after models and textures else entity types can't be validated.
+    play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -2147,9 +2143,9 @@ int32_t main(int32_t argc, char* argv[]) {
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, outputImageID);
         glProgramUniform1i(imageBlitShaderProgram, outputImageLoc_imageBlit, 4);
-        glProgramUniform1ui(imageBlitShaderProgram, skyVisibleLoc_imageBlit, 1u);
-        glProgramUniform1ui(imageBlitShaderProgram, planetaryBodiesVisibleLoc_imageBlit, 1u);
-        glProgramUniform1ui(imageBlitShaderProgram, groveShieldVisibleLoc_imageBlit, (currentLevel >= 10 && currentLevel < 13) ? 1u : 0u);
+        glProgramUniform1ui(imageBlitShaderProgram, skyVisibleLoc_imageBlit, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || currentLevel == 13);
+        glProgramUniform1ui(imageBlitShaderProgram, planetaryBodiesVisibleLoc_imageBlit, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && currentLevel != 13);
+        glProgramUniform1ui(imageBlitShaderProgram, groveShieldVisibleLoc_imageBlit, ((currentLevel >= 10 && currentLevel < 13) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
         uint32_t shieldOnType = 0u; // No shield green tint.
         if (questData.ShieldActivated) {
             if (currentLevel == 6 || currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
@@ -2184,7 +2180,13 @@ int32_t main(int32_t argc, char* argv[]) {
         float screenCenterY = (float)screen_height / 2;
         float lineSpacing = GetScreenRelativeY(genericTextHeightFac * 1.0f);
         
-        // 8. Render UI Images
+        // 8. UI
+        glEnable(GL_BLEND);
+        glDepthMask(GL_TRUE);
+        glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
+        
         //    Cursor
         uint16_t cursorTexture = 1260;
         if (gamePaused || menuActive) cursorTexture = 1261;
@@ -2193,8 +2195,10 @@ int32_t main(int32_t argc, char* argv[]) {
         if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         
-        float shootModePos_x = GetScreenRelativeX(0.5f) - 32.0f, shootModePos_y = 0.0f, shootModeWidth = 22.4f, shootModeHeight = 22.4f;
-        AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, 22.4f, 22.4f, 1020); // Shoot mode button
+        float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
+        float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
+        float shootModePos_y = 0.0f;
+        AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
         if (inventoryMode) {
             if (cursorPosition_x <= shootModePos_x + shootModeWidth && cursorPosition_x >= shootModePos_x
                 && cursorPosition_y <= shootModePos_y + shootModeHeight && cursorPosition_y >= shootModePos_y) {
@@ -2203,35 +2207,42 @@ int32_t main(int32_t argc, char* argv[]) {
                 }
             }
         }
-        glEnable(GL_BLEND);
-        glDepthMask(GL_TRUE);
-        glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDisable(GL_CULL_FACE);
-        RenderUIImages();
         
-        // 9. Render UI Text;
-        if (gamePaused) RenderFormattedText(screenCenterX - (genericTextHeightFac * lineSpacing), screenCenterY - GetScreenRelativeY(0.30f), UI_LAYER_5, TEXT_RED, "PAUSED");
-
+//         if (gamePaused) {
+            float textCenter = screenCenterX - (genericTextHeightFac * lineSpacing) - GetScreenRelativeX(0.03f);
+            RenderFormattedText(textCenter, screenCenterY - GetScreenRelativeY(0.3f),   UI_LAYER_5, TEXT_RED, "PAUSED");
+            RenderFormattedText(textCenter, screenCenterY - GetScreenRelativeY(0.05f),   UI_LAYER_5, TEXT_RED, "RESUME");
+            RenderFormattedText(textCenter + GetScreenRelativeX(0.02f), screenCenterY + GetScreenRelativeY(0.00f),    UI_LAYER_5, TEXT_RED, "LOAD");
+            RenderFormattedText(textCenter + GetScreenRelativeX(0.02f), screenCenterY + GetScreenRelativeY(0.08f),    UI_LAYER_5, TEXT_RED, "SAVE");
+            RenderFormattedText(textCenter + GetScreenRelativeX(0.05f),  screenCenterY + GetScreenRelativeY(0.16f),   UI_LAYER_5, TEXT_RED, "OPTIONS");
+            RenderFormattedText(textCenter + GetScreenRelativeX(-0.015f), screenCenterY + GetScreenRelativeY(0.24f), UI_LAYER_5, TEXT_RED, "QUIT TO MENU");
+            RenderFormattedText(textCenter + GetScreenRelativeX(-0.015f), screenCenterY + GetScreenRelativeY(0.40f),   UI_LAYER_5, TEXT_RED, "QUIT GAME");
+            float pauseBGWidth = GetScreenRelativeX(0.3f), pauseBGHeight = GetScreenRelativeY(0.42f);
+            AddUIImage(screenCenterX - (pauseBGWidth * 0.5f), screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.1f), UI_LAYER_0, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background (infopanel.png)
+//             AddUIImage(screenCenterX - (pauseBGWidth * 0.5f), screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.1f), UI_LAYER_1, pauseBGWidth, pauseBGHeight, 1086); // Pause Menu background (infopanel.png)
+//         }
+        
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
-        RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
-        RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
-        RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
-        RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
-        RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
+//         RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
+//         RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
+//         RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
+//         RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
+//         RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, "%s",statusText);
 
-        // Frame stats
+        RenderUIImages();
+        
+        // Frame stats (AFTER EVERYTHING ELSE)
         double time_now = get_time();
         drawCallsRenderedThisFrame++; // Add one more for this text render ;)
         textDrawCallsRenderedThisFrame++;
