@@ -2182,9 +2182,10 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // 8. UI
         glEnable(GL_BLEND);
-        glDepthMask(GL_TRUE);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
+        glDepthMask(GL_TRUE);
         glDisable(GL_CULL_FACE);
         
         //    Cursor
@@ -2212,9 +2213,9 @@ int32_t main(int32_t argc, char* argv[]) {
             float textCenter = screenCenterX - (genericTextHeightFac * lineSpacing) - GetScreenRelativeX(0.03f);
             RenderFormattedText(textCenter, screenCenterY - GetScreenRelativeY(0.3f),   UI_LAYER_5, TEXT_RED, "PAUSED");
             RenderFormattedText(textCenter, screenCenterY - GetScreenRelativeY(0.05f),   UI_LAYER_5, TEXT_RED, "RESUME");
-            RenderFormattedText(textCenter + GetScreenRelativeX(0.02f), screenCenterY + GetScreenRelativeY(0.00f),    UI_LAYER_5, TEXT_RED, "LOAD");
-            RenderFormattedText(textCenter + GetScreenRelativeX(0.02f), screenCenterY + GetScreenRelativeY(0.08f),    UI_LAYER_5, TEXT_RED, "SAVE");
-            RenderFormattedText(textCenter + GetScreenRelativeX(0.05f),  screenCenterY + GetScreenRelativeY(0.16f),   UI_LAYER_5, TEXT_RED, "OPTIONS");
+            RenderFormattedText(textCenter + GetScreenRelativeX(0.01f), screenCenterY + GetScreenRelativeY(0.00f),    UI_LAYER_5, TEXT_RED, "LOAD");
+            RenderFormattedText(textCenter + GetScreenRelativeX(0.01f), screenCenterY + GetScreenRelativeY(0.08f),    UI_LAYER_5, TEXT_RED, "SAVE");
+            RenderFormattedText(textCenter + GetScreenRelativeX(-0.008f),  screenCenterY + GetScreenRelativeY(0.16f),   UI_LAYER_5, TEXT_RED, "OPTIONS");
             RenderFormattedText(textCenter + GetScreenRelativeX(-0.015f), screenCenterY + GetScreenRelativeY(0.24f), UI_LAYER_5, TEXT_RED, "QUIT TO MENU");
             RenderFormattedText(textCenter + GetScreenRelativeX(-0.015f), screenCenterY + GetScreenRelativeY(0.40f),   UI_LAYER_5, TEXT_RED, "QUIT GAME");
             float pauseBGWidth = GetScreenRelativeX(0.3f), pauseBGHeight = GetScreenRelativeY(0.42f);
@@ -2240,6 +2241,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, "%s",statusText);
 
+        glDepthMask(GL_TRUE);
         RenderUIImages();
         
         // Frame stats (AFTER EVERYTHING ELSE)

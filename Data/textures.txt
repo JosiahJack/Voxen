@@ -2181,10 +2181,6 @@ index: 1077
 index: 1078
 #Textures/UI/slider.png
 index: 1079
-#Textures/UI/teleportstatic_red.png
-index: 1084
-#Textures/UI/teleportstatic_white.png
-index: 1085
 #Textures/UI/vaporizebutton_outline_dark.png
 index: 1086
 #Textures/UI/vaporizebutton_outline.png
