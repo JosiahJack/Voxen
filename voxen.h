@@ -39,7 +39,7 @@ typedef struct {
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;
-    uint16_t index;
+    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     bool active;
     bool solid;
     bool cardchunk;

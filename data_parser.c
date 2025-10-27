@@ -368,9 +368,16 @@ static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filen
         while ((c = fgetc(file)) != EOF && c != '\n');
     }
 
-    if (entry_count == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
-
-    allocate_entries(parser, entry_count);
+    if (entry_count == 0) { DualLogError("No entries found in %s\n", filename); exit(1); }
+    if (entry_count > MAX_ENTRIES) { DualLogError("Entry count %d exceeds %d\n", entry_count, MAX_ENTRIES); exit(1); }
+    
+    if (entry_count > parser->capacity) {
+        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
+        parser->entries = new_entries;
+        for (int32_t i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
+        parser->capacity = entry_count;
+    }
+    parser->count = entry_count;
 
     // Second pass: parse entries
     rewind(file);
@@ -1115,9 +1122,81 @@ void LoadLevelGeometry(uint8_t curlevel) {
 
     DebugRAM("start of LoadLevelGeometry");
     char filename[64];
-    snprintf(filename, sizeof(filename), "./Data/CitadelScene_geometry_level%d.txt", curlevel);
-    if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
+    snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
+    FILE *file = fopen(filename, "r");
+    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); exit(1); }
 
+    int32_t entry_count = 0;
+    bool is_comment, is_eof, is_newline;
+    int32_t c;
+    uint32_t lineNum = 0;
+    while ((c = fgetc(file)) != EOF) { // First pass: count entries
+        if (data_parser_isspace(c) || c == '\n') continue;
+        if (c == '/' && (c = fgetc(file)) == '/') {
+            while ((c = fgetc(file)) != EOF && c != '\n');
+            continue;
+        }
+        entry_count++;
+        while ((c = fgetc(file)) != EOF && c != '\n');
+    }
+
+    if (entry_count == 0) { DualLogError("No entries found in %s\n", filename); exit(1); }
+    if (entry_count > MAX_ENTRIES) { DualLogError("Entry count %d exceeds %d\n", entry_count, MAX_ENTRIES); exit(1); }
+    
+    if (entry_count > level_parser.capacity) {
+        Entity *new_entries = realloc(level_parser.entries, entry_count * sizeof(Entity));  
+        level_parser.entries = new_entries;
+        for (int32_t i = level_parser.capacity; i < entry_count; ++i) init_data_entry(&level_parser.entries[i]);
+        level_parser.capacity = entry_count;
+    }
+    level_parser.count = entry_count;
+
+    // Second pass: parse entries
+    rewind(file);
+    int32_t current_index = 0;
+    lineNum = 0;
+    char token[1024];
+    Entity entry;
+    init_data_entry(&entry);
+    while (!feof(file)) {
+        if (!read_token(file, token, sizeof(token), '|', &is_comment, &is_eof, &is_newline, &lineNum)) {
+            if (is_comment) { lineNum++; continue; }
+            
+            if (is_newline) {
+                if (current_index < level_parser.count) level_parser.entries[current_index++] = entry;
+                init_data_entry(&entry);
+                lineNum++;
+            }
+            
+            if (is_eof) break;
+            continue;
+        }
+
+        char *colon = strchr(token, ':');
+        if (colon) {
+            *colon = '\0';
+            char *key = token;
+            char *value = colon + 1;
+            process_key_value(&entry, key, value, token, lineNum);
+        } else {
+            strncpy(entry.path, token, sizeof(entry.path) - 1);
+            entry.path[sizeof(entry.path) - 1] = '\0';
+        }
+
+        if (is_newline) {
+            if (current_index < level_parser.count) level_parser.entries[current_index++] = entry;
+            init_data_entry(&entry);
+            lineNum++;
+        }
+    }
+
+    // Store last entry
+    if (entry.path[0] && current_index < level_parser.count) { level_parser.entries[current_index] = entry; current_index++; }
+    fclose(file);
+    
+    
+
+    
     uint16_t gameObjectCount = level_parser.count;
     DualLog("Loading %d geometry chunks for Level %d...",gameObjectCount,curlevel);
     float correctionX, correctionY, correctionZ;
