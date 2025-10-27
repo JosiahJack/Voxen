@@ -44,6 +44,7 @@
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
+
 static char *xstrdup(const char *s) {
     size_t len = strlen(s) + 1;
     char *p = malloc(len);
