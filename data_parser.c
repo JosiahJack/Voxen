@@ -1,21 +1,51 @@
-#include <malloc.h>
-#include <ctype.h>
-#include <string.h>
-#include <stdint.h>
-#include <stdbool.h>
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_MAX_DIMENSIONS 2048
+#include "External/stb_image.h"
 #include <stdlib.h>
-#include <stdio.h>
+#include <sys/stat.h>
 #include <errno.h>
-#include <GL/glew.h>
+#include <uthash.h>
+#include <omp.h>
+#include <math.h>
+#include "voxen.h"
+#include "citadel.h"
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <assimp/version.h>
-#include <math.h>
-#include <omp.h>
-#include "voxen.h"
-#include "citadel.h"
 
+DataParser texture_parser; // Zero initialized by C default.
+DataParser model_parser;
+DataParser level_parser;
+DataParser entity_parser;
+DataParser lights_parser;
+DataParser dynamics_parser;
+
+// Textures
+typedef struct {
+    uint32_t color;
+    uint8_t index;
+    UT_hash_handle hh;
+} ColorEntry;
+
+GLuint colorBufferID = 0;
+GLuint textureSizesID = 0;
+GLuint textureOffsetsID = 0;
+GLuint texturePalettesID = 0;
+GLuint texturePaletteOffsetsID = 0;
+uint32_t* textureOffsets = NULL;
+uint32_t* texturePaletteOffsets = NULL;
+uint32_t* texturePalettes = NULL;
+uint32_t totalPixels = 0;
+uint32_t totalPaletteColors = 0;
+int* textureSizes = NULL;
+uint16_t loadedTextures = 0;
+bool* doubleSidedTexture = NULL;
+bool* transparentTexture = NULL;
+unsigned char** image_data = NULL;
+
+// Models
 uint32_t* modelVertexCounts = NULL;
 uint32_t* modelTriangleCounts = NULL;
 uint16_t* modelTypeCountsOpaque = NULL;
@@ -32,8 +62,6 @@ GLuint* vbos = NULL;
 GLuint* tbos = NULL;
 GLuint modelBoundsID;
 float* modelBounds = NULL;
-float * tempVertices;
-uint32_t * tempTriangles;
 uint16_t renderableCount = 0;
 uint16_t loadedInstances = 0;
 uint16_t loadedModels = 0;
@@ -42,21 +70,17 @@ uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
 uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
 uint16_t doubleSidedInstancesHead = 0;
 uint16_t transparentInstancesHead = 0;
-DataParser model_parser;
-DataParser level_parser;
-DataParser lights_parser;
-DataParser dynamics_parser;
+
+// Entities
+Entity entities[MAX_ENTITIES]; // Global array of entity definitions
+int32_t entityCount = 0;            // Number of entities loaded
 uint16_t physHead = 0;
 
-void parser_init(DataParser *parser) {
-    parser->entries = NULL;
-    parser->count = 0;
-    parser->capacity = 0;
-}
+static int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
     if (str == NULL || *str == '\0') { fprintf(stderr, "Invalid input blank string, from line[%d]: %s\n", lineNum, line); return 0; }
-    while (isspace((unsigned char)*str)) str++;
+    while (data_parser_isspace((unsigned char)*str)) str++;
     if (*str == '-') { fprintf(stderr, "Invalid input, negative not allowed (%s), from line: %s\n", str, line); return 0; }
     char* endptr;
     errno = 0;
@@ -90,50 +114,6 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
     float val = strtof(str, &endptr);
     if (errno != 0 || endptr == str || *endptr != '\0') { fprintf(stderr, "Invalid float input %s, from line[%d]: %s\n", str, lineNum, line); return 0.0f; }
     return val;
-}
-
-uint8_t parse_saveablestring(const char* value, const char* line, uint32_t lineNum) {
-    if (value == NULL || *value == '\0') { fprintf(stderr, "Invalid float input blank string, from line[%d]: %s\n", lineNum, line); return 36; }
-
-    if (strcmp(value, "Player") == 0) return 0;
-    if (strcmp(value, "Useable") == 0) return 1;
-    if (strcmp(value, "Grenade") == 0) return 2;
-    if (strcmp(value, "NPC") == 0) return 3;
-    if (strcmp(value, "Destructable") == 0) return 4;
-    if (strcmp(value, "SearchableStatic") == 0) return 5;
-    if (strcmp(value, "SearchableDestructable") == 0) return 6;
-    if (strcmp(value, "Door") == 0) return 7;
-    if (strcmp(value, "ForceBridge") == 0) return 8;
-    if (strcmp(value, "Switch") == 0) return 9;
-    if (strcmp(value, "FuncWall") == 0) return 10;
-    if (strcmp(value, "TeleDest") == 0) return 11;
-    if (strcmp(value, "LBranch") == 0) return 12;
-    if (strcmp(value, "LRelay") == 0) return 13;
-    if (strcmp(value, "LSpawner") == 0) return 14;
-    if (strcmp(value, "InteractablePanel") == 0) return 15;
-    if (strcmp(value, "ElevatorPanel") == 0) return 16;
-    if (strcmp(value, "Keypad") == 0) return 17;
-    if (strcmp(value, "PuzzleGrid") == 0) return 18;
-    if (strcmp(value, "PuzzleWire") == 0) return 19;
-    if (strcmp(value, "TCounter") == 0) return 20;
-    if (strcmp(value, "TGravity") == 0) return 21;
-    if (strcmp(value, "MChanger") == 0) return 22;
-    if (strcmp(value, "GravPad") == 0) return 23;
-    if (strcmp(value, "TransformParentless") == 0) return 24;
-    if (strcmp(value, "ChargeStation") == 0) return 25;
-    if (strcmp(value, "Light") == 0) return 26;
-    if (strcmp(value, "LTimer") == 0) return 27;
-    if (strcmp(value, "Camera") == 0) return 28;
-    if (strcmp(value, "DelayedSpawn") == 0) return 29;
-    if (strcmp(value, "SecurityCamera") == 0) return 30;
-    if (strcmp(value, "Trigger") == 0) return 31;
-    if (strcmp(value, "Projectile") == 0) return 32;
-    if (strcmp(value, "NormalScreen") == 0) return 33;
-    if (strcmp(value, "CyberSwitch") == 0) return 34;
-    if (strcmp(value, "CyberItem") == 0) return 35;
-    if (strcmp(value, "Transform") == 0) return 36;
-    DualLogError("Unknown saveableType '%s' at line %u: %s\n", value, lineNum, line);
-    return 36; // Default to Transform
 }
 
 void init_data_entry(Entity *entry) {
@@ -173,8 +153,8 @@ void allocate_entries(DataParser *parser, int32_t entry_count) {
 bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
     if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
     
-    while (isspace((unsigned char)*key)) key++;
-    while (isspace((unsigned char)*value)) value++;
+    while (data_parser_isspace((unsigned char)*key)) key++;
+    while (data_parser_isspace((unsigned char)*value)) value++;
     char trimmed_key[256];
     char trimmed_value[1024];
     strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
@@ -183,15 +163,13 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     trimmed_value[sizeof(trimmed_value) - 1] = '\0';
     char *key_end = trimmed_key + strlen(trimmed_key) - 1;
     char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-    while (key_end > trimmed_key && isspace((unsigned char)*key_end)) *key_end-- = '\0';
-    while (val_end > trimmed_value && isspace((unsigned char)*val_end)) *val_end-- = '\0';
-
+    while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
+    while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
     if (strncmp(trimmed_key, "chunk_", 6) == 0) {
         strncpy(entry->path, trimmed_key, sizeof(entry->path) - 1);
         entry->path[sizeof(entry->path) - 1] = '\0';
         return true;
     }
-
          if (strcmp(trimmed_key, "index") == 0)           entry->index = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "constIndex") == 0)      entry->index = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "model") == 0)           entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
@@ -203,8 +181,8 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     else if (strcmp(trimmed_key, "transparent") == 0)     entry->transparent = parse_bool(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "cardchunk") == 0)       entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
-    else if (strcmp(trimmed_key, "levelcount") == 0)      { numLevels = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
-    else if (strcmp(trimmed_key, "startlevel") == 0)      { startLevel = parse_numberu8(trimmed_value, line, lineNum); entry->index = 0; }
+    else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "startlevel") == 0)      startLevel = parse_numberu8(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "lod") == 0)             entry->lodIndex = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->position.x = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->position.y = parse_float(trimmed_value, line, lineNum);
@@ -227,22 +205,10 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     else if (strcmp(trimmed_key, "color.r") == 0)         entry->color.r = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "color.g") == 0)         entry->color.g = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "color.b") == 0)         entry->color.b = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "saveableType") == 0)    entry->saveableType = parse_saveablestring(trimmed_value, line, lineNum); // TODO
     else if (strcmp(trimmed_key, "go.activeSelf") == 0)   entry->active = parse_bool(trimmed_value, line, lineNum);
     else return false;
     return true;
 }
-
-// TODO: Figure out how to handle info_ressurection_points that needed to live outside the levels:
-// Level R -27.386 -55.488 26.5941
-// Level 1 40.903 -42.372 -30.78
-// Level 2 30.67407 -25.832 10.21412
-// Level 3 38.26813 -15.498 20.37825
-// Level 4 -19.48 -7.928 22.954
-// Level 5 -24.358 12.5956 31.8497
-// Level 6 -22.3568 33.7845 -30.728
-// Level 7 2.228084 50.95243 7.532025
-// Level 9.1_resdest 2.303 106.77 -38.554 (I don't remember what this is for, cheat spawn from `load 9`??)
 
 bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum) {
     *is_comment = false;
@@ -250,7 +216,7 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
     *is_newline = false;
     size_t pos = 0;
     int32_t c;
-    while ((c = fgetc(file)) != EOF && isspace(c) && c != '\n');
+    while ((c = fgetc(file)) != EOF && data_parser_isspace(c) && c != '\n');
     if (c == EOF) { *is_eof = true; return false; }
     if (c == '\n') { *is_newline = true; return false; }
     
@@ -269,6 +235,42 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
     return pos > 0;
 }
 
+// Load Game/Mod Definition
+void ParseGameData() {
+    const char* filename = "./Data/gamedata.txt";
+    DualLog("Loading game definition from %s...",filename);    
+    Entity entry;
+    init_data_entry(&entry);
+    FILE *gamedatfile = fopen(filename, "r");
+    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); exit(1); }
+    
+    uint32_t lineNum = 0;
+    bool is_eof;
+    while (!feof(gamedatfile)) {
+        char token[1024];
+        bool is_comment, is_newline;
+        if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
+            if (is_comment || is_newline) {
+                if (is_newline) lineNum += 1;
+                continue;
+            }
+        }
+        
+        char key[256];
+        strncpy(key, token, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+        if (!read_token(gamedatfile, token, sizeof(token), '\n', &is_comment, &is_eof, &is_newline, &lineNum)) continue;
+        
+        process_key_value(&entry, key, token, key, lineNum);
+        lineNum += 1;
+    }
+    
+    fclose(gamedatfile);
+    if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
+    currentLevel = startLevel;
+    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
+}
+
 static bool ParseResourceData(DataParser *parser, FILE* file, const char *filename) {
     char line[1024];
     uint32_t lineNum = 0;
@@ -277,16 +279,16 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;        
         char *start = line;
-        while (isspace((unsigned char)*start)) start++;
+        while (data_parser_isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
-        while (end > start && isspace((unsigned char)*end)) *end-- = '\0';
+        while (end > start && data_parser_isspace((unsigned char)*end)) *end-- = '\0';
         if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
         if (line[0] == '#') { entry_count++; continue; }
 
         char *colon = strchr(start, ':');
         if (colon && strncmp(start, "index", colon - start) == 0) {
             char *value = colon + 1;
-            while (isspace((unsigned char)*value)) value++;
+            while (data_parser_isspace((unsigned char)*value)) value++;
             uint32_t idx = parse_numberu32(value, line, lineNum);
             if (idx > max_index) max_index = idx;
        }
@@ -303,9 +305,9 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
     while (fgets(line, sizeof(line), file)) {
         lineNum++;
         char *start = line;
-        while (isspace((unsigned char)*start)) start++;
+        while (data_parser_isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
-        while (end > start && isspace((unsigned char)*end)) *end-- = '\0';
+        while (end > start && data_parser_isspace((unsigned char)*end)) *end-- = '\0';
         if (*start == '\0') continue; // Skip empty line
         if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
 
@@ -329,8 +331,8 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
             *colon = '\0';
             char *key = start;
             char *value = colon + 1;
-            while (isspace((unsigned char)*key)) key++;
-            while (isspace((unsigned char)*value)) value++;
+            while (data_parser_isspace((unsigned char)*key)) key++;
+            while (data_parser_isspace((unsigned char)*value)) value++;
             if (*key && *value) {
                 process_key_value(&entry, key, value, start, lineNum);
             } else {
@@ -357,7 +359,7 @@ static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filen
     int32_t c;
     uint32_t lineNum = 0;
     while ((c = fgetc(file)) != EOF) { // First pass: count entries
-        if (isspace(c) || c == '\n') continue;
+        if (data_parser_isspace(c) || c == '\n') continue;
         if (c == '/' && (c = fgetc(file)) == '/') {
             while ((c = fgetc(file)) != EOF && c != '\n');
             continue;
@@ -423,13 +425,283 @@ bool parse_data_file(DataParser *parser, const char *filename, int32_t type) {
     else return ParseResourceData(parser, file, filename);
 }
 
+bool isDoubleSided(uint32_t texIndexToCheck) {
+    if (texIndexToCheck > loadedTextures) return false;
+    return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
+}
+bool isTransparent(uint32_t texIndexToCheck) {
+    if (texIndexToCheck > loadedTextures) return false;
+    return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
+}
+
+//-----------------------------------------------------------------------------
+// Load all Textures
+void LoadTextures(void) {
+    double start_time = get_time();
+    DualLog("Loading textures");
+    DebugRAM("start of LoadTextures");
+    loadedTextures = 0;
+    uint16_t numTexturesOver256PaletteSize = 0;
+    if (!parse_data_file(&texture_parser, "./Data/textures.txt", 0)) { DualLogError("Could not parse ./Data/textures.txt!\n"); exit(1); }
+
+    int32_t maxIndex = -1;
+    for (int32_t k = 0; k < texture_parser.count; k++) {
+        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) {
+            maxIndex = texture_parser.entries[k].index;
+        }
+    }
+
+    loadedTextures = maxIndex + 1;
+    if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
+
+    DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);
+    image_data            =   malloc(loadedTextures * sizeof(unsigned char*));
+    textureOffsets        = calloc(loadedTextures, sizeof(uint32_t));
+    textureSizes          = calloc(loadedTextures * 2, sizeof(int));
+    texturePaletteOffsets = calloc(loadedTextures, sizeof(uint32_t));
+    doubleSidedTexture    = calloc(loadedTextures,sizeof(bool));
+    transparentTexture    = calloc(loadedTextures,sizeof(bool));
+    size_t maxFileSize = 512000;
+    uint32_t totalPaletteColorsExtraSized = 80000;
+    texturePalettes             = malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
+    int32_t* widths             = malloc(loadedTextures * sizeof(int32_t));
+    int32_t* heights            = malloc(loadedTextures * sizeof(int32_t));
+    int32_t* matchedParserIdxes = malloc(loadedTextures * sizeof(int32_t));
+
+    // Initialize arrays
+    for (int32_t i = 0; i < loadedTextures; i++) {
+        image_data[i] = NULL;
+        widths[i] = 0;
+        heights[i] = 0;
+        matchedParserIdxes[i] = -1;
+    }
+
+    // Match parser entries to indices
+    for (int32_t k = 0; k < texture_parser.count; k++) {
+        if (texture_parser.entries[k].index < loadedTextures) {
+            matchedParserIdxes[texture_parser.entries[k].index] = k;
+        }
+    }
+    
+    int num_threads = omp_get_max_threads();
+    uint8_t** file_buffer_pool = malloc(num_threads * sizeof(uint8_t*));
+    for (int i = 0; i < num_threads; i++) file_buffer_pool[i] = malloc(maxFileSize);
+
+    #pragma omp parallel
+    {
+        int thread_id = omp_get_thread_num();
+        uint8_t* file_buffer = file_buffer_pool[thread_id];
+        #pragma omp for schedule(dynamic)
+        for (int32_t i = 0; i < loadedTextures; i++) {
+            if (matchedParserIdxes[i] < 0) continue;
+            struct stat file_stat;
+            if (stat(texture_parser.entries[matchedParserIdxes[i]].path, &file_stat) != 0) { DualLogError("Failed to stat %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, strerror(errno)); continue; }
+                
+            size_t file_size = file_stat.st_size;
+            if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdxes[i]].path, file_size); continue; }
+            
+            FILE* fp = fopen(texture_parser.entries[matchedParserIdxes[i]].path, "rb");
+            if (!fp) { DualLogError("Failed to open %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, strerror(errno)); continue; }
+            
+            fread(file_buffer, 1, file_size, fp);
+            fclose(fp);
+            int w, h, n;
+            image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, STBI_rgb_alpha);
+            if (!image_data[i]) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, stbi_failure_reason()); continue; }
+            
+            widths[matchedParserIdxes[i]] = w;
+            heights[matchedParserIdxes[i]] = h;
+            doubleSidedTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].doublesided > 0 ? 1 : 0;
+            transparentTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].transparent > 0 ? 1 : 0;
+        }
+    }
+
+    for (int i = 0; i < num_threads; i++) free(file_buffer_pool[i]);
+    free(file_buffer_pool);
+    malloc_trim(0);
+
+    // Initialize OpenGL buffers
+    GLuint stagingBuffer;
+    glGenBuffers(1, &stagingBuffer);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, (((MAX_TEXTURE_DIMENSION * MAX_TEXTURE_DIMENSION) + 3) / 4) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
+
+    glGenBuffers(1, &texturePalettesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColorsExtraSized * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+
+    glGenBuffers(1, &colorBufferID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
+    uint32_t max_total_pixels = 45100000; // From colorBufferSize
+    int32_t colorBufferSize = (((int32_t)max_total_pixels + 3) / 4) * sizeof(uint32_t);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, colorBufferSize, NULL, GL_STATIC_DRAW);
+    ColorEntry* color_pool = malloc(loadedTextures * MAX_PALETTE_SIZE * sizeof(ColorEntry));
+    uint32_t* pool_indices = malloc(loadedTextures * sizeof(uint32_t));
+    memset(pool_indices, 0, loadedTextures * sizeof(uint32_t));
+    uint32_t pixel_offset = 0;
+    uint32_t palette_offset = 0;
+    uint32_t maxPalletSize = 0;
+    uint32_t** per_texture_palettes = malloc(loadedTextures * sizeof(uint32_t*));
+    uint32_t* per_texture_palette_sizes = malloc(loadedTextures * sizeof(uint32_t));
+    uint8_t* all_indices = malloc(max_total_pixels * sizeof(uint8_t));
+    uint32_t* index_offsets = malloc(loadedTextures * sizeof(uint32_t));
+    uint32_t current_index_offset = 0;
+    for (uint16_t i = 0; i < loadedTextures; i++) {
+        per_texture_palettes[i] = malloc(MAX_PALETTE_SIZE * sizeof(uint32_t));
+        per_texture_palette_sizes[i] = 0;
+        index_offsets[i] = current_index_offset;
+        if (matchedParserIdxes[i] >= 0 && image_data[i]) {
+            current_index_offset += widths[i] * heights[i];
+        }
+    }
+
+    // Parallel loop for palette construction
+    #pragma omp parallel
+    {
+        #pragma omp for schedule(dynamic)
+        for (uint16_t i = 0; i < loadedTextures; i++) {
+            if (matchedParserIdxes[i] < 0 || !image_data[i]) continue;
+            ColorEntry* color_table = NULL;
+            uint32_t palette_size = 0; // Oversized larger than max pallete size for catching overflows.
+            uint8_t* texture_indices = &all_indices[index_offsets[i]];
+            uint32_t pool_start = i * MAX_PALETTE_SIZE;
+            for (int32_t j = 0; j < widths[i] * heights[i] * 4; j += 4) {
+                uint32_t color = ((uint32_t)image_data[i][j] << 24) | ((uint32_t)image_data[i][j + 1] << 16) |
+                                ((uint32_t)image_data[i][j + 2] << 8) | (uint32_t)image_data[i][j + 3];
+                ColorEntry* entry;
+                HASH_FIND_INT(color_table, &color, entry);
+                if (!entry) {
+                    if (palette_size >= MAX_PALETTE_SIZE) {
+                        DualLogError("Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdxes[i]].path);
+                        palette_size = MAX_PALETTE_SIZE - 1;
+                        break;
+                    }
+                    entry = &color_pool[pool_start + palette_size];
+                    entry->color = color;
+                    entry->index = (uint8_t)palette_size++;
+                    HASH_ADD_INT(color_table, color, entry);
+                    per_texture_palettes[i][entry->index] = color;
+                }
+                texture_indices[j / 4] = entry->index;
+            }
+            per_texture_palette_sizes[i] = palette_size;
+            HASH_CLEAR(hh, color_table); // No free needed, as entries are from color_pool
+        }
+    }
+
+    for (uint16_t i = 0; i < loadedTextures; i++) {
+        if (matchedParserIdxes[i] < 0 || !image_data[i]) continue;
+        textureOffsets[i] = totalPixels;
+        texturePaletteOffsets[i] = totalPaletteColors;
+        textureSizes[i * 2] = widths[i];
+        textureSizes[(i * 2) + 1] = heights[i];
+        uint32_t palette_size = per_texture_palette_sizes[i];
+        memcpy(&texturePalettes[palette_offset], per_texture_palettes[i], palette_size * sizeof(uint32_t));
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
+        uint32_t* mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0,
+                                                ((widths[i] * heights[i] + 3) / 4) * sizeof(uint32_t),
+                                                GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
+        uint8_t* texture_indices = &all_indices[index_offsets[i]];
+        for (int32_t j = 0; j < widths[i] * heights[i]; j += 4) {
+            uint32_t packed = (uint32_t)texture_indices[j];
+            if (j + 1 < widths[i] * heights[i]) {
+                packed |= (uint32_t)texture_indices[j + 1] << 8;
+            }
+            if (j + 2 < widths[i] * heights[i]) {
+                packed |= (uint32_t)texture_indices[j + 2] << 16;
+            }
+            if (j + 3 < widths[i] * heights[i]) {
+                packed |= (uint32_t)texture_indices[j + 3] << 24;
+            }
+            mapped_buffer[j / 4] = packed;
+        }
+        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+        glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, colorBufferID);
+        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0,
+                            ((pixel_offset + 3) / 4) * sizeof(uint32_t),
+                            ((widths[i] * heights[i] + 3) / 4) * sizeof(uint32_t));
+        pixel_offset += widths[i] * heights[i];
+        palette_offset += palette_size;
+        totalPixels += widths[i] * heights[i];
+        totalPaletteColors += palette_size;
+        if (palette_size > 256) {
+            numTexturesOver256PaletteSize++;
+            DualLogWarn("Palette size of %u is greater than 256 for %s\n", palette_size, texture_parser.entries[matchedParserIdxes[i]].path);
+        }
+        
+        #ifdef DEBUG_TEXTURE_LOAD_DATA
+        DualLog("Pallete size for texture %s is %u\n",texture_parser.entries[matchedParserIdxes[i]].path,palette_size);
+        #endif
+
+        if (palette_size > maxPalletSize) maxPalletSize = palette_size;
+        stbi_image_free(image_data[i]);
+        image_data[i] = NULL;
+    }
+
+    free(all_indices);
+    free(index_offsets);
+    for (uint16_t i = 0; i < loadedTextures; i++) {
+        free(per_texture_palettes[i]);
+    }
+    
+    free(per_texture_palettes);
+    free(per_texture_palette_sizes);
+    free(color_pool);
+    free(pool_indices);
+    free(image_data);
+    free(widths);
+    free(heights);
+    free(matchedParserIdxes);
+    glDeleteBuffers(1, &stagingBuffer);
+
+    #ifdef DEBUG_TEXTURE_LOAD_DATA
+    DualLog("Largest palette size of %d, Total palletes greater than 256: %u, total pallete colors: %u\n", maxPalletSize, numTexturesOver256PaletteSize, totalPaletteColors);
+    #endif
+
+    // Upload texture palettes
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePalettesID);
+    glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, totalPaletteColors * sizeof(uint32_t), texturePalettes);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 16, texturePalettesID);
+    free(texturePalettes);
+
+    // Upload texture offsets
+    glGenBuffers(1, &textureOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedTextures * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, textureOffsetsID);
+    free(textureOffsets);
+
+    // Upload texture sizes
+    glGenBuffers(1, &textureSizesID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, textureSizesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedTextures * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, textureSizesID);
+    free(textureSizes);
+
+    // Upload texture palette offsets
+    glGenBuffers(1, &texturePaletteOffsetsID);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, texturePaletteOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedTextures * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 17, texturePaletteOffsetsID);
+    free(texturePaletteOffsets);
+
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, colorBufferID);
+    glFlush();
+    CHECK_GL_ERROR();
+    malloc_trim(0);
+    double end_time = get_time();
+    DualLog(" took %f seconds\n", end_time - start_time);
+    DebugRAM("After LoadTextures");
+}
+
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
 void LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
     loadedModels = 0;
-    parser_init(&model_parser);
     if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
 
     int32_t maxIndex = -1;
@@ -620,10 +892,6 @@ void LoadModels(void) {
 }
 
 //--------------------------------- Entities -------------------------------------
-Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-int32_t entityCount = 0;            // Number of entities loaded
-DataParser entity_parser;
-
 // Suppress -Wformat-truncation for LoadEntities so it can share 256 length "path" and truncate it into 32 length "name".
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
@@ -631,7 +899,6 @@ void LoadEntities(void) {
     double start_time = get_time();
     
     // Initialize parser with entity-specific keys
-    parser_init(&entity_parser);
     if (!parse_data_file(&entity_parser, "./Data/entities.txt",0)) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
     
     entityCount = entity_parser.count;
@@ -849,7 +1116,6 @@ void LoadLevelGeometry(uint8_t curlevel) {
     DebugRAM("start of LoadLevelGeometry");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_geometry_level%d.txt", curlevel);
-    parser_init(&level_parser);
     if (!parse_data_file(&level_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
 
     uint16_t gameObjectCount = level_parser.count;
@@ -889,7 +1155,6 @@ void LoadLevelLights(uint8_t curlevel) {
     DebugRAM("start of LoadLevelLights");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_lights_level%d.txt", curlevel);
-    parser_init(&lights_parser);
     if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
 
     loadedLights = lights_parser.count;
@@ -928,7 +1193,6 @@ void LoadLevelDynamicObjects(uint8_t curlevel) {
     DebugRAM("start of LoadLevelDynamicObjects");
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/CitadelScene_dynamics_level%d.txt", curlevel);
-    parser_init(&dynamics_parser);
     if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
 
     int32_t dynamicObjectCount = dynamics_parser.count;

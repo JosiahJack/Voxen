@@ -4,31 +4,23 @@
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
-// Generic Constants
-#define M_PI 3.141592653f
-
-// Global Types
-typedef struct { float x,y; } Vector2;
-typedef struct { float x,y,z; } Vector3;
-typedef struct { float x,y,z,w; } Quaternion;
-typedef struct { float r,g,b,a; } Color;
-
 // Generic Lib Includes TODO REDUCE AS MUCH AS POSSIBLE!!
+#include <malloc.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-// ----------------------------------------------------------------------------
-// Audio
-#include "./External/miniaudio.h"
-void play_mp3(const char* path, float volume, int32_t fade_in_ms);
-void play_wav(const char* path, float volume);
-// ----------------------------------------------------------------------------
-// Data Parsing
-#define MAX_ENTRIES 6000
+// Generic Constants
+#define M_PI 3.141592653f
 #define MAX_PATH 128
+
+// Global Types
+typedef struct { float x,y; } Vector2;
+typedef struct { float x,y,z; } Vector3;
+typedef struct { float x,y,z,w; } Quaternion;
+typedef struct { float r,g,b,a; } Color;
 
 // Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
 typedef struct {
@@ -54,8 +46,6 @@ typedef struct {
     bool doublesided; // Parsing only, TODO Remove
     bool transparent; // Parsing only, TODO Remove
     uint8_t type; // Parsing only, TODO Remove
-    uint8_t saveableType; // Parsing only, TODO Remove
-    uint8_t metadata; // padding, TODO fix!
     char path[MAX_PATH]; // Parsing only, TODO Remove
 } Entity;
 
@@ -107,11 +97,14 @@ typedef struct {
 } QuestBits;
 extern QuestBits questData;
 
-void init_data_entry(Entity *entry);
-bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum);
-bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum);
-void parser_init(DataParser *parser);
-bool parse_data_file(DataParser *parser, const char *filename, int type);
+// ----------------------------------------------------------------------------
+// Audio
+void play_mp3(const char* path, float volume, int32_t fade_in_ms);
+void play_wav(const char* path, float volume);
+// ----------------------------------------------------------------------------
+// Data Parsing
+#define MAX_ENTRIES 6000
+void ParseGameData();
 
 // Textures
 #define MAX_TEXTURE_DIMENSION 2048
@@ -507,7 +500,7 @@ extern FILE *console_log_file;
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
-void DebugRAM(const char *context, ...);
+void DebugRAM(const char *context);
 #ifdef VOXEN_ENGINE_IMPLEMENTATION
 //     Logs both to log file and console, usage same as printf
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -530,13 +523,8 @@ void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); Dua
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-void DebugRAM(const char *context, ...) {
+void DebugRAM(const char *context) {
 #ifdef DEBUG_RAM_OUTPUT
-    char formatted_context[TEXT_BUFFER_SIZE];
-    va_list args;
-    va_start(args, context);
-    vsnprintf(formatted_context, sizeof(formatted_context), context, args);
-    va_end(args);
     struct mallinfo2 info = mallinfo2();
     size_t uss_bytes = 0;
     FILE *fp = fopen("/proc/self/smaps_rollup", "r");
@@ -551,7 +539,7 @@ void DebugRAM(const char *context, ...) {
     } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
 
     DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
-            formatted_context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
+            context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
             uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
 #endif
 }

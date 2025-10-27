@@ -1,8 +1,4 @@
-#include <malloc.h>
-#include <stdint.h>
-#include <stdbool.h>
 #include <stdlib.h>
-#include <GL/glew.h>
 #include "External/stb_image.h"
 #include "voxen.h"
 #include "citadel.h"

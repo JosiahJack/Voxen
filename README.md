@@ -70,7 +70,6 @@ Project must be linked against the following libraries which your system must in
  * -lm
  * -lrt
  * -lpthread (for multithread support)
- * -lenet (for networking with Enet)
  * -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ (Prebuilt, included in ./External/, for model loading from .fbx (for now))
  * -fopenmp (Will hopefully remove after only loading needed items for current level at a time)
 
@@ -100,7 +99,7 @@ Exit with cleanup, conditionally cleaning up resources based on how we exited an
 
 ### Systems:
 
-#### Unified Event Queue:
+#### Unified Event Queue
 
 All Server actions occur as events processed by the
 event queue that runs on just the Server's main thread.
@@ -110,18 +109,7 @@ demo files and uses same .dem extension but with a
 different custom format.
 
 
-#### Client-Server Architecture:
-
-All game sessions are coop sessions using Listen
-Server; singleplayer is local Listen Server with
-itself as only client.  Singleplayer is the same
-as starting a coop game before anyone has joined.
-Only 2 player coop is currently planned (4 maybe).
-Server handles all game functionality except
-loading in resources, keeping track of static
-level geometry and structures needed for rendering,
-and rendering are all Client-side.
-Data Resource Loading:
+#### Data Resource Loading
 
 All game assets are loaded as different types of data
 via first loading a definition text file from ./Data
@@ -138,7 +126,7 @@ textures.txt definition file.  These indices are used
 by all other systems that use textures (e.g. instaces).
 
 
-#### Entity - Instance System:
+#### Entity - Instance System
 
 All objects/items in the game are Instances that
 have an associated Entity type.  No instances exist
@@ -148,7 +136,7 @@ Entity definition is loaded first to populate the
 types list.  The Instances are populated after as
 a product of the level load system.
 
-#### Level Load System:
+#### Level Load System
 
 Levels are specified in sets of files for each level data
 type: geometry, dynamic objects, lights.  Geometry are any
@@ -167,7 +155,7 @@ E.g. level3_geometery.txt, level3_lights.txt
 Levels use same specification as savegames, in plain text.
 
 
-#### Savegame System:
+#### Savegame System
 
 All script variables are saved.  All instance states are
 saved.  All physics states are saved, referenced by instance
@@ -179,7 +167,7 @@ given by the variable name, variable names pulled from the
 scripts on the instance based on its entity type.
 
 
-#### VXGI Lighting:
+#### VXGI Lighting
 
 Voxen wouldn't be called Voxen without Voxels.  The world is
 overlayed with a sparse voxel representation for storing and
@@ -189,7 +177,7 @@ calculated on a separate thread then passed to GPU for actually
 applying lighting/shadows.
 
 
-#### Screen Space Reflections:
+#### Screen Space Reflections
 
 All specular surfaces get reflections.  There are
 no specular highlight fakeries to be found here.
@@ -198,7 +186,7 @@ the player can see elsewhere in their screen. This
 may be augmented with the, albeit softer and
 blurrier, voxel results.  Also called SSR.
 
-#### Rendering System:
+#### Rendering System
 
 Rendering uses a multipass system with forward+ lighting with voxel light clusters (x,z voxel columns).
 Pass 1: Forward+ Rasterization - gets albedo, normals, depth
@@ -218,7 +206,7 @@ Rendering leverages static buffers for minimal CPU->GPU
 data transfers and maximal performance with minimal state
 changes.
 
-#### Texturing System:
+#### Texturing System
 
 Leveraging a unified single buffer for all texture colors,
 palettized by texture, allows for completely arbitrary
@@ -230,7 +218,7 @@ One flat buffer of color, One flat buffer of palette
 offsets, one flat buffer of palette indices, one flat
 buffer of texture palette indices offsets.
 
-#### Mesh System:
+#### Mesh System
 
 Models are loaded into one unified flat vertex buffer with
 minimal data, just position, normal, and uv.  Meshes are indexed triangles.

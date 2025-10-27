@@ -1,18 +1,31 @@
 // File: voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
+// TODO: Figure out how to handle info_ressurection_points that needed to live outside the levels:
+// Level R -27.386 -55.488 26.5941
+// Level 1 40.903 -42.372 -30.78
+// Level 2 30.67407 -25.832 10.21412
+// Level 3 38.26813 -15.498 20.37825
+// Level 4 -19.48 -7.928 22.954
+// Level 5 -24.358 12.5956 31.8497
+// Level 6 -22.3568 33.7845 -30.728
+// Level 7 2.228084 50.95243 7.532025
+// Level 9.1_resdest 2.303 106.77 -38.554 (I don't remember what this is for, cheat spawn from `load 9`??)
+// TODO: Animated lights
+// TODO: Dynamic shadowmaps?
+// TODO: Multiview renders for sensaround
+// TODO: Proper physics
+// TODO: Raycasts
+// TODO: Voxel GI
+// TODO: Scripting engine for gameplay
+// TODO: Save/Load system
+// TODO: Combine the level data with unified parsing
 #define VERSION_STRING "v0.7.2"
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
-#include <math.h>
+#include <malloc.h>
 #include <sys/stat.h>
 #include <errno.h>
 #include <time.h>
-#include <enet/enet.h>
-#include "External/miniaudio.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "External/stb_image_write.h"
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -20,7 +33,7 @@
 #include <fontconfig/fontconfig.h>
 #define VOXEN_ENGINE_IMPLEMENTATION
 #include "voxen.h"
-#include "citadel.h"
+#include "./External/miniaudio.h"
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
 #include "Shaders/chunk_vert.glsl.h"
@@ -239,20 +252,6 @@ ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
 // Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
-// ----------------------------------------------------------------------------
-// Networking
-typedef enum {
-    MODE_LISTEN_SERVER,    // Runs both server and client locally
-    MODE_CLIENT            // Client only, connects to a server
-} EngineMode;
-
-EngineMode engine_mode = MODE_LISTEN_SERVER; // Default mode
-char* server_address = "127.0.0.1"; // Default to localhost for listen server
-int32_t server_port = 27015; // Default port
-
-ENetHost* server_host = NULL;
-ENetHost* client_host = NULL;
-ENetPeer* server_peer = NULL; // Client's connection to server
 // ----------------------------------------------------------------------------
 // ============================================================================
 // GLFW Callbacks
@@ -1577,59 +1576,12 @@ void InitializeEnvironment(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 19, lightsID);
-
-    // Input
-    Input_MouselookApply();
-    
-    // Network
-    if (enet_initialize() != 0) { DualLogError("ENet initialization failed\n"); exit(1); }
-    ENetAddress address;
-    enet_address_set_host(&address, server_address);
-    address.port = server_port;
-    client_host = enet_host_create(NULL, 1, 2, 0, 0);
-    if (!client_host) { DualLogError("Failed to create ENet client host\n"); exit(1); }
-
-    server_peer = enet_host_connect(client_host, &address, 2, 0);
-    if (!server_peer) { DualLogError("Failed to connect to server\n"); exit(1); }
-    
-    // Audio
-    InitializeAudio();
+   
+    Input_MouselookApply(); // Input
+    InitializeAudio(); // Audio
     DebugRAM("audio init");
     RenderLoadingProgress(50,"Loading...");
-
-    // Load Game/Mod Definition
-    const char* filename = "./Data/gamedata.txt";
-    DualLog("Loading game definition from %s...",filename);    
-    Entity entry;
-    init_data_entry(&entry);
-    FILE *gamedatfile = fopen(filename, "r");
-    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); exit(1); }
-    
-    uint32_t lineNum = 0;
-    bool is_eof;
-    while (!feof(gamedatfile)) {
-        char token[1024];
-        bool is_comment, is_newline;
-        if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
-            if (is_comment || is_newline) {
-                if (is_newline) lineNum += 1;
-                continue;
-            }
-        }
-        
-        char key[256];
-        strncpy(key, token, sizeof(key) - 1);
-        key[sizeof(key) - 1] = '\0';
-        if (!read_token(gamedatfile, token, sizeof(token), '\n', &is_comment, &is_eof, &is_newline, &lineNum)) continue;
-        
-        process_key_value(&entry, key, token, key, lineNum);
-        lineNum += 1;
-    }
-    
-    fclose(gamedatfile);
-    if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
-    currentLevel = startLevel;
-    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
+    ParseGameData();
     RenderLoadingProgress(100,"Loading textures...");
     DualLog("Window and GL Init took %f seconds\n", get_time() - init_start_time);
     LoadTextures();

@@ -4,46 +4,6 @@
 
 #include <stdint.h> // For uint8_t
 
-// SaveableType
-typedef uint8_t SaveableType;
-static const uint8_t SaveableType_Transform = 0;
-static const uint8_t SaveableType_Player = 1;
-static const uint8_t SaveableType_Useable = 2;
-static const uint8_t SaveableType_Grenade = 3;
-static const uint8_t SaveableType_NPC = 4;
-static const uint8_t SaveableType_Destructable = 5;
-static const uint8_t SaveableType_SearchableStatic = 6;
-static const uint8_t SaveableType_SearchableDestructable = 7;
-static const uint8_t SaveableType_Door = 8;
-static const uint8_t SaveableType_ForceBridge = 9;
-static const uint8_t SaveableType_Switch = 10;
-static const uint8_t SaveableType_FuncWall = 11;
-static const uint8_t SaveableType_TeleDest = 12;
-static const uint8_t SaveableType_LBranch = 13;
-static const uint8_t SaveableType_LRelay = 14;
-static const uint8_t SaveableType_LSpawner = 15;
-static const uint8_t SaveableType_InteractablePanel = 16;
-static const uint8_t SaveableType_ElevatorPanel = 17;
-static const uint8_t SaveableType_Keypad = 18;
-static const uint8_t SaveableType_PuzzleGrid = 19;
-static const uint8_t SaveableType_PuzzleWire = 20;
-static const uint8_t SaveableType_TCounter = 21;
-static const uint8_t SaveableType_TGravity = 22;
-static const uint8_t SaveableType_MChanger = 23;
-static const uint8_t SaveableType_GravPad = 24;
-static const uint8_t SaveableType_TransformParentless = 25;
-static const uint8_t SaveableType_ChargeStation = 26;
-static const uint8_t SaveableType_Light = 27;
-static const uint8_t SaveableType_LTimer = 28;
-static const uint8_t SaveableType_Camera = 29;
-static const uint8_t SaveableType_DelayedSpawn = 30;
-static const uint8_t SaveableType_SecurityCamera = 31;
-static const uint8_t SaveableType_Trigger = 32;
-static const uint8_t SaveableType_Projectile = 33;
-static const uint8_t SaveableType_NormalScreen = 34;
-static const uint8_t SaveableType_CyberSwitch = 35;
-static const uint8_t SaveableType_CyberItem = 36;
-
 // BodyState
 typedef uint8_t BodyState;
 static const uint8_t BodyState_Standing = 0;
