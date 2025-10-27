@@ -17,10 +17,8 @@
 
 DataParser texture_parser; // Zero initialized by C default.
 DataParser model_parser;
-DataParser level_parser;
 DataParser entity_parser;
 DataParser lights_parser;
-DataParser dynamics_parser;
 
 // Textures
 typedef struct {
@@ -118,24 +116,16 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
 
 void init_data_entry(Entity *entry) {
     entry->type = 0;
-    entry->cardchunk = false;
-    entry->doublesided = false;
-    entry->transparent = false;
+    entry->cardchunk = entry->doublesided = entry->transparent = false;
     entry->index = UINT16_MAX;
     entry->modelIndex = MODEL_IDX_MAX;
-    entry->texIndex = UINT16_MAX;
-    entry->glowIndex = MATERIAL_IDX_MAX;
-    entry->specIndex = MATERIAL_IDX_MAX;
-    entry->normIndex = MATERIAL_IDX_MAX;
+    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
     entry->lodIndex = UINT16_MAX;
     entry->path[0] = '\0';
-    entry->position.x = 0.0f; entry->position.y = 0.0f; entry->position.z = 0.0f;
-    entry->rotation.x = 0.0f; entry->rotation.y = 0.0f; entry->rotation.z = 0.0f; entry->rotation.w = 1.0f;
-    entry->scale.x = 1.0f; entry->scale.y = 1.0f; entry->scale.z = 1.0f;
-    entry->intensity = 0.0f;
-    entry->range = 0.0f;
-    entry->spotAngle = 0.0f;
-    entry->color.r = 0.0f; entry->color.g = 0.0f; entry->color.b = 0.0f;
+    entry->position.x = entry->position.y = entry->position.z = 0.0f;
+    entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
+    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
+    entry->intensity = entry->range = entry->spotAngle = entry->color.r = 0.0f; entry->color.g = 0.0f; entry->color.b = 0.0f; // Light data
 }
 
 void allocate_entries(DataParser *parser, int32_t entry_count) {
@@ -183,29 +173,6 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
     else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "startlevel") == 0)      startLevel = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "lod") == 0)             entry->lodIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localPosition.x") == 0) entry->position.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localPosition.y") == 0) entry->position.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localPosition.z") == 0) entry->position.z = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localRotation.x") == 0) entry->rotation.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localRotation.y") == 0) entry->rotation.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localRotation.z") == 0) entry->rotation.z = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localRotation.w") == 0) entry->rotation.w = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localScale.x") == 0)    entry->scale.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localScale.y") == 0)    entry->scale.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "localScale.z") == 0)    entry->scale.z = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "intensity") == 0)       entry->intensity = parse_float(trimmed_value, line, lineNum) * 0.4; // Adjustment, globally applied from Citadel Unity conversion.
-    else if (strcmp(trimmed_key, "range") == 0)           entry->range = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "spotAngle") == 0)       entry->spotAngle = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "type") == 0) {
-        if ((strcmp(trimmed_value, "Spot") == 0)) entry->type = 1u;
-        else if ((strcmp(trimmed_value, "Directional") == 0)) entry->type = 2u;
-        else entry->type = 0u;
-    }
-    else if (strcmp(trimmed_key, "color.r") == 0)         entry->color.r = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "color.g") == 0)         entry->color.g = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "color.b") == 0)         entry->color.b = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "go.activeSelf") == 0)   entry->active = parse_bool(trimmed_value, line, lineNum);
     else return false;
     return true;
 }
@@ -353,83 +320,10 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
     return true;
 }
 
-static bool ParseSaveLevelData(DataParser *parser, FILE* file, const char *filename) {
-    int32_t entry_count = 0;
-    bool is_comment, is_eof, is_newline;
-    int32_t c;
-    uint32_t lineNum = 0;
-    while ((c = fgetc(file)) != EOF) { // First pass: count entries
-        if (data_parser_isspace(c) || c == '\n') continue;
-        if (c == '/' && (c = fgetc(file)) == '/') {
-            while ((c = fgetc(file)) != EOF && c != '\n');
-            continue;
-        }
-        entry_count++;
-        while ((c = fgetc(file)) != EOF && c != '\n');
-    }
-
-    if (entry_count == 0) { DualLogError("No entries found in %s\n", filename); exit(1); }
-    if (entry_count > MAX_ENTRIES) { DualLogError("Entry count %d exceeds %d\n", entry_count, MAX_ENTRIES); exit(1); }
-    
-    if (entry_count > parser->capacity) {
-        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
-        parser->entries = new_entries;
-        for (int32_t i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
-        parser->capacity = entry_count;
-    }
-    parser->count = entry_count;
-
-    // Second pass: parse entries
-    rewind(file);
-    int32_t current_index = 0;
-    lineNum = 0;
-    char token[1024];
-    Entity entry;
-    init_data_entry(&entry);
-    while (!feof(file)) {
-        if (!read_token(file, token, sizeof(token), '|', &is_comment, &is_eof, &is_newline, &lineNum)) {
-            if (is_comment) { lineNum++; continue; }
-            
-            if (is_newline) {
-                if (current_index < parser->count) parser->entries[current_index++] = entry;
-                init_data_entry(&entry);
-                lineNum++;
-            }
-            
-            if (is_eof) break;
-            continue;
-        }
-
-        char *colon = strchr(token, ':');
-        if (colon) {
-            *colon = '\0';
-            char *key = token;
-            char *value = colon + 1;
-            process_key_value(&entry, key, value, token, lineNum);
-        } else {
-            strncpy(entry.path, token, sizeof(entry.path) - 1);
-            entry.path[sizeof(entry.path) - 1] = '\0';
-        }
-
-        if (is_newline) {
-            if (current_index < parser->count) parser->entries[current_index++] = entry;
-            init_data_entry(&entry);
-            lineNum++;
-        }
-    }
-
-    // Store last entry
-    if (entry.path[0] && current_index < parser->count) { parser->entries[current_index] = entry; current_index++; }
-    fclose(file);
-    return true;
-}
-
-bool parse_data_file(DataParser *parser, const char *filename, int32_t type) {
+bool parse_data_file(DataParser *parser, const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
-    
-    if (type == 1) return ParseSaveLevelData(parser, file, filename);
-    else return ParseResourceData(parser, file, filename);
+    return ParseResourceData(parser, file, filename);
 }
 
 bool isDoubleSided(uint32_t texIndexToCheck) {
@@ -449,7 +343,7 @@ void LoadTextures(void) {
     DebugRAM("start of LoadTextures");
     loadedTextures = 0;
     uint16_t numTexturesOver256PaletteSize = 0;
-    if (!parse_data_file(&texture_parser, "./Data/textures.txt", 0)) { DualLogError("Could not parse ./Data/textures.txt!\n"); exit(1); }
+    if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); exit(1); }
 
     int32_t maxIndex = -1;
     for (int32_t k = 0; k < texture_parser.count; k++) {
@@ -502,7 +396,7 @@ void LoadTextures(void) {
         for (int32_t i = 0; i < loadedTextures; i++) {
             if (matchedParserIdxes[i] < 0) continue;
             struct stat file_stat;
-            if (stat(texture_parser.entries[matchedParserIdxes[i]].path, &file_stat) != 0) { DualLogError("Failed to stat %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, strerror(errno)); continue; }
+            if (stat(texture_parser.entries[matchedParserIdxes[i]].path, &file_stat) != 0) { DualLogError("Failed to stat %s for texture index %u against matchedParserIdx %u: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, i, matchedParserIdxes[i], strerror(errno)); continue; }
                 
             size_t file_size = file_stat.st_size;
             if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", texture_parser.entries[matchedParserIdxes[i]].path, file_size); continue; }
@@ -709,7 +603,7 @@ void LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
     loadedModels = 0;
-    if (!parse_data_file(&model_parser, "./Data/models.txt", 0)) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
+    if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
 
     int32_t maxIndex = -1;
     for (int32_t k = 0; k < model_parser.count; k++) {
@@ -906,7 +800,7 @@ void LoadEntities(void) {
     double start_time = get_time();
     
     // Initialize parser with entity-specific keys
-    if (!parse_data_file(&entity_parser, "./Data/entities.txt",0)) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
+    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
     
     entityCount = entity_parser.count;
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); exit(1); }
@@ -944,365 +838,172 @@ void LoadEntities(void) {
 }
 #pragma GCC diagnostic pop // Ok restore string truncation warning
 
-void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-    
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
-        case 0:  *ofsx = 3.6f; *ofsy = -4.10195f; *ofsz = 1.0f; break;
-        case 1:  *ofsx = -5.12f; *ofsy = -48.64f; *ofsz = -15.36f; break;
-        case 2:  *ofsx = -2.6f; *ofsy = 0.0f; *ofsz = -7.7f; break;
-        case 3:  *ofsx = -45.12f; *ofsy = -0.700374f; *ofsz = -16.32f; break;
-        case 4:  *ofsx = -20.4f; *ofsy = 0.0f; *ofsz = 11.48f; break;
-        case 5:  *ofsx = -10.14f; *ofsy = 0.065f; *ofsz = -0.0383f; break;
-        case 6:  *ofsx = -0.6728f; *ofsy = 0.1725f; *ofsz = 3.76f; break;
-        case 7: *ofsx = -6.7f; *ofsy = 0.24443f; *ofsz = 1.16f; break;
-        case 8:  *ofsx = 1.08f; *ofsy = -0.935f; *ofsz = 0.8f; break;
-        case 9:  *ofsx = 3.6f; *ofsy = 0.0f; *ofsz = -1.28f; break;
-        case 10: *ofsx = 107.37f; *ofsy = 101.2f; *ofsz = 35.48f; break;
-        case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
-        case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticSaveable
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
-        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = -5.12f; *ofsy = -48.37571f; *ofsz = -15.391001f; break;
-        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = -14.528f; *ofsy = 48.269f; *ofsz = -26.836f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DoorsStaticSaveable
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsSaveable
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsImmutable
-        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.NPCsSaveableInstantiated
-        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = -33.28f; *ofsy = 48.64f; *ofsz = 7.679996f; break;
-        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
 //----------------------------------- Level -----------------------------------
-void LoadLevelGeometry(uint8_t curlevel) {
+void LoadLevel(uint8_t curlevel) {
+    DebugRAM("start of LoadLevel");
     double start_time = get_time();
-    memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances
+    memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     for (uint16_t idx = 0;idx<INSTANCE_COUNT;idx++) {
         instances[idx].modelIndex = MODEL_IDX_MAX;
-        instances[idx].texIndex = UINT16_MAX;
-        instances[idx].glowIndex = MATERIAL_IDX_MAX;
-        instances[idx].specIndex = MATERIAL_IDX_MAX;
-        instances[idx].normIndex = MATERIAL_IDX_MAX;
+        instances[idx].texIndex = instances[idx].glowIndex = instances[idx].specIndex = instances[idx].normIndex = MATERIAL_IDX_MAX;
         instances[idx].lodIndex = UINT16_MAX;
         instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
-        instances[idx].rotation.w = 1.0f; // Quaternion identity
-        instances[idx].doublesided = 0u;
-        instances[idx].transparent = 0u;
+        instances[idx].rotation.x = instances[idx].rotation.y = instances[idx].rotation.z = 0.0f; instances[idx].rotation.w = 1.0f; // Quaternion identity (other fields left at 0.0f)
         dirtyInstances[idx] = true;
     }
 
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    DebugRAM("end of SetupInstances");
     if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
-
-    DebugRAM("start of LoadLevelGeometry");
-    char filename[64];
+    
+    char filename[20]; // Minimum size for 0 through 13.
     snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); exit(1); }
 
-    int32_t entry_count = 0;
-    bool is_comment, is_eof, is_newline;
-    int32_t c;
-    uint32_t lineNum = 0;
-    while ((c = fgetc(file)) != EOF) { // First pass: count entries
-        if (data_parser_isspace(c) || c == '\n') continue;
-        if (c == '/' && (c = fgetc(file)) == '/') {
-            while ((c = fgetc(file)) != EOF && c != '\n');
-            continue;
-        }
-        entry_count++;
-        while ((c = fgetc(file)) != EOF && c != '\n');
-    }
-
-    if (entry_count == 0) { DualLogError("No entries found in %s\n", filename); exit(1); }
-    if (entry_count > MAX_ENTRIES) { DualLogError("Entry count %d exceeds %d\n", entry_count, MAX_ENTRIES); exit(1); }
-    
-    if (entry_count > level_parser.capacity) {
-        Entity *new_entries = realloc(level_parser.entries, entry_count * sizeof(Entity));  
-        level_parser.entries = new_entries;
-        for (int32_t i = level_parser.capacity; i < entry_count; ++i) init_data_entry(&level_parser.entries[i]);
-        level_parser.capacity = entry_count;
-    }
-    level_parser.count = entry_count;
-
-    // Second pass: parse entries
-    rewind(file);
-    int32_t current_index = 0;
-    lineNum = 0;
-    char token[1024];
-    Entity entry;
-    init_data_entry(&entry);
-    while (!feof(file)) {
-        if (!read_token(file, token, sizeof(token), '|', &is_comment, &is_eof, &is_newline, &lineNum)) {
-            if (is_comment) { lineNum++; continue; }
-            
-            if (is_newline) {
-                if (current_index < level_parser.count) level_parser.entries[current_index++] = entry;
-                init_data_entry(&entry);
-                lineNum++;
-            }
-            
-            if (is_eof) break;
-            continue;
-        }
-
-        char *colon = strchr(token, ':');
-        if (colon) {
-            *colon = '\0';
-            char *key = token;
-            char *value = colon + 1;
-            process_key_value(&entry, key, value, token, lineNum);
-        } else {
-            strncpy(entry.path, token, sizeof(entry.path) - 1);
-            entry.path[sizeof(entry.path) - 1] = '\0';
-        }
-
-        if (is_newline) {
-            if (current_index < level_parser.count) level_parser.entries[current_index++] = entry;
-            init_data_entry(&entry);
-            lineNum++;
-        }
-    }
-
-    // Store last entry
-    if (entry.path[0] && current_index < level_parser.count) { level_parser.entries[current_index] = entry; current_index++; }
-    fclose(file);
-    
-    
-
-    
-    uint16_t gameObjectCount = level_parser.count;
-    DualLog("Loading %d geometry chunks for Level %d...",gameObjectCount,curlevel);
+    int32_t lineNum = -1; // Start at 0 on first loop iteration, as it needs to iterate before each blank or commented line skip
+    int32_t instanceIdx = -1;
+    int32_t lightsIdx = -1;
+    size_t lineLengthMax = 81920; 
+    char lineSpace[lineLengthMax];
+    char* line = &lineSpace[0];
+    char firstKeyCheck[11];
+    char initialLine[lineLengthMax];
     float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    for (uint16_t idx=loadedInstances;idx<gameObjectCount;++idx) {
-        loadedInstances++;
-        instances[idx] = level_parser.entries[idx];
-        uint16_t entIdx = level_parser.entries[idx].index;
-        if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",idx,entIdx,MAX_ENTITIES); exit(1); }
-        
-        instances[idx].modelIndex = entities[entIdx].modelIndex;
-        if (instances[idx].modelIndex < loadedModels) renderableCount++;
-        instances[idx].texIndex = entities[entIdx].texIndex;
-        instances[idx].glowIndex = entities[entIdx].glowIndex;
-        if (instances[idx].glowIndex >= MATERIAL_IDX_MAX) instances[idx].glowIndex = 41;
-        instances[idx].specIndex = entities[entIdx].specIndex;
-        if (instances[idx].specIndex >= MATERIAL_IDX_MAX) instances[idx].specIndex = 41;
-        instances[idx].normIndex = entities[entIdx].normIndex;
-        if (instances[idx].normIndex >= MATERIAL_IDX_MAX) instances[idx].normIndex = 41;
-        instances[idx].lodIndex = entities[entIdx].lodIndex;
-        instances[idx].position.x += correctionX;
-        instances[idx].position.y += correctionY;
-        instances[idx].position.z += correctionZ;
-    }
-
-    // Instances uploaded after loading statics and dynamics in next functions...
-    DualLog(" took %f seconds\n", get_time() - start_time);
-    DebugRAM("end of LoadLevelGeometry");
-}
-
-void LoadLevelLights(uint8_t curlevel) {
-    double start_time = get_time();
-    if (curlevel >= numLevels) { DualLogError("Cannot load level lights, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
-
-    DebugRAM("start of LoadLevelLights");
-    char filename[64];
-    snprintf(filename, sizeof(filename), "./Data/CitadelScene_lights_level%d.txt", curlevel);
-    if (!parse_data_file(&lights_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
-
-    loadedLights = lights_parser.count;
-    DualLog("Loading  %d  statics lights for Level %d...",loadedLights,curlevel);
+//     float correctionDynamicX, correctionDynamicY, correctionDynamicZ;
+//     GetLevel_Transform_Offsets(curlevel,&correctionDynamicX,&correctionDynamicY,&correctionDynamicZ);
     float correctionLightX, correctionLightY, correctionLightZ;
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
-    for (uint32_t i=0;i<loadedLights;++i) {
-        uint16_t idx = (i * LIGHT_DATA_SIZE);
-        lights[idx + LIGHT_DATA_OFFSET_POSX] = lights_parser.entries[i].position.x + correctionLightX;
-        lights[idx + LIGHT_DATA_OFFSET_POSY] = lights_parser.entries[i].position.y + correctionLightY;
-        lights[idx + LIGHT_DATA_OFFSET_POSZ] = lights_parser.entries[i].position.z + correctionLightZ;
-        lights[idx + LIGHT_DATA_OFFSET_INTENSITY] = lights_parser.entries[i].intensity;
-        lights[idx + LIGHT_DATA_OFFSET_RANGE] = lights_parser.entries[i].range;
-        float ang = 0.0f;
-        if (lights_parser.entries[i].type == 2) ang = 1000.0f; // Indicate this is directional light
-        else if (lights_parser.entries[i].type == 1) ang = lights_parser.entries[i].spotAngle; // If spot apply it, else get 0 for spotAng
+    while (fgets(lineSpace, lineLengthMax, file)) {
+        size_t len = strlen(lineSpace);
+        while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
+        lineSpace[--len] = '\0';
+
+        line = lineSpace;
+        snprintf(initialLine, sizeof(initialLine), "%s", line);
+        memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
+        lineNum++;
         
-        lights[idx + LIGHT_DATA_OFFSET_SPOTANG] = ang;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRX] = lights_parser.entries[i].rotation.x;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRY] = lights_parser.entries[i].rotation.y;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRZ] = lights_parser.entries[i].rotation.z;
-        lights[idx + LIGHT_DATA_OFFSET_SPOTDIRW] = lights_parser.entries[i].rotation.w;
-        lights[idx + LIGHT_DATA_OFFSET_R] = lights_parser.entries[i].color.r;
-        lights[idx + LIGHT_DATA_OFFSET_G] = lights_parser.entries[i].color.g;
-        lights[idx + LIGHT_DATA_OFFSET_B] = lights_parser.entries[i].color.b;
-    }
-    
-    DualLog(" took %f secs\n", get_time() - start_time);
-    DebugRAM("end of LoadLevelLights");
-}
-
-void LoadLevelDynamicObjects(uint8_t curlevel) {
-    double start_time = get_time();
-    if (curlevel >= numLevels) { DualLogError("Cannot load level dynamic objects, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
-
-    DebugRAM("start of LoadLevelDynamicObjects");
-    char filename[64];
-    snprintf(filename, sizeof(filename), "./Data/CitadelScene_dynamics_level%d.txt", curlevel);
-    if (!parse_data_file(&dynamics_parser, filename,1)) { DualLogError("Could not parse %s!\n",filename); exit(1); }
-
-    int32_t dynamicObjectCount = dynamics_parser.count;
-    DualLog("Loading  %d dynamic objects for Level %d...",dynamicObjectCount,curlevel);
-    float correctionX, correctionY, correctionZ;
-    GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    int32_t startingIdx = (int32_t)loadedInstances;
-    physHead = 0;
-    for (int32_t idx=loadedInstances, i = 0;idx<(startingIdx + dynamicObjectCount);++idx, ++i) {
-        loadedInstances++;
-        int32_t entIdx = dynamics_parser.entries[i].index;
-        if (entIdx >= MAX_ENTITIES) { DualLogError("Entity index when loading dynamic object %d was %d, exceeds max entity count of %d\n",(idx - startingIdx),entIdx,MAX_ENTITIES); exit(1); }
+        bool isLight = true;
+        if (strcmp(firstKeyCheck, "constIndex") == 0) isLight = false;  // constIndex specified indicating this is a real entity?
+        if (isLight) {
+            lightsIdx++;
+            if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); exit(1); }
+        } else {
+            instanceIdx++;
+            if (instanceIdx >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n",instanceIdx,curlevel); exit(1); }
+        }
         
-        instances[idx] = dynamics_parser.entries[i];
-        instances[idx].modelIndex = entities[entIdx].modelIndex;
-        if (instances[idx].modelIndex < loadedModels) renderableCount++;
-        instances[idx].texIndex = entities[entIdx].texIndex;
-        instances[idx].glowIndex = entities[entIdx].glowIndex;
-        if (instances[idx].glowIndex >= MATERIAL_IDX_MAX) instances[idx].glowIndex = 41;
-        instances[idx].specIndex = entities[entIdx].specIndex;
-        if (instances[idx].specIndex >= MATERIAL_IDX_MAX) instances[idx].specIndex = 41;
-        instances[idx].normIndex = entities[entIdx].normIndex;
-        if (instances[idx].normIndex >= MATERIAL_IDX_MAX) instances[idx].normIndex = 41;
-        instances[idx].lodIndex = entities[entIdx].lodIndex;
-        instances[idx].position.x += correctionX;
-        instances[idx].position.y += correctionY;
-        instances[idx].position.z += correctionZ;
+        int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
+        uint8_t lightType = 0u; // Point
+        while(line[0] != '\0') {
+            // Guaranteed no leading whitespaces,k comments, or blank lines, so don't bother
+            char* pipe = strchr(line,'|');
+            char* kvString = line; // key:value pair before the pipe as a string
+            if (pipe) {
+                *pipe = '\0';          // Split string at the pipe
+                line = pipe + 1;       // Point to rest of the line after the pipe
+            } else { // Else this is the last string after the last pipe with last kv pair
+                line += strlen(line);
+            }
+           
+            if (kvString[0] == '\0' || strchr(kvString, ':') == NULL) continue;
+            
+            char *colon = strchr(kvString, ':');
+            if (colon[1] == '\0') continue; // Don't care about the name of the Unity gameobject from when this data used to be over there.  Need to skip this in the middle, but this also handles the very end
+            
+            *colon = '\0';           // Split string at the colon
+            char *key = kvString;    // Assign key to before colon
+            char *value = colon + 1; // Assing value to after colon
+            if (!key || !value) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); exit(1); }
+            
+            while (data_parser_isspace((unsigned char)*key)) key++;
+            while (data_parser_isspace((unsigned char)*value)) value++;
+            char trimmed_key[8192];
+            char trimmed_value[8192];
+            snprintf(trimmed_key, sizeof(trimmed_key), "%s", key);
+            snprintf(trimmed_value, sizeof(trimmed_value), "%s", value);
+            trimmed_key[sizeof(trimmed_key) - 1] = '\0';
+            trimmed_value[sizeof(trimmed_value) - 1] = '\0';
+            char *key_end = trimmed_key + strlen(trimmed_key) - 1;
+            char *val_end = trimmed_value + strlen(trimmed_value) - 1;
+            while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
+            while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+            if (isLight) {
+                     if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightX;
+                else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightY;
+                else if (strcmp(trimmed_key, "localPosition.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightZ;
+                else if (strcmp(trimmed_key, "localRotation.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.w") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intensity") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = parse_float(trimmed_value, initialLine, lineNum) * 0.4; // Adjustment, globally applied from Citadel's Unity to Custom Game Engine (Voxen) conversion.
+                else if (strcmp(trimmed_key, "range") == 0)           lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "spotAngle") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "type") == 0) {
+                    if ((strcmp(trimmed_value, "Spot") == 0)) lightType = 1u;
+                    else if ((strcmp(trimmed_value, "Directional") == 0)) lightType = 2u;
+                }
+                else if (strcmp(trimmed_key, "color.r") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_R] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "color.g") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_G] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "color.b") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_B] = parse_float(trimmed_value, initialLine, lineNum);
+            } else {
+                     if (strcmp(trimmed_key, "index") == 0)           instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localPosition.x") == 0) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localPosition.y") == 0) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localPosition.z") == 0) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.x") == 0) instances[instanceIdx].rotation.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.y") == 0) instances[instanceIdx].rotation.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.z") == 0) instances[instanceIdx].rotation.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localRotation.w") == 0) instances[instanceIdx].rotation.w = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localScale.x") == 0)    instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localScale.y") == 0)    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localScale.z") == 0)    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "go.activeSelf") == 0)   instances[instanceIdx].active = parse_bool(trimmed_value, initialLine, lineNum);
+            }
+        }
+        
+        if (isLight) {
+            loadedLights++;
+            if (lightType == 1) {
+                if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Light %d on line %d loaded with spotAngle less than 5deg but was marked as spotlight type!\n",lightsIdx,lineNum);
+            } else if (lightType == 2) {
+                // TODO: Handle directional lights for cyberspace
+                lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
+            } else {
+                lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
+            }
+        } else {
+            loadedInstances++;
+            uint16_t entIdx = instances[lineNum].index;
+            if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",lineNum,entIdx,MAX_ENTITIES); exit(1); }
+            
+            instances[lineNum].modelIndex = entities[entIdx].modelIndex;
+            if (instances[lineNum].modelIndex < loadedModels) renderableCount++;
+            instances[lineNum].texIndex = entities[entIdx].texIndex;
+            instances[lineNum].glowIndex = entities[entIdx].glowIndex;
+            if (instances[lineNum].glowIndex >= MATERIAL_IDX_MAX) instances[lineNum].glowIndex = 41;
+            instances[lineNum].specIndex = entities[entIdx].specIndex;
+            if (instances[lineNum].specIndex >= MATERIAL_IDX_MAX) instances[lineNum].specIndex = 41;
+            instances[lineNum].normIndex = entities[entIdx].normIndex;
+            if (instances[lineNum].normIndex >= MATERIAL_IDX_MAX) instances[lineNum].normIndex = 41;
+            instances[lineNum].lodIndex = entities[entIdx].lodIndex;
+//             if (IsDynamicObject) {
+//                 instances[lineNum].position.x += correctionDynamicX; // TODO
+//                 instances[lineNum].position.y += correctionDynamicY;
+//                 instances[lineNum].position.z += correctionDynamicZ;
+//             } else {
+                instances[lineNum].position.x += correctionX;
+                instances[lineNum].position.y += correctionY;
+                instances[lineNum].position.z += correctionZ;
+//             }
+        }
     }
 
-    DualLog(" took %f secs\n", get_time() - start_time);
-    DebugRAM("end of LoadLevelDynamicObjects");
+    fclose(file);
+    DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f seconds\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
+    DebugRAM("end of LoadLevel");
 }
 
 bool IsDynamicObject(uint16_t constIndex) {
@@ -1335,7 +1036,7 @@ void SortInstances(void) {
 
     // Step 1: Categorize instances and count model types per category
     for (uint32_t i = 0; i < loadedInstances; i++) {
-        if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != UINT16_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
+        if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != MATERIAL_IDX_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
         if (instances[i].modelIndex >= loadedModels || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
         if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
 
@@ -1435,5 +1136,4 @@ void SortInstances(void) {
 
     DualLog(" took %f secs\n", get_time() - start_time);
     DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invisible: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
-//     DualLog("startOfDoubleSidedInstances %u, startOfTransparentInstances %u, invalidModelIndexCount %u\n", startOfDoubleSidedInstances, startOfTransparentInstances, invalidModelIndexCount);
 }

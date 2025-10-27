@@ -1398,11 +1398,8 @@ void NewGame(void) {
     RenderLoadingProgress(100,"Loading level data...");
     renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    LoadLevelGeometry(currentLevel); // Must be after entities!
-    RenderLoadingProgress(110,"Loading lighting data...");
-    LoadLevelLights(currentLevel);
-    RenderLoadingProgress(120,"Loading dynamic object data...");
-    LoadLevelDynamicObjects(currentLevel);
+    loadedLights = 0;
+    LoadLevel(currentLevel); // Must be after entities!
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!

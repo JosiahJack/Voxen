@@ -147,7 +147,7 @@ void LoadModels(void);
 
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define INSTANCE_COUNT 8000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 extern Entity entities[MAX_ENTITIES];
 extern Entity instances[INSTANCE_COUNT];
 extern uint16_t* modelTypeCountsOpaque;
@@ -198,16 +198,14 @@ void LoadEntities(void);
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 
 // Levels / Game Management
+#define LEVEL_CYBERSPACE 13
 extern char global_modname[256];
 extern uint8_t startLevel;
 extern uint8_t numLevels; // Can be set by gamedata.txt
 extern uint8_t currentLevel;
 extern bool gamePaused;
 extern bool menuActive;
-void LoadLevels();
-void LoadLevelGeometry(uint8_t curlevel);
-void LoadLevelLights(uint8_t curlevel);
-void LoadLevelDynamicObjects(uint8_t curlevel);
+void LoadLevel(uint8_t curlevel);
 void SortInstances();
 // ----------------------------------------------------------------------------
 // Event System
@@ -363,6 +361,9 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
 #define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
+#define PLAYER_RADIUS 0.48f
+#define PLAYER_HEIGHT 2.00f
+#define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 extern double time_PhysicsStep;
 extern double physicsProcessingTime;
 extern uint16_t physHead;
@@ -501,6 +502,8 @@ void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
 void DebugRAM(const char *context);
+void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
+void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
 #ifdef VOXEN_ENGINE_IMPLEMENTATION
 //     Logs both to log file and console, usage same as printf
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -546,6 +549,160 @@ void DebugRAM(const char *context) {
 #pragma GCC diagnostic pop
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
+
+void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; } // TODO: Resave levels with the offsets applied.
+    
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
+        case 0:  *ofsx = 3.6f; *ofsy = -4.10195f; *ofsz = 1.0f; break;
+        case 1:  *ofsx = -5.12f; *ofsy = -48.64f; *ofsz = -15.36f; break;
+        case 2:  *ofsx = -2.6f; *ofsy = 0.0f; *ofsz = -7.7f; break;
+        case 3:  *ofsx = -45.12f; *ofsy = -0.700374f; *ofsz = -16.32f; break;
+        case 4:  *ofsx = -20.4f; *ofsy = 0.0f; *ofsz = 11.48f; break;
+        case 5:  *ofsx = -10.14f; *ofsy = 0.065f; *ofsz = -0.0383f; break;
+        case 6:  *ofsx = -0.6728f; *ofsy = 0.1725f; *ofsz = 3.76f; break;
+        case 7: *ofsx = -6.7f; *ofsy = 0.24443f; *ofsz = 1.16f; break;
+        case 8:  *ofsx = 1.08f; *ofsy = -0.935f; *ofsz = 0.8f; break;
+        case 9:  *ofsx = 3.6f; *ofsy = 0.0f; *ofsz = -1.28f; break;
+        case 10: *ofsx = 107.37f; *ofsy = 101.2f; *ofsz = 35.48f; break;
+        case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
+        case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticSaveable
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = -5.12f; *ofsy = -48.37571f; *ofsz = -15.391001f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = -14.528f; *ofsy = 48.269f; *ofsz = -26.836f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DoorsStaticSaveable
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsSaveable
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsImmutable
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.NPCsSaveableInstantiated
+        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = -33.28f; *ofsy = 48.64f; *ofsz = 7.679996f; break;
+        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
 #endif // VOXEN_ENGINE_IMPLEMENTATION
 // ----------------------------------------------------------------------------
 #endif // VOXEN_HEADER_H
