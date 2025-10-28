@@ -504,7 +504,8 @@ extern float genericTextWidthFacStopD;
 extern float genericTextHeightFac;
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-int CodepointToPackedIndex(int codepoint);
+int CodepointToPackedIndex(int32_t codepoint);
+float TextWidth(const char *utf8, int fontId);
 void InitFontAtlasses();
 // ----------------------------------------------------------------------------
 // UI

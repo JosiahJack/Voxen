@@ -2010,10 +2010,9 @@ int32_t main(int32_t argc, char* argv[]) {
         if (gamePaused) {
             RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), UI_LAYER_5, TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
             char* pauseButton_ResumeText = "RESUME";
-            
             float pauseButton_ResumeWidth = GetScreenRelativeX((sizeof(pauseButton_ResumeText) - 1) * genericTextWidthFacStopD);
             float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
-            float pauseButton_ResumeX = screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f);
+            float pauseButton_ResumeX = screenCenterX;// - (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
             float pauseButton_ResumeY = screenCenterY - GetScreenRelativeY(0.08f);
             uint8_t pauseButton_ResumeColor = TEXT_STOPD_RED;
             if (cursorPosition_x <= pauseButton_ResumeX + pauseButton_ResumeWidth && cursorPosition_x >= pauseButton_ResumeX - GetScreenRelativeX(genericTextWidthFacStopD) && cursorPosition_y <= pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.5f) && cursorPosition_y >= pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.5f)) pauseButton_ResumeColor = TEXT_STOPD_RED_HIGHLIGHT;

@@ -4,6 +4,7 @@
 #include "External/stb_truetype.h"
 #include <fontconfig/fontconfig.h>
 
+#define MAX_FALLBACK_FONTS 32
 static char *xstrdup(const char *s) {
     size_t len = strlen(s) + 1;
     char *p = malloc(len);
@@ -17,38 +18,12 @@ float genericTextHeightFac = 0.025f;
 float genericTextWidthFac = 0.0125f;
 float genericTextHeightFacStopD = 0.07f;
 float genericTextWidthFacStopD = 0.0182f;
+int numPackedGlyphs = 0;
+int numPackedGlyphsStopD = 0;
 GLuint fontAtlasTex;
 GLuint fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-
-typedef struct {
-    int first;   // first codepoint in range
-    int count;   // number of codepoints
-    int startIndex; // index into fontPackedChar where this range starts
-} GlyphRange;
-
-static GlyphRange fontRanges[] = {
-    {0x0020, 0x7E - 0x20+1, 0},       // ASCII
-    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
-    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
-    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
-    // add other ranges here
-};
-
-int numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
-
-int CodepointToPackedIndex(int codepoint) {
-    for (int i = 0; i < numFontRanges; i++) {
-        if (codepoint >= fontRanges[i].first && codepoint < fontRanges[i].first + fontRanges[i].count) return fontRanges[i].startIndex + (codepoint - fontRanges[i].first);
-    }
-    return -1; // not found
-}
-
-float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
-float fixedNumberAdvanceWidthStopD = 0.0f;
-
-#define MAX_FALLBACK_FONTS 32
 
 typedef struct {
     char *path;
@@ -60,9 +35,89 @@ typedef struct {
 static stbtt_fontinfo primaryFontInfo;
 static unsigned char *primaryFontData;
 static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
-static int numFallbackFonts = 0;
-
+static int32_t numFallbackFonts = 0;
 static FcConfig *fontCfg = NULL;
+
+typedef struct {
+    int32_t first;   // first codepoint in range
+    int32_t count;   // number of codepoints
+    int32_t startIndex; // index into fontPackedChar where this range starts
+} GlyphRange;
+
+static GlyphRange fontRanges[] = {
+    {0x0020, 0x7E - 0x20+1, 0},       // ASCII
+    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
+    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
+    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
+    // add other ranges here
+};
+
+int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
+
+int32_t CodepointToPackedIndex(int32_t codepoint) {
+    for (int32_t i = 0; i < numFontRanges; i++) {
+        if (codepoint >= fontRanges[i].first && codepoint < fontRanges[i].first + fontRanges[i].count) return fontRanges[i].startIndex + (codepoint - fontRanges[i].first);
+    }
+    return -1; // not found
+}
+
+float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
+float fixedNumberAdvanceWidthStopD = 0.0f;
+
+float GetTextAdvanceAmount(int32_t packedIdx, uint8_t font) {
+    if (font == FONT_STOPD) {
+        if (packedIdx < 0 || packedIdx >= numPackedGlyphsStopD) return 0.0f;
+        return fontPackedCharStopD[packedIdx].xadvance;
+    } else {
+        if (packedIdx < 0 || packedIdx >= numPackedGlyphs) return 0.0f;
+        return fontPackedChar[packedIdx].xadvance;
+    }
+}
+
+static int Utf8ToCodepoint(const char **p) {
+    const unsigned char *s = (const unsigned char*)*p;
+    int cp = 0;
+    if (s[0] < 0x80) { cp = s[0]; ++*p; }
+    else if ((s[0] & 0xE0) == 0xC0) { cp = ((s[0]&0x1F)<<6)|(s[1]&0x3F); *p += 2; }
+    else if ((s[0] & 0xF0) == 0xE0) { cp = ((s[0]&0x0F)<<12)|((s[1]&0x3F)<<6)|(s[2]&0x3F); *p += 3; }
+    else if ((s[0] & 0xF8) == 0xF0) { cp = ((s[0]&0x07)<<18)|((s[1]&0x3F)<<12)|((s[2]&0x3F)<<6)|(s[3]&0x3F); *p += 4; }
+    else { ++*p; } // invalid
+    return cp;
+}
+
+// Returns the *pixel* width of the string in the current font scale.
+float TextWidth(const char *utf8, int fontId) {
+    if (!utf8) return 0.0f;
+
+    float width = 0.0f;
+    const char *p = utf8;
+    int prevGlyph = -1;
+    while (*p) {
+        int cp = Utf8ToCodepoint(&p);
+        int packedIdx = CodepointToPackedIndex(cp);
+        float advance = 0.0f;
+        if (fontId == FONT_STOPD) {
+            if (packedIdx >= 0 && packedIdx < numPackedGlyphsStopD) advance = fontPackedCharStopD[packedIdx].xadvance;
+        } else {
+            if (packedIdx >= 0 && packedIdx < numPackedGlyphs) advance = fontPackedChar[packedIdx].xadvance;   
+        }
+
+        if (prevGlyph != -1 && advance > 0.0f) { // Kerning
+            if (fontId == FONT_NORMAL && packedIdx >= 0) {
+                int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
+                width += kern * stbtt_ScaleForPixelHeight(&primaryFontInfo, GetScreenRelativeY(genericTextHeightFac));
+            } else if (fontId == FONT_STOPD && packedIdx >= 0) {
+                int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
+                width += kern * stbtt_ScaleForPixelHeight(&primaryFontInfo, GetScreenRelativeY(genericTextHeightFacStopD));
+            }
+        }
+
+        width += advance;
+        prevGlyph = (packedIdx >= 0) ? stbtt_FindGlyphIndex(&primaryFontInfo, cp) : -1;
+    }
+    
+    return width;
+}
 
 static char *FindFontFileForCodepoint(uint32_t codepoint) {
     if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
@@ -185,12 +240,9 @@ void InitFontAtlasses(void) {
     stbtt_pack_context pc;
     stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     stbtt_PackSetOversampling(&pc, 8, 8);
-
-    int numPackedGlyphs = 0;
+    numPackedGlyphs = 0;
     fixedNumberAdvanceWidth = 0.0f;
-
     float pixelHeight = GetScreenRelativeY(genericTextHeightFac);
-
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
@@ -245,15 +297,11 @@ void InitFontAtlasses(void) {
     stbtt_pack_context pcStopD;
     stbtt_PackBegin(&pcStopD, atlasBitmapStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     stbtt_PackSetOversampling(&pcStopD, 8, 8);  // You can adjust per-font oversampling
-
-    int numPackedGlyphsStopD = 0;
+    numPackedGlyphsStopD = 0;
     float fixedNumberAdvanceWidthStopD = 0.0f;
     float pixelHeightStopD = GetScreenRelativeY(genericTextHeightFacStopD); // Optional: slightly larger
-
-    // Reuse same glyph ranges for StopD
     GlyphRange fontRangesStopD[sizeof(fontRanges)/sizeof(fontRanges[0])];
     memcpy(fontRangesStopD, fontRanges, sizeof(fontRanges));
-
     for (int r = 0; r < numFontRanges; r++) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
