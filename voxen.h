@@ -1,5 +1,6 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
+#define VERSION_STRING "v0.7.2"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
@@ -11,6 +12,7 @@
 #include <stdbool.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include "External/stb_truetype.h"
 
 // Generic Constants
 #define M_PI 3.141592653f
@@ -449,14 +451,6 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
-#define TEXT_WHITE 0
-#define TEXT_YELLOW 1
-#define TEXT_DARK_YELLOW 2
-#define TEXT_GREEN 3
-#define TEXT_RED 4
-#define TEXT_ORANGE 5
-#define TEXT_BUFFER_SIZE 1024
-#define BTN_SHOOT_MODE 10
 extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
@@ -471,13 +465,6 @@ extern bool noclip;
 extern bool consoleActive;
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
-#define UI_LAYER_TOP 1.0f
-#define UI_LAYER_5 0.5f
-#define UI_LAYER_4 0.4f
-#define UI_LAYER_3 0.3f
-#define UI_LAYER_2 0.2f
-#define UI_LAYER_1 0.1f
-#define UI_LAYER_0 0.0f
 extern float cam_x, cam_y, cam_z;
 extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
@@ -486,18 +473,51 @@ extern GLuint chunkShaderProgram;
 extern GLuint imageBlitShaderProgram;
 extern GLint debugViewLoc_quadblit, debugValueLoc_quadblit;
 extern GLint debugViewLoc_chunk, debugValueLoc_chunk;
-void InitFontAtlasses();
 void CacheUniformLocationsForShaders(void);
 void Screenshot(void);
 void ToggleConsole(void);
 bool CursorVisible(void);
-extern float uiOrthoProjection[16];
 float dot(float x1, float y1, float z1, float x2, float y2, float z2);
-void ConsoleEmulator(int32_t scancode);
-void CenterStatusPrint(const char* fmt, ...);
+// ----------------------------------------------------------------------------
+// Text
+#define TEXT_WHITE 0
+#define TEXT_YELLOW 1
+#define TEXT_DARK_YELLOW 2
+#define TEXT_GREEN 3
+#define TEXT_RED 4
+#define TEXT_ORANGE 5
+#define TEXT_BUFFER_SIZE 1024
+#define FONT_ATLAS_SIZE 4096
+#define MAX_GLYPHS 8192      // Rough estimate for all ranges
+#define FONT_NORMAL 0
+#define FONT_STOPD 1
+extern GLuint fontAtlasTex;
+extern GLuint fontAtlasTexStopD;
+extern float fixedNumberAdvanceWidth;
+extern float genericTextHeightFac;
+extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
+extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
+int CodepointToPackedIndex(int codepoint);
+void InitFontAtlasses();
+// ----------------------------------------------------------------------------
+// UI
+#define BTN_SHOOT_MODE 10
+#define UI_LAYER_TOP 1.0f
+#define UI_LAYER_5 0.5f
+#define UI_LAYER_4 0.4f
+#define UI_LAYER_3 0.3f
+#define UI_LAYER_2 0.2f
+#define UI_LAYER_1 0.1f
+#define UI_LAYER_0 0.0f
+extern float uiOrthoProjection[16];
+float GetScreenRelativeX(float percentage);
+float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints
 extern FILE *console_log_file;
+void Screenshot();
+void ConsoleEmulator(int32_t scancode);
+void CenterStatusPrint(const char* fmt, ...);
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
