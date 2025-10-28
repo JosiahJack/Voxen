@@ -18,7 +18,6 @@
 // TODO: Voxel GI
 // TODO: Scripting engine for gameplay
 // TODO: Save/Load system
-// TODO: Combine the level data with unified parsing
 #define VERSION_STRING "v0.7.2"
 #include <stdlib.h>
 #include <string.h>
@@ -144,7 +143,7 @@ GLint texLoc_quadblit, debugViewLoc_quadblit, debugValueLoc_quadblit, screenWidt
 //    Text Shader
 GLuint textShaderProgram;
 GLuint textVAO, textVBO;
-GLint projectionLoc_text, textColorLoc_text, textTextureLoc_text, texelSizeLoc_text;
+GLint projectionLoc_text, textColorLoc_text, textTextureLoc_text, texelSizeLoc_text, fontTypeLoc_text;
 
 // ----------------------------------------------------------------------------
 // UI Cursor
@@ -169,13 +168,16 @@ GLuint uiImageVAO, uiImageVBO;
 //    Text
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
-Color textColors[6] = {
-    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White 1.0f, 1.0f, 1.0f
-    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow 0.8902f, 0.8745f, 0f
+Color textColors[TEXT_COLOR_COUNT] = {
+    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White
+    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow
     { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
-    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green 0.3725f, 0.6549f, 0.1686f
-    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red 0.9176f, 0.1373f, 0.1686f
-    {         1.0f, 0.498039216f,          0.0f, 1.0f}  // 5 Orange 1f, 0.498f, 0f
+    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green
+    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red
+    {         1.0f, 0.498039216f,          0.0f, 1.0f}, // 5 Orange
+    { 0.674509804f, 0.058823529f,  0.070588235f, 1.0f}, // 6 StopD Red
+    { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight
+    { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}  // 8 StopD Red Pause Title
 };
 
 //      Console Emulator
@@ -384,6 +386,7 @@ void CompileShaders(void) {
     textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
     textTextureLoc_text = glGetUniformLocation(textShaderProgram, "textTexture");
     texelSizeLoc_text = glGetUniformLocation(textShaderProgram, "texelSize");
+    fontTypeLoc_text = glGetUniformLocation(textShaderProgram, "fontType");
     CHECK_GL_ERROR();
 }
 
@@ -982,6 +985,7 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
     if (font == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
     else glBindTextureUnit(6, fontAtlasTex);
     glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
+    glProgramUniform1ui(textShaderProgram, fontTypeLoc_text, font);
     glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
     glBindVertexArray(textVAO);
 
@@ -1040,7 +1044,8 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
         vertexCount++;
 
         if (codepoint >= '0' && codepoint <= '9') {
-            xpos = q.x0 + fixedNumberAdvanceWidth;
+            if (font == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
+            else xpos = q.x0 + fixedNumberAdvanceWidth;
         }
     }
     if (vertexCount > 0) {
@@ -1971,14 +1976,14 @@ int32_t main(int32_t argc, char* argv[]) {
         // UI Common References
         float screenCenterX = (float)screen_width / 2;
         float screenCenterY = (float)screen_height / 2;
-        float lineSpacing = GetScreenRelativeY(genericTextHeightFac * 1.0f);
+        float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
         
         // 8. UI
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
-        glDepthMask(GL_TRUE);
+        glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
+//         glDepthMask(GL_TRUE);
         glDisable(GL_CULL_FACE);
         
         //    Cursor
@@ -1992,7 +1997,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
         float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
         float shootModePos_y = 0.0f;
-        AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+        if (!gamePaused) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
         if (inventoryMode) {
             if (cursorPosition_x <= shootModePos_x + shootModeWidth && cursorPosition_x >= shootModePos_x
                 && cursorPosition_y <= shootModePos_y + shootModeHeight && cursorPosition_y >= shootModePos_y) {
@@ -2002,21 +2007,29 @@ int32_t main(int32_t argc, char* argv[]) {
             }
         }
         
-//         if (gamePaused) {
-            float textCenter = screenCenterX - (genericTextHeightFac * lineSpacing) - GetScreenRelativeX(0.03f);
-            RenderFormattedText(textCenter, screenCenterY - GetScreenRelativeY(0.3f),   UI_LAYER_5, TEXT_RED, FONT_STOPD, "PAUSED");
-            RenderFormattedText(textCenter, screenCenterY - GetScreenRelativeY(0.05f),   UI_LAYER_5, TEXT_RED, FONT_STOPD, "RESUME");
-            RenderFormattedText(textCenter + GetScreenRelativeX(0.01f), screenCenterY + GetScreenRelativeY(0.00f),    UI_LAYER_5, TEXT_RED, FONT_STOPD, "LOAD");
-            RenderFormattedText(textCenter + GetScreenRelativeX(0.01f), screenCenterY + GetScreenRelativeY(0.08f),    UI_LAYER_5, TEXT_RED, FONT_STOPD, "SAVE");
-            RenderFormattedText(textCenter + GetScreenRelativeX(-0.008f),  screenCenterY + GetScreenRelativeY(0.16f),   UI_LAYER_5, TEXT_RED, FONT_STOPD, "OPTIONS");
-            RenderFormattedText(textCenter + GetScreenRelativeX(-0.015f), screenCenterY + GetScreenRelativeY(0.24f), UI_LAYER_5, TEXT_RED, FONT_STOPD, "QUIT TO MENU");
-            RenderFormattedText(textCenter + GetScreenRelativeX(-0.015f), screenCenterY + GetScreenRelativeY(0.40f),   UI_LAYER_5, TEXT_RED, FONT_STOPD, "QUIT GAME");
-            float pauseBGWidth = GetScreenRelativeX(0.3f), pauseBGHeight = GetScreenRelativeY(0.42f);
-            AddUIImage(screenCenterX - (pauseBGWidth * 0.5f), screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.1f), UI_LAYER_0, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background (infopanel.png)
-//             AddUIImage(screenCenterX - (pauseBGWidth * 0.5f), screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.1f), UI_LAYER_1, pauseBGWidth, pauseBGHeight, 1086); // Pause Menu background (infopanel.png)
-//         } else {
-
-//         }
+        if (gamePaused) {
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), UI_LAYER_5, TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
+            char* pauseButton_ResumeText = "RESUME";
+            
+            float pauseButton_ResumeWidth = GetScreenRelativeX((sizeof(pauseButton_ResumeText) - 1) * genericTextWidthFacStopD);
+            float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
+            float pauseButton_ResumeX = screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f);
+            float pauseButton_ResumeY = screenCenterY - GetScreenRelativeY(0.08f);
+            uint8_t pauseButton_ResumeColor = TEXT_STOPD_RED;
+            if (cursorPosition_x <= pauseButton_ResumeX + pauseButton_ResumeWidth && cursorPosition_x >= pauseButton_ResumeX - GetScreenRelativeX(genericTextWidthFacStopD) && cursorPosition_y <= pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.5f) && cursorPosition_y >= pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.5f)) pauseButton_ResumeColor = TEXT_STOPD_RED_HIGHLIGHT;
+            RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, UI_LAYER_5, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
+            
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.00f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "LOAD");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.08f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "SAVE");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.5f), screenCenterY + GetScreenRelativeY(0.16f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "OPTIONS");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 6.0f), screenCenterY + GetScreenRelativeY(0.24f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "QUIT TO MENU");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 4.5f), screenCenterY + GetScreenRelativeY(0.40f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "QUIT GAME");
+            float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
+            float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);
+            float pauseBGY = screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
+            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_0, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background (infopanel.png)
+            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_1, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background (infopanel.png)
+        }
         
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);

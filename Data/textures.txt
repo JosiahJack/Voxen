@@ -2181,6 +2181,8 @@ index: 1077
 index: 1078
 #Textures/UI/slider.png
 index: 1079
+#Textures/UI/pause_bg_outline.png
+index: 1080
 #Textures/UI/vaporizebutton_outline_dark.png
 index: 1086
 #Textures/UI/vaporizebutton_outline.png

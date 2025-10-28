@@ -486,6 +486,10 @@ float dot(float x1, float y1, float z1, float x2, float y2, float z2);
 #define TEXT_GREEN 3
 #define TEXT_RED 4
 #define TEXT_ORANGE 5
+#define TEXT_STOPD_RED 6
+#define TEXT_STOPD_RED_HIGHLIGHT 7
+#define TEXT_STOPD_RED_PAUSETITLE 8
+#define TEXT_COLOR_COUNT 9
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 4096
 #define MAX_GLYPHS 8192      // Rough estimate for all ranges
@@ -494,6 +498,9 @@ float dot(float x1, float y1, float z1, float x2, float y2, float z2);
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;
+extern float fixedNumberAdvanceWidthStopD;
+extern float genericTextHeightFacStopD;
+extern float genericTextWidthFacStopD;
 extern float genericTextHeightFac;
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
