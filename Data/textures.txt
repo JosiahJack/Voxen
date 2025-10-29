@@ -184,7 +184,8 @@ index: 76
 index: 77
 #Textures/chipset_interface_demodulator.png
 index: 78
-
+#Textures/obsidian_normal.png
+index: 79
 #Textures/citmat1_1.png
 index: 83
 #Textures/citmat1_2_glow.png

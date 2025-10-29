@@ -19,7 +19,6 @@ uniform float fogColorG;
 uniform float fogColorB;
 uniform uint reflectionsEnabled;
 uniform uint shadowsEnabled;
-uniform uint ditherEnabled;
 uniform float shadowmapSize;
 uniform uint unlit;
 
@@ -75,7 +74,6 @@ uint GetVoxelIndex(vec3 worldPos) {
 const float INV_FOG_DIST = 1.0 / 71.68;
 
 // Small Poisson disk for stochastic PCF.
-// 12 samples gives good quality when temporally accumulated.
 const int PCF_SAMPLES = 6;
 const vec2 poissonDisk[6] = vec2[](
     vec2(-0.04, -0.04), vec2(0.07, -0.07), vec2(-0.10, -0.10),
@@ -127,8 +125,6 @@ void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
     float distToPixel = length(viewDir);
-//     if (distToPixel > 71.66) return;
-
     viewDir = normalize(viewDir);
     int texIndexChecked = 0;
     if (TexIndex >= 0) texIndexChecked = int(TexIndex); 
@@ -141,10 +137,8 @@ void main() {
     vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
-    if (albedoColor.a > 0.21 && albedoColor.a < 0.19) albedoColor.a = 0.20; // Force it to not be the sky hack alpha, this is an actual rendered object!
     if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
-
     if (NormalIndex != 41 && debugValue < 1) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
@@ -209,7 +203,7 @@ void main() {
 
         vec3 lightDir = normalize(toLight);
         float lambertian = max(dot(normal, lightDir), 0.0);
-//         if (lambertian < 0.25) continue;
+        if (lambertian < 0.25) continue;
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
@@ -234,11 +228,10 @@ void main() {
         float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
         float attenuation = rangeFacSqrd * lambertian;
         float shadowFactor = 1.0;
-//         if (debugValue != 2 && shadowsEnabled > 0) {
-        if (shadowsEnabled > 0) {
+        if (debugValue != 2 && shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
             float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0);
-            float normalBias = 0.02;//clamp(0.01 * (1.0 - dot(normal, lightDir)), 0.0, 0.16);
+            float normalBias = 0.04;
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -306,28 +299,20 @@ void main() {
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
     if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac);
 
-//     if (debugView == 1) {
-//         outAlbedo = albedoColor;
-//         outAlbedo.a = 1.0;
-//     } else if (debugView == 2) {
-//         outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;
-//         outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;
-//         outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;
-//         outAlbedo.a = 1.0;
-//     } else if (debugView == 3) {
-//         float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug
-//         float clipDepth = ndcDepth / gl_FragCoord.w;
-//         float linearDepth = (clipDepth - 0.02) / (71.68 - 0.02);
-//         outAlbedo = vec4(vec3(linearDepth), 1.0);
-//     } else if (debugView == 4) {
-//         outAlbedo.r = float(InstanceIndex) / 5500.0;
-//         outAlbedo.g = 0.0;
-//         outAlbedo.b = float(texIndexChecked) / 1231.0;
-//         outAlbedo.a = 1.0;
-//     } else if (debugView == 5) { // Worldpos debug
-//         outAlbedo.rgb = vec3(1.0);//worldPosPack.xyz;
-//         outAlbedo.a = 1.0;
-//     } else {
+    if (debugView == 1) {
+        outAlbedo = albedoColor;
+        outAlbedo.a = 1.0;
+    } else if (debugView == 2) {
+        outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;
+        outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;
+        outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;
+        outAlbedo.a = 1.0;
+    } else if (debugView == 3) {
+        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug
+        float clipDepth = ndcDepth / gl_FragCoord.w;
+        float linearDepth = (clipDepth - 0.02) / (71.68 - 0.02);
+        outAlbedo = vec4(vec3(linearDepth), 1.0);
+    } else {
         outAlbedo = vec4(lighting.rgb, albedoColor.a);
-//     }
+    }
 }

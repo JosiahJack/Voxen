@@ -635,6 +635,7 @@ glowtexture: 446
 #chunk_blockerflightbay
 index: 123
 model: 178
+normtexture: 79
 texture: 1230
 spectexture: 1242
 #chunk_maint1_9

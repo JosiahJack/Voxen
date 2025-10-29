@@ -52,7 +52,7 @@ int32_t Input_KeyDown(int32_t keycode) {
     if (keys[GLFW_KEY_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
     if (keys[GLFW_KEY_R]) {
         debugView++;
-        if (debugView > 7) debugView = 0;
+        if (debugView > 4) debugView = 0;
         glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
         glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
     }
@@ -413,7 +413,7 @@ int32_t Physics(void) {
     // Naive loop over all instances and their triangles
     for (uint32_t i = 0; i < loadedInstances; i++) {
         if (instances[i].modelIndex > loadedModels) continue;
-        if (IsDynamicObject(instances[i].index)) continue;
+        if (ConstIndexIsDynamicObject(instances[i].index)) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         
         int32_t mid = instances[i].modelIndex;

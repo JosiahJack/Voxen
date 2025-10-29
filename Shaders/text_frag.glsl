@@ -11,11 +11,7 @@ uniform vec2 texelSize;         // (1.0 / atlasWidth, 1.0 / atlasHeight)
 void main() {
     float sdf = texture(textTexture, TexCoord).r;
 
-    // Center of glyph (fully filled)
-    if (sdf >= 0.8) {
-        FragColor = textColor;
-        return;
-    }
+    if (sdf >= 0.8) { FragColor = vec4(textColor.rgb,1.0); return; } // Center of glyph (fully filled)
 
     // Outside glyph: fully transparent
     if (sdf <= 0.00001) {
@@ -33,18 +29,12 @@ void main() {
     // Compute approximate gradient direction using central differences
     vec2 grad = vec2(sdfRight - sdfLeft, sdfUp - sdfDown);
     float gradLen = length(grad);
+    if (gradLen < 0.001) discard; // No strong direction — fallback or ignore
 
-    if (gradLen < 0.001) {
-        // No strong direction — fallback or ignore
-        discard;
-    }
+    vec2 gradNorm = grad / gradLen; // Normalize gradient
 
-    // Normalize gradient
-    vec2 gradNorm = grad / gradLen;
-
-    // Determine if we're on the top or bottom edge
+    // Determine if on a vertical edge
     float verticalComponent = gradNorm.y; // +1 = pointing up (bottom edge), -1 = pointing down (top edge)
-
     if (fontType == 1) { // StopD: directional colored borders
         if (abs(verticalComponent) > 0.1) { // Only strong vertical edges
             if (verticalComponent > 0.0) {

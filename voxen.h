@@ -5,7 +5,7 @@
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
-// Generic Lib Includes TODO REDUCE AS MUCH AS POSSIBLE!!
+// Generic Lib Includes
 #include <malloc.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -24,17 +24,10 @@ typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 typedef struct { float r,g,b,a; } Color;
 
-// Ordered with name last since it is accessed infrequently so doesn't need to hit cache much.
 typedef struct {
     Vector3 position;
     Quaternion rotation;
     Vector3 scale;
-    Vector3 velocity;
-    Vector3 angularVelocity;
-    Color color;
-    float intensity;
-    float range;
-    float spotAngle;
     uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t glowIndex;
@@ -45,10 +38,6 @@ typedef struct {
     bool active;
     bool solid;
     bool cardchunk;
-    bool doublesided; // Parsing only, TODO Remove
-    bool transparent; // Parsing only, TODO Remove
-    uint8_t type; // Parsing only, TODO Remove
-    char path[MAX_PATH]; // Parsing only, TODO Remove
 } Entity;
 
 typedef struct {
@@ -58,8 +47,22 @@ typedef struct {
 } Trigger;
 
 typedef struct {
-    Entity* entries;
-    int32_t count;        // Added to track valid entries
+    uint16_t index;
+    uint16_t modelIndex;
+    uint16_t lodIndex;
+    uint16_t texIndex;
+    uint16_t glowIndex;
+    uint16_t specIndex;
+    uint16_t normIndex;
+    bool doublesided;
+    bool transparent;
+    bool cardchunk;
+    char path[MAX_PATH];
+} ResourceEntry;
+
+typedef struct {
+    ResourceEntry* entries;
+    int32_t count;
     int32_t capacity;
 } DataParser;
 
@@ -194,7 +197,7 @@ void LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 256u
+#define SHADOW_MAP_SIZE 192u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -315,7 +318,16 @@ void Cull();
 bool get_cull_bit(const uint32_t* arr, size_t idx);
 // ----------------------------------------------------------------------------
 // Helper Functions
-bool IsDynamicObject(uint16_t constIndex);
+bool ConstIndexInBounds(int constdex);
+bool ConstIndexIsGeometry(int constdex);
+bool ConstIndexIsDynamicObject(uint16_t constIndex);
+bool ConstIndexIsDoor(int constdex);
+bool ConstIndexIsLightStaticSaveable(int constdex);
+bool ConstIndexIsGenericTransform(int constdex);
+bool ConstIndexIsDynamicObject(uint16_t constIndex);
+bool ConstIndexIsStaticObjectImmutable(int constdex);
+bool ConstIndexIsNPC(int constdex);
+bool ConstIndexIsHardware(int constdex);
 static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
@@ -504,8 +516,8 @@ extern float genericTextWidthFacStopD;
 extern float genericTextHeightFac;
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-int CodepointToPackedIndex(int32_t codepoint);
-float TextWidth(const char *utf8, int fontId);
+int32_t CodepointToPackedIndex(int32_t codepoint, int fontID);
+float TextWidth(const char *utf8, int fontID);
 void InitFontAtlasses();
 // ----------------------------------------------------------------------------
 // UI

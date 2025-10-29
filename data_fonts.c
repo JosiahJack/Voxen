@@ -33,6 +33,7 @@ typedef struct {
 } LoadedFont;
 
 static stbtt_fontinfo primaryFontInfo;
+static stbtt_fontinfo secondaryFontInfo;
 static unsigned char *primaryFontData;
 static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
 static int32_t numFallbackFonts = 0;
@@ -44,21 +45,29 @@ typedef struct {
     int32_t startIndex; // index into fontPackedChar where this range starts
 } GlyphRange;
 
-static GlyphRange fontRanges[] = {
+GlyphRange fontRanges[] = {
     {0x0020, 0x7E - 0x20+1, 0},       // ASCII
     {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
     {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
     {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
-    // add other ranges here
+};
+
+GlyphRange fontRangesStopD[] = {
+    {0x0020, 0x7E - 0x20+1, 0},       // ASCII
+    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
+    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
+    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
 };
 
 int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
 
-int32_t CodepointToPackedIndex(int32_t codepoint) {
+int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
+    const GlyphRange* ranges = (fontID == FONT_STOPD) ? fontRangesStopD : fontRanges;
     for (int32_t i = 0; i < numFontRanges; i++) {
-        if (codepoint >= fontRanges[i].first && codepoint < fontRanges[i].first + fontRanges[i].count) return fontRanges[i].startIndex + (codepoint - fontRanges[i].first);
+        if (codepoint >= ranges[i].first && codepoint < ranges[i].first + ranges[i].count)
+            return ranges[i].startIndex + (codepoint - ranges[i].first);
     }
-    return -1; // not found
+    return -1;
 }
 
 float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
@@ -86,7 +95,7 @@ static int Utf8ToCodepoint(const char **p) {
 }
 
 // Returns the *pixel* width of the string in the current font scale.
-float TextWidth(const char *utf8, int fontId) {
+float TextWidth(const char *utf8, int fontID) {
     if (!utf8) return 0.0f;
 
     float width = 0.0f;
@@ -94,26 +103,26 @@ float TextWidth(const char *utf8, int fontId) {
     int prevGlyph = -1;
     while (*p) {
         int cp = Utf8ToCodepoint(&p);
-        int packedIdx = CodepointToPackedIndex(cp);
+        int packedIdx = CodepointToPackedIndex(cp,fontID);
         float advance = 0.0f;
-        if (fontId == FONT_STOPD) {
+        if (fontID == FONT_STOPD) {
             if (packedIdx >= 0 && packedIdx < numPackedGlyphsStopD) advance = fontPackedCharStopD[packedIdx].xadvance;
         } else {
             if (packedIdx >= 0 && packedIdx < numPackedGlyphs) advance = fontPackedChar[packedIdx].xadvance;   
         }
 
         if (prevGlyph != -1 && advance > 0.0f) { // Kerning
-            if (fontId == FONT_NORMAL && packedIdx >= 0) {
+            if (fontID == FONT_NORMAL && packedIdx >= 0) {
                 int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
                 width += kern * stbtt_ScaleForPixelHeight(&primaryFontInfo, GetScreenRelativeY(genericTextHeightFac));
-            } else if (fontId == FONT_STOPD && packedIdx >= 0) {
-                int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
-                width += kern * stbtt_ScaleForPixelHeight(&primaryFontInfo, GetScreenRelativeY(genericTextHeightFacStopD));
+            } else if (fontID == FONT_STOPD && packedIdx >= 0) {
+                int kern = stbtt_GetGlyphKernAdvance(&secondaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&secondaryFontInfo, cp));
+                width += kern * stbtt_ScaleForPixelHeight(&secondaryFontInfo, GetScreenRelativeY(genericTextHeightFacStopD));
             }
         }
 
         width += advance;
-        prevGlyph = (packedIdx >= 0) ? stbtt_FindGlyphIndex(&primaryFontInfo, cp) : -1;
+        prevGlyph = (packedIdx >= 0) ? stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &secondaryFontInfo : &primaryFontInfo), cp) : -1;
     }
     
     return width;
@@ -171,8 +180,8 @@ static LoadedFont *LoadFallbackFont(const char *path) {
     return lf;
 }
 
-static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont) {
-    int glyph = stbtt_FindGlyphIndex(&primaryFontInfo, codepoint);
+static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
+    int glyph = stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &secondaryFontInfo : &primaryFontInfo), codepoint);
     if (glyph) { *outFont = &primaryFontInfo; return glyph; }
 
     for (int i = 0; i < numFallbackFonts; i++) {
@@ -225,7 +234,6 @@ void InitFontAtlasses(void) {
     if (fread(secondaryFontData, 1, secondarySize, f2) != secondarySize) { DualLogError("Read failed (secondary)\n"); exit(1); }
     fclose(f2);
 
-    stbtt_fontinfo secondaryFontInfo;
     if (!stbtt_InitFont(&secondaryFontInfo, secondaryFontData, 0)) {
         DualLogError("Secondary font init failed\n"); exit(1);
     }
@@ -250,7 +258,7 @@ void InitFontAtlasses(void) {
 
             uint32_t codepoint = fontRanges[r].first + i;
             stbtt_fontinfo *font = NULL;
-            int glyph = GetGlyphAndFont(codepoint, &font);
+            int glyph = GetGlyphAndFont(codepoint, &font, FONT_NORMAL);
             if (!glyph) continue;
 
             float height = pixelHeight;
@@ -300,8 +308,6 @@ void InitFontAtlasses(void) {
     numPackedGlyphsStopD = 0;
     float fixedNumberAdvanceWidthStopD = 0.0f;
     float pixelHeightStopD = GetScreenRelativeY(genericTextHeightFacStopD); // Optional: slightly larger
-    GlyphRange fontRangesStopD[sizeof(fontRanges)/sizeof(fontRanges[0])];
-    memcpy(fontRangesStopD, fontRanges, sizeof(fontRanges));
     for (int r = 0; r < numFontRanges; r++) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
@@ -316,7 +322,7 @@ void InitFontAtlasses(void) {
 
             if (!glyph) {
                 // Fallback to primary or system fonts
-                glyph = GetGlyphAndFont(codepoint, &font);
+                glyph = GetGlyphAndFont(codepoint, &font, FONT_STOPD);
                 if (!glyph) continue;
                 fontData = (font == &primaryFontInfo) ? primaryFontData
                     : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;

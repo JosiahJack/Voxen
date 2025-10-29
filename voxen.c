@@ -98,6 +98,8 @@ double last_mouse_x = 0.0, last_mouse_y = 0.0;
 // OpenGL / Rendering
 int32_t debugView = 0;
 int32_t debugValue = 0;
+float aspect3D = 1.0f;
+float aspect2D = 1.0f;
 float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
@@ -138,7 +140,8 @@ GLuint shadowmapsClearShaderProgram;
 GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit, debugViewLoc_quadblit, debugValueLoc_quadblit, screenWidthLoc_imageBlit, screenHeightLoc_imageBlit, outputImageLoc_imageBlit, skyVisibleLoc_imageBlit, planetaryBodiesVisibleLoc_imageBlit,
-      groveShieldVisibleLoc_imageBlit, stationShieldVisibleLoc_imageBlit, reflectionsEnabledLoc_imageBlit, aaEnabledLoc_imageBlit, brightnessSettingLoc_imageBlit, fovLoc_imageBlit, camRotLoc_imageBlit, timeValLoc_imageBlit;
+      groveShieldVisibleLoc_imageBlit, stationShieldVisibleLoc_imageBlit, reflectionsEnabledLoc_imageBlit, aaEnabledLoc_imageBlit, brightnessSettingLoc_imageBlit, fovLoc_imageBlit, camRotLoc_imageBlit, timeValLoc_imageBlit,
+      aspectLoc_imageBlit, shadowsSettingLoc_imageBlit, shadowmapSizeLoc_imageBlit, worldMin_xLoc_imageBlit, worldMin_zLoc_imageBlit, viewProjectionLoc_imageBlit, camPosLoc_imageBlit, invViewRotLoc_imageBlit;
       
 //    Text Shader
 GLuint textShaderProgram;
@@ -381,7 +384,15 @@ void CompileShaders(void) {
     fovLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "fov");
     camRotLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "camRot");
     timeValLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "timeVal");
-    
+    aspectLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "aspect");
+    shadowsSettingLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "shadowsEnabled");
+    shadowmapSizeLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "shadowmapSize");
+    worldMin_xLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "worldMin_x");
+    worldMin_zLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "worldMin_z");
+    viewProjectionLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "viewProjection");
+    camPosLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "camPos");
+    invViewRotLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "invViewRot");
+
     projectionLoc_text = glGetUniformLocation(textShaderProgram, "projection");
     textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
     textTextureLoc_text = glGetUniformLocation(textShaderProgram, "textTexture");
@@ -479,21 +490,21 @@ void UpdateScreenSize(void) {
     m[8] =                       0.0f; m[9] =                           0.0f; m[10]= -1.0f; m[11]= 0.0f;
     m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
-    float aspect = (float)screen_width / (float)screen_height;
+    aspect3D = (float)screen_width / (float)screen_height;
     float f = 1.0f / tan(cam_fov * M_PI / 360.0f);
     m = rasterPerspectiveProjection;
-    m[0] = f / aspect; m[1] = 0.0f; m[2] =                                                  0.0f; m[3] =  0.0f;
-    m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
-    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
+    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
+    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
+    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
     
-    aspect = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
+    aspect2D = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
     f = 1.0f / tan(SHADOWMAP_FOV * M_PI / 360.0f);
     m = shadowmapsPerspectiveProjection;
-    m[0] = f / aspect; m[1] = 0.0f; m[2] =                                                  0.0f; m[3] =  0.0f;
-    m[4] =       0.0f; m[5] =    f; m[6] =                                                  0.0f; m[7] =  0.0f;
-    m[8] =       0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=       0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
+    m[0] = f / aspect2D; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
+    m[4] =         0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
+    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
 }
 
 uint32_t* voxelLightListsRaw = NULL;
@@ -684,7 +695,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     for (uint16_t j = 0; j < loadedInstances; j++) {
         if (instances[j].modelIndex >= loadedModels) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-        if (IsDynamicObject(instances[j].index)) continue;
+        if (ConstIndexIsDynamicObject(instances[j].index)) continue;
         
         float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
@@ -870,6 +881,11 @@ void RenderUIImages() {
     glUseProgram(0);
 }
 
+bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
+    return (   cursorPosition_x >= startX && cursorPosition_x <= endX     // 0 == left
+            && cursorPosition_y >= endY   && cursorPosition_y <= startY); // 0 == top
+}
+
 void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
     if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
@@ -974,7 +990,7 @@ static uint32_t DecodeUTF8(const char **p) {
 
 float textVertexData[4096]; // Reusable buffer for text vertices.  Most text only needs ~3000
 
-void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font, const char* format, ...) {
+void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t fontID, const char* format, ...) {
     va_list args;
     va_start(args, format);
     vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
@@ -982,10 +998,10 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
     glUseProgram(textShaderProgram);
     glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
     glProgramUniform4f(textShaderProgram, textColorLoc_text, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
-    if (font == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
+    if (fontID == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
     else glBindTextureUnit(6, fontAtlasTex);
     glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
-    glProgramUniform1ui(textShaderProgram, fontTypeLoc_text, font);
+    glProgramUniform1ui(textShaderProgram, fontTypeLoc_text, fontID);
     glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
     glBindVertexArray(textVAO);
 
@@ -1011,10 +1027,10 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
             continue;
         }
 
-        int idx = CodepointToPackedIndex(codepoint);
+        int idx = CodepointToPackedIndex(codepoint, fontID);
         if (idx < 0) continue;
 
-        if (font == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
+        if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
 
         // Expand vertex quad
@@ -1044,7 +1060,7 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
         vertexCount++;
 
         if (codepoint >= '0' && codepoint <= '9') {
-            if (font == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
+            if (fontID == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
             else xpos = q.x0 + fixedNumberAdvanceWidth;
         }
     }
@@ -1262,6 +1278,7 @@ void InitializeEnvironment(void) {
     glUseProgram(imageBlitShaderProgram);
     glUniform1ui(screenWidthLoc_imageBlit, screen_width);
     glUniform1ui(screenHeightLoc_imageBlit, screen_height);
+    glProgramUniform1f(imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
 
     glUseProgram(chunkShaderProgram);
     glUniform1ui(screenWidthLoc_chunk, screen_width);
@@ -1380,7 +1397,7 @@ void InitializeEnvironment(void) {
     LoadModels();
     RenderLoadingProgress(100,"Loading entities...");
     LoadEntities(); // Must be after models and textures else entity types can't be validated.
-    play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
+//     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -1755,10 +1772,7 @@ static const char* debugViewNames[] = {
     "unlit",           // 1
     "surface normals", // 2
     "depth",           // 3
-    "shadows",         // 4
-    "worldpos",        // 5
-    "lightview",       // 6
-    "reflections"      // 7
+    "reflections"     // 4
 };
 
 int32_t main(int32_t argc, char* argv[]) {
@@ -1871,12 +1885,29 @@ int32_t main(int32_t argc, char* argv[]) {
         uiImageDrawCallsRenderedThisFrame = 0;
         shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
+        uiImageCount = 0;
         
         // 0. Clear Frame Buffers and Depth
         if (!gamePaused) glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
-        uiImageCount = 0;
-        
+    
+        // 0.5 Set View and Projection Matrices
+        float view[16]; // Also known as view matrix
+        mat4_lookat(view);
+        float viewProj[16]; // view-projection matrix
+        float invViewProj[16]; // inverse view-projection matrix
+        mul_mat4(viewProj, rasterPerspectiveProjection, view);
+        invertAffineMat4(invViewProj, viewProj);
+        float invViewRot[9];
+        invViewRot[0] = view[0];
+        invViewRot[1] = view[4];
+        invViewRot[2] = view[8];
+        invViewRot[3] = view[1];
+        invViewRot[4] = view[5];
+        invViewRot[5] = view[9];
+        invViewRot[6] = view[2];
+        invViewRot[7] = view[6];
+        invViewRot[8] = view[10];
         if (!gamePaused && !menuActive) { // !PAUSED BLOCK -------------------------------------------------
             // 1. Culling
             Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
@@ -1884,7 +1915,7 @@ int32_t main(int32_t argc, char* argv[]) {
             // 2. Pass instance data to GPU
             for (uint32_t i = 0; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } }
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-            glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, loadedInstances * 16 * sizeof(float), modelMatrices); // * 16 because matrix4x4
+            glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
             // 3. Dynamic Shadowmaps
@@ -1894,12 +1925,6 @@ int32_t main(int32_t argc, char* argv[]) {
             //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
             glUseProgram(chunkShaderProgram);
-            float view[16];
-            mat4_lookat(view);
-            float viewProj[16];
-            float invViewProj[16];
-            mul_mat4(viewProj, rasterPerspectiveProjection, view);
-            invertAffineMat4(invViewProj, viewProj);
             glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
             glUniform1f(worldMin_xLoc_chunk, worldMin_x);
             glUniform1f(worldMin_zLoc_chunk, worldMin_z);
@@ -1921,9 +1946,9 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
-            if ((debugView == 0 || debugView == 7) && settings_Reflections > 0) {
+            if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
-                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
+                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);                
                 glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
@@ -1953,10 +1978,17 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform1ui(imageBlitShaderProgram, reflectionsEnabledLoc_imageBlit, settings_Reflections);
         glProgramUniform1ui(imageBlitShaderProgram, aaEnabledLoc_imageBlit, settings_AntiAliasing);
         glProgramUniform1ui(imageBlitShaderProgram, brightnessSettingLoc_imageBlit, settings_Brightness);
+        glProgramUniform1ui(imageBlitShaderProgram, shadowsSettingLoc_imageBlit, settings_Shadows);
+        glProgramUniform1f(imageBlitShaderProgram, worldMin_xLoc_imageBlit, worldMin_x);
+        glProgramUniform1f(imageBlitShaderProgram, worldMin_zLoc_imageBlit, worldMin_z);
+        glProgramUniform3f(imageBlitShaderProgram, camPosLoc_imageBlit, cam_x, cam_y, cam_z);
+        glUniformMatrix4fv(viewProjectionLoc_imageBlit, 1, GL_FALSE, viewProj);
+        glUniformMatrix3fv(invViewRotLoc_imageBlit, 1, GL_FALSE, invViewRot);
         glProgramUniform1f(imageBlitShaderProgram, fovLoc_imageBlit, cam_fov);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glUniform3f(camRotLoc_imageBlit, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
         glProgramUniform1f(imageBlitShaderProgram, timeValLoc_imageBlit, pauseRelativeTime * 0.1);
+        glProgramUniform1f(imageBlitShaderProgram, aspectLoc_imageBlit, aspect3D);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
@@ -1999,8 +2031,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float shootModePos_y = 0.0f;
         if (!gamePaused) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
         if (inventoryMode) {
-            if (cursorPosition_x <= shootModePos_x + shootModeWidth && cursorPosition_x >= shootModePos_x
-                && cursorPosition_y <= shootModePos_y + shootModeHeight && cursorPosition_y >= shootModePos_y) {
+            if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
                 if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
                     DualLog("Clicked the Shoot Mode button %u\n", globalFrameNum);
                 }
@@ -2010,12 +2041,15 @@ int32_t main(int32_t argc, char* argv[]) {
         if (gamePaused) {
             RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), UI_LAYER_5, TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
             char* pauseButton_ResumeText = "RESUME";
-            float pauseButton_ResumeWidth = GetScreenRelativeX((sizeof(pauseButton_ResumeText) - 1) * genericTextWidthFacStopD);
+            float pauseButton_ResumeWidth = (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
             float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
-            float pauseButton_ResumeX = screenCenterX;// - (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
+            float pauseButton_ResumeX = screenCenterX - pauseButton_ResumeWidth;
             float pauseButton_ResumeY = screenCenterY - GetScreenRelativeY(0.08f);
             uint8_t pauseButton_ResumeColor = TEXT_STOPD_RED;
-            if (cursorPosition_x <= pauseButton_ResumeX + pauseButton_ResumeWidth && cursorPosition_x >= pauseButton_ResumeX - GetScreenRelativeX(genericTextWidthFacStopD) && cursorPosition_y <= pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.5f) && cursorPosition_y >= pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.5f)) pauseButton_ResumeColor = TEXT_STOPD_RED_HIGHLIGHT;
+            bool pauseButton_CursorIsAbove = CursorIsOverBounds(pauseButton_ResumeX - GetScreenRelativeX(genericTextWidthFacStopD), pauseButton_ResumeX + pauseButton_ResumeWidth,
+                                                                pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.5f), pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.5f));
+            
+            if (pauseButton_CursorIsAbove) pauseButton_ResumeColor = TEXT_STOPD_RED_HIGHLIGHT;
             RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, UI_LAYER_5, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
             
             RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.00f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "LOAD");
@@ -2026,10 +2060,13 @@ int32_t main(int32_t argc, char* argv[]) {
             float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
             float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);
             float pauseBGY = screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
-            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_0, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background (infopanel.png)
-            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_1, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background (infopanel.png)
+            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_0, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background
+            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_1, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background
+            float quitGame_Height = GetScreenRelativeY(0.05f);
+            AddUIImage(pauseBGX, screenCenterY + GetScreenRelativeY(0.40f) - (quitGame_Height * 0.5f), UI_LAYER_0, pauseBGWidth, quitGame_Height, 950); // Pause Quit Game background
         }
         
+        // Diagnostics / Debugging
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
@@ -2039,12 +2076,6 @@ int32_t main(int32_t argc, char* argv[]) {
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_WHITE, "Color test:");
-//         RenderFormattedText(leftPad + 120,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_YELLOW, "ylw");
-//         RenderFormattedText(leftPad + 165,  debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_DARK_YELLOW, "dk ylw");
-//         RenderFormattedText(leftPad + 240, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_GREEN, "grn");
-//         RenderFormattedText(leftPad + 280, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_RED, "red");
-//         RenderFormattedText(leftPad + 320, debugTextStartY + (lineSpacing * 7), UI_LAYER_1, TEXT_ORANGE, "orng");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 

@@ -114,25 +114,19 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
     return val;
 }
 
-void init_data_entry(Entity *entry) {
-    entry->type = 0;
+void init_data_entry(ResourceEntry *entry) {
     entry->cardchunk = entry->doublesided = entry->transparent = false;
     entry->index = UINT16_MAX;
-    entry->modelIndex = MODEL_IDX_MAX;
+    entry->modelIndex = entry->lodIndex = MODEL_IDX_MAX;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
-    entry->lodIndex = UINT16_MAX;
     entry->path[0] = '\0';
-    entry->position.x = entry->position.y = entry->position.z = 0.0f;
-    entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
-    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
-    entry->intensity = entry->range = entry->spotAngle = entry->color.r = 0.0f; entry->color.g = 0.0f; entry->color.b = 0.0f; // Light data
 }
 
 void allocate_entries(DataParser *parser, int32_t entry_count) {
     if (entry_count > MAX_ENTRIES) { DualLogWarn("\033[38;5;208mEntry count %d exceeds %d\033[0m\n", entry_count, MAX_ENTRIES); entry_count = MAX_ENTRIES; }
     
     if (entry_count > parser->capacity) {
-        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
+        ResourceEntry *new_entries = realloc(parser->entries, entry_count * sizeof(ResourceEntry));  
         parser->entries = new_entries;
         for (int32_t i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
         parser->capacity = entry_count;
@@ -140,7 +134,7 @@ void allocate_entries(DataParser *parser, int32_t entry_count) {
     parser->count = entry_count;
 }
 
-bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
+bool process_key_value(ResourceEntry *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
     if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
     
     while (data_parser_isspace((unsigned char)*key)) key++;
@@ -161,7 +155,6 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
         return true;
     }
          if (strcmp(trimmed_key, "index") == 0)           entry->index = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "constIndex") == 0)      entry->index = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "model") == 0)           entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "texture") == 0)         entry->texIndex = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "glowtexture") == 0)     entry->glowIndex = parse_numberu16(trimmed_value, line, lineNum);
@@ -206,7 +199,7 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
 void ParseGameData() {
     const char* filename = "./Data/gamedata.txt";
     DualLog("Loading game definition from %s...",filename);    
-    Entity entry;
+    ResourceEntry entry;
     init_data_entry(&entry);
     FILE *gamedatfile = fopen(filename, "r");
     if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); exit(1); }
@@ -265,7 +258,7 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
 
     allocate_entries(parser, max_index + 1);  // Second pass: parse entries
     rewind(file);
-    Entity entry;
+    ResourceEntry entry;
     init_data_entry(&entry);
     int32_t entries_stored = 0;
     lineNum = 0;
@@ -793,9 +786,6 @@ void LoadModels(void) {
 }
 
 //--------------------------------- Entities -------------------------------------
-// Suppress -Wformat-truncation for LoadEntities so it can share 256 length "path" and truncate it into 32 length "name".
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadEntities(void) {
     double start_time = get_time();
     
@@ -812,8 +802,7 @@ void LoadEntities(void) {
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
-        // Copy with truncation to 31 characters to fit 32 char array for name.  Smaller for RAM constraints.
-        snprintf(entities[i].path, MAX_PATH, "%s", entity_parser.entries[i].path);
+        entities[i].index = entity_parser.entries[i].index;
         entities[i].modelIndex = entity_parser.entries[i].modelIndex;
         entities[i].texIndex = entity_parser.entries[i].texIndex;
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
@@ -824,19 +813,18 @@ void LoadEntities(void) {
         entities[i].position.x = 0.0f;
         entities[i].position.y = 0.0f;
         entities[i].position.z = 0.0f;
-        entities[i].scale.x = 0.0f;
-        entities[i].scale.y = 0.0f;
-        entities[i].scale.z = 0.0f;
+        entities[i].scale.x = 1.0f;
+        entities[i].scale.y = 1.0f;
+        entities[i].scale.z = 1.0f;
         entities[i].rotation.x = 0.0f;
         entities[i].rotation.y = 0.0f;
         entities[i].rotation.z = 0.0f;
-        entities[i].rotation.w = 0.0f;
+        entities[i].rotation.w = 1.0f;
     }
 
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("after loading all entities");
 }
-#pragma GCC diagnostic pop // Ok restore string truncation warning
 
 //----------------------------------- Level -----------------------------------
 void LoadLevel(uint8_t curlevel) {
@@ -989,32 +977,25 @@ void LoadLevel(uint8_t curlevel) {
             instances[lineNum].normIndex = entities[entIdx].normIndex;
             if (instances[lineNum].normIndex >= MATERIAL_IDX_MAX) instances[lineNum].normIndex = 41;
             instances[lineNum].lodIndex = entities[entIdx].lodIndex;
-//             if (IsDynamicObject) {
+            if (ConstIndexIsDoor(entIdx)) {
+                instances[lineNum].position.x += correctionX + 0.6001f;
+                instances[lineNum].position.y += correctionY - 0.5681f;
+                instances[lineNum].position.z += correctionZ -0.905f;
+//             if (ConstIndexIsDynamicObject) {
 //                 instances[lineNum].position.x += correctionDynamicX; // TODO
 //                 instances[lineNum].position.y += correctionDynamicY;
 //                 instances[lineNum].position.z += correctionDynamicZ;
-//             } else {
+            } else {
                 instances[lineNum].position.x += correctionX;
                 instances[lineNum].position.y += correctionY;
                 instances[lineNum].position.z += correctionZ;
-//             }
+            }
         }
     }
 
     fclose(file);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f seconds\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel");
-}
-
-bool IsDynamicObject(uint16_t constIndex) {
-    return (constIndex >= 307 && constIndex <= 404)
-            || (constIndex >= 402 && constIndex <= 404)
-            ||  constIndex == 417
-            || (constIndex >= 419 && constIndex <= 428)
-            || (constIndex >= 430 && constIndex <= 437)
-            || (constIndex >= 440 && constIndex <= 442)
-            || (constIndex >= 458 && constIndex <= 463)
-            || (constIndex >= 465 && constIndex <= 476);
 }
 
 void SortInstances(void) {
