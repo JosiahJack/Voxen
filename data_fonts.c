@@ -2,8 +2,11 @@
 #include "voxen.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
+#ifdef LOAD_LOCALIZATION_FONTS
 #include <fontconfig/fontconfig.h>
+#endif
 
+#ifdef LOAD_LOCALIZATION_FONTS
 #define MAX_FALLBACK_FONTS 32
 static char *xstrdup(const char *s) {
     size_t len = strlen(s) + 1;
@@ -12,6 +15,7 @@ static char *xstrdup(const char *s) {
     return p;
 }
 #define strdup xstrdup
+#endif // LOAD_LOCALIZATION_FONTS
 // ----------------------------------------------------------------------------
 // Text
 float genericTextHeightFac = 0.025f;
@@ -35,9 +39,11 @@ typedef struct {
 static stbtt_fontinfo primaryFontInfo;
 static stbtt_fontinfo secondaryFontInfo;
 static unsigned char *primaryFontData;
-static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
 static int32_t numFallbackFonts = 0;
+#ifdef LOAD_LOCALIZATION_FONTS
+static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
 static FcConfig *fontCfg = NULL;
+#endif
 
 typedef struct {
     int32_t first;   // first codepoint in range
@@ -128,29 +134,7 @@ float TextWidth(const char *utf8, int fontID) {
     return width;
 }
 
-static char *FindFontFileForCodepoint(uint32_t codepoint) {
-    if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
-    FcCharSet *cs = FcCharSetCreate();
-    FcCharSetAddChar(cs, (FcChar32)codepoint);
-    FcPattern *pat = FcPatternCreate();
-    FcPatternAddCharSet(pat, FC_CHARSET, cs);
-    FcPatternAddInteger(pat, FC_WEIGHT, FC_WEIGHT_BOLD);
-    FcConfigSubstitute(NULL, pat, FcMatchPattern);
-    FcDefaultSubstitute(pat);
-    FcResult result;
-    FcPattern *match = FcFontMatch(NULL, pat, &result);
-    char *file = NULL;
-    if (match) {
-        FcChar8 *file8 = NULL;
-        if (FcPatternGetString(match, FC_FILE, 0, &file8) == FcResultMatch) file = strdup((const char*)file8);
-        FcPatternDestroy(match);
-    }
-    
-    FcPatternDestroy(pat);
-    FcCharSetDestroy(cs);
-    return file;
-}
-
+#ifdef LOAD_LOCALIZATION_FONTS
 static LoadedFont *LoadFallbackFont(const char *path) {
     for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
         if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
@@ -179,25 +163,46 @@ static LoadedFont *LoadFallbackFont(const char *path) {
     lf->info = info;
     return lf;
 }
+#endif
 
 static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
     int glyph = stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &secondaryFontInfo : &primaryFontInfo), codepoint);
     if (glyph) { *outFont = &primaryFontInfo; return glyph; }
 
+#ifdef LOAD_LOCALIZATION_FONTS
     for (int i = 0; i < numFallbackFonts; i++) {
         glyph = stbtt_FindGlyphIndex(&fallbackFonts[i].info, codepoint);
         if (glyph) { *outFont = &fallbackFonts[i].info; return glyph; }
     }
 
-    char *fontfile = FindFontFileForCodepoint(codepoint);
+    if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
+    FcCharSet *cs = FcCharSetCreate();
+    FcCharSetAddChar(cs, (FcChar32)codepoint);
+    FcPattern *pat = FcPatternCreate();
+    FcPatternAddCharSet(pat, FC_CHARSET, cs);
+    FcPatternAddInteger(pat, FC_WEIGHT, FC_WEIGHT_BOLD);
+    FcConfigSubstitute(NULL, pat, FcMatchPattern);
+    FcDefaultSubstitute(pat);
+    FcResult result;
+    FcPattern *match = FcFontMatch(NULL, pat, &result); // Takes ~0.21secs
+    char *fontfile = NULL;
+    if (match) {
+        FcChar8 *file8 = NULL;
+        if (FcPatternGetString(match, FC_FILE, 0, &file8) == FcResultMatch) fontfile = strdup((const char*)file8);
+        FcPatternDestroy(match);
+    }
+    
+    FcPatternDestroy(pat);
+    FcCharSetDestroy(cs);
     if (!fontfile) return 0;
     
     LoadedFont *lf = LoadFallbackFont(fontfile);
     free(fontfile);
     if (!lf) return 0;
-
+    
     glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
     if (glyph) { *outFont = &lf->info; return glyph; }
+#endif
     return 0;
 }
 
@@ -240,8 +245,10 @@ void InitFontAtlasses(void) {
 
     // ------------------------------------------------------------------------
     // Initialize fontconfig once
+#ifdef LOAD_LOCALIZATION_FONTS
     if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
-
+#endif
+    
     // ------------------------------------------------------------------------
     // Pack Primary Font Atlas
     unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
@@ -367,17 +374,17 @@ void InitFontAtlasses(void) {
 
     // ------------------------------------------------------------------------
     // Cleanup
+#ifdef LOAD_LOCALIZATION_FONTS
     if (fontCfg) { FcConfigDestroy(fontCfg); fontCfg = NULL; }
     for (int i = 0; i < numFallbackFonts; i++) {
         free(fallbackFonts[i].data);
         free(fallbackFonts[i].path);
     }
-    
-    numFallbackFonts = 0;
+#endif
     free(primaryFontData);
     primaryFontData = NULL;
     free(secondaryFontData);
     malloc_trim(0);
-    DebugRAM("end of font init (dual)");
-    DualLog("font init (dual) took %f\n", get_time() - font_start_time);
+    DebugRAM("end of font init");
+    DualLog("Loading fonts(%d)... took %f\n", numFallbackFonts + 2, get_time() - font_start_time);
 }

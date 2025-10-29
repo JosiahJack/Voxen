@@ -33,23 +33,24 @@ uniform uint  shadowsEnabled;
 uniform float shadowmapSize;
 uniform mat4 viewProjection;
 uniform mat3 invViewRot;
+
 const int SSR_RES = 4;
+
 const float vhsBlurAmount = 0.5;
-const float vhsRadiusMax = 3.0;         // e.g. 6.0 (max pixel radius in px)
+const float vhsRadiusMax = 3.0; // in pixels
+
 const float staticIntensity = 0.0;      // 0.0 .. 1.0
-const float staticBandThickness = 0.005;  // 0.0 .. 1.0 (percent of screen height)
-const float staticScrollSpeedX = 200.0;    // px/sec or normalized units
-const float staticScrollSpeedY = 4.0;    // px/sec or normalized units
-const vec3  staticColor = vec3(1.0, 0.0, 0.0);          // color of static (rgb)
-const float staticNoiseScale = 5.4;     // noise frequency for per-band noise
+const float staticBandThickness = 0.005;
+const float staticScrollSpeed = 200.0;
+const vec3  staticColor = vec3(1.0, 0.0, 0.0);
+
 const uint  volumetricFogEnabled = 0;   // 0 = off, 1 = on
-const float fogDensity = 0.5;             // density (e.g. 0.02)
-const float fogStepSize = 0.24;            // world-space step length
-const uint  fogMaxSteps = 64;            // max ray-march steps (e.g. 80)
+const float fogDensity = 1.0;             // density (e.g. 0.02)
+const float fogStepSize = 0.08;            // world-space step length
+const uint  fogMaxSteps = 24;            // max ray-march steps (e.g. 80)
 const float fogScatteringAniso = 0.0;     // Henyey-Greenstein g (-1..1), 0 = isotropic
 const vec3  fogBaseColor = vec3(0.0,0.0,0.0);           // colour of the fog when no light hits it
 const float fogLightIntensity = 2.0;      // multiplier for light contribution inside fog
-// -----  LIGHT EVALUATION (identical to chunk.glsl) -----
 const int LIGHT_DATA_SIZE = 13;
 const int LIGHT_DATA_OFFSET_POSX = 0;
 const int LIGHT_DATA_OFFSET_POSY = 1;
@@ -67,14 +68,8 @@ const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
 
-// Small Poisson disk for stochastic PCF.
-const int PCF_SAMPLES = 6;
-const vec2 poissonDisk[6] = vec2[](
-    vec2(-0.04, -0.04), vec2(0.07, -0.07), vec2(-0.10, -0.10),
-    vec2(0.04, 0.04), vec2(0.07, 0.07), vec2(0.10, 0.10)
-);
-
 const float PI = 3.14159265359;
+
 const float aaThreshold = 0.2;
 
 // Simplex noise implementation (2D)
@@ -206,28 +201,6 @@ vec3 milkyWay(vec3 dir) {
     return vec3(intensity) * tint * 0.06 + vec3(ditherVal);
 }
 
-vec3 lerp(vec3 a, vec3 b, float t) {
-    return mix(a, b, clamp(t, 0.0, 1.0));
-}
-
-vec3 rgb2yuv(vec3 c) {
-    float y = dot(c, vec3(0.299, 0.587, 0.114));
-    float u = c.b - y;
-    float v = c.r - y;
-    return vec3(y, u, v);
-}
-vec3 yuv2rgb(vec3 yuv) {
-    float y = yuv.x;
-    float r = y + yuv.z;
-    float g = (y - 0.299*y - 0.114*y + 0.587*y); // approximate fallback
-    // better convert directly:
-    r = y + yuv.z;
-    float b = y + yuv.y;
-    float gg = (y - 0.2126*r - 0.0722*b) / 0.7152; // fallback safe-ish
-    // simpler and robust:
-    return vec3(r, clamp(gg, 0.0, 1.0), b);
-}
-
 vec3 vhsBlur(vec2 uv) { // Subtly soften everything for more realism.  Subtle but really does help.
     const float r = vhsRadiusMax * vhsBlurAmount;
     if (r < 0.5) return texture(tex, uv).rgb;
@@ -252,45 +225,22 @@ vec3 vhsBlur(vec2 uv) { // Subtly soften everything for more realism.  Subtle bu
     return acc * (1.0/1.5); // renormalize
 }
 
-float bandNoise(vec2 uv, float bandIndex) {
-    // coarse noise per band
-    float n = snoise(vec2(bandIndex * 0.5, uv.x * staticNoiseScale + timeVal * 0.05));
-    // high freq speckle inside band
-    float speck = snoise(uv * 200.0 + timeVal * 10.0) * 0.5 + 0.5;
-    return clamp(n * 0.6 + speck * 0.4, 0.0, 1.0);
-}
-
 vec3 bandedStatic(vec2 uv) {
     float baseThickness = clamp(staticBandThickness, 0.001, 1.0);
     float screenY = uv.y * float(screenHeight);
-    float scroll = timeVal * staticScrollSpeedX;
+    float scroll = timeVal * staticScrollSpeed;
     float thicknessPx = baseThickness * float(screenHeight);
-
-    // vertical band index (scrolls)
     float bandCoord = (screenY + scroll) / thicknessPx;
     float bandIndex = floor(bandCoord);
-
-    // use staticIntensity to reduce gaps (higher intensity → smaller gaps)
     float cluster = snoise(vec2(bandIndex * 0.05, timeVal * 5.2));
     float minGap = 0.1; // min empty space fraction
     float maxGap = 0.9; // max empty space fraction
     float gapFrac = mix(maxGap, minGap, staticIntensity); 
     cluster = smoothstep(0.0, 1.0, cluster);
     cluster = step(gapFrac, cluster); // band visible if cluster > gapFrac
-
-    // per-band horizontal modulation
-    float horiz = snoise(vec2(uv.x * 2.0 * staticScrollSpeedY, bandIndex * 0.5 + timeVal * 0.1)) * 0.5 + 0.5;
-
-    // vertical drift
-    float verticalDrift = snoise(vec2(bandIndex * 0.15, timeVal * 0.03)) * 400.0;
-    float driftedBandCoord = (screenY + scroll + verticalDrift) / thicknessPx;
-    float driftedFrac = fract(driftedBandCoord);
-
-    // soft edges
-    float edgeSoft = smoothstep(0.0, 0.1, driftedFrac) * (1.0 - smoothstep(0.9, 1.0, driftedFrac));
     float speck = snoise(uv * 200.0 + timeVal * 10.0) * 0.5 + 0.5;
     float bandNoiseVal = snoise(vec2(bandIndex * 0.3, uv.x * 5.0 + timeVal * 0.1));
-    float intensity = mix(bandNoiseVal, speck, 0.6) * edgeSoft * cluster * horiz;
+    float intensity = mix(bandNoiseVal, speck, 0.6) * cluster;
     return staticColor * intensity;
 }
 
@@ -308,121 +258,11 @@ uint GetVoxelIndex(vec3 worldPos) {
     return cellIndex * 64 + voxelIndexInCell;
 }
 
-float EvaluateLightContribution(vec3 pos, out vec3 outLightColor) {
-    uint voxelIdx = GetVoxelIndex(pos);
-    uint count    = min(voxelLightListIndices[voxelIdx * 2 + 1], 16u);
-    uint listOff  = (count > 0) ? voxelLightListIndices[voxelIdx * 2] : 0u;
-    vec3 accum = vec3(0.0);
-    outLightColor = vec3(0.0);
-    for (uint i = 0u; i < count; ++i) {
-        uint lightIdxInPVS = uniqueLightLists[listOff + i];
-        uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
-        vec3  Lpos   = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],
-                            lights[lightIdx + LIGHT_DATA_OFFSET_POSY],
-                            lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
-        float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        if (intensity < 0.05) continue;
-
-        float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
-        vec3  toLight = Lpos - pos;
-        float dist = length(toLight);
-        if (dist > range) continue;
-
-        vec3 lightDir = normalize(toLight);
-        float lambertian = 1.0; // No normal to compare against
-        float distOverRange = dist / range;
-        float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
-        float attenuation = rangeFacSqrd * lambertian;
-        attenuation = attenuation * attenuation;                     // quadratic fall-off
-        float shadowFactor = 1.0;
-        if (shadowsEnabled > 0) {
-            float smearness = attenuation * attenuation * 38.0;
-            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0);
-            float normalBias = 0.04;
-            vec3 a = abs(-toLight);
-            float maxAxis = max(max(a.x, a.y), a.z);
-            float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
-            vec3 dir = -toLight * invMax;
-            uint face;
-            vec2 uv;
-            if (a.x >= a.y && a.x >= a.z) {
-                face = -toLight.x > 0.0 ? 0u : 1u; uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
-            } else if (a.y >= a.x && a.y >= a.z) {
-                face = -toLight.y > 0.0 ? 2u : 3u; uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
-            } else {
-                face = -toLight.z > 0.0 ? 4u : 5u; uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
-            }
-
-            uv = uv * 0.5 + 0.5;
-            uint base = lightIdxInPVS * 6u * uint(shadowmapSize) * uint(shadowmapSize);
-            uint faceOff = base + face * uint(shadowmapSize) * uint(shadowmapSize);
-            vec2 tc = uv * shadowmapSize;
-            float tx = clamp(tc.x, 0.0, shadowmapSize - 1.0);
-            float ty = clamp(tc.y, 0.0, shadowmapSize - 1.0);
-            uint utx = uint(tx);
-            uint uty = uint(ty);
-            uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
-            uint distInt = shadowMaps[ssbo_index];
-            float d = float(distInt) / 10000.0;
-            float depthDiff = dist - d - (bias + normalBias);
-            shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
-            if (shadowFactor < 0.005) continue;
-        }
-
-        vec3 Lcol = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R],
-                          lights[lightIdx + LIGHT_DATA_OFFSET_G],
-                          lights[lightIdx + LIGHT_DATA_OFFSET_B]);
-
-        accum += Lcol * intensity * attenuation * shadowFactor;
-    }
-    outLightColor = accum;
-    return max(accum.r, max(accum.g, accum.b));
-}
-
-vec3 unpackWorldPos(vec4 packedPos) {
-    vec2 worldXY = unpackHalf2x16(floatBitsToUint(packedPos.r));
-    vec2 worldZInst = unpackHalf2x16(floatBitsToUint(packedPos.g));
-    return vec3(worldXY.x, worldXY.y, worldZInst.x);
-}
-
-vec4 VolumetricFog(ivec2 uv) {
-    if (volumetricFogEnabled == 0u) return vec4(0.0);
-
-    vec4 wpPack   = imageLoad(inputWorldPos, uv);
-    vec3 surfPos  = unpackWorldPos(wpPack);                 // helper from your file
-    float surfDepth = length(surfPos - camPos);            // distance to geometry
-    if (surfDepth < 0.08) return vec4(0.0,0.0,0.0,0.0);
-
-    float tanHalf = tan(radians(fov) * 0.5);
-    vec2 ndc = ((vec2(uv) + 0.5) / vec2(screenWidth, screenHeight)) * 2.0 - 1.0;
-    ndc.x *= aspect;
-    vec3 viewDir = normalize(invViewRot * normalize(vec3(ndc * tanHalf, -1.0)));
-    const float stepLen = fogStepSize;
-    vec3  accumScat   = vec3(0.0);
-    float accumTrans  = 1.0;
-    float marchedDist = 0.0;
-    vec3  pos         = camPos;
-    for (uint i = 0u; i < fogMaxSteps; ++i) {
-        marchedDist += stepLen;
-        if (marchedDist >= surfDepth) break;
-
-        pos = camPos + viewDir * marchedDist;
-        float density = fogDensity;
-        vec3 lightCol;
-        float Llum = EvaluateLightContribution(pos, lightCol);
-        float phase = 1.0 / (4.0 * PI);
-        vec3 scat = lightCol * phase * fogLightIntensity;
-
-        // Beer-Lambert
-        float extinction     = density * stepLen;
-        float transmittance  = exp(-extinction);
-        accumScat  += accumTrans * scat * density * stepLen;
-        accumTrans *= transmittance;
-        if (accumTrans < 0.01) break;            // early-out
-    }
-
-    vec3 fogColor = accumScat + fogBaseColor * accumTrans;
-    return vec4(fogColor, 1.0 - accumTrans);       // rgb = fog, a = opacity
+vec4 unpackColor32(uint color) {
+    return vec4(float((color >> 24) & 0xFFu) / 255.0,  // r
+                float((color >> 16) & 0xFFu) / 255.0,  // g
+                float((color >>  8) & 0xFFu) / 255.0,  // b
+                float((color      ) & 0xFFu) / 255.0); // a
 }
 
 void main() {
@@ -569,19 +409,127 @@ void main() {
         }
     }
 
-    ivec2 ipix = ivec2(gl_FragCoord.xy);                // pixel centre
-    vec4 fog = VolumetricFog(ipix);
-    if (!isSky) {
-        color.rgb = mix(color.rgb, fog.rgb, fog.a);
+    ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
+    vec4 fog = vec4(0.0,0.0,0.0,0.0);
+    vec4 wpPack = vec4(0.0,0.0,0.0,0.0);
+    vec3 surfPos = vec3(0.0,0.0,0.0);
+    vec4 specColor = vec4(0.0,0.0,0.0,0.0);
+    if (volumetricFogEnabled > 0 || reflectionsEnabled > 0) {
+        wpPack = imageLoad(inputWorldPos, uv);
+        vec2 worldXY = unpackHalf2x16(floatBitsToUint(wpPack.r));
+        vec2 worldZInst = unpackHalf2x16(floatBitsToUint(wpPack.g));
+        surfPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
     }
 
+    if (reflectionsEnabled > 0) specColor = unpackColor32(floatBitsToUint(wpPack.a));
+
+    if (volumetricFogEnabled > 0) {
+        float surfDepth = length(surfPos - camPos);            // distance to geometry
+        float tanHalf = tan(radians(fov) * 0.5);
+        vec2 ndc = ((vec2(uv) + 0.5) / vec2(screenWidth, screenHeight)) * 2.0 - 1.0;
+        ndc.x *= aspect;
+        vec3 viewDir = normalize(invViewRot * normalize(vec3(ndc * tanHalf, -1.0)));
+        const float stepLen = fogStepSize;
+        vec3  accumScat   = vec3(0.0);
+        float accumTrans  = 1.0;
+        float marchedDist = 0.0;
+        vec3  pos         = camPos;
+        for (uint i = 0u; i < fogMaxSteps; ++i) {
+            marchedDist += stepLen;
+            if (marchedDist >= surfDepth) break;
+
+            pos = camPos + viewDir * marchedDist;
+            float density = fogDensity;
+            vec3 lightCol;
+            uint voxelIdx = GetVoxelIndex(pos);
+            uint count    = min(voxelLightListIndices[voxelIdx * 2 + 1], 16u);
+            uint listoffset  = (count > 0) ? voxelLightListIndices[voxelIdx * 2] : 0u;
+            lightCol = vec3(0.0);
+            for (uint i = 0u; i < count; ++i) {
+                uint lightIdxInPVS = uniqueLightLists[listoffset + i];
+                uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
+                vec3  Lpos   = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],
+                                    lights[lightIdx + LIGHT_DATA_OFFSET_POSY],
+                                    lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
+                float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
+                if (intensity < 0.05) continue;
+
+                float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
+                vec3  toLight = Lpos - pos;
+                float dist = length(toLight);
+                if (dist > range) continue;
+
+                vec3 lightDir = normalize(toLight);
+                float lambertian = 1.0; // No normal to compare against
+                float distOverRange = dist / range;
+                float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
+                float attenuation = rangeFacSqrd * lambertian;
+                attenuation = attenuation * attenuation;                     // quadratic fall-off
+                float shadowFactor = 1.0;
+                if (shadowsEnabled > 0) {
+                    float smearness = attenuation * attenuation * 38.0;
+                    float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0);
+                    float normalBias = 0.04;
+                    vec3 a = abs(-toLight);
+                    float maxAxis = max(max(a.x, a.y), a.z);
+                    float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
+                    vec3 dir = -toLight * invMax;
+                    uint face;
+                    vec2 uv;
+                    if (a.x >= a.y && a.x >= a.z) {
+                        face = -toLight.x > 0.0 ? 0u : 1u; uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
+                    } else if (a.y >= a.x && a.y >= a.z) {
+                        face = -toLight.y > 0.0 ? 2u : 3u; uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
+                    } else {
+                        face = -toLight.z > 0.0 ? 4u : 5u; uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
+                    }
+
+                    uv = uv * 0.5 + 0.5;
+                    uint base = lightIdxInPVS * 6u * uint(shadowmapSize) * uint(shadowmapSize);
+                    uint faceOff = base + face * uint(shadowmapSize) * uint(shadowmapSize);
+                    vec2 tc = uv * shadowmapSize;
+                    float tx = clamp(tc.x, 0.0, shadowmapSize - 1.0);
+                    float ty = clamp(tc.y, 0.0, shadowmapSize - 1.0);
+                    uint utx = uint(tx);
+                    uint uty = uint(ty);
+                    uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
+                    uint distInt = shadowMaps[ssbo_index];
+                    float d = float(distInt) / 10000.0;
+                    float depthDiff = dist - d - (bias + normalBias);
+                    shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
+                    if (shadowFactor < 0.005) continue;
+                }
+
+                vec3 Lcol = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R],
+                                lights[lightIdx + LIGHT_DATA_OFFSET_G],
+                                lights[lightIdx + LIGHT_DATA_OFFSET_B]);
+
+                lightCol += Lcol * intensity * attenuation * shadowFactor;
+            }
+
+            float phase = 1.0 / (4.0 * PI);
+            vec3 scat = lightCol * phase * fogLightIntensity;
+
+            // Beer-Lambert
+            float extinction     = density * stepLen;
+            float transmittance  = exp(-extinction);
+            accumScat  += accumTrans * scat * density * stepLen;
+            accumTrans *= transmittance;
+            if (accumTrans < 0.01) break;            // early-out
+        }
+
+        vec3 fogColor = clamp(accumScat + fogBaseColor * accumTrans,0.0,1.0);
+        fog = vec4(fogColor, 1.0 - accumTrans);       // rgb = fog, a = opacity
+    }
+
+    if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
     ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
     if (debugView != 4) {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-            vec3 reflectionColor = texture(outputImage, sampleUV).rgb;
+            vec3 reflectionColor = texture(outputImage, sampleUV).rgb * specColor.rgb * 1.4;
             if (isSky) {
                 FragColor.rgb += reflectionColor;
                 return;

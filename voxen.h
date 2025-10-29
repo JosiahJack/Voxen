@@ -1,7 +1,8 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.2"
-// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+// #define LOAD_LOCALIZATION_FONTS
+#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 // #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
@@ -503,7 +504,11 @@ float dot(float x1, float y1, float z1, float x2, float y2, float z2);
 #define TEXT_STOPD_RED_PAUSETITLE 8
 #define TEXT_COLOR_COUNT 9
 #define TEXT_BUFFER_SIZE 1024
+#ifdef LOAD_LOCALIZATION_FONTS
 #define FONT_ATLAS_SIZE 4096
+#else
+#define FONT_ATLAS_SIZE 2048
+#endif // LOAD_LOCALIZATION_FONTS
 #define MAX_GLYPHS 8192      // Rough estimate for all ranges
 #define FONT_NORMAL 0
 #define FONT_STOPD 1

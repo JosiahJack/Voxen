@@ -139,22 +139,25 @@ void main() {
 
     if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
-    if (NormalIndex != 41 && debugValue < 1) {
+    if (NormalIndex != 41 && debugValue < 1 && distToPixel < 10.24) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
         vec2 duv2 = dFdy(TexCoord);
-        vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
-        vec3 b = normalize(dp1 * duv2.x - dp2 * duv1.x);
-        mat3 TBN3x3 = mat3(t, b, adjustedNormal);
-        ivec2 texSizeNorm = textureSizes[NormalIndex];
-        vec2 uvNorm = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
-        int xNorm = int(floor(uvNorm.x * float(texSizeNorm.x)));
-        int yNorm = int(floor(uvNorm.y * float(texSizeNorm.y)));
-        ivec2 texUVNorm = ivec2(xNorm,yNorm);
-        vec3 normalColor = (getTextureColor(NormalIndex,texUVNorm).rgb * 2.0 - 1.0);
-        normalColor.g = -normalColor.g;
-        adjustedNormal = normalize(TBN3x3 * normalColor);
+        float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
+        if (uvArea > 0.0000001) {
+            vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
+            vec3 b = normalize(dp1 * duv2.x - dp2 * duv1.x);
+            mat3 TBN3x3 = mat3(t, b, adjustedNormal);
+            ivec2 texSizeNorm = textureSizes[NormalIndex];
+            vec2 uvNorm = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+            int xNorm = int(floor(uvNorm.x * float(texSizeNorm.x)));
+            int yNorm = int(floor(uvNorm.y * float(texSizeNorm.y)));
+            ivec2 texUVNorm = ivec2(xNorm,yNorm);
+            vec3 normalColor = (getTextureColor(NormalIndex,texUVNorm).rgb * 2.0 - 1.0);
+            normalColor.g = -normalColor.g;
+            adjustedNormal = normalize(TBN3x3 * normalColor);
+        }
     }
 
     vec4 glowColor = vec4(0.0,0.0,0.0,0.0);

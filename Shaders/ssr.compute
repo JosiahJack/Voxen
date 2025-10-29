@@ -27,7 +27,7 @@ void main() {
     imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0));
     vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * SSR_RES));
     vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
-    if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;
+//     if (specColor.r < 0.01 && specColor.g < 0.01 && specColor.b < 0.01) return;
     
     vec2 worldXY = unpackHalf2x16(floatBitsToUint(worldPosPack.r));
     vec2 worldZInst = unpackHalf2x16(floatBitsToUint(worldPosPack.g));
@@ -97,6 +97,6 @@ void main() {
     if (totalWeight < 0.01) return; // Avoid division by near-zero
 
     reflectionColor /= totalWeight; // Normalize by total weight
-    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, specColor.rgb * 0.451);
+    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, vec3(1.0) * 0.451); // Just so happens to work well with, yes, another magical 451
     imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));
 }
