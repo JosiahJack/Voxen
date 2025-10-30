@@ -230,7 +230,7 @@ void SortInstances();
 #define EV_QUIT 255u
 
 // Event Journal Buffer
-#define EVENT_JOURNAL_BUFFER_SIZE 30000
+#define EVENT_JOURNAL_BUFFER_SIZE 1000
 
 // Event Queue
 #define MAX_EVENTS_PER_FRAME 100
@@ -506,10 +506,11 @@ float dot(float x1, float y1, float z1, float x2, float y2, float z2);
 #define TEXT_BUFFER_SIZE 1024
 #ifdef LOAD_LOCALIZATION_FONTS
 #define FONT_ATLAS_SIZE 4096
+#define MAX_GLYPHS 8192      // Rough estimate for all ranges
 #else
 #define FONT_ATLAS_SIZE 2048
+#define MAX_GLYPHS 256
 #endif // LOAD_LOCALIZATION_FONTS
-#define MAX_GLYPHS 8192      // Rough estimate for all ranges
 #define FONT_NORMAL 0
 #define FONT_STOPD 1
 extern GLuint fontAtlasTex;

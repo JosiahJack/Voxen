@@ -1197,7 +1197,7 @@ static const float quadBlit_vertices[] = {
 
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
-    DebugRAM("InitializeEnvironment start");    
+    DebugRAM("InitializeEnvironment start");   
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); exit(1); }
     
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
@@ -1207,10 +1207,13 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
+    malloc_trim(0);
     if (!window) { DualLogError("glfwCreateWindow failed\n"); glfwTerminate(); exit(1); }
+    
     glfwMakeContextCurrent(window);
     UpdateScreenSize();
     stbi_flip_vertically_on_write(1);
+    malloc_trim(0);
     DebugRAM("window init");
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
@@ -1228,6 +1231,7 @@ void InitializeEnvironment(void) {
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(1); }
 
+    malloc_trim(0);
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
@@ -1244,7 +1248,9 @@ void InitializeEnvironment(void) {
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glViewport(0, 0, screen_width, screen_height);
+    malloc_trim(0);
     CompileShaders();
+    malloc_trim(0);
     glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
     glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
     glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
@@ -1458,26 +1464,22 @@ void clear_ev_journal(void) {
 }
 
 void JournalLog(void) {
+//     double timestamp = get_time();
     FILE* fp;
     if (journalFirstWrite) {
         fp = fopen("./voxen.dem", "wb"); // Overwrite for first write.
         journalFirstWrite = false;
     } else fp = fopen("./voxen.dem", "ab"); // Append
 
-    if (!fp) {
-        DualLogError("Failed to open voxen.dem for journal log\n");
-        return;
-    }
+    if (!fp) { DualLogError("Failed to open voxen.dem for journal log\n"); return; }
 
-    // Write all valid events in eventJournal
-    for (int32_t i = 0; i < eventJournalIndex; i++) {
-        if (eventJournal[i].type != EV_NULL) {
-            fwrite(&eventJournal[i], sizeof(Event), 1, fp);
-        }
+    for (int32_t i = 0; i < eventJournalIndex; i++) { // Write all valid events in eventJournal
+        if (eventJournal[i].type != EV_NULL) fwrite(&eventJournal[i], sizeof(Event), 1, fp);
     }
 
     fflush(fp);
     fclose(fp);
+//     DualLog("Writing to event journal at timestamp %f, took %f seconds\n", timestamp, get_time() - timestamp);
 }
 
 bool IsPlayableEventType(uint8_t type) {
@@ -1738,6 +1740,7 @@ static const char* debugViewNames[] = {
 
 int32_t main(int32_t argc, char* argv[]) {
     double programStartTime = get_time();
+    DebugRAM("program start");
     random_range_rng = (uint32_t)programStartTime; // Seed global rand uniquely with time since system boot.
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
@@ -2075,8 +2078,8 @@ int32_t main(int32_t argc, char* argv[]) {
         CHECK_GL_ERROR();
         globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT
-            if (globalFrameNum == 4) DebugRAM("after 4 frames of running");
-            else if (globalFrameNum == 100) DebugRAM("after 100 frames of running");
+            if (globalFrameNum == 4) { DebugRAM("after 4 frames of running"); malloc_trim(0); }
+            else if (globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
             else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
         #endif
     }
