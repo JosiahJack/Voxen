@@ -420,6 +420,8 @@ void LoadTextures(void) {
         if (matchedParserIdxes[i] >= 0 && image_data[i]) current_index_offset += widths[i] * heights[i];
     }
 
+    malloc_trim(0);
+    
     // Parallel loop for palette construction
     #pragma omp parallel
     {

@@ -725,6 +725,8 @@ void RenderShadowmap(uint16_t lightIdx) {
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
+
+    malloc_trim(0);
 }
 
 // Renders all static shadowmaps at level load
@@ -734,6 +736,7 @@ void RenderShadowmaps(void) {
     double start_time = get_time();
     DualLog("Rendering shadowmaps...");
     DebugRAM("Start of RenderShadowmaps");
+    malloc_trim(0);
     glGenTextures(1, &shadowCubeMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
     for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R8, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
@@ -750,22 +753,11 @@ void RenderShadowmaps(void) {
     glDrawBuffer(0);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("\nShadow FBO incomplete, status: 0x%x\n", status); return; }
    
-    // SSBO for shadow map data
-    GLuint tempSSBO;
-    glGenBuffers(1, &tempSSBO);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, tempSSBO);
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
     uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
     uint32_t totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
     uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
-    glGenBuffers(1, &shadowMapSSBO);
-    glBindBuffer(GL_COPY_WRITE_BUFFER, shadowMapSSBO); // destination
-    glBufferData(GL_COPY_WRITE_BUFFER, depthMapBufferSize, NULL, GL_STATIC_DRAW);
-    glBindBuffer(GL_COPY_READ_BUFFER, tempSSBO);
-    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, depthMapBufferSize);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, shadowMapSSBO);
-    glDeleteBuffers(1, &tempSSBO);
+    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glUseProgram(shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
