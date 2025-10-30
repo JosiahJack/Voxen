@@ -3,7 +3,6 @@
 #define VERSION_STRING "v0.7.2"
 // #define LOAD_LOCALIZATION_FONTS
 #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-// #define DEBUG_TEXTURE_LOAD_DATA 1
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
 // Generic Lib Includes
@@ -487,6 +486,7 @@ extern GLuint imageBlitShaderProgram;
 extern GLint debugViewLoc_quadblit, debugValueLoc_quadblit;
 extern GLint debugViewLoc_chunk, debugValueLoc_chunk;
 void CacheUniformLocationsForShaders(void);
+GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 void Screenshot(void);
 void ToggleConsole(void);
 bool CursorVisible(void);

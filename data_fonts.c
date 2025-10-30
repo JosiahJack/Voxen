@@ -366,7 +366,6 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
     free(atlasBitmapStopD);
 
     // Store fixed width for numbers in StopD (optional global)

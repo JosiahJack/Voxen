@@ -407,18 +407,15 @@ void Screenshot() {
         if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
     }
     
-    unsigned char* pixels = calloc(screen_width * screen_height * 4, sizeof(char));
+    unsigned char* pixels = malloc(screen_width * screen_height * 4 * sizeof(char));
     glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     char timestamp[32];
     char filename[96];
     time_t now = time(NULL);
-    struct tm *utc_time = localtime(&now);
-    if (!utc_time) { DualLog("Failed to get current time for screenshot!\n"); free(pixels); return; }
-    
-    strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
+    struct tm *utc_time = localtime(&now);    
+    if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
     snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_x, cam_y, cam_z, get_time());
-    int32_t success = stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4);
-    if (!success) DualLog("Failed to save screenshot\n");
+    if (!stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4)) DualLogError("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
     free(pixels);
@@ -1178,32 +1175,13 @@ static inline uint8_t random_range_u8(uint8_t a, uint8_t b){
 }
 // ============================================================================
 void NewGame(void) {
+    memset(&questData, 0, sizeof(QuestBits));
     questData.lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
     questData.lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
     questData.lev3SecCode = random_range_u8(0u,9u);
     questData.lev4SecCode = random_range_u8(0u,9u);
     questData.lev5SecCode = random_range_u8(0u,9u);
     questData.lev6SecCode = random_range_u8(0u,9u);
-    questData.RobotSpawnDeactivated = false;
-    questData.IsotopeInstalled = false;
-    questData.ShieldActivated = false;
-    questData.LaserSafetyOverriden = false;
-    questData.LaserDestroyed = false;
-    questData.BetaGroveCyberUnlocked = false;
-    questData.GroveAlphaJettisonEnabled = false;
-    questData.GroveBetaJettisonEnabled = false;
-    questData.GroveDeltaJettisonEnabled = false;
-    questData.MasterJettisonBroken = false;
-    questData.Relay428Fixed = false;
-    questData.MasterJettisonEnabled = false;
-    questData.BetaGroveJettisoned = false;
-    questData.AntennaNorthDestroyed = false;
-    questData.AntennaSouthDestroyed = false;
-    questData.AntennaEastDestroyed = false;
-    questData.AntennaWestDestroyed = false;
-    questData.SelfDestructActivated = false;
-    questData.BridgeSeparated = false;
-    questData.IsolinearChipsetInstalled = false;
     RenderLoadingProgress(100,"Loading level data...");
     renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -1213,7 +1191,7 @@ void NewGame(void) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    glClearColor(0.0f, 0.0f, 0.0f, 0.2f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.2f); // Set after shadowmap rendering.
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
     VoxelLists();
 }
@@ -1240,6 +1218,7 @@ void InitializeEnvironment(void) {
     if (!window) { DualLogError("glfwCreateWindow failed\n"); glfwTerminate(); exit(1); }
     glfwMakeContextCurrent(window);
     UpdateScreenSize();
+    stbi_flip_vertically_on_write(1);
     DebugRAM("window init");
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
@@ -1253,7 +1232,6 @@ void InitializeEnvironment(void) {
         DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\n", glfwGetMonitorName(target_monitor), xpos, ypos);
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
     
-    stbi_flip_vertically_on_write(1);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
     if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(1); }
@@ -1269,29 +1247,21 @@ void InitializeEnvironment(void) {
     glfwSetCursorPosCallback(window, cursor_pos_callback);
     glfwSetWindowFocusCallback(window, window_focus_callback);
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_MULTISAMPLE);
+    glDisable(GL_MULTISAMPLE);
     glMinSampleShading(0.0f);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glEnable(GL_CULL_FACE); // Enable backface culling
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glViewport(0, 0, screen_width, screen_height);
     CompileShaders();
-    glUseProgram(imageBlitShaderProgram);
-    glUniform1ui(screenWidthLoc_imageBlit, screen_width);
-    glUniform1ui(screenHeightLoc_imageBlit, screen_height);
-    glProgramUniform1f(imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
-
-    glUseProgram(chunkShaderProgram);
-    glUniform1ui(screenWidthLoc_chunk, screen_width);
-    glUniform1ui(screenHeightLoc_chunk, screen_height);
-    glProgramUniform1f(chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
-
-    glUseProgram(ssrShaderProgram);
-    glUniform1ui(screenWidthLoc_ssr, screen_width / SSR_RES);
-    glUniform1ui(screenHeightLoc_ssr, screen_height / SSR_RES);
-    glProgramUniform1i(ssrShaderProgram, outputImageLoc_ssr, 4);
-    glUseProgram(0);
+    glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
+    glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
+    glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1ui(chunkShaderProgram, screenWidthLoc_chunk, screen_width);
+    glProgramUniform1ui(chunkShaderProgram, screenHeightLoc_chunk, screen_height);
+    glProgramUniform1f( chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
+    glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
+    glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
         
     // Setup full screen quad for image blit for post processing effects like lighting.
     glCreateBuffers(1, &quadVBO);
@@ -1368,7 +1338,6 @@ void InitializeEnvironment(void) {
     
     // Text Initialization
     InitFontAtlasses();
-    DebugRAM("stb TTF init");
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
     glEnableVertexArrayAttrib(textVAO, 0);
@@ -1378,8 +1347,6 @@ void InitializeEnvironment(void) {
     glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
     glVertexArrayAttribBinding(textVAO, 0, 0);
     glVertexArrayAttribBinding(textVAO, 1, 0);
-    
-    DebugRAM("text init");
 
     // Lights buffer
     glGenBuffers(1, &lightsID);

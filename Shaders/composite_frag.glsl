@@ -36,7 +36,7 @@ uniform mat3 invViewRot;
 
 const int SSR_RES = 4;
 
-const float vhsBlurAmount = 0.5;
+const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
 
 const float staticIntensity = 0.0;      // 0.0 .. 1.0
