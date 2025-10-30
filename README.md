@@ -232,6 +232,8 @@ MIT-0
 #### Stats
 
 Log ouput from standard run:
+
+```
 Compiling voxen...
 Shaders converted to string constants in 13 ms
 Linking completed in 128 ms
@@ -254,8 +256,11 @@ Culling...Found 1170 open cells for level 1, Found closed edges north: 368, sout
 Generating voxel lighting data... took 0.016571 seconds, total list size: 1008105
 Rendering shadowmaps... took 0.482151 seconds to render 892 static shadow maps
 Game Initialized in 1.602535 secs
+```
 
 Log output from one run with DEBUG_RAM_OUTPUT declared in voxen.h:
+
+```
 Compiling voxen...
 Shaders converted to string constants in 12 ms
 Linking completed in 131 ms
@@ -304,8 +309,11 @@ Game Initialized in 1.626723 secs
 Memory at after 4 frames of running: Heap usage 167258208 bytes (163338 KB | 159.51 MB), USS 162844672 bytes (159028 KB | 155.30 MB)
 Memory at after 100 frames of running: Heap usage 167235360 bytes (163315 KB | 159.49 MB), USS 158351360 bytes (154640 KB | 151.02 MB)
 Memory at after 200 frames of running: Heap usage 167233344 bytes (163313 KB | 159.49 MB), USS 158351360 bytes (154640 KB | 151.02 MB)
+```
 
 Heap impacts:
+
+```
 ❯ grep -rIn  "alloc("
 voxen.c:410:    unsigned char* pixels = malloc(screen_width * screen_height * 4 * sizeof(char));
 voxen.c:525:    uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
@@ -353,13 +361,19 @@ data_parser.c:949:    modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16
 data_parser.c:950:    modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
 data_parser.c:951:    modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
 NOTE: Excluded miniaudio, stb_image ./External alloc calls
+```
 
 Binary static variable impacts:
+
+```
 ❯ size ./voxen
    text    data     bss     dec     hex filename
 2703444   34128 5476360 8213932  7d55ac ./voxen
+```
 
 Individual static variable impacts:
+
+```
 ❯ nm -S --size-sort -r ./voxen | grep ' [BD] '
 0000000000324420 0000000000200000 B precomputedVisibleCellsFromHere
 000000000056a560 000000000009c400 B modelMatrices
@@ -757,3 +771,4 @@ Individual static variable impacts:
 000000000067ddc0 0000000000000001 B cursorVisible
 000000000068205a 0000000000000001 B currentLevel
 0000000000676940 0000000000000001 B consoleActive
+```
