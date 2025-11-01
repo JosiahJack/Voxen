@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include "External/stb_image.h"
 #include "voxen.h"
-#include "citadel.h"
 
 uint8_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];

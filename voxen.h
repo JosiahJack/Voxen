@@ -2,7 +2,7 @@
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.2"
 // #define LOAD_LOCALIZATION_FONTS
-#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
 // Generic Lib Includes
@@ -36,7 +36,6 @@ typedef struct {
     uint16_t lodIndex;
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     bool active;
-    bool solid;
     bool cardchunk;
 } Entity;
 
@@ -115,6 +114,7 @@ void ParseGameData();
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
+#define BLACK_TEXTURE_IDX 41
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
@@ -153,6 +153,7 @@ void LoadModels(void);
 // Entities
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 #define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define GEOMETRY_LOD_CARD_MODEL_IDX 178
 extern Entity entities[MAX_ENTITIES];
 extern Entity instances[INSTANCE_COUNT];
 extern uint16_t* modelTypeCountsOpaque;
@@ -379,7 +380,6 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 extern double time_PhysicsStep;
-extern double physicsProcessingTime;
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;
@@ -539,6 +539,125 @@ extern float uiOrthoProjection[16];
 float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------
+// GAME LOGIC
+#include "citadel_enumerations.h"
+
+// Patches
+#define PATCH_TIME_BERSERK 30.0f
+
+typedef struct {
+    int SFXJump;
+    int SFXJumpLand;
+    int SFXLadder;
+    float playerSpeed;
+    float playerSpeedActual;
+    float playerSpeedHorizontalActual;
+    bool grounded;
+    float feetRayLength;
+    bool FatigueCheat;
+    BodyState bodyState;
+    int ladderState;
+    bool gravliftState;
+    float walkAcceleration;
+    int SFXIndex;
+    float walkDeacceleration;
+	float walkDeaccelerationBooster;
+	float deceleration;
+	float walkAccelAirRatio;
+	float maxWalkSpeed;
+	float maxCyberSpeed;
+	float maxCyberUltimateSpeed;
+	float maxCrouchSpeed;
+	float maxProneSpeed;
+	float maxSprintSpeed;
+	float maxSprintSpeedFatigued;
+	float maxVerticalSpeed;
+	float boosterSpeedBoost; // ammount to boost by when booster is active
+	float jumpImpulseTime;
+	float jumpVelocityBoots;
+	float jumpVelocity;
+    float jumpVelocityFatigued;
+	float crouchRatio;
+	float proneRatio;
+	float transitionToCrouchSec;
+	float transitionToProneAdd;
+	float currentCrouchRatio;
+	float capsuleHeight;
+	float capsuleRadius;
+	float ladderSpeed;
+	float fallDamage;
+    bool CheatWallSticky;
+    bool CheatNoclip;
+    bool staminupActive;
+    Vector2 horizontalMovement;
+    float verticalMovement;
+    float jumpTime;
+    float crouchingVelocity;
+    float lastCrouchRatio;
+    int layerGeometry;
+	int layerMask;
+	float fallDamageSpeed;
+	Vector3 oldVelocity;
+	float fatigue;
+	float jumpFatigue;
+	float fatigueWanePerTick;
+	float fatigueWanePerTickCrouched;
+	float fatigueWanePerTickProne;
+	float fatigueWaneTickSecs;
+	float fatiguePerWalkTick;
+	float fatiguePerSprintTick;
+	bool justJumped;
+	float fatigueFinished;
+	float fatigueFinished2;
+	bool running;
+	float relForward;
+	float relSideways;
+	bool cyberSetup;
+	bool cyberDesetup;
+	float bonus;
+    float walkDeaccelerationVolx;
+    float walkDeaccelerationVoly;
+    float walkDeaccelerationVolz;
+	bool consoleActivated;
+	float leanTarget;
+	float leanShift;
+	float leanMaxAngle;
+	float leanMaxShift;
+	float jumpSFXFinished;
+	float ladderSFXFinished;
+	float ladderSFXIntervalTime;
+	float jumpSFXIntervalTime;
+	float jumpLandSoundFinished;
+	float jumpJetEnergySuckTickFinished;
+	float jumpJetEnergySuckTick;
+	float leanSpeed;
+	bool Notarget; // for cheat to disable enemy sight checks against this player
+    bool fatigueWarned;
+    float ressurectingFinished;
+	float burstForce;
+	float doubleJumpFinished;
+	Vector3 playerHome;
+	float turboFinished;
+	float turboCyberTime;
+	bool inCyberTube;
+	float stepFinished;
+	float rustleFinished;
+	int doubleJumpTicks;
+	Vector3 tempVecRbody;
+	bool inputtingMovement;
+	float accel;
+	float floorDot;
+	Vector3 floorAng;
+	float slideAngle;
+	float gravFinished;
+	float bodyLerpGravityOffDelayFinished;
+	Vector3 feetOffset;
+} PlayerMovement;
+
+extern PlayerMovement playerMovement;
+
+
+// ----------------------------------------------------------------------------
 // Logging / Debug Prints
 extern FILE *console_log_file;
 void Screenshot();
@@ -595,6 +714,9 @@ void DebugRAM(const char *context) {
 #pragma GCC diagnostic pop
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
+
+float random() { return ((float)rand() / RAND_MAX); }
+float crandom() { return 2.0f * (random() - 0.5f); }
 
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; } // TODO: Resave levels with the offsets applied.

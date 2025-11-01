@@ -9,7 +9,6 @@
 #include <omp.h>
 #include <math.h>
 #include "voxen.h"
-#include "citadel.h"
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -490,7 +489,7 @@ void LoadTextures(void) {
         malloc_trim(0);
     }
 
-    DualLog(" total pallete colors: %u, totalPixels was: %u... \n", totalPaletteColors, totalPixels);
+    DualLog(" total pallete colors: %u, totalPixels was: %u... ", totalPaletteColors, totalPixels);
     free(all_indices);
     free(index_offsets);
     for (uint16_t i = 0; i < loadedTextures; i++) free(per_texture_palettes[i]);
@@ -750,7 +749,7 @@ void LoadEntities(void) {
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
-        entities[i].lodIndex = entity_parser.entries[i].cardchunk ? 178: entity_parser.entries[i].lodIndex; // Generic LOD card
+        entities[i].lodIndex = entity_parser.entries[i].cardchunk ? GEOMETRY_LOD_CARD_MODEL_IDX: entity_parser.entries[i].lodIndex; // Generic LOD card
         entities[i].cardchunk = entity_parser.entries[i].cardchunk;
         entities[i].position.x = 0.0f;
         entities[i].position.y = 0.0f;
@@ -913,12 +912,13 @@ void LoadLevel(uint8_t curlevel) {
             if (instances[lineNum].modelIndex < loadedModels) renderableCount++;
             instances[lineNum].texIndex = entities[entIdx].texIndex;
             instances[lineNum].glowIndex = entities[entIdx].glowIndex;
-            if (instances[lineNum].glowIndex >= MATERIAL_IDX_MAX) instances[lineNum].glowIndex = 41;
+            if (instances[lineNum].glowIndex >= MATERIAL_IDX_MAX) instances[lineNum].glowIndex = BLACK_TEXTURE_IDX;
             instances[lineNum].specIndex = entities[entIdx].specIndex;
-            if (instances[lineNum].specIndex >= MATERIAL_IDX_MAX) instances[lineNum].specIndex = 41;
+            if (instances[lineNum].specIndex >= MATERIAL_IDX_MAX) instances[lineNum].specIndex = BLACK_TEXTURE_IDX;
             instances[lineNum].normIndex = entities[entIdx].normIndex;
-            if (instances[lineNum].normIndex >= MATERIAL_IDX_MAX) instances[lineNum].normIndex = 41;
+            if (instances[lineNum].normIndex >= MATERIAL_IDX_MAX) instances[lineNum].normIndex = BLACK_TEXTURE_IDX;
             instances[lineNum].lodIndex = entities[entIdx].lodIndex;
+            instances[lineNum].cardchunk = entities[entIdx].cardchunk;
             if (ConstIndexIsDoor(entIdx)) {
                 instances[lineNum].position.x += correctionX + 0.6001f;
                 instances[lineNum].position.y += correctionY - 0.5681f;

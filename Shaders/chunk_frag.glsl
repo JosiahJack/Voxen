@@ -55,6 +55,7 @@ const int LIGHT_DATA_OFFSET_G = 11;
 const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
+const int BLACK_TEXTURE_IDX = 41;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
 
 uint GetVoxelIndex(vec3 worldPos) {
@@ -139,7 +140,7 @@ void main() {
 
     if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
-    if (NormalIndex != 41 && debugValue < 1 && distToPixel < 10.24) {
+    if (NormalIndex != BLACK_TEXTURE_IDX && debugValue < 1 && distToPixel < 10.24) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -161,7 +162,7 @@ void main() {
     }
 
     vec4 glowColor = vec4(0.0,0.0,0.0,0.0);
-    if (GlowIndex != 41) {
+    if (GlowIndex != BLACK_TEXTURE_IDX) {
         ivec2 texSizeGlow = textureSizes[GlowIndex];
         vec2 uvGlow = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
         int xGlow = int(floor(uvGlow.x * float(texSizeGlow.x)));

@@ -15,7 +15,7 @@
 // TODO: Multiview renders for sensaround
 // TODO: Proper physics
 // TODO: Raycasts
-// TODO: Voxel GI
+// TODO: Voxel GI?
 // TODO: Scripting engine for gameplay
 // TODO: Save/Load system
 #define VERSION_STRING "v0.7.2"
@@ -94,6 +94,8 @@ float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
 float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
 float cam_fov = 65.0f;
 double last_mouse_x = 0.0, last_mouse_y = 0.0;
+float berserkFinished = 0.0f;
+float berserkSeedTime = 0.0f;
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering
 int32_t debugView = 0;
@@ -141,7 +143,8 @@ GLuint imageBlitShaderProgram;
 GLuint quadVAO, quadVBO;
 GLint texLoc_quadblit, debugViewLoc_quadblit, debugValueLoc_quadblit, screenWidthLoc_imageBlit, screenHeightLoc_imageBlit, outputImageLoc_imageBlit, skyVisibleLoc_imageBlit, planetaryBodiesVisibleLoc_imageBlit,
       groveShieldVisibleLoc_imageBlit, stationShieldVisibleLoc_imageBlit, reflectionsEnabledLoc_imageBlit, aaEnabledLoc_imageBlit, brightnessSettingLoc_imageBlit, fovLoc_imageBlit, camRotLoc_imageBlit, timeValLoc_imageBlit,
-      aspectLoc_imageBlit, shadowsSettingLoc_imageBlit, shadowmapSizeLoc_imageBlit, worldMin_xLoc_imageBlit, worldMin_zLoc_imageBlit, viewProjectionLoc_imageBlit, camPosLoc_imageBlit, invViewRotLoc_imageBlit;
+      aspectLoc_imageBlit, shadowsSettingLoc_imageBlit, shadowmapSizeLoc_imageBlit, worldMin_xLoc_imageBlit, worldMin_zLoc_imageBlit, viewProjectionLoc_imageBlit, camPosLoc_imageBlit, invViewRotLoc_imageBlit,
+      berserkTimeRemainingLoc_imageBlit, berserkSeedTimestampLoc_imageBlit;
       
 //    Text Shader
 GLuint textShaderProgram;
@@ -392,7 +395,9 @@ void CompileShaders(void) {
     viewProjectionLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "viewProjection");
     camPosLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "camPos");
     invViewRotLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "invViewRot");
-
+    berserkTimeRemainingLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "berserkTimeRemaining");
+    berserkSeedTimestampLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "berserkSeedTimestamp");
+    
     projectionLoc_text = glGetUniformLocation(textShaderProgram, "projection");
     textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
     textTextureLoc_text = glGetUniformLocation(textShaderProgram, "textTexture");
@@ -853,8 +858,8 @@ void RenderUIImages() {
 
         if (vertexCount > 0) {
             glUniform1ui(texIndexLoc_chunk, currentTex);
-            glUniform1ui(glowSpecIndexLoc_chunk, 41);
-            glUniform1ui(normInstanceIndexLoc_chunk, 41);
+            glUniform1ui(glowSpecIndexLoc_chunk,     BLACK_TEXTURE_IDX);
+            glUniform1ui(normInstanceIndexLoc_chunk, BLACK_TEXTURE_IDX);
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, (float[16]){1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1});
             glNamedBufferData(uiImageVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
@@ -1186,6 +1191,7 @@ void NewGame(void) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.2f); // Set after shadowmap rendering.
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
     VoxelLists();
+    pauseRelativeTime = 0.0f;
 }
 
 static const float quadBlit_vertices[] = {
@@ -1803,7 +1809,7 @@ int32_t main(int32_t argc, char* argv[]) {
     }
 
     InitializeEnvironment();
-    double last_physics_time = get_time();
+//     double last_physics_time = get_time();
     last_time = get_time();
     DebugRAM("prior to game loop");
     RenderShadowmaps();
@@ -1814,15 +1820,22 @@ int32_t main(int32_t argc, char* argv[]) {
         current_time = get_time();
         double frame_time = current_time - last_time;
         if (!gamePaused) pauseRelativeTime += (float)frame_time;
+        
+        // Handle Berserk Effect for Compositing Shader
+        float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
+        if (berserkFinished < pauseRelativeTime && berserkFinished > 0.0001f) {
+            berserkFinished = 0.0f;
+            berserkTimeRemainingNormalized = 0.0f;
+        }
 
         // Enqueue input events
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
-        double timeSinceLastPhysicsTick = current_time - last_physics_time;
-        if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
-            last_physics_time = current_time;
+//         double timeSinceLastPhysicsTick = current_time - last_physics_time;
+//         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
+//             last_physics_time = current_time;
             EnqueueEvent_Simple(EV_PHYSICS_TICK);
-        }
+//         }
 
         // Enqueue all logged events for the current frame.
         if (log_playback) {
@@ -1948,6 +1961,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform3f(imageBlitShaderProgram, camPosLoc_imageBlit, cam_x, cam_y, cam_z);
         glUniformMatrix4fv(viewProjectionLoc_imageBlit, 1, GL_FALSE, viewProj);
         glUniformMatrix3fv(invViewRotLoc_imageBlit, 1, GL_FALSE, invViewRot);
+        glProgramUniform1f(imageBlitShaderProgram, berserkTimeRemainingLoc_imageBlit, berserkTimeRemainingNormalized);
+        glProgramUniform1f(imageBlitShaderProgram, berserkSeedTimestampLoc_imageBlit, berserkSeedTime);
         glProgramUniform1f(imageBlitShaderProgram, fovLoc_imageBlit, cam_fov);
         glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
         glUniform3f(camRotLoc_imageBlit, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));

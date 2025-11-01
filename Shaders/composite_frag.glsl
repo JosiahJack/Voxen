@@ -18,6 +18,8 @@ uniform float worldMin_z;
 uniform sampler2D outputImage;
 uniform uint reflectionsEnabled;
 uniform uint aaEnabled;
+uniform float berserkTimeRemaining;
+uniform float berserkSeedTimestamp;
 uniform uint brightnessSetting;
 uniform vec3 camRot;
 uniform vec3 camPos;
@@ -265,6 +267,49 @@ vec4 unpackColor32(uint color) {
                 float((color      ) & 0xFFu) / 255.0); // a
 }
 
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 hsv2rgb(vec3 c) {
+    vec3 rgb = abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0;
+    rgb = clamp(rgb, 0.0, 1.0);
+    return c.z * mix(vec3(1.0), rgb, c.y);
+}
+
+vec3 applyBerserk(vec3 worldPos, vec3 base) {
+    if (berserkTimeRemaining <= 0.0) return base;
+
+    float prog = clamp(1.0 - berserkTimeRemaining, 0.0, 1.0);
+    float seed = fract(sin(berserkSeedTimestamp * 91.7) * 43758.5453);
+    float hueBase = mix(0.15, 0.75, seed);
+    float hueShift = mix(0.0, hueBase, smoothstep(0.0, 1.0, prog * 0.8) + 0.2);
+    float n = fract(sin(dot(worldPos, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float d = length(worldPos - camPos) * 0.1;
+    float dn = fract(sin(d + n * 37.719) * 15731.743);
+    float coverage = mix(dn, 1.0, smoothstep(0.0, 1.0, prog));
+    float coverageMask = smoothstep(0.0, 1.0, (coverage - n) * 4.0);
+
+    vec3 hsv = rgb2hsv(base);
+    hsv.x = fract(hsv.x + hueShift + n * 0.2);
+    float fadeIn = smoothstep(0.0, 0.05, prog);
+    float fadeOut = smoothstep(0.0, 0.025, berserkTimeRemaining);
+
+    vec3 berserkColor = mix(base, hsv2rgb(hsv), coverageMask * fadeIn * fadeOut);
+
+    // Inversion fade in final throes
+    float invertFade = smoothstep(0.25, 0.22, berserkTimeRemaining) * fadeOut;
+    vec3 inverted = vec3(1.0) - berserkColor;
+    inverted *= inverted * 1.5;
+    return mix(berserkColor, inverted * berserkColor * 1.5, invertFade);
+}
+
+
 void main() {
     vec2 texCoordUsed = TexCoord;
     if (empEffectActive > 0u) texCoordUsed.y += timeVal * 15.0;
@@ -414,7 +459,7 @@ void main() {
     vec4 wpPack = vec4(0.0,0.0,0.0,0.0);
     vec3 surfPos = vec3(0.0,0.0,0.0);
     vec4 specColor = vec4(0.0,0.0,0.0,0.0);
-    if (volumetricFogEnabled > 0 || reflectionsEnabled > 0) {
+    if (volumetricFogEnabled > 0 || reflectionsEnabled > 0 || berserkTimeRemaining > 0.0) {
         wpPack = imageLoad(inputWorldPos, uv);
         vec2 worldXY = unpackHalf2x16(floatBitsToUint(wpPack.r));
         vec2 worldZInst = unpackHalf2x16(floatBitsToUint(wpPack.g));
@@ -588,6 +633,8 @@ void main() {
         // Gamma/Brightness Setting
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
 
+        // Berserk last as it's a brain effect not an eye effect
+        if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(surfPos, aaColor);
         FragColor = vec4(aaColor, 1.0);
     } else {
         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);

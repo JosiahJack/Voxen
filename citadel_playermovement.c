@@ -1,6 +1,5 @@
 // PlayerMovement
 #include "voxen.h"
-#include "citadel.h"
 
 PlayerMovement playerMovement;
 

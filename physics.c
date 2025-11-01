@@ -1,12 +1,18 @@
 #include "voxen.h"
 #include <math.h>
 #include <stdlib.h>
-#include "citadel.h"
 // ----------------------------------------------------------------------------
 // Physics
+//     Player
+#define PLAYER_CAPSULE_TOTAL_HEIGHT 2.0f
+#define PLAYER_CAPSULE_RADIUS 0.48f
+#define PLAYER_CROUCH_RATIO 0.6f
+#define PLAYER_PRONE_RATIO 0.2f
+#define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
+#define PLAYER_CAMERA_OFFSET_Y 0.84f
 float move_speed = 0.06;
-bool noclip = true;
-double physicsProcessingTime = 0.0;
+bool noclip = false;
+// double physicsProcessingTime = 0.0;
 
 // ----------------------------------------------------------------------------
 // Input
@@ -373,14 +379,14 @@ static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint3
     int32_t inst_z = instanceCellIdx / WORLDZ;
     int32_t object_x = objectCellIdx % WORLDX;
     int32_t object_z = objectCellIdx / WORLDZ;
-    return abs(inst_x - object_x) <= 1 && abs(inst_z - object_z) <= 1;
+    return abs(inst_x - object_x) <= 1 && abs(inst_z - object_z) <= 1; // 0 means same cell, 1 means one of the 8 neighbors, accept all.
 }
 
 // ================================= Physics ==================================
 int32_t Physics(void) {
     if (gamePaused || menuActive) return 0; // No physics on the menu or paused
     
-    double start_time = get_time();
+//     double start_time = get_time();
 
     // Player Movement from Input
     if (window_has_focus) { // Move the player based on input first, then bound it below...
@@ -395,14 +401,14 @@ int32_t Physics(void) {
     cam_y -= 0.01f;
     
     // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
-    float capsule_offset = 0.84f;  // Center below camera (1.84 below, 0.16 above)
-    Vector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};
-    float radius = 0.48f;
-    float half_height = (2.0f - (radius * 2.0f)) * 0.5f;  // Half of 2.0f height
-    
-    // Adjust for body state (e.g., standing adds height, but here fixed for simplicity)
+    bool inCyberSpace = (currentLevel == LEVEL_CYBERSPACE);
+    float capsule_offset = inCyberSpace ? 0.0f : PLAYER_CAMERA_OFFSET_Y;  // Center below camera (1.84 below, 0.16 above for total capsule heights including end radii).
+    Vector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};          // Cyberspace in Unity version of Citadel had sphere collider at 0.84f offset to center on camera,
+                                                                          // here we center the camera on the capsule center which is the player center for cyberspace, simpler.
+    float half_height = inCyberSpace ? PLAYER_CAPSULE_RADIUS : (2.0f - (PLAYER_CAPSULE_RADIUS * 2.0f)) * 0.5f;  // Half of 2.0f height
+
 //     float body_state_add = 0.0f;
-//     if (currentLevel != LEVEL_CYBERSPACE) {
+//     if (!inCyberSpace) {
 //         switch (playerMovement.bodyState) {
 //             case BodyState_Standing: body_state_add = 0.32f; break;//(PLAYER_HEIGHT * 0.5f); break; TODO
 //             // Add cases for crouch/prone: adjust half_height, offset
@@ -411,12 +417,13 @@ int32_t Physics(void) {
 //     }
     
     // Naive loop over all instances and their triangles
+    uint32_t numTrisProcessed = 0;
     for (uint32_t i = 0; i < loadedInstances; i++) {
         if (instances[i].modelIndex > loadedModels) continue;
         if (ConstIndexIsDynamicObject(instances[i].index)) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         
-        int32_t mid = instances[i].modelIndex;
+        int32_t mid = instances[i].cardchunk ? GEOMETRY_LOD_CARD_MODEL_IDX : instances[i].modelIndex;
         if (mid > loadedModels || mid < 0) continue;
         if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
 
@@ -428,24 +435,20 @@ int32_t Physics(void) {
             uint32_t i2 = modelTriangles[mid][t * 3 + 2] * VERTEX_ATTRIBUTES_COUNT;
             
             // Transform positions to world
-            Vector3 v0 = mul_mat4_vector3(world_mat, (Vector3){
-                modelVertices[mid][i0 + 0], modelVertices[mid][i0 + 1], modelVertices[mid][i0 + 2]
-            });
-            Vector3 v1 = mul_mat4_vector3(world_mat, (Vector3){
-                modelVertices[mid][i1 + 0], modelVertices[mid][i1 + 1], modelVertices[mid][i1 + 2]
-            });
-            Vector3 v2 = mul_mat4_vector3(world_mat, (Vector3){
-                modelVertices[mid][i2 + 0], modelVertices[mid][i2 + 1], modelVertices[mid][i2 + 2]
-            });
+            Vector3 v0 = mul_mat4_vector3(world_mat, (Vector3){ modelVertices[mid][i0 + 0], modelVertices[mid][i0 + 1], modelVertices[mid][i0 + 2] });
+            Vector3 v1 = mul_mat4_vector3(world_mat, (Vector3){ modelVertices[mid][i1 + 0], modelVertices[mid][i1 + 1], modelVertices[mid][i1 + 2] });
+            Vector3 v2 = mul_mat4_vector3(world_mat, (Vector3){ modelVertices[mid][i2 + 0], modelVertices[mid][i2 + 1], modelVertices[mid][i2 + 2] });
+            numTrisProcessed++;
             
             // Test and resolve
-            capsule_vs_tri(&cap_center, half_height, radius, v0, v1, v2);
+            capsule_vs_tri(&cap_center, half_height, PLAYER_CAPSULE_RADIUS, v0, v1, v2);
         }
     }
 
     cam_x = cap_center.x; // Update camera from resolved capsule center
     cam_y = cap_center.y + capsule_offset;  // Restore offset
     cam_z = cap_center.z;
-    physicsProcessingTime = get_time() - start_time;
+//     physicsProcessingTime = get_time() - start_time;
+//     DualLog("Physics processing took %f, numTrisProcessed: %u\n",physicsProcessingTime,numTrisProcessed);
     return 0;
 }
