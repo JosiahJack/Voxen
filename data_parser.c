@@ -605,71 +605,126 @@ static void md5(const uint8_t *data, size_t len, uint8_t out[16]) {
     }
 }
 
-/* -------------------------------------------------------------
-   Build .vmdl path from .fbx path
-   ------------------------------------------------------------- */
 static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
-    const char *base = strrchr(fbx_path, '/');
-    if (!base) base = fbx_path; else ++base;
-    size_t len = base - fbx_path;
-    if (len >= outsz) len = outsz-1;
-    memcpy(out, fbx_path, len);
-    out[len] = '\0';
-    char *dot = strrchr(out, '.');
-    if (dot) *dot = '\0';
+    // Find last slash
+    const char *slash = strrchr(fbx_path, '/');
+    const char *start = slash ? slash + 1 : fbx_path;
+
+    // Find last dot in filename
+    const char *dot = strrchr(start, '.');
+    size_t name_len = dot ? (size_t)(dot - start) : (size_t)strlen(start);
+
+    // Build path: directory + basename (without extension) + ".vmdl"
+    size_t dir_len = start - fbx_path;
+    if (dir_len + name_len + 6 >= outsz) {
+        // Truncate safely
+        memcpy(out, fbx_path, outsz - 6);
+        out[outsz - 6] = '\0';
+        char *last_slash = strrchr(out, '/');
+        if (last_slash) {
+            *++last_slash = '\0';
+            strcat(out, "toolong.vmdl");
+        } else {
+            strcpy(out, "toolong.vmdl");
+        }
+        return;
+    }
+
+    // Copy directory + basename
+    memcpy(out, fbx_path, dir_len + name_len);
+    out[dir_len + name_len] = '\0';
     strcat(out, ".vmdl");
 }
 
-/* -------------------------------------------------------------
-   Load .vmdl (mmap) – returns true on success
-   ------------------------------------------------------------- */
-static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount) {
+static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
     int fd = open(vmdl_path, O_RDONLY);
     if (fd < 0) return false;
 
     struct stat st;
     if (fstat(fd, &st) < 0) { close(fd); return false; }
-    if (st.st_size < 16 + 4 + 4) { close(fd); return false; }   // too small
-
+    if (st.st_size < 16 + 4 + 4) { close(fd); return false; }
     uint8_t *map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     if (map == MAP_FAILED) return false;
 
-    if (memcmp(map, expected_md5, 16) != 0) { munmap(map, st.st_size); return false; }
+    if (memcmp(map, expected_md5, 16) != 0) { 
+        munmap(map, st.st_size); 
+        return false; 
+    }
 
     const uint8_t *p = map + 16;
     uint32_t vcnt = *(uint32_t*)p; p += 4;
+    *out_vcount = vcnt;
     uint32_t icnt = *(uint32_t*)p; p += 4;
-    if (p + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + icnt*3*sizeof(uint32_t) != map + st.st_size) { munmap(map, st.st_size); return false; }
+    *out_icount = icnt;
+    size_t vert_bytes = vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+    size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
+    size_t expected   = 16 + 4 + vert_bytes + 4 + idx_bytes;
+    if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, st.st_size); return false; }
+    if (p + vert_bytes + idx_bytes > map + st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, st.st_size); return false; }
 
     *out_verts  = (float*)p;
-    *out_vcount = vcnt;
-    p += vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+    p += vert_bytes;
     *out_idx    = (uint32_t*)p;
-    *out_icount = icnt;
+    *out_map = map;
+    *out_mapsz = st.st_size;
+//     DualLog("vmdl loaded: v=%u, i=%u, vert_bytes=%zu, idx_bytes=%zu\n", vcnt, icnt, vert_bytes, idx_bytes);
     return true;
 }
 
-/* -------------------------------------------------------------
-   Write .vmdl (after Assimp processing)
-   ------------------------------------------------------------- */
-static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float *verts, uint32_t vcnt, const uint32_t *idx, uint32_t icnt) {
+static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float *verts, uint32_t vcnt, const uint32_t *triangleIndices, uint32_t triCount) {
     int fd = open(vmdl_path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
     if (fd < 0) return;
 
-    size_t total = 16 + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + icnt*3*sizeof(uint32_t);
+    size_t total = 16 + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
     uint8_t *buf = malloc(total);
     if (!buf) { close(fd); return; }
 
     uint8_t *p = buf;
     memcpy(p, md5, 16); p += 16;
     *(uint32_t*)p = vcnt; p += 4;
+    *(uint32_t*)p = triCount; p += 4;
     memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
-    *(uint32_t*)p = icnt; p += 4;
-    memcpy(p, idx, icnt*3*sizeof(uint32_t));
-    write(fd, buf, total);
+    memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
+    size_t written = write(fd, buf, total);
+    if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
     free(buf);
     close(fd);
+}
+
+typedef struct {
+    void* ptr;
+    size_t size;
+} MMapEntry;
+
+MMapEntry* mmap_cleanup = NULL;
+int mmap_cleanup_count = 0;
+int mmap_cleanup_capacity = 0;
+
+void add_mmap_cleanup(void* ptr, size_t size) {
+    #pragma omp critical(mmap_cleanup)
+    {
+        if (mmap_cleanup_count >= mmap_cleanup_capacity) {
+            mmap_cleanup_capacity = mmap_cleanup_capacity ? mmap_cleanup_capacity * 2 : 256;
+            mmap_cleanup = realloc(mmap_cleanup, mmap_cleanup_capacity * sizeof(MMapEntry));
+            if (!mmap_cleanup) {
+                DualLogError("realloc failed in add_mmap_cleanup\n");
+                exit(1);
+            }
+        }
+        mmap_cleanup[mmap_cleanup_count].ptr = ptr;
+        mmap_cleanup[mmap_cleanup_count].size = size;
+        mmap_cleanup_count++;
+    }
+}
+
+void cleanup_all_mmaps(void) {
+    for (int i = 0; i < mmap_cleanup_count; i++) {
+        munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
+    }
+    free(mmap_cleanup);
+    mmap_cleanup = NULL;
+    mmap_cleanup_count = mmap_cleanup_capacity = 0;
 }
 
 void LoadModels(void) {
@@ -687,10 +742,6 @@ void LoadModels(void) {
     DualLog("Loading   models( %d) with max index  %d, using    Assimp version: %d.%d.%d...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch());
     int32_t totalVertCount = 0;
     int32_t totalTriCount = 0;
-    #ifdef DEBUG_MODEL_LOAD_DATA
-        uint32_t largestVertCount = 0;
-        uint32_t largestTriangleCount = 0;
-    #endif
     modelVertexCounts   = calloc(loadedModels, sizeof(uint32_t));
     modelTriangleCounts = calloc(loadedModels, sizeof(uint32_t));
     modelVertices       = calloc(loadedModels, sizeof(float*));
@@ -717,89 +768,172 @@ void LoadModels(void) {
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-    #pragma omp parallel
+    #pragma omp parallel default(none) \
+        shared(model_parser, indexToParser, loadedModels, \
+            modelVertexCounts, modelTriangleCounts, \
+            modelVertices, modelTriangles, modelBounds, \
+            props, totalVertCount, totalTriCount)
     {
         #pragma omp for schedule(dynamic)
-        for (uint32_t i = 0; i < loadedModels; i++) {
-            int32_t matchedParserIdx = indexToParser[i];
-//             if (matchedParserIdx == 280) continue;
-            
-            if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue; // Perfectly fine to skip unused indices between 0 and max.
+        for (uint32_t i = 0; i < loadedModels; ++i) {
+            int32_t parserIdx = indexToParser[i];
+            const char *fbx_path = model_parser.entries[parserIdx].path;
+            if (!fbx_path || !fbx_path[0]) continue;
 
-            const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
-            if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); exit(1); }
+            /* ---------- 1. Build .vmdl name ---------- */
+            char vmdl_path[512];
+            make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
+//             DualLog("FBX: %s → VMDL: %s\n", fbx_path, vmdl_path);
+            if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); exit(1); }
 
-            uint32_t vertexCount = 0, triCount = 0;
-            for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
-                vertexCount += scene->mMeshes[m]->mNumVertices;
-                triCount += scene->mMeshes[m]->mNumFaces;
-            }
-
-            if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT || vertexCount < 1 || triCount < 1) { DualLogError("Model %s exceeds buffer limits: verts=%u (> %u), tris=%u (> %u)\n", model_parser.entries[matchedParserIdx].path, vertexCount, MAX_VERT_COUNT, triCount, MAX_TRI_COUNT); exit(1); }
-
-            modelVertexCounts[i] = vertexCount;
-            modelTriangleCounts[i] = triCount;
-            #pragma omp critical
-            { // Ensure that the total is atomic
-                #ifdef DEBUG_MODEL_LOAD_DATA
-                    if (vertexCount > largestVertCount) largestVertCount = vertexCount;
-                    if (triCount > largestTriangleCount) largestTriangleCount = triCount;
-                #endif
-                totalVertCount += vertexCount;
-                totalTriCount += triCount;
-            }
-
-            modelVertices[i]  = calloc(vertexCount * VERTEX_ATTRIBUTES_COUNT,sizeof(float));
-            modelTriangles[i] = calloc(triCount * 3,sizeof(uint32_t));
-            uint32_t vertexIndex = 0;
-            float minx = 1E9f, miny = 1E9f, minz = 1E9f;
-            float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
-            uint32_t triangleIndex = 0;
-            uint32_t globalVertexOffset = 0;
-            for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
-                struct aiMesh* mesh = scene->mMeshes[m];
-                for (uint32_t v = 0; v < mesh->mNumVertices; v++) {
-                    modelVertices[i][vertexIndex++] = mesh->mVertices[v].x;
-                    modelVertices[i][vertexIndex++] = mesh->mVertices[v].y;
-                    modelVertices[i][vertexIndex++] = mesh->mVertices[v].z;
-                    modelVertices[i][vertexIndex++] = mesh->mNormals[v].x;
-                    modelVertices[i][vertexIndex++] = mesh->mNormals[v].y;
-                    modelVertices[i][vertexIndex++] = mesh->mNormals[v].z;
-                    float tempU = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].x : 0.0f;
-                    float tempV = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][v].y : 0.0f;
-                    modelVertices[i][vertexIndex++] = tempU;
-                    modelVertices[i][vertexIndex++] = tempV;
-                    if (mesh->mVertices[v].x < minx) minx = mesh->mVertices[v].x;
-                    if (mesh->mVertices[v].x > maxx) maxx = mesh->mVertices[v].x;
-                    if (mesh->mVertices[v].y < miny) miny = mesh->mVertices[v].y;
-                    if (mesh->mVertices[v].y > maxy) maxy = mesh->mVertices[v].y;
-                    if (mesh->mVertices[v].z < minz) minz = mesh->mVertices[v].z;
-                    if (mesh->mVertices[v].z > maxz) maxz = mesh->mVertices[v].z;
-                }
-
-                for (uint32_t f = 0; f < mesh->mNumFaces; f++) {
-                    struct aiFace* face = &mesh->mFaces[f];
-                    if (face->mNumIndices != 3) { DualLogError("Non-triangular face detected in %s, face %u\n", model_parser.entries[matchedParserIdx].path, f); exit(1); }
+            /* ---------- 2. Compute MD5 of the .fbx ---------- */
+            uint8_t fbx_md5[16];
+            {
+                FILE *f = fopen(fbx_path, "rb");
+                if (!f) { DualLogError("Cannot open %s for MD5\n", fbx_path); continue; }
+                fseek(f, 0, SEEK_END);
+                long sz = ftell(f); fseek(f, 0, SEEK_SET);
+                uint8_t *buf = malloc(sz);
+                size_t read = fread(buf, 1, sz, f);
+                if (read != (size_t)sz) { DualLogError("Failed to read full FBX: %s\n", fbx_path); exit(1); }
                     
-                    uint32_t v[3] = {face->mIndices[0] + globalVertexOffset, face->mIndices[1] + globalVertexOffset, face->mIndices[2] + globalVertexOffset};
-                    modelTriangles[i][triangleIndex++] = v[0];
-                    modelTriangles[i][triangleIndex++] = v[1];
-                    modelTriangles[i][triangleIndex++] = v[2];
+                fclose(f);
+                md5(buf, sz, fbx_md5);
+                free(buf);
+            }
+
+            /* ---------- 3. Try to load cached .vmdl ---------- */
+            float  *cached_verts = NULL;
+            uint32_t cached_vcnt = 0;
+            uint32_t *cached_idx  = NULL;
+            uint32_t cached_icnt = 0;
+            void* mmap_map = NULL;
+            size_t mmap_size = 0;
+            bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
+
+            /* ---------- 4. If cache miss – run Assimp ---------- */
+            if (!cache_hit) {
+//                 DualLog("No vmdl found, loading %s with Assimp...\n", fbx_path);
+                const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
+                if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); continue; }
+
+                /* ---- count verts / tris ---- */
+                uint32_t vertexCount = 0, triCount = 0;
+                for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
+                    vertexCount += scene->mMeshes[m]->mNumVertices;
+                    triCount    += scene->mMeshes[m]->mNumFaces;
                 }
                 
-                globalVertexOffset += mesh->mNumVertices;
+                if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds limits\n", fbx_path); aiReleaseImport(scene); continue; }
+
+                modelVertexCounts[i]   = vertexCount;
+                modelTriangleCounts[i] = triCount;
+
+                modelVertices[i]  = calloc(vertexCount * VERTEX_ATTRIBUTES_COUNT, sizeof(float));
+                modelTriangles[i] = calloc(triCount * 3, sizeof(uint32_t));
+
+                /* ---- fill vertex / index arrays (same code you already have) ---- */
+                uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
+                float minx = 1E9f, miny = 1E9f, minz = 1E9f;
+                float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
+
+                for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
+                    struct aiMesh *mesh = scene->mMeshes[m];
+                    for (uint32_t vert = 0; vert < mesh->mNumVertices; ++vert) {
+                        modelVertices[i][vertexIndex++] = mesh->mVertices[vert].x;
+                        modelVertices[i][vertexIndex++] = mesh->mVertices[vert].y;
+                        modelVertices[i][vertexIndex++] = mesh->mVertices[vert].z;
+                        modelVertices[i][vertexIndex++] = mesh->mNormals[vert].x;
+                        modelVertices[i][vertexIndex++] = mesh->mNormals[vert].y;
+                        modelVertices[i][vertexIndex++] = mesh->mNormals[vert].z;
+                        float u = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].x : 0.0f;
+                        float v = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].y : 0.0f;
+                        modelVertices[i][vertexIndex++] = u;
+                        modelVertices[i][vertexIndex++] = v;
+                        minx = fminf(minx, mesh->mVertices[vert].x);
+                        maxx = fmaxf(maxx, mesh->mVertices[vert].x);
+                        miny = fminf(miny, mesh->mVertices[vert].y);
+                        maxy = fmaxf(maxy, mesh->mVertices[vert].y);
+                        minz = fminf(minz, mesh->mVertices[vert].z);
+                        maxz = fmaxf(maxz, mesh->mVertices[vert].z);
+                    }
+
+                    for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
+                        struct aiFace *face = &mesh->mFaces[f];
+                        if (face->mNumIndices != 3) {
+                            DualLogError("Non-tri face in %s\n", fbx_path);
+                            aiReleaseImport(scene);
+                            continue;
+                        }
+                        uint32_t a = face->mIndices[0] + globalVertexOffset;
+                        uint32_t b = face->mIndices[1] + globalVertexOffset;
+                        uint32_t c = face->mIndices[2] + globalVertexOffset;
+                        modelTriangles[i][triangleIndex++] = a;
+                        modelTriangles[i][triangleIndex++] = b;
+                        modelTriangles[i][triangleIndex++] = c;
+                    }
+                    globalVertexOffset += mesh->mNumVertices;
+                }
+
+                /* ---- bounds ---- */
+                uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MINY] = miny;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MINZ] = minz;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+                float r = 0.0f;
+                r = fmaxf(r, fabsf(minx)); r = fmaxf(r, fabsf(miny)); r = fmaxf(r, fabsf(minz));
+                r = fmaxf(r, maxx);        r = fmaxf(r, maxy);        r = fmaxf(r, maxz);
+                modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
+                write_vmdl(vmdl_path, fbx_md5, modelVertices[i], vertexCount, modelTriangles[i], triCount);
+                aiReleaseImport(scene);
+            } else {
+                /* ---- CACHE HIT ---- */
+//                 DualLog("vmdl found, loading %s...\n", vmdl_path);
+                modelVertexCounts[i]   = cached_vcnt;
+                modelTriangleCounts[i] = cached_icnt;
+                modelVertices[i]  = malloc(cached_vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                modelTriangles[i] = malloc(cached_icnt * 3 * sizeof(uint32_t));
+                memcpy(modelVertices[i],  cached_verts, cached_vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                memcpy(modelTriangles[i], cached_idx,  cached_icnt * 3 * sizeof(uint32_t));
+                float minx = 1E9f, miny = 1E9f, minz = 1E9f;
+                float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
+                for (uint32_t v = 0; v < cached_vcnt; ++v) {
+                    float x = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 0];
+                    float y = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 1];
+                    float z = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 2];
+                    minx = fminf(minx, x); maxx = fmaxf(maxx, x);
+                    miny = fminf(miny, y); maxy = fmaxf(maxy, y);
+                    minz = fminf(minz, z); maxz = fmaxf(maxz, z);
+                }
+                uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MINY] = miny;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MINZ] = minz;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MAXX] = maxx;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
+                modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
+                float r = 0.0f;
+                r = fmaxf(r, fabsf(minx)); r = fmaxf(r, fabsf(miny)); r = fmaxf(r, fabsf(minz));
+                r = fmaxf(r, maxx);        r = fmaxf(r, maxy);        r = fmaxf(r, maxz);
+                modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
+                add_mmap_cleanup(mmap_map, mmap_size);  // defer munmap
             }
 
-            uint32_t boundsBase = (i * BOUNDS_ATTRIBUTES_COUNT);
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MINX] = minx;
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MINY] = miny;
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MINZ] = minz;
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-            modelBounds[boundsBase + BOUNDS_DATA_OFFSET_RADIUS] = fmaxf(fmaxf(fmaxf(fmaxf(fmaxf(fabs(minx), fabs(miny)), fabs(minz)), maxx), maxy), maxz);
-            aiReleaseImport(scene);
-            malloc_trim(0);
+            /* ---- atomic totals (debug) ---- */
+            #pragma omp critical
+            {
+                totalVertCount += modelVertexCounts[i];
+                totalTriCount  += modelTriangleCounts[i];
+            }
+        }
+        
+        #pragma omp barrier
+        #pragma omp master
+        {
+            cleanup_all_mmaps();
         }
     }
 
@@ -832,7 +966,6 @@ void LoadModels(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
 #ifdef DEBUG_MODEL_LOAD_DATA
-    DualLog("\nLargest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
     DualLog("Total vertices: %d (", totalVertCount); print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); DualLog(")\nTotal triangles: %d (", totalTriCount); print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t)); DualLog(")\n");
 #endif
 
