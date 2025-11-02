@@ -1694,7 +1694,7 @@ void RenderInstances(uint8_t type) {
             float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
             
-//             if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue;
+//             if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue; // Better performance without frustum culling, wut!?  Well... can't argue with that.
             
             visibleInstances[visibleCount].index = i;
             visibleInstances[visibleCount].depth = distSqrd;

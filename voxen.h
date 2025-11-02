@@ -1,7 +1,7 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.2"
-// #define LOAD_LOCALIZATION_FONTS
+#define LOAD_LOCALIZATION_FONTS
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
