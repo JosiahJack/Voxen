@@ -587,9 +587,10 @@ void LoadModels(void) {
         #pragma omp for schedule(dynamic)
         for (uint32_t i = 0; i < loadedModels; i++) {
             int32_t matchedParserIdx = indexToParser[i];
+//             if (matchedParserIdx == 280) continue;
+            
             if (!model_parser.entries[matchedParserIdx].path || model_parser.entries[matchedParserIdx].path[0] == '\0') continue; // Perfectly fine to skip unused indices between 0 and max.
 
-            
             const struct aiScene* scene = aiImportFileExWithProperties(model_parser.entries[matchedParserIdx].path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
             if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed to load %s: %s\n", model_parser.entries[matchedParserIdx].path, aiGetErrorString()); aiReleasePropertyStore(props); exit(1); }
 
@@ -676,26 +677,21 @@ void LoadModels(void) {
 
         totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        glBindBuffer(GL_ARRAY_BUFFER, stagingVBO);
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_DYNAMIC_COPY);
-        void* mapped_buffer = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        memcpy(mapped_buffer, modelVertices[i], vertSize);
-        glUnmapBuffer(GL_ARRAY_BUFFER);
         glGenBuffers(1, &vbos[i]);
-        glBindBuffer(GL_COPY_WRITE_BUFFER, vbos[i]);
-        glBufferData(GL_COPY_WRITE_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
-        glCopyBufferSubData(GL_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, vertSize);
-
+        glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
+        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW); // Orphan
+        void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+        memcpy(ptr, modelVertices[i], vertSize);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
         size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, stagingTBO);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_DYNAMIC_COPY);
-        mapped_buffer = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        memcpy(mapped_buffer, modelTriangles[i], triSize);
-        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         glGenBuffers(1, &tbos[i]);
-        glBindBuffer(GL_COPY_WRITE_BUFFER, tbos[i]);
-        glBufferData(GL_COPY_WRITE_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-        glCopyBufferSubData(GL_ELEMENT_ARRAY_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, triSize);
+        glBindBuffer(GL_ARRAY_BUFFER, tbos[i]);
+        glBufferData(GL_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW); // Orphan
+        ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+        memcpy(ptr, modelTriangles[i], triSize);
+        glUnmapBuffer(GL_ARRAY_BUFFER);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);

@@ -550,9 +550,8 @@ typedef struct {
     int SFXJumpLand;
     int SFXLadder;
     float playerSpeed;
-    float playerSpeedActual;
-    float playerSpeedHorizontalActual;
     bool grounded;
+    bool useGravity;
     float feetRayLength;
     bool FatigueCheat;
     BodyState bodyState;
@@ -618,7 +617,6 @@ typedef struct {
     float walkDeaccelerationVolx;
     float walkDeaccelerationVoly;
     float walkDeaccelerationVolz;
-	bool consoleActivated;
 	float leanTarget;
 	float leanShift;
 	float leanMaxAngle;
@@ -655,7 +653,6 @@ typedef struct {
 } PlayerMovement;
 
 extern PlayerMovement playerMovement;
-
 
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints

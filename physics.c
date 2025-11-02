@@ -398,7 +398,7 @@ int32_t Physics(void) {
     if (noclip) return 0;
     
     // Apply gravity to camera (affects bottom of capsule)
-    cam_y -= 0.01f;
+    if (playerMovement.useGravity) cam_y -= 0.01f;
     
     // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
     bool inCyberSpace = (currentLevel == LEVEL_CYBERSPACE);
