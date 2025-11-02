@@ -3,7 +3,11 @@
 #define STBI_MAX_DIMENSIONS 2048
 #include "External/stb_image.h"
 #include <stdlib.h>
+#include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <uthash.h>
 #include <omp.h>
@@ -533,6 +537,141 @@ GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* da
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
+
+// MD5 (128-bit / 16 bytes) – tiny self-contained implementation
+#define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+#define F(x,y,z) (((x) & (y)) | (~(x) & (z)))
+#define G(x,y,z) (((x) & (z)) | ((y) & ~(z)))
+#define H(x,y,z) ((x) ^ (y) ^ (z))
+#define I(x,y,z) ((y) ^ ((x) | ~(z)))
+static void md5(const uint8_t *data, size_t len, uint8_t out[16]) {
+    // Very small, public-domain MD5 – copy-paste from https://github.com/kerukuro/digestpp/blob/master/algorithm/detail/constants/md5_constants.hpp
+    static const uint32_t K[64] = {
+        0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a,	0xa8304613, 0xfd469501,
+        0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,	0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+        0xf61e2562, 0xc040b340,	0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+        0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8,	0x676f02d9, 0x8d2a4c8a,
+        0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,	0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+        0x289b7ec6, 0xeaa127fa,	0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+        0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+        0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
+    };
+
+    uint32_t h[4] = {0x67452301,0xefcdab89,0x98badcfe,0x10325476};
+    uint32_t a,b,c,d,f,g;
+    uint32_t M[16];
+    size_t i, n = len;
+    while (n >= 64) {
+        memcpy(M, data, 64);
+        a = h[0]; b = h[1]; c = h[2]; d = h[3];
+        for (i = 0; i < 64; ++i) {
+            if (i < 16) { f = F(b,c,d); g = i; }
+            else if (i < 32) { f = G(b,c,d); g = (5*i+1)%16; }
+            else if (i < 48) { f = H(b,c,d); g = (3*i+5)%16; }
+            else { f = I(b,c,d); g = (7*i)%16; }
+            uint32_t temp = d;
+            d = c; c = b;
+            b += ROTL(a + f + K[i] + M[g], (i%4)*7 + 7);
+            a = temp;
+        }
+        h[0] += a; h[1] += b; h[2] += c; h[3] += d;
+        data += 64; n -= 64;
+    }
+
+    /* pad the last block */
+    uint8_t pad[64] = {0};
+    memcpy(pad, data, n);
+    pad[n] = 0x80;
+    if (n >= 56) { /* need a second block */
+        /* (process first block) */
+        memcpy(M, pad, 64);
+        a = h[0]; b = h[1]; c = h[2]; d = h[3];
+        for (i = 0; i < 64; ++i) { /* same loop as above */ }
+        h[0] += a; h[1] += b; h[2] += c; h[3] += d;
+        memset(pad, 0, 56);
+    }
+
+    uint64_t bits = len * 8;
+    for (i = 0; i < 8; ++i) pad[56+i] = (bits >> (i*8)) & 0xFF;
+    memcpy(M, pad, 64);
+    a = h[0]; b = h[1]; c = h[2]; d = h[3];
+    for (i = 0; i < 64; ++i) { /* same loop */ }
+    h[0] += a; h[1] += b; h[2] += c; h[3] += d;
+    for (i = 0; i < 4; ++i) {
+        out[i*4+0] = h[i] >> 0;
+        out[i*4+1] = h[i] >> 8;
+        out[i*4+2] = h[i] >> 16;
+        out[i*4+3] = h[i] >> 24;
+    }
+}
+
+/* -------------------------------------------------------------
+   Build .vmdl path from .fbx path
+   ------------------------------------------------------------- */
+static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
+    const char *base = strrchr(fbx_path, '/');
+    if (!base) base = fbx_path; else ++base;
+    size_t len = base - fbx_path;
+    if (len >= outsz) len = outsz-1;
+    memcpy(out, fbx_path, len);
+    out[len] = '\0';
+    char *dot = strrchr(out, '.');
+    if (dot) *dot = '\0';
+    strcat(out, ".vmdl");
+}
+
+/* -------------------------------------------------------------
+   Load .vmdl (mmap) – returns true on success
+   ------------------------------------------------------------- */
+static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount) {
+    int fd = open(vmdl_path, O_RDONLY);
+    if (fd < 0) return false;
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) { close(fd); return false; }
+    if (st.st_size < 16 + 4 + 4) { close(fd); return false; }   // too small
+
+    uint8_t *map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) return false;
+
+    if (memcmp(map, expected_md5, 16) != 0) { munmap(map, st.st_size); return false; }
+
+    const uint8_t *p = map + 16;
+    uint32_t vcnt = *(uint32_t*)p; p += 4;
+    uint32_t icnt = *(uint32_t*)p; p += 4;
+    if (p + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + icnt*3*sizeof(uint32_t) != map + st.st_size) { munmap(map, st.st_size); return false; }
+
+    *out_verts  = (float*)p;
+    *out_vcount = vcnt;
+    p += vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+    *out_idx    = (uint32_t*)p;
+    *out_icount = icnt;
+    return true;
+}
+
+/* -------------------------------------------------------------
+   Write .vmdl (after Assimp processing)
+   ------------------------------------------------------------- */
+static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float *verts, uint32_t vcnt, const uint32_t *idx, uint32_t icnt) {
+    int fd = open(vmdl_path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    if (fd < 0) return;
+
+    size_t total = 16 + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + icnt*3*sizeof(uint32_t);
+    uint8_t *buf = malloc(total);
+    if (!buf) { close(fd); return; }
+
+    uint8_t *p = buf;
+    memcpy(p, md5, 16); p += 16;
+    *(uint32_t*)p = vcnt; p += 4;
+    memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
+    *(uint32_t*)p = icnt; p += 4;
+    memcpy(p, idx, icnt*3*sizeof(uint32_t));
+    write(fd, buf, total);
+    free(buf);
+    close(fd);
+}
+
 void LoadModels(void) {
     double start_time = get_time();
     DebugRAM("start of LoadModels");
@@ -547,7 +686,6 @@ void LoadModels(void) {
     loadedModels = maxIndex + 1;
     DualLog("Loading   models( %d) with max index  %d, using    Assimp version: %d.%d.%d...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch());
     int32_t totalVertCount = 0;
-    int32_t totalBounds = 0;
     int32_t totalTriCount = 0;
     #ifdef DEBUG_MODEL_LOAD_DATA
         uint32_t largestVertCount = 0;
@@ -558,9 +696,6 @@ void LoadModels(void) {
     modelVertices       = calloc(loadedModels, sizeof(float*));
     modelTriangles      = calloc(loadedModels, sizeof(uint32_t*));
     modelBounds         = calloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT, sizeof(float));
-    GLuint stagingVBO, stagingTBO;
-    glGenBuffers(1, &stagingVBO);
-    glGenBuffers(1, &stagingTBO);
     int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
     for (int32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) {
@@ -672,41 +807,33 @@ void LoadModels(void) {
     malloc_trim(0);
     vbos = calloc(loadedModels, sizeof(GLuint));
     tbos = calloc(loadedModels, sizeof(GLuint));
-    for (uint32_t i = 0; i < loadedModels; i++) { // Sequential phase
-        if (modelVertexCounts[i] == 0 || modelTriangleCounts[i] == 0) continue;
+    glGenBuffers(loadedModels, vbos);
+    glGenBuffers(loadedModels, tbos);
+    for (int i = 0; i < loadedModels; ++i) {
+        if (modelVertexCounts[i] == 0) continue;
 
-        totalBounds += BOUNDS_ATTRIBUTES_COUNT;
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        glGenBuffers(1, &vbos[i]);
+        size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW); // Orphan
+        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);  // orphan
+        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);  // safe
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
-        size_t triSize = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
-        glGenBuffers(1, &tbos[i]);
-        glBindBuffer(GL_ARRAY_BUFFER, tbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-        glBufferData(GL_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW); // Orphan
-        ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
+        ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
-        glUnmapBuffer(GL_ARRAY_BUFFER);
+        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
 
 #ifdef DEBUG_MODEL_LOAD_DATA
     DualLog("\nLargest vertex count: %d, triangle count: %d\n", largestVertCount, largestTriangleCount);
-    DualLog("Total vertices: %d (", totalVertCount);
-    print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-    DualLog(")\nTotal triangles: %d (", totalTriCount);
-    print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t));
-    DualLog(")\nBounds (");
-    print_bytes_no_newline(totalBounds * sizeof(float));
-    DualLog(")\n");
+    DualLog("Total vertices: %d (", totalVertCount); print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); DualLog(")\nTotal triangles: %d (", totalTriCount); print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t)); DualLog(")\n");
 #endif
 
     glGenBuffers(1, &modelBoundsID);
@@ -714,8 +841,6 @@ void LoadModels(void) {
     glBufferData(GL_SHADER_STORAGE_BUFFER, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glDeleteBuffers(1, &stagingVBO);
-    glDeleteBuffers(1, &stagingTBO);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");
     free(indexToParser);
