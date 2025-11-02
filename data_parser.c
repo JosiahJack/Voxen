@@ -813,7 +813,7 @@ void LoadModels(void) {
 
             /* ---------- 4. If cache miss – run Assimp ---------- */
             if (!cache_hit) {
-//                 DualLog("No vmdl found, loading %s with Assimp...\n", fbx_path);
+                DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
                 const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
                 if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); continue; }
 
