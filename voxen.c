@@ -685,6 +685,67 @@ Quaternion orientationQuaternion[6] = {
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
 
+bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
+    // Vector from camera to instance
+    float to_inst_x = inst_x - cam_x;
+    float to_inst_y = inst_y - cam_y;
+    float to_inst_z = inst_z - cam_z;
+    float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
+    if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
+
+    // Precompute FOV constants (assuming cam_fov is constant per frame)
+    static float cos_half_fov = 0.0f;
+    static float last_cam_fov = -1.0f;
+    if (cam_fov != last_cam_fov) {
+        float fovAdjusted = cam_fov * 2.5f;
+        float half_fov_rad = fovAdjusted * 0.5f * (M_PI / 180.0f); // deg2rad
+        cos_half_fov = cosf(half_fov_rad);
+        last_cam_fov = cam_fov;
+    }
+
+    // Compute dot product without normalization
+    float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
+    float dist = sqrtf(dist_sq); // Only compute sqrt once
+    float dot_normalized = dot / dist; // Normalize dot product
+    if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
+    return false; // Outside FOV cone
+}
+
+typedef struct {
+    float nx, ny, nz, d;
+} Plane;
+
+bool SphereInFrustum(Plane* planes, float cx, float cy, float cz, float radius) {
+    for (int i = 0; i < 6; i++) {
+        float dist = planes[i].nx * cx + planes[i].ny * cy + planes[i].nz * cz + planes[i].d;
+        if (dist < -radius) return false;
+    }
+    return true;
+}
+
+void ExtractFrustumPlanes(float* m, Plane* planes) {
+    // Left
+    planes[0].nx = m[3]  + m[0];  planes[0].ny = m[7]  + m[4];  planes[0].nz = m[11] + m[8];  planes[0].d = m[15] + m[12];
+    // Right
+    planes[1].nx = m[3]  - m[0];  planes[1].ny = m[7]  - m[4];  planes[1].nz = m[11] - m[8];  planes[1].d = m[15] - m[12];
+    // Bottom
+    planes[2].nx = m[3]  + m[1];  planes[2].ny = m[7]  + m[5];  planes[2].nz = m[11] + m[9];  planes[2].d = m[15] + m[13];
+    // Top
+    planes[3].nx = m[3]  - m[1];  planes[3].ny = m[7]  - m[5];  planes[3].nz = m[11] - m[9];  planes[3].d = m[15] - m[13];
+    // Near
+    planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14];
+    // Far
+    planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14];
+
+    // Normalize
+    for (int i = 0; i < 6; i++) {
+        float len = sqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
+        if (len > 0.0f) {
+            planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len;
+        }
+    }
+}
+
 double shadowmapCPUTime = 0.0;
 void RenderShadowmap(uint16_t lightIdx) {
     double thisShadowmapStartT = get_time();
@@ -710,11 +771,13 @@ void RenderShadowmap(uint16_t lightIdx) {
     }
 
     shadowmapCPUTime += get_time() - thisShadowmapStartT;
+    Plane planes[6];
     for (uint8_t face = 0; face < 6; face++) {
         float lightView[16];
         float lightViewProj[16];
         mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
         mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
+        ExtractFrustumPlanes(lightViewProj, planes);
         glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
         glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
@@ -722,6 +785,9 @@ void RenderShadowmap(uint16_t lightIdx) {
             int i = nearMeshes[j];
             if (instances[i].modelIndex >= loadedModels) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
+            
+            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+            if (!SphereInFrustum(planes, instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
 
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
@@ -1375,32 +1441,6 @@ int32_t EventExecute(Event* event) {
 
     DualLogError("Unknown event %d\n",event->type);
     return 99;
-}
-
-bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
-    // Vector from camera to instance
-    float to_inst_x = inst_x - cam_x;
-    float to_inst_y = inst_y - cam_y;
-    float to_inst_z = inst_z - cam_z;
-    float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
-    if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
-
-    // Precompute FOV constants (assuming cam_fov is constant per frame)
-    static float cos_half_fov = 0.0f;
-    static float last_cam_fov = -1.0f;
-    if (cam_fov != last_cam_fov) {
-        float fovAdjusted = cam_fov * 2.5f;
-        float half_fov_rad = fovAdjusted * 0.5f * (M_PI / 180.0f); // deg2rad
-        cos_half_fov = cosf(half_fov_rad);
-        last_cam_fov = cam_fov;
-    }
-
-    // Compute dot product without normalization
-    float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
-    float dist = sqrtf(dist_sq); // Only compute sqrt once
-    float dot_normalized = dot / dist; // Normalize dot product
-    if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
-    return false; // Outside FOV cone
 }
 
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f) {
