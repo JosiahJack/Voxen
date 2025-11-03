@@ -7,11 +7,8 @@
 #include <fcntl.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
-#ifdef LOAD_LOCALIZATION_FONTS
 #include <fontconfig/fontconfig.h>
-#endif
 
-#ifdef LOAD_LOCALIZATION_FONTS
 #define MAX_FALLBACK_FONTS 32
 static char *xstrdup(const char *s) {
     size_t len = strlen(s) + 1;
@@ -20,7 +17,6 @@ static char *xstrdup(const char *s) {
     return p;
 }
 #define strdup xstrdup
-#endif // LOAD_LOCALIZATION_FONTS
 // ----------------------------------------------------------------------------
 // Text
 float genericTextHeightFac = 0.025f;
@@ -45,10 +41,8 @@ static stbtt_fontinfo primaryFontInfo;
 static stbtt_fontinfo secondaryFontInfo;
 static unsigned char *primaryFontData;
 static int32_t numFallbackFonts = 0;
-#ifdef LOAD_LOCALIZATION_FONTS
 static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
 static FcConfig *fontCfg = NULL;
-#endif
 
 typedef struct {
     int32_t first;   // first codepoint in range
@@ -142,7 +136,6 @@ float TextWidth(const char *utf8, int fontID) {
     return width;
 }
 
-#ifdef LOAD_LOCALIZATION_FONTS
 static LoadedFont *LoadFallbackFont(const char *path) {
     for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
         if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
@@ -171,13 +164,11 @@ static LoadedFont *LoadFallbackFont(const char *path) {
     lf->info = info;
     return lf;
 }
-#endif
 
 static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
     int glyph = stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &secondaryFontInfo : &primaryFontInfo), codepoint);
     if (glyph) { *outFont = &primaryFontInfo; return glyph; }
 
-#ifdef LOAD_LOCALIZATION_FONTS
     for (int i = 0; i < numFallbackFonts; i++) {
         glyph = stbtt_FindGlyphIndex(&fallbackFonts[i].info, codepoint);
         if (glyph) { *outFont = &fallbackFonts[i].info; return glyph; }
@@ -210,7 +201,6 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     
     glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
     if (glyph) { *outFont = &lf->info; return glyph; }
-#endif
     return 0;
 }
 
