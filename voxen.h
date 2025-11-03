@@ -319,6 +319,7 @@ void Cull();
 bool get_cull_bit(const uint32_t* arr, size_t idx);
 // ----------------------------------------------------------------------------
 // Helper Functions
+void md5(const uint8_t *data, size_t len, uint8_t out[16]);
 bool ConstIndexInBounds(int constdex);
 bool ConstIndexIsGeometry(int constdex);
 bool ConstIndexIsDynamicObject(uint16_t constIndex);

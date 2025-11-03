@@ -1,5 +1,10 @@
 #include <string.h>
 #include "voxen.h"
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 #ifdef LOAD_LOCALIZATION_FONTS
@@ -69,9 +74,12 @@ int32_t numFontRanges = sizeof(fontRanges)/sizeof(fontRanges[0]);
 
 int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
     const GlyphRange* ranges = (fontID == FONT_STOPD) ? fontRangesStopD : fontRanges;
+    int32_t total_packed = (fontID == FONT_STOPD) ? numPackedGlyphsStopD : numPackedGlyphs;
     for (int32_t i = 0; i < numFontRanges; i++) {
-        if (codepoint >= ranges[i].first && codepoint < ranges[i].first + ranges[i].count)
-            return ranges[i].startIndex + (codepoint - ranges[i].first);
+        if (codepoint >= ranges[i].first && codepoint < ranges[i].first + ranges[i].count) {
+            int32_t idx = ranges[i].startIndex + (codepoint - ranges[i].first);
+            if (idx < total_packed) return idx;
+        }
     }
     return -1;
 }
@@ -206,184 +214,183 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     return 0;
 }
 
-void InitFontAtlasses(void) {
-    double font_start_time = get_time();
+static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint8_t ttf_md5[16], const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
+    FILE *f = fopen(path, "wb");
+    if (!f) { DualLogError("Failed to write font cache %s\n", path); exit(1); }
 
-    // ------------------------------------------------------------------------
-    // Load Primary Font: SystemShockText.ttf
-    const char* primaryFilename = "./Fonts/SystemShockText.ttf";
-    FILE *f = fopen(primaryFilename, "rb");
-    if (!f) { DualLogError("Failed to open primary font %s\n", primaryFilename); exit(1); }
-    fseek(f, 0, SEEK_END);
-    size_t primarySize = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    primaryFontData = malloc(primarySize);
-    if (!primaryFontData) { DualLogError("OOM (primary font)\n"); exit(1); }
-    if (fread(primaryFontData, 1, primarySize, f) != primarySize) { DualLogError("Read failed (primary)\n"); exit(1); }
+    fwrite(&expected_glyphs, 1, 4, f);
+    fwrite(ttf_md5, 1, 16, f);
+    fwrite(&actual_packed, 1, 4, f);
+    fwrite(&fixed_advance, 1, 4, f);  // ← store
+    fwrite(packed, sizeof(stbtt_packedchar), actual_packed, f);
+    fwrite(bitmap, 1, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, f);
     fclose(f);
+}
 
-    if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) {
-        DualLogError("Primary font init failed\n"); exit(1);
+static bool load_font_cache(const char *path, uint32_t expected_glyphs, const uint8_t expected_md5[16], stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return false;
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) { close(fd); DualLogWarn("fstat failed %s\n", path); return false; }
+    size_t sz = (size_t)st.st_size;
+    if (sz < 28 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { close(fd); DualLogWarn("cache too small %s\n", path); return false; }
+
+    uint8_t *map = mmap(NULL, sz, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (map == MAP_FAILED) { DualLogError("mmap failed %s\n", path); return false; }
+
+    const uint8_t *p = map;
+    uint32_t file_expected = *(uint32_t*)p; p += 4;
+    if (file_expected != expected_glyphs) {
+        munmap(map, sz);
+        DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs);
+        return false;
     }
 
-    // ------------------------------------------------------------------------
-    // Load Secondary Font: StopD.ttf
-    const char* secondaryFilename = "./Fonts/StopD.ttf";
-    FILE *f2 = fopen(secondaryFilename, "rb");
-    if (!f2) { DualLogError("Failed to open secondary font %s\n", secondaryFilename); exit(1); }
-    fseek(f2, 0, SEEK_END);
-    size_t secondarySize = ftell(f2);
-    fseek(f2, 0, SEEK_SET);
-    unsigned char *secondaryFontData = malloc(secondarySize);
-    if (!secondaryFontData) { DualLogError("OOM (secondary font)\n"); exit(1); }
-    if (fread(secondaryFontData, 1, secondarySize, f2) != secondarySize) { DualLogError("Read failed (secondary)\n"); exit(1); }
-    fclose(f2);
-
-    if (!stbtt_InitFont(&secondaryFontInfo, secondaryFontData, 0)) {
-        DualLogError("Secondary font init failed\n"); exit(1);
+    const uint8_t *md5 = p; p += 16;
+    if (memcmp(md5, expected_md5, 16) != 0) {
+        munmap(map, sz);
+        DualLogWarn("MD5 mismatch %s\n", path);
+        return false;
     }
 
-    // ------------------------------------------------------------------------
-    // Initialize fontconfig once
-#ifdef LOAD_LOCALIZATION_FONTS
-    if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
-#endif
+    uint32_t actual_packed = *(uint32_t*)p; p += 4;
+    float fixed_advance = *(float*)p; p += 4;
+    if (actual_packed > MAX_GLYPHS) { munmap(map, sz); return false; }
+
+    memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
+    *out_num = (int32_t)actual_packed;
+    *out_fixed_advance = fixed_advance;
+    p += sizeof(stbtt_packedchar) * actual_packed;
+    glCreateTextures(GL_TEXTURE_2D, 1, out_tex);
+    glTextureStorage2D(*out_tex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
+    glTextureSubImage2D(*out_tex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, p);
+    glTextureParameteri(*out_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTextureParameteri(*out_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    munmap(map, sz);
+    return true;
+}
+
+void InitFontAtlasses(void) {
+    double t0 = get_time();
+    const char *pri_path = "./Fonts/SystemShockText.ttf";
+    const char *sec_path = "./Fonts/StopD.ttf";
+    FILE *f = fopen(pri_path, "rb"); if (!f) { DualLogError("Missing %s\n", pri_path); exit(1); }
     
-    // ------------------------------------------------------------------------
-    // Pack Primary Font Atlas
-    unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
+    fseek(f, 0, SEEK_END); size_t pri_sz = ftell(f); fseek(f, 0, SEEK_SET);
+    primaryFontData = malloc(pri_sz);
+    size_t read = fread(primaryFontData, 1, pri_sz, f); fclose(f);
+    if (read != (size_t)pri_sz) { DualLogError("Failed to read full SystemShockText.ttf at: %s\n", pri_path); exit(1); }
+    f = fopen(sec_path, "rb"); if (!f) { DualLogError("Missing %s\n", sec_path); exit(1); }
+    
+    fseek(f, 0, SEEK_END); size_t sec_sz = ftell(f); fseek(f, 0, SEEK_SET);
+    unsigned char *sec_data = malloc(sec_sz);
+    read = fread(sec_data, 1, sec_sz, f); fclose(f);
+    if (read != (size_t)sec_sz) { DualLogError("Failed to read full StopD.ttf at: %s\n", sec_path); exit(1); }
+    if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); exit(1); }
+    if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); exit(1); }
+
+    uint8_t pri_md5[16], sec_md5[16];
+    md5(primaryFontData, pri_sz, pri_md5);
+    md5(sec_data, sec_sz, sec_md5);
+    uint32_t pri_expected = 0, sec_expected = 0;
+    for (int i = 0; i < numFontRanges; i++) { pri_expected += fontRanges[i].count; sec_expected += fontRangesStopD[i].count; }
+    const char *pri_cache = "./Fonts/SystemShockText.vfnt";
+    const char *sec_cache = "./Fonts/StopD.vfnt";
+    bool pri_hit = load_font_cache(pri_cache, pri_expected, pri_md5, fontPackedChar, &numPackedGlyphs, &fixedNumberAdvanceWidth, &fontAtlasTex);
+    bool sec_hit = load_font_cache(sec_cache, sec_expected, sec_md5, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
+    if (pri_hit && sec_hit) {
+        free(primaryFontData); free(sec_data);
+        malloc_trim(0);
+        DualLog("Fonts loaded from cache in %.3f s\n", get_time() - t0);
+        return;
+    }
+
+    DualLog("Font ranges changed or .vfnt files not present – regenerating...\n");
+
+    // Primary
+    unsigned char *bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
-    stbtt_PackBegin(&pc, atlasBitmap, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
+    stbtt_PackBegin(&pc, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     stbtt_PackSetOversampling(&pc, 8, 8);
     numPackedGlyphs = 0;
-    fixedNumberAdvanceWidth = 0.0f;
-    float pixelHeight = GetScreenRelativeY(genericTextHeightFac);
+    float h = GetScreenRelativeY(genericTextHeightFac);
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
             if (numPackedGlyphs >= MAX_GLYPHS) break;
-
-            uint32_t codepoint = fontRanges[r].first + i;
+            uint32_t cp = fontRanges[r].first + i;
             stbtt_fontinfo *font = NULL;
-            int glyph = GetGlyphAndFont(codepoint, &font, FONT_NORMAL);
-            if (!glyph) continue;
-
-            float height = pixelHeight;
-            unsigned char *fontData = (font == &primaryFontInfo) ? primaryFontData
+            int g = GetGlyphAndFont(cp, &font, FONT_NORMAL);
+            if (!g) continue;
+            unsigned char *data = (font == &primaryFontInfo) ? primaryFontData
                 : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
-
-            // Scale fallback fonts
-            if (font != &primaryFontInfo) {
-                float fallbackScale = 1.2f;
-                height *= fallbackScale;
-
-                int ascent, descent, lineGap;
-                stbtt_GetFontVMetrics(font, &ascent, &descent, &lineGap);
-                float scale = stbtt_ScaleForPixelHeight(font, height);
-                float baselineOffset = scale * (ascent - 2);
-                fontPackedChar[numPackedGlyphs].y0 -= (int)baselineOffset;
-                fontPackedChar[numPackedGlyphs].y1 -= (int)baselineOffset;
-            }
-
-            stbtt_PackFontRange(&pc, fontData, 0, height, codepoint, 1, &fontPackedChar[numPackedGlyphs]);
+            float height = h;
+            if (font != &primaryFontInfo) height *= 1.2f;
+            stbtt_PackFontRange(&pc, data, 0, height, cp, 1, &fontPackedChar[numPackedGlyphs]);
             int idx = numPackedGlyphs++;
-            if (codepoint >= '0' && codepoint <= '9') {
-                float advance = fontPackedChar[idx].xadvance;
-                if (advance > fixedNumberAdvanceWidth) fixedNumberAdvanceWidth = advance;
-            }
+            if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidth = fmaxf(fixedNumberAdvanceWidth, fontPackedChar[idx].xadvance);
         }
     }
+    
     stbtt_PackEnd(&pc);
-
-    // Upload Primary Atlas
+    malloc_trim(0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
     glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
-    glTextureSubImage2D(fontAtlasTex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, atlasBitmap);
+    glTextureSubImage2D(fontAtlasTex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    free(atlasBitmap);
+    write_font_cache(pri_cache, pri_expected, pri_md5, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
+    free(bmp);
     malloc_trim(0);
 
-    // ------------------------------------------------------------------------
-    // Pack Secondary Font Atlas: StopD.ttf
-    unsigned char *atlasBitmapStopD = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
-    stbtt_pack_context pcStopD;
-    stbtt_PackBegin(&pcStopD, atlasBitmapStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    stbtt_PackSetOversampling(&pcStopD, 8, 8);  // You can adjust per-font oversampling
+    // Secondary
+    bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
+    stbtt_pack_context pc2;
+    stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
+    stbtt_PackSetOversampling(&pc2, 8, 8);
     numPackedGlyphsStopD = 0;
-    float fixedNumberAdvanceWidthStopD = 0.0f;
-    float pixelHeightStopD = GetScreenRelativeY(genericTextHeightFacStopD); // Optional: slightly larger
+    float h2 = GetScreenRelativeY(genericTextHeightFacStopD);
     for (int r = 0; r < numFontRanges; r++) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
             if (numPackedGlyphsStopD >= MAX_GLYPHS) break;
-
-            uint32_t codepoint = fontRangesStopD[r].first + i;
-
-            // Try secondary font first
-            int glyph = stbtt_FindGlyphIndex(&secondaryFontInfo, codepoint);
+            uint32_t cp = fontRangesStopD[r].first + i;
+            int g = stbtt_FindGlyphIndex(&secondaryFontInfo, cp);
             stbtt_fontinfo *font = &secondaryFontInfo;
-            unsigned char *fontData = secondaryFontData;
-
-            if (!glyph) {
-                // Fallback to primary or system fonts
-                glyph = GetGlyphAndFont(codepoint, &font, FONT_STOPD);
-                if (!glyph) continue;
-                fontData = (font == &primaryFontInfo) ? primaryFontData
-                    : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
+            unsigned char *data = sec_data;
+            if (!g) {
+                g = GetGlyphAndFont(cp, &font, FONT_STOPD);
+                if (!g) continue;
+                
+                data = (font == &primaryFontInfo) ? primaryFontData : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
             }
-
-            float height = pixelHeightStopD;
-            if (font != &secondaryFontInfo) {
-                float fallbackScale = 1.2f;
-                height *= fallbackScale;
-
-                int ascent, descent, lineGap;
-                stbtt_GetFontVMetrics(font, &ascent, &descent, &lineGap);
-                float scale = stbtt_ScaleForPixelHeight(font, height);
-                float baselineOffset = scale * (ascent - 2);
-                fontPackedCharStopD[numPackedGlyphsStopD].y0 -= (int)baselineOffset;
-                fontPackedCharStopD[numPackedGlyphsStopD].y1 -= (int)baselineOffset;
-            }
-
-            stbtt_PackFontRange(&pcStopD, fontData, 0, height, codepoint, 1, &fontPackedCharStopD[numPackedGlyphsStopD]);
+            
+            float height = h2;
+            if (font != &secondaryFontInfo) height *= 1.2f;
+            stbtt_PackFontRange(&pc2, data, 0, height, cp, 1, &fontPackedCharStopD[numPackedGlyphsStopD]);
             int idx = numPackedGlyphsStopD++;
-            if (codepoint >= '0' && codepoint <= '9') {
-                float advance = fontPackedCharStopD[idx].xadvance;
-                if (advance > fixedNumberAdvanceWidthStopD) fixedNumberAdvanceWidthStopD = advance;
-            }
+            if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidthStopD = fmaxf(fixedNumberAdvanceWidthStopD, fontPackedCharStopD[idx].xadvance);
         }
     }
-    stbtt_PackEnd(&pcStopD);
-
-    // Upload Secondary Atlas
+    
+    stbtt_PackEnd(&pc2);
+    malloc_trim(0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
-    glTextureSubImage2D(fontAtlasTexStopD, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, atlasBitmapStopD);
+    glTextureSubImage2D(fontAtlasTexStopD, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    free(atlasBitmapStopD);
-
-    // Store fixed width for numbers in StopD (optional global)
-    // You can expose this as `fixedNumberAdvanceWidthStopD` if needed
-
-    // ------------------------------------------------------------------------
-    // Cleanup
-#ifdef LOAD_LOCALIZATION_FONTS
-    if (fontCfg) { FcConfigDestroy(fontCfg); fontCfg = NULL; }
-    for (int i = 0; i < numFallbackFonts; i++) {
-        free(fallbackFonts[i].data);
-        free(fallbackFonts[i].path);
-    }
-#endif
-    free(primaryFontData);
-    primaryFontData = NULL;
-    free(secondaryFontData);
+    write_font_cache(sec_cache, sec_expected, sec_md5, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
+    free(bmp);
+    free(primaryFontData); free(sec_data);
     malloc_trim(0);
-    DebugRAM("end of font init");
-    DualLog("Loading fonts(%d)... took %f\n", numFallbackFonts + 2, get_time() - font_start_time);
+    DualLog("Fonts regenerated in %.3f s\n", get_time() - t0);
 }
