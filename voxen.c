@@ -11,7 +11,6 @@
 // Level 7 2.228084 50.95243 7.532025
 // Level 9.1_resdest 2.303 106.77 -38.554 (I don't remember what this is for, cheat spawn from `load 9`??)
 // TODO: Animated lights
-// TODO: Dynamic shadowmaps?
 // TODO: Multiview renders for sensaround
 // TODO: Proper physics
 // TODO: Raycasts
@@ -125,10 +124,13 @@ float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
 GLuint shadowCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
-GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightPosLoc_shadowmaps, ssbo_indexBaseLoc_shadowmaps, shadowmapSizeLoc_shadowmaps;
+GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightPosLoc_shadowmaps, ssbo_indexBaseLoc_shadowmaps,
+      shadowmapSizeLoc_shadowmaps, viewProjArrayLoc_shadowmaps;
 GLuint shadowMapSSBO; // SSBO for storing all shadow maps
-bool shadowMapsRendered = false;
+// bool shadowMapsRendered = false;
 uint32_t lightIsDynamic[LIGHT_COUNT + 31 / 32] = {0}; // TODO  Handle dynamic animated lights; and their shadowmaps
+uint32_t totalShadowmapPixels = 0;
+uint32_t shadSizeSquared = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE;
 
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 25% of render resolution.
@@ -201,6 +203,9 @@ float statusTextDecayFinished = 0.0f;
 GLuint lightsID;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
+float*** lightViewProj = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
+float*** lightView = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
+FrustumPlane*** lightFrustumPlanes = NULL; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 // ----------------------------------------------------------------------------
 // Event System states
 int32_t maxEventCount_debug = 0;
@@ -509,9 +514,6 @@ void UpdateScreenSize(void) {
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
 }
 
-uint32_t* voxelLightListsRaw = NULL;
-uint32_t* voxelLightListIndices = NULL;
-
 typedef struct {
     uint16_t index; // Original index in lights array
     float distanceSquared; // Distance to camera squared
@@ -522,6 +524,97 @@ int32_t compareLightCandidates(const void* a, const void* b) {
     const LightCandidate* ca = (const LightCandidate*)a;
     const LightCandidate* cb = (const LightCandidate*)b;
     return (ca->score < cb->score) ? -1 : ((ca->score > cb->score) ? 1 : 0);
+}
+
+Quaternion cubemapOrientationQuaternion[6] = {
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+};
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
+void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
+    float rotation[16];
+    quat_to_matrix(camRotation, rotation);
+
+    // Extract basis vectors (camera space axes)
+    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
+    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
+    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
+
+    // View matrix: inverse rotation (transpose) and inverse translation
+    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
+    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
+    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
+    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
+    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
+    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
+    m[15] = 1.0f;
+}
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
+void mat4_lookat(float* m) {
+    mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
+}
+
+bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
+    // Vector from camera to instance
+    float to_inst_x = inst_x - cam_x;
+    float to_inst_y = inst_y - cam_y;
+    float to_inst_z = inst_z - cam_z;
+    float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
+    if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
+
+    // Precompute FOV constants (assuming cam_fov is constant per frame)
+    static float cos_half_fov = 0.0f;
+    static float last_cam_fov = -1.0f;
+    if (cam_fov != last_cam_fov) {
+        float fovAdjusted = cam_fov * 2.5f;
+        float half_fov_rad = fovAdjusted * 0.5f * (M_PI / 180.0f); // deg2rad
+        cos_half_fov = cosf(half_fov_rad);
+        last_cam_fov = cam_fov;
+    }
+
+    // Compute dot product without normalization
+    float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
+    float dist = sqrtf(dist_sq); // Only compute sqrt once
+    float dot_normalized = dot / dist; // Normalize dot product
+    if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
+    return false; // Outside FOV cone
+}
+
+bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
+    for (int i = 0; i < 6; i++) {
+        float dist = planes[i].nx * cx + planes[i].ny * cy + planes[i].nz * cz + planes[i].d;
+        if (dist < -radius) return false;
+    }
+    return true;
+}
+
+void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
+    // Left
+    planes[0].nx = m[3]  + m[0];  planes[0].ny = m[7]  + m[4];  planes[0].nz = m[11] + m[8];  planes[0].d = m[15] + m[12];
+    // Right
+    planes[1].nx = m[3]  - m[0];  planes[1].ny = m[7]  - m[4];  planes[1].nz = m[11] - m[8];  planes[1].d = m[15] - m[12];
+    // Bottom
+    planes[2].nx = m[3]  + m[1];  planes[2].ny = m[7]  + m[5];  planes[2].nz = m[11] + m[9];  planes[2].d = m[15] + m[13];
+    // Top
+    planes[3].nx = m[3]  - m[1];  planes[3].ny = m[7]  - m[5];  planes[3].nz = m[11] - m[9];  planes[3].d = m[15] - m[13];
+    // Near
+    planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14];
+    // Far
+    planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14];
+
+    // Normalize
+    for (int i = 0; i < 6; i++) {
+        float len = sqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
+        if (len > 0.0f) {
+            planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len;
+        }
+    }
 }
 
 int32_t VoxelLists() {
@@ -638,6 +731,26 @@ int32_t VoxelLists() {
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
     glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
+    lightView = malloc(loadedLights * sizeof(float**));
+    lightViewProj = malloc(loadedLights * sizeof(float**));
+    lightFrustumPlanes = malloc(loadedLights * sizeof(FrustumPlane**));
+    for (int i=0;i<loadedLights;++i) {
+        lightView[i] = malloc(6 * sizeof(float*));
+        lightViewProj[i] = malloc(6 * sizeof(float*));
+        lightFrustumPlanes[i] = malloc(6 * sizeof(FrustumPlane*));
+        uint32_t litIdx = i * LIGHT_DATA_SIZE;
+        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        for (int j=0;j<6;++j) {
+            lightView[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
+            lightViewProj[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
+            lightFrustumPlanes[i][j] = malloc(6 * sizeof(FrustumPlane)); // Frustum Planes for this cubemap face
+            mat4_lookat_from(lightView[i][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
+            mul_mat4(lightViewProj[i][j], shadowmapsPerspectiveProjection, lightView[i][j]);
+            ExtractFrustumPlanes(lightViewProj[i][j], lightFrustumPlanes[i][j]);
+        }
+    }
     
     for (uint16_t i = 0; i < loadedInstances; i++) UpdateInstanceMatrix(i);
     glGenBuffers(1, &matricesBuffer);
@@ -651,143 +764,83 @@ int32_t VoxelLists() {
     return 0;
 }
 
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
-    float rotation[16];
-    quat_to_matrix(camRotation, rotation);
-
-    // Extract basis vectors (camera space axes)
-    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
-    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
-    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
-
-    // View matrix: inverse rotation (transpose) and inverse translation
-    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
-    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
-    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
-    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
-    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
-    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
-    m[15] = 1.0f;
-}
-
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat(float* m) {
-    mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
-}
-
-Quaternion orientationQuaternion[6] = {
-    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
-    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
-    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
-    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
-    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
-    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
-};
-
-bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
-    // Vector from camera to instance
-    float to_inst_x = inst_x - cam_x;
-    float to_inst_y = inst_y - cam_y;
-    float to_inst_z = inst_z - cam_z;
-    float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
-    if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
-
-    // Precompute FOV constants (assuming cam_fov is constant per frame)
-    static float cos_half_fov = 0.0f;
-    static float last_cam_fov = -1.0f;
-    if (cam_fov != last_cam_fov) {
-        float fovAdjusted = cam_fov * 2.5f;
-        float half_fov_rad = fovAdjusted * 0.5f * (M_PI / 180.0f); // deg2rad
-        cos_half_fov = cosf(half_fov_rad);
-        last_cam_fov = cam_fov;
-    }
-
-    // Compute dot product without normalization
-    float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
-    float dist = sqrtf(dist_sq); // Only compute sqrt once
-    float dot_normalized = dot / dist; // Normalize dot product
-    if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
-    return false; // Outside FOV cone
-}
-
-typedef struct {
-    float nx, ny, nz, d;
-} Plane;
-
-bool SphereInFrustum(Plane* planes, float cx, float cy, float cz, float radius) {
-    for (int i = 0; i < 6; i++) {
-        float dist = planes[i].nx * cx + planes[i].ny * cy + planes[i].nz * cz + planes[i].d;
-        if (dist < -radius) return false;
-    }
-    return true;
-}
-
-void ExtractFrustumPlanes(float* m, Plane* planes) {
-    // Left
-    planes[0].nx = m[3]  + m[0];  planes[0].ny = m[7]  + m[4];  planes[0].nz = m[11] + m[8];  planes[0].d = m[15] + m[12];
-    // Right
-    planes[1].nx = m[3]  - m[0];  planes[1].ny = m[7]  - m[4];  planes[1].nz = m[11] - m[8];  planes[1].d = m[15] - m[12];
-    // Bottom
-    planes[2].nx = m[3]  + m[1];  planes[2].ny = m[7]  + m[5];  planes[2].nz = m[11] + m[9];  planes[2].d = m[15] + m[13];
-    // Top
-    planes[3].nx = m[3]  - m[1];  planes[3].ny = m[7]  - m[5];  planes[3].nz = m[11] - m[9];  planes[3].d = m[15] - m[13];
-    // Near
-    planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14];
-    // Far
-    planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14];
-
-    // Normalize
-    for (int i = 0; i < 6; i++) {
-        float len = sqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
-        if (len > 0.0f) {
-            planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len;
-        }
-    }
-}
-
-double shadowmapCPUTime = 0.0;
 void RenderShadowmap(uint16_t lightIdx) {
-    double thisShadowmapStartT = get_time();
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = fmin(lightRadius, 15.36f);
+    float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+    float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
+    float thresh = 0.005f;//0.042f;
+    if (currentLevel >= 10) thresh += 0.015f;
+    if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
+    if (currentLevel == 8) thresh += 0.005f;
+    if (luminosity < thresh) return; // Skip if light is off
+
+    float distSqrd = squareDistance3D(cam_x, cam_y, cam_z, lightPosX, lightPosY, lightPosZ);
+    if (distSqrd >= FAR_PLANE_SQUARED) return;
+
+    int lightCellIdx = cellIndexForLight[lightIdx];
+    int x = lightCellIdx % WORLDX;
+    int y = lightCellIdx / WORLDX;
+    int range = floor(lightRadius * 0.390625f); // 1 / 2.56f
+    int xMin = x - range; int xMax = x + range;
+    int yMin = y - range; int yMax = y + range;
+    bool inPVS = false;
+    if (lightCellIdx < ARRSIZE && lightCellIdx >= 0) {
+        if ((gridCellStates[lightCellIdx] & CELL_VISIBLE)) {// || !(gridCellStates[lightCellIdx] & CELL_OPEN)) {
+            inPVS = true; // Allow lights outside windows (and thus in non open cells) to still be applicable.
+        } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
+            for (int ix = xMin;ix <= xMax; ix++) {
+                for (int iy = yMin;iy <= yMax; iy++) {
+                    if (!XZPairInBounds(ix,iy)) continue;
+
+                    int subIdx = (iy * WORLDX) + ix;
+                    int cellIdx = (lightCellIdx * ARRSIZE);
+                    int flat_idx = cellIdx + subIdx;
+                    if ((gridCellStates[subIdx] & CELL_VISIBLE) // Player can see cell in light's range.
+                        && get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) { // Light's cell can see the cell in light's range.
+                        
+                        inPVS = true;
+                        goto Label_PVSCheck; // Avoid checking any more.  One is enough to count.
+                    }
+                }
+                
+            }
+        }
+    }
+    
+    Label_PVSCheck:    
+    if (!inPVS) return;
+
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 0; j < loadedInstances; j++) {
         if (instances[j].modelIndex >= loadedModels) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-        if (ConstIndexIsDynamicObject(instances[j].index)) continue;
         
         float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
         float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
-        if (distToLightSqrd > (effectiveRadius + radius) * (effectiveRadius + radius)) continue;
+        float radSum = (effectiveRadius + radius);
+        if (distToLightSqrd > radSum * radSum) continue;
         
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
     }
 
-    shadowmapCPUTime += get_time() - thisShadowmapStartT;
-    Plane planes[6];
+    glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
     for (uint8_t face = 0; face < 6; face++) {
-        float lightView[16];
-        float lightViewProj[16];
-        mat4_lookat_from(lightView, &orientationQuaternion[face], lightPosX, lightPosY, lightPosZ);
-        mul_mat4(lightViewProj, shadowmapsPerspectiveProjection, lightView);
-        ExtractFrustumPlanes(lightViewProj, planes);
-        glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE + face * SHADOW_MAP_SIZE * SHADOW_MAP_SIZE);
-        glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj);
+        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * shadSizeSquared + face * shadSizeSquared);
+        glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
             if (instances[i].modelIndex >= loadedModels) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-            if (!SphereInFrustum(planes, instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
+            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 1.42f;
+            if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
 
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
@@ -795,27 +848,16 @@ void RenderShadowmap(uint16_t lightIdx) {
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
-            shadowDrawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
-
-    malloc_trim(0);
+    
+    shadowDrawCallsRenderedThisFrame++;
 }
 
-// Renders all static shadowmaps at level load
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
     
-    shadowmapCPUTime = 0.0;
-    double start_time = get_time();
-    DualLog("Rendering shadowmaps...");
-    DebugRAM("Start of RenderShadowmaps");
-    uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
-    uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
-    uint32_t totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
-    uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
-    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     glUseProgram(shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
@@ -827,18 +869,11 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    shadowmapCPUTime = get_time() - start_time;
     for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i); // Render static lights once.
-    double timePointAfterLoop = get_time();
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
-    shadowMapsRendered = true;
-    shadowmapCPUTime += get_time() - timePointAfterLoop;
-    DualLog(" took %f seconds to render %d static shadow maps, shadowmapCPUTime: %f\n", get_time() - start_time, loadedLights, shadowmapCPUTime);
-    DebugRAM("After rendering all shadowmaps");
 }
 
-void RenderDynamicShadowmaps(void) {}
 // ============================================================================
 // UI Rendering and Text
 float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
@@ -1241,6 +1276,11 @@ void NewGame(void) {
     glClearColor(0.0f, 0.0f, 0.0f, 0.2f); // Set after shadowmap rendering.
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
     VoxelLists();
+    uint32_t shadowmapPixelCount = shadSizeSquared * 6u;
+    uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
+    totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
+    uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
+    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     pauseRelativeTime = 0.0f;
 }
 
@@ -1702,8 +1742,6 @@ void RenderInstances(uint8_t type) {
                                startOfNextType = loadedInstances - invalidModelIndexCount; break;
     }
     
-    if (countsArray == NULL) { DualLogError("Invalid type %u passed to RenderInstances\n",type); return; }
-    
     for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         if (countsArray[modelIdx] == 0) continue;
 
@@ -1717,9 +1755,7 @@ void RenderInstances(uint8_t type) {
             
             float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            
-//             if (!IsSphereInFOVCone(instances[i].position.x, instances[i].position.y, instances[i].position.z)) continue; // Better performance without frustum culling, wut!?  Well... can't argue with that.
-            
+
             visibleInstances[visibleCount].index = i;
             visibleInstances[visibleCount].depth = distSqrd;
             visibleCount++;
@@ -1836,7 +1872,6 @@ int32_t main(int32_t argc, char* argv[]) {
 //     double last_physics_time = get_time();
     last_time = get_time();
     DebugRAM("prior to game loop");
-    RenderShadowmaps();
     Input_MouselookApply();
     lastJournalWriteTime = get_time();
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
@@ -1920,7 +1955,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
             // 3. Dynamic Shadowmaps
-            RenderDynamicShadowmaps();      
+            RenderShadowmaps();
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
             
             // 3. Raterized Geometry
             //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts

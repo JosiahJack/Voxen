@@ -1,10 +1,12 @@
 #include <stdlib.h>
+#include <string.h>
 #include "External/stb_image.h"
 #include "voxen.h"
 
 uint8_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
+uint16_t cellIndexForLight[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
 uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
 uint16_t numCellsVisible = 0u;
@@ -35,6 +37,23 @@ void PutChunksInCells() {
         cellIdx = (z * WORLDX) + x;
         if (!(gridCellStates[cellIdx] & CELL_OPEN)) cellIdx = 0;
         cellIndexForInstance[c] = (uint32_t)cellIdx;
+    }
+}
+
+void PutMeshesInCells(int type) {
+    int count = 0;
+    switch(type) {
+        case 5: count = LIGHT_COUNT; break; // Lights
+    }
+    for (int index=0;index<count;index++) {
+        uint16_t x,z;
+        switch(type) {
+            case 5: // Lights
+                int lightIdx = (index * LIGHT_DATA_SIZE);
+                PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
+                cellIndexForLight[index] = (z * WORLDX) + x;
+                break;
+        }
     }
 }
 
@@ -658,6 +677,8 @@ void CullInit(void) {
 //     PutMeshesInCells(2); // Doors
 //     PutMeshesInCells(3); // NPCs
 //     PutMeshesInCells(4); // Static Saveable
+    memset(cellIndexForLight,0,LIGHT_COUNT * sizeof(uint16_t));
+    PutMeshesInCells(5); // Lights
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     malloc_trim(0);
     DualLog(" took %f seconds\n", get_time() - start_time);

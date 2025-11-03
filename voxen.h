@@ -46,6 +46,10 @@ typedef struct {
 } Trigger;
 
 typedef struct {
+    float nx, ny, nz, d;
+} FrustumPlane;
+
+typedef struct {
     uint16_t index;
     uint16_t modelIndex;
     uint16_t lodIndex;
@@ -198,7 +202,7 @@ void LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 192u
+#define SHADOW_MAP_SIZE 128u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -312,6 +316,7 @@ extern uint8_t gridCellStates[ARRSIZE];
 // extern float gridCellCeilingHeight[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
+extern uint16_t cellIndexForLight[LIGHT_COUNT];
 extern float worldMin_x, worldMin_z;
 void CullInit(void);
 void CullCore(void);
