@@ -858,10 +858,10 @@ void RenderShadowmap(uint16_t lightIdx) {
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
     
-    glUseProgram(shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+//     glUseProgram(shadowmapsClearShaderProgram);
+//     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+//     glDispatchCompute(groupX_shadClear,1, 1);
+//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
     glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
@@ -1873,6 +1873,10 @@ int32_t main(int32_t argc, char* argv[]) {
     last_time = get_time();
     DebugRAM("prior to game loop");
     Input_MouselookApply();
+    glUseProgram(shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     lastJournalWriteTime = get_time();
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
     while(1) {
