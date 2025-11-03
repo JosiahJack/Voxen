@@ -685,7 +685,9 @@ Quaternion orientationQuaternion[6] = {
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
 
+double shadowmapCPUTime = 0.0;
 void RenderShadowmap(uint16_t lightIdx) {
+    double thisShadowmapStartT = get_time();
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -707,6 +709,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         nearbyMeshCount++;
     }
 
+    shadowmapCPUTime += get_time() - thisShadowmapStartT;
     for (uint8_t face = 0; face < 6; face++) {
         float lightView[16];
         float lightViewProj[16];
@@ -737,7 +740,8 @@ void RenderShadowmap(uint16_t lightIdx) {
 // Renders all static shadowmaps at level load
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
-
+    
+    shadowmapCPUTime = 0.0;
     double start_time = get_time();
     DualLog("Rendering shadowmaps...");
     DebugRAM("Start of RenderShadowmaps");
@@ -778,13 +782,16 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
+    shadowmapCPUTime = get_time() - start_time;
     for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
+    double timePointAfterLoop = get_time();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
     malloc_trim(0);
     shadowMapsRendered = true;
-    DualLog(" took %f seconds to render %d static shadow maps\n", get_time() - start_time, loadedLights);
+    shadowmapCPUTime += get_time() - timePointAfterLoop;
+    DualLog(" took %f seconds to render %d static shadow maps, shadowmapCPUTime: %f\n", get_time() - start_time, loadedLights, shadowmapCPUTime);
     DebugRAM("After rendering all shadowmaps");
 }
 

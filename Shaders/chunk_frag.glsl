@@ -234,8 +234,8 @@ void main() {
         float shadowFactor = 1.0;
         if (debugValue != 2 && shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
-            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0);
-            float normalBias = 0.04;
+            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0) + 0.04;
+            bias = 2.0 * dist * bias + bias * bias;
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -267,8 +267,8 @@ void main() {
                     uint uty = uint(ty);
                     uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
                     uint distInt = shadowMaps[ssbo_index];
-                    float d = float(distInt) / 10000.0;
-                    float depthDiff = dist - d - (bias + normalBias);
+                    float d = (float(distInt) / 10.0);
+                    float depthDiff = (dist * dist) - d - bias;
                     float shadowContrib = depthDiff > 0.0 ? 0.0 : 1.0;
                     sum += shadowContrib * invSamples;
                 }
@@ -281,8 +281,8 @@ void main() {
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
                 uint distInt = shadowMaps[ssbo_index];
-                float d = float(distInt) / 10000.0;
-                float depthDiff = dist - d - (bias + normalBias);
+                float d = (float(distInt) / 10.0);
+                float depthDiff = (dist * dist) - d - bias;
                 shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
             }
 
