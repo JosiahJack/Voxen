@@ -745,23 +745,6 @@ void RenderShadowmaps(void) {
     double start_time = get_time();
     DualLog("Rendering shadowmaps...");
     DebugRAM("Start of RenderShadowmaps");
-    malloc_trim(0);
-    glGenTextures(1, &shadowCubeMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, shadowCubeMap);
-    for (int face = 0; face < 6; face++) glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, 0, GL_R8, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-
-    glGenFramebuffers(1, &shadowFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, shadowCubeMap, 0);
-    glDrawBuffer(0);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) { GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER); DualLogError("\nShadow FBO incomplete, status: 0x%x\n", status); return; }
-   
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6u;
     uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
     uint32_t totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
@@ -771,10 +754,6 @@ void RenderShadowmaps(void) {
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    malloc_trim(0);
-    
-    // Render static lights once
-    glBindFramebuffer(GL_FRAMEBUFFER, shadowFBO);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
     glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
@@ -783,24 +762,22 @@ void RenderShadowmaps(void) {
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
     shadowmapCPUTime = get_time() - start_time;
-    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i);
+    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i); // Render static lights once.
     double timePointAfterLoop = get_time();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
-    malloc_trim(0);
     shadowMapsRendered = true;
     shadowmapCPUTime += get_time() - timePointAfterLoop;
     DualLog(" took %f seconds to render %d static shadow maps, shadowmapCPUTime: %f\n", get_time() - start_time, loadedLights, shadowmapCPUTime);
     DebugRAM("After rendering all shadowmaps");
 }
 
-float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
-float GetScreenRelativeY(float percentage) { return (float)screen_height * percentage; }
-
 void RenderDynamicShadowmaps(void) {}
 // ============================================================================
 // UI Rendering and Text
+float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
+float GetScreenRelativeY(float percentage) { return (float)screen_height * percentage; }
+
 uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
     if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return 0; }
     
