@@ -38,7 +38,7 @@ echo "Shaders converted to string constants in $((shader_end - shader_start)) ms
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
 LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.4.a -l:libminiaudio.0.11.22.a -lGLEW -lGL -lm -lfontconfig -fopenmp"
-SOURCES="voxen.c data_parser.c data_fonts.c physics.c dynamic_culling.c citadel_playermovement.c helpers.c"
+SOURCES="voxen.c data_parser.c data_fonts.c input.c physics.c dynamic_culling.c citadel_playermovement.c helpers.c"
 
 # Compile sources in parallel
 pids=()

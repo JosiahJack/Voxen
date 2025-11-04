@@ -22,6 +22,8 @@ DataParser texture_parser; // Zero initialized by C default.
 DataParser model_parser;
 DataParser entity_parser;
 DataParser lights_parser;
+float correctionX, correctionY, correctionZ;
+float correctionLightX, correctionLightY, correctionLightZ;
 
 // Textures
 typedef struct {
@@ -122,6 +124,30 @@ void init_data_entry(ResourceEntry *entry) {
     entry->index = UINT16_MAX;
     entry->modelIndex = entry->lodIndex = MODEL_IDX_MAX;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
+    entry->volume = 1.0f;
+    entry->child0 = UINT16_MAX;
+    entry->child0_offset.x = 0.0f;
+    entry->child0_offset.y = 0.0f;
+    entry->child0_offset.z = 0.0f;
+    entry->child0_rotation.x = 0.0f;
+    entry->child0_rotation.y = 0.0f;
+    entry->child0_rotation.z = 0.0f;
+    entry->child0_rotation.w = 1.0f;
+    entry->child0_scale.x = 1.0f;
+    entry->child0_scale.y = 1.0f;
+    entry->child0_scale.z = 1.0f;
+    
+    entry->child1 = UINT16_MAX;
+    entry->child1_offset.x = 0.0f;
+    entry->child1_offset.y = 0.0f;
+    entry->child1_offset.z = 0.0f;
+    entry->child1_rotation.x = 0.0f;
+    entry->child1_rotation.y = 0.0f;
+    entry->child1_rotation.z = 0.0f;
+    entry->child1_rotation.w = 1.0f;
+    entry->child1_scale.x = 1.0f;
+    entry->child1_scale.y = 1.0f;
+    entry->child1_scale.z = 1.0f;
     entry->path[0] = '\0';
 }
 
@@ -166,6 +192,17 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
     else if (strcmp(trimmed_key, "doublesided") == 0)     entry->doublesided = parse_bool(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "transparent") == 0)     entry->transparent = parse_bool(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "cardchunk") == 0)       entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "volume") == 0)          entry->volume = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0") == 0)          entry->child0 = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0_offsetx") == 0)  entry->child0_offset.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0_offsety") == 0)  entry->child0_offset.y = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0_offsetz") == 0)  entry->child0_offset.z = parse_float(trimmed_value, line, lineNum);
+    
+    else if (strcmp(trimmed_key, "child1") == 0)          entry->child1 = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child1_offsetx") == 0)  entry->child1_offset.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child1_offsety") == 0)  entry->child1_offset.y = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child1_offsetz") == 0)  entry->child1_offset.z = parse_float(trimmed_value, line, lineNum);
+    
     else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
     else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "startlevel") == 0)      startLevel = parse_numberu8(trimmed_value, line, lineNum);
@@ -230,7 +267,6 @@ void ParseGameData() {
     
     fclose(gamedatfile);
     if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
-    currentLevel = startLevel;
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d\n",global_modname,numLevels,startLevel);
 }
 
@@ -715,7 +751,6 @@ void LoadModels(void) {
             /* ---------- 1. Build .vmdl name ---------- */
             char vmdl_path[512];
             make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
-//             DualLog("FBX: %s → VMDL: %s\n", fbx_path, vmdl_path);
             if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); exit(1); }
 
             /* ---------- 2. Compute MD5 of the .fbx ---------- */
@@ -823,7 +858,6 @@ void LoadModels(void) {
                 aiReleaseImport(scene);
             } else {
                 /* ---- CACHE HIT ---- */
-//                 DualLog("vmdl found, loading %s...\n", vmdl_path);
                 modelVertexCounts[i]   = cached_vcnt;
                 modelTriangleCounts[i] = cached_icnt;
                 modelVertices[i]  = malloc(cached_vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -935,8 +969,11 @@ void LoadEntities(void) {
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
-        entities[i].lodIndex = entity_parser.entries[i].cardchunk ? GEOMETRY_LOD_CARD_MODEL_IDX: entity_parser.entries[i].lodIndex; // Generic LOD card
-        entities[i].cardchunk = entity_parser.entries[i].cardchunk;
+        bool isCardChunk = entity_parser.entries[i].cardchunk;
+        entities[i].lodIndex = isCardChunk ? GEOMETRY_LOD_CARD_MODEL_IDX : entity_parser.entries[i].lodIndex; // Generic LOD card
+        flag_enable(&entities[i].entflags, ENTFLAG_ACTIVE);
+        flag_set(&entities[i].entflags, ENTFLAG_CARDCHUNK, isCardChunk);
+        entities[i].volume = entity_parser.entries[i].volume;
         entities[i].position.x = 0.0f;
         entities[i].position.y = 0.0f;
         entities[i].position.z = 0.0f;
@@ -947,6 +984,30 @@ void LoadEntities(void) {
         entities[i].rotation.y = 0.0f;
         entities[i].rotation.z = 0.0f;
         entities[i].rotation.w = 1.0f;
+        
+        entities[i].child0 = entity_parser.entries[i].child0;
+        entities[i].child0_offset.x = entity_parser.entries[i].child0_offset.x;
+        entities[i].child0_offset.y = entity_parser.entries[i].child0_offset.y;
+        entities[i].child0_offset.z = entity_parser.entries[i].child0_offset.z;
+        entities[i].child0_rotation.x = entity_parser.entries[i].child0_rotation.x;
+        entities[i].child0_rotation.y = entity_parser.entries[i].child0_rotation.y;
+        entities[i].child0_rotation.z = entity_parser.entries[i].child0_rotation.z;
+        entities[i].child0_rotation.w = entity_parser.entries[i].child0_rotation.w;
+        entities[i].child0_scale.x = entity_parser.entries[i].child0_scale.x;
+        entities[i].child0_scale.y = entity_parser.entries[i].child0_scale.y;
+        entities[i].child0_scale.z = entity_parser.entries[i].child0_scale.z;
+        
+        entities[i].child1 = entity_parser.entries[i].child1;
+        entities[i].child1_offset.x = entity_parser.entries[i].child1_offset.x;
+        entities[i].child1_offset.y = entity_parser.entries[i].child1_offset.y;
+        entities[i].child1_offset.z = entity_parser.entries[i].child1_offset.z;
+        entities[i].child1_rotation.x = entity_parser.entries[i].child1_rotation.x;
+        entities[i].child1_rotation.y = entity_parser.entries[i].child1_rotation.y;
+        entities[i].child1_rotation.z = entity_parser.entries[i].child1_rotation.z;
+        entities[i].child1_rotation.w = entity_parser.entries[i].child1_rotation.w;
+        entities[i].child1_scale.x = entity_parser.entries[i].child1_scale.x;
+        entities[i].child1_scale.y = entity_parser.entries[i].child1_scale.y;
+        entities[i].child1_scale.z = entity_parser.entries[i].child1_scale.z;
     }
 
     DualLog(" took %f seconds\n", get_time() - start_time);
@@ -954,11 +1015,67 @@ void LoadEntities(void) {
 }
 
 //----------------------------------- Level -----------------------------------
+void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
+    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",lineNum,entIdx,MAX_ENTITIES); exit(1); }
+            
+    instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
+    if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
+    instances[instanceIdx].texIndex = entities[entIdx].texIndex;
+    instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
+    if (instances[instanceIdx].glowIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].glowIndex = BLACK_TEXTURE_IDX;
+    instances[instanceIdx].specIndex = entities[entIdx].specIndex;
+    if (instances[instanceIdx].specIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].specIndex = BLACK_TEXTURE_IDX;
+    instances[instanceIdx].normIndex = entities[entIdx].normIndex;
+    if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
+    instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    if (ConstIndexIsDoor(entIdx)) {
+        instances[instanceIdx].position.x += correctionX + 0.6001f;
+        instances[instanceIdx].position.y += correctionY - 0.5681f;
+        instances[instanceIdx].position.z += correctionZ - 0.905f;
+    } else {
+        instances[instanceIdx].position.x += correctionX;
+        instances[instanceIdx].position.y += correctionY;
+        instances[instanceIdx].position.z += correctionZ;
+    }
+
+    instances[instanceIdx].index = entIdx;
+    loadedInstances++;
+}
+
+void AddChild0(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
+    if (child == UINT16_MAX) return;
+    
+    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
+    AddInstance(child, *instanceIdx, lineNum);
+    instances[*instanceIdx].index = child;
+    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child0_offset.x;
+    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child0_offset.y;
+    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child0_offset.z;
+    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child0_scale.x;
+    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child0_scale.y;
+    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child0_scale.z;
+}
+
+void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
+    if (child == UINT16_MAX) return;
+
+    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
+    AddInstance(child, *instanceIdx, lineNum);
+    instances[*instanceIdx].index = child;
+    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child1_offset.x;
+    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child1_offset.y;
+    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child1_offset.z;
+    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child1_scale.x;
+    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child1_scale.y;
+    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child1_scale.z;
+}
+
 void LoadLevel(uint8_t curlevel) {
+    currentLevel = curlevel;
     DebugRAM("start of LoadLevel");
     double start_time = get_time();
-    memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    for (uint16_t idx = 0;idx<INSTANCE_COUNT;idx++) {
+    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { // Start AFTER player indices and NULLENT
         instances[idx].modelIndex = MODEL_IDX_MAX;
         instances[idx].texIndex = instances[idx].glowIndex = instances[idx].specIndex = instances[idx].normIndex = MATERIAL_IDX_MAX;
         instances[idx].lodIndex = UINT16_MAX;
@@ -976,18 +1093,14 @@ void LoadLevel(uint8_t curlevel) {
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); exit(1); }
 
     int32_t lineNum = -1; // Start at 0 on first loop iteration, as it needs to iterate before each blank or commented line skip
-    int32_t instanceIdx = -1;
+    int32_t instanceIdx = PLAYER2;
     int32_t lightsIdx = -1;
     size_t lineLengthMax = 81920; 
     char lineSpace[lineLengthMax];
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[lineLengthMax];
-    float correctionX, correctionY, correctionZ;
     GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-//     float correctionDynamicX, correctionDynamicY, correctionDynamicZ;
-//     GetLevel_Transform_Offsets(curlevel,&correctionDynamicX,&correctionDynamicY,&correctionDynamicZ);
-    float correctionLightX, correctionLightY, correctionLightZ;
     GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
     while (fgets(lineSpace, lineLengthMax, file)) {
         size_t len = strlen(lineSpace);
@@ -1075,7 +1188,7 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "localScale.x") == 0)    instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localScale.y") == 0)    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localScale.z") == 0)    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "go.activeSelf") == 0)   instances[instanceIdx].active = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "go.activeSelf") == 0)   flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
             }
         }
         
@@ -1090,38 +1203,40 @@ void LoadLevel(uint8_t curlevel) {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
         } else {
-            loadedInstances++;
-            uint16_t entIdx = instances[lineNum].index;
-            if (entIdx >= MAX_ENTITIES) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",lineNum,entIdx,MAX_ENTITIES); exit(1); }
-            
-            instances[lineNum].modelIndex = entities[entIdx].modelIndex;
-            if (instances[lineNum].modelIndex < loadedModels) renderableCount++;
-            instances[lineNum].texIndex = entities[entIdx].texIndex;
-            instances[lineNum].glowIndex = entities[entIdx].glowIndex;
-            if (instances[lineNum].glowIndex >= MATERIAL_IDX_MAX) instances[lineNum].glowIndex = BLACK_TEXTURE_IDX;
-            instances[lineNum].specIndex = entities[entIdx].specIndex;
-            if (instances[lineNum].specIndex >= MATERIAL_IDX_MAX) instances[lineNum].specIndex = BLACK_TEXTURE_IDX;
-            instances[lineNum].normIndex = entities[entIdx].normIndex;
-            if (instances[lineNum].normIndex >= MATERIAL_IDX_MAX) instances[lineNum].normIndex = BLACK_TEXTURE_IDX;
-            instances[lineNum].lodIndex = entities[entIdx].lodIndex;
-            instances[lineNum].cardchunk = entities[entIdx].cardchunk;
-            if (ConstIndexIsDoor(entIdx)) {
-                instances[lineNum].position.x += correctionX + 0.6001f;
-                instances[lineNum].position.y += correctionY - 0.5681f;
-                instances[lineNum].position.z += correctionZ -0.905f;
-//             if (ConstIndexIsDynamicObject) {
-//                 instances[lineNum].position.x += correctionDynamicX; // TODO
-//                 instances[lineNum].position.y += correctionDynamicY;
-//                 instances[lineNum].position.z += correctionDynamicZ;
-            } else {
-                instances[lineNum].position.x += correctionX;
-                instances[lineNum].position.y += correctionY;
-                instances[lineNum].position.z += correctionZ;
-            }
+            uint16_t parent = instanceIdx;
+            uint16_t entIdx = instances[parent].index;
+            AddInstance(entIdx, parent, lineNum);
+            if (entIdx == 626) DualLog("Adding #ambient_fan at %f %f %f\n", instances[parent].position.x,instances[parent].position.y,instances[parent].position.z);
+            if (entIdx == 640) DualLog("Adding #ambient_machine_ambience at %f %f %f\n", instances[parent].position.x,instances[parent].position.y,instances[parent].position.z);
+            if (entIdx == 653) DualLog("Adding #ambient_rain at %f %f %f\n", instances[parent].position.x,instances[parent].position.y,instances[parent].position.z);
+            AddChild0(entities[entIdx].child0, parent, entIdx, &instanceIdx, lineNum);
+            AddChild1(entities[entIdx].child1, parent, entIdx, &instanceIdx, lineNum);
         }
     }
 
     fclose(file);
+    
+    // Set Fog
+    switch(curlevel) {
+        case  0: fogColorR = 0.3207547f;  fogColorG = 0.29200783f;  fogColorB = 0.29200783f;  fogBaseDensityForLevel = 0.07f;  break;
+        case  1: fogColorR = 0.34509805f; fogColorG = 0.38431373f;  fogColorB = 0.49019608f;  fogBaseDensityForLevel = 0.055f; break;
+        case  2: fogColorR = 0.47058824f; fogColorG = 0.3882353f;   fogColorB = 0.3928334f;   fogBaseDensityForLevel = 0.05f;  break;
+        case  3: fogColorR = 0.32941177f; fogColorG = 0.29411766f;  fogColorB = 0.2509804f;   fogBaseDensityForLevel = 0.065f; break;
+        case  4: fogColorR = 0.3882353f;  fogColorG = 0.452415f;    fogColorB = 0.47058824f;  fogBaseDensityForLevel = 0.075f; break;
+        case  5: fogColorR = 0.3882353f;  fogColorG = 0.4117647f;   fogColorB = 0.47058824f;  fogBaseDensityForLevel = 0.03f;  break;
+        case  6: fogColorR = 0.3f;        fogColorG = 0.24f;        fogColorB = 0.33f;        fogBaseDensityForLevel = 0.07f;  break;
+        case  7: fogColorR = 0.38679248f; fogColorG = 0.3471719f;   fogColorB = 0.3302332f;   fogBaseDensityForLevel = 0.07f;  break;
+        case  8: fogColorR = 0.44708973f; fogColorG = 0.45681614f;  fogColorB = 0.4811321f;   fogBaseDensityForLevel = 0.04f;  break;
+        case  9: fogColorR = 0.4056604f;  fogColorG = 0.3992963f;   fogColorB = 0.36930403f;  fogBaseDensityForLevel = 0.05f;  break;
+        case 10: fogColorR = 0.48235294f; fogColorG = 0.58431375f;  fogColorB = 0.5176471f;   fogBaseDensityForLevel = 0.04f;  break;
+        case 11: fogColorR = 0.52872473f; fogColorG = 0.58431375f;  fogColorB = 0.48235294f;  fogBaseDensityForLevel = 0.04f;  break;
+        case 12: fogColorR = 0.48235294f; fogColorG = 0.58431375f;  fogColorB = 0.5176471f;   fogBaseDensityForLevel = 0.05f;  break;
+        case 13: fogColorR = 0.0f;        fogColorG = 0.0f;         fogColorB = 0.0f;         fogBaseDensityForLevel = 0.005f; break;
+    }
+
+    fogBaseDensityForLevel *= 4.0f; // Global multiplier to get it to look similar to Unity's
+    SetFog();
+    DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f seconds\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel");
 }
@@ -1144,7 +1259,7 @@ void SortInstances(void) {
     invalidModelIndexCount = 0;
 
     // Step 1: Categorize instances and count model types per category
-    for (uint32_t i = 0; i < loadedInstances; i++) {
+    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
         if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != MATERIAL_IDX_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
         if (instances[i].modelIndex >= loadedModels || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
         if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
@@ -1169,7 +1284,7 @@ void SortInstances(void) {
     }
 
     // Step 2: Compute offsets
-    uint16_t currentOffset = 0;
+    uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
     for (uint16_t i = 0; i < loadedModels; i++) {
         modelTypeOffsetsOpaque[i] = currentOffset;
         currentOffset += modelTypeCountsOpaque[i];
@@ -1191,49 +1306,63 @@ void SortInstances(void) {
     // Step 3: Reorder instances
     Entity tempInstances[INSTANCE_COUNT];
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
-    uint16_t targetIdx = 0;
-
+    uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
+    
     // Copy opaque instances
     for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         for (uint16_t j = 0; j < opaqueInstancesHead; j++) {
             uint16_t i = opaqueInstances[j];
-            if (tempInstances[i].modelIndex == modelIdx) {
-                if (targetIdx >= startOfDoubleSidedInstances) { DualLogError("Opaque instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
-                
-                instances[targetIdx] = tempInstances[i];
-                targetIdx++;
+            if (i >= START_INDEX_LEVEL_INSTANCES) {
+                if (tempInstances[i].modelIndex == modelIdx) {
+                    if (targetIdx >= startOfDoubleSidedInstances) { DualLogError("Opaque instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
+                    
+                    instances[targetIdx] = tempInstances[i];
+                    targetIdx++;
+                }
             }
         }
     }
 
     // Copy double-sided instances
-    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; ++modelIdx) {
         for (uint16_t j = 0; j < doubleSidedInstancesHead; j++) {
             uint16_t i = doubleSidedInstances[j];
-            if (tempInstances[i].modelIndex == modelIdx) {
-                if (targetIdx >= startOfTransparentInstances) { DualLogError("Double-sided instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
-                
-                instances[targetIdx] = tempInstances[i];
-                targetIdx++;
+            if (i >= START_INDEX_LEVEL_INSTANCES) {
+                if (tempInstances[i].modelIndex == modelIdx) {
+                    if (targetIdx >= startOfTransparentInstances) { DualLogError("Double-sided instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
+                    
+                    instances[targetIdx] = tempInstances[i];
+                    targetIdx++;
+                }
             }
         }
     }
 
     // Copy transparent instances
-    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; ++modelIdx) {
         for (uint16_t j = 0; j < transparentInstancesHead; j++) {
             uint16_t i = transparentInstances[j];
-            if (tempInstances[i].modelIndex == modelIdx) {
-                if (targetIdx >= loadedInstances - invalidModelIndexCount) { DualLogError("Transparent instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
-                
-                instances[targetIdx] = tempInstances[i];
-                targetIdx++;
+            if (i >= START_INDEX_LEVEL_INSTANCES) {
+                if (tempInstances[i].modelIndex == modelIdx) {
+                    if (targetIdx >= loadedInstances - invalidModelIndexCount) { DualLogError("Transparent instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
+                    
+                    instances[targetIdx] = tempInstances[i];
+                    targetIdx++;
+                }
             }
+        }
+    }
+    
+    // Put all the invisible entities at the end of the list now
+    for (uint16_t i = 0; i < loadedInstances; ++i) {
+        if (tempInstances[i].modelIndex > loadedModels) {
+            instances[targetIdx] = tempInstances[i];
+            targetIdx++;
         }
     }
 
     // Update cellIndexForInstance
-    for (uint16_t i = 0; i < loadedInstances; i++) {
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) { // Skip player index and start at 3?
         float x = instances[i].position.x;
         float z = instances[i].position.z;
         int32_t cellX = (int32_t)floorf((x - worldMin_x) / WORLDCELL_WIDTH_F);
@@ -1242,7 +1371,22 @@ void SortInstances(void) {
         cellZ = clamp(cellZ, 0, 63);
         cellIndexForInstance[i] = cellZ * 64 + cellX;
     }
+    
+    // Perform post-sort registrations:
+    loadedAmbients = 0;
+    for (uint16_t i = opaqueInstancesHead + doubleSidedInstancesHead + transparentInstancesHead; i<loadedInstances;++i) {
+        uint16_t entIdx = instances[i].index;
+        if (ConstIndexIsAmbient(entIdx)) {
+            ambientRegistry[loadedAmbients] = i;
+            loadedAmbients++;
+            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); exit(1); }
+            
+            instances[i].volume = entities[entIdx].volume * 0.5f;
+            DualLog("Registered ambient effect with index %u at %f %f %f, instances[%u]\n",entIdx,instances[i].position.x, instances[i].position.y, instances[i].position.z, i);
+        }
+    }
 
+    DualLog("Loaded %d ambient noises for Level %d\n", loadedAmbients, currentLevel);
     DualLog(" took %f secs\n", get_time() - start_time);
     DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invisible: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
 }

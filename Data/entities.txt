@@ -2470,74 +2470,109 @@ index: 619
 index: 620
 #ambient_airhiss
 index: 621
+volume: 0.05
 #ambient_clicker
 index: 622
+volume: 0.20
 #ambient_compressor
 index: 623
+volume: 0.4
 #ambient_dishwasher
 index: 624
+volume: 0.2
 #ambient_drip_amb
 index: 625
+volume: 0.5
 #ambient_fan
 index: 626
+volume: 0.3
 #ambient_generator_gas
 index: 627
+volume: 0.3
 #ambient_gurgle
 index: 628
+volume: 0.3
 #ambient_icemaker
 index: 629
+volume: 0.6
 #ambient_intake
 index: 630
+volume: 0.2
 #ambient_lathe
 index: 631
+volume: 0.4
 #ambient_lev3loop1
 index: 632
+volume: 0.1
 #ambient_lev3loop2
 index: 633
+volume: 0.1
 #ambient_lev3loop3
 index: 634
+volume: 0.1
 #ambient_lev3loop4
 index: 635
+volume: 0.1
 #ambient_liquid_bubble
 index: 636
+volume: 1.0
 #ambient_liquid_lava2
 index: 637
+volume: 0.4
 #ambient_looping
 index: 638
+volume: 0.4
 #ambient_machgear_loop
 index: 639
+volume: 0.4
 #ambient_machine_ambience
 index: 640
+volume: 0.8
 #ambient_machine_go
 index: 641
+volume: 0.6
 #ambient_machine_humamb7
 index: 642
+volume: 1.0
 #ambient_machine_humlonoise
 index: 643
+volume: 0.4
 #ambient_machine_loop1
 index: 644
+volume: 0.4
 #ambient_machine_loop2
 index: 645
+volume: 0.4
 #ambient_machinea1
 index: 646
+volume: 0.4
 #ambient_machinevat_loop
 index: 647
+volume: 0.8
 #ambient_mist
 index: 648
+volume: 0.02
 #ambient_pipewater_loop
 index: 649
+volume: 0.65
 #ambient_powerloom
 index: 650
+volume: 0.3
 #ambient_pump
 index: 651
+volume: 0.2
 #ambient_pump2
 index: 652
+volume: 0.05
 #ambient_rain
 index: 653
+volume: 0.55
 #ambient_steam_loop
 index: 654
+volume: 0.1
 #ambient_washing_machine
 index: 655
+volume: 0.5
 #decal_blood_die
 index: 656
 #decal_blood_resist
@@ -2668,6 +2703,7 @@ index: 718
 index: 719
 #ef_mist
 index: 720
+child0: 648
 #ef_particle_bloodspurtsmall
 index: 721
 #ef_particle_bloodspurtsmallgreen
@@ -2694,6 +2730,9 @@ index: 731
 index: 732
 #ef_spraydrips
 index: 733
+child0: 649
+child1: 653
+child1_offsety: -1.26
 #ef_steam
 index: 734
 #env_sparksmall

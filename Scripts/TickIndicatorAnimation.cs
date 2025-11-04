@@ -1,0 +1,61 @@
+﻿using UnityEngine;
+using UnityEngine.UI;
+using System.Collections;
+
+public class TickIndicatorAnimation : MonoBehaviour {
+	public Sprite[] indicatorImages;
+	public bool healthIndicator; // true = health, false = energy
+	public float thinkTime = 0.5f;
+	private float nextthink;
+	private Image indicator;
+	private int tick;
+
+	void Start () {
+		tick = 0;
+		indicator = GetComponent<Image>();
+	}
+
+	void Update() {
+		if (!gameObject.activeSelf) return;
+		if (PauseScript.a.MenuActive()) return;
+
+		if (nextthink < PauseScript.a.relativeTime) {
+			if (healthIndicator) {
+				if (PlayerHealth.a.hm.health > 176) {
+					if (indicator.overrideSprite != indicatorImages[0]) indicator.overrideSprite = indicatorImages[0];
+				} else {
+					if (PlayerHealth.a.hm.health > 88) {
+						if (indicator.overrideSprite != indicatorImages[1]) indicator.overrideSprite = indicatorImages[1];
+					} else {
+						switch (tick) {
+							case 1: if (indicator.overrideSprite != indicatorImages[2]) indicator.overrideSprite = indicatorImages[2]; break;
+							case 2: if (indicator.overrideSprite != indicatorImages[3]) indicator.overrideSprite = indicatorImages[3]; break;
+							case 3: if (indicator.overrideSprite != indicatorImages[4]) indicator.overrideSprite = indicatorImages[4]; break;
+							case 4: if (indicator.overrideSprite != indicatorImages[5]) indicator.overrideSprite = indicatorImages[5]; break;
+							case 5: if (indicator.overrideSprite != indicatorImages[6]) indicator.overrideSprite = indicatorImages[6]; break;
+						}
+					}
+				}
+			} else {
+				if (PlayerEnergy.a.energy > 176) {
+					if (indicator.overrideSprite != indicatorImages[0]) indicator.overrideSprite = indicatorImages[0];
+				} else {
+					if (PlayerEnergy.a.energy > 88) {
+						if (indicator.overrideSprite != indicatorImages[1]) indicator.overrideSprite = indicatorImages[1];
+					} else {
+						switch (tick) {
+							case 1: if (indicator.overrideSprite != indicatorImages[2]) indicator.overrideSprite = indicatorImages[2]; break;
+							case 2: if (indicator.overrideSprite != indicatorImages[3]) indicator.overrideSprite = indicatorImages[3]; break;
+							case 3: if (indicator.overrideSprite != indicatorImages[4]) indicator.overrideSprite = indicatorImages[4]; break;
+							case 4: if (indicator.overrideSprite != indicatorImages[5]) indicator.overrideSprite = indicatorImages[5]; break;
+							case 5: if (indicator.overrideSprite != indicatorImages[2]) indicator.overrideSprite = indicatorImages[2]; break; // 1 less frame than the health indicator, hold the dark one twice as long		
+						}
+					}
+				}
+			}
+			tick++;
+			if (tick > 5) tick = 0;
+			nextthink = PauseScript.a.relativeTime + thinkTime;
+		}
+	}
+}

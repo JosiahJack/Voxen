@@ -75,21 +75,33 @@ int32_t Input_KeyDown(int32_t keycode) {
     }
 
     if (keys[GLFW_KEY_1]) {
-        fogColorR += 0.01f;
+        fogColorRUsed += 0.01f;
+            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
+
     } else if (keys[GLFW_KEY_2]) {
-        fogColorR -= 0.01f;
+        fogColorRUsed -= 0.01f;
+            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
+
     }
     
     if (keys[GLFW_KEY_3]) {
-        fogColorG += 0.01f;
+        fogColorGUsed += 0.01f;
+            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
+
     } else if (keys[GLFW_KEY_4]) {
-        fogColorG -= 0.01f;
+        fogColorGUsed -= 0.01f;
+            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
+
     }
     
     if (keys[GLFW_KEY_5]) {
-        fogColorB += 0.01f;
+        fogColorBUsed += 0.01f;
+            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
+
     } else if (keys[GLFW_KEY_6]) {
-        fogColorB -= 0.01f;
+        fogColorBUsed -= 0.01f;
+            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
+
     }
 
     return 0;
@@ -131,29 +143,29 @@ void ProcessInput(void) {
     float finalMoveSpeed = move_speed;
     if (keys[GLFW_KEY_LEFT_SHIFT]) finalMoveSpeed = move_speed * 1.75f;
     if (keys[GLFW_KEY_F]) {
-        cam_x += finalMoveSpeed * cam_forwardx; // Move forward
-        cam_y += finalMoveSpeed * cam_forwardy;
-        cam_z += finalMoveSpeed * cam_forwardz;
+        instances[PLAYER1].position.x += finalMoveSpeed * cam_forwardx; // Move forward
+        if (currentLevel != LEVEL_CYBERSPACE) instances[PLAYER1].position.y += finalMoveSpeed * cam_forwardy;
+        instances[PLAYER1].position.z += finalMoveSpeed * cam_forwardz;
     } else if (keys[GLFW_KEY_S]) {
-        cam_x -= finalMoveSpeed * cam_forwardx; // Move backward
-        cam_y -= finalMoveSpeed * cam_forwardy;
-        cam_z -= finalMoveSpeed * cam_forwardz;
+        instances[PLAYER1].position.x -= finalMoveSpeed * cam_forwardx; // Move backward
+        if (currentLevel != LEVEL_CYBERSPACE) instances[PLAYER1].position.y -= finalMoveSpeed * cam_forwardy;
+        instances[PLAYER1].position.z -= finalMoveSpeed * cam_forwardz;
     }
 
     if (keys[GLFW_KEY_D]) {
-        cam_x += finalMoveSpeed * cam_rightx; // Strafe right
-        cam_y += finalMoveSpeed * cam_righty;
-        cam_z += finalMoveSpeed * cam_rightz;
+        instances[PLAYER1].position.x += finalMoveSpeed * cam_rightx; // Strafe right
+        if (currentLevel != LEVEL_CYBERSPACE) instances[PLAYER1].position.y += finalMoveSpeed * cam_righty;
+        instances[PLAYER1].position.z += finalMoveSpeed * cam_rightz;
     } else if (keys[GLFW_KEY_A]) {
-        cam_x -= finalMoveSpeed * cam_rightx; // Strafe left
-        cam_y -= finalMoveSpeed * cam_righty;
-        cam_z -= finalMoveSpeed * cam_rightz;
+        instances[PLAYER1].position.x -= finalMoveSpeed * cam_rightx; // Strafe left
+        if (currentLevel != LEVEL_CYBERSPACE) instances[PLAYER1].position.y -= finalMoveSpeed * cam_righty;
+        instances[PLAYER1].position.z -= finalMoveSpeed * cam_rightz;
     }
 
-//     if (noclip) { Temporarily allow noclip like flying for now to solidify physics
-        if (keys[GLFW_KEY_V]) cam_y += finalMoveSpeed; // Move up
-        else if (keys[GLFW_KEY_C]) cam_y -= finalMoveSpeed; // Move down
-//     }
+    if (noclip) { // Temporarily allow noclip like flying for now to solidify physics
+        if (keys[GLFW_KEY_V]) instances[PLAYER1].position.y += finalMoveSpeed; // Move up
+        else if (keys[GLFW_KEY_C]) instances[PLAYER1].position.y -= finalMoveSpeed; // Move down
+    }
 
     if (keys[GLFW_KEY_Q]) {
         cam_roll += move_speed * 5.0f; // Move up
@@ -383,11 +395,7 @@ static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint3
 }
 
 // ================================= Physics ==================================
-int32_t Physics(void) {
-    if (gamePaused || menuActive) return 0; // No physics on the menu or paused
-    
-//     double start_time = get_time();
-
+void PlayerPhysics(void) {
     // Player Movement from Input
     if (window_has_focus) { // Move the player based on input first, then bound it below...
         UpdatePlayerFacingAngles();
@@ -395,20 +403,19 @@ int32_t Physics(void) {
     }
 
     // Player Physics: Capsule-triangle naive collision
-    if (noclip) return 0;
+    if (noclip) return;
     
     // Apply gravity to camera (affects bottom of capsule)
-    if (playerMovement.useGravity) cam_y -= 0.01f;
+    if (instances[PLAYER1].entflags & ENTFLAG_USEGRAVITY) instances[PLAYER1].position.y -= 0.01f;
     
-    // Capsule setup: radius=0.48, height=2.0, center at cam_y - 1.84
-    bool inCyberSpace = (currentLevel == LEVEL_CYBERSPACE);
-    float capsule_offset = inCyberSpace ? 0.0f : PLAYER_CAMERA_OFFSET_Y;  // Center below camera (1.84 below, 0.16 above for total capsule heights including end radii).
-    Vector3 cap_center = {cam_x, cam_y - capsule_offset, cam_z};          // Cyberspace in Unity version of Citadel had sphere collider at 0.84f offset to center on camera,
+    // Capsule setup: radius=0.48, height=2.0, center at instances[PLAYER1].position.y - 1.84
+    float capsule_offset = currentLevel == LEVEL_CYBERSPACE ? 0.0f : PLAYER_CAMERA_OFFSET_Y;  // Center below camera (1.84 below, 0.16 above for total capsule heights including end radii).
+    Vector3 cap_center = {instances[PLAYER1].position.x, instances[PLAYER1].position.y - capsule_offset, instances[PLAYER1].position.z};          // Cyberspace in Unity version of Citadel had sphere collider at 0.84f offset to center on camera,
                                                                           // here we center the camera on the capsule center which is the player center for cyberspace, simpler.
-    float half_height = inCyberSpace ? PLAYER_CAPSULE_RADIUS : (2.0f - (PLAYER_CAPSULE_RADIUS * 2.0f)) * 0.5f;  // Half of 2.0f height
+    float half_height = currentLevel == LEVEL_CYBERSPACE ? PLAYER_CAPSULE_RADIUS : (2.0f - (PLAYER_CAPSULE_RADIUS * 2.0f)) * 0.5f;  // Half of 2.0f height
 
 //     float body_state_add = 0.0f;
-//     if (!inCyberSpace) {
+//     if (currentLevel != LEVEL_CYBERSPACE) {
 //         switch (playerMovement.bodyState) {
 //             case BodyState_Standing: body_state_add = 0.32f; break;//(PLAYER_HEIGHT * 0.5f); break; TODO
 //             // Add cases for crouch/prone: adjust half_height, offset
@@ -418,12 +425,12 @@ int32_t Physics(void) {
     
     // Naive loop over all instances and their triangles
     uint32_t numTrisProcessed = 0;
-    for (uint32_t i = 0; i < loadedInstances; i++) {
+    for (uint32_t i = 3; i < loadedInstances; i++) { // Skip player indices and start at 3
         if (instances[i].modelIndex > loadedModels) continue;
         if (ConstIndexIsDynamicObject(instances[i].index)) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         
-        int32_t mid = instances[i].cardchunk ? GEOMETRY_LOD_CARD_MODEL_IDX : instances[i].modelIndex;
+        int32_t mid = instances[i].entflags & ENTFLAG_CARDCHUNK ? GEOMETRY_LOD_CARD_MODEL_IDX : instances[i].modelIndex;
         if (mid > loadedModels || mid < 0) continue;
         if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
 
@@ -445,10 +452,14 @@ int32_t Physics(void) {
         }
     }
 
-    cam_x = cap_center.x; // Update camera from resolved capsule center
-    cam_y = cap_center.y + capsule_offset;  // Restore offset
-    cam_z = cap_center.z;
-//     physicsProcessingTime = get_time() - start_time;
-//     DualLog("Physics processing took %f, numTrisProcessed: %u\n",physicsProcessingTime,numTrisProcessed);
+    instances[PLAYER1].position.x = cap_center.x; // Update camera from resolved capsule center
+    instances[PLAYER1].position.y = cap_center.y + capsule_offset;  // Restore offset
+    instances[PLAYER1].position.z = cap_center.z;
+}
+
+int32_t Physics(void) {
+    if (gamePaused || menuActive) return 0; // No physics on the menu or paused
+    
+    PlayerPhysics();
     return 0;
 }

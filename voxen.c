@@ -48,6 +48,7 @@ uint16_t screen_width = 1366, screen_height = 768;
 FILE* console_log_file = NULL;
 // ----------------------------------------------------------------------------
 // Diagnostics
+double game_start_time = 0.00;
 double lastFrameSecCountTime = 0.00;
 uint32_t lastFrameSecCount = 0;
 uint32_t framesPerLastSecond = 0;
@@ -84,7 +85,6 @@ QuestBits questData;
 // ----------------------------------------------------------------------------
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
-float cam_x = -20.4f, cam_y = -43.79f + 0.84f, cam_z = 10.2f; // Added 0.84f for cam offset from center
 float cam_yaw = 90.0f;
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
@@ -92,7 +92,6 @@ Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
 float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
 float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
 float cam_fov = 65.0f;
-double last_mouse_x = 0.0, last_mouse_y = 0.0;
 float berserkFinished = 0.0f;
 float berserkSeedTime = 0.0f;
 // ----------------------------------------------------------------------------
@@ -118,7 +117,8 @@ GLuint vao_chunk; // Vertex Array Object
 GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowSpecIndexLoc_chunk, normInstanceIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
       worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk,
       isUILoc_chunk, unlitLoc_chunk;
-float fogColorR = 0.04f, fogColorG = 0.04f, fogColorB = 0.09f;
+      
+float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;
 
 //    Shadowmap Rastered Depth Shader
 GLuint shadowCubeMap;
@@ -231,50 +231,10 @@ ma_engine audio_engine;
 ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
+uint16_t loadedAmbients = 0;
+uint16_t ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
 // Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 // ----------------------------------------------------------------------------
-// ============================================================================
-// GLFW Callbacks
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        if (log_playback) {
-            log_playback = false;
-            DualLog("Exited log playback manually.  Control returned\n");
-        } else {
-            EnqueueEvent_Simple(EV_QUIT);
-        }
-        return;
-    }
-    if (!log_playback) {
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-            EnqueueEvent_Int(EV_KEYDOWN, key);
-        } else if (action == GLFW_RELEASE) {
-            EnqueueEvent_Int(EV_KEYUP, key);
-        }
-    }
-}
-
-static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (!log_playback && window_has_focus) {
-        int32_t dx = (int32_t)(xpos - last_mouse_x);
-        int32_t dy = (int32_t)(ypos - last_mouse_y);
-        last_mouse_x = xpos;
-        last_mouse_y = ypos;
-        if (globalFrameNum > 1) EnqueueEvent_IntInt(EV_MOUSEMOVE, dx, dy);
-    }
-}
-#pragma GCC diagnostic pop
-
-static void window_focus_callback(GLFWwindow* window, int focused) {
-    window_has_focus = focused != 0;
-    if (window_has_focus) {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    } else {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    }
-}
 // ============================================================================
 // OpenGL / Rendering Helper Functions
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
@@ -424,7 +384,7 @@ void Screenshot() {
     time_t now = time(NULL);
     struct tm *utc_time = localtime(&now);    
     if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, cam_x, cam_y, cam_z, get_time());
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, get_time());
     if (!stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4)) DualLogError("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
@@ -557,14 +517,14 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat(float* m) {
-    mat4_lookat_from(m,&cam_rotation, cam_x, cam_y, cam_z);
+    mat4_lookat_from(m,&cam_rotation, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 }
 
 bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
     // Vector from camera to instance
-    float to_inst_x = inst_x - cam_x;
-    float to_inst_y = inst_y - cam_y;
-    float to_inst_z = inst_z - cam_z;
+    float to_inst_x = inst_x - instances[PLAYER1].position.x;
+    float to_inst_y = inst_y - instances[PLAYER1].position.y;
+    float to_inst_z = inst_z - instances[PLAYER1].position.z;
     float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
     if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
 
@@ -752,7 +712,7 @@ int32_t VoxelLists() {
         }
     }
     
-    for (uint16_t i = 0; i < loadedInstances; i++) UpdateInstanceMatrix(i);
+    for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     glGenBuffers(1, &matricesBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
@@ -779,7 +739,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     if (currentLevel == 8) thresh += 0.005f;
     if (luminosity < thresh) return; // Skip if light is off
 
-    float distSqrd = squareDistance3D(cam_x, cam_y, cam_z, lightPosX, lightPosY, lightPosZ);
+    float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
     if (distSqrd >= FAR_PLANE_SQUARED) return;
 
     int lightCellIdx = cellIndexForLight[lightIdx];
@@ -817,7 +777,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
-    for (uint16_t j = 0; j < loadedInstances; j++) {
+    for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
         if (instances[j].modelIndex >= loadedModels) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
         
@@ -1241,6 +1201,109 @@ void play_wav(const char* path, float volume) {
     ma_sound_set_volume(&wav_sounds[slot], volume);
     ma_sound_start(&wav_sounds[slot]);
 }
+
+typedef struct {
+    uint16_t    index;
+    const char* filename;          // ./Audio/ambient/…
+} AmbientDef;
+
+static const AmbientDef g_ambient_defs[] = {
+    {621, "airhiss.wav"},          {622, "clicker.wav"},
+    {623, "compressor.wav"},       {624, "dishwasher.wav"},
+    {625, "drip_amb.wav"},         {626, "fan1.wav"},
+    {627, "generator_gas.wav"},    {628, "gurgle.wav"},
+    {629, "icemaker.wav"},         {630, "intake.wav"},
+    {631, "lathe.wav"},            {632, "lev3loop1.wav"},
+    {633, "lev3loop2.wav"},        {634, "lev3loop3.wav"},
+    {635, "lev3loop4.wav"},        {636, "liquid_bubble.wav"},
+    {637, "lava2.wav"},            {638, "rain.wav"},
+    {639, "machgear_loop.wav"},    {640, "machine_ambience.wav"},
+    {641, "machine_go.wav"},       {642, "machine_humamb7.wav"},
+    {643, "machine_humlonoise.wav"},{644, "machine_loop1.wav"},
+    {645, "machine_loop2.wav"},    {646, "machinea1.wav"},
+    {647, "machinevat_loop.wav"},  {648, "mist.wav"},
+    {649, "pipewater_loop.wav"},   {650, "powerloom.wav"},
+    {651, "pump.wav"},             {652, "pump2.wav"},
+    {653, "rain.wav"},             {654, "steam_loop.wav"},
+    {655, "washing_machine.wav"},
+};
+#define AMBIENT_DEF_COUNT  (sizeof(g_ambient_defs)/sizeof(g_ambient_defs[0]))
+
+typedef struct {
+    ma_sound  sound;
+    ma_bool32 loaded;
+    float     length_sec;
+} AmbientSlot;
+
+static AmbientSlot g_ambient_slots[AMBIENT_DEF_COUNT] = {0};
+
+static float ma_sound_get_length_sec(ma_sound* pSound) {
+    if (!pSound) return 0.0f;
+    
+    ma_uint64 frames;
+    if (ma_sound_get_length_in_pcm_frames(pSound, &frames) != MA_SUCCESS) return 0.0f;
+    
+    ma_uint32 sr = ma_engine_get_sample_rate(ma_sound_get_engine(pSound));
+    return (sr == 0) ? 0.0f : (float)frames / (float)sr;
+}
+
+static const AmbientDef* ambient_def_by_index(uint16_t idx) {
+    for (size_t i = 0; i < AMBIENT_DEF_COUNT; ++i) {
+        if (g_ambient_defs[i].index == idx) return &g_ambient_defs[i];
+    }
+    
+    return NULL;
+}
+
+void UpdateAmbientSounds(void) {
+    const Vector3* player = &instances[PLAYER1].position;
+    const float max_range = 7.68f;
+    const float max_range_sq = max_range * max_range;
+    for (uint16_t i = 0; i < loadedAmbients; ++i) {
+        const uint16_t ent_idx = ambientRegistry[i];
+        const Entity* ent = &instances[ent_idx];
+        const AmbientDef* def = ambient_def_by_index(ent->index);
+        if (!def) { DualLogError("  [SKIP] Entity %u has unknown index %u\n", ent_idx, ent->index); continue; }
+
+        const float dist_sq = squareDistance3D(player->x, player->y, player->z, ent->position.x, ent->position.y, ent->position.z);
+        const float distance = sqrtf(dist_sq);
+        const ma_bool32 in_range = (dist_sq < max_range_sq);
+        const size_t slot_idx = (size_t)(def - g_ambient_defs);
+        AmbientSlot* slot = &g_ambient_slots[slot_idx];
+        if (in_range) {
+            if (!slot->loaded) {
+                char path[512];
+                snprintf(path, sizeof(path), "./Audio/ambient/%s", def->filename);
+                ma_sound_uninit(&slot->sound);
+                ma_result r = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &slot->sound);
+                if (r != MA_SUCCESS) continue;
+
+                slot->length_sec = ma_sound_get_length_sec(&slot->sound);
+                if (slot->length_sec <= 0.0f) { ma_sound_uninit(&slot->sound); continue; }
+
+                ma_sound_set_looping(&slot->sound, MA_TRUE);
+                slot->loaded = MA_TRUE;
+            }
+
+            if (!ma_sound_is_playing(&slot->sound)) ma_sound_start(&slot->sound);
+
+            // Time sync
+            if (slot->length_sec > 0.0f) {
+                ma_uint64 cur;
+                ma_sound_get_cursor_in_pcm_frames(&slot->sound, &cur);
+            }
+
+            // Volume
+            float vol_factor = (distance <= 1.0f) ? 1.0f :
+                              (distance >= max_range) ? 0.0f :
+                              (max_range - distance) / (max_range - 1.0f);
+            float final_vol = ent->volume * vol_factor;
+            ma_sound_set_volume(&slot->sound, final_vol);
+        } else {
+            if (ma_sound_is_playing(&slot->sound)) ma_sound_stop(&slot->sound);
+        }
+    }
+}
 // ============================================================================
 uint32_t random_range_rng = 0x12345678u; // Global seed
 static inline uint32_t xs32(uint32_t *s){
@@ -1255,8 +1318,23 @@ static inline uint8_t random_range_u8(uint8_t a, uint8_t b){
     do v = (uint8_t)xs32(&random_range_rng); while (v >= 256u - t);
     return (uint8_t)(a + (v % n));
 }
+
 // ============================================================================
+void InitializePlayer(uint16_t playerIdx) {
+    instances[playerIdx].position.x = -20.4f;
+    instances[playerIdx].position.y = -43.79f + 0.84f; // Added 0.84f for cam offset from center
+    instances[playerIdx].position.z = 10.2f;
+    instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
+    instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
+    instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
+    flag_enable(&instances[playerIdx].entflags, ENTFLAG_USEGRAVITY);
+    instances[playerIdx].bodyState = BodyState_Standing;
+}
+
 void NewGame(void) {
+    RenderLoadingProgress(100,"Loading new game...");
+    memset(&ambientRegistry, 0, sizeof(uint16_t));
+    loadedAmbients = 0;
     memset(&questData, 0, sizeof(QuestBits));
     questData.lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
     questData.lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
@@ -1264,11 +1342,13 @@ void NewGame(void) {
     questData.lev4SecCode = random_range_u8(0u,9u);
     questData.lev5SecCode = random_range_u8(0u,9u);
     questData.lev6SecCode = random_range_u8(0u,9u);
-    RenderLoadingProgress(100,"Loading level data...");
     renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+    memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    InitializePlayer(PLAYER1);
+    InitializePlayer(PLAYER2);
     loadedLights = 0;
-    LoadLevel(currentLevel); // Must be after entities!
+    LoadLevel(startLevel); // Must be after entities!
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
@@ -1282,6 +1362,9 @@ void NewGame(void) {
     uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
     shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
     pauseRelativeTime = 0.0f;
+//     DualLog("Player 1:\n=========================\n");
+//     DualLogEntity(PLAYER1);
+//     DualLog("=========================\n");
 }
 
 static const float quadBlit_vertices[] = {
@@ -1335,9 +1418,7 @@ void InitializeEnvironment(void) {
     DualLog("OpenGL Version: %s\n", (const char*)version);
     DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");
     glfwSwapInterval(settings_Vsync ? 1 : 0);
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, cursor_pos_callback);
-    glfwSetWindowFocusCallback(window, window_focus_callback);
+    Input_Init(window);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_MULTISAMPLE);
     glMinSampleShading(0.0f);
@@ -1429,7 +1510,8 @@ void InitializeEnvironment(void) {
     glBindTexture(GL_TEXTURE_2D, outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     DebugRAM("setup gbuffer end");
-    
+    RenderLoadingProgress(100,"Loading..."); // Early load screen to immediately clear what's in the window
+
     // Text Initialization
     InitFontAtlasses();
     glCreateBuffers(1, &textVBO);
@@ -1746,6 +1828,7 @@ void RenderInstances(uint8_t type) {
         if (countsArray[modelIdx] == 0) continue;
 
         uint16_t start = offsetsArray[modelIdx];
+        if (start < 3) DualLogError("offsets for rendering wrong!\n");
         uint16_t count =  countsArray[modelIdx];
         DepthSort visibleInstances[start + count];
         uint16_t visibleCount = 0;
@@ -1753,7 +1836,9 @@ void RenderInstances(uint8_t type) {
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
             if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
             
-            float distSqrd = squareDistance3D(instances[i].position.x, instances[i].position.y, instances[i].position.z, cam_x, cam_y, cam_z);
+            float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
+                                              instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+            
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
 
             visibleInstances[visibleCount].index = i;
@@ -1796,18 +1881,24 @@ void RenderInstances(uint8_t type) {
     }
 }
 
-static const char* debugViewNames[] = {
-    "standard render", // 0
-    "unlit",           // 1
-    "surface normals", // 2
-    "depth",           // 3
-    "reflections"     // 4
-};
+// static const char* debugViewNames[] = {
+//     "standard render", // 0
+//     "unlit",           // 1
+//     "surface normals", // 2
+//     "depth",           // 3
+//     "reflections"     // 4
+// };
+
+void SetFog() {
+    fogColorRUsed = fogColorR * fogBaseDensityForLevel;
+    fogColorGUsed = fogColorG * fogBaseDensityForLevel;
+    fogColorBUsed = fogColorB * fogBaseDensityForLevel;
+}
 
 int32_t main(int32_t argc, char* argv[]) {
-    double programStartTime = get_time();
+    game_start_time = get_time();
     DebugRAM("program start");
-    random_range_rng = (uint32_t)programStartTime; // Seed global rand uniquely with time since system boot.
+    random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
@@ -1878,7 +1969,7 @@ int32_t main(int32_t argc, char* argv[]) {
     glDispatchCompute(groupX_shadClear,1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     lastJournalWriteTime = get_time();
-    DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - programStartTime);
+    DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - game_start_time);
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;
@@ -1949,11 +2040,13 @@ int32_t main(int32_t argc, char* argv[]) {
         invViewRot[7] = view[6];
         invViewRot[8] = view[10];
         if (!gamePaused && !menuActive) { // !PAUSED BLOCK -------------------------------------------------
+            UpdateAmbientSounds();
+            
             // 1. Culling
             Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
             
             // 2. Pass instance data to GPU
-            for (uint32_t i = 0; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } }
+            for (uint32_t i = 3; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } } // Skip player indices and start at 3
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
             glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -1969,10 +2062,10 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
             glUniform1f(worldMin_xLoc_chunk, worldMin_x);
             glUniform1f(worldMin_zLoc_chunk, worldMin_z);
-            glUniform3f(camPosLoc_chunk, cam_x, cam_y, cam_z);
-            glUniform1f(fogColorRLoc_chunk, fogColorR);
-            glUniform1f(fogColorGLoc_chunk, fogColorG);
-            glUniform1f(fogColorBLoc_chunk, fogColorB);
+            glUniform3f(camPosLoc_chunk, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+            glUniform1f(fogColorRLoc_chunk, fogColorRUsed);
+            glUniform1f(fogColorGLoc_chunk, fogColorGUsed);
+            glUniform1f(fogColorBLoc_chunk, fogColorBUsed);
             glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 0u);
             glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk,0u);
             glProgramUniform1ui(chunkShaderProgram, reflectionsEnabledLoc_chunk, settings_Reflections);
@@ -1990,7 +2083,7 @@ int32_t main(int32_t argc, char* argv[]) {
             if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);                
-                glUniform3f(camPosLoc_ssr, cam_x, cam_y, cam_z);
+                glUniform3f(camPosLoc_ssr, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -2022,7 +2115,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform1ui(imageBlitShaderProgram, shadowsSettingLoc_imageBlit, settings_Shadows);
         glProgramUniform1f(imageBlitShaderProgram, worldMin_xLoc_imageBlit, worldMin_x);
         glProgramUniform1f(imageBlitShaderProgram, worldMin_zLoc_imageBlit, worldMin_z);
-        glProgramUniform3f(imageBlitShaderProgram, camPosLoc_imageBlit, cam_x, cam_y, cam_z);
+        glProgramUniform3f(imageBlitShaderProgram, camPosLoc_imageBlit, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         glUniformMatrix4fv(viewProjectionLoc_imageBlit, 1, GL_FALSE, viewProj);
         glUniformMatrix3fv(invViewRotLoc_imageBlit, 1, GL_FALSE, invViewRot);
         glProgramUniform1f(imageBlitShaderProgram, berserkTimeRemainingLoc_imageBlit, berserkTimeRemainingNormalized);
@@ -2112,13 +2205,13 @@ int32_t main(int32_t argc, char* argv[]) {
         // Diagnostics / Debugging
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
-        RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", cam_x, cam_y, cam_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 

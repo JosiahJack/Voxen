@@ -46,7 +46,7 @@ const float staticBandThickness = 0.005;
 const float staticScrollSpeed = 200.0;
 const vec3  staticColor = vec3(1.0, 0.0, 0.0);
 
-const uint  volumetricFogEnabled = 0;   // 0 = off, 1 = on
+const uint  volumetricFogEnabled = 0;   // 0 = off, 1 = on TODO Fix volumetric fog to behave correctly
 const float fogDensity = 1.0;             // density (e.g. 0.02)
 const float fogStepSize = 0.08;            // world-space step length
 const uint  fogMaxSteps = 24;            // max ray-march steps (e.g. 80)

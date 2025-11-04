@@ -31,7 +31,7 @@ static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
 void PutChunksInCells() {
     uint16_t x,z;
     uint16_t cellIdx;
-    for (uint16_t c=0; c < INSTANCE_COUNT; ++c) {
+    for (uint16_t c=3; c < INSTANCE_COUNT; ++c) { // Start after player instances and NULLENT
         
         PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
         cellIdx = (z * WORLDX) + x;
@@ -202,7 +202,7 @@ void DetermineClosedEdges() {
 bool UpdatedPlayerCell() {
     uint16_t lastX = playerCellIdx_x;
     uint16_t lastZ = playerCellIdx_z;
-    PosToCellCoords(cam_x,cam_z,&playerCellIdx_x,&playerCellIdx_z);
+    PosToCellCoords(instances[PLAYER1].position.x,instances[PLAYER1].position.z,&playerCellIdx_x,&playerCellIdx_z);
     playerCellIdx = (playerCellIdx_z * WORLDX) + playerCellIdx_x;
     if (playerCellIdx_x == lastX && playerCellIdx_z == lastZ) return false;
     return true;

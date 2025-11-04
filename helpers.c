@@ -141,3 +141,7 @@ bool ConstIndexIsNPC(int constdex) {
 bool ConstIndexIsHardware(int constdex) {
 	return (constdex >= 328) && (constdex <= 339);
 }
+
+bool ConstIndexIsAmbient(int constdex) {
+    return (constdex >= 621 && constdex <= 655);
+}

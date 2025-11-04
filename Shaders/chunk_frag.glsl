@@ -234,7 +234,7 @@ void main() {
         float shadowFactor = 1.0;
         if (debugValue != 2 && shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
-            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0) + 0.07;
+            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0) + 0.08;
             bias = 2.0 * dist * bias + bias * bias;
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);

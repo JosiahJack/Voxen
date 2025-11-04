@@ -12,6 +12,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "External/stb_truetype.h"
+#include "citadel_enumerations.h"
 
 // Generic Constants
 #define M_PI 3.141592653f
@@ -23,10 +24,21 @@ typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 typedef struct { float r,g,b,a; } Color;
 
+#define NULLENT 0
+#define PLAYER1 1
+#define PLAYER2 2
+#define START_INDEX_LEVEL_INSTANCES 3
+#define ENTFLAG_ACTIVE 1
+#define ENTFLAG_CARDCHUNK 2
+#define ENTFLAG_GROUNDED 4
+#define ENTFLAG_USEGRAVITY 8
+
 typedef struct {
     Vector3 position;
     Quaternion rotation;
     Vector3 scale;
+    Vector3 velocity;
+    uint32_t entflags;
     uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t glowIndex;
@@ -34,8 +46,18 @@ typedef struct {
     uint16_t normIndex;
     uint16_t lodIndex;
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    bool active;
-    bool cardchunk;
+    BodyState bodyState;
+    float volume;
+    
+    uint16_t   child0;
+    Vector3    child0_offset;
+    Quaternion child0_rotation;
+    Vector3    child0_scale;
+    
+    uint16_t   child1;
+    Vector3    child1_offset;
+    Quaternion child1_rotation;
+    Vector3    child1_scale;
 } Entity;
 
 typedef struct {
@@ -59,6 +81,18 @@ typedef struct {
     bool doublesided;
     bool transparent;
     bool cardchunk;
+    float volume;
+    
+    uint16_t   child0;
+    Vector3    child0_offset;
+    Quaternion child0_rotation;
+    Vector3    child0_scale;
+    
+    uint16_t   child1;
+    Vector3    child1_offset;
+    Quaternion child1_rotation;
+    Vector3    child1_scale;
+    
     char path[MAX_PATH];
 } ResourceEntry;
 
@@ -106,6 +140,9 @@ extern QuestBits questData;
 
 // ----------------------------------------------------------------------------
 // Audio
+#define MAX_AMBIENT_NOISES 32
+extern uint16_t loadedAmbients;
+extern uint16_t ambientRegistry[MAX_AMBIENT_NOISES];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
 // ----------------------------------------------------------------------------
@@ -334,6 +371,7 @@ bool ConstIndexIsDynamicObject(uint16_t constIndex);
 bool ConstIndexIsStaticObjectImmutable(int constdex);
 bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
+bool ConstIndexIsAmbient(int constdex);
 static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
@@ -375,6 +413,18 @@ inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, 
     float dy = y2 - y1;
     float dz = z2 - z1;
     return dx * dx + dy * dy + dz * dz;
+}
+
+static inline void flag_enable(uint32_t *flags, uint32_t bit) {
+    *flags |= bit;
+}
+
+static inline void flag_disable(uint32_t *flags, uint32_t bit) {
+    *flags &= ~bit;
+}
+
+static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
+    *flags = (*flags & ~bit) | (-state & bit);
 }
 // ----------------------------------------------------------------------------
 // Physics
@@ -418,7 +468,6 @@ static const uint8_t PhysicsLayer_Clip             = 26;
 //static const uint8_t PhysicsLayer_               = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 int32_t ParticleSystemStep(void);
-void ProcessInput(void);
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
 
@@ -452,10 +501,13 @@ inline void quat_to_matrix(Quaternion* q, float* m) {
 #define NUM_KEYS 350
 extern bool keys[NUM_KEYS];
 extern bool window_has_focus;
+extern double last_mouse_x, last_mouse_y;
+void Input_Init(GLFWwindow* window);
 void Input_MouselookApply();
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
+void ProcessInput(void);
 // ----------------------------------------------------------------------------
 // Rendering
 #define DEBUG_OPENGL
@@ -472,7 +524,8 @@ extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
 extern int32_t debugValue;
-extern float fogColorR, fogColorG, fogColorB;
+extern float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;
+void SetFog();
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern bool lightDirty[LIGHT_COUNT];
@@ -482,7 +535,6 @@ extern bool noclip;
 extern bool consoleActive;
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
-extern float cam_x, cam_y, cam_z;
 extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
 extern Quaternion cam_rotation;
@@ -540,119 +592,9 @@ float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------
 // GAME LOGIC
-#include "citadel_enumerations.h"
 
 // Patches
 #define PATCH_TIME_BERSERK 30.0f
-
-typedef struct {
-    int SFXJump;
-    int SFXJumpLand;
-    int SFXLadder;
-    float playerSpeed;
-    bool grounded;
-    bool useGravity;
-    float feetRayLength;
-    bool FatigueCheat;
-    BodyState bodyState;
-    int ladderState;
-    bool gravliftState;
-    float walkAcceleration;
-    int SFXIndex;
-    float walkDeacceleration;
-	float walkDeaccelerationBooster;
-	float deceleration;
-	float walkAccelAirRatio;
-	float maxWalkSpeed;
-	float maxCyberSpeed;
-	float maxCyberUltimateSpeed;
-	float maxCrouchSpeed;
-	float maxProneSpeed;
-	float maxSprintSpeed;
-	float maxSprintSpeedFatigued;
-	float maxVerticalSpeed;
-	float boosterSpeedBoost; // ammount to boost by when booster is active
-	float jumpImpulseTime;
-	float jumpVelocityBoots;
-	float jumpVelocity;
-    float jumpVelocityFatigued;
-	float crouchRatio;
-	float proneRatio;
-	float transitionToCrouchSec;
-	float transitionToProneAdd;
-	float currentCrouchRatio;
-	float capsuleHeight;
-	float capsuleRadius;
-	float ladderSpeed;
-	float fallDamage;
-    bool CheatWallSticky;
-    bool CheatNoclip;
-    bool staminupActive;
-    Vector2 horizontalMovement;
-    float verticalMovement;
-    float jumpTime;
-    float crouchingVelocity;
-    float lastCrouchRatio;
-    int layerGeometry;
-	int layerMask;
-	float fallDamageSpeed;
-	Vector3 oldVelocity;
-	float fatigue;
-	float jumpFatigue;
-	float fatigueWanePerTick;
-	float fatigueWanePerTickCrouched;
-	float fatigueWanePerTickProne;
-	float fatigueWaneTickSecs;
-	float fatiguePerWalkTick;
-	float fatiguePerSprintTick;
-	bool justJumped;
-	float fatigueFinished;
-	float fatigueFinished2;
-	bool running;
-	float relForward;
-	float relSideways;
-	bool cyberSetup;
-	bool cyberDesetup;
-	float bonus;
-    float walkDeaccelerationVolx;
-    float walkDeaccelerationVoly;
-    float walkDeaccelerationVolz;
-	float leanTarget;
-	float leanShift;
-	float leanMaxAngle;
-	float leanMaxShift;
-	float jumpSFXFinished;
-	float ladderSFXFinished;
-	float ladderSFXIntervalTime;
-	float jumpSFXIntervalTime;
-	float jumpLandSoundFinished;
-	float jumpJetEnergySuckTickFinished;
-	float jumpJetEnergySuckTick;
-	float leanSpeed;
-	bool Notarget; // for cheat to disable enemy sight checks against this player
-    bool fatigueWarned;
-    float ressurectingFinished;
-	float burstForce;
-	float doubleJumpFinished;
-	Vector3 playerHome;
-	float turboFinished;
-	float turboCyberTime;
-	bool inCyberTube;
-	float stepFinished;
-	float rustleFinished;
-	int doubleJumpTicks;
-	Vector3 tempVecRbody;
-	bool inputtingMovement;
-	float accel;
-	float floorDot;
-	Vector3 floorAng;
-	float slideAngle;
-	float gravFinished;
-	float bodyLerpGravityOffDelayFinished;
-	Vector3 feetOffset;
-} PlayerMovement;
-
-extern PlayerMovement playerMovement;
 
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints
@@ -666,6 +608,7 @@ void DualLogError(const char* fmt, ...);
 void DebugRAM(const char *context);
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
 void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
+void DualLogEntity(uint16_t idx);
 #ifdef VOXEN_ENGINE_IMPLEMENTATION
 //     Logs both to log file and console, usage same as printf
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -680,6 +623,42 @@ static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_li
     }
     va_end(copy);
 }
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+void DualLogEntity(uint16_t idx) {
+    DualLog("Entity instance[%u]::\n"
+            "    index: %u\n"
+            "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n    ]\n"
+            "    position.x: %f, .y: %f, .z: %f\n"
+            "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+            "    scale.x: %f, .y: %f, .z: %f\n"
+            "    velocity.x: %f, .y: %f, .z: %f\n"
+            "    modelIndex: %u\n"
+            "    texIndex:   %u\n"
+            "    glowIndex:  %u\n"
+            "    specIndex:  %u\n"
+            "    normIndex:  %u\n"
+            "    lodIndex:   %u\n",
+            idx,
+            instances[idx].index,
+            instances[idx].entflags,
+                (instances[idx].entflags & ENTFLAG_ACTIVE) > 0,
+                (instances[idx].entflags & ENTFLAG_CARDCHUNK) > 0,
+                (instances[idx].entflags & ENTFLAG_GROUNDED) > 0,
+                (instances[idx].entflags & ENTFLAG_USEGRAVITY) > 0,
+            instances[idx].position.x, instances[idx].position.y, instances[idx].position.z,
+            instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w,
+            instances[idx].scale.x, instances[idx].scale.y, instances[idx].scale.z,
+            instances[idx].velocity.x, instances[idx].velocity.y, instances[idx].velocity.z,
+            instances[idx].modelIndex,
+            instances[idx].texIndex,
+            instances[idx].glowIndex,
+            instances[idx].specIndex,
+            instances[idx].normIndex,
+            instances[idx].lodIndex);
+}
+#pragma GCC diagnostic pop
 
 void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
 void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
