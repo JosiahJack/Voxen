@@ -231,8 +231,6 @@ ma_engine audio_engine;
 ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
-uint16_t loadedAmbients = 0;
-uint16_t ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
 // Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 // ----------------------------------------------------------------------------
 // ============================================================================
@@ -1202,6 +1200,10 @@ void play_wav(const char* path, float volume) {
     ma_sound_start(&wav_sounds[slot]);
 }
 
+// ============================================================================
+uint16_t loadedAmbients = 0;
+uint16_t ambientRegistry[MAX_AMBIENT_NOISES]; // For ambient_ type entities that play looped sound
+
 typedef struct {
     uint16_t    index;
     const char* filename;          // ./Audio/ambient/…
@@ -1235,7 +1237,7 @@ typedef struct {
     float     length_sec;
 } AmbientSlot;
 
-static AmbientSlot g_ambient_slots[AMBIENT_DEF_COUNT] = {0};
+static AmbientSlot ambientSlots[AMBIENT_DEF_COUNT] = {0};
 
 static float ma_sound_get_length_sec(ma_sound* pSound) {
     if (!pSound) return 0.0f;
@@ -1267,9 +1269,15 @@ void UpdateAmbientSounds(void) {
 
         const float dist_sq = squareDistance3D(player->x, player->y, player->z, ent->position.x, ent->position.y, ent->position.z);
         const float distance = sqrtf(dist_sq);
-        const ma_bool32 in_range = (dist_sq < max_range_sq);
+        bool in_range = (dist_sq < max_range_sq);
+        uint16_t ix, iy;
+        PosToCellCoords(ent->position.x, ent->position.z, &ix, &iy);
+        int subIdx = (iy * WORLDX) + ix;
+        int cellIdx = (playerCellIdx * ARRSIZE);
+        int flat_idx = cellIdx + subIdx;
+        if (!get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) in_range = false;
         const size_t slot_idx = (size_t)(def - g_ambient_defs);
-        AmbientSlot* slot = &g_ambient_slots[slot_idx];
+        AmbientSlot* slot = &ambientSlots[slot_idx];
         if (in_range) {
             if (!slot->loaded) {
                 char path[512];
@@ -1294,9 +1302,10 @@ void UpdateAmbientSounds(void) {
             }
 
             // Volume
-            float vol_factor = (distance <= 1.0f) ? 1.0f :
-                              (distance >= max_range) ? 0.0f :
-                              (max_range - distance) / (max_range - 1.0f);
+            float vol_factor = (distance <= 1.0f) ? 1.0f
+                               : (distance >= max_range) ? 0.0f
+                                 : (max_range - distance) / (max_range - 1.0f);
+                                 
             float final_vol = ent->volume * vol_factor;
             ma_sound_set_volume(&slot->sound, final_vol);
         } else {
