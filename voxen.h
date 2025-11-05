@@ -5,11 +5,10 @@
 // #define DEBUG_MODEL_LOAD_DATA 1U
 
 // Generic Lib Includes
-#include <malloc.h>
 #include <time.h>
-#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "External/stb_truetype.h"
@@ -68,10 +67,6 @@ typedef struct {
 } Trigger;
 
 typedef struct {
-    float nx, ny, nz, d;
-} FrustumPlane;
-
-typedef struct {
     uint16_t index;
     uint16_t modelIndex;
     uint16_t lodIndex;
@@ -96,12 +91,6 @@ typedef struct {
     
     char path[MAX_PATH];
 } ResourceEntry;
-
-typedef struct {
-    ResourceEntry* entries;
-    int32_t count;
-    int32_t capacity;
-} DataParser;
 
 typedef struct {
 	int lev1SecCode;
@@ -140,9 +129,10 @@ typedef struct {
 extern QuestBits questData;
 
 typedef struct {
-    uint16_t index;
-    float depth;
-} DepthSort;
+    ResourceEntry* entries;
+    int32_t count;
+    int32_t capacity;
+} DataParser;
 
 // ----------------------------------------------------------------------------
 // Audio
@@ -151,16 +141,21 @@ extern uint16_t loadedAmbients;
 extern uint16_t ambientRegistry[MAX_AMBIENT_NOISES];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
+int32_t InitializeAudio();
+void UpdateAmbientSounds(void);
 // ----------------------------------------------------------------------------
 // Data Parsing
 #define MAX_ENTRIES 6000
 void ParseGameData();
+bool parse_data_file(DataParser *parser, const char *filename);
 
 // Textures
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 #define BLACK_TEXTURE_IDX 41
+extern bool* doubleSidedTexture;
+extern bool* transparentTexture;
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
@@ -302,7 +297,6 @@ extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE];
 extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were
                 // already executed and walked away from the counter.
 extern int32_t eventQueueEnd; // End of the waiting line
-extern FILE* activeLogFile;
 extern bool log_playback;
 extern double lastJournalWriteTime;
 extern double cpuTime;
@@ -312,6 +306,10 @@ extern uint32_t globalFrameNum;
 extern double last_time;
 extern double current_time;
 extern float pauseRelativeTime;
+void ActiveLogFileInit();
+void OpenLogForPlayback(const char* path);
+int32_t ReadActiveLog();
+void clear_ev_queue(void);
 int32_t EventExecute(Event* event);
 int32_t EventInit(void);
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
@@ -356,8 +354,6 @@ extern uint16_t numberOfFOVConeChecks3; // 2687
 extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
-// extern float gridCellFloorHeight[ARRSIZE];
-// extern float gridCellCeilingHeight[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
@@ -407,6 +403,7 @@ static const uint8_t PhysicsLayer_Clip             = 26;
 //static const uint8_t PhysicsLayer_               = 27;
 //static const uint8_t PhysicsLayer_               = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
+extern float move_speed;
 int32_t ParticleSystemStep(void);
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
@@ -540,10 +537,11 @@ float GetScreenRelativeY(float percentage);
 
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints
-extern FILE *console_log_file;
+void OpenConsoleLogFile();
 void Screenshot();
 void ConsoleEmulator(int32_t scancode);
 void CenterStatusPrint(const char* fmt, ...);
+void JournalDump(const char* dem_file);
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
@@ -567,6 +565,7 @@ bool ConstIndexIsStaticObjectImmutable(int constdex);
 bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
+void Screenshot();
 static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
@@ -634,60 +633,6 @@ double get_time(void) {
 
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
 }
-
-//     Logs both to log file and console, usage same as printf
-static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
-    va_list copy; va_copy(copy, args);
-    if (prefix) fprintf(stream, "%s\033[0m", prefix);
-    vfprintf(stream, fmt, args);
-    fprintf(stream, "\033[0m"); fflush(stream);
-    if (console_log_file) {
-        if (prefix) fprintf(console_log_file, "%s ", prefix);
-        vfprintf(console_log_file, fmt, copy);
-        fflush(console_log_file);
-    }
-    va_end(copy);
-}
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-void DualLogEntity(uint16_t idx) {
-    DualLog("Entity instance[%u]::\n"
-            "    index: %u\n"
-            "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n    ]\n"
-            "    position.x: %f, .y: %f, .z: %f\n"
-            "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-            "    scale.x: %f, .y: %f, .z: %f\n"
-            "    velocity.x: %f, .y: %f, .z: %f\n"
-            "    modelIndex: %u\n"
-            "    texIndex:   %u\n"
-            "    glowIndex:  %u\n"
-            "    specIndex:  %u\n"
-            "    normIndex:  %u\n"
-            "    lodIndex:   %u\n",
-            idx,
-            instances[idx].index,
-            instances[idx].entflags,
-                (instances[idx].entflags & ENTFLAG_ACTIVE) > 0,
-                (instances[idx].entflags & ENTFLAG_CARDCHUNK) > 0,
-                (instances[idx].entflags & ENTFLAG_GROUNDED) > 0,
-                (instances[idx].entflags & ENTFLAG_USEGRAVITY) > 0,
-            instances[idx].position.x, instances[idx].position.y, instances[idx].position.z,
-            instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w,
-            instances[idx].scale.x, instances[idx].scale.y, instances[idx].scale.z,
-            instances[idx].velocity.x, instances[idx].velocity.y, instances[idx].velocity.z,
-            instances[idx].modelIndex,
-            instances[idx].texIndex,
-            instances[idx].glowIndex,
-            instances[idx].specIndex,
-            instances[idx].normIndex,
-            instances[idx].lodIndex);
-}
-#pragma GCC diagnostic pop
-
-void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
-void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
-void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
 #pragma GCC diagnostic push

@@ -1,7 +1,11 @@
-// Event System states
+#include <stdio.h>
+#include "voxen.h"
+void exit(int status);
+
 int32_t maxEventCount_debug = 0;
 double lastJournalWriteTime = 0;
 FILE* activeLogFile;
+FILE* console_log_file = NULL;
 const char* manualLogName;
 bool log_playback = false;
 Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
@@ -10,6 +14,78 @@ int32_t eventJournalIndex;
 int32_t eventIndex; // Event that made it to the counter.  Indices below this were already executed and walked away from the counter.
 int32_t eventQueueEnd; // End of the waiting line
 bool journalFirstWrite = true;
+
+// Logs both to log file and console, usage same as printf
+void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
+    va_list copy; va_copy(copy, args);
+    if (prefix) fprintf(stream, "%s\033[0m", prefix);
+    vfprintf(stream, fmt, args);
+    fprintf(stream, "\033[0m"); fflush(stream);
+    if (console_log_file) {
+        if (prefix) fprintf(console_log_file, "%s ", prefix);
+        vfprintf(console_log_file, fmt, copy);
+        fflush(console_log_file);
+    }
+    va_end(copy);
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+void DualLogEntity(uint16_t idx) {
+    DualLog("Entity instance[%u]::\n"
+            "    index: %u\n"
+            "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n    ]\n"
+            "    position.x: %f, .y: %f, .z: %f\n"
+            "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+            "    scale.x: %f, .y: %f, .z: %f\n"
+            "    velocity.x: %f, .y: %f, .z: %f\n"
+            "    modelIndex: %u\n"
+            "    texIndex:   %u\n"
+            "    glowIndex:  %u\n"
+            "    specIndex:  %u\n"
+            "    normIndex:  %u\n"
+            "    lodIndex:   %u\n",
+            idx,
+            instances[idx].index,
+            instances[idx].entflags,
+                (instances[idx].entflags & ENTFLAG_ACTIVE) > 0,
+                (instances[idx].entflags & ENTFLAG_CARDCHUNK) > 0,
+                (instances[idx].entflags & ENTFLAG_GROUNDED) > 0,
+                (instances[idx].entflags & ENTFLAG_USEGRAVITY) > 0,
+            instances[idx].position.x, instances[idx].position.y, instances[idx].position.z,
+            instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w,
+            instances[idx].scale.x, instances[idx].scale.y, instances[idx].scale.z,
+            instances[idx].velocity.x, instances[idx].velocity.y, instances[idx].velocity.z,
+            instances[idx].modelIndex,
+            instances[idx].texIndex,
+            instances[idx].glowIndex,
+            instances[idx].specIndex,
+            instances[idx].normIndex,
+            instances[idx].lodIndex);
+}
+#pragma GCC diagnostic pop
+
+void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
+void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+
+void OpenConsoleLogFile() {
+    console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
+    if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
+}
+
+void ActiveLogFileInit() {
+    activeLogFile = NULL;
+}
+
+void OpenLogForPlayback(const char* path) {
+    activeLogFile = fopen(path, "rb");
+    if (!activeLogFile) {
+        DualLogError("Failed to read log: %s\n", path);
+    } else {
+        log_playback = true; // Perform log playback.
+    }
+}
 
 // All core engine operations run through the EventExecute as an Event processed
 // by the unified event system in the order it was enqueued.

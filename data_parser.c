@@ -1,79 +1,26 @@
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
-#define STBI_MAX_DIMENSIONS 2048
-#include "External/stb_image.h"
+#include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include <string.h>
 #include <errno.h>
-#include <uthash.h>
-#include <omp.h>
 #include <math.h>
 #include "voxen.h"
-#include <assimp/cimport.h>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <assimp/version.h>
+int malloc_trim(size_t pad); // #include <malloc.h>
+enum {
+   STBI_default    = 0, // only used for desired_channels
+   STBI_grey       = 1,
+   STBI_grey_alpha = 2,
+   STBI_rgb        = 3,
+   STBI_rgb_alpha  = 4
+};
+typedef unsigned char stbi_uc;
+stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
+void stbi_image_free(void *retval_from_stbi_load);
 
-DataParser texture_parser; // Zero initialized by C default.
-DataParser model_parser;
 DataParser entity_parser;
 DataParser lights_parser;
 float correctionX, correctionY, correctionZ;
 float correctionLightX, correctionLightY, correctionLightZ;
 bool lightIsDynamic[LIGHT_COUNT];
-
-// Textures
-typedef struct {
-    uint32_t color;
-    uint8_t index;
-    UT_hash_handle hh;
-} ColorEntry;
-
-GLuint colorBufferID = 0;
-GLuint textureSizesID = 0;
-GLuint textureOffsetsID = 0;
-GLuint texturePalettesID = 0;
-GLuint texturePaletteOffsetsID = 0;
-uint32_t* textureOffsets = NULL;
-uint32_t* texturePaletteOffsets = NULL;
-uint32_t* texturePalettes = NULL;
-uint32_t totalPixels = 0;
-uint32_t totalPaletteColors = 0;
-int* textureSizes = NULL;
-uint16_t loadedTextures = 0;
-bool* doubleSidedTexture = NULL;
-bool* transparentTexture = NULL;
-unsigned char** image_data = NULL;
-
-// Models
-uint32_t* modelVertexCounts = NULL;
-uint32_t* modelTriangleCounts = NULL;
-uint16_t* modelTypeCountsOpaque = NULL;
-uint16_t* modelTypeCountsDoubleSided = NULL;
-uint16_t* modelTypeCountsTransparent = NULL;
-uint16_t invalidModelIndexCount;
-uint16_t* modelTypeOffsetsOpaque = NULL;
-uint16_t* modelTypeOffsetsDoubleSided = NULL;
-uint16_t* modelTypeOffsetsTransparent = NULL;
-uint16_t opaqueInstancesHead = 0;
-float** modelVertices = NULL;
-uint32_t** modelTriangles = NULL;
-GLuint* vbos = NULL;
-GLuint* tbos = NULL;
-GLuint modelBoundsID;
-float* modelBounds = NULL;
-uint16_t renderableCount = 0;
-uint16_t loadedInstances = 0;
-uint16_t loadedModels = 0;
-uint16_t loadedLights = 0;
-uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
-uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
-uint16_t doubleSidedInstancesHead = 0;
-uint16_t transparentInstancesHead = 0;
 
 // Entities
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
@@ -83,25 +30,25 @@ uint16_t physHead = 0;
 static int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
-    if (str == NULL || *str == '\0') { fprintf(stderr, "Invalid input blank string, from line[%d]: %s\n", lineNum, line); return 0; }
+    if (str == NULL || *str == '\0') { DualLogError("Invalid input blank string, from line[%d]: %s\n", lineNum, line); return 0; }
     while (data_parser_isspace((unsigned char)*str)) str++;
-    if (*str == '-') { fprintf(stderr, "Invalid input, negative not allowed (%s), from line: %s\n", str, line); return 0; }
+    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s), from line: %s\n", str, line); return 0; }
     char* endptr;
     errno = 0;
     unsigned long val = strtoul(str, &endptr, 10);
-    if (errno != 0 || val > UINT32_MAX) { fprintf(stderr, "Invalid input %s, from line[%d]: %s\n", str, lineNum, line); return 0; }
+    if (errno != 0 || val > UINT32_MAX) { DualLogError("Invalid input %s, from line[%d]: %s\n", str, lineNum, line); return 0; }
     return (uint32_t)val;
 }
 
 uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
     uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT16_MAX) { fprintf(stderr, "Value out of range for uint16_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
+    if (retval > UINT16_MAX) { DualLogError("Value out of range for uint16_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
     return (uint16_t)retval;
 }
 
 uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
     uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT8_MAX) { fprintf(stderr, "Value out of range for uint8_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
+    if (retval > UINT8_MAX) { DualLogError("Value out of range for uint8_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
     return (uint8_t)retval;
 }
 
@@ -112,11 +59,11 @@ bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
 }
 
 float parse_float(const char* str, const char* line, uint32_t lineNum) {
-    if (str == NULL || *str == '\0') { fprintf(stderr, "Invalid float input blank string, from line[%d]: %s\n", lineNum, line); return 0.0f; }
+    if (str == NULL || *str == '\0') { DualLogError("Invalid float input blank string, from line[%d]: %s\n", lineNum, line); return 0.0f; }
     char* endptr;
     errno = 0;
     float val = strtof(str, &endptr);
-    if (errno != 0 || endptr == str || *endptr != '\0') { fprintf(stderr, "Invalid float input %s, from line[%d]: %s\n", str, lineNum, line); return 0.0f; }
+    if (errno != 0 || endptr == str || *endptr != '\0') { DualLogError("Invalid float input %s, from line[%d]: %s\n", str, lineNum, line); return 0.0f; }
     return val;
 }
 
@@ -366,585 +313,6 @@ bool isDoubleSided(uint32_t texIndexToCheck) {
 bool isTransparent(uint32_t texIndexToCheck) {
     if (texIndexToCheck > loadedTextures) return false;
     return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
-}
-
-//-----------------------------------------------------------------------------
-// Load all Textures
-void LoadTextures(void) {
-    malloc_trim(0);
-    double start_time = get_time();
-    DualLog("Loading textures");
-    DebugRAM("start of LoadTextures");
-    loadedTextures = 0;
-    if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); exit(1); }
-
-    int32_t maxIndex = -1;
-    for (int32_t k = 0; k < texture_parser.count; k++) {
-        if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) maxIndex = texture_parser.entries[k].index;
-    }
-
-    loadedTextures = maxIndex + 1;
-    if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
-
-    DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);
-    image_data            =   malloc(loadedTextures * sizeof(unsigned char*));
-    textureOffsets        = calloc(loadedTextures, sizeof(uint32_t));
-    textureSizes          = calloc(loadedTextures * 2, sizeof(int));
-    texturePaletteOffsets = calloc(loadedTextures, sizeof(uint32_t));
-    doubleSidedTexture    = calloc(loadedTextures,sizeof(bool));
-    transparentTexture    = calloc(loadedTextures,sizeof(bool));
-    uint32_t totalPaletteColorsExtraSized = 80000;
-    texturePalettes             = malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
-    int32_t* widths             = malloc(loadedTextures * sizeof(int32_t));
-    int32_t* heights            = malloc(loadedTextures * sizeof(int32_t));
-    int32_t* matchedParserIdxes = malloc(loadedTextures * sizeof(int32_t));
-    for (int32_t i = 0; i < loadedTextures; i++) {
-        image_data[i] = NULL;
-        widths[i] = heights[i] = 0;
-        matchedParserIdxes[i] = -1;
-    }
-
-    for (int32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
-        if (texture_parser.entries[k].index < loadedTextures) matchedParserIdxes[texture_parser.entries[k].index] = k;
-    }
-    
-    #pragma omp parallel
-    {
-        #pragma omp for schedule(dynamic)
-        for (int32_t i = 0; i < loadedTextures; i++) {
-            if (matchedParserIdxes[i] < 0) continue;
-            struct stat file_stat;
-            if (stat(texture_parser.entries[matchedParserIdxes[i]].path, &file_stat) != 0) { DualLogError("Failed to stat %s for texture index %u against matchedParserIdx %u: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, i, matchedParserIdxes[i], strerror(errno)); continue; }
-                
-            size_t file_size = file_stat.st_size;
-            if (file_size > 512000) { DualLogError("PNG file %s too large (%zu bytes), larger than 512000 bytes\n", texture_parser.entries[matchedParserIdxes[i]].path, file_size); exit(1); }
-            
-            uint8_t* file_buffer = malloc(file_size);
-            FILE* fp = fopen(texture_parser.entries[matchedParserIdxes[i]].path, "rb");
-            if (!fp) { DualLogError("Failed to open %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, strerror(errno)); exit(1); }
-            
-            fread(file_buffer, 1, file_size, fp);
-            fclose(fp);
-            int w, h, n;
-            image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, STBI_rgb_alpha);
-            if (!image_data[i]) { DualLogError("stbi_load failed for %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, stbi_failure_reason()); exit(1); }
-            
-            widths[matchedParserIdxes[i]] = w;
-            heights[matchedParserIdxes[i]] = h;
-            doubleSidedTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].doublesided > 0 ? 1 : 0;
-            transparentTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].transparent > 0 ? 1 : 0;
-            free(file_buffer);
-            malloc_trim(0);
-        }
-    }
-
-    malloc_trim(0);
-    GLuint stagingBuffer;
-    glGenBuffers(1, &stagingBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, (((MAX_TEXTURE_DIMENSION * MAX_TEXTURE_DIMENSION) + 3) / 4) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
-    uint32_t max_total_pixels = 33438148; // From colorBufferSize
-    int32_t colorBufferSize = (((int32_t)max_total_pixels + 3) / 4) * sizeof(uint32_t);
-    ColorEntry* color_pool = malloc(loadedTextures * MAX_PALETTE_SIZE * sizeof(ColorEntry));
-    uint32_t* pool_indices = malloc(loadedTextures * sizeof(uint32_t));
-    memset(pool_indices, 0, loadedTextures * sizeof(uint32_t));
-    uint32_t** per_texture_palettes = malloc(loadedTextures * sizeof(uint32_t*));
-    uint32_t* per_texture_palette_sizes = malloc(loadedTextures * sizeof(uint32_t));
-    uint8_t* all_indices = malloc(max_total_pixels * sizeof(uint8_t));
-    uint32_t* index_offsets = malloc(loadedTextures * sizeof(uint32_t));
-    uint32_t current_index_offset = 0;
-    for (uint16_t i = 0; i < loadedTextures; i++) {
-        per_texture_palettes[i] = malloc(MAX_PALETTE_SIZE * sizeof(uint32_t));
-        per_texture_palette_sizes[i] = 0;
-        index_offsets[i] = current_index_offset;
-        if (matchedParserIdxes[i] >= 0 && image_data[i]) current_index_offset += widths[i] * heights[i];
-    }
-
-    malloc_trim(0);
-    
-    // Parallel loop for palette construction
-    #pragma omp parallel
-    {
-        #pragma omp for schedule(dynamic)
-        for (uint16_t i = 0; i < loadedTextures; i++) {
-            if (matchedParserIdxes[i] < 0 || !image_data[i]) continue;
-            ColorEntry* color_table = NULL;
-            uint32_t palette_size = 0; // Oversized larger than max pallete size for catching overflows.
-            uint8_t* texture_indices = &all_indices[index_offsets[i]];
-            uint32_t pool_start = i * MAX_PALETTE_SIZE;
-            for (int32_t j = 0; j < widths[i] * heights[i] * 4; j += 4) {
-                uint32_t color = ((uint32_t)image_data[i][j] << 24) | ((uint32_t)image_data[i][j + 1] << 16) |
-                                ((uint32_t)image_data[i][j + 2] << 8) | (uint32_t)image_data[i][j + 3];
-                ColorEntry* entry;
-                HASH_FIND_INT(color_table, &color, entry);
-                if (!entry) {
-                    if (palette_size >= MAX_PALETTE_SIZE) { DualLogError("Palette size exceeded for %s\n", texture_parser.entries[matchedParserIdxes[i]].path); exit(1); }
-                    
-                    entry = &color_pool[pool_start + palette_size];
-                    entry->color = color;
-                    entry->index = (uint8_t)palette_size++;
-                    HASH_ADD_INT(color_table, color, entry);
-                    per_texture_palettes[i][entry->index] = color;
-                }
-                texture_indices[j / 4] = entry->index;
-            }
-            
-            per_texture_palette_sizes[i] = palette_size;
-            HASH_CLEAR(hh, color_table); // No free needed, as entries are from color_pool
-        }
-    }
-    
-    malloc_trim(0);
-    colorBufferID = SetupSSBO(colorBufferID, 12, colorBufferSize, NULL, GL_STATIC_DRAW);
-    uint32_t pixel_offset = 0, palette_offset = 0;
-    for (uint16_t i = 0; i < loadedTextures; i++) {
-        if (matchedParserIdxes[i] < 0 || !image_data[i]) continue;
-        textureOffsets[i] = totalPixels;
-        texturePaletteOffsets[i] = totalPaletteColors;
-        textureSizes[i * 2] = widths[i];
-        textureSizes[(i * 2) + 1] = heights[i];
-        uint32_t palette_size = per_texture_palette_sizes[i];
-        memcpy(&texturePalettes[palette_offset], per_texture_palettes[i], palette_size * sizeof(uint32_t));
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
-        int32_t numberOfPixelsForThisTexture = widths[i] * heights[i];
-        uint32_t* mapped_buffer = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, ((numberOfPixelsForThisTexture + 3) / 4) * sizeof(uint32_t), GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-        uint8_t* texture_indices = &all_indices[index_offsets[i]];
-        for (int32_t j = 0; j < numberOfPixelsForThisTexture; j += 4) {
-            uint32_t packed = (uint32_t)texture_indices[j];
-            if (j + 1 < numberOfPixelsForThisTexture) packed |= (uint32_t)texture_indices[j + 1] << 8;
-            if (j + 2 < numberOfPixelsForThisTexture) packed |= (uint32_t)texture_indices[j + 2] << 16;
-            if (j + 3 < numberOfPixelsForThisTexture) packed |= (uint32_t)texture_indices[j + 3] << 24;
-            mapped_buffer[j / 4] = packed;
-        }
-
-        glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-        glBindBuffer(GL_COPY_READ_BUFFER, stagingBuffer);
-        glBindBuffer(GL_COPY_WRITE_BUFFER, colorBufferID);
-        glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, ((pixel_offset + 3) / 4) * sizeof(uint32_t), ((numberOfPixelsForThisTexture + 3) / 4) * sizeof(uint32_t));
-        pixel_offset += numberOfPixelsForThisTexture;
-        palette_offset += palette_size;
-        totalPixels += numberOfPixelsForThisTexture;
-        totalPaletteColors += palette_size;
-        stbi_image_free(image_data[i]);
-        image_data[i] = NULL;
-        malloc_trim(0);
-    }
-
-    DualLog(" total pallete colors: %u, totalPixels was: %u... ", totalPaletteColors, totalPixels);
-    free(all_indices);
-    free(index_offsets);
-    for (uint16_t i = 0; i < loadedTextures; i++) free(per_texture_palettes[i]);
-    free(per_texture_palettes);
-    free(per_texture_palette_sizes);
-    free(color_pool);
-    free(pool_indices);
-    free(image_data);
-    free(widths);
-    free(heights);
-    free(matchedParserIdxes);
-    glDeleteBuffers(1, &stagingBuffer);
-    malloc_trim(0);
-    texturePalettesID = SetupSSBO(texturePalettesID, 16, totalPaletteColors * sizeof(uint32_t), texturePalettes, GL_STATIC_DRAW);
-    free(texturePalettes);
-    textureOffsetsID = SetupSSBO(textureOffsetsID, 14, loadedTextures * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
-    free(textureOffsets);
-    textureSizesID = SetupSSBO(textureSizesID, 15, loadedTextures * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
-    free(textureSizes);
-    texturePaletteOffsetsID = SetupSSBO(texturePaletteOffsetsID, 17, loadedTextures * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
-    free(texturePaletteOffsets);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    glFlush();
-    glFinish();
-    CHECK_GL_ERROR();
-    malloc_trim(0);
-    double end_time = get_time();
-    DualLog(" took %f seconds\n", end_time - start_time);
-    DebugRAM("After LoadTextures");
-}
-
-GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
-    if (id != 0) glDeleteBuffers(1, &id); // Clear last level's SSBO.
-    GLuint new_id = 0;
-    glGenBuffers(1, &new_id);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, new_id);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, new_id);
-    return new_id;
-}
-
-//-----------------------------------------------------------------------------
-// Loads all 3D meshes
-static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
-    // Find last slash
-    const char *slash = strrchr(fbx_path, '/');
-    const char *start = slash ? slash + 1 : fbx_path;
-
-    // Find last dot in filename
-    const char *dot = strrchr(start, '.');
-    size_t name_len = dot ? (size_t)(dot - start) : (size_t)strlen(start);
-
-    // Build path: directory + basename (without extension) + ".vmdl"
-    size_t dir_len = start - fbx_path;
-    if (dir_len + name_len + 6 >= outsz) {
-        // Truncate safely
-        memcpy(out, fbx_path, outsz - 6);
-        out[outsz - 6] = '\0';
-        char *last_slash = strrchr(out, '/');
-        if (last_slash) {
-            *++last_slash = '\0';
-            strcat(out, "toolong.vmdl");
-        } else {
-            strcpy(out, "toolong.vmdl");
-        }
-        return;
-    }
-
-    // Copy directory + basename
-    memcpy(out, fbx_path, dir_len + name_len);
-    out[dir_len + name_len] = '\0';
-    strcat(out, ".vmdl");
-}
-
-static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
-    int fd = open(vmdl_path, O_RDONLY);
-    if (fd < 0) return false;
-
-    struct stat st;
-    if (fstat(fd, &st) < 0) { close(fd); return false; }
-    if (st.st_size < 16 + 4 + 4) { close(fd); return false; }
-    uint8_t *map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    close(fd);
-    if (map == MAP_FAILED) return false;
-
-    if (memcmp(map, expected_md5, 16) != 0) { 
-        munmap(map, st.st_size); 
-        return false; 
-    }
-
-    const uint8_t *p = map + 16;
-    uint32_t vcnt = *(uint32_t*)p; p += 4;
-    *out_vcount = vcnt;
-    uint32_t icnt = *(uint32_t*)p; p += 4;
-    *out_icount = icnt;
-    size_t vert_bytes = vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-    size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
-    size_t expected   = 16 + 4 + vert_bytes + 4 + idx_bytes;
-    if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, st.st_size); return false; }
-    if (p + vert_bytes + idx_bytes > map + st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, st.st_size); return false; }
-
-    *out_verts  = (float*)p;
-    p += vert_bytes;
-    *out_idx    = (uint32_t*)p;
-    *out_map = map;
-    *out_mapsz = st.st_size;
-//     DualLog("vmdl loaded: v=%u, i=%u, vert_bytes=%zu, idx_bytes=%zu\n", vcnt, icnt, vert_bytes, idx_bytes);
-    return true;
-}
-
-static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float *verts, uint32_t vcnt, const uint32_t *triangleIndices, uint32_t triCount) {
-    int fd = open(vmdl_path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
-    if (fd < 0) return;
-
-    size_t total = 16 + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
-    uint8_t *buf = malloc(total);
-    if (!buf) { close(fd); return; }
-
-    uint8_t *p = buf;
-    memcpy(p, md5, 16); p += 16;
-    *(uint32_t*)p = vcnt; p += 4;
-    *(uint32_t*)p = triCount; p += 4;
-    memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
-    memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
-    size_t written = write(fd, buf, total);
-    if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
-    free(buf);
-    close(fd);
-}
-
-typedef struct {
-    void* ptr;
-    size_t size;
-} MMapEntry;
-
-MMapEntry* mmap_cleanup = NULL;
-int mmap_cleanup_count = 0;
-int mmap_cleanup_capacity = 0;
-
-void add_mmap_cleanup(void* ptr, size_t size) {
-    #pragma omp critical(mmap_cleanup)
-    {
-        if (mmap_cleanup_count >= mmap_cleanup_capacity) {
-            mmap_cleanup_capacity = mmap_cleanup_capacity ? mmap_cleanup_capacity * 2 : 256;
-            mmap_cleanup = realloc(mmap_cleanup, mmap_cleanup_capacity * sizeof(MMapEntry));
-            if (!mmap_cleanup) {
-                DualLogError("realloc failed in add_mmap_cleanup\n");
-                exit(1);
-            }
-        }
-        mmap_cleanup[mmap_cleanup_count].ptr = ptr;
-        mmap_cleanup[mmap_cleanup_count].size = size;
-        mmap_cleanup_count++;
-    }
-}
-
-void cleanup_all_mmaps(void) {
-    for (int i = 0; i < mmap_cleanup_count; i++) {
-        munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
-    }
-    free(mmap_cleanup);
-    mmap_cleanup = NULL;
-    mmap_cleanup_count = mmap_cleanup_capacity = 0;
-}
-
-void LoadModels(void) {
-    double start_time = get_time();
-    DebugRAM("start of LoadModels");
-    loadedModels = 0;
-    if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
-
-    int32_t maxIndex = -1;
-    for (int32_t k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
-    }
-
-    loadedModels = maxIndex + 1;
-    DualLog("Loading   models( %d) with max index  %d, using    Assimp version: %d.%d.%d...", model_parser.count, maxIndex, aiGetVersionMajor(), aiGetVersionMinor(), aiGetVersionPatch());
-    int32_t totalVertCount = 0;
-    int32_t totalTriCount = 0;
-    modelVertexCounts   = calloc(loadedModels, sizeof(uint32_t));
-    modelTriangleCounts = calloc(loadedModels, sizeof(uint32_t));
-    modelVertices       = calloc(loadedModels, sizeof(float*));
-    modelTriangles      = calloc(loadedModels, sizeof(uint32_t*));
-    modelBounds         = calloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT, sizeof(float));
-    int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
-    for (int32_t k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index != UINT16_MAX) {
-            indexToParser[model_parser.entries[k].index] = k;
-        }
-    }
-    
-    struct aiPropertyStore* props = aiCreatePropertyStore();
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 16);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-    #pragma omp parallel default(none) \
-        shared(model_parser, indexToParser, loadedModels, \
-            modelVertexCounts, modelTriangleCounts, \
-            modelVertices, modelTriangles, modelBounds, \
-            props, totalVertCount, totalTriCount)
-    {
-        #pragma omp for schedule(dynamic)
-        for (uint32_t i = 0; i < loadedModels; ++i) {
-            int32_t parserIdx = indexToParser[i];
-            const char *fbx_path = model_parser.entries[parserIdx].path;
-            if (!fbx_path || !fbx_path[0]) continue;
-
-            /* ---------- 1. Build .vmdl name ---------- */
-            char vmdl_path[512];
-            make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
-            if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); exit(1); }
-
-            /* ---------- 2. Compute MD5 of the .fbx ---------- */
-            uint8_t fbx_md5[16];
-            {
-                FILE *f = fopen(fbx_path, "rb");
-                if (!f) { DualLogError("Cannot open %s for MD5\n", fbx_path); continue; }
-                fseek(f, 0, SEEK_END);
-                long sz = ftell(f); fseek(f, 0, SEEK_SET);
-                uint8_t *buf = malloc(sz);
-                size_t read = fread(buf, 1, sz, f);
-                if (read != (size_t)sz) { DualLogError("Failed to read full FBX: %s\n", fbx_path); exit(1); }
-                    
-                fclose(f);
-                md5(buf, sz, fbx_md5);
-                free(buf);
-            }
-
-            /* ---------- 3. Try to load cached .vmdl ---------- */
-            float  *cached_verts = NULL;
-            uint32_t cached_vcnt = 0;
-            uint32_t *cached_idx  = NULL;
-            uint32_t cached_icnt = 0;
-            void* mmap_map = NULL;
-            size_t mmap_size = 0;
-            bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
-
-            /* ---------- 4. If cache miss – run Assimp ---------- */
-            if (!cache_hit) {
-                DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
-                const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, aiProcess_GenNormals | aiProcess_ImproveCacheLocality, NULL, props);
-                if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); continue; }
-
-                /* ---- count verts / tris ---- */
-                uint32_t vertexCount = 0, triCount = 0;
-                for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
-                    vertexCount += scene->mMeshes[m]->mNumVertices;
-                    triCount    += scene->mMeshes[m]->mNumFaces;
-                }
-                
-                if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds limits\n", fbx_path); aiReleaseImport(scene); continue; }
-
-                modelVertexCounts[i]   = vertexCount;
-                modelTriangleCounts[i] = triCount;
-
-                modelVertices[i]  = calloc(vertexCount * VERTEX_ATTRIBUTES_COUNT, sizeof(float));
-                modelTriangles[i] = calloc(triCount * 3, sizeof(uint32_t));
-
-                /* ---- fill vertex / index arrays (same code you already have) ---- */
-                uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
-                float minx = 1E9f, miny = 1E9f, minz = 1E9f;
-                float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
-
-                for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
-                    struct aiMesh *mesh = scene->mMeshes[m];
-                    for (uint32_t vert = 0; vert < mesh->mNumVertices; ++vert) {
-                        modelVertices[i][vertexIndex++] = mesh->mVertices[vert].x;
-                        modelVertices[i][vertexIndex++] = mesh->mVertices[vert].y;
-                        modelVertices[i][vertexIndex++] = mesh->mVertices[vert].z;
-                        modelVertices[i][vertexIndex++] = mesh->mNormals[vert].x;
-                        modelVertices[i][vertexIndex++] = mesh->mNormals[vert].y;
-                        modelVertices[i][vertexIndex++] = mesh->mNormals[vert].z;
-                        float u = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].x : 0.0f;
-                        float v = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].y : 0.0f;
-                        modelVertices[i][vertexIndex++] = u;
-                        modelVertices[i][vertexIndex++] = v;
-                        minx = fminf(minx, mesh->mVertices[vert].x);
-                        maxx = fmaxf(maxx, mesh->mVertices[vert].x);
-                        miny = fminf(miny, mesh->mVertices[vert].y);
-                        maxy = fmaxf(maxy, mesh->mVertices[vert].y);
-                        minz = fminf(minz, mesh->mVertices[vert].z);
-                        maxz = fmaxf(maxz, mesh->mVertices[vert].z);
-                    }
-
-                    for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
-                        struct aiFace *face = &mesh->mFaces[f];
-                        if (face->mNumIndices != 3) {
-                            DualLogError("Non-tri face in %s\n", fbx_path);
-                            aiReleaseImport(scene);
-                            continue;
-                        }
-                        uint32_t a = face->mIndices[0] + globalVertexOffset;
-                        uint32_t b = face->mIndices[1] + globalVertexOffset;
-                        uint32_t c = face->mIndices[2] + globalVertexOffset;
-                        modelTriangles[i][triangleIndex++] = a;
-                        modelTriangles[i][triangleIndex++] = b;
-                        modelTriangles[i][triangleIndex++] = c;
-                    }
-                    globalVertexOffset += mesh->mNumVertices;
-                }
-
-                /* ---- bounds ---- */
-                uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MINY] = miny;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MINZ] = minz;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-                float r = 0.0f;
-                r = fmaxf(r, fabsf(minx)); r = fmaxf(r, fabsf(miny)); r = fmaxf(r, fabsf(minz));
-                r = fmaxf(r, maxx);        r = fmaxf(r, maxy);        r = fmaxf(r, maxz);
-                modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
-                write_vmdl(vmdl_path, fbx_md5, modelVertices[i], vertexCount, modelTriangles[i], triCount);
-                aiReleaseImport(scene);
-            } else {
-                /* ---- CACHE HIT ---- */
-                modelVertexCounts[i]   = cached_vcnt;
-                modelTriangleCounts[i] = cached_icnt;
-                modelVertices[i]  = malloc(cached_vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                modelTriangles[i] = malloc(cached_icnt * 3 * sizeof(uint32_t));
-                memcpy(modelVertices[i],  cached_verts, cached_vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                memcpy(modelTriangles[i], cached_idx,  cached_icnt * 3 * sizeof(uint32_t));
-                float minx = 1E9f, miny = 1E9f, minz = 1E9f;
-                float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
-                for (uint32_t v = 0; v < cached_vcnt; ++v) {
-                    float x = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 0];
-                    float y = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 1];
-                    float z = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 2];
-                    minx = fminf(minx, x); maxx = fmaxf(maxx, x);
-                    miny = fminf(miny, y); maxy = fmaxf(maxy, y);
-                    minz = fminf(minz, z); maxz = fmaxf(maxz, z);
-                }
-                uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MINY] = miny;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MINZ] = minz;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MAXX] = maxx;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
-                modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
-                float r = 0.0f;
-                r = fmaxf(r, fabsf(minx)); r = fmaxf(r, fabsf(miny)); r = fmaxf(r, fabsf(minz));
-                r = fmaxf(r, maxx);        r = fmaxf(r, maxy);        r = fmaxf(r, maxz);
-                modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
-                add_mmap_cleanup(mmap_map, mmap_size);  // defer munmap
-            }
-
-            /* ---- atomic totals (debug) ---- */
-            #pragma omp critical
-            {
-                totalVertCount += modelVertexCounts[i];
-                totalTriCount  += modelTriangleCounts[i];
-            }
-        }
-        
-        #pragma omp barrier
-        #pragma omp master
-        {
-            cleanup_all_mmaps();
-        }
-    }
-
-    aiReleasePropertyStore(props);
-    malloc_trim(0);
-    vbos = calloc(loadedModels, sizeof(GLuint));
-    tbos = calloc(loadedModels, sizeof(GLuint));
-    glGenBuffers(loadedModels, vbos);
-    glGenBuffers(loadedModels, tbos);
-    for (int i = 0; i < loadedModels; ++i) {
-        if (modelVertexCounts[i] == 0) continue;
-
-        size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);  // orphan
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);  // safe
-        void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        memcpy(ptr, modelVertices[i], vertSize);
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-        ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        memcpy(ptr, modelTriangles[i], triSize);
-        glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-#ifdef DEBUG_MODEL_LOAD_DATA
-    DualLog("Total vertices: %d (", totalVertCount); print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); DualLog(")\nTotal triangles: %d (", totalTriCount); print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t)); DualLog(")\n");
-#endif
-
-    glGenBuffers(1, &modelBoundsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    DualLog(" took %f seconds\n", get_time() - start_time);
-    DebugRAM("After Load Models");
-    free(indexToParser);
-    malloc_trim(0);
 }
 
 //--------------------------------- Entities -------------------------------------
@@ -1394,4 +762,721 @@ void SortInstances(void) {
     DualLog("Loaded %d ambient noises for Level %d\n", loadedAmbients, currentLevel);
     DualLog(" took %f secs\n", get_time() - start_time);
     DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invisible: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
+}
+//=============================================================================
+// Culling System
+uint8_t gridCellStates[ARRSIZE];
+uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
+uint32_t cellIndexForInstance[INSTANCE_COUNT];
+uint16_t cellIndexForLight[LIGHT_COUNT];
+uint16_t playerCellIdx = 0u;
+uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
+uint16_t numCellsVisible = 0u;
+float worldMin_x = 0.0f; float worldMin_z = 0.0f;
+
+bool get_cull_bit(const uint32_t* arr, size_t idx) {
+    size_t word = idx / 32;
+    size_t bit = idx % 32;
+    return ((arr[word] & (1U << bit)) != 0);
+}
+
+static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
+    size_t word = idx / 32;
+    size_t bit = idx % 32;
+    if (val) {
+        arr[word] |= (1U << bit);
+    } else {
+        arr[word] &= ~(1U << bit);
+    }
+}
+
+void PutChunksInCells() {
+    uint16_t x,z;
+    uint16_t cellIdx;
+    for (uint16_t c=3; c < INSTANCE_COUNT; ++c) { // Start after player instances and NULLENT
+        
+        PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
+        cellIdx = (z * WORLDX) + x;
+        if (!(gridCellStates[cellIdx] & CELL_OPEN)) cellIdx = 0;
+        cellIndexForInstance[c] = (uint32_t)cellIdx;
+    }
+}
+
+void PutMeshesInCells(int type) {
+    int count = 0;
+    switch(type) {
+        case 5: count = LIGHT_COUNT; break; // Lights
+    }
+    for (int index=0;index<count;index++) {
+        uint16_t x,z;
+        switch(type) {
+            case 5: // Lights
+                int lightIdx = (index * LIGHT_DATA_SIZE);
+                PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
+                cellIndexForLight[index] = (z * WORLDX) + x;
+                break;
+        }
+    }
+}
+
+void DetermineClosedEdges() {
+    DebugRAM("Start of DetermineClosedEdges");
+    size_t maxFileSize = 500000; // 0.5MB
+    uint8_t* file_buffer = malloc(maxFileSize);
+    FILE* fp;
+    size_t file_size, read_size;
+    int32_t wpng, hpng, channels;
+    
+    // ------------------- Open Cells ------------------
+    char filename2[256];
+    sprintf(filename2,"./Data/worldcellopen_%d.png",currentLevel);
+    fp = fopen(filename2, "rb");
+    if (!fp) { DualLogError("Failed to open %s\n", filename2); exit(1); }
+    
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); exit(1); }
+    
+    fseek(fp, 0, SEEK_SET);
+    read_size = fread(file_buffer, 1, file_size, fp);
+    fclose(fp);
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); exit(1); }
+    unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); exit(1); }
+ 
+    unsigned char openData_r, openData_g, openData_b;
+    uint16_t totalOpenCells = 0;
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx = (z * WORLDX) + x;
+            gridCellStates[cellIdx] &= ~CELL_OPEN;
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            openData_r = openPixels[pixelIdx + 0];
+            openData_g = openPixels[pixelIdx + 1];
+            openData_b = openPixels[pixelIdx + 2];
+            if (openData_r > 0 || openData_g > 0 || openData_b > 0) {
+                gridCellStates[cellIdx] |= CELL_OPEN;
+                totalOpenCells++;
+            } else {
+                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST; // Also force close the edges for closed cells even if above edges image said tweren't closed edges.
+            }
+        }
+    }
+
+    gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
+    stbi_image_free(openPixels);
+    malloc_trim(0);
+    
+    // ------------------- Closed Edges ------------------    
+    char filename[256];
+    sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
+
+    fp = fopen(filename, "rb");
+    if (!fp) { DualLogError("Failed to open %s\n", filename); exit(1); }
+    
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); exit(1); }
+    
+    fseek(fp, 0, SEEK_SET);
+    read_size = fread(file_buffer, 1, file_size, fp);
+    fclose(fp);
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); exit(1); }
+
+    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); exit(1); }
+
+    unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
+    uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
+    for (int32_t x=0;x<WORLDX;x++) {
+        for (int32_t z=0;z<WORLDZ;z++) {
+            int32_t cellIdx = (z * WORLDX) + x;
+            gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            closedData_r = edgePixels[pixelIdx + 0];
+            closedData_g = edgePixels[pixelIdx + 1];
+            closedData_b = edgePixels[pixelIdx + 2];
+            closedData_a = edgePixels[pixelIdx + 3];
+            if (closedData_r > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDNORTH; closedCountNorth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
+            if (closedData_g > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDEAST; closedCountEast += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
+            if (closedData_b > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH; closedCountSouth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
+            if (   (closedData_r < 255 && closedData_r > 0)
+                || (closedData_g < 255 && closedData_g > 0)
+                || (closedData_b < 255 && closedData_b > 0)) {
+                
+                // Anything that has closed west edge will be not at full 255 on at least one channel.
+                // Typical for all other edge conditions is to use full brightness 255 on the channel(s).
+                // All 4 closed would be 128 128 128 but this doesn't ever happen.
+                // None closed is 0 0 0
+                gridCellStates[cellIdx] |= CELL_CLOSEDWEST; closedCountWest += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0;
+            }
+            
+            if (closedData_a > 0 && closedData_a < 255) {
+                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST;
+            }
+        }
+    }
+    
+    DualLog("Found %d open cells for level %d, Found closed edges north: %d, south: %d, east: %d, west: %d...",totalOpenCells,currentLevel,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
+    stbi_image_free(edgePixels);
+    malloc_trim(0);
+    
+    // ------------------- Sky/Sun Visibility ------------------    
+    char filename3[256];
+    sprintf(filename3,"./Data/worldcellskyvis_%d.png",currentLevel);
+    fp = fopen(filename3, "rb");
+    if (!fp) { DualLogError("Failed to open %s\n", filename3); exit(1); }
+    
+    fseek(fp, 0, SEEK_END);
+    file_size = ftell(fp);
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); exit(1); }
+    
+    fseek(fp, 0, SEEK_SET);
+    read_size = fread(file_buffer, 1, file_size, fp);
+    fclose(fp);
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); exit(1); }
+    unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); exit(1); }
+
+    unsigned char skyData_r, skyData_g, skyData_b;
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx = (z * WORLDX) + x;
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            skyData_r = skyPixels[pixelIdx + 0];
+            skyData_g = skyPixels[pixelIdx + 1];
+            skyData_b = skyPixels[pixelIdx + 2];
+            if (skyData_r > 127 && skyData_g < 127 && skyData_b < 127) gridCellStates[cellIdx] &= ~(CELL_SEES_SUN | CELL_SEES_SKYBOX); // All red cells marked as -1, no sky or sun.
+            else if (skyData_r <= 127 && skyData_g <= 127 && skyData_b > 127) gridCellStates[cellIdx] |= CELL_SEES_SUN | CELL_SEES_SKYBOX; // All blue cells marked as sky visible.  Sun + Sky.
+            else { gridCellStates[cellIdx] &= ~CELL_SEES_SKYBOX; gridCellStates[cellIdx] |= CELL_SEES_SUN; } // All white and black cells marked as 0.  Only sees Sun.
+        }
+    }
+    
+    stbi_image_free(skyPixels);
+    free(file_buffer);
+    malloc_trim(0);
+    DebugRAM("end of dynamic culling DetermineClosedEdges");
+}
+
+bool UpdatedPlayerCell() {
+    uint16_t lastX = playerCellIdx_x;
+    uint16_t lastZ = playerCellIdx_z;
+    PosToCellCoords(instances[PLAYER1].position.x,instances[PLAYER1].position.z,&playerCellIdx_x,&playerCellIdx_z);
+    playerCellIdx = (playerCellIdx_z * WORLDX) + playerCellIdx_x;
+    if (playerCellIdx_x == lastX && playerCellIdx_z == lastZ) return false;
+    return true;
+}
+
+int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
+    if (!(lastX == x && lastZ == z)) {
+        if (XZPairInBounds(lastX,lastZ)) {
+            int32_t cellIdx_last = (lastZ * WORLDX) + lastX;
+            if (lastZ == z) {
+                if (lastX > x) { // [  x  ][lastX]
+                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) return -1;
+                } else { // Less than x since == x was already checked.
+                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDEAST) return -1;
+                }
+            }
+
+            if (lastX == x) {
+                if (lastZ > z) { // [lastZ]
+                                 // [  y  ]
+                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) return -1;
+                } else { // Less than y since == y was already checked.
+                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) return -1;
+                }
+            }
+
+            // Diagonals
+            if (lastZ != z && lastX != x) {
+                int32_t cellIdx_neighborNorth = ((lastZ + 1) * WORLDX) + lastX;
+                cellIdx_neighborNorth = cellIdx_neighborNorth > ARRSIZE ? ARRSIZE : cellIdx_neighborNorth;
+                int32_t cellIdx_neighborSouth = ((lastZ - 1) * WORLDX) + lastX;
+                cellIdx_neighborSouth = cellIdx_neighborSouth > ARRSIZE ? ARRSIZE : cellIdx_neighborSouth;
+                int32_t cellIdx_neighborEast = (lastZ * WORLDX) + lastX + 1;
+                cellIdx_neighborEast = cellIdx_neighborEast > ARRSIZE ? ARRSIZE : cellIdx_neighborEast;
+                int32_t cellIdx_neighborWest = (lastZ * WORLDX) + lastX - 1;
+                cellIdx_neighborWest = cellIdx_neighborWest > ARRSIZE ? ARRSIZE : cellIdx_neighborWest;
+                
+                if (lastZ > z && lastX > x) { // [Nb][ 1]
+                                              // [ 2][Na]
+                    bool neighborClosedWest = false;
+                    bool neighborClosedSouth = false;
+                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedWest = (gridCellStates[cellIdx_neighborSouth] & CELL_CLOSEDWEST) && (gridCellStates[cellIdx_neighborSouth] & CELL_OPEN);
+                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedSouth = (gridCellStates[cellIdx_neighborWest] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_neighborWest] & CELL_OPEN);
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST)) return -1;// Check cell 1 only
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) && neighborClosedWest) return -1; // Check cell 1 and Neighbor a (Na)
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1; // Check cell 1 and Neighbor b (Nb)
+                    if (neighborClosedWest && neighborClosedSouth) return -1; // Check Neighbor a (Na) and Neighbor b (Nb)
+                } else if (lastZ < z && lastX < x) { // [ ][2]
+                                                     // [1][ ]return
+                    bool neighborClosedEast = false;
+                    bool neighborClosedNorth = false;
+                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedEast = (gridCellStates[cellIdx_neighborNorth] & CELL_CLOSEDEAST) && (gridCellStates[cellIdx_neighborNorth] & CELL_OPEN);
+                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedNorth = (gridCellStates[cellIdx_neighborEast] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_neighborEast] & CELL_OPEN);
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDEAST)) return -1;
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
+                    if (neighborClosedEast && neighborClosedNorth) return -1;
+                } else if (lastZ > z && lastX < x) { // [1][ ]
+                                                     // [ ][2]
+                    bool neighborClosedEast = false;
+                    bool neighborClosedSouth = false;
+                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedEast = (gridCellStates[cellIdx_neighborSouth] & CELL_CLOSEDEAST) && (gridCellStates[cellIdx_neighborSouth] & CELL_OPEN);
+                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedSouth = (gridCellStates[cellIdx_neighborEast] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_neighborEast] & CELL_OPEN);
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDEAST)) return -1;
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1;
+                    if (neighborClosedEast && neighborClosedSouth) return -1;
+                } else if (lastZ < z && lastX > x) { // [2][ ]
+                                                     // [ ][1]
+                    bool neighborClosedWest = false;
+                    bool neighborClosedNorth = false;
+                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedWest = (gridCellStates[cellIdx_neighborNorth] & CELL_CLOSEDWEST) && (gridCellStates[cellIdx_neighborNorth] & CELL_OPEN);
+                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedNorth = (gridCellStates[cellIdx_neighborWest] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_neighborWest] & CELL_OPEN);
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST)) return -1;
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) && neighborClosedWest) return -1;
+                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
+                    if (neighborClosedWest && neighborClosedNorth) return -1;
+                }
+            }
+        }
+    }
+    
+    if (XZPairInBounds(x,z)) {
+        int32_t cellIdx_xz = (z * WORLDX) + x; 
+        if (gridCellStates[cellIdx_xz] & CELL_OPEN) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+        else gridCellStates[cellIdx_xz] &= ~CELL_VISIBLE;
+        
+        if (!(gridCellStates[cellIdx_xz] & CELL_VISIBLE)) return -1;
+        return 1;
+    }
+
+    return 0;
+}
+
+int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
+    if (signz > 0 && pz >= (WORLDZ - 1)) return pz; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
+    if (signz < 0 && pz <= 0) return pz;
+    if (!XZPairInBounds(px,pz)) return pz;
+    
+    int32_t cellIdx = (pz * WORLDX) + px;
+    if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) return pz;
+    
+    bool currentVisible = true;
+    int32_t x = px;
+    int32_t z = pz + signz;
+    int32_t zabs = abs(z);
+    for (;zabs<WORLDX;z+=signz) { // Up/Down
+        currentVisible = false;
+        int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
+        int32_t cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+        if (XZPairInBounds(x,z - signz) && XZPairInBounds(x,z)) {
+            int32_t cellIdx_x_zmnus_sign = ((z - signz) * WORLDX) + x;
+            if (gridCellStates[cellIdx_x_zmnus_sign] & CELL_VISIBLE) {
+                if (signz > 0) {
+                    if (gridCellStates[cellIdx_x_zmnus1] & CELL_CLOSEDNORTH && gridCellStates[cellIdx_x_zmnus1] & CELL_OPEN) return z;
+                } else if (signz < 0) {
+                    if (gridCellStates[cellIdx_x_zplus1] & CELL_CLOSEDSOUTH && gridCellStates[cellIdx_x_zplus1] & CELL_OPEN) return z;
+                }
+
+                int32_t subCellIdx = (z * WORLDX) + x;
+                if (gridCellStates[subCellIdx] & CELL_OPEN) gridCellStates[subCellIdx] |= CELL_VISIBLE;
+                else gridCellStates[subCellIdx] &= ~CELL_VISIBLE;
+                
+                currentVisible = true; // Would be if twas open.
+            }
+        }
+
+        if (!currentVisible) break; // Hit wall!
+
+        if (XZPairInBounds(x + 1,z)) {
+            int32_t cellIdx_xplus1_z = (z * WORLDX) + x + 1;
+            if (CastRayCellCheck(x,z,x + 1,z) > 0) {
+                if (gridCellStates[cellIdx_xplus1_z] & CELL_OPEN) gridCellStates[cellIdx_xplus1_z] |= CELL_VISIBLE;
+                else gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
+            } else {
+                gridCellStates[cellIdx_xplus1_z] &= ~CELL_VISIBLE;
+            }
+        }
+        
+        if (XZPairInBounds(x - 1,z)) {
+            int32_t cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
+            if (CastRayCellCheck(x,z,x - 1,z) > 0) {
+                if (gridCellStates[cellIdx_xmnus1_z] & CELL_OPEN) gridCellStates[cellIdx_xmnus1_z] |= CELL_VISIBLE;
+                else gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
+            } else {
+                gridCellStates[cellIdx_xmnus1_z] &= ~CELL_VISIBLE;
+            }
+        }
+    }
+    
+    return WORLDX * signz;
+}
+
+int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
+    if (signx > 0 && px >= (WORLDX - 1)) return px; // Nowwhere to step to if right by edge, hence WORLDX - 1 here.
+    if (signx < 0 && px <= 0) return px;
+    if (!XZPairInBounds(px,pz)) return px;
+    if (!gridCellStates[(pz * WORLDX) + px] & CELL_VISIBLE) return px;
+
+    int32_t x = px + signx;
+    int32_t z = pz;
+    bool currentVisible = true;
+    int32_t xabs = abs(x);
+    for (;xabs<WORLDX;x+=signx) { // Right/Left
+        currentVisible = false;
+        int32_t cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
+        int32_t cellIdx_xplus1_z = (z * WORLDX) + x + 1;
+        if (XZPairInBounds(x - signx,z) && XZPairInBounds(x,z)) {
+            int32_t cellIdx_xmnussign_z = (z * WORLDX) + x - signx;
+            if (gridCellStates[cellIdx_xmnussign_z] & CELL_VISIBLE) {
+                if (signx > 0) {
+                    if ((gridCellStates[cellIdx_xmnus1_z] & CELL_CLOSEDEAST) && (gridCellStates[cellIdx_xmnus1_z] & CELL_OPEN)) return x;
+                } else if (signx < 0) {
+                    if ((gridCellStates[cellIdx_xplus1_z] & CELL_CLOSEDWEST) && (gridCellStates[cellIdx_xplus1_z] & CELL_OPEN)) return x;
+                }
+                
+                int32_t subCellIdx = (z * WORLDX) + x;
+                if (gridCellStates[subCellIdx] & CELL_OPEN) gridCellStates[subCellIdx] |= CELL_VISIBLE;
+                else gridCellStates[subCellIdx] &= ~CELL_VISIBLE;
+                
+                currentVisible = true; // Would be if twas open.
+            }
+        }
+
+        if (!currentVisible) break; // Hit wall!
+        
+        if (XZPairInBounds(x,z + 1)) {
+            int32_t cellIdx_x_zplus1 = ((z + 1) * WORLDX) + x;
+            if (CastRayCellCheck(x,z,x,z + 1) > 0) {
+                if (gridCellStates[cellIdx_x_zplus1] & CELL_OPEN) gridCellStates[cellIdx_x_zplus1] |= CELL_VISIBLE;
+                else gridCellStates[cellIdx_x_zplus1] &= ~CELL_VISIBLE;
+            } else {
+                gridCellStates[cellIdx_x_zplus1] &= ~CELL_VISIBLE;
+            }
+        }
+        
+        if (XZPairInBounds(x,z - 1)) {
+            int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
+            if (CastRayCellCheck(x,z,x,z - 1) > 0) {
+                if (gridCellStates[cellIdx_x_zmnus1] & CELL_OPEN) gridCellStates[cellIdx_x_zmnus1] |= CELL_VISIBLE;
+                else gridCellStates[cellIdx_x_zmnus1] &= ~CELL_VISIBLE;
+            } else {
+                gridCellStates[cellIdx_x_zmnus1] &= ~CELL_VISIBLE;
+            }
+        }
+    }
+    
+    return WORLDX * signx;
+}
+
+void CastRay(int32_t x0, int32_t z0, int32_t x1, int32_t z1) {
+    int32_t dx = abs(x1 - x0);       int32_t dz = abs(z1 - z0);
+    int32_t sx = (x0 < x1) ? 1 : -1; int32_t sz = (z0 < z1) ? 1 : -1;
+    int32_t x = x0;                  int32_t z = z0;
+    int32_t lastX = x;               int32_t lastZ = z;
+    int32_t err = dx - dz;
+    int32_t iter = dx > dz ? dx : dz;
+    while (iter >= 0) {
+        if (!XZPairInBounds(x,z) || !XZPairInBounds(lastX,lastZ)) continue;
+        if (CastRayCellCheck(x,z,lastX,lastZ) == -1) return;
+
+        lastX = x;
+        lastZ = z;
+        int32_t e2 = 2 * err;
+        if (e2 > -dz) { err -= dz; x += sx; }
+        if (e2 <  dx) { err += dx; z += sz; }
+        iter--;
+    }
+}
+
+void CircleFanRays(int32_t x0, int32_t z0) { // CastRay()'s in fan from x0,z0 out to every cell around map perimeter.
+    if (!XZPairInBounds(x0,z0)) return;
+    if (!(gridCellStates[(z0 * WORLDX) + x0] & CELL_VISIBLE)) return;
+
+    int32_t x,z;     
+    int32_t max = WORLDX; // Reduce work slightly by not casting towards 
+    int32_t min = 0;      // edges but 1 less = [1,63].
+    for (x=min;x<max;x++) CastRay(x0,z0,x,min);
+    for (x=min;x<max;x++) CastRay(x0,z0,x,max);
+    for (z=min;z<max;z++) CastRay(x0,z0,min,z);
+    for (z=min;z<max;z++) CastRay(x0,z0,max,z);
+}
+
+void DetermineVisibleCells(int32_t startX, int32_t startZ) {
+    if (!XZPairInBounds(startX,startZ)) return;
+
+    for (int32_t x=0;x<WORLDX;x++) {
+        for (int32_t z=0;z<WORLDZ;z++) {
+            int32_t subCellIdx = (z * WORLDX) + x;
+            gridCellStates[subCellIdx] &= ~CELL_VISIBLE; // Clear all to not visible.
+        }
+    }
+
+    int32_t cellIdx_start = (startZ * WORLDX) + startX;
+    gridCellStates[cellIdx_start] |= CELL_VISIBLE; // Force starting player cell to visible.
+    
+    // Cast to the right (East)        [ ][3]
+    CastStraightX(startX,startZ,1); // [1][2]
+                                    // [ ][3]
+    int32_t iter = 0;
+    for (int32_t march=startX;march<(WORLDX - 1);march++) {
+        iter++;
+        if (iter > WORLDX) break;
+        
+        if (XZPairInBounds(march,startZ + 1)) {
+            if (gridCellStates[((startZ + 1) * WORLDX) + march] & CELL_VISIBLE) {
+                march = CastStraightX(march,startZ + 1,1);  // Above [1]
+            }
+        }
+    }
+    
+    iter = 0;
+    for (int32_t march=startX;march<(WORLDX - 1);march++) {
+        iter++;
+        if (iter > WORLDX) break;
+
+        if (XZPairInBounds(march,startZ - 1)) {
+            if (gridCellStates[((startZ - 1) * WORLDX) + march] & CELL_VISIBLE) {
+                march = CastStraightX(march,startZ - 1,1);  // Below [1]
+            }
+        }
+    }
+    
+    // Cast to the left (West)          [3][ ]
+    CastStraightX(startX,startZ,-1); // [2][1]
+                                     // [3][ ]
+    iter = 0;
+    for (int32_t march=startX;march>=1;march--) {
+        iter++;
+        if (iter > WORLDX) break;
+        
+        if (XZPairInBounds(march,startZ + 1)) {
+            if (gridCellStates[((startZ + 1) * WORLDX) + march] & CELL_VISIBLE) {
+                march = CastStraightX(march,startZ + 1,-1); // Above [1]
+            }
+        }
+    }
+
+    iter = 0;
+    for (int32_t march=startX;march>=1;march--) {
+        iter++;
+        if (iter > WORLDX) break;
+
+        if (XZPairInBounds(march,startZ - 1)) {
+            if (gridCellStates[((startZ - 1) * WORLDX) + march] & CELL_VISIBLE) {
+                march = CastStraightX(march,startZ - 1,-1); // Below [1]
+            }
+        }
+    }
+
+    // Cast down (South)                [ ][1][ ]
+    CastStraightZ(startX,startZ,-1); // [3][2][3]
+    iter = 0;
+    for (int32_t march=startZ;march>=1;march--) {
+        iter++;
+        if (iter > WORLDX) break;
+
+        if (XZPairInBounds(startX + 1,march)) {
+            if (gridCellStates[(march * WORLDX) + startX + 1] & CELL_VISIBLE) {
+                march = CastStraightZ(startX + 1,march,-1);
+            }
+        }
+    }
+    
+    iter = 0;
+    for (int32_t march=startZ;march>=1;march--) {
+        iter++;
+        if (iter > WORLDX) break;
+
+        if (XZPairInBounds(startX - 1,march)) {
+            if (gridCellStates[(march * WORLDX) + startX - 1] & CELL_VISIBLE) {
+                march = CastStraightZ(startX - 1,march,-1);
+            }
+        }
+    }
+
+    // Cast up (North)                 [3][2][3]
+    CastStraightZ(startX,startZ,1); // [ ][1][ ]
+    iter = 0;
+    for (int32_t march=startZ;march<(WORLDX - 1);march++) {
+        iter++;
+        if (iter > WORLDX) break;
+
+        if (XZPairInBounds(startX + 1,march)) {
+            if (gridCellStates[(march * WORLDX) + startX + 1] & CELL_VISIBLE) {
+                march = CastStraightZ(startX + 1,march,1);
+            }
+        }
+    }
+    
+    iter = 0;
+    for (int32_t march=startZ;march<(WORLDX - 1);march++) {
+        iter++;
+        if (iter > WORLDX) break;
+
+        if (XZPairInBounds(startX - 1,march)) {
+            if (gridCellStates[(march * WORLDX) + startX - 1] & CELL_VISIBLE) {
+                march = CastStraightZ(startX - 1,march,1);
+            }
+        }
+    }
+
+    CircleFanRays(startX,startZ);
+    CircleFanRays(startX + 1,startZ);
+    CircleFanRays(startX + 1,startZ + 1);
+    CircleFanRays(startX,startZ + 1);
+    CircleFanRays(startX - 1,startZ + 1);
+    CircleFanRays(startX - 1,startZ);
+    CircleFanRays(startX - 1,startZ - 1);
+    CircleFanRays(startX,startZ - 1);
+    CircleFanRays(startX + 1,startZ - 1);
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            int32_t cellIdx_xz = (z * WORLDX) + x;
+            if (currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
+                if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
+                    || (x >= 32 && startX >= 32)
+                    || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
+                    ||  x >= 34) {
+                    
+                    gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+                }
+                
+                if (startX <=12 && x == 14 && z == 31 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+                if (startX <=12 && x == 14 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+                if (startX <=12 && x == 13 && z == 30 && startZ >= 24) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
+            }
+        }
+    }
+    
+    int32_t numVisible = 0;
+    for (int32_t x=0;x<WORLDX;++x) {
+        for (int32_t z=0;z<WORLDZ;++z) {
+            if (gridCellStates[(z * WORLDX) + x] & CELL_VISIBLE) numVisible++;
+        }
+    }
+}
+
+void CullInit(void) {
+    double start_time = get_time();    
+    DualLog("Culling...");
+    DebugRAM("start of Cull_Init");    
+    switch(currentLevel) {
+        case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
+        case 1: worldMin_x = -81.92f; worldMin_z = -71.68f; break;
+        case 2: worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); worldMin_z = -46.08f + (0.0f + -7.7f); break;
+        case 3: worldMin_x = -53.76f + (50.17400f +  -45.1200f); worldMin_z = -46.08f + (13.714f + -16.32f); break;
+        case 4: worldMin_x =  -7.68f + ( 1.17800f +  -20.4000f); worldMin_z = -64.00f + (1.292799f + 11.48f); break;
+        case 5: worldMin_x = -35.84f + ( 1.17780f +  -10.1400f); worldMin_z = -51.20f + (-1.2417f + -0.0383f); break;
+        case 6: worldMin_x = -64.00f + ( 1.29280f +   -0.6728f); worldMin_z = -71.68f + (-1.2033f + 3.76f); break;
+        case 7: worldMin_x = -58.88f + ( 1.24110f +   -6.7000f); worldMin_z = -79.36f + (-1.2544f + 1.16f); break;
+        case 8: worldMin_x = -40.96f + (-1.30560f +    1.0800f); worldMin_z = -43.52f + (1.2928f + 0.8f); break;
+        case 9: worldMin_x = -51.20f + (-1.34390f +    3.6000f); worldMin_z = -64.0f + (-1.1906f + -1.28f); break;
+        case 10:worldMin_x =-128.00f + (-0.90945f +  107.3700f); worldMin_z = -71.68f + (-1.0372f + 35.48f); break;
+        case 11:worldMin_x = -38.40f + (-1.26720f +   15.0500f); worldMin_z =  51.2f + (0.96056f + -77.94f); break;
+        case 12:worldMin_x = -34.53f + ( 0.00000f +   19.0400f); worldMin_z = -123.74f + (0.0f + 95.8f); break;
+    }
+    
+    worldMin_x -= 2.56f; // Add one cell gap around edges
+    worldMin_z -= 2.56f;
+    DetermineClosedEdges();
+    PutChunksInCells();
+    
+    // For each cell, get the visibility as though player were there and put into gridCellStates
+    // Then store the visibility of gridCellStates into the table of all visible cells for that cell
+    // at the appropriate offset for looking up later when actually re-assigning gridCellStates
+    // from this precalculated visibility state for the particular cell.
+    int32_t numPrecomputedVisibleCells = 0;
+    for (int32_t z=0;z<WORLDZ;z++) {
+        for (int32_t x=0;x<WORLDX;x++) {
+            playerCellIdx_x = x;
+            playerCellIdx_z = z;
+            DetermineVisibleCells(x,z);
+            int32_t cellIdx = (z * WORLDX) + x;
+            for (int32_t z2=0;z2<WORLDZ;z2++) {
+                for (int32_t x2=0;x2<WORLDX;x2++) {
+                    int32_t subCellIdx = (z2 * WORLDX) + x2;
+                    size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + subCellIdx;
+                    bool is_visible = (gridCellStates[subCellIdx] & CELL_VISIBLE);
+                    set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,is_visible);
+                    if (is_visible) numPrecomputedVisibleCells++;
+                }
+            }
+            
+            if (currentLevel == 10) {
+                if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
+                    size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
+                    set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
+                    numPrecomputedVisibleCells++;
+                }
+            }
+        }
+    }
+    
+    UpdatedPlayerCell();
+    int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
+    int32_t numFoundVisibleCellsForPlayerStart = 0;
+    for (int32_t z=0;z<WORLDZ;++z) {
+        for (int32_t x=0;x<WORLDX;++x) {
+            int32_t cellIdx = (z * WORLDX) + x;
+            size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
+            if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
+                numFoundVisibleCellsForPlayerStart++;
+                gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
+            }
+        }
+    }
+
+    gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
+//     PutMeshesInCells(0); // Static Immutable
+//     PutMeshesInCells(1); // Dynamic
+//     PutMeshesInCells(2); // Doors
+//     PutMeshesInCells(3); // NPCs
+//     PutMeshesInCells(4); // Static Saveable
+    memset(cellIndexForLight,0,LIGHT_COUNT * sizeof(uint16_t));
+    PutMeshesInCells(5); // Lights
+    CullCore(); // Do first Cull pass, forcing as player moved to new cell.
+    malloc_trim(0);
+    DualLog(" took %f seconds\n", get_time() - start_time);
+    DebugRAM("end of Cull_Init");
+}
+
+void CullCore(void) {    
+    if (currentLevel >= (numLevels - 1)) return;
+
+    numCellsVisible = 0;
+    int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
+    for (int32_t z=0;z<WORLDZ;++z) {
+        for (int32_t x=0;x<WORLDX;++x) {
+            int32_t cellIdx = (z * WORLDX) + x;
+            if (cellIdx == 0) { gridCellStates[0] |= CELL_VISIBLE; continue; } // Errors default here so draw them anyways.  Don't count it though.
+            if (cellIdx == playerCellIdx) { gridCellStates[playerCellIdx] |= CELL_VISIBLE; numCellsVisible++; continue; } // Always at least set player's cell.
+
+            size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
+            if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
+                numCellsVisible++;
+                gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
+            } else {
+                gridCellStates[cellIdx] &= ~CELL_VISIBLE;
+            }
+        }
+    }
+
+//     CameraViewUnculling(playerCellX,playerCellY);
+//     UpdateNPCPVS();
+//     ToggleNPCPVS();
+}
+
+void Cull() {
+    if (menuActive || gamePaused || currentLevel >= LEVEL_CYBERSPACE) return;
+
+    // Now handle player position updating PVS. Always do UpdatedPlayerCell
+    // to set playerCellX and playerCellY.
+    if (UpdatedPlayerCell()) CullCore();
 }

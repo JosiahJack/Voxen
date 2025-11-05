@@ -1,11 +1,12 @@
 #include "voxen.h"
+#include <malloc.h>
 #include <sys/types.h>
 #include <sys/mman.h>
-#include <unistd.h>
 #include <fcntl.h>
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 #include <fontconfig/fontconfig.h>
+int close (int filedes); // #include <unistd.h>
 
 #define MAX_FALLBACK_FONTS 32
 static char *xstrdup(const char *s) {

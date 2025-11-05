@@ -1,4 +1,7 @@
 #include <string.h>
+#include <sys/stat.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "External/stb_image_write.h"
 #include "voxen.h"
 
 // MD5 (128-bit / 16 bytes) – tiny self-contained implementation
@@ -144,4 +147,34 @@ bool ConstIndexIsHardware(int constdex) {
 
 bool ConstIndexIsAmbient(int constdex) {
     return (constdex >= 621 && constdex <= 655);
+}
+
+void Screenshot() {
+    struct stat st = {0};
+    if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
+        if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
+    }
+    
+    unsigned char* pixels = malloc(screen_width * screen_height * 4 * sizeof(char));
+    glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    char timestamp[32];
+    char filename[96];
+    time_t now = time(NULL);
+    struct tm *utc_time = localtime(&now);    
+    if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, get_time());
+    if (!stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4)) DualLogError("Failed to save screenshot\n");
+    else DualLog("Saved screenshot %s\n", filename);
+
+    free(pixels);
+}
+
+GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
+    if (id != 0) glDeleteBuffers(1, &id); // Clear last level's SSBO.
+    GLuint new_id = 0;
+    glGenBuffers(1, &new_id);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, new_id);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, new_id);
+    return new_id;
 }
