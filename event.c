@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include "event.h"
 #include "voxen.h"
+
 void exit(int status);
 
 int32_t maxEventCount_debug = 0;

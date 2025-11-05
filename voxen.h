@@ -256,73 +256,6 @@ extern bool menuActive;
 void LoadLevel(uint8_t curlevel);
 void SortInstances();
 // ----------------------------------------------------------------------------
-// Event System
-#define EV_NULL 0u
-#define EV_INIT 1u
-#define EV_KEYDOWN 10u
-#define EV_KEYUP 11u
-#define EV_MOUSEMOVE 12u
-#define EV_MOUSEDOWN 13u
-#define EV_MOUSEUP 14u
-#define EV_MOUSEWARP 15u
-#define EV_PLAYAUDIO_CLIP 40u
-#define EV_PLAYAUDIO_STREAM 41u
-#define EV_PHYSICS_TICK 50u
-#define EV_PARTICLE_TICK 60u
-#define EV_PAUSE 254u
-#define EV_QUIT 255u
-
-// Event Journal Buffer
-#define EVENT_JOURNAL_BUFFER_SIZE 1000
-
-// Event Queue
-#define MAX_EVENTS_PER_FRAME 100
-
-// Event System variables
-typedef struct {
-    double timestamp;
-    double deltaTime_ns;
-    uint32_t frameNum;
-    int32_t payload1i; // First one used for payloads less than or equal to 4 bytes
-    int32_t payload2i; // Second one used for more values or for long ints by using bitpacking
-    float payload1f; // First one used for float payloads
-    float payload2f; // Second one used for a 2nd value or for double via bitpacking
-    uint8_t type;
-} Event;
-extern Event eventQueue[MAX_EVENTS_PER_FRAME];
-extern int32_t eventJournalIndex;
-extern bool journalFirstWrite;
-// Journal buffer for event history to write into the log/demo file
-extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE];
-extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were
-                // already executed and walked away from the counter.
-extern int32_t eventQueueEnd; // End of the waiting line
-extern bool log_playback;
-extern double lastJournalWriteTime;
-extern double cpuTime;
-extern const char* manualLogName;
-extern int32_t maxEventCount_debug;
-extern uint32_t globalFrameNum;
-extern double last_time;
-extern double current_time;
-extern float pauseRelativeTime;
-void ActiveLogFileInit();
-void OpenLogForPlayback(const char* path);
-int32_t ReadActiveLog();
-void clear_ev_queue(void);
-int32_t EventExecute(Event* event);
-int32_t EventInit(void);
-int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
-int32_t EnqueueEvent_IntInt(uint8_t type, int32_t payload1i, int32_t payload2i);
-int32_t EnqueueEvent_Int(uint8_t type, int32_t payload1i);
-int32_t EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f);
-int32_t EnqueueEvent_Float(uint8_t type, float payload1f);
-int32_t EnqueueEvent_Simple(uint8_t type);
-void clear_ev_journal(void);
-void JournalLog(void);
-double get_time(void);
-int32_t EventQueueProcess(void);
-// ----------------------------------------------------------------------------
 // Dynamic Culling
 #define WORLDX 64
 #define WORLDZ WORLDX
@@ -407,32 +340,7 @@ extern float move_speed;
 int32_t ParticleSystemStep(void);
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
-
-// Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
-inline void quat_to_matrix(Quaternion* q, float* m) {
-    float x = q->x, y = q->y, z = q->z, w = q->w;
-    float x2 = x * x, y2 = y * y, z2 = z * z;
-    float xy = x * y, xz = x * z, yz = y * z;
-    float wx = w * x, wy = w * y, wz = w * z;
-
-    // Column-major rotation matrix for Unity (Y+ up, Z+ forward, X+ right)
-    m[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
-    m[1]  = 2.0f * (xy + wz);        // Right Y
-    m[2]  = 2.0f * (xz - wy);        // Right Z
-    m[3]  = 0.0f;
-    m[4]  = 2.0f * (xy - wz);        // Up X
-    m[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
-    m[6]  = 2.0f * (yz + wx);        // Up Z
-    m[7]  = 0.0f;
-    m[8]  = 2.0f * (xz + wy);        // Forward X
-    m[9]  = 2.0f * (yz - wx);        // Forward Y
-    m[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
-    m[11] = 0.0f;
-    m[12] = 0.0f;
-    m[13] = 0.0f;
-    m[14] = 0.0f;
-    m[15] = 1.0f;
-}
+void quat_to_matrix(Quaternion* q, float* m);
 // ----------------------------------------------------------------------------
 // Input
 #define NUM_KEYS 350
@@ -444,7 +352,6 @@ void Input_MouselookApply();
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
-void ProcessInput(void);
 // ----------------------------------------------------------------------------
 // Rendering
 #define DEBUG_OPENGL

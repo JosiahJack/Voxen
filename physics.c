@@ -1,6 +1,8 @@
 #include "voxen.h"
-#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <math.h>
+void ProcessInput(void);
 
 // Player
 #define PLAYER_CAPSULE_TOTAL_HEIGHT 2.0f

@@ -5,16 +5,8 @@
 #include <math.h>
 #include "voxen.h"
 int malloc_trim(size_t pad); // #include <malloc.h>
-enum {
-   STBI_default    = 0, // only used for desired_channels
-   STBI_grey       = 1,
-   STBI_grey_alpha = 2,
-   STBI_rgb        = 3,
-   STBI_rgb_alpha  = 4
-};
 typedef unsigned char stbi_uc;
 stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
-void stbi_image_free(void *retval_from_stbi_load);
 
 DataParser entity_parser;
 DataParser lights_parser;
@@ -841,7 +833,7 @@ void DetermineClosedEdges() {
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); exit(1); }
-    unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+    unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, 4); // I handmade them, well what can ya do
 	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); exit(1); }
  
     unsigned char openData_r, openData_g, openData_b;
@@ -865,7 +857,7 @@ void DetermineClosedEdges() {
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-    stbi_image_free(openPixels);
+    free(openPixels);
     malloc_trim(0);
     
     // ------------------- Closed Edges ------------------    
@@ -884,7 +876,7 @@ void DetermineClosedEdges() {
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); exit(1); }
 
-    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, 4); // I handmade them, well what can ya do
     if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); exit(1); }
 
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
@@ -920,7 +912,7 @@ void DetermineClosedEdges() {
     }
     
     DualLog("Found %d open cells for level %d, Found closed edges north: %d, south: %d, east: %d, west: %d...",totalOpenCells,currentLevel,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
-    stbi_image_free(edgePixels);
+    free(edgePixels);
     malloc_trim(0);
     
     // ------------------- Sky/Sun Visibility ------------------    
@@ -937,7 +929,7 @@ void DetermineClosedEdges() {
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); exit(1); }
-    unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, STBI_rgb_alpha); // I handmade them, well what can ya do
+    unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, 4); // I handmade them, well what can ya do
     if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); exit(1); }
 
     unsigned char skyData_r, skyData_g, skyData_b;
@@ -955,7 +947,7 @@ void DetermineClosedEdges() {
         }
     }
     
-    stbi_image_free(skyPixels);
+    free(skyPixels);
     free(file_buffer);
     malloc_trim(0);
     DebugRAM("end of dynamic culling DetermineClosedEdges");

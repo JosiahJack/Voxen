@@ -36,14 +36,16 @@ build_start=$(now_ms)
 echo "Shaders converted to string constants in $((shader_end - shader_start)) ms"
 
 CC=gcc
-CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O3 -D_POSIX_C_SOURCE=199309L"
-LDFLAGS="-L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.4.a -l:libminiaudio.0.11.22.a -lGLEW -lGL -lm -lfontconfig -fopenmp"
+CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=199309L"
+LDFLAGS="-flto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.4.a -l:libminiaudio.0.11.22.a -lGLEW -lGL -lm -lfontconfig -fopenmp"
 SOURCES="voxen.c data_parser.c physics.c data_fonts.c audio.c helpers.c event.c data_models.c data_textures.c"
 
 # Array to store PIDs and source names
 declare -a pids
 declare -a sources
 
+# SEQUENTIAL BUILD
+#========================================================
 # voxenc_time=$(now_ms)
 # gcc -c voxen.c $CFLAGS -o "$TEMP_DIR"/voxen.o
 # voxenc_end=$(now_ms)
@@ -88,8 +90,9 @@ declare -a sources
 # gcc -c event.c $CFLAGS -o "$TEMP_DIR"/event.o
 # eventc_end=$(now_ms)
 # echo "event.c: $((eventc_end - eventc_time)) ms"
-
-# Start compilation jobs
+#========================================================
+# PARALLEL BUILD
+#========================================================
 for src in $SOURCES; do
     obj="$TEMP_DIR/${src%.c}.o"
     start_time=$(now_ms)
@@ -99,7 +102,6 @@ for src in $SOURCES; do
 done
 
 # Wait and report per-file time
-compile_times=()
 failed=false
 
 for i in "${!pids[@]}"; do
@@ -109,10 +111,7 @@ for i in "${!pids[@]}"; do
     status=$?
     end_time=$(now_ms)
     elapsed=$((end_time - start_time))
-
-    if [ $status -eq 0 ]; then
-        compile_times+=("$src: ${elapsed}ms")
-    else
+    if [ $status -ne 0 ]; then
         echo "ERROR: Compilation failed for $src"
         failed=true
     fi
@@ -124,9 +123,7 @@ if $failed; then
     rm -f "$TEMP_DIR"/*.o
     exit 1
 fi
-
-# Sort and print compile times (longest first)
-printf '%s\n' "${compile_times[@]}" | sort -t: -k2 -nr | sed 's/^\s*/  /'
+#========================================================
 
 # === Linking ===
 link_start=$(now_ms)

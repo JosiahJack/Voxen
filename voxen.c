@@ -23,6 +23,7 @@
 #include <sys/stat.h>
 #include <math.h>
 #include <stdlib.h>
+#include "event.h"
 #define VOXEN_ENGINE_IMPLEMENTATION
 #include "voxen.h"
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
@@ -42,7 +43,6 @@ typedef struct {
     float nx, ny, nz, d;
 } FrustumPlane;
 
-void stbi_flip_vertically_on_write(int flag);
 // ----------------------------------------------------------------------------
 // Window
 GLFWwindow *window;
@@ -1161,7 +1161,6 @@ void InitializeEnvironment(void) {
     
     glfwMakeContextCurrent(window);
     UpdateScreenSize();
-    stbi_flip_vertically_on_write(1);
     malloc_trim(0);
     DebugRAM("window init");
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.

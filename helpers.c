@@ -1,6 +1,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
 #include "voxen.h"
 
@@ -177,4 +178,30 @@ GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* da
     glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, new_id);
     return new_id;
+}
+
+// Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
+void quat_to_matrix(Quaternion* q, float* m) {
+    float x = q->x, y = q->y, z = q->z, w = q->w;
+    float x2 = x * x, y2 = y * y, z2 = z * z;
+    float xy = x * y, xz = x * z, yz = y * z;
+    float wx = w * x, wy = w * y, wz = w * z;
+
+    // Column-major rotation matrix for Unity (Y+ up, Z+ forward, X+ right)
+    m[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
+    m[1]  = 2.0f * (xy + wz);        // Right Y
+    m[2]  = 2.0f * (xz - wy);        // Right Z
+    m[3]  = 0.0f;
+    m[4]  = 2.0f * (xy - wz);        // Up X
+    m[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
+    m[6]  = 2.0f * (yz + wx);        // Up Z
+    m[7]  = 0.0f;
+    m[8]  = 2.0f * (xz + wy);        // Forward X
+    m[9]  = 2.0f * (yz - wx);        // Forward Y
+    m[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
+    m[11] = 0.0f;
+    m[12] = 0.0f;
+    m[13] = 0.0f;
+    m[14] = 0.0f;
+    m[15] = 1.0f;
 }

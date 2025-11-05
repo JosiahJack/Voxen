@@ -1,37 +1,34 @@
-#ifndef STBI_INCLUDE_STB_IMAGE_H
-#define STBI_INCLUDE_STB_IMAGE_H
-
-#ifndef STBI_NO_STDIO
 #include <stdio.h>
-#endif // STBI_NO_STDIO
-
-#define STBI_VERSION 1
-
-enum {
-   STBI_default    = 0, // only used for desired_channels
-   STBI_grey       = 1,
-   STBI_grey_alpha = 2,
-   STBI_rgb        = 3,
-   STBI_rgb_alpha  = 4
-};
-
+typedef unsigned short stbi__uint16;
+typedef   signed short stbi__int16;
+typedef unsigned int   stbi__uint32;
+typedef   signed int   stbi__int32;
 #include <stdlib.h>
 typedef unsigned char stbi_uc;
 typedef unsigned short stbi_us;
-
-#ifndef STBIDEF
-#ifdef STB_IMAGE_STATIC
-#define STBIDEF static
-#else
 #define STBIDEF extern
-#endif
-#endif
 
 typedef struct {
    int      (*read)  (void *user,char *data,int size);   // fill 'data' with 'size' bytes.  return number of bytes actually read
    void     (*skip)  (void *user,int n);                 // skip the next 'n' bytes, or 'unget' the last -n bytes if negative
    int      (*eof)   (void *user);                       // returns nonzero if we are at end of file/data
 } stbi_io_callbacks;
+
+typedef struct {
+   stbi__uint32 img_x, img_y;
+   int img_n, img_out_n;
+
+   stbi_io_callbacks io;
+   void *io_user_data;
+
+   int read_from_callbacks;
+   int buflen;
+   stbi_uc buffer_start[128];
+   int callback_already_read;
+
+   stbi_uc *img_buffer, *img_buffer_end;
+   stbi_uc *img_buffer_original, *img_buffer_original_end;
+} stbi__context;
 
 STBIDEF stbi_uc *stbi_load_from_memory   (stbi_uc           const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
 
@@ -54,13 +51,8 @@ STBIDEF int   stbi_zlib_decode_buffer(char *obuffer, int olen, const char *ibuff
 STBIDEF char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen);
 STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
 
-#endif // STBI_INCLUDE_STB_IMAGE_H
-
 #ifdef STB_IMAGE_IMPLEMENTATION
-
-#define STBI_NO_HDR
 #define STBI_NO_FAILURE_STRINGS
-
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -97,21 +89,25 @@ STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const ch
    #endif
 #endif
 
-#if defined(_MSC_VER) || defined(__SYMBIAN32__)
-typedef unsigned short stbi__uint16;
-typedef   signed short stbi__int16;
-typedef unsigned int   stbi__uint32;
-typedef   signed int   stbi__int32;
-#else
-#include <stdint.h>
-typedef uint16_t stbi__uint16;
-typedef int16_t  stbi__int16;
-typedef uint32_t stbi__uint32;
-typedef int32_t  stbi__int32;
-#endif
-
 // should produce compiler error if size is wrong
 typedef unsigned char validate_uint32[sizeof(stbi__uint32)==4 ? 1 : -1];
+
+typedef struct {
+   stbi__context *s;
+   stbi_uc *idata, *expanded, *out;
+   int depth;
+} stbi__png;
+
+enum {
+   STBI__F_none=0,
+   STBI__F_sub=1,
+   STBI__F_up=2,
+   STBI__F_avg=3,
+   STBI__F_paeth=4,
+   // synthetic filters used for first scanline to avoid needing a dummy row of 0s
+   STBI__F_avg_first,
+   STBI__F_paeth_first
+};
 
 #ifdef _MSC_VER
 #define STBI_NOTUSED(v)  (void)(v)
@@ -219,39 +215,7 @@ static int stbi__cpuid3(void)
 #define STBI_MAX_DIMENSIONS (1 << 24)
 #endif
 
-typedef struct {
-   stbi__uint32 img_x, img_y;
-   int img_n, img_out_n;
-
-   stbi_io_callbacks io;
-   void *io_user_data;
-
-   int read_from_callbacks;
-   int buflen;
-   stbi_uc buffer_start[128];
-   int callback_already_read;
-
-   stbi_uc *img_buffer, *img_buffer_end;
-   stbi_uc *img_buffer_original, *img_buffer_original_end;
-} stbi__context;
-
-
 static void stbi__refill_buffer(stbi__context *s);
-
-// initialize a memory-decode context
-static void stbi__start_mem(stbi__context *s, stbi_uc const *buffer, int len)
-{
-   s->io.read = NULL;
-   s->read_from_callbacks = 0;
-   s->callback_already_read = 0;
-   s->img_buffer = s->img_buffer_original = (stbi_uc *) buffer;
-   s->img_buffer_end = s->img_buffer_original_end = (stbi_uc *) buffer+len;
-}
-
-static void stbi__rewind(stbi__context *s) {
-   s->img_buffer = s->img_buffer_original;
-   s->img_buffer_end = s->img_buffer_original_end;
-}
 
 enum {
    STBI_ORDER_RGB,
@@ -263,9 +227,6 @@ typedef struct {
    int num_channels;
    int channel_order;
 } stbi__result_info;
-
-static int      stbi__png_test(stbi__context *s);
-static void    *stbi__png_load(stbi__context *s, int *x, int *y, int *comp, int req_comp, stbi__result_info *ri);
 
 static
 #ifdef STBI_THREAD_LOCAL
@@ -324,11 +285,6 @@ static void *stbi__malloc_mad3(int a, int b, int c, int add)
 #define stbi__errpf(x,y)   ((float *)(size_t) (stbi__err(x,y)?NULL:NULL))
 #define stbi__errpuc(x,y)  ((unsigned char *)(size_t) (stbi__err(x,y)?NULL:NULL))
 
-STBIDEF void stbi_image_free(void *retval_from_stbi_load)
-{
-   STBI_FREE(retval_from_stbi_load);
-}
-
 static int stbi__vertically_flip_on_load_global = 0;
 
 STBIDEF void stbi_set_flip_vertically_on_load(int flag_true_if_should_flip)
@@ -351,23 +307,6 @@ STBIDEF void stbi_set_flip_vertically_on_load_thread(int flag_true_if_should_fli
                                          ? stbi__vertically_flip_on_load_local  \
                                          : stbi__vertically_flip_on_load_global)
 #endif // STBI_THREAD_LOCAL
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-static void *stbi__load_main(stbi__context *s, int *x, int *y, int *comp, int req_comp, stbi__result_info *ri, int bpc) {
-   memset(ri, 0, sizeof(*ri)); // make sure it's initialized if we add new fields
-   ri->bits_per_channel = 8; // default is 8 so most paths don't have to be changed
-   ri->channel_order = STBI_ORDER_RGB; // all current input & output are this, but this is here so we can add BGR order
-   ri->num_channels = 0;
-
-   // test the formats with a very explicit header first (at least a FOURCC
-   // or distinctive magic number first)
-   #ifndef STBI_NO_PNG
-   if (stbi__png_test(s))  return stbi__png_load(s,x,y,comp,req_comp, ri);
-   #endif
-   return stbi__errpuc("unknown image type", "Image not of any known type, or corrupt");
-}
-#pragma GCC diagnostic pop
 
 static stbi_uc *stbi__convert_16_to_8(stbi__uint16 *orig, int w, int h, int channels)
 {
@@ -409,23 +348,42 @@ static void stbi__vertical_flip(void *image, int w, int h, int bytes_per_pixel)
    }
 }
 
-static unsigned char *stbi__load_and_postprocess_8bit(stbi__context *s, int *x, int *y, int *comp, int req_comp)
-{
-   stbi__result_info ri;
-   void *result = stbi__load_main(s, x, y, comp, req_comp, &ri, 8);
+stbi_inline static stbi_uc stbi__get8(stbi__context *s) {
+   if (s->img_buffer < s->img_buffer_end)
+      return *s->img_buffer++;
+   if (s->read_from_callbacks) {
+      stbi__refill_buffer(s);
+      return *s->img_buffer++;
+   }
+   return 0;
+}
 
-   if (result == NULL)
-      return NULL;
+static void *stbi__do_png(stbi__png *p, int *x, int *y, int *n, int req_comp, stbi__result_info *ri);
+
+STBIDEF stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp) {
+   stbi__context s;
+   s.io.read = NULL;
+   s.read_from_callbacks = 0;
+   s.callback_already_read = 0;
+   s.img_buffer = s.img_buffer_original = (stbi_uc *) buffer;
+   s.img_buffer_end = s.img_buffer_original_end = (stbi_uc *) buffer+len;
+   stbi__result_info ri;
+   memset(&ri, 0, sizeof(ri)); // make sure it's initialized if we add new fields
+   ri.bits_per_channel = 8; // default is 8 so most paths don't have to be changed
+   ri.channel_order = STBI_ORDER_RGB; // all current input & output are this, but this is here so we can add BGR order
+   ri.num_channels = 0;
+   void* result = NULL;
+   stbi__png p;
+   p.s = &s;
+   result = stbi__do_png(&p, x,y,comp,req_comp, &ri);
+   if (result == NULL) return NULL;
 
    // it is the responsibility of the loaders to make sure we get either 8 or 16 bit.
    STBI_ASSERT(ri.bits_per_channel == 8 || ri.bits_per_channel == 16);
-
    if (ri.bits_per_channel != 8) {
       result = stbi__convert_16_to_8((stbi__uint16 *) result, *x, *y, req_comp == 0 ? *comp : req_comp);
       ri.bits_per_channel = 8;
    }
-
-   // @TODO: move stbi__convert_format to here
 
    if (stbi__vertically_flip_on_load) {
       int channels = req_comp ? req_comp : *comp;
@@ -434,14 +392,6 @@ static unsigned char *stbi__load_and_postprocess_8bit(stbi__context *s, int *x, 
 
    return (unsigned char *) result;
 }
-
-STBIDEF stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp)
-{
-   stbi__context s;
-   stbi__start_mem(&s,buffer,len);
-   return stbi__load_and_postprocess_8bit(&s,x,y,comp,req_comp);
-}
-
 
 enum
 {
@@ -465,17 +415,6 @@ static void stbi__refill_buffer(stbi__context *s)
       s->img_buffer = s->buffer_start;
       s->img_buffer_end = s->buffer_start + n;
    }
-}
-
-stbi_inline static stbi_uc stbi__get8(stbi__context *s)
-{
-   if (s->img_buffer < s->img_buffer_end)
-      return *s->img_buffer++;
-   if (s->read_from_callbacks) {
-      stbi__refill_buffer(s);
-      return *s->img_buffer++;
-   }
-   return 0;
 }
 
 static void stbi__skip(stbi__context *s, int n)
@@ -1151,33 +1090,13 @@ static stbi__pngchunk stbi__get_chunk_header(stbi__context *s)
    return c;
 }
 
-static int stbi__check_png_header(stbi__context *s)
-{
+static int stbi__check_png_header(stbi__context *s) {
    static const stbi_uc png_sig[8] = { 137,80,78,71,13,10,26,10 };
    int i;
    for (i=0; i < 8; ++i)
       if (stbi__get8(s) != png_sig[i]) return stbi__err("bad png sig","Not a PNG");
    return 1;
 }
-
-typedef struct
-{
-   stbi__context *s;
-   stbi_uc *idata, *expanded, *out;
-   int depth;
-} stbi__png;
-
-
-enum {
-   STBI__F_none=0,
-   STBI__F_sub=1,
-   STBI__F_up=2,
-   STBI__F_avg=3,
-   STBI__F_paeth=4,
-   // synthetic filters used for first scanline to avoid needing a dummy row of 0s
-   STBI__F_avg_first,
-   STBI__F_paeth_first
-};
 
 static stbi_uc first_row_filter[5] =
 {
@@ -1840,21 +1759,5 @@ static void *stbi__do_png(stbi__png *p, int *x, int *y, int *n, int req_comp, st
    return result;
 }
 
-static void *stbi__png_load(stbi__context *s, int *x, int *y, int *comp, int req_comp, stbi__result_info *ri)
-{
-   stbi__png p;
-   p.s = s;
-   return stbi__do_png(&p, x,y,comp,req_comp, ri);
-}
-
-static int stbi__png_test(stbi__context *s)
-{
-   int r;
-   r = stbi__check_png_header(s);
-   stbi__rewind(s);
-   return r;
-}
-
 #endif
-
 #endif // STB_IMAGE_IMPLEMENTATION

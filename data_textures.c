@@ -96,7 +96,7 @@ void LoadTextures(void) {
             read(fp, file_buffer, file_size);
             close(fp);
             int w, h, n;
-            image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, STBI_rgb_alpha);
+            image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, 4);
             if (!image_data[i]) { DualLogError("stbi_load failed for %s\n", texture_parser.entries[matchedParserIdxes[i]].path); exit(1); }
             
             widths[matchedParserIdxes[i]] = w;
@@ -195,7 +195,7 @@ void LoadTextures(void) {
         palette_offset += palette_size;
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;
-        stbi_image_free(image_data[i]);
+        free(image_data[i]);
         image_data[i] = NULL;
         malloc_trim(0);
     }
