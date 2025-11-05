@@ -14,6 +14,8 @@ float move_speed = 0.06;
 bool noclip = false;
 // double physicsProcessingTime = 0.0;
 
+float testLight_x, testLight_y, testLight_z;
+
 // ----------------------------------------------------------------------------
 // Input
 bool window_has_focus = false;
@@ -160,6 +162,30 @@ void ProcessInput(void) {
         instances[PLAYER1].position.x -= finalMoveSpeed * cam_rightx; // Strafe left
         if (currentLevel != LEVEL_CYBERSPACE) instances[PLAYER1].position.y -= finalMoveSpeed * cam_righty;
         instances[PLAYER1].position.z -= finalMoveSpeed * cam_rightz;
+    }
+    
+    if (keys[GLFW_KEY_K]) {
+        testLight_x += finalMoveSpeed;
+        lightDirty[0] = true;
+    } else if (keys[GLFW_KEY_J]) {
+        testLight_x -= finalMoveSpeed;
+        lightDirty[0] = true;
+    }
+    
+    if (keys[GLFW_KEY_N]) {
+        testLight_y += finalMoveSpeed;
+        lightDirty[0] = true;
+    } else if (keys[GLFW_KEY_M]) {
+        testLight_y -= finalMoveSpeed;
+        lightDirty[0] = true;
+    }
+    
+    if (keys[GLFW_KEY_U]) {
+        testLight_z += finalMoveSpeed;
+        lightDirty[0] = true;
+    } else if (keys[GLFW_KEY_I]) {
+        testLight_z -= finalMoveSpeed;
+        lightDirty[0] = true;
     }
 
     if (noclip) { // Temporarily allow noclip like flying for now to solidify physics

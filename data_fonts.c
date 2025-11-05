@@ -1,7 +1,5 @@
-#include <string.h>
 #include "voxen.h"
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -122,10 +120,15 @@ float TextWidth(const char *utf8, int fontID) {
         if (prevGlyph != -1 && advance > 0.0f) { // Kerning
             if (fontID == FONT_NORMAL && packedIdx >= 0) {
                 int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
-                width += kern * stbtt_ScaleForPixelHeight(&primaryFontInfo, GetScreenRelativeY(genericTextHeightFac));
+                
+                int fheight = ttSHORT(primaryFontInfo.data + primaryFontInfo.hhea + 4) - ttSHORT(primaryFontInfo.data + primaryFontInfo.hhea + 6);
+                float kernScaleForPixelHeight = (float) GetScreenRelativeY(genericTextHeightFac) / fheight;
+                width += kern * kernScaleForPixelHeight;
             } else if (fontID == FONT_STOPD && packedIdx >= 0) {
                 int kern = stbtt_GetGlyphKernAdvance(&secondaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&secondaryFontInfo, cp));
-                width += kern * stbtt_ScaleForPixelHeight(&secondaryFontInfo, GetScreenRelativeY(genericTextHeightFacStopD));
+                int fheight = ttSHORT(secondaryFontInfo.data + secondaryFontInfo.hhea + 4) - ttSHORT(secondaryFontInfo.data + secondaryFontInfo.hhea + 6);
+                float kernScaleForPixelHeight = (float) GetScreenRelativeY(genericTextHeightFacStopD) / fheight;
+                width += kern * kernScaleForPixelHeight;
             }
         }
 
@@ -305,7 +308,8 @@ void InitFontAtlasses(void) {
     unsigned char *bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
     stbtt_PackBegin(&pc, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    stbtt_PackSetOversampling(&pc, 8, 8);
+    pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
+    pc.v_oversample = 8;
     numPackedGlyphs = 0;
     float h = GetScreenRelativeY(genericTextHeightFac);
     for (int r = 0; r < numFontRanges; r++) {
@@ -326,7 +330,8 @@ void InitFontAtlasses(void) {
         }
     }
     
-    stbtt_PackEnd(&pc);
+    free(pc.nodes);
+    free(pc.pack_info);
     malloc_trim(0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
     glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
@@ -343,7 +348,8 @@ void InitFontAtlasses(void) {
     bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc2;
     stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    stbtt_PackSetOversampling(&pc2, 8, 8);
+    pc2.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
+    pc2.v_oversample = 8;
     numPackedGlyphsStopD = 0;
     float h2 = GetScreenRelativeY(genericTextHeightFacStopD);
     for (int r = 0; r < numFontRanges; r++) {
@@ -369,7 +375,8 @@ void InitFontAtlasses(void) {
         }
     }
     
-    stbtt_PackEnd(&pc2);
+    free(pc2.nodes);
+    free(pc2.pack_info);
     malloc_trim(0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
@@ -380,7 +387,35 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, sec_md5, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
     free(bmp);
-    free(primaryFontData); free(sec_data);
+    free(primaryFontData);
+    free(sec_data);
     malloc_trim(0);
     DualLog("Fonts regenerated in %.3f s\n", get_time() - t0);
+}
+
+uint32_t DecodeUTF8(const char **p) {
+    const unsigned char *s = (const unsigned char *)*p;
+    uint32_t codepoint = 0;
+    if (*s < 0x80) {          // 1-byte ASCII
+        codepoint = *s++;
+    } else if ((*s & 0xE0) == 0xC0) { // 2-byte
+        codepoint  = (*s & 0x1F) << 6;
+        codepoint |= (s[1] & 0x3F);
+        s += 2;
+    } else if ((*s & 0xF0) == 0xE0) { // 3-byte
+        codepoint  = (*s & 0x0F) << 12;
+        codepoint |= (s[1] & 0x3F) << 6;
+        codepoint |= (s[2] & 0x3F);
+        s += 3;
+    } else if ((*s & 0xF8) == 0xF0) { // 4-byte
+        codepoint  = (*s & 0x07) << 18;
+        codepoint |= (s[1] & 0x3F) << 12;
+        codepoint |= (s[2] & 0x3F) << 6;
+        codepoint |= (s[3] & 0x3F);
+        s += 4;
+    } else {
+        s++; // invalid byte
+    }
+    *p = (const char *)s;
+    return codepoint;
 }

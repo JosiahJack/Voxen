@@ -158,11 +158,7 @@ LICENSE
 #ifdef STB_IMAGE_WRITE_STATIC
 #define STBIWDEF  static
 #else
-#ifdef __cplusplus
-#define STBIWDEF  extern "C"
-#else
 #define STBIWDEF  extern
-#endif
 #endif
 #endif
 
@@ -287,11 +283,7 @@ static void stbi__stdio_write(void *context, void *data, int size)
 }
 
 #if defined(_WIN32) && defined(STBIW_WINDOWS_UTF8)
-#ifdef __cplusplus
-#define STBIW_EXTERN extern "C"
-#else
 #define STBIW_EXTERN extern
-#endif
 STBIW_EXTERN __declspec(dllimport) int __stdcall MultiByteToWideChar(unsigned int cp, unsigned long flags, const char *str, int cbmb, wchar_t *widestr, int cchwide);
 STBIW_EXTERN __declspec(dllimport) int __stdcall WideCharToMultiByte(unsigned int cp, unsigned long flags, const wchar_t *widestr, int cchwide, char *str, int cbmb, const char *defchar, int *used_default);
 

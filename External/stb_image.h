@@ -385,10 +385,6 @@ enum
 typedef unsigned char stbi_uc;
 typedef unsigned short stbi_us;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef STBIDEF
 #ifdef STB_IMAGE_STATIC
 #define STBIDEF static
@@ -532,11 +528,6 @@ STBIDEF int   stbi_zlib_decode_buffer(char *obuffer, int olen, const char *ibuff
 STBIDEF char *stbi_zlib_decode_noheader_malloc(const char *buffer, int len, int *outlen);
 STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const char *ibuffer, int ilen);
 
-
-#ifdef __cplusplus
-}
-#endif
-
 //
 //
 ////   end header file   /////////////////////////////////////////////////////
@@ -601,27 +592,15 @@ STBIDEF int   stbi_zlib_decode_noheader_buffer(char *obuffer, int olen, const ch
 #define STBI_ASSERT(x) assert(x)
 #endif
 
-#ifdef __cplusplus
-#define STBI_EXTERN extern "C"
-#else
 #define STBI_EXTERN extern
-#endif
-
-
 #ifndef _MSC_VER
-   #ifdef __cplusplus
-   #define stbi_inline inline
-   #else
    #define stbi_inline
-   #endif
 #else
    #define stbi_inline __forceinline
 #endif
 
 #ifndef STBI_NO_THREAD_LOCALS
-   #if defined(__cplusplus) &&  __cplusplus >= 201103L
-      #define STBI_THREAD_LOCAL       thread_local
-   #elif defined(__GNUC__) && __GNUC__ < 5
+   #if defined(__GNUC__) && __GNUC__ < 5
       #define STBI_THREAD_LOCAL       __thread
    #elif defined(_MSC_VER)
       #define STBI_THREAD_LOCAL       __declspec(thread)

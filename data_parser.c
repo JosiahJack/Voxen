@@ -24,6 +24,7 @@ DataParser entity_parser;
 DataParser lights_parser;
 float correctionX, correctionY, correctionZ;
 float correctionLightX, correctionLightY, correctionLightZ;
+bool lightIsDynamic[LIGHT_COUNT];
 
 // Textures
 typedef struct {
@@ -1116,6 +1117,7 @@ void LoadLevel(uint8_t curlevel) {
         if (strcmp(firstKeyCheck, "constIndex") == 0) isLight = false;  // constIndex specified indicating this is a real entity?
         if (isLight) {
             lightsIdx++;
+            lightIsDynamic[lightsIdx] = false;
             if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); exit(1); }
         } else {
             instanceIdx++;
@@ -1194,6 +1196,13 @@ void LoadLevel(uint8_t curlevel) {
         
         if (isLight) {
             loadedLights++;
+            if (lightsIdx == 817) {
+                testLight_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+                testLight_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+                testLight_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+                lightIsDynamic[lightsIdx] = true;
+            }
+            
             if (lightType == 1) {
                 if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Light %d on line %d loaded with spotAngle less than 5deg but was marked as spotlight type!\n",lightsIdx,lineNum);
             } else if (lightType == 2) {
@@ -1206,9 +1215,6 @@ void LoadLevel(uint8_t curlevel) {
             uint16_t parent = instanceIdx;
             uint16_t entIdx = instances[parent].index;
             AddInstance(entIdx, parent, lineNum);
-            if (entIdx == 626) DualLog("Adding #ambient_fan at %f %f %f\n", instances[parent].position.x,instances[parent].position.y,instances[parent].position.z);
-            if (entIdx == 640) DualLog("Adding #ambient_machine_ambience at %f %f %f\n", instances[parent].position.x,instances[parent].position.y,instances[parent].position.z);
-            if (entIdx == 653) DualLog("Adding #ambient_rain at %f %f %f\n", instances[parent].position.x,instances[parent].position.y,instances[parent].position.z);
             AddChild0(entities[entIdx].child0, parent, entIdx, &instanceIdx, lineNum);
             AddChild1(entities[entIdx].child1, parent, entIdx, &instanceIdx, lineNum);
         }
@@ -1382,7 +1388,6 @@ void SortInstances(void) {
             if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); exit(1); }
             
             instances[i].volume = entities[entIdx].volume * 0.5f;
-            DualLog("Registered ambient effect with index %u at %f %f %f, instances[%u]\n",entIdx,instances[i].position.x, instances[i].position.y, instances[i].position.z, i);
         }
     }
 

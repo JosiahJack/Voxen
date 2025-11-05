@@ -6,6 +6,7 @@
 
 // Generic Lib Includes
 #include <malloc.h>
+#include <time.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -138,6 +139,11 @@ typedef struct {
 } QuestBits;
 extern QuestBits questData;
 
+typedef struct {
+    uint16_t index;
+    float depth;
+} DepthSort;
+
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32
@@ -242,6 +248,7 @@ void LoadEntities(void);
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+extern bool lightIsDynamic[LIGHT_COUNT];
 
 // Levels / Game Management
 #define LEVEL_CYBERSPACE 13
@@ -289,6 +296,7 @@ typedef struct {
 } Event;
 extern Event eventQueue[MAX_EVENTS_PER_FRAME];
 extern int32_t eventJournalIndex;
+extern bool journalFirstWrite;
 // Journal buffer for event history to write into the log/demo file
 extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE];
 extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were
@@ -358,74 +366,6 @@ void CullInit(void);
 void CullCore(void);
 void Cull();
 bool get_cull_bit(const uint32_t* arr, size_t idx);
-// ----------------------------------------------------------------------------
-// Helper Functions
-void md5(const uint8_t *data, size_t len, uint8_t out[16]);
-bool ConstIndexInBounds(int constdex);
-bool ConstIndexIsGeometry(int constdex);
-bool ConstIndexIsDynamicObject(uint16_t constIndex);
-bool ConstIndexIsDoor(int constdex);
-bool ConstIndexIsLightStaticSaveable(int constdex);
-bool ConstIndexIsGenericTransform(int constdex);
-bool ConstIndexIsDynamicObject(uint16_t constIndex);
-bool ConstIndexIsStaticObjectImmutable(int constdex);
-bool ConstIndexIsNPC(int constdex);
-bool ConstIndexIsHardware(int constdex);
-bool ConstIndexIsAmbient(int constdex);
-static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
-static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
-static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
-    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
-    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
-}
-
-static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
-    if (val > max) return max;
-    if (val < min) return min;
-    return val;
-}
-
-static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
-    int32_t max = WORLDX - 1; // 63
-    int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
-    if (xval > max) xval = max;
-    if (xval < 0) xval = 0;
-    *x = (uint16_t)xval;
-    
-    int32_t zval = (int32_t)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
-    if (zval > max) zval = max;
-    if (zval < 0) zval = 0;
-    *z = (uint16_t)zval;
-}
-
-static inline bool XZPairInBounds(int32_t x, int32_t z) {
-    return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
-}
-
-inline float squareDistance2D(float x1, float z1, float x2, float z2) {
-    float dx = x2 - x1;
-    float dz = z2 - z1;
-    return dx * dx + dz * dz;
-}
-
-inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
-    float dx = x2 - x1;
-    float dy = y2 - y1;
-    float dz = z2 - z1;
-    return dx * dx + dy * dy + dz * dz;
-}
-
-static inline void flag_enable(uint32_t *flags, uint32_t bit) {
-    *flags |= bit;
-}
-
-static inline void flag_disable(uint32_t *flags, uint32_t bit) {
-    *flags &= ~bit;
-}
-
-static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
-    *flags = (*flags & ~bit) | (-state & bit);
-}
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 512
@@ -520,6 +460,7 @@ void ProcessInput(void);
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
+extern float testLight_x, testLight_y, testLight_z;
 extern uint16_t screen_width;
 extern uint16_t screen_height;
 extern int32_t debugView;
@@ -576,6 +517,7 @@ extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 int32_t CodepointToPackedIndex(int32_t codepoint, int fontID);
 float TextWidth(const char *utf8, int fontID);
+uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses();
 // ----------------------------------------------------------------------------
 // UI
@@ -609,7 +551,90 @@ void DebugRAM(const char *context);
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
 void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
 void DualLogEntity(uint16_t idx);
-#ifdef VOXEN_ENGINE_IMPLEMENTATION
+// ============================================================================
+// ----------------------------------------------------------------------------
+// Helper Functions
+double get_time(void);
+void md5(const uint8_t *data, size_t len, uint8_t out[16]);
+bool ConstIndexInBounds(int constdex);
+bool ConstIndexIsGeometry(int constdex);
+bool ConstIndexIsDynamicObject(uint16_t constIndex);
+bool ConstIndexIsDoor(int constdex);
+bool ConstIndexIsLightStaticSaveable(int constdex);
+bool ConstIndexIsGenericTransform(int constdex);
+bool ConstIndexIsDynamicObject(uint16_t constIndex);
+bool ConstIndexIsStaticObjectImmutable(int constdex);
+bool ConstIndexIsNPC(int constdex);
+bool ConstIndexIsHardware(int constdex);
+bool ConstIndexIsAmbient(int constdex);
+static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
+static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
+static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
+    *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
+    *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
+}
+
+static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
+    if (val > max) return max;
+    if (val < min) return min;
+    return val;
+}
+
+static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
+    int32_t max = WORLDX - 1; // 63
+    int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
+    if (xval > max) xval = max;
+    if (xval < 0) xval = 0;
+    *x = (uint16_t)xval;
+    
+    int32_t zval = (int32_t)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
+    if (zval > max) zval = max;
+    if (zval < 0) zval = 0;
+    *z = (uint16_t)zval;
+}
+
+static inline bool XZPairInBounds(int32_t x, int32_t z) {
+    return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
+}
+
+inline float squareDistance2D(float x1, float z1, float x2, float z2) {
+    float dx = x2 - x1;
+    float dz = z2 - z1;
+    return dx * dx + dz * dz;
+}
+
+inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float dz = z2 - z1;
+    return dx * dx + dy * dy + dz * dz;
+}
+
+static inline void flag_enable(uint32_t *flags, uint32_t bit) {
+    *flags |= bit;
+}
+
+static inline void flag_disable(uint32_t *flags, uint32_t bit) {
+    *flags &= ~bit;
+}
+
+static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
+    *flags = (*flags & ~bit) | (-state & bit);
+}
+
+// // // // //
+#ifdef VOXEN_ENGINE_IMPLEMENTATION // -----------------------------<<<
+// // // // // 
+double get_time(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+        DualLogError("clock_gettime failed\n");
+        return 0.0;
+    }
+
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
+}
+
 //     Logs both to log file and console, usage same as printf
 static void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
     va_list copy; va_copy(copy, args);
@@ -847,6 +872,7 @@ void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float*
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
+// ============================================================================
 #endif // VOXEN_ENGINE_IMPLEMENTATION
 // ----------------------------------------------------------------------------
 #endif // VOXEN_HEADER_H

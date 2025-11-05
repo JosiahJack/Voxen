@@ -74,10 +74,6 @@
 #define STBRP_DEF extern
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct stbrp_context stbrp_context;
 typedef struct stbrp_node    stbrp_node;
 typedef struct stbrp_rect    stbrp_rect;
@@ -190,10 +186,6 @@ struct stbrp_context
    stbrp_node *free_head;
    stbrp_node extra[2]; // we allocate two extra nodes so optimal user-node-count is 'width' not 'width+2'
 };
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif
 
