@@ -205,3 +205,7 @@ void quat_to_matrix(Quaternion* q, float* m) {
     m[14] = 0.0f;
     m[15] = 1.0f;
 }
+
+bool CursorVisible(void) {
+    return (inventoryMode || menuActive || gamePaused);
+}

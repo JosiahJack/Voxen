@@ -239,7 +239,7 @@ void LoadEntities(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE 64u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -473,6 +473,7 @@ bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
 void Screenshot();
+bool CursorVisible(void);
 static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
 static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {

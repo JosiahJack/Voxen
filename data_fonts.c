@@ -17,7 +17,6 @@ void DualLogError(const char* fmt, ...);
 // end #include "voxen.h" limited includes
 
 #include <malloc.h>
-#include <sys/types.h>
 #include <sys/mman.h>
 #include <fcntl.h>
 #define STB_TRUETYPE_IMPLEMENTATION

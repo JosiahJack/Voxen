@@ -6,7 +6,7 @@ rm -f "$TEMP_DIR"/*.o
 
 echo "Compiling voxen..."
 now_ms() { date +%s%3N; }
-shader_start=$(now_ms)
+# shader_start=$(now_ms)
 
 # Convert shaders into string headers
 gen_header() {
@@ -31,9 +31,9 @@ gen_header ./Shaders/composite_vert.glsl        quadVertexShaderSource
 gen_header ./Shaders/composite_frag.glsl        quadFragmentShaderSource
 gen_header ./Shaders/shadowmap_vert.glsl        shadowmapVertexShaderSource
 gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
-shader_end=$(now_ms)
+# shader_end=$(now_ms)
 build_start=$(now_ms)
-echo "Shaders converted to string constants in $((shader_end - shader_start)) ms"
+# echo "Shaders converted to string constants in $((shader_end - shader_start)) ms"
 
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=199309L"
@@ -123,6 +123,7 @@ if $failed; then
     rm -f "$TEMP_DIR"/*.o
     exit 1
 fi
+
 #========================================================
 
 # === Linking ===
@@ -137,7 +138,7 @@ if [ $link_status -ne 0 ]; then
     exit 1
 fi
 
-echo "Linking completed in ${link_time} ms"
+# echo "Linking completed in ${link_time} ms"
 
 # === Cleanup ===
 rm -f "$TEMP_DIR"/*.o

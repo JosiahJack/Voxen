@@ -474,11 +474,6 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float
     m[15] = 1.0f;
 }
 
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat(float* m) {
-    mat4_lookat_from(m,&cam_rotation, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-}
-
 bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
     // Vector from camera to instance
     float to_inst_x = inst_x - instances[PLAYER1].position.x;
@@ -549,7 +544,7 @@ void UpdateVoxelLightLists() {
 
     // Precompute total size
     uint32_t totalLightAssignments = 0;
-    for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {        
+    for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
@@ -630,9 +625,6 @@ void UpdateVoxelLightLists() {
         }
     }
 
-    glNamedBufferData(voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
-    glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
-    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     lightView = malloc(loadedLights * sizeof(float**));
     lightViewProj = malloc(loadedLights * sizeof(float**));
     lightFrustumPlanes = malloc(loadedLights * sizeof(FrustumPlane**));
@@ -658,7 +650,9 @@ void UpdateVoxelLightLists() {
         numMarkedNonDirty++;
     }
     
-    DualLog("Updating voxel lighting lists, head: %u, numMarkedNonDirty: %u\n",head, numMarkedNonDirty);
+    glNamedBufferData(voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
+    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
 void VoxelLists() {
@@ -766,10 +760,10 @@ void RenderShadowmap(uint16_t lightIdx) {
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
     
-//     glUseProgram(shadowmapsClearShaderProgram); // TODO See if clearing is needed once I get the test light to move!
-//     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-//     glDispatchCompute(groupX_shadClear,1, 1);
-//     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glUseProgram(shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
     glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
@@ -883,10 +877,6 @@ void ToggleConsole(void) {
         cursorPosition_x = (float)screen_width * 0.5f;
         cursorPosition_y = (float)screen_height * 0.5f;
     }
-}
-
-bool CursorVisible(void) {
-    return (inventoryMode || menuActive || gamePaused);
 }
 
 void ProcessConsoleCommand(const char* command) {
@@ -1207,7 +1197,6 @@ void InitializeEnvironment(void) {
     glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
     glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
         
-    // Setup full screen quad for image blit for post processing effects like lighting.
     glCreateBuffers(1, &quadVBO);
     glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
     glCreateVertexArrays(1, &quadVAO);
@@ -1219,7 +1208,6 @@ void InitializeEnvironment(void) {
     glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
     glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
     
-    // VAO for Global Vertex Definition
     glGenVertexArrays(1, &vao_chunk);
     glBindVertexArray(vao_chunk);
     glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
@@ -1229,7 +1217,6 @@ void InitializeEnvironment(void) {
     glBindVertexArray(0);
     DebugRAM("after vao chunk bind");
     
-    // VAO for UI Images
     glCreateBuffers(1, &uiImageVBO);
     glCreateVertexArrays(1, &uiImageVAO);
     glEnableVertexArrayAttrib(uiImageVAO, 0);
@@ -1241,8 +1228,6 @@ void InitializeEnvironment(void) {
     glVertexArrayAttribBinding(uiImageVAO, 1, 0);
     DebugRAM("after ui image vao chunk bind");
 
-    // Create Framebuffer
-    // First pass gbuffer images
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
@@ -1281,7 +1266,6 @@ void InitializeEnvironment(void) {
     DebugRAM("setup gbuffer end");
     RenderLoadingProgress(100,"Loading..."); // Early load screen to immediately clear what's in the window
 
-    // Text Initialization
     InitFontAtlasses();
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
@@ -1545,7 +1529,7 @@ int32_t main(int32_t argc, char* argv[]) {
     
         // 0.5 Set View and Projection Matrices
         float view[16]; // Also known as view matrix
-        mat4_lookat(view);
+        mat4_lookat_from(view,&cam_rotation, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         float viewProj[16]; // view-projection matrix
         float invViewProj[16]; // inverse view-projection matrix
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
@@ -1571,16 +1555,15 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
             glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
             
-            int lightBase = 817;
-            if ((lights[lightBase + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[lightBase + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
-            if ((lights[lightBase + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[lightBase + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
-            if ((lights[lightBase + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[lightBase + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, lightsID);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_STATIC_DRAW);
+            uint32_t lightBase = 817;
+            uint32_t litIdx = lightBase * LIGHT_DATA_SIZE;
+            if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
+            if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
+            if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
             for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) UpdateVoxelLightLists();
+                if (lightDirty[i]) { UpdateVoxelLightLists(); break; }
             }
-
+            
             // 3. Dynamic Shadowmaps
             RenderShadowmaps();
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
@@ -1737,7 +1720,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "testLight_x x: %.4f, y: %.4f, z: %.4f", testLight_x, testLight_y, testLight_z);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "testLight_x x: %.4f, y: %.4f, z: %.4f", lights[817 + LIGHT_DATA_OFFSET_POSX], lights[817 + LIGHT_DATA_OFFSET_POSY], lights[817 + LIGHT_DATA_OFFSET_POSZ]);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);

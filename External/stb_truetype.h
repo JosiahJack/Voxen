@@ -28,8 +28,8 @@
 
 
    #ifndef STBTT_assert
-   #include <assert.h>
-   #define STBTT_assert(x)    assert(x)
+//    #include <assert.h>
+   #define STBTT_assert(x)    
    #endif
 
    #ifndef STBTT_strlen

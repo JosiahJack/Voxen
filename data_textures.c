@@ -95,7 +95,7 @@ void LoadTextures(void) {
             
             read(fp, file_buffer, file_size);
             close(fp);
-            int w, h, n;
+            int w = 1, h = 1, n = 1;
             image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, 4);
             if (!image_data[i]) { DualLogError("stbi_load failed for %s\n", texture_parser.entries[matchedParserIdxes[i]].path); exit(1); }
             

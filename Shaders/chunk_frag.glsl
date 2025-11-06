@@ -207,8 +207,6 @@ void main() {
 
         vec3 lightDir = normalize(toLight);
         float lambertian = max(dot(normal, lightDir), 0.0);
-        if (lambertian < 0.25) continue;
-
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
         if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.
@@ -234,7 +232,7 @@ void main() {
         float shadowFactor = 1.0;
         if (debugValue != 2 && shadowsEnabled > 0) {
             float smearness = attenuation * attenuation * 38.0;
-            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0) + 0.08;
+            float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0) + 0.16;
             bias = 2.0 * dist * bias + bias * bias;
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
@@ -285,8 +283,6 @@ void main() {
                 float depthDiff = (dist * dist) - d - bias;
                 shadowFactor = depthDiff > 0.0 ? 0.0 : 1.0;
             }
-
-            if (shadowFactor < 0.005) continue;
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
