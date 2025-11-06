@@ -4,6 +4,7 @@
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
 #include "voxen.h"
+#include "event.h"
 
 // MD5 (128-bit / 16 bytes) – tiny self-contained implementation
 #define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
@@ -171,6 +172,7 @@ void Screenshot() {
 }
 
 GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
+    if (!levelCurrentlyLoading && globalFrameNum > 1) DualLogError("Trying to delete and generate a new SSBO %u outside of a level load!\n", bindingIndex);
     if (id != 0) glDeleteBuffers(1, &id); // Clear last level's SSBO.
     GLuint new_id = 0;
     glGenBuffers(1, &new_id);

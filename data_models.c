@@ -427,11 +427,8 @@ void LoadModels(void) {
 #ifdef DEBUG_MODEL_LOAD_DATA
     DualLog("Total vertices: %d (", totalVertCount); print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); DualLog(")\nTotal triangles: %d (", totalTriCount); print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t)); DualLog(")\n");
 #endif
-
-    glGenBuffers(1, &modelBoundsID);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, modelBoundsID);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, modelBoundsID);
+    
+    modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" took %f seconds\n", get_time() - start_time);
     DebugRAM("After Load Models");

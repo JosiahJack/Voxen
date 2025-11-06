@@ -86,6 +86,7 @@ uint8_t startLevel = 3;
 uint8_t currentLevel = 0;
 bool gamePaused = false;
 bool menuActive = false;
+bool levelCurrentlyLoading = false;
 float pauseRelativeTime = 0.0f;
 QuestBits questData;
 // ----------------------------------------------------------------------------
@@ -143,6 +144,7 @@ GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_
 
 //    Shadowmaps Clear
 GLuint shadowmapsClearShaderProgram;
+bool* dirtyLightIdices = NULL;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -667,6 +669,8 @@ void VoxelLists() {
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
+    if (!dirtyLightIdices[lightIdx]) return;
+    
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -759,7 +763,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
-    
+
     glUseProgram(shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
@@ -1090,6 +1094,7 @@ void InitializePlayer(uint16_t playerIdx) {
 
 void NewGame(void) {
     RenderLoadingProgress(100,"Loading new game...");
+    levelCurrentlyLoading = true;
     memset(&ambientRegistry, 0, sizeof(uint16_t));
     loadedAmbients = 0;
     memset(&questData, 0, sizeof(QuestBits));
@@ -1118,6 +1123,12 @@ void NewGame(void) {
     totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
     uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
     shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
+    dirtyLightIdices = malloc(loadedLights * sizeof(bool));
+    memset(dirtyLightIdices,true,loadedLights * sizeof(bool));
+    glUseProgram(shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     numDynamicLights = 0;
     for (int i=0;i<loadedLights;++i) { if (lightIsDynamic[i]) numDynamicLights++; }
     DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
@@ -1125,6 +1136,7 @@ void NewGame(void) {
 //     DualLog("Player 1:\n=========================\n");
 //     DualLogEntity(PLAYER1);
 //     DualLog("=========================\n");
+    levelCurrentlyLoading = false;
 }
 
 static const float quadBlit_vertices[] = {
@@ -1469,11 +1481,8 @@ int32_t main(int32_t argc, char* argv[]) {
     last_time = get_time();
     DebugRAM("prior to game loop");
     Input_MouselookApply();
-    glUseProgram(shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     lastJournalWriteTime = get_time();
+    RenderShadowmaps();
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - game_start_time);
     while(1) {
         current_time = get_time();
@@ -1560,12 +1569,23 @@ int32_t main(int32_t argc, char* argv[]) {
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
+            uint16_t numLightsFoundDirty = 0;
+            memset(dirtyLightIdices,false,loadedLights * sizeof(bool));
             for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) { UpdateVoxelLightLists(); break; }
+                if (lightDirty[i]) {
+                    numLightsFoundDirty++;
+                    dirtyLightIdices[i] = true;
+                }
             }
             
+            dirtyLightIdices[817] = true;
+            
+//             if (numLightsFoundDirty > 0) {
+                UpdateVoxelLightLists();
+                RenderShadowmaps();
+//             }
+            
             // 3. Dynamic Shadowmaps
-            RenderShadowmaps();
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
             
             // 3. Raterized Geometry

@@ -235,6 +235,8 @@ void LoadEntities(void);
 // Make sure these match in chunk.glsl shader!
                    
 #define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
+   // Make sure this ^^^ matches in shadowmaps_clear_selective compute shader!
+
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
@@ -253,6 +255,7 @@ extern uint8_t numLevels; // Can be set by gamedata.txt
 extern uint8_t currentLevel;
 extern bool gamePaused;
 extern bool menuActive;
+extern bool levelCurrentlyLoading;
 void LoadLevel(uint8_t curlevel);
 void SortInstances();
 // ----------------------------------------------------------------------------

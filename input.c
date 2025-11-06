@@ -252,26 +252,20 @@ void ProcessInput(void) {
     
     if (keys[GLFW_KEY_K]) {
         testLight_x += finalMoveSpeed;
-        lightDirty[0] = true;
     } else if (keys[GLFW_KEY_J]) {
         testLight_x -= finalMoveSpeed;
-        lightDirty[0] = true;
     }
     
     if (keys[GLFW_KEY_N]) {
         testLight_y += finalMoveSpeed;
-        lightDirty[0] = true;
     } else if (keys[GLFW_KEY_M]) {
         testLight_y -= finalMoveSpeed;
-        lightDirty[0] = true;
     }
     
     if (keys[GLFW_KEY_U]) {
         testLight_z += finalMoveSpeed;
-        lightDirty[0] = true;
     } else if (keys[GLFW_KEY_I]) {
         testLight_z -= finalMoveSpeed;
-        lightDirty[0] = true;
     }
 
     if (noclip) { // Temporarily allow noclip like flying for now to solidify physics
