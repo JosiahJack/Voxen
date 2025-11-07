@@ -4,6 +4,7 @@
 #include "External/stb_image.h"
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <uthash.h>
 #include <omp.h>
 #include "voxen.h"
@@ -83,18 +84,16 @@ void LoadTextures(void) {
         #pragma omp for schedule(dynamic)
         for (int32_t i = 0; i < loadedTextures; i++) {
             if (matchedParserIdxes[i] < 0) continue;
-            struct stat file_stat;
-            if (stat(texture_parser.entries[matchedParserIdxes[i]].path, &file_stat) != 0) { DualLogError("Failed to stat %s for texture index %u against matchedParserIdx %u: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, i, matchedParserIdxes[i], strerror(errno)); continue; }
-                
-            size_t file_size = file_stat.st_size;
-            if (file_size > 512000) { DualLogError("PNG file %s too large (%zu bytes), larger than 512000 bytes\n", texture_parser.entries[matchedParserIdxes[i]].path, file_size); exit(1); }
-            
-            uint8_t* file_buffer = malloc(file_size);
             int fp = open(texture_parser.entries[matchedParserIdxes[i]].path, O_RDONLY);
             if (!fp) { DualLogError("Failed to open %s: %s\n", texture_parser.entries[matchedParserIdxes[i]].path, strerror(errno)); exit(1); }
             
-            read(fp, file_buffer, file_size);
+            struct stat file_stat;
+            fstat(fp, &file_stat);
+            size_t file_size = file_stat.st_size;            
+            uint8_t* file_buffer = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fp, 0);
             close(fp);
+            if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap %s\n", texture_parser.entries[matchedParserIdxes[i]].path); exit(1); }
+                        
             int w = 1, h = 1, n = 1;
             image_data[i] = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, 4);
             if (!image_data[i]) { DualLogError("stbi_load failed for %s\n", texture_parser.entries[matchedParserIdxes[i]].path); exit(1); }
@@ -103,8 +102,7 @@ void LoadTextures(void) {
             heights[matchedParserIdxes[i]] = h;
             doubleSidedTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].doublesided > 0 ? 1 : 0;
             transparentTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].transparent > 0 ? 1 : 0;
-            free(file_buffer);
-            malloc_trim(0);
+            munmap(file_buffer, file_size);
         }
     }
 
@@ -164,7 +162,6 @@ void LoadTextures(void) {
         }
     }
     
-    malloc_trim(0);
     colorBufferID = SetupSSBO(colorBufferID, 12, colorBufferSize, NULL, GL_STATIC_DRAW);
     uint32_t pixel_offset = 0, palette_offset = 0;
     for (uint16_t i = 0; i < loadedTextures; i++) {
@@ -196,8 +193,6 @@ void LoadTextures(void) {
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;
         free(image_data[i]);
-        image_data[i] = NULL;
-        malloc_trim(0);
     }
 
     DualLog(" total pallete colors: %u, totalPixels was: %u... ", totalPaletteColors, totalPixels);
