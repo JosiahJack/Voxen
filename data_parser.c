@@ -761,6 +761,8 @@ uint8_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];
 uint16_t cellIndexForLight[LIGHT_COUNT];
+uint16_t cellIndexForLightX[LIGHT_COUNT];
+uint16_t cellIndexForLightZ[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
 uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
 uint16_t numCellsVisible = 0u;
@@ -806,6 +808,8 @@ void PutMeshesInCells(int type) {
                 int lightIdx = (index * LIGHT_DATA_SIZE);
                 PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
                 cellIndexForLight[index] = (z * WORLDX) + x;
+                cellIndexForLightX[index] = x;
+                cellIndexForLightZ[index] = z;
                 break;
         }
     }
@@ -1432,6 +1436,8 @@ void CullInit(void) {
 //     PutMeshesInCells(3); // NPCs
 //     PutMeshesInCells(4); // Static Saveable
     memset(cellIndexForLight,0,LIGHT_COUNT * sizeof(uint16_t));
+    memset(cellIndexForLightX,0,LIGHT_COUNT * sizeof(uint16_t));
+    memset(cellIndexForLightZ,0,LIGHT_COUNT * sizeof(uint16_t));
     PutMeshesInCells(5); // Lights
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
     malloc_trim(0);

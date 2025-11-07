@@ -206,7 +206,7 @@ float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
-GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID;
+GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnabledID;
 uint32_t* voxelLightListsRaw = NULL;
 uint32_t* voxelLightListIndices = NULL;
 uint32_t numDynamicLights;
@@ -550,7 +550,7 @@ void UpdateVoxelLightLists() {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float range = sqrtf(rangeSquared[lightIdx]);
+        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
         int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
         int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
@@ -597,7 +597,7 @@ void UpdateVoxelLightLists() {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float range = sqrtf(rangeSquared[lightIdx]);
+        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
         int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
         int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
@@ -627,29 +627,16 @@ void UpdateVoxelLightLists() {
         }
     }
 
-    lightView = malloc(loadedLights * sizeof(float**));
-    lightViewProj = malloc(loadedLights * sizeof(float**));
-    lightFrustumPlanes = malloc(loadedLights * sizeof(FrustumPlane**));
-    uint32_t numMarkedNonDirty = 0;
     for (int i=0;i<loadedLights;++i) {
-        lightView[i] = malloc(6 * sizeof(float*));
-        lightViewProj[i] = malloc(6 * sizeof(float*));
-        lightFrustumPlanes[i] = malloc(6 * sizeof(FrustumPlane*));
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         for (int j=0;j<6;++j) {
-            lightView[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
-            lightViewProj[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
-            lightFrustumPlanes[i][j] = malloc(6 * sizeof(FrustumPlane)); // Frustum Planes for this cubemap face
             mat4_lookat_from(lightView[i][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
             mul_mat4(lightViewProj[i][j], shadowmapsPerspectiveProjection, lightView[i][j]);
             ExtractFrustumPlanes(lightViewProj[i][j], lightFrustumPlanes[i][j]);
         }
-        
-        lightDirty[i] = false;
-        numMarkedNonDirty++;
     }
     
     glNamedBufferData(voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
@@ -657,19 +644,55 @@ void UpdateVoxelLightLists() {
     glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
+bool* lightShadowsEnabled = NULL;
+
 void VoxelLists() {
     voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
     voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  1008105 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     lightsID = SetupSSBO(lightsID, 19, loadedLights * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    lightView = malloc(loadedLights * sizeof(float**));
+    lightViewProj = malloc(loadedLights * sizeof(float**));
+    lightFrustumPlanes = malloc(loadedLights * sizeof(FrustumPlane**));
+    for (int i=0;i<loadedLights;++i) {
+        lightView[i] = malloc(6 * sizeof(float*));
+        lightViewProj[i] = malloc(6 * sizeof(float*));
+        lightFrustumPlanes[i] = malloc(6 * sizeof(FrustumPlane*));
+        for (int j=0;j<6;++j) {
+            lightView[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
+            lightViewProj[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
+            lightFrustumPlanes[i][j] = malloc(6 * sizeof(FrustumPlane)); // Frustum Planes for this cubemap face
+        }
+    }
     UpdateVoxelLightLists();
     for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    lightShadowsEnabled = malloc(loadedLights * sizeof(bool));
+    memset(lightShadowsEnabled,false,loadedLights * sizeof(bool));
+    uint16_t numLightsWithShadows = 0;
+    for (int i=0;i<loadedLights;++i) {
+        uint32_t litIdx = i * LIGHT_DATA_SIZE;
+        float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        float effectiveRadius = fmin(lightRadius, 15.36f);
+        float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
+        float thresh = 0.006f;//0.042f;
+//         if (currentLevel >= 10) thresh += 0.015f; // TODO retweak with Voxen
+//         if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // TODO retweak with Voxen
+//         if (currentLevel == 8) thresh += 0.005f; // TODO retweak with Voxen
+        if (luminosity < thresh) continue; // Skip if light is off
+        
+        lightShadowsEnabled[i] = true;
+        numLightsWithShadows++;
+    }
+    
+    lightShadowsEnabledID = SetupSSBO(lightShadowsEnabledID, 6, loadedLights * sizeof(uint32_t), lightShadowsEnabled, GL_STATIC_DRAW);
+    DualLog("Number of lights with shadows: %u\n",numLightsWithShadows);
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
-    if (!dirtyLightIdices[lightIdx]) return;
+    if (!lightShadowsEnabled[lightIdx]) return;
     
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -677,44 +700,34 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = fmin(lightRadius, 15.36f);
-    float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-    float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
-    float thresh = 0.005f;//0.042f;
-    if (currentLevel >= 10) thresh += 0.015f;
-    if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // makes it 0.0451, heehehe
-    if (currentLevel == 8) thresh += 0.005f;
-    if (luminosity < thresh) return; // Skip if light is off
-
     float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
     if (distSqrd >= FAR_PLANE_SQUARED) return;
 
     int lightCellIdx = cellIndexForLight[lightIdx];
-    int x = lightCellIdx % WORLDX;
-    int y = lightCellIdx / WORLDX;
-    int range = floor(lightRadius * 0.390625f); // 1 / 2.56f
-    int xMin = x - range; int xMax = x + range;
-    int yMin = y - range; int yMax = y + range;
     bool inPVS = false;
-    if (lightCellIdx < ARRSIZE && lightCellIdx >= 0) {
-        if ((gridCellStates[lightCellIdx] & CELL_VISIBLE)) {// || !(gridCellStates[lightCellIdx] & CELL_OPEN)) {
-            inPVS = true; // Allow lights outside windows (and thus in non open cells) to still be applicable.
-        } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
-            for (int ix = xMin;ix <= xMax; ix++) {
-                for (int iy = yMin;iy <= yMax; iy++) {
-                    if (!XZPairInBounds(ix,iy)) continue;
+    if ((gridCellStates[lightCellIdx] & CELL_VISIBLE)) {// || !(gridCellStates[lightCellIdx] & CELL_OPEN)) {
+        inPVS = true; // Allow lights outside windows (and thus in non open cells) to still be applicable.
+    } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
+        int x = cellIndexForLightX[lightIdx];
+        int y = cellIndexForLightZ[lightIdx];
+        int range = floor(lightRadius * 0.390625f); // 1 / 2.56f
+        int xMin = x - range; int xMax = x + range;
+        int yMin = y - range; int yMax = y + range;
+        for (int ix = xMin;ix <= xMax; ix++) {
+            for (int iy = yMin;iy <= yMax; iy++) {
+                if (!XZPairInBounds(ix,iy)) continue;
 
-                    int subIdx = (iy * WORLDX) + ix;
-                    int cellIdx = (lightCellIdx * ARRSIZE);
-                    int flat_idx = cellIdx + subIdx;
-                    if ((gridCellStates[subIdx] & CELL_VISIBLE) // Player can see cell in light's range.
-                        && get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) { // Light's cell can see the cell in light's range.
-                        
-                        inPVS = true;
-                        goto Label_PVSCheck; // Avoid checking any more.  One is enough to count.
-                    }
+                int subIdx = (iy * WORLDX) + ix;
+                int cellIdx = (lightCellIdx * ARRSIZE);
+                int flat_idx = cellIdx + subIdx;
+                if ((gridCellStates[subIdx] & CELL_VISIBLE) // Player can see cell in light's range.
+                    && get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) { // Light's cell can see the cell in light's range.
+                    
+                    inPVS = true;
+                    goto Label_PVSCheck; // Avoid checking any more.  One is enough to count.
                 }
-                
             }
+            
         }
     }
     
@@ -764,10 +777,6 @@ void RenderShadowmap(uint16_t lightIdx) {
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
 
-    glUseProgram(shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
     glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
@@ -1569,17 +1578,16 @@ int32_t main(int32_t argc, char* argv[]) {
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
-            uint16_t numLightsFoundDirty = 0;
-            memset(dirtyLightIdices,false,loadedLights * sizeof(bool));
-            for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) {
-                    numLightsFoundDirty++;
-                    dirtyLightIdices[i] = true;
-                }
-            }
-            
+//             uint16_t numLightsFoundDirty = 0;
+//             memset(dirtyLightIdices,0,loadedLights * sizeof(bool));
+//             for (int i = 0; i < loadedLights; ++i) {
+//                 if (lightDirty[i]) {
+//                     numLightsFoundDirty++;
+//                     dirtyLightIdices[i] = true;
+//                 }
+//             }
+// 
             dirtyLightIdices[817] = true;
-            
 //             if (numLightsFoundDirty > 0) {
                 UpdateVoxelLightLists();
                 RenderShadowmaps();
@@ -1611,6 +1619,13 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindVertexArray(0);
             glUseProgram(0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            
+            // Done with shadowmaps, wipe em
+            if (settings_Shadows > 0u) {
+                glUseProgram(shadowmapsClearShaderProgram);
+                GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+                glDispatchCompute(groupX_shadClear,1, 1);
+            }
             // ====================================================================
             // 6. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {

@@ -30,6 +30,7 @@ flat in uint NormalIndex;
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
+layout(std430, binding = 6) buffer LightShadowsEnabled { uint lightShadowsEnabled[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
@@ -230,7 +231,7 @@ void main() {
         float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
         float attenuation = rangeFacSqrd * lambertian;
         float shadowFactor = 1.0;
-        if (debugValue != 2 && shadowsEnabled > 0) {
+        if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0) {
             float smearness = attenuation * attenuation * 38.0;
             float bias = clamp(((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02,0.01,1.0) + 0.16;
             bias = 2.0 * dist * bias + bias * bias;

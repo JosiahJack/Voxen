@@ -293,6 +293,8 @@ extern uint8_t gridCellStates[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
+extern uint16_t cellIndexForLightX[LIGHT_COUNT];
+extern uint16_t cellIndexForLightZ[LIGHT_COUNT];
 extern float worldMin_x, worldMin_z;
 void CullInit(void);
 void CullCore(void);
