@@ -1,0 +1,134 @@
+diff --git a/Shaders/chunk_frag.glsl b/Shaders/chunk_frag.glsl
+index e8365fc..60f229c 100644
+--- a/Shaders/chunk_frag.glsl
++++ b/Shaders/chunk_frag.glsl
+@@ -31,6 +31,7 @@ layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
+ layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
+ layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
+ layout(std430, binding = 6) buffer LightShadowsEnabled { uint lightShadowsEnabled[]; };
++layout(std430, binding = 7) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
+ layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
+ layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
+ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
+@@ -231,7 +232,8 @@ void main() {
+         float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
+         float attenuation = rangeFacSqrd * lambertian;
+         float shadowFactor = 1.0;
+-        if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0) {
++        uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
++        if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0 && shadowIndex < 96) {
+             float NdL = max(dot(normal, normalize(toLight)), 0.0);
+             float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
+             float biasBase = ((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02;
+@@ -253,8 +255,8 @@ void main() {
+             }
+ 
+             uv = uv * 0.5 + 0.5;
+-            uint base = lightIdxInPVS * 6u * uint(shadowmapSize) * uint(shadowmapSize);
+-            uint faceOff = base + face * uint(shadowmapSize) * uint(shadowmapSize);
++            uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
++            uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
+             vec2 tc = uv * shadowmapSize;
+             if (shadowsEnabled > 1 && distToPixel < 10.0) {
+                 // Pseudo-Stochastic PCF sampling
+diff --git a/voxen b/voxen
+index ff8d262..f24d2dd 100755
+Binary files a/voxen and b/voxen differ
+diff --git a/voxen.c b/voxen.c
+index 8a359d1..8bd4c0a 100644
+--- a/voxen.c
++++ b/voxen.c
+@@ -206,9 +206,10 @@ float statusTextDecayFinished = 0.0f;
+ // ----------------------------------------------------------------------------
+ // Lights
+ // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
+-GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnabledID;
++GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnabledID, shadowMapsIndirectionID;
+ uint32_t* voxelLightListsRaw = NULL;
+ uint32_t* voxelLightListIndices = NULL;
++uint32_t* shadowmapIndirectionList = NULL;
+ uint32_t numDynamicLights;
+ float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
+ float lightsRangeSquared[LIGHT_COUNT] = {0.0f};
+@@ -662,6 +663,7 @@ void VoxelLists() {
+     voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
+     voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+     voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  1008105 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
++    shadowmapIndirectionList = malloc(loadedLights * sizeof(uint32_t));
+     lightsID = SetupSSBO(lightsID, 19, loadedLights * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+     lightView = malloc(loadedLights * sizeof(float**));
+     lightViewProj = malloc(loadedLights * sizeof(float**));
+@@ -699,6 +701,7 @@ void VoxelLists() {
+     }
+     
+     lightShadowsEnabledID = SetupSSBO(lightShadowsEnabledID, 6, loadedLights * sizeof(uint32_t), lightShadowsEnabled, GL_STATIC_DRAW);
++    shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+     DualLog("Number of lights with shadows: %u\n",numLightsWithShadows);
+ }
+ 
+@@ -762,7 +765,7 @@ void RenderShadowmap(uint16_t lightIdx) {
+ 
+     glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
+     for (uint8_t face = 0; face < 6; face++) {
+-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * shadSizeSquared + face * shadSizeSquared);
++        glUniform1i(ssbo_indexBaseLoc_shadowmaps, shadowDrawCallsRenderedThisFrame * 6 * shadSizeSquared + face * shadSizeSquared);
+         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
+         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
+             int i = nearMeshes[j];
+@@ -782,6 +785,8 @@ void RenderShadowmap(uint16_t lightIdx) {
+         }
+     }
+     
++    shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
++    DualLog("Wrote shadowmap %u for lightIdx %u, shadowmapIndirectionList[lightIdx]: %u\n",shadowDrawCallsRenderedThisFrame,lightIdx,shadowmapIndirectionList[lightIdx]);
+     shadowDrawCallsRenderedThisFrame++;
+ }
+ 
+@@ -795,9 +800,13 @@ void RenderShadowmaps(void) {
+     glDisable(GL_CULL_FACE);
+     glDepthMask(GL_TRUE);
+     glBindVertexArray(vao_chunk);
+-    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i); // Render static lights once.
++    memset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(uint32_t));
++    for (uint16_t i = 0; i < loadedLights && shadowDrawCallsRenderedThisFrame < MAX_SHADOWMAPS; ++i) RenderShadowmap(i); // Render static lights once.
+     glViewport(0, 0, screen_width, screen_height);
+     glEnable(GL_CULL_FACE);
++    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
++    glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
++    glNamedBufferData(shadowMapsIndirectionID,loadedLights * sizeof(uint32_t),shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+ }
+ 
+ // ============================================================================
+@@ -1139,10 +1148,8 @@ void NewGame(void) {
+     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
+     VoxelLists();
+     uint32_t shadowmapPixelCount = shadSizeSquared * 6u;
+-    uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
+-    totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
+-    uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
+-    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
++    totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
++    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+     dirtyLightIdices = malloc(loadedLights * sizeof(bool));
+     memset(dirtyLightIdices,true,loadedLights * sizeof(bool));
+     glUseProgram(shadowmapsClearShaderProgram);
+@@ -1603,6 +1610,7 @@ int32_t main(int32_t argc, char* argv[]) {
+                     glUseProgram(shadowmapsClearShaderProgram);
+                     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+                     glDispatchCompute(groupX_shadClear,1, 1);
++                    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                     RenderShadowmaps();
+                 }
+             }
+diff --git a/voxen.h b/voxen.h
+index acd0dd9..a680fbd 100644
+--- a/voxen.h
++++ b/voxen.h
+@@ -242,6 +242,7 @@ void LoadEntities(void);
+ #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
+ #define MAX_VISIBLE_LIGHTS 90
+ #define SHADOW_MAP_SIZE 192u
++#define MAX_SHADOWMAPS 96u
+ #define SHADOWMAP_FOV 90.0f
+ 
+ extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];

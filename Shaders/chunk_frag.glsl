@@ -31,6 +31,7 @@ layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 6) buffer LightShadowsEnabled { uint lightShadowsEnabled[]; };
+layout(std430, binding = 7) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
@@ -196,6 +197,9 @@ void main() {
     if (count > 0) listoffset = voxelLightListIndices[voxelIdx * 2];
     for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
+        uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
+        if (shadowIndex > 96) continue;
+
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
         vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
@@ -231,7 +235,7 @@ void main() {
         float rangeFacSqrd = 1.0 - (distOverRange * distOverRange);
         float attenuation = rangeFacSqrd * lambertian;
         float shadowFactor = 1.0;
-        if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0) {
+        if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0 && shadowIndex < 96) {
             float NdL = max(dot(normal, normalize(toLight)), 0.0);
             float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
             float biasBase = ((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02;
@@ -253,8 +257,8 @@ void main() {
             }
 
             uv = uv * 0.5 + 0.5;
-            uint base = lightIdxInPVS * 6u * uint(shadowmapSize) * uint(shadowmapSize);
-            uint faceOff = base + face * uint(shadowmapSize) * uint(shadowmapSize);
+            uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
+            uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
             vec2 tc = uv * shadowmapSize;
             if (shadowsEnabled > 1 && distToPixel < 10.0) {
                 // Pseudo-Stochastic PCF sampling

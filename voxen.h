@@ -242,6 +242,7 @@ void LoadEntities(void);
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
 #define SHADOW_MAP_SIZE 192u
+#define MAX_SHADOWMAPS 96u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];

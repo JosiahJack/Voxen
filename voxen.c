@@ -206,9 +206,10 @@ float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
-GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnabledID;
+GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnabledID, shadowMapsIndirectionID;
 uint32_t* voxelLightListsRaw = NULL;
 uint32_t* voxelLightListIndices = NULL;
+uint32_t* shadowmapIndirectionList = NULL;
 uint32_t numDynamicLights;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
 float lightsRangeSquared[LIGHT_COUNT] = {0.0f};
@@ -662,6 +663,7 @@ void VoxelLists() {
     voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
     voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  1008105 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    shadowmapIndirectionList = malloc(loadedLights * sizeof(uint32_t));
     lightsID = SetupSSBO(lightsID, 19, loadedLights * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     lightView = malloc(loadedLights * sizeof(float**));
     lightViewProj = malloc(loadedLights * sizeof(float**));
@@ -699,6 +701,7 @@ void VoxelLists() {
     }
     
     lightShadowsEnabledID = SetupSSBO(lightShadowsEnabledID, 6, loadedLights * sizeof(uint32_t), lightShadowsEnabled, GL_STATIC_DRAW);
+    shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     DualLog("Number of lights with shadows: %u\n",numLightsWithShadows);
 }
 
@@ -762,7 +765,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
     glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
     for (uint8_t face = 0; face < 6; face++) {
-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, lightIdx * 6 * shadSizeSquared + face * shadSizeSquared);
+        glUniform1i(ssbo_indexBaseLoc_shadowmaps, shadowDrawCallsRenderedThisFrame * 6 * shadSizeSquared + face * shadSizeSquared);
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -782,6 +785,8 @@ void RenderShadowmap(uint16_t lightIdx) {
         }
     }
     
+    shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
+    DualLog("Wrote shadowmap %u for lightIdx %u, shadowmapIndirectionList[lightIdx]: %u\n",shadowDrawCallsRenderedThisFrame,lightIdx,shadowmapIndirectionList[lightIdx]);
     shadowDrawCallsRenderedThisFrame++;
 }
 
@@ -795,9 +800,13 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    for (uint16_t i = 0; i < loadedLights; ++i) RenderShadowmap(i); // Render static lights once.
+    memset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(uint32_t));
+    for (uint16_t i = 0; i < loadedLights && shadowDrawCallsRenderedThisFrame < MAX_SHADOWMAPS; ++i) RenderShadowmap(i); // Render static lights once.
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
+    glNamedBufferData(shadowMapsIndirectionID,loadedLights * sizeof(uint32_t),shadowmapIndirectionList, GL_DYNAMIC_DRAW);
 }
 
 // ============================================================================
@@ -1139,10 +1148,8 @@ void NewGame(void) {
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
     VoxelLists();
     uint32_t shadowmapPixelCount = shadSizeSquared * 6u;
-    uint32_t loadedLights_u32 = (uint32_t)(loadedLights);
-    totalShadowmapPixels = loadedLights_u32 * shadowmapPixelCount;
-    uint32_t depthMapBufferSize = totalShadowmapPixels * sizeof(uint32_t);
-    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, depthMapBufferSize, NULL, GL_STATIC_DRAW);
+    totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
+    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     dirtyLightIdices = malloc(loadedLights * sizeof(bool));
     memset(dirtyLightIdices,true,loadedLights * sizeof(bool));
     glUseProgram(shadowmapsClearShaderProgram);
@@ -1603,6 +1610,7 @@ int32_t main(int32_t argc, char* argv[]) {
                     glUseProgram(shadowmapsClearShaderProgram);
                     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
                     glDispatchCompute(groupX_shadClear,1, 1);
+                    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
                     RenderShadowmaps();
                 }
             }
