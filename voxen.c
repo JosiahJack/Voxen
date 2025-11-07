@@ -544,9 +544,9 @@ void UpdateVoxelLightLists() {
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) * cellWidthRecip);
+        int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip);
         int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) * cellWidthRecip);
-        int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) * cellWidthRecip);
+        int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip);
         int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
@@ -555,6 +555,8 @@ void UpdateVoxelLightLists() {
         for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * 64 + cellX;
+//                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue; // TODO should be able to do this somehow without it getting truncated and leaving half the cell black.
+                
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
@@ -625,6 +627,8 @@ void UpdateVoxelLightLists() {
         for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * 64 + cellX;
+//                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue;
+
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
