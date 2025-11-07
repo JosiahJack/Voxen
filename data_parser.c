@@ -19,6 +19,8 @@ Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 int32_t entityCount = 0;            // Number of entities loaded
 uint16_t physHead = 0;
 
+float voxelMinCenterX, voxelMinCenterZ;
+
 static int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
@@ -556,6 +558,7 @@ void LoadLevel(uint8_t curlevel) {
         
         if (isLight) {
             loadedLights++;
+            lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             if (lightsIdx == 817) {
                 testLight_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
                 testLight_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -602,7 +605,6 @@ void LoadLevel(uint8_t curlevel) {
 
     fogBaseDensityForLevel *= 4.0f; // Global multiplier to get it to look similar to Unity's
     SetFog();
-    DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f seconds\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel");
 }
@@ -751,7 +753,7 @@ void SortInstances(void) {
         }
     }
 
-    DualLog("Loaded %d ambient noises for Level %d\n", loadedAmbients, currentLevel);
+    DualLog("loaded %d ambient noises for Level %d...", loadedAmbients, currentLevel);
     DualLog(" took %f secs\n", get_time() - start_time);
     DualLog("Total opaque instances: %u, double-sided: %u, transparent: %u, invisible: %u\n", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
 }
@@ -1381,6 +1383,8 @@ void CullInit(void) {
     
     worldMin_x -= 2.56f; // Add one cell gap around edges
     worldMin_z -= 2.56f;
+    voxelMinCenterX = worldMin_x + VOXEL_HALF;
+    voxelMinCenterZ = worldMin_z + VOXEL_HALF;
     DetermineClosedEdges();
     PutChunksInCells();
     

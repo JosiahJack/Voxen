@@ -245,6 +245,7 @@ void LoadEntities(void);
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+extern float lightsRangeSquared[LIGHT_COUNT];
 extern bool lightIsDynamic[LIGHT_COUNT];
 
 // Levels / Game Management
@@ -272,6 +273,7 @@ void SortInstances();
 #define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_SIZE 0.32f
+#define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
 #define MAX_SQUARE_DIST_INT 268435456 // (64 * 256)^2 = max square dist
 #define MAX_LIGHTS_PER_VOXEL 24 // Cap to prevent overflow
@@ -295,7 +297,7 @@ extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
 extern uint16_t cellIndexForLight[LIGHT_COUNT];
 extern uint16_t cellIndexForLightX[LIGHT_COUNT];
 extern uint16_t cellIndexForLightZ[LIGHT_COUNT];
-extern float worldMin_x, worldMin_z;
+extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
 void CullCore(void);
 void Cull();

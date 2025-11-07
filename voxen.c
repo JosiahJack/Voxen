@@ -210,7 +210,8 @@ GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnab
 uint32_t* voxelLightListsRaw = NULL;
 uint32_t* voxelLightListIndices = NULL;
 uint32_t numDynamicLights;
-float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0}; // 20800 floats
+float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
+float lightsRangeSquared[LIGHT_COUNT] = {0.0f};
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
 float*** lightViewProj = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 float*** lightView = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
@@ -536,25 +537,17 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
 void UpdateVoxelLightLists() {
     memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
-    const float startX = worldMin_x + (VOXEL_SIZE * 0.5f);
-    const float startZ = worldMin_z + (VOXEL_SIZE * 0.5f);
-    float rangeSquared[LIGHT_COUNT]; // Precompute light ranges
-    for (int32_t i = 0; i < LIGHT_COUNT; ++i) {
-        rangeSquared[i] = lights[(i * LIGHT_DATA_SIZE) + LIGHT_DATA_OFFSET_RANGE];
-        rangeSquared[i] *= rangeSquared[i];
-    }
-
-    // Precompute total size
     uint32_t totalLightAssignments = 0;
+    float cellWidthRecip = 1.0f / WORLDCELL_WIDTH_F;
     for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
-        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
+        int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) * cellWidthRecip);
+        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) * cellWidthRecip);
+        int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) * cellWidthRecip);
+        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
@@ -565,10 +558,10 @@ void UpdateVoxelLightLists() {
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-                        float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
-                        float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
+                        float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
+                        float posZ = voxelMinCenterZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-                        if (distSqrd < rangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
+                        if (distSqrd < lightsRangeSquared[lightIdx] && voxelLightListIndices[voxelIndex * 2 + 1] < MAX_LIGHTS_PER_VOXEL) {
                             voxelLightListIndices[voxelIndex * 2 + 1]++; // Increment light count
                             totalLightAssignments++;
                         }
@@ -598,10 +591,33 @@ void UpdateVoxelLightLists() {
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        int32_t minCellX = (int32_t)floorf((litX - range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t minCellZ = (int32_t)floorf((litZ - range - worldMin_z) / WORLDCELL_WIDTH_F);
-        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) / WORLDCELL_WIDTH_F);
+        float distSq = squareDistance2D(instances[PLAYER1].position.x, instances[PLAYER1].position.z, litX, litZ);
+        if(distSq > FAR_PLANE_SQUARED) continue;
+        
+        int lightCellIdx = cellIndexForLight[lightIdx];
+        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        if(!inPVS) {
+            int x = cellIndexForLightX[lightIdx];
+            int z = cellIndexForLightZ[lightIdx];
+            int r = floor(range * 0.390625f);
+            for(int ix=x-r; ix<=x+r && !inPVS; ix++){
+                for(int iz=z-r; iz<=z+r; iz++){
+                    if(!XZPairInBounds(ix,iz)) continue;
+                    int subIdx = iz*WORLDX + ix;
+                    if((gridCellStates[subIdx] & CELL_VISIBLE) &&
+                        get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx*ARRSIZE + subIdx)) {
+                        inPVS = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if(!inPVS) continue; // Only include lights that the voxel can actually see
+        
+        int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip); // cast to int truncates, no floorf
+        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) * cellWidthRecip);
+        int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip); // cast to int truncates, no floorf
+        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
@@ -612,11 +628,10 @@ void UpdateVoxelLightLists() {
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
-                        float posX = startX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
-                        float posZ = startZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
+                        float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
+                        float posZ = voxelMinCenterZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-
-                        if (distSqrd < rangeSquared[lightIdx] && lightCounts[voxelIndex] < MAX_LIGHTS_PER_VOXEL) {
+                        if (distSqrd < lightsRangeSquared[lightIdx] && lightCounts[voxelIndex] < MAX_LIGHTS_PER_VOXEL) {
                             uint32_t offset = voxelLightListIndices[voxelIndex * 2];
                             voxelLightListsRaw[offset + lightCounts[voxelIndex]] = lightIdx;
                             lightCounts[voxelIndex]++;
