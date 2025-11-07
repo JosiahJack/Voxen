@@ -1153,9 +1153,6 @@ void NewGame(void) {
     for (int i=0;i<loadedLights;++i) { if (lightIsDynamic[i]) numDynamicLights++; }
     DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
     pauseRelativeTime = 0.0f;
-//     DualLog("Player 1:\n=========================\n");
-//     DualLogEntity(PLAYER1);
-//     DualLog("=========================\n");
     levelCurrentlyLoading = false;
 }
 
@@ -1764,7 +1761,6 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "testLight_x x: %.4f, y: %.4f, z: %.4f", lights[817 + LIGHT_DATA_OFFSET_POSX], lights[817 + LIGHT_DATA_OFFSET_POSY], lights[817 + LIGHT_DATA_OFFSET_POSZ]);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);

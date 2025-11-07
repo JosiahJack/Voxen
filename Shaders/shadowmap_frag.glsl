@@ -10,7 +10,7 @@ void main() {
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     int ssbo_index = ssbo_indexBase + texelCoord.y * shadowmapSize + texelCoord.x;
     vec3 toLight = lightPos - FragPos;
-    float dist = dot(toLight,toLight);
+    float dist = dot(toLight,toLight); // Actually faster for performance to use length... likely due to shadows mostly being static so read speed is more crucial (or the bias math)
     uint distInt = uint(dist * 10.0);
     atomicMin(depthData[ssbo_index], distInt);
 }
