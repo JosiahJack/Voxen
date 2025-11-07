@@ -512,24 +512,16 @@ bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float r
 }
 
 void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
-    // Left
-    planes[0].nx = m[3]  + m[0];  planes[0].ny = m[7]  + m[4];  planes[0].nz = m[11] + m[8];  planes[0].d = m[15] + m[12];
-    // Right
-    planes[1].nx = m[3]  - m[0];  planes[1].ny = m[7]  - m[4];  planes[1].nz = m[11] - m[8];  planes[1].d = m[15] - m[12];
-    // Bottom
-    planes[2].nx = m[3]  + m[1];  planes[2].ny = m[7]  + m[5];  planes[2].nz = m[11] + m[9];  planes[2].d = m[15] + m[13];
-    // Top
-    planes[3].nx = m[3]  - m[1];  planes[3].ny = m[7]  - m[5];  planes[3].nz = m[11] - m[9];  planes[3].d = m[15] - m[13];
-    // Near
-    planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14];
-    // Far
-    planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14];
-
-    // Normalize
+    planes[0].nx = m[3]  + m[0];  planes[0].ny = m[7]  + m[4];  planes[0].nz = m[11] + m[8];  planes[0].d = m[15] + m[12]; // Left
+    planes[1].nx = m[3]  - m[0];  planes[1].ny = m[7]  - m[4];  planes[1].nz = m[11] - m[8];  planes[1].d = m[15] - m[12]; // Right
+    planes[2].nx = m[3]  + m[1];  planes[2].ny = m[7]  + m[5];  planes[2].nz = m[11] + m[9];  planes[2].d = m[15] + m[13]; // Bottom
+    planes[3].nx = m[3]  - m[1];  planes[3].ny = m[7]  - m[5];  planes[3].nz = m[11] - m[9];  planes[3].d = m[15] - m[13]; // Top
+    planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14]; // Near
+    planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14]; // Far
     for (int i = 0; i < 6; i++) {
         float len = sqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
         if (len > 0.0f) {
-            planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len;
+            planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len; // Normalize
         }
     }
 }
@@ -543,7 +535,7 @@ void UpdateVoxelLightLists() {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE]; // Can't early out here for range to player as it breaks shadows!
         int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip);
         int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) * cellWidthRecip);
         int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip);
@@ -1559,6 +1551,7 @@ int32_t main(int32_t argc, char* argv[]) {
         shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
         uiImageCount = 0;
+        memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));
         
         // 0. Clear Frame Buffers and Depth
         if (!gamePaused) glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
@@ -1592,30 +1585,34 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
             glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
             
+            // 3. Dynamic Shadowmaps
             uint32_t lightBase = 817;
             uint32_t litIdx = lightBase * LIGHT_DATA_SIZE;
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
-//             uint16_t numLightsFoundDirty = 0;
-//             memset(dirtyLightIdices,0,loadedLights * sizeof(bool));
-//             for (int i = 0; i < loadedLights; ++i) {
-//                 if (lightDirty[i]) {
-//                     numLightsFoundDirty++;
-//                     dirtyLightIdices[i] = true;
-//                 }
-//             }
-// 
-            dirtyLightIdices[817] = true;
-//             if (numLightsFoundDirty > 0) {
+            uint16_t numLightsFoundDirty = 0;
+            memset(dirtyLightIdices,0,loadedLights * sizeof(bool));
+            for (int i = 0; i < loadedLights; ++i) {
+                if (lightDirty[i]) {
+                    numLightsFoundDirty++;
+                    dirtyLightIdices[i] = true;
+                }
+            }
+
+            if (numLightsFoundDirty > 0) {
                 UpdateVoxelLightLists();
-                RenderShadowmaps();
-//             }
+                if (settings_Shadows > 0u) {
+                    glUseProgram(shadowmapsClearShaderProgram);
+                    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+                    glDispatchCompute(groupX_shadClear,1, 1);
+                    RenderShadowmaps();
+                }
+            }
             
-            // 3. Dynamic Shadowmaps
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
-            
-            // 3. Raterized Geometry
+
+            // 4. Raterized Geometry
             //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
             glUseProgram(chunkShaderProgram);
@@ -1638,15 +1635,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindVertexArray(0);
             glUseProgram(0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            
-            // Done with shadowmaps, wipe em
-            if (settings_Shadows > 0u) {
-                glUseProgram(shadowmapsClearShaderProgram);
-                GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-                glDispatchCompute(groupX_shadClear,1, 1);
-            }
             // ====================================================================
-            // 6. SSR (Screen Space Reflections)
+            // 5. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
                 glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);                
@@ -1660,7 +1650,7 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }
         
-        // 7. Render final meshes' results with full screen quad
+        // 6. Render final meshes' results with full screen quad
         glUseProgram(imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, inputImageID);
@@ -1713,7 +1703,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float screenCenterY = (float)screen_height / 2;
         float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
         
-        // 8. UI
+        // 7. UI
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
