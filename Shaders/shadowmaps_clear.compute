@@ -7,5 +7,5 @@ layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
 
 void main() {
     uvec2 pixel = gl_GlobalInvocationID.xy;
-    depthData[pixel.x] = 153600;
+    depthData[pixel.x] = 0xFFFFFFFFu;
 }

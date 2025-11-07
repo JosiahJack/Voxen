@@ -1452,6 +1452,7 @@ void CullInit(void) {
 void CullCore(void) {    
     if (currentLevel >= (numLevels - 1)) return;
 
+    lightDirty[0] = true; // Force dynamic lights to update.
     numCellsVisible = 0;
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
     for (int32_t z=0;z<WORLDZ;++z) {

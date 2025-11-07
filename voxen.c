@@ -656,7 +656,7 @@ void UpdateVoxelLightLists() {
     glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
-bool* lightShadowsEnabled = NULL;
+uint32_t* lightShadowsEnabled = NULL;
 
 void VoxelLists() {
     voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
@@ -681,8 +681,8 @@ void VoxelLists() {
     UpdateVoxelLightLists();
     for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-    lightShadowsEnabled = malloc(loadedLights * sizeof(bool));
-    memset(lightShadowsEnabled,false,loadedLights * sizeof(bool));
+    lightShadowsEnabled = malloc(loadedLights * sizeof(uint32_t));
+    memset(lightShadowsEnabled,0u,loadedLights * sizeof(uint32_t));
     uint16_t numLightsWithShadows = 0;
     for (int i=0;i<loadedLights;++i) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
@@ -696,7 +696,7 @@ void VoxelLists() {
 //         if (currentLevel == 8) thresh += 0.005f; // TODO retweak with Voxen
         if (luminosity < thresh) continue; // Skip if light is off
         
-        lightShadowsEnabled[i] = true;
+        lightShadowsEnabled[i] = 1u;
         numLightsWithShadows++;
     }
     
@@ -706,7 +706,7 @@ void VoxelLists() {
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
-    if (!lightShadowsEnabled[lightIdx]) return;
+    if (lightShadowsEnabled[lightIdx] == 0u) return;
     
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -765,7 +765,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
     glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
     for (uint8_t face = 0; face < 6; face++) {
-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, shadowDrawCallsRenderedThisFrame * 6 * shadSizeSquared + face * shadSizeSquared);
+        glUniform1i(ssbo_indexBaseLoc_shadowmaps, (shadowmapIndirectionList[lightIdx] * (6 * shadSizeSquared)) + (face * shadSizeSquared));
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -784,29 +784,87 @@ void RenderShadowmap(uint16_t lightIdx) {
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
-    
-    shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
-    DualLog("Wrote shadowmap %u for lightIdx %u, shadowmapIndirectionList[lightIdx]: %u\n",shadowDrawCallsRenderedThisFrame,lightIdx,shadowmapIndirectionList[lightIdx]);
-    shadowDrawCallsRenderedThisFrame++;
 }
 
 void RenderShadowmaps(void) {
     if (settings_Shadows < 1u) return;
 
+    glUseProgram(shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    
+    shadowDrawCallsRenderedThisFrame = 0;
+    memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
+    
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
-    glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)(SHADOW_MAP_SIZE));
+    glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)SHADOW_MAP_SIZE);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    memset(shadowmapIndirectionList,MAX_SHADOWMAPS + 1,loadedLights * sizeof(uint32_t));
-    for (uint16_t i = 0; i < loadedLights && shadowDrawCallsRenderedThisFrame < MAX_SHADOWMAPS; ++i) RenderShadowmap(i); // Render static lights once.
-    glViewport(0, 0, screen_width, screen_height);
-    glEnable(GL_CULL_FACE);
+
+    // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
+    LightCandidate candidates[loadedLights];
+    uint32_t candidateCount = 0;
+    for (uint16_t i = 0; i < loadedLights; ++i) {
+        if (lightShadowsEnabled[i] == 0u) continue;
+
+        uint32_t litIdx = i * LIGHT_DATA_SIZE;
+        float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
+
+        // Your inPVS check
+        int lightCellIdx = cellIndexForLight[i];
+        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        if (!inPVS) {
+            int x = cellIndexForLightX[i];
+            int z = cellIndexForLightZ[i];
+            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+            int r = floor(range * 0.390625f);
+            for (int ix = x - r; ix <= x + r && !inPVS; ix++) {
+                for (int iz = z - r; iz <= z + r; iz++) {
+                    if (!XZPairInBounds(ix, iz)) continue;
+                    int subIdx = iz * WORLDX + ix;
+                    if ((gridCellStates[subIdx] & CELL_VISIBLE) &&
+                        get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx)) {
+                        inPVS = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!inPVS) continue;
+
+        // Score: lower score = closer and brighter (higher priority)
+        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        float score = distSqrd / fmax(intensity, 0.01f);  // Avoid div by 0, favor bright lights
+
+        candidates[candidateCount++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
+    }
+
+    // Sort candidates by score (ascending: best first)
+    qsort(candidates, candidateCount, sizeof(LightCandidate), compareLightCandidates);
+
+    // Render top MAX_SHADOWMAPS candidates
+    uint32_t numToRender = fmin(candidateCount, MAX_SHADOWMAPS);
+    for (uint32_t c = 0; c < numToRender; ++c) {
+        uint16_t lightIdx = candidates[c].index;
+        uint32_t slot = shadowDrawCallsRenderedThisFrame;
+        shadowmapIndirectionList[lightIdx] = slot;
+        RenderShadowmap(lightIdx);
+        shadowDrawCallsRenderedThisFrame++;
+    }
+
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
-    glNamedBufferData(shadowMapsIndirectionID,loadedLights * sizeof(uint32_t),shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    glViewport(0, 0, screen_width, screen_height);
+    glEnable(GL_CULL_FACE);
+    glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
 }
 
 // ============================================================================
@@ -1606,12 +1664,10 @@ int32_t main(int32_t argc, char* argv[]) {
 
             if (numLightsFoundDirty > 0) {
                 UpdateVoxelLightLists();
-                if (settings_Shadows > 0u) {
-                    glUseProgram(shadowmapsClearShaderProgram);
-                    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-                    glDispatchCompute(groupX_shadClear,1, 1);
-                    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-                    RenderShadowmaps();
+                if (settings_Shadows > 0u) RenderShadowmaps();
+                else {
+                    memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
+                    glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
                 }
             }
             
