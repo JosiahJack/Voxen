@@ -684,10 +684,10 @@ void VoxelLists() {
     memset(lightShadowsEnabled,0u,loadedLights * sizeof(uint32_t));
     uint16_t numLightsWithShadows = 0;
     for (int i=0;i<loadedLights;++i) {
-        uint32_t litIdx = i * LIGHT_DATA_SIZE;
-        float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        float effectiveRadius = fmin(lightRadius, 15.36f);
-        float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+//         uint32_t litIdx = i * LIGHT_DATA_SIZE;
+//         float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+//         float effectiveRadius = fmin(lightRadius, 15.36f);
+//         float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
 //         float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
 //         float thresh = 0.006f;//0.042f;
 // //         if (currentLevel >= 10) thresh += 0.015f; // TODO retweak with Voxen
@@ -804,6 +804,15 @@ void RenderShadowmaps(void) {
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
 
+    // Alternate form to find all lights without actual sorting:
+    // first for over lights to get distance to player once
+    // set short threshold of like 2.56 and use that first in one for loop.
+    // another for loop, keeping head of the found lights but starting over at the beginning of the list and checking against a wider dist
+    // another for loop, same as above but a little wider dist
+    // another for loop, same as above but a little wider dist
+    
+    // This method is 0.027ms so not too worried about it at the moment.
+//     double sortStart = get_time();
     // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
     LightCandidate candidates[loadedLights];
     uint32_t candidateCount = 0;
@@ -849,6 +858,7 @@ void RenderShadowmaps(void) {
     // Sort candidates by score (ascending: best first)
     qsort(candidates, candidateCount, sizeof(LightCandidate), compareLightCandidates);
 
+//     DualLog("Sorting time for lights: %f\n",get_time() - sortStart);
     // Render top MAX_SHADOWMAPS candidates
     uint32_t numToRender = fmin(candidateCount, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) {
@@ -1650,19 +1660,19 @@ int32_t main(int32_t argc, char* argv[]) {
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
-            uint16_t numLightsFoundDirty = 0;
-            for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) numLightsFoundDirty++;
-            }
+//             uint16_t numLightsFoundDirty = 0;
+//             for (int i = 0; i < loadedLights; ++i) {
+//                 if (lightDirty[i]) numLightsFoundDirty++;
+//             }
 
-            if (numLightsFoundDirty > 0) {
-                UpdateVoxelLightLists();
+//             if (numLightsFoundDirty > 0) {
+                UpdateVoxelLightLists(); // Takes 1.4ms of total frametime!!
                 if (settings_Shadows > 0u) RenderShadowmaps();
                 else {
                     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
                     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
                 }
-            }
+//             }
             
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
 
