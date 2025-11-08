@@ -1660,19 +1660,19 @@ int32_t main(int32_t argc, char* argv[]) {
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
-//             uint16_t numLightsFoundDirty = 0;
-//             for (int i = 0; i < loadedLights; ++i) {
-//                 if (lightDirty[i]) numLightsFoundDirty++;
-//             }
+            uint16_t numLightsFoundDirty = 0;
+            for (int i = 0; i < loadedLights; ++i) {
+                if (lightDirty[i]) numLightsFoundDirty++;
+            }
 
-//             if (numLightsFoundDirty > 0) {
+            if (numLightsFoundDirty > 0) {
                 UpdateVoxelLightLists(); // Takes 1.4ms of total frametime!!
                 if (settings_Shadows > 0u) RenderShadowmaps();
                 else {
                     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
                     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
                 }
-//             }
+            }
             
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
 
@@ -1842,7 +1842,14 @@ int32_t main(int32_t argc, char* argv[]) {
         // Frame stats (AFTER EVERYTHING ELSE)
         double time_now = get_time();
         drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "ms: %.2f, CPU %.2f (FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d", (time_now - last_time) * 1000.0f,cpuTime * 1000.0f,framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame);
+        drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
+        double thisFrameTime = (time_now - last_time) * 1000.0f;
+        double cpuFrameTime = cpuTime * 1000.0f;
+        uint8_t timingColor = TEXT_WHITE;
+        if (fabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_ORANGE;
+        if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
+        RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame);
         // End ALL rendering
         // ------------------------------------
         // ====================================
