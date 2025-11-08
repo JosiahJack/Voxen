@@ -141,7 +141,7 @@ extern uint16_t loadedAmbients;
 extern uint16_t ambientRegistry[MAX_AMBIENT_NOISES];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
-int32_t InitializeAudio();
+void InitializeAudio();
 void UpdateAmbientSounds(void);
 // ----------------------------------------------------------------------------
 // Data Parsing

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 #include "./External/miniaudio.h"
 #include "voxen.h"
 
@@ -10,17 +11,12 @@ ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
 // Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 
-int32_t InitializeAudio() {
+void InitializeAudio() {
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; // Stereo output, adjust if needed
-
     result = ma_engine_init(&engine_config, &audio_engine);
-    if (result != MA_SUCCESS) {
-        DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result);
-        return 1;
-    }
-    return 0;
+    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result); exit(1); }
 }
 
 void play_mp3(const char* path, float volume, int32_t fade_in_ms) {

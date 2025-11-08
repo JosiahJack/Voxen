@@ -1,9 +1,12 @@
+#define _GNU_SOURCE
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/types.h> //
+#include <unistd.h> //
 #include <fcntl.h>
 #include <omp.h>
 #include "voxen.h"
@@ -67,34 +70,11 @@ uint16_t transparentInstancesHead = 0;
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes
 static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
-    // Find last slash
-    const char *slash = strrchr(fbx_path, '/');
-    const char *start = slash ? slash + 1 : fbx_path;
-
-    // Find last dot in filename
-    const char *dot = strrchr(start, '.');
-    size_t name_len = dot ? (size_t)(dot - start) : (size_t)strlen(start);
-
-    // Build path: directory + basename (without extension) + ".vmdl"
-    size_t dir_len = start - fbx_path;
-    if (dir_len + name_len + 6 >= outsz) {
-        // Truncate safely
-        memcpy(out, fbx_path, outsz - 6);
-        out[outsz - 6] = '\0';
-        char *last_slash = strrchr(out, '/');
-        if (last_slash) {
-            *++last_slash = '\0';
-            strcat(out, "toolong.vmdl");
-        } else {
-            strcpy(out, "toolong.vmdl");
-        }
-        return;
-    }
-
-    // Copy directory + basename
-    memcpy(out, fbx_path, dir_len + name_len);
-    out[dir_len + name_len] = '\0';
-    strcat(out, ".vmdl");
+    strncpy(out, fbx_path, outsz - 1);
+    out[outsz - 1] = '\0';
+    char *ext = strrchr(out, '.');
+    if (ext && strcmp(ext, ".fbx") == 0) strncpy(ext, ".vmdl", outsz - (ext - out) - 1);
+    else if (strlen(out) + 5 < outsz) strcat(out, ".vmdl");
 }
 
 static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
@@ -104,14 +84,11 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     struct stat st;
     if (fstat(fd, &st) < 0) { close(fd); return false; }
     if (st.st_size < 16 + 4 + 4) { close(fd); return false; }
+    
     uint8_t *map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     if (map == MAP_FAILED) return false;
-
-    if (memcmp(map, expected_md5, 16) != 0) { 
-        munmap(map, st.st_size); 
-        return false; 
-    }
+    if (memcmp(map, expected_md5, 16) != 0) { munmap(map, st.st_size); return false; }
 
     const uint8_t *p = map + 16;
     uint32_t vcnt = *(uint32_t*)p; p += 4;
@@ -168,11 +145,9 @@ void add_mmap_cleanup(void* ptr, size_t size) {
         if (mmap_cleanup_count >= mmap_cleanup_capacity) {
             mmap_cleanup_capacity = mmap_cleanup_capacity ? mmap_cleanup_capacity * 2 : 256;
             mmap_cleanup = realloc(mmap_cleanup, mmap_cleanup_capacity * sizeof(MMapEntry));
-            if (!mmap_cleanup) {
-                DualLogError("realloc failed in add_mmap_cleanup\n");
-                exit(1);
-            }
+            if (!mmap_cleanup) { DualLogError("realloc failed in add_mmap_cleanup\n"); exit(1); }
         }
+        
         mmap_cleanup[mmap_cleanup_count].ptr = ptr;
         mmap_cleanup[mmap_cleanup_count].size = size;
         mmap_cleanup_count++;
@@ -180,12 +155,8 @@ void add_mmap_cleanup(void* ptr, size_t size) {
 }
 
 void cleanup_all_mmaps(void) {
-    for (int i = 0; i < mmap_cleanup_count; i++) {
-        munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
-    }
+    for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
     free(mmap_cleanup);
-    mmap_cleanup = NULL;
-    mmap_cleanup_count = mmap_cleanup_capacity = 0;
 }
 
 void LoadModels(void) {
@@ -203,11 +174,11 @@ void LoadModels(void) {
     DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
     int32_t totalVertCount = 0;
     int32_t totalTriCount = 0;
-    modelVertexCounts   = calloc(loadedModels, sizeof(uint32_t));
-    modelTriangleCounts = calloc(loadedModels, sizeof(uint32_t));
-    modelVertices       = calloc(loadedModels, sizeof(float*));
-    modelTriangles      = calloc(loadedModels, sizeof(uint32_t*));
-    modelBounds         = calloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT, sizeof(float));
+    modelVertexCounts   = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    modelTriangleCounts = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    modelBounds         = mmap(NULL, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
     for (int32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) {
@@ -241,12 +212,10 @@ void LoadModels(void) {
             const char *fbx_path = model_parser.entries[parserIdx].path;
             if (!fbx_path || !fbx_path[0]) continue;
 
-            /* ---------- 1. Build .vmdl name ---------- */
             char vmdl_path[512];
             make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
             if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); exit(1); }
 
-            /* ---------- 2. Compute MD5 of the .fbx ---------- */
             uint8_t fbx_md5[16];
             {
                 FILE *f = fopen(fbx_path, "rb");
@@ -262,7 +231,6 @@ void LoadModels(void) {
                 free(buf);
             }
 
-            /* ---------- 3. Try to load cached .vmdl ---------- */
             float  *cached_verts = NULL;
             uint32_t cached_vcnt = 0;
             uint32_t *cached_idx  = NULL;
@@ -270,14 +238,11 @@ void LoadModels(void) {
             void* mmap_map = NULL;
             size_t mmap_size = 0;
             bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
-
-            /* ---------- 4. If cache miss – run Assimp ---------- */
             if (!cache_hit) {
                 DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
                 const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_GenNormals*/ 0x20 | 0x800/*aiProcess_ImproveCacheLocality*/, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
                 if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); continue; }
 
-                /* ---- count verts / tris ---- */
                 uint32_t vertexCount = 0, triCount = 0;
                 for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
                     vertexCount += scene->mMeshes[m]->mNumVertices;
@@ -288,15 +253,11 @@ void LoadModels(void) {
 
                 modelVertexCounts[i]   = vertexCount;
                 modelTriangleCounts[i] = triCount;
-
-                modelVertices[i]  = calloc(vertexCount * VERTEX_ATTRIBUTES_COUNT, sizeof(float));
-                modelTriangles[i] = calloc(triCount * 3, sizeof(uint32_t));
-
-                /* ---- fill vertex / index arrays (same code you already have) ---- */
+                modelVertices[i]  = mmap(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+                modelTriangles[i] =  mmap(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
                 uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
                 float minx = 1E9f, miny = 1E9f, minz = 1E9f;
                 float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
-
                 for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
                     struct aiMesh *mesh = scene->mMeshes[m];
                     for (uint32_t vert = 0; vert < mesh->mNumVertices; ++vert) {
@@ -398,8 +359,8 @@ void LoadModels(void) {
 
     aiReleasePropertyStore(props);
     malloc_trim(0);
-    vbos = calloc(loadedModels, sizeof(GLuint));
-    tbos = calloc(loadedModels, sizeof(GLuint));
+    vbos = mmap(NULL, loadedModels * sizeof(GLuint), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    tbos = mmap(NULL, loadedModels * sizeof(GLuint), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     glGenBuffers(loadedModels, vbos);
     glGenBuffers(loadedModels, tbos);
     for (int i = 0; i < loadedModels; ++i) {

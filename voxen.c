@@ -48,7 +48,7 @@ typedef struct {
 GLFWwindow *window;
 double monitorSwitchTime;
 bool inventoryMode = false;
-uint16_t screen_width = 1920, screen_height = 1080;
+uint16_t screen_width = 1366, screen_height = 768;
 // ----------------------------------------------------------------------------
 // Diagnostics
 double game_start_time = 0.00;
@@ -1860,8 +1860,8 @@ int32_t main(int32_t argc, char* argv[]) {
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
+//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
@@ -1910,6 +1910,8 @@ int32_t main(int32_t argc, char* argv[]) {
             if (globalFrameNum == 4) { DebugRAM("after 4 frames of running"); malloc_trim(0); }
             else if (globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
             else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
+            else if (globalFrameNum == 500) DebugRAM("after 500 frames of running");
+            else if (globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
         #endif
     }
     glfwTerminate();

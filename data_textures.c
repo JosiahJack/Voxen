@@ -193,6 +193,7 @@ void LoadTextures(void) {
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;
         free(image_data[i]);
+        malloc_trim(0);
     }
 
     DualLog(" total pallete colors: %u, totalPixels was: %u... ", totalPaletteColors, totalPixels);
