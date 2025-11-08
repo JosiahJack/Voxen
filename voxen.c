@@ -683,24 +683,14 @@ void VoxelLists() {
             lightFrustumPlanes[i][j] = malloc(6 * sizeof(FrustumPlane)); // Frustum Planes for this cubemap face
         }
     }
+    
     UpdateVoxelLightLists();
     for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     lightShadowsEnabled = malloc(loadedLights * sizeof(uint32_t));
     memset(lightShadowsEnabled,0u,loadedLights * sizeof(uint32_t));
     uint16_t numLightsWithShadows = 0;
-    for (int i=0;i<loadedLights;++i) {
-//         uint32_t litIdx = i * LIGHT_DATA_SIZE;
-//         float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//         float effectiveRadius = fmin(lightRadius, 15.36f);
-//         float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-//         float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
-//         float thresh = 0.006f;//0.042f;
-// //         if (currentLevel >= 10) thresh += 0.015f; // TODO retweak with Voxen
-// //         if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // TODO retweak with Voxen
-// //         if (currentLevel == 8) thresh += 0.005f; // TODO retweak with Voxen
-//         if (luminosity < thresh) continue; // Skip if light is off
-        
+    for (int i=0;i<loadedLights;++i) {        
         lightShadowsEnabled[i] = 1u;
         numLightsWithShadows++;
     }
@@ -901,7 +891,7 @@ uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32
     return uiImageCount - 1; // Return index of this just now created image for use on making buttons.
 }
 
-float uiImageVertexData[4096]; // Reusable buffer, adjust size as needed
+float uiImageVertexData[31768];
 void RenderUIImages() {
     if (uiImageCount == 0) return;
 
@@ -1044,8 +1034,7 @@ void ConsoleEmulator(int32_t keycode) {
     }
 }
 
-float textVertexData[4096]; // Reusable buffer for text vertices.  Most text only needs ~3000
-
+float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
 void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t fontID, const char* format, ...) {
     va_list args;
     va_start(args, format);

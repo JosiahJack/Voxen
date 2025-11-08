@@ -5,28 +5,11 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <sys/types.h> //
-#include <unistd.h> //
 #include <fcntl.h>
 #include <omp.h>
 #include "voxen.h"
 #define C_STRUCT struct // #include <assimp/defs.h>
-#ifdef _WIN32 // #include <assimp/defs.h>
-#  undef ASSIMP_API
-#  ifdef ASSIMP_BUILD_DLL_EXPORT
-#    define ASSIMP_API __declspec(dllexport)
-#    define ASSIMP_API_WINONLY __declspec(dllexport)
-#  elif (defined ASSIMP_DLL)
-#    define ASSIMP_API __declspec(dllimport)
-#    define ASSIMP_API_WINONLY __declspec(dllimport)
-#  else
-#    define ASSIMP_API
-#    define ASSIMP_API_WINONLY
-#  endif
-#else
-#  define ASSIMP_API __attribute__((visibility("default")))
-#  define ASSIMP_API_WINONLY
-#endif // _WIN32
+#define ASSIMP_API
 struct aiFileIO; // #include <assimp/cimport.h>
 ASSIMP_API C_STRUCT aiPropertyStore *aiCreatePropertyStore(void); // #include <assimp/cimport.h>
 ASSIMP_API const C_STRUCT aiScene *aiImportFileExWithProperties(const char *pFile, unsigned int pFlags, C_STRUCT aiFileIO *pFS, const C_STRUCT aiPropertyStore *pProps); // #include <assimp/cimport.h>
@@ -172,13 +155,12 @@ void LoadModels(void) {
 
     loadedModels = maxIndex + 1;
     DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
-    int32_t totalVertCount = 0;
-    int32_t totalTriCount = 0;
     modelVertexCounts   = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     modelTriangleCounts = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     modelBounds         = mmap(NULL, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+    DebugRAM("after main mmap block");
     int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
     for (int32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) {
@@ -200,11 +182,8 @@ void LoadModels(void) {
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-    #pragma omp parallel default(none) \
-        shared(model_parser, indexToParser, loadedModels, \
-            modelVertexCounts, modelTriangleCounts, \
-            modelVertices, modelTriangles, modelBounds, \
-            props, totalVertCount, totalTriCount)
+    DebugRAM("prior to parallel model load loop");
+    #pragma omp parallel default(none) shared(model_parser, indexToParser, loadedModels, modelVertexCounts, modelTriangleCounts, modelVertices, modelTriangles, modelBounds, props)
     {
         #pragma omp for schedule(dynamic)
         for (uint32_t i = 0; i < loadedModels; ++i) {
@@ -341,13 +320,6 @@ void LoadModels(void) {
                 modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
                 add_mmap_cleanup(mmap_map, mmap_size);  // defer munmap
             }
-
-            /* ---- atomic totals (debug) ---- */
-            #pragma omp critical
-            {
-                totalVertCount += modelVertexCounts[i];
-                totalTriCount  += modelTriangleCounts[i];
-            }
         }
         
         #pragma omp barrier
@@ -356,6 +328,7 @@ void LoadModels(void) {
             cleanup_all_mmaps();
         }
     }
+    DebugRAM("after to parallel model load loop");
 
     aiReleasePropertyStore(props);
     malloc_trim(0);
@@ -369,26 +342,20 @@ void LoadModels(void) {
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
         size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);  // orphan
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);  // safe
+        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
     }
-
+    
+    DebugRAM("after to model to gpu transfer");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-#ifdef DEBUG_MODEL_LOAD_DATA
-    DualLog("Total vertices: %d (", totalVertCount); print_bytes_no_newline(totalVertCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float)); DualLog(")\nTotal triangles: %d (", totalTriCount); print_bytes_no_newline(totalTriCount * 3 * sizeof(uint32_t)); DualLog(")\n");
-#endif
-    
     modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" took %f seconds\n", get_time() - start_time);
