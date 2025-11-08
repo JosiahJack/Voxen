@@ -144,7 +144,6 @@ GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_
 
 //    Shadowmaps Clear
 GLuint shadowmapsClearShaderProgram;
-bool* dirtyLightIdices = NULL;
 
 //    Full Screen Quad Blit for rendering final output/image effect passes
 GLuint imageBlitShaderProgram;
@@ -689,12 +688,12 @@ void VoxelLists() {
         float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         float effectiveRadius = fmin(lightRadius, 15.36f);
         float litIntensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
-        float thresh = 0.006f;//0.042f;
-//         if (currentLevel >= 10) thresh += 0.015f; // TODO retweak with Voxen
-//         if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // TODO retweak with Voxen
-//         if (currentLevel == 8) thresh += 0.005f; // TODO retweak with Voxen
-        if (luminosity < thresh) continue; // Skip if light is off
+//         float luminosity = (litIntensity / (effectiveRadius * effectiveRadius));
+//         float thresh = 0.006f;//0.042f;
+// //         if (currentLevel >= 10) thresh += 0.015f; // TODO retweak with Voxen
+// //         if (currentLevel == 7 || currentLevel == 0 || currentLevel == 8) thresh += 0.0051f; // TODO retweak with Voxen
+// //         if (currentLevel == 8) thresh += 0.005f; // TODO retweak with Voxen
+//         if (luminosity < thresh) continue; // Skip if light is off
         
         lightShadowsEnabled[i] = 1u;
         numLightsWithShadows++;
@@ -1208,8 +1207,6 @@ void NewGame(void) {
     uint32_t shadowmapPixelCount = shadSizeSquared * 6u;
     totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
     shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    dirtyLightIdices = malloc(loadedLights * sizeof(bool));
-    memset(dirtyLightIdices,true,loadedLights * sizeof(bool));
     glUseProgram(shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
@@ -1654,12 +1651,8 @@ int32_t main(int32_t argc, char* argv[]) {
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
             if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
             uint16_t numLightsFoundDirty = 0;
-            memset(dirtyLightIdices,0,loadedLights * sizeof(bool));
             for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) {
-                    numLightsFoundDirty++;
-                    dirtyLightIdices[i] = true;
-                }
+                if (lightDirty[i]) numLightsFoundDirty++;
             }
 
             if (numLightsFoundDirty > 0) {

@@ -238,8 +238,8 @@ void main() {
             float NdL = max(dot(normal, normalize(toLight)), 0.0);
             float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
             float biasBase = ((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02;
-            float bias = clamp(biasBase, 0.01, 1.0) + 0.08;
-            bias += (1.0 - NdL) * 0.09;
+            float bias = clamp(biasBase, 0.01, 1.0) + 0.12;
+            bias += (1.0 - NdL) * 0.07;
             bias = 2.0 * dist * bias + bias * bias;
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
