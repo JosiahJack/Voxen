@@ -352,9 +352,12 @@ void quat_to_matrix(Quaternion* q, float* m);
 // ----------------------------------------------------------------------------
 // Input
 #define NUM_KEYS 350
+extern GLFWwindow *window;
 extern bool keys[NUM_KEYS];
 extern bool window_has_focus;
 extern double last_mouse_x, last_mouse_y;
+extern bool ignore_next_mouse_delta;
+void CycleToNextMonitor(GLFWwindow* window);
 void Input_Init(GLFWwindow* window);
 void Input_MouselookApply();
 int32_t Input_KeyDown(int32_t scancode);

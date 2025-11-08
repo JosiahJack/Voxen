@@ -46,8 +46,9 @@ typedef struct {
 // ----------------------------------------------------------------------------
 // Window
 GLFWwindow *window;
+double monitorSwitchTime;
 bool inventoryMode = false;
-uint16_t screen_width = 1366, screen_height = 768;
+uint16_t screen_width = 1920, screen_height = 1080;
 // ----------------------------------------------------------------------------
 // Diagnostics
 double game_start_time = 0.00;
@@ -549,7 +550,9 @@ void UpdateVoxelLightLists() {
                 uint32_t cellIndex = cellZ * 64 + cellX;
 //                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue; // TODO should be able to do this somehow without it getting truncated and leaving half the cell black.
                 
+                #pragma GCC unroll 8
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+                    #pragma GCC unroll 8
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
                         float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
@@ -593,7 +596,7 @@ void UpdateVoxelLightLists() {
         if(!inPVS) {
             int x = cellIndexForLightX[lightIdx];
             int z = cellIndexForLightZ[lightIdx];
-            int r = floor(range * 0.390625f);
+            int r = floor(range * 0.390625f); // 6 max
             for(int ix=x-r; ix<=x+r && !inPVS; ix++){
                 for(int iz=z-r; iz<=z+r; iz++){
                     if(!XZPairInBounds(ix,iz)) continue;
@@ -621,7 +624,9 @@ void UpdateVoxelLightLists() {
                 uint32_t cellIndex = cellZ * 64 + cellX;
 //                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue;
 
+                #pragma GCC unroll 8
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
+                    #pragma GCC unroll 8
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
                         uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
                         float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
@@ -643,6 +648,7 @@ void UpdateVoxelLightLists() {
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        #pragma GCC unroll 6
         for (int j=0;j<6;++j) {
             mat4_lookat_from(lightView[i][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
             mul_mat4(lightViewProj[i][j], shadowmapsPerspectiveProjection, lightView[i][j]);
@@ -1234,6 +1240,29 @@ static const float quadBlit_vertices[] = {
     -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
     -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
 };
+
+int currentMonitorIndex = 0;
+bool ignore_next_mouse_delta = false;
+void CycleToNextMonitor(GLFWwindow* window) {
+    if (get_time() < monitorSwitchTime) return;
+    
+    monitorSwitchTime = get_time() + 1.5f; // Dumb hack to prevent toggling every frame from keypress illogic
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (!monitors || monitorCount < 2) return;
+
+    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
+    GLFWmonitor* next = monitors[currentMonitorIndex];
+
+    int mx, my;
+    glfwGetMonitorPos(next, &mx, &my);
+    const GLFWvidmode* mode = glfwGetVideoMode(next);
+    int xpos = mx + (mode->width - screen_width) / 2;
+    int ypos = my + (mode->height - screen_height) / 2;
+    glfwSetWindowPos(window, xpos, ypos);
+    ignore_next_mouse_delta = true;
+    DualLog("Window moved to monitor %d: %s at %d,%d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
+}
 
 void InitializeEnvironment(void) {
     double init_start_time = get_time();

@@ -64,6 +64,8 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
         int32_t dy = (int32_t)(ypos - last_mouse_y);
         last_mouse_x = xpos;
         last_mouse_y = ypos;
+        if (ignore_next_mouse_delta) { ignore_next_mouse_delta = false; return; }
+        
         if (globalFrameNum > 1) EnqueueEvent_IntInt(EV_MOUSEMOVE, dx, dy);
     }
 }
@@ -228,6 +230,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
 void ProcessInput(void) {
     if (gamePaused || consoleActive) return;
     
+    if (keys[GLFW_KEY_B]) CycleToNextMonitor(window);
     float finalMoveSpeed = move_speed;
     if (keys[GLFW_KEY_LEFT_SHIFT]) finalMoveSpeed = move_speed * 1.75f;
     if (keys[GLFW_KEY_F]) {
