@@ -4,15 +4,31 @@
 #include <errno.h>
 #include <math.h>
 #include "voxen.h"
+#include "citadel_enumerations.h"
 int malloc_trim(size_t pad); // #include <malloc.h>
 typedef unsigned char stbi_uc;
 stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
 
 DataParser entity_parser;
-DataParser lights_parser;
+
 float correctionX, correctionY, correctionZ;
+
+DataParser lights_parser;
 float correctionLightX, correctionLightY, correctionLightZ;
 bool lightIsDynamic[LIGHT_COUNT];
+uint16_t loadedLights = 0;
+
+uint16_t invalidModelIndexCount;
+uint16_t* modelTypeOffsetsOpaque = NULL;
+uint16_t* modelTypeOffsetsDoubleSided = NULL;
+uint16_t* modelTypeOffsetsTransparent = NULL;
+uint16_t opaqueInstancesHead = 0;
+uint16_t renderableCount = 0;
+uint16_t loadedInstances = 0;
+uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
+uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
+uint16_t doubleSidedInstancesHead = 0;
+uint16_t transparentInstancesHead = 0;
 
 // Entities
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
@@ -62,11 +78,39 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
 }
 
 void init_data_entry(ResourceEntry *entry) {
-    entry->cardchunk = entry->doublesided = entry->transparent = false;
     entry->index = UINT16_MAX;
-    entry->modelIndex = entry->lodIndex = MODEL_IDX_MAX;
-    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
+    entry->modelIndex = MODEL_IDX_MAX;
+    entry->lodIndex  = MODEL_IDX_MAX;
+    entry->texIndex  = MATERIAL_IDX_MAX;
+    entry->glowIndex = MATERIAL_IDX_MAX;
+    entry->specIndex = MATERIAL_IDX_MAX;
+    entry->normIndex = MATERIAL_IDX_MAX;
+    
+    entry->doublesided = false;
+    entry->transparent = false;
+    entry->cardchunk = false;
+    
+    entry->collider = COLLIDER_TYPE_NONE;
+    entry->colliderCenter.x = 0.0f;
+    entry->colliderCenter.y = 0.0f;
+    entry->colliderCenter.z = 0.0f;
+    entry->colliderSize.x = 0.0f;
+    entry->colliderSize.y = 0.0f;
+    entry->colliderSize.z = 0.0f;
+    entry->colliderMeshIndex = MODEL_IDX_MAX;
+    entry->mass = 1.0f;
+    entry->kinematic = false;
+    entry->useGravity = false;
+    entry->linearDrag = 0.0f;
+    entry->angularDrag = 0.05f;
+    entry->dynamicFriction = 0.6f;
+    entry->staticFriction = 0.6f;
+    entry->bounciness = 0.00f;
+    entry->frictionCombine = PHYS_COMBINE_AVG;
+    entry->bounceCombine = PHYS_COMBINE_AVG;
+    
     entry->volume = 1.0f;
+    
     entry->child0 = UINT16_MAX;
     entry->child0_offset.x = 0.0f;
     entry->child0_offset.y = 0.0f;
@@ -125,25 +169,46 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
         entry->path[sizeof(entry->path) - 1] = '\0';
         return true;
     }
-         if (strcmp(trimmed_key, "index") == 0)           entry->index = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "model") == 0)           entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "texture") == 0)         entry->texIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "glowtexture") == 0)     entry->glowIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "spectexture") == 0)     entry->specIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "normtexture") == 0)     entry->normIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "doublesided") == 0)     entry->doublesided = parse_bool(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "transparent") == 0)     entry->transparent = parse_bool(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "cardchunk") == 0)       entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "volume") == 0)          entry->volume = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0") == 0)          entry->child0 = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0_offsetx") == 0)  entry->child0_offset.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0_offsety") == 0)  entry->child0_offset.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0_offsetz") == 0)  entry->child0_offset.z = parse_float(trimmed_value, line, lineNum);
+         if (strcmp(trimmed_key, "index") == 0)             entry->index = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "model") == 0)             entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "texture") == 0)           entry->texIndex = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "glowtexture") == 0)       entry->glowIndex = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "spectexture") == 0)       entry->specIndex = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "normtexture") == 0)       entry->normIndex = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "doublesided") == 0)       entry->doublesided = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "transparent") == 0)       entry->transparent = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "cardchunk") == 0)         entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
+
+    else if (strcmp(trimmed_key, "collider") == 0)          entry->collider = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "collider_centerx") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "collider_centery") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "collider_centerz") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "collider_sizex") == 0)    entry->colliderSize.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "collider_sizey") == 0)    entry->colliderSize.y = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "collider_sizez") == 0)    entry->colliderSize.z = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "colliderMeshIndex") == 0) entry->colliderMeshIndex = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "mass") == 0)              entry->mass = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "linearDrag") == 0)        entry->linearDrag = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "angularDrag") == 0)       entry->angularDrag = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "kinematic") == 0)         entry->kinematic = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "useGravity") == 0)        entry->useGravity = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "bounciness") == 0)        entry->bounciness = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry->dynamicFriction = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "bounciness") == 0)        entry->bounciness = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry->frictionCombine = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry->bounceCombine = parse_numberu8(trimmed_value, line, lineNum);
+
+    else if (strcmp(trimmed_key, "volume") == 0)            entry->volume = parse_float(trimmed_value, line, lineNum);
     
-    else if (strcmp(trimmed_key, "child1") == 0)          entry->child1 = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child1_offsetx") == 0)  entry->child1_offset.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child1_offsety") == 0)  entry->child1_offset.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child1_offsetz") == 0)  entry->child1_offset.z = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0") == 0)            entry->child0 = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0_offsetx") == 0)    entry->child0_offset.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0_offsety") == 0)    entry->child0_offset.y = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child0_offsetz") == 0)    entry->child0_offset.z = parse_float(trimmed_value, line, lineNum);
+    
+    else if (strcmp(trimmed_key, "child1") == 0)            entry->child1 = parse_numberu16(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child1_offsetx") == 0)    entry->child1_offset.x = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child1_offsety") == 0)    entry->child1_offset.y = parse_float(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "child1_offsetz") == 0)    entry->child1_offset.z = parse_float(trimmed_value, line, lineNum);
     
     else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
     else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
@@ -326,28 +391,67 @@ void LoadEntities(void) {
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
-        entities[i].index = entity_parser.entries[i].index;
+        entities[i].index = entity_parser.entries[i].index;           // Different struct types, can't just wholesale assign.
+        bool isCardChunk = entity_parser.entries[i].cardchunk;
+        flag_enable(&entities[i].entflags, ENTFLAG_ACTIVE);
+        flag_set(&entities[i].entflags,    ENTFLAG_CARDCHUNK, isCardChunk);
+        flag_set(&entities[i].entflags,    ENTFLAG_GROUNDED, false);
+        flag_set(&entities[i].entflags,    ENTFLAG_USEGRAVITY, entity_parser.entries[i].useGravity);
+        flag_set(&entities[i].entflags,    ENTFLAG_KINEMATIC, entity_parser.entries[i].kinematic);
+        flag_set(&entities[i].entflags,    ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(entities[i].index));
+        
         entities[i].modelIndex = entity_parser.entries[i].modelIndex;
         entities[i].texIndex = entity_parser.entries[i].texIndex;
         entities[i].glowIndex = entity_parser.entries[i].glowIndex;
         entities[i].specIndex = entity_parser.entries[i].specIndex;
         entities[i].normIndex = entity_parser.entries[i].normIndex;
-        bool isCardChunk = entity_parser.entries[i].cardchunk;
         entities[i].lodIndex = isCardChunk ? GEOMETRY_LOD_CARD_MODEL_IDX : entity_parser.entries[i].lodIndex; // Generic LOD card
-        flag_enable(&entities[i].entflags, ENTFLAG_ACTIVE);
-        flag_set(&entities[i].entflags, ENTFLAG_CARDCHUNK, isCardChunk);
-        entities[i].volume = entity_parser.entries[i].volume;
+
         entities[i].position.x = 0.0f;
         entities[i].position.y = 0.0f;
         entities[i].position.z = 0.0f;
-        entities[i].scale.x = 1.0f;
-        entities[i].scale.y = 1.0f;
-        entities[i].scale.z = 1.0f;
         entities[i].rotation.x = 0.0f;
         entities[i].rotation.y = 0.0f;
         entities[i].rotation.z = 0.0f;
         entities[i].rotation.w = 1.0f;
+        entities[i].scale.x = 1.0f;
+        entities[i].scale.y = 1.0f;
+        entities[i].scale.z = 1.0f;
+        entities[i].velocity.x = 0.0f;
+        entities[i].velocity.y = 0.0f;
+        entities[i].velocity.z = 0.0f;
+        entities[i].angularVelocity.x = 0.0f;
+        entities[i].angularVelocity.y = 0.0f;
+        entities[i].angularVelocity.z = 0.0f;
         
+        entities[i].bodyState = BodyState_Standing;
+        
+        entities[i].collider = entity_parser.entries[i].collider;
+        entities[i].colliderCenter.x = entity_parser.entries[i].colliderCenter.x;
+        entities[i].colliderCenter.y = entity_parser.entries[i].colliderCenter.y;
+        entities[i].colliderCenter.z = entity_parser.entries[i].colliderCenter.z;
+        entities[i].colliderSize.x = entity_parser.entries[i].colliderSize.x;
+        entities[i].colliderSize.y = entity_parser.entries[i].colliderSize.y;
+        entities[i].colliderSize.z = entity_parser.entries[i].colliderSize.z;
+        entities[i].colliderMeshIndex = entity_parser.entries[i].colliderMeshIndex;
+        entities[i].mass = entity_parser.entries[i].mass;
+        entities[i].linearDrag = entity_parser.entries[i].linearDrag;
+        entities[i].angularDrag = entity_parser.entries[i].angularDrag;
+        entities[i].inertia = 0.0f;
+        entities[i].accumulatedForce.x = 0.0f;
+        entities[i].accumulatedForce.y = 0.0f;
+        entities[i].accumulatedForce.z = 0.0f;
+        entities[i].accumulatedTorque.x = 0.0f;
+        entities[i].accumulatedTorque.y = 0.0f;
+        entities[i].accumulatedTorque.z = 0.0f;
+        entities[i].dynamicFriction = entity_parser.entries[i].dynamicFriction;
+        entities[i].staticFriction = entity_parser.entries[i].staticFriction;
+        entities[i].bounciness = entity_parser.entries[i].bounciness;
+        entities[i].frictionCombine = entity_parser.entries[i].frictionCombine;
+        entities[i].bounceCombine = entity_parser.entries[i].bounceCombine;
+
+        entities[i].volume = entity_parser.entries[i].volume;
+
         entities[i].child0 = entity_parser.entries[i].child0;
         entities[i].child0_offset.x = entity_parser.entries[i].child0_offset.x;
         entities[i].child0_offset.y = entity_parser.entries[i].child0_offset.y;
@@ -381,6 +485,7 @@ void LoadEntities(void) {
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max entity count of %d\n",lineNum,entIdx,MAX_ENTITIES); exit(1); }
             
+    instances[instanceIdx].index = entIdx;
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
     if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
@@ -391,7 +496,15 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
     if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
+//     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
+    instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
+    instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+
     if (ConstIndexIsDoor(entIdx)) {
         instances[instanceIdx].position.x += correctionX + 0.6001f;
         instances[instanceIdx].position.y += correctionY - 0.5681f;
@@ -402,7 +515,6 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         instances[instanceIdx].position.z += correctionZ;
     }
 
-    instances[instanceIdx].index = entIdx;
     loadedInstances++;
 }
 

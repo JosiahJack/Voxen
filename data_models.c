@@ -30,25 +30,13 @@ uint32_t* modelTriangleCounts = NULL;
 uint16_t* modelTypeCountsOpaque = NULL;
 uint16_t* modelTypeCountsDoubleSided = NULL;
 uint16_t* modelTypeCountsTransparent = NULL;
-uint16_t invalidModelIndexCount;
-uint16_t* modelTypeOffsetsOpaque = NULL;
-uint16_t* modelTypeOffsetsDoubleSided = NULL;
-uint16_t* modelTypeOffsetsTransparent = NULL;
-uint16_t opaqueInstancesHead = 0;
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
 GLuint* vbos = NULL;
 GLuint* tbos = NULL;
 GLuint modelBoundsID;
 float* modelBounds = NULL;
-uint16_t renderableCount = 0;
-uint16_t loadedInstances = 0;
 uint16_t loadedModels = 0;
-uint16_t loadedLights = 0;
-uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
-uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
-uint16_t doubleSidedInstancesHead = 0;
-uint16_t transparentInstancesHead = 0;
 
 //-----------------------------------------------------------------------------
 // Loads all 3D meshes

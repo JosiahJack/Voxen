@@ -36,17 +36,51 @@ void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args
 void DualLogEntity(uint16_t idx) {
     DualLog("Entity instance[%u]::\n"
             "    index: %u\n"
-            "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n    ]\n"
-            "    position.x: %f, .y: %f, .z: %f\n"
-            "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-            "    scale.x: %f, .y: %f, .z: %f\n"
-            "    velocity.x: %f, .y: %f, .z: %f\n"
+            "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
+            
             "    modelIndex: %u\n"
             "    texIndex:   %u\n"
             "    glowIndex:  %u\n"
             "    specIndex:  %u\n"
             "    normIndex:  %u\n"
-            "    lodIndex:   %u\n",
+            "    lodIndex:  %u\n"
+            
+            "    position.x: %f, .y: %f, .z: %f\n"
+            "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+            "    scale.x: %f, .y: %f, .z: %f\n"
+            "    velocity.x: %f, .y: %f, .z: %f\n"
+            "    angularVelocity.x: %f, .y: %f, .z: %f\n"
+            
+            "    bodyState: %u\n"
+            
+            "    collider: %u\n"
+            "    colliderCenter.x: %f, .y: %f, .z: %f\n"
+            "    colliderSize.x: %f, .y: %f, .z: %f\n"
+            "    colliderMeshIndex: %u,\n"
+            "    mass: %f\n"
+            "    linearDrag: %f\n"
+            "    angularDrag: %f\n"
+            "    inertia: %f\n"
+            "    accumulatedForce.x: %f, .y: %f, .z: %f\n"
+            "    accumulatedTorque.x: %f, .y: %f, .z: %f\n"
+            "    bounciness: %f\n"
+            "    dynamicFriction: %f\n"
+            "    staticFriction: %f\n"
+            "    frictionCombine: %u\n"
+            "    bounceCombine: %u\n"
+            
+            "    volume: %f\n"
+            
+            "    child0: %u\n"
+            "    child0_offset.x: %f, .y: %f, .z: %f\n"
+            "    child0_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+            "    child0_scale.x: %f, .y: %f, .z: %f\n"
+            
+            "    child1: %u\n"
+            "    child1_offset.x: %f, .y: %f, .z: %f\n"
+            "    child1_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+            "    child1_scale.x: %f, .y: %f, .z: %f\n"
+            ,
             idx,
             instances[idx].index,
             instances[idx].entflags,
@@ -54,16 +88,66 @@ void DualLogEntity(uint16_t idx) {
                 (instances[idx].entflags & ENTFLAG_CARDCHUNK) > 0,
                 (instances[idx].entflags & ENTFLAG_GROUNDED) > 0,
                 (instances[idx].entflags & ENTFLAG_USEGRAVITY) > 0,
-            instances[idx].position.x, instances[idx].position.y, instances[idx].position.z,
-            instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w,
-            instances[idx].scale.x, instances[idx].scale.y, instances[idx].scale.z,
-            instances[idx].velocity.x, instances[idx].velocity.y, instances[idx].velocity.z,
+                (instances[idx].entflags & ENTFLAG_KINEMATIC) > 0,
+                (instances[idx].entflags & ENTFLAG_RIGIDBODY) > 0,
+            
             instances[idx].modelIndex,
             instances[idx].texIndex,
             instances[idx].glowIndex,
             instances[idx].specIndex,
             instances[idx].normIndex,
-            instances[idx].lodIndex);
+            instances[idx].lodIndex,
+            
+            instances[idx].position.x, instances[idx].position.y, instances[idx].position.z,
+            instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w,
+            instances[idx].scale.x, instances[idx].scale.y, instances[idx].scale.z,
+            instances[idx].velocity.x, instances[idx].velocity.y, instances[idx].velocity.z,
+            instances[idx].angularVelocity.x, instances[idx].angularVelocity.y, instances[idx].angularVelocity.z,
+            
+            instances[idx].bodyState,
+            
+            instances[idx].collider,
+            instances[idx].colliderCenter.x, instances[idx].colliderCenter.y, instances[idx].colliderCenter.z,
+            instances[idx].colliderSize.x, instances[idx].colliderSize.y, instances[idx].colliderSize.z,
+            instances[idx].colliderMeshIndex,
+            instances[idx].mass,
+            instances[idx].linearDrag,
+            instances[idx].angularDrag,
+            instances[idx].inertia,
+            instances[idx].accumulatedForce.x, instances[idx].accumulatedForce.y, instances[idx].accumulatedForce.z,
+            instances[idx].accumulatedTorque.x, instances[idx].accumulatedTorque.y, instances[idx].accumulatedTorque.z,
+            instances[idx].dynamicFriction,
+            instances[idx].staticFriction,
+            instances[idx].bounciness,
+            instances[idx].frictionCombine,
+            instances[idx].bounceCombine,
+            
+            instances[idx].volume,
+            
+            instances[idx].child0,
+            instances[idx].child0_offset.x,
+            instances[idx].child0_offset.y,
+            instances[idx].child0_offset.z,
+            instances[idx].child0_rotation.x,
+            instances[idx].child0_rotation.y,
+            instances[idx].child0_rotation.z,
+            instances[idx].child0_rotation.w,
+            instances[idx].child0_scale.x,
+            instances[idx].child0_scale.y,
+            instances[idx].child0_scale.z,
+            
+            instances[idx].child1,
+            instances[idx].child1_offset.x,
+            instances[idx].child1_offset.y,
+            instances[idx].child1_offset.z,
+            instances[idx].child1_rotation.x,
+            instances[idx].child1_rotation.y,
+            instances[idx].child1_rotation.z,
+            instances[idx].child1_rotation.w,
+            instances[idx].child1_scale.x,
+            instances[idx].child1_scale.y,
+            instances[idx].child1_scale.z
+            );
 }
 #pragma GCC diagnostic pop
 

@@ -23,72 +23,6 @@ int32_t ParticleSystemStep(void) {
 }
 
 // ================================= Vector Logic ==================================
-void normalize_vector(float* x, float* y, float* z) {
-    float len = sqrtf(*x * *x + *y * *y + *z * *z);
-    if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } // Length check to avoid division by zero.
-}
-
-static inline Vector3 sub_vector3(Vector3 a, Vector3 b) {
-    Vector3 res = {a.x - b.x, a.y - b.y, a.z - b.z};
-    return res;
-}
-
-static inline Vector3 add_vector3(Vector3 a, Vector3 b) {
-    Vector3 res = {a.x + b.x, a.y + b.y, a.z + b.z};
-    return res;
-}
-
-static inline Vector3 scale_vector3(Vector3 v, float s) {
-    Vector3 res = {v.x * s, v.y * s, v.z * s};
-    return res;
-}
-
-float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
-    return x1 * x2 + y1 * y2 + z1 * z2;
-}
-
-static inline float dot_vector3(Vector3 a, Vector3 b) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-static inline float dist_sq_vector3(Vector3 a, Vector3 b) {
-    Vector3 d = sub_vector3(a, b);
-    return dot_vector3(d, d);
-}
-
-static inline Vector3 cross_vector3(Vector3 a, Vector3 b) {
-    Vector3 res;
-    res.x = a.y * b.z - a.z * b.y;
-    res.y = a.z * b.x - a.x * b.z;
-    res.z = a.x * b.y - a.y * b.x;
-    return res;
-}
-
-static inline float length_vector3(Vector3 v) {
-    return sqrtf(dot_vector3(v, v));
-}
-
-static inline Vector3 normalize_vector3(Vector3 v) {
-    float len = length_vector3(v);
-    if (len > 1e-6f) {
-        v.x /= len; v.y /= len; v.z /= len;
-    }
-    return v;
-}
-
-static inline float clampf(float x, float a, float b) {
-    return x < a ? a : (x > b ? b : x);
-}
-
-static inline Vector3 mul_mat4_vector3(const float* mat, Vector3 v) {
-    // Assume homogeneous, w=1
-    Vector3 res;
-    res.x = mat[0] * v.x + mat[4] * v.y + mat[8] * v.z + mat[12];
-    res.y = mat[1] * v.x + mat[5] * v.y + mat[9] * v.z + mat[13];
-    res.z = mat[2] * v.x + mat[6] * v.y + mat[10] * v.z + mat[14];
-    return res;
-}
-
 void UpdatePlayerFacingAngles() {
     float rotation[16]; // Extract forward and right vectors from quaternion
     quat_to_matrix(&cam_rotation, rotation);
@@ -271,7 +205,6 @@ void PlayerPhysics(void) {
     uint32_t numTrisProcessed = 0;
     for (uint32_t i = 3; i < loadedInstances; i++) { // Skip player indices and start at 3
         if (instances[i].modelIndex > loadedModels) continue;
-        if (ConstIndexIsDynamicObject(instances[i].index)) continue;
         if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
         
         int32_t mid = instances[i].entflags & ENTFLAG_CARDCHUNK ? GEOMETRY_LOD_CARD_MODEL_IDX : instances[i].modelIndex;

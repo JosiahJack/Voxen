@@ -2,7 +2,6 @@
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.2"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-#define DEBUG_MODEL_LOAD_DATA 1U
 
 // Generic Lib Includes
 #include <time.h>
@@ -13,40 +12,66 @@
 #include <GLFW/glfw3.h>
 #include "External/stb_truetype.h"
 #include "citadel_enumerations.h"
+#include "matvecquat.h"
 
 // Generic Constants
 #define M_PI 3.141592653f
 #define MAX_PATH 128
 
 // Global Types
-typedef struct { float x,y; } Vector2;
-typedef struct { float x,y,z; } Vector3;
-typedef struct { float x,y,z,w; } Quaternion;
 typedef struct { float r,g,b,a; } Color;
 
 #define NULLENT 0
 #define PLAYER1 1
 #define PLAYER2 2
 #define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE 1
-#define ENTFLAG_CARDCHUNK 2
-#define ENTFLAG_GROUNDED 4
+#define ENTFLAG_ACTIVE     1
+#define ENTFLAG_CARDCHUNK  2
+#define ENTFLAG_GROUNDED   4
 #define ENTFLAG_USEGRAVITY 8
+#define ENTFLAG_KINEMATIC 16
+#define ENTFLAG_RIGIDBODY 32
+
+typedef uint8_t PhysCombineType;
+typedef uint8_t ColliderType;
 
 typedef struct {
-    Vector3 position;
-    Quaternion rotation;
-    Vector3 scale;
-    Vector3 velocity;
+    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     uint32_t entflags;
+    
     uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t glowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;
-    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
+
+    Vector3 position; // global worldspace xyz location
+    Quaternion rotation; // Orientation matching Unity convention
+    Vector3 scale;
+    Vector3 velocity;
+    Vector3 angularVelocity;
+    
     BodyState bodyState;
+    
+    ColliderType collider;
+    Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
+    Vector3 colliderSize; // x,y,z for Box,
+                          // x for Sphere radius,
+                          // x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
+    uint16_t colliderMeshIndex;
+    float mass;
+    float linearDrag;
+    float angularDrag;
+    float inertia;
+    Vector3 accumulatedForce;
+    Vector3 accumulatedTorque;
+    float dynamicFriction;
+    float staticFriction;
+    float bounciness;
+    PhysCombineType frictionCombine;
+    PhysCombineType bounceCombine;
+    
     float volume;
     
     uint16_t   child0;
@@ -74,9 +99,26 @@ typedef struct {
     uint16_t glowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
+    
     bool doublesided;
     bool transparent;
     bool cardchunk;
+    
+    ColliderType collider;
+    Vector3 colliderCenter;
+    Vector3 colliderSize;
+    uint16_t colliderMeshIndex;
+    float mass;
+    bool kinematic;
+    bool useGravity;
+    float linearDrag;
+    float angularDrag;
+    float dynamicFriction;
+    float staticFriction;
+    float bounciness;
+    PhysCombineType frictionCombine;
+    PhysCombineType bounceCombine;
+    
     float volume;
     
     uint16_t   child0;
@@ -311,6 +353,20 @@ bool get_cull_bit(const uint32_t* arr, size_t idx);
 #define PLAYER_RADIUS 0.48f
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
+#define PHYS_COMBINE_AVG 0 // All the same for both frictionCombine and bounceCombine
+#define PHYS_COMBINE_MIN 1
+#define PHYS_COMBINE_MUL 2
+#define PHYS_COMBINE_MAX 3
+#define COLLIDER_TYPE_NONE 0
+#define COLLIDER_TYPE_BOX 1
+#define COLLIDER_TYPE_SPHERE 2
+#define COLLIDER_TYPE_CAPSULE 3
+#define COLLIDER_TYPE_CONVEXMESH 4
+#define COLLIDER_TYPE_MESH 5
+#define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
+#define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
+#define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
+// TODO: Ensure that npc corpses get dynamicFriction of 10.0f, staticFriction of 10.0f, bounciness of 0.0f, frictionCombine of 2, bounceCombine of 3
 extern double time_PhysicsStep;
 extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
@@ -348,7 +404,6 @@ extern float move_speed;
 int32_t ParticleSystemStep(void);
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
-void quat_to_matrix(Quaternion* q, float* m);
 // ----------------------------------------------------------------------------
 // Input
 #define NUM_KEYS 350
@@ -403,7 +458,6 @@ GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* da
 void Screenshot(void);
 void ToggleConsole(void);
 bool CursorVisible(void);
-float dot(float x1, float y1, float z1, float x2, float y2, float z2);
 // ----------------------------------------------------------------------------
 // Text
 #define TEXT_WHITE 0
@@ -470,15 +524,30 @@ void DualLogEntity(uint16_t idx);
 // ============================================================================
 // ----------------------------------------------------------------------------
 // Helper Functions
+extern uint32_t random_range_rng;
 double get_time(void);
 void md5(const uint8_t *data, size_t len, uint8_t out[16]);
+void normalize_vector(float* x, float* y, float* z);
+Vector3 add_vector3(Vector3 a, Vector3 b);
+Vector3 sub_vector3(Vector3 a, Vector3 b);
+Vector3 scale_vector3(Vector3 v, float s);
+float dot(float x1, float y1, float z1, float x2, float y2, float z2);
+float dot_vector3(Vector3 a, Vector3 b);
+float dist_sq_vector3(Vector3 a, Vector3 b);
+Vector3 cross_vector3(Vector3 a, Vector3 b);
+float length_vector3(Vector3 v);
+Vector3 normalize_vector3(Vector3 v);
+Vector3 mul_mat4_vector3(const float* mat, Vector3 v);
+void quat_to_matrix(Quaternion* q, float* m);
+float clampf(float x, float a, float b);
+uint32_t xs32(uint32_t *s);
+uint8_t random_range_u8(uint8_t a, uint8_t b);
 bool ConstIndexInBounds(int constdex);
 bool ConstIndexIsGeometry(int constdex);
 bool ConstIndexIsDynamicObject(uint16_t constIndex);
 bool ConstIndexIsDoor(int constdex);
 bool ConstIndexIsLightStaticSaveable(int constdex);
 bool ConstIndexIsGenericTransform(int constdex);
-bool ConstIndexIsDynamicObject(uint16_t constIndex);
 bool ConstIndexIsStaticObjectImmutable(int constdex);
 bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);

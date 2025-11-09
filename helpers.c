@@ -182,32 +182,24 @@ GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* da
     return new_id;
 }
 
-// Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
-void quat_to_matrix(Quaternion* q, float* m) {
-    float x = q->x, y = q->y, z = q->z, w = q->w;
-    float x2 = x * x, y2 = y * y, z2 = z * z;
-    float xy = x * y, xz = x * z, yz = y * z;
-    float wx = w * x, wy = w * y, wz = w * z;
-
-    // Column-major rotation matrix for Unity (Y+ up, Z+ forward, X+ right)
-    m[0]  = 1.0f - 2.0f * (y2 + z2); // Right X
-    m[1]  = 2.0f * (xy + wz);        // Right Y
-    m[2]  = 2.0f * (xz - wy);        // Right Z
-    m[3]  = 0.0f;
-    m[4]  = 2.0f * (xy - wz);        // Up X
-    m[5]  = 1.0f - 2.0f * (x2 + z2); // Up Y
-    m[6]  = 2.0f * (yz + wx);        // Up Z
-    m[7]  = 0.0f;
-    m[8]  = 2.0f * (xz + wy);        // Forward X
-    m[9]  = 2.0f * (yz - wx);        // Forward Y
-    m[10] = 1.0f - 2.0f * (x2 + y2); // Forward Z
-    m[11] = 0.0f;
-    m[12] = 0.0f;
-    m[13] = 0.0f;
-    m[14] = 0.0f;
-    m[15] = 1.0f;
-}
-
 bool CursorVisible(void) {
     return (inventoryMode || menuActive || gamePaused);
+}
+
+float clampf(float x, float a, float b) {
+    return x < a ? a : (x > b ? b : x);
+}
+
+uint32_t random_range_rng = 0x12345678u; // Global seed
+uint32_t xs32(uint32_t *s) {
+    uint32_t x=*s; x^=x<<13; x^=x>>17; x^=x<<5;
+    return *s = x ? x : 0xdeadbeefu;
+}
+
+uint8_t random_range_u8(uint8_t a, uint8_t b) {
+    uint8_t n = (uint8_t)(b - a + 1u);
+    if (!n) return a; // handle wrap if a>b (undefined otherwise)
+    uint8_t v, t = (uint8_t)(256u % n);
+    do v = (uint8_t)xs32(&random_range_rng); while (v >= 256u - t);
+    return (uint8_t)(a + (v % n));
 }

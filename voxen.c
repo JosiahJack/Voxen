@@ -478,32 +478,6 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float
     m[15] = 1.0f;
 }
 
-bool IsSphereInFOVCone(float inst_x, float inst_y, float inst_z) {
-    // Vector from camera to instance
-    float to_inst_x = inst_x - instances[PLAYER1].position.x;
-    float to_inst_y = inst_y - instances[PLAYER1].position.y;
-    float to_inst_z = inst_z - instances[PLAYER1].position.z;
-    float dist_sq = to_inst_x * to_inst_x + to_inst_y * to_inst_y + to_inst_z * to_inst_z;
-    if (dist_sq < 13.107200002f) return true; // ((sqrt(2) * 2.56f)^2)^2
-
-    // Precompute FOV constants (assuming cam_fov is constant per frame)
-    static float cos_half_fov = 0.0f;
-    static float last_cam_fov = -1.0f;
-    if (cam_fov != last_cam_fov) {
-        float fovAdjusted = cam_fov * 2.5f;
-        float half_fov_rad = fovAdjusted * 0.5f * (M_PI / 180.0f); // deg2rad
-        cos_half_fov = cosf(half_fov_rad);
-        last_cam_fov = cam_fov;
-    }
-
-    // Compute dot product without normalization
-    float dot = cam_forwardx * to_inst_x + cam_forwardy * to_inst_y + cam_forwardz * to_inst_z;
-    float dist = sqrtf(dist_sq); // Only compute sqrt once
-    float dot_normalized = dot / dist; // Normalize dot product
-    if (dot_normalized >= cos_half_fov) return true; // Center is within FOV cone
-    return false; // Outside FOV cone
-}
-
 bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
     for (int i = 0; i < 6; i++) {
         float dist = planes[i].nx * cx + planes[i].ny * cy + planes[i].nz * cz + planes[i].d;
@@ -1157,21 +1131,6 @@ void CenterStatusPrint(const char* fmt, ...) {
     statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.
 }
 // ============================================================================
-uint32_t random_range_rng = 0x12345678u; // Global seed
-static inline uint32_t xs32(uint32_t *s){
-    uint32_t x=*s; x^=x<<13; x^=x>>17; x^=x<<5;
-    return *s = x ? x : 0xdeadbeefu;
-}
-
-static inline uint8_t random_range_u8(uint8_t a, uint8_t b){
-    uint8_t n = (uint8_t)(b - a + 1u);
-    if (!n) return a; // handle wrap if a>b (undefined otherwise)
-    uint8_t v, t = (uint8_t)(256u % n);
-    do v = (uint8_t)xs32(&random_range_rng); while (v >= 256u - t);
-    return (uint8_t)(a + (v % n));
-}
-
-// ============================================================================
 void InitializePlayer(uint16_t playerIdx) {
     instances[playerIdx].position.x = -20.4f;
     instances[playerIdx].position.y = -43.79f + 0.84f; // Added 0.84f for cam offset from center
@@ -1179,8 +1138,26 @@ void InitializePlayer(uint16_t playerIdx) {
     instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
     instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
     instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
+    instances[playerIdx].entflags = 0x00000000000000000000000000000000u; // Zero out all bits (yes I realize this representation is excessive lol)
+    flag_enable(&instances[playerIdx].entflags, ENTFLAG_ACTIVE);
     flag_enable(&instances[playerIdx].entflags, ENTFLAG_USEGRAVITY);
+    flag_enable(&instances[playerIdx].entflags, ENTFLAG_RIGIDBODY);
     instances[playerIdx].bodyState = BodyState_Standing;
+    instances[playerIdx].collider = COLLIDER_TYPE_CAPSULE;
+    instances[playerIdx].colliderCenter.x = 0.0f;
+    instances[playerIdx].colliderCenter.y = 0.0f;
+    instances[playerIdx].colliderCenter.z = 0.0f;
+    instances[playerIdx].colliderSize.x = 0.48f; // Radius
+    instances[playerIdx].colliderSize.y = 2.0f;  // Overall height including end radii (Unity convention, blech)
+    instances[playerIdx].colliderSize.z = COLLIDER_CAPSULE_DIRECTION_X_F; // Direction, 1.0 == Y-Axis
+    instances[playerIdx].mass = 1.0f;
+    instances[playerIdx].linearDrag = 0.0f;
+    instances[playerIdx].angularDrag = 0.0f;
+    instances[playerIdx].dynamicFriction = 0.0f;
+    instances[playerIdx].staticFriction = 0.0f;
+    instances[playerIdx].bounciness = 0.0f;
+    instances[playerIdx].frictionCombine = PHYS_COMBINE_MUL;
+    instances[playerIdx].bounceCombine = PHYS_COMBINE_AVG;
 }
 
 void NewGame(void) {
@@ -1221,6 +1198,7 @@ void NewGame(void) {
     DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
     pauseRelativeTime = 0.0f;
     levelCurrentlyLoading = false;
+    DualLogEntity(PLAYER1);
 }
 
 static const float quadBlit_vertices[] = {
@@ -1584,7 +1562,7 @@ int32_t main(int32_t argc, char* argv[]) {
     }
 
     InitializeEnvironment();
-//     double last_physics_time = get_time();
+    double last_physics_time = get_time();
     last_time = get_time();
     DebugRAM("prior to game loop");
     Input_MouselookApply();
@@ -1606,11 +1584,11 @@ int32_t main(int32_t argc, char* argv[]) {
         // Enqueue input events
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
-//         double timeSinceLastPhysicsTick = current_time - last_physics_time;
-//         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
-//             last_physics_time = current_time;
+        double timeSinceLastPhysicsTick = current_time - last_physics_time;
+        if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
+            last_physics_time = current_time;
             EnqueueEvent_Simple(EV_PHYSICS_TICK);
-//         }
+        }
 
         // Enqueue all logged events for the current frame.
         if (log_playback) {

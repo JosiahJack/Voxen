@@ -38,7 +38,7 @@ build_start=$(now_ms)
 CC=gcc
 CFLAGS="-fopenmp -std=c11 -Wall -Wextra -O2 -D_POSIX_C_SOURCE=199309L"
 LDFLAGS="-flto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.4.a -l:libminiaudio.0.11.22.a -lGLEW -lGL -lm -lfontconfig -fopenmp"
-SOURCES="voxen.c data_parser.c physics.c data_fonts.c audio.c helpers.c event.c data_models.c data_textures.c"
+SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c event.c data_models.c data_textures.c"
 
 # Array to store PIDs and source names
 declare -a pids
@@ -90,6 +90,11 @@ declare -a sources
 # gcc -c event.c $CFLAGS -o "$TEMP_DIR"/event.o
 # eventc_end=$(now_ms)
 # echo "event.c: $((eventc_end - eventc_time)) ms"
+
+# matvecquatc_time=$(now_ms)
+# gcc -c matvecquat.c $CFLAGS -o "$TEMP_DIR"/matvecquat.o
+# matvecquatc_end=$(now_ms)
+# echo "matvecquat.c: $((eventc_end - matvecquatc_time)) ms"
 #========================================================
 # PARALLEL BUILD
 #========================================================
