@@ -48,7 +48,7 @@ typedef struct {
 GLFWwindow *window;
 double monitorSwitchTime;
 bool inventoryMode = false;
-uint16_t screen_width = 1366, screen_height = 768;
+uint16_t screen_width = 1920, screen_height = 1080;
 // ----------------------------------------------------------------------------
 // Diagnostics
 double game_start_time = 0.00;
@@ -139,7 +139,7 @@ uint32_t totalShadowmapPixels = 0;
 uint32_t shadSizeSquared = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE;
 
 //    SSR (Screen Space Reflections)
-#define SSR_RES 4 // 25% of render resolution.
+#define SSR_RES 2 // 50% of render resolution.
 GLuint ssrShaderProgram;
 GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr;
 
@@ -1094,7 +1094,7 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
     glBindVertexArray(0);
 }
 
-void RenderLoadingProgress(int32_t offset, const char* format, ...) {
+void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only adds 0.01secs to game startup time.
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, inputImageID);

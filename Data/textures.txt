@@ -19,8 +19,6 @@
 // Unneeded fields do not need to be specified.
 #Textures/UI/ss1_original_palette_FULL.png
 index: 0
-#Textures/access_card01.png
-index: 79
 #Textures/access_card02.png
 index: 1
 #Textures/access_card03.png
@@ -184,8 +182,14 @@ index: 76
 index: 77
 #Textures/chipset_interface_demodulator.png
 index: 78
-#Textures/obsidian_normal.png
+#Textures/access_card01.png
 index: 79
+#Textures/audiolog_glow.png
+index: 80
+#Textures/access_card04_glow.png
+index: 81
+#Textures/access_card10_glow.png
+index: 82
 #Textures/citmat1_1.png
 index: 83
 #Textures/citmat1_2_glow.png
@@ -350,7 +354,12 @@ index: 157
 #Textures/darthit.png
 index: 158
 transparent: 1
-
+#Textures/access_card08_glow.png
+index: 159
+#Textures/obsidian_normal.png
+index: 160
+#Textures/access_card02_glow.png
+index: 161
 #Textures/dexmissile_glow.png
 index: 162
 #Textures/dexmissile_normal.png
@@ -776,7 +785,14 @@ index: 338
 index: 339
 #Textures/g_energmine.png
 index: 340
-
+#Textures/access_card09_glow.png
+index: 341
+#Textures/access_card06_glow.png
+index: 342
+#Textures/access_card03_glow.png
+index: 343
+#Textures/access_card11_glow.png
+index: 344
 #Textures/g_eshaker_active.png
 index: 345
 #Textures/g_eshaker.png
@@ -1808,7 +1824,8 @@ index: 864
 index: 865
 #Textures/toolbox_wheeled_specular.png
 index: 866
-
+#Textures/access_card01_glow.png
+index: 867
 #Textures/vending1.png
 index: 870
 #Textures/vending2.png
@@ -2521,7 +2538,8 @@ index: 1251
 index: 1252
 #Textures/sequences/engpump_03.png
 index: 1253
-
+#Textures/med2_1_spec.png
+index: 1254
 #Textures/med1_1_norm.png
 index: 1255
 #Textures/a20_20_43.png
@@ -2546,3 +2564,11 @@ index: 1264
 index: 1265
 #Textures/UI/cursors/cursor_cyberspace.png
 index: 1266
+#Textures/med1_9_spec.png
+index: 1267
+#Textures/med1_7_spec.png
+index: 1268
+#Textures/med1_7d_spec.png
+index: 1269
+#Textures/med1_7d_norm.png
+index: 1270

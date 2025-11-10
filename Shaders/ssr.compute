@@ -11,7 +11,7 @@ uniform uint screenWidth;
 uniform uint screenHeight;
 uniform mat4 viewProjection;
 uniform vec3 camPos;
-const int SSR_RES = 4;
+const int SSR_RES = 2;
 
 vec4 unpackColor32(uint color) {
     return vec4(float((color >> 24) & 0xFFu) / 255.0,  // r

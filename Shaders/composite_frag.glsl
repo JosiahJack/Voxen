@@ -36,7 +36,7 @@ uniform float shadowmapSize;
 uniform mat4 viewProjection;
 uniform mat3 invViewRot;
 
-const int SSR_RES = 4;
+const int SSR_RES = 2; // 1/SSR_RES = scale factor, e.g. 1/4 = 25% resolution vs main screen.
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
@@ -309,6 +309,21 @@ vec3 applyBerserk(vec3 worldPos, vec3 base) {
     return mix(berserkColor, inverted * berserkColor * 1.5, invertFade);
 }
 
+const float reflectionWeights[25] = float[](
+    0.00390625, 0.015625, 0.0234375, 0.015625, 0.00390625,
+    0.015625,   0.0625,   0.09375,   0.0625,   0.015625,
+    0.0234375,  0.09375,  0.140625,  0.09375,  0.0234375,
+    0.015625,   0.0625,   0.09375,   0.0625,   0.015625,
+    0.00390625, 0.015625, 0.0234375, 0.015625, 0.00390625
+);
+
+ivec2 reflectionOffsets[25] = ivec2[](
+    ivec2(-2, -2), ivec2(-1, -2), ivec2(0, -2), ivec2(1, -2), ivec2(2,-2),
+    ivec2(-2, -1), ivec2(-1, -1), ivec2(0, -1), ivec2(1, -1), ivec2(2,-1),
+    ivec2(-2, 0), ivec2(-1, 0), ivec2(0, 0), ivec2(1, 0), ivec2(2,0),
+    ivec2(-2, 1), ivec2(-1, 1), ivec2(0, 1), ivec2(1, 1), ivec2(2, 1),
+    ivec2(-2, 2), ivec2(-1, 2), ivec2(0, 2), ivec2(1, 2), ivec2(2, 2)
+);
 
 void main() {
     vec2 texCoordUsed = TexCoord;
@@ -574,13 +589,21 @@ void main() {
     if (debugView != 4) {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-            vec3 reflectionColor = texture(outputImage, sampleUV).rgb * specColor.rgb * 1.4;
+            vec4 reflectionColor = vec4(0.0);
+//             vec3 reflectionColor = texture(outputImage, sampleUV).rgb * specColor.rgb * 1.4;
+            for (int i = 0; i < 9; ++i) {
+                ivec2 samplePixel = pixel + reflectionOffsets[i];
+                samplePixel = clamp(samplePixel, ivec2(0), ivec2(int(screenWidth/SSR_RES)-1, int(screenHeight/SSR_RES)-1));
+                vec3 sampleWeight = vec3(reflectionWeights[i],reflectionWeights[i],reflectionWeights[i]);
+//                 reflectionColor.rgb += imageLoad(outputImage, samplePixel).rgb * sampleWeight * 6.0;
+                reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * sampleWeight * 6.0;
+            }
             if (isSky) {
-                FragColor.rgb += reflectionColor;
+                FragColor.rgb += reflectionColor.rgb;
                 return;
             }
 
-            color.rgb += reflectionColor;
+            color.rgb += reflectionColor.rgb;
         }
 
         vec3 aaColor = color.rgb; // Default to chromatic aberration result

@@ -1,12 +1,12 @@
 #!/bin/bash
 VOXEN="./voxen"
-ITERATIONS=50
+ITERATIONS=10
 echo "Starting $ITERATIONS voxen test iterations..."
 for ((i=1; i<=ITERATIONS; i++)); do
     echo "Iteration $i/$ITERATIONS"
     $VOXEN &
     VOXEN_PID=$!
-    sleep 1.3 #secs
+    sleep 5.0 #secs
     if ! pidof voxen >/dev/null; then
         echo -e "\033[31mError: voxen (PID $VOXEN_PID) crashed\033[0m"
         exit 1

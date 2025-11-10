@@ -635,7 +635,7 @@ glowtexture: 446
 #chunk_blockerflightbay
 index: 123
 model: 178
-normtexture: 79
+normtexture: 160
 texture: 1230
 spectexture: 1242
 #chunk_maint1_9
@@ -859,43 +859,45 @@ index: 162
 model: 262
 cardchunk: 1
 texture: 499
-spectexture: 1236
+spectexture: 1268
 normtexture: 498
 #chunk_med1_7_slice14_64
 index: 163
 model: 263
 texture: 499
-spectexture: 1236
+spectexture: 1268
 normtexture: 1254
 #chunk_med1_7_slice45_320lh
 index: 164
 model: 264
 texture: 499
-spectexture: 1236
+spectexture: 1268
 normtexture: 1254
 #chunk_med1_7_slice45_320rh
 index: 165
 model: 265
 texture: 499
-spectexture: 1236
+spectexture: 1268
 normtexture: 1254
 #chunk_med1_7_slice96high
 index: 166
 model: 266
 texture: 499
-spectexture: 1236
+spectexture: 1268
 normtexture: 1254
 #chunk_med1_7d
 index: 167
 model: 260
 cardchunk: 1
 texture: 497
-spectexture: 1236
-#chunk_med 1_7d_slice128
+spectexture: 1269
+normtexture: 1270
+#chunk_med1_7d_slice128
 index: 168
 model: 261
 texture: 497
-spectexture: 1236
+spectexture: 1269
+normtexture: 1270
 #chunk_med1_8
 index: 169
 model: 268
@@ -913,29 +915,29 @@ index: 171
 model: 278
 cardchunk: 1
 texture: 507
-spectexture: 1238
+spectexture: 1267
 #chunk_med1_9d
 index: 174
 model: 269
 cardchunk: 1
 texture: 505
-spectexture: 1242
+spectexture: 1267
 #chunk_med1_9d_ofs112_90
 index: 176
 model: 270
 texture: 505
-spectexture: 1238
+spectexture: 1267
 #chunk_med1_9d_ofs144_90
 index: 177
 model: 272
 texture: 505
-spectexture: 1238
+spectexture: 1267
 #chunk_med2_1
 index: 178
 model: 280
 cardchunk: 1
 texture: 513
-spectexture: 1242
+spectexture: 1254
 glowtexture: 511
 normtexture: 512
 #chunk_med2_1_slice32RH
@@ -943,13 +945,13 @@ index: 179
 model: 281
 texture: 513
 normtexture: 512
-spectexture: 1242
+spectexture: 1254
 #chunk_med2_1d
 index: 180
 model: 279
 glowtexture: 508
 texture: 510
-spectexture: 1242
+spectexture: 1254
 #chunk_med2_2
 index: 181
 model: 283
@@ -1694,6 +1696,14 @@ bounceCombine: 0
 #item_arm
 index: 312
 model: 7
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 678
 mass: 1.0
 linearDrag: 0.0
 angularDrag: 0.05
@@ -1707,7 +1717,16 @@ bounceCombine: 0
 #item_audiolog
 index: 313
 model: 11
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 679
 texture: 52
+glowtexture: 80
 mass: 0.2
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2083,6 +2102,8 @@ bounceCombine: 0
 #item_access_card_admin
 index: 341
 model: 0
+texture: 9
+glowtexture: 82
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2327,6 +2348,14 @@ bounceCombine: 0
 #item_battery
 index: 359
 model: 13
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 680
 mass: 0.3
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2340,6 +2369,14 @@ bounceCombine: 0
 #item_battery_icad
 index: 360
 model: 13
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 680
 mass: 0.35
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2433,6 +2470,14 @@ bounceCombine: 0
 #item_ammo_rubber
 index: 367
 model: 8
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 676
 mass: 0.25
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2513,6 +2558,14 @@ bounceCombine: 0
 #item_ammo_needle
 index: 373
 model: 4
+collider: 1
+collider_centerx: -0.0004654949
+collider_centery: 0.0004549972
+collider_centerz: 0.0244365
+collider_sizex: 0.131339
+collider_sizey: 0.1442801
+collider_sizez: 0.04838703
+colliderMeshIndex: 65535
 mass: 0.15
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2526,6 +2579,14 @@ bounceCombine: 0
 #item_ammo_tranq
 index: 374
 model: 626
+collider: 1
+collider_centerx: -0.0004654949
+collider_centery: 0.0004549972
+collider_centerz: 0.0244365
+collider_sizex: 0.131339
+collider_sizey: 0.1442801
+collider_sizez: 0.04838703
+colliderMeshIndex: 65535
 mass: 0.15
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2539,6 +2600,14 @@ bounceCombine: 0
 #item_ammo_standard
 index: 375
 model: 5
+collider: 1
+collider_centerx: 0.0001984993
+collider_centery: 0.0
+collider_centerz: 0.02172501
+collider_sizex: 0.1209471
+collider_sizey: 0.2176701
+collider_sizez: 0.04345007
+colliderMeshIndex: 65535
 mass: 0.2
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2552,6 +2621,14 @@ bounceCombine: 0
 #item_ammo_teflon
 index: 376
 model: 5
+collider: 1
+collider_centerx: 0.0001984993
+collider_centery: 0.0
+collider_centerz: 0.02172501
+collider_sizex: 0.1209471
+collider_sizey: 0.2176701
+collider_sizez: 0.04345007
+colliderMeshIndex: 65535
 mass: 0.2
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2586,6 +2663,14 @@ bounceCombine: 0
 #item_ammo_slug
 index: 378
 model: 3
+collider: 1
+collider_centerx: 0.0002185023
+collider_centery: 0.0
+collider_centerz: 0.02122951
+collider_sizex: 0.1423431
+collider_sizey: 0.2127061
+collider_sizez: 0.04245907
+colliderMeshIndex: 65535
 glowtexture: 22
 mass: 0.2
 linearDrag: 0.0
@@ -2600,6 +2685,14 @@ bounceCombine: 0
 #item_ammo_magnesium
 index: 379
 model: 3
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 673
 mass: 0.35
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2613,6 +2706,14 @@ bounceCombine: 0
 #item_ammo_penetrator
 index: 380
 model: 3
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 673
 mass: 0.35
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2647,6 +2748,14 @@ bounceCombine: 0
 #item_ammo_splinter
 index: 382
 model: 630
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 673
 mass: 0.35
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2660,6 +2769,14 @@ bounceCombine: 0
 #item_ammo_rail
 index: 383
 model: 6
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 675
 mass: 0.4
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2673,6 +2790,14 @@ bounceCombine: 0
 #item_ammo_slag
 index: 384
 model: 9
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 673
 mass: 0.35
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2686,6 +2811,14 @@ bounceCombine: 0
 #item_ammo_slaglarge
 index: 385
 model: 10
+collider: 4
+collider_centerx: 0.0
+collider_centery: 0.0
+collider_centerz: 0.0
+collider_sizex: 1.0
+collider_sizey: 1.0
+collider_sizez: 1.0
+colliderMeshIndex: 677
 mass: 0.40
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2733,6 +2866,8 @@ bounceCombine: 0
 #item_access_card_std
 index: 388
 model: 0
+texture: 79
+glowtexture: 867
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2767,6 +2902,8 @@ bounceCombine: 0
 #item_access_card_group1
 index: 390
 model: 0
+texture: 7
+glowtexture: 159
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2788,6 +2925,8 @@ bounceCombine: 0
 #item_access_card_science
 index: 391
 model: 0
+texture: 2
+glowtexture: 343
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2809,6 +2948,8 @@ bounceCombine: 0
 #item_access_card_eng
 index: 392
 model: 0
+texture: 3
+glowtexture: 81
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2830,6 +2971,8 @@ bounceCombine: 0
 #item_access_card_groupB
 index: 393
 model: 0
+texture: 7
+glowtexture: 159
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2851,6 +2994,8 @@ bounceCombine: 0
 #item_access_card_security
 index: 394
 model: 0
+texture: 10
+glowtexture: 344
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2872,6 +3017,8 @@ bounceCombine: 0
 #item_access_card_per5diego
 index: 395
 model: 0
+texture: 8
+glowtexture: 341
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2893,6 +3040,8 @@ bounceCombine: 0
 #item_access_card_medi
 index: 396
 model: 0
+texture: 1
+glowtexture: 161
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2914,6 +3063,8 @@ bounceCombine: 0
 #item_access_card_group3
 index: 397
 model: 0
+texture: 7
+glowtexture: 159
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -2935,6 +3086,8 @@ bounceCombine: 0
 #item_access_card_purple
 index: 398
 model: 0
+texture: 5
+glowtexture: 342
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -3061,6 +3214,8 @@ index: 416
 #item_access_card_perdarcy
 index: 417
 model: 0
+texture: 8
+glowtexture: 341
 collider: 4
 collider_centerx: 0.0
 collider_centery: 0.0
