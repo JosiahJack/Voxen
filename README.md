@@ -1,6 +1,6 @@
 # Voxen
 
-## The OpenGL Voxel Lit Engine
+## The Voxel Lit Open Source Engine
 
 This is a pure C (C11) rendering engine with a focus on high performance and 
 simplicity for first person shooter games.  This project was developed with 
