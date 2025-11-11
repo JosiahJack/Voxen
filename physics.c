@@ -12,7 +12,11 @@ void ProcessInput(void);
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
 #define PLAYER_CAMERA_OFFSET_Y 0.84f
 float move_speed = 0.06;
-bool noclip = false;
+bool noclip = true; // Testing, TODO
+bool god = true; // Testing, TODO
+bool notarget = false;
+bool fatigueCheat = false;
+bool redbull = false;
 float testLight_x, testLight_y, testLight_z;
 
 // ================================= Particle System ==================================

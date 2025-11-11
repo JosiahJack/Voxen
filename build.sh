@@ -37,7 +37,7 @@ export CC="ccache gcc"
 CC=gcc
 CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og -D_POSIX_C_SOURCE=199309L"
 LDFLAGS="-flto=auto -s -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.4.a -l:libminiaudio.0.11.22.a -lGLEW -lGL -lm -lfontconfig -fopenmp"
-SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c event.c data_models.c data_textures.c"
+SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c console.c event.c data_models.c data_textures.c"
 export CC=gcc
 export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og -D_POSIX_C_SOURCE=199309L"
 export TEMP_DIR=temp_build

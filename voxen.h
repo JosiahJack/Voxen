@@ -407,6 +407,7 @@ void UpdateInstanceMatrix(int32_t i);
 // ----------------------------------------------------------------------------
 // Input
 #define NUM_KEYS 350
+extern bool editMode;
 extern GLFWwindow *window;
 extern bool keys[NUM_KEYS];
 extern bool window_has_focus;
@@ -442,8 +443,6 @@ extern uint32_t verticesRenderedThisFrame;
 extern bool lightDirty[LIGHT_COUNT];
 extern bool global_modIsCitadel;
 extern bool inventoryMode;
-extern bool noclip;
-extern bool consoleActive;
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
@@ -457,7 +456,19 @@ void CacheUniformLocationsForShaders(void);
 GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 void Screenshot(void);
 void ToggleConsole(void);
+void ConsoleEmulator(int32_t keycode);
 bool CursorVisible(void);
+// ----------------------------------------------------------------------------
+// Cheats
+extern bool god;
+extern bool noclip;
+extern bool notarget;
+extern bool bottomless;
+extern bool superoverride;
+extern bool fatigueCheat;
+extern bool redbull;
+extern bool consoleActive;
+extern bool noHUD;
 // ----------------------------------------------------------------------------
 // Text
 #define TEXT_WHITE 0
@@ -475,6 +486,12 @@ bool CursorVisible(void);
 #define MAX_GLYPHS 8192      // Rough estimate for all ranges
 #define FONT_NORMAL 0
 #define FONT_STOPD 1
+
+// Hefty 9mb table for localization support.  Could be sparsely stored instead via dynamic alloc.
+#define TEXT_LOCALIZATION_MAX_LENGTH 1207
+// extern char** stringTable[2048][TEXT_LOCALIZATION_MAX_LENGTH * 4]; // Times 4 to fit num characters times longest 4-byte UTF-8 character codepoint
+extern char** stringTable;
+
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;
@@ -482,6 +499,7 @@ extern float fixedNumberAdvanceWidthStopD;
 extern float genericTextHeightFacStopD;
 extern float genericTextWidthFacStopD;
 extern float genericTextHeightFac;
+extern char consoleEntryText[TEXT_BUFFER_SIZE];
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 int32_t CodepointToPackedIndex(int32_t codepoint, int fontID);
@@ -511,7 +529,6 @@ float GetScreenRelativeY(float percentage);
 // Logging / Debug Prints
 void OpenConsoleLogFile();
 void Screenshot();
-void ConsoleEmulator(int32_t scancode);
 void CenterStatusPrint(const char* fmt, ...);
 void JournalDump(const char* dem_file);
 void DualLog(const char* fmt, ...);

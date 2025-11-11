@@ -49,6 +49,7 @@ GLFWwindow *window;
 double monitorSwitchTime;
 bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
+bool editMode = true;
 // ----------------------------------------------------------------------------
 // Diagnostics
 double game_start_time = 0.00;
@@ -62,6 +63,7 @@ uint32_t framesPerLastSecond = 0;
 uint32_t worstFPS = UINT32_MAX;
 double screenshotTimeout = 0.0;
 double time_PhysicsStep = 0.0;
+char statusText[TEXT_BUFFER_SIZE];
 // ----------------------------------------------------------------------------
 // Settings
 uint8_t settings_Reflections = 1u; // Default 1
@@ -69,6 +71,7 @@ uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
 uint8_t settings_VolumeMusic = 20u;
+uint8_t settings_Language = 0; // English default
 bool settings_Vsync = false;
 float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
@@ -90,6 +93,8 @@ bool menuActive = false;
 bool levelCurrentlyLoading = false;
 float pauseRelativeTime = 0.0f;
 QuestBits questData;
+bool bottomless = false;
+bool superoverride;
 // ----------------------------------------------------------------------------
 // Camera variables
 // Start Actual: Puts player on Medical Level in actual game start position
@@ -167,6 +172,7 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 // UI
 //    Images
 #define MAX_UI_IMAGES 1024 // Adjust based on needs
+bool noHUD = false;
 
 typedef struct {
     float x, y, z;        // Top-left corner in screen space (pixels)
@@ -180,6 +186,8 @@ uint32_t uiImageCount = 0;
 GLuint uiImageVAO, uiImageVBO;
 
 //    Text
+char** stringTable = NULL;
+
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
 Color textColors[TEXT_COLOR_COUNT] = {
@@ -193,12 +201,6 @@ Color textColors[TEXT_COLOR_COUNT] = {
     { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight
     { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}  // 8 StopD Red Pause Title
 };
-
-//      Console Emulator
-int32_t currentEntryLength = 0;
-bool consoleActive = false;
-char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
-char statusText[TEXT_BUFFER_SIZE];
 
 //      Center Status Print
 int statusTextLengthWithoutNullTerminator = 6;
@@ -937,77 +939,6 @@ bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
             && cursorPosition_y >= endY   && cursorPosition_y <= startY); // 0 == top
 }
 
-void ToggleConsole(void) {
-    static bool inventoryModeWasActivePriorToConsole = false;
-    if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
-    consoleActive = !consoleActive; // Tilde
-    if (consoleActive) inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
-        inventoryMode = false;
-        cursorPosition_x = (float)screen_width * 0.5f;
-        cursorPosition_y = (float)screen_height * 0.5f;
-    }
-}
-
-void ProcessConsoleCommand(const char* command) {
-    if (strcmp(command, "noclip") == 0) {
-        noclip = !noclip;
-        CenterStatusPrint("Noclip %s", noclip ? "enabled" : "disabled");
-        ToggleConsole();
-    }  else if (strcmp(command, "quit") == 0) {
-        EnqueueEvent_Simple(EV_QUIT);
-    } else {
-        CenterStatusPrint("Unknown command: %s", command);
-    }
-    
-    consoleEntryText[0] = '\0'; // Clear the input
-    currentEntryLength = 0;
-}
-
-void ConsoleEmulator(int32_t keycode) {
-    if (keycode == GLFW_KEY_U && keys[GLFW_KEY_LEFT_CONTROL]) {
-        consoleEntryText[0] = '\0'; // Clear the input
-        currentEntryLength = 0;
-        return;
-    }
-    
-    if (keycode >= GLFW_KEY_A && keycode <= GLFW_KEY_Z) { // Handle alphabet keys
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) { // Ensure we don't overflow the buffer
-            char c = 'a' + (keycode - GLFW_KEY_A); // Map keycode to lowercase character
-            consoleEntryText[currentEntryLength] = c;
-            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
-            currentEntryLength++;
-        }
-    } else if (keycode >= GLFW_KEY_1 && keycode <= GLFW_KEY_9) { // Handle number keys 1-9
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            char c = '1' + (keycode - GLFW_KEY_1); // Map to '1'-'9'
-
-            consoleEntryText[currentEntryLength] = c;
-            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
-            currentEntryLength++;
-        }
-    } else if (keycode == GLFW_KEY_0) { // Handle '0'
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            consoleEntryText[currentEntryLength] = '0';
-            consoleEntryText[currentEntryLength + 1] = '\0'; // Null-terminate
-            currentEntryLength++;
-        }
-    } else if (keycode == GLFW_KEY_BACKSPACE && currentEntryLength > 0) { // Handle backspace
-        currentEntryLength--;
-        consoleEntryText[currentEntryLength] = '\0'; // Null-terminate
-    } else if (keycode == GLFW_KEY_SPACE) { // Handle space
-        if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            consoleEntryText[currentEntryLength] = ' ';
-            consoleEntryText[currentEntryLength + 1] = '\0';
-            currentEntryLength++;
-        }
-    } else if (keycode == GLFW_KEY_ENTER || keycode == GLFW_KEY_KP_ENTER) { // Handle enter (main and keypad)
-        // Handle command execution or clear the console
-        DualLog("Console command: %s\n", consoleEntryText);
-        ProcessConsoleCommand(consoleEntryText);
-    }
-}
-
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
 void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t fontID, const char* format, ...) {
     va_list args;
@@ -1231,6 +1162,118 @@ void CycleToNextMonitor(GLFWwindow* window) {
     DualLog("Window moved to monitor %d: %s at %d,%d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
 }
 
+void LoadTextForLanguage(uint8_t lang) {
+    // Clear previous language allocations
+    if (stringTable) {
+        for (int i = 0; i < 2048; ++i) {
+            if (stringTable[i]) {
+                free(stringTable[i]);
+                stringTable[i] = NULL;
+            }
+        }
+        free(stringTable);
+        stringTable = NULL;
+    }
+    
+    // Allocate for normal stringTable
+    stringTable = malloc(2048 * sizeof(char*));
+    if (!stringTable) {
+        DualLog("Failed to allocate stringTable\n");
+        return;
+    }
+    for (int i = 0; i < 2048; ++i) {
+        stringTable[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
+        if (!stringTable[i]) {
+            DualLog("Failed to allocate stringTable[%d]\n", i);
+            // Handle error, perhaps free previous
+            return;
+        }
+        stringTable[i][0] = '\0'; // Initialize empty
+    }
+    
+    char textFile[256];
+    strcpy(textFile, "./Data/text_english.txt"); // Default
+    switch (lang) {
+        case 0: strcpy(textFile, "./Data/text_english.txt"); break;
+        case 1: strcpy(textFile, "./Data/text_espanol.txt"); break;
+        case 2: strcpy(textFile, "./Data/text_deutsch.txt"); break;
+        case 3: strcpy(textFile, "./Data/text_francais.txt"); break;
+        case 4: strcpy(textFile, "./Data/text_nihongo.txt"); break;
+        case 5: strcpy(textFile, "./Data/text_russkiy.txt"); break;
+        case 6: strcpy(textFile, "./Data/text_italiano.txt"); break;
+        case 7: strcpy(textFile, "./Data/text_portugues.txt"); break;
+        default: break;
+    }
+    
+    FILE* fp = fopen(textFile, "rb"); // Binary mode to handle any line endings consistently
+    if (!fp) {
+        DualLog("Failed to open text file: %s\n", textFile);
+        return;
+    }
+    
+    int lineNum = 0;
+    char line[TEXT_LOCALIZATION_MAX_LENGTH];
+    bool logSection = false;
+    bool firstLine = true;
+    while (fgets(line, sizeof(line), fp)) {
+        // Trim trailing newline and carriage return
+        size_t len = strlen(line);
+        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+            line[len - 1] = '\0';
+            len--;
+        }
+        
+        // Handle UTF-8 BOM on first line
+        if (firstLine && len >= 3 && line[0] == (char)0xEF && line[1] == (char)0xBB && line[2] == (char)0xBF) {
+            memmove(line, line + 3, len - 2);
+            len -= 3;
+            line[len] = '\0';
+        }
+        firstLine = false;
+        
+        if (len == 0) {
+            continue; // Skip completely empty lines
+        }
+        
+        if (strcmp(line, "#") == 0) {
+            logSection = true;
+            DualLog("Entered log section\n");
+            continue; // Skip the # marker line
+        }
+        
+        if (!logSection) {
+            // Load normal text snippets sequentially
+            if (lineNum < 2048) {
+                strncpy(stringTable[lineNum], line, TEXT_LOCALIZATION_MAX_LENGTH - 1);
+                stringTable[lineNum][TEXT_LOCALIZATION_MAX_LENGTH - 1] = '\0';
+                DualLog("stringTable[%d] = '%s'\n", lineNum, stringTable[lineNum]);
+                lineNum++;
+            } else {
+                DualLog("Exceeded max normal strings: %d\n", lineNum);
+            }
+        } else {
+            // Parse log text section: CSV lines for audio logs
+            // (Your existing log parsing code here, unchanged)
+            // For example:
+            // char* token = strtok(line, ",");
+            // etc.
+            // Note: Since strtok modifies line, copy to temp if needed
+            char logline[TEXT_LOCALIZATION_MAX_LENGTH];
+            strncpy(logline, line, sizeof(logline) - 1);
+            logline[sizeof(logline) - 1] = '\0';
+            
+            // Rest of parsing...
+            // (Omit for brevity, add your log parsing)
+        }
+    }
+    
+    fclose(fp);
+    DualLog("Loaded %d normal text lines from %s\n", lineNum, textFile);
+    
+    // If lineNum < 1000, check your text_english.txt file - it may have fewer lines than expected before the # marker.
+    // Ensure the file has at least 1016+ lines of normal text before the # for indices like 1000-1015.
+}
+
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     DebugRAM("InitializeEnvironment start");   
@@ -1387,6 +1430,7 @@ void InitializeEnvironment(void) {
     RenderLoadingProgress(100,"Loading entities...");
     LoadEntities(); // Must be after models and textures else entity types can't be validated.
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
+    LoadTextForLanguage(settings_Language);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
