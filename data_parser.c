@@ -73,24 +73,10 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
     if (str == NULL || *str == '\0') { DualLogError("Invalid float input blank string, from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
     char* endptr;
     errno = 0;
-    
-    // Copy to new buffer (oversized by 4 bytes) and swap out any sneaky utf8 dashes for real one.
-    char buf[16];
-    strncpy(buf, str, sizeof(buf)-1);
-    buf[sizeof(buf)-1] = '\0';            
-    if (!memcmp(buf, "\xE2\x80\x90", 3) || // hyphen
-        !memcmp(buf, "\xE2\x80\x91", 3) || // non-breaking hyphen
-        !memcmp(buf, "\xE2\x80\x93", 3) || // en dash
-        !memcmp(buf, "\xE2\x80\x94", 3) || // em dash
-        !memcmp(buf, "\xE2\x88\x92", 3) || // minus sign
-        !memcmp(buf, "\xC2\xAD", 2)) {     // soft hyphen
-        memmove((void*)buf + 1, buf + 3, strlen(buf + 3) + 1);
-        buf[0] = '-';
-    }
-    float val = strtof(buf, &endptr);
-    if (errno != 0) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      gave errno %u\n", buf, lineNum+1, line, errno); return 0.0f; }
-    if (*endptr != '\0') { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      missing null terminator, *endptr: %u\n", buf, lineNum+1, line, *endptr); return 0.0f; }
-    if (endptr == buf) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      end is equal to start\n", buf, lineNum+1, line); return 0.0f; }
+    float val = strtof(str, &endptr);
+    if (errno != 0) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      gave errno %u\n", str, lineNum+1, line, errno); return 0.0f; }
+    if (*endptr != '\0') { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      missing null terminator, *endptr: %u\n", str, lineNum+1, line, *endptr); return 0.0f; }
+    if (endptr == str) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      end is equal to start\n", str, lineNum+1, line); return 0.0f; }
     return val;
 }
 
@@ -166,6 +152,32 @@ void allocate_entries(DataParser *parser, int32_t entry_count) {
     parser->count = entry_count;
 }
 
+static inline void sanitize_utf8_ascii(char *s) {
+    char *dst = s;
+    while (*s) {
+        if (!memcmp(s, "\xE2\x80\x90", 3) || !memcmp(s, "\xE2\x80\x91", 3) ||
+            !memcmp(s, "\xE2\x80\x92", 3) || !memcmp(s, "\xE2\x80\x93", 3) ||
+            !memcmp(s, "\xE2\x80\x94", 3) || !memcmp(s, "\xE2\x80\x95", 3) ||  // Added: Horizontal bar
+            !memcmp(s, "\xE2\x88\x92", 3)) {
+            dst[0] = '-'; dst++; s += 3; continue;
+        }
+        if (!memcmp(s, "\xC2\xAD", 2)) { dst[0] = '-'; dst++; s += 2; continue; }
+        if (!memcmp(s, "\xE2\x80\x9C", 3) || !memcmp(s, "\xE2\x80\x9D", 3)) { dst[0] = '"'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xE2\x80\x98", 3) || !memcmp(s, "\xE2\x80\x99", 3)) { dst[0] = '\''; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8B", 3)) { dst[0] = '+'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8F", 3)) { dst[0] = '/'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x88", 3)) { dst[0] = '('; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x89", 3)) { dst[0] = ')'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x9A", 3)) { dst[0] = ':'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x9B", 3)) { dst[0] = ';'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8C", 3)) { dst[0] = ','; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8E", 3)) { dst[0] = '.'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8D", 3)) { dst[0] = '-'; dst++; s += 3; continue; }
+        dst[0] = *s; dst++; s++;
+    }
+    *dst = '\0';
+}
+
 bool process_key_value(ResourceEntry *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
     if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
     
@@ -181,6 +193,8 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
     char *val_end = trimmed_value + strlen(trimmed_value) - 1;
     while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
     while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+    sanitize_utf8_ascii(trimmed_key);
+    sanitize_utf8_ascii(trimmed_value);
     if (strncmp(trimmed_key, "chunk_", 6) == 0) {
         strncpy(entry->path, trimmed_key, sizeof(entry->path) - 1);
         entry->path[sizeof(entry->path) - 1] = '\0';
@@ -211,7 +225,6 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
     else if (strcmp(trimmed_key, "useGravity") == 0)        entry->useGravity = parse_bool(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "bounciness") == 0)        entry->bounciness = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry->dynamicFriction = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "bounciness") == 0)        entry->bounciness = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry->frictionCombine = parse_numberu8(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry->bounceCombine = parse_numberu8(trimmed_value, line, lineNum);
 
@@ -304,7 +317,7 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
         char *start = line;
         while (data_parser_isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
-        while (end > start && data_parser_isspace((unsigned char)*end)) *end-- = '\0';
+        while (end > start && data_parser_isspace((unsigned char)*end)) { *end = '\0'; end--; }
         if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
         if (line[0] == '#') { entry_count++; continue; }
 
@@ -330,7 +343,7 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
         char *start = line;
         while (data_parser_isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
-        while (end > start && data_parser_isspace((unsigned char)*end)) *end-- = '\0';
+        while (end > start && data_parser_isspace((unsigned char)*end)) { *end = '\0'; end--; }
         if (*start == '\0') continue; // Skip empty line
         if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
 
@@ -659,6 +672,8 @@ void LoadLevel(uint8_t curlevel) {
             char *val_end = trimmed_value + strlen(trimmed_value) - 1;
             while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
             while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+            sanitize_utf8_ascii(trimmed_key);
+            sanitize_utf8_ascii(trimmed_value);
             if (isLight) {
                      if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightX;
                 else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightY;
