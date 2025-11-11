@@ -12,6 +12,7 @@ stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y
 DataParser entity_parser;
 
 float correctionX, correctionY, correctionZ;
+float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
 
 DataParser lights_parser;
 float correctionLightX, correctionLightY, correctionLightZ;
@@ -40,40 +41,56 @@ float voxelMinCenterX, voxelMinCenterZ;
 static int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
-    if (str == NULL || *str == '\0') { DualLogError("Invalid input blank string, from line[%d]: %s\n", lineNum, line); return 0; }
+    if (str == NULL || *str == '\0') { DualLogError("Invalid input blank string, from line[%d]: %s\n", lineNum+1, line); return 0; }
     while (data_parser_isspace((unsigned char)*str)) str++;
-    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s), from line: %s\n", str, line); return 0; }
+    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
     char* endptr;
     errno = 0;
     unsigned long val = strtoul(str, &endptr, 10);
-    if (errno != 0 || val > UINT32_MAX) { DualLogError("Invalid input %s, from line[%d]: %s\n", str, lineNum, line); return 0; }
+    if (errno != 0 || val > UINT32_MAX) { DualLogError("Invalid input %s\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
     return (uint32_t)val;
 }
 
 uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
     uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT16_MAX) { DualLogError("Value out of range for uint16_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
+    if (retval > UINT16_MAX) { DualLogError("Value out of range for uint16_t: %u\n      from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
     return (uint16_t)retval;
 }
 
 uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
     uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT8_MAX) { DualLogError("Value out of range for uint8_t: %u from line[%d]: %s\n", retval, lineNum, line); return 0; }
+    if (retval > UINT8_MAX) { DualLogError("Value out of range for uint8_t: %u\n      from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
     return (uint8_t)retval;
 }
 
 bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
     uint32_t parseval = parse_numberu32(str, line, lineNum);
-    if (parseval > 1) DualLogWarn("Loaded %u in place where expected a boolean from line[%u]: %s\n",lineNum,line);
+    if (parseval > 1) DualLogWarn("Loaded %u\n      in place where expected a boolean from line[%u]: %s\n",lineNum+1,line);
     return parseval > 0 ? true : false;
 }
 
 float parse_float(const char* str, const char* line, uint32_t lineNum) {
-    if (str == NULL || *str == '\0') { DualLogError("Invalid float input blank string, from line[%d]: %s\n", lineNum, line); return 0.0f; }
+    if (str == NULL || *str == '\0') { DualLogError("Invalid float input blank string, from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
     char* endptr;
     errno = 0;
-    float val = strtof(str, &endptr);
-    if (errno != 0 || endptr == str || *endptr != '\0') { DualLogError("Invalid float input %s, from line[%d]: %s\n", str, lineNum, line); return 0.0f; }
+    
+    // Copy to new buffer (oversized by 4 bytes) and swap out any sneaky utf8 dashes for real one.
+    char buf[16];
+    strncpy(buf, str, sizeof(buf)-1);
+    buf[sizeof(buf)-1] = '\0';            
+    if (!memcmp(buf, "\xE2\x80\x90", 3) || // hyphen
+        !memcmp(buf, "\xE2\x80\x91", 3) || // non-breaking hyphen
+        !memcmp(buf, "\xE2\x80\x93", 3) || // en dash
+        !memcmp(buf, "\xE2\x80\x94", 3) || // em dash
+        !memcmp(buf, "\xE2\x88\x92", 3) || // minus sign
+        !memcmp(buf, "\xC2\xAD", 2)) {     // soft hyphen
+        memmove((void*)buf + 1, buf + 3, strlen(buf + 3) + 1);
+        buf[0] = '-';
+    }
+    float val = strtof(buf, &endptr);
+    if (errno != 0) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      gave errno %u\n", buf, lineNum+1, line, errno); return 0.0f; }
+    if (*endptr != '\0') { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      missing null terminator, *endptr: %u\n", buf, lineNum+1, line, *endptr); return 0.0f; }
+    if (endptr == buf) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      end is equal to start\n", buf, lineNum+1, line); return 0.0f; }
     return val;
 }
 
@@ -155,7 +172,7 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
     while (data_parser_isspace((unsigned char)*key)) key++;
     while (data_parser_isspace((unsigned char)*value)) value++;
     char trimmed_key[256];
-    char trimmed_value[1024];
+    char trimmed_value[256];
     strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
     strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
     trimmed_key[sizeof(trimmed_key) - 1] = '\0';
@@ -382,6 +399,7 @@ void LoadEntities(void) {
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
     
     entityCount = entity_parser.count;
+    DualLog("Entity count found: %u\n",entityCount);
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); exit(1); }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); exit(1); }
 
@@ -505,14 +523,22 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
 
-    if (ConstIndexIsDoor(entIdx)) {
-        instances[instanceIdx].position.x += correctionX + 0.6001f;
-        instances[instanceIdx].position.y += correctionY - 0.5681f;
-        instances[instanceIdx].position.z += correctionZ - 0.905f;
+    if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
+        if (ConstIndexIsDoor(entIdx)) {
+            instances[instanceIdx].position.x += correctionX + 0.6001f;
+            instances[instanceIdx].position.y += correctionY - 0.5681f;
+            instances[instanceIdx].position.z += correctionZ - 0.905f;
+//         } else if (ConstIndexIsStaticObjectSaveable(entIdx)) {
+//             instances[instanceIdx].position.x += 5.12f;
+//             instances[instanceIdx].position.y += 48.2291f;
+//             instances[instanceIdx].position.z += -15.36f;
+        } else {
+            instances[instanceIdx].position.x += correctionX;   
+            instances[instanceIdx].position.y += correctionY;
+            instances[instanceIdx].position.z += correctionZ;
+        }
     } else {
-        instances[instanceIdx].position.x += correctionX;
-        instances[instanceIdx].position.y += correctionY;
-        instances[instanceIdx].position.z += correctionZ;
+        DualLog("entity with entIdx %u located at %f, %f, %f\n",entIdx,instances[instanceIdx].position.x,instances[instanceIdx].position.y,instances[instanceIdx].position.z);
     }
 
     loadedInstances++;

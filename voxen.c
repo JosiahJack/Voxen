@@ -48,7 +48,7 @@ typedef struct {
 GLFWwindow *window;
 double monitorSwitchTime;
 bool inventoryMode = false;
-uint16_t screen_width = 1920, screen_height = 1080;
+uint16_t screen_width = 1366, screen_height = 768;
 // ----------------------------------------------------------------------------
 // Diagnostics
 double game_start_time = 0.00;
@@ -1132,9 +1132,9 @@ void CenterStatusPrint(const char* fmt, ...) {
 }
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) {
-    instances[playerIdx].position.x = -20.4f;
-    instances[playerIdx].position.y = -43.79f + 0.84f; // Added 0.84f for cam offset from center
-    instances[playerIdx].position.z = 10.2f;
+    instances[playerIdx].position.x = -22.0f;//-20.4f;
+    instances[playerIdx].position.y = -44.0f;//-43.79f + 0.84f; // Added 0.84f for cam offset from center
+    instances[playerIdx].position.z = -13.0f;//10.2f;
     instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
     instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
     instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
@@ -1460,18 +1460,16 @@ void RenderInstances(uint8_t type) {
         if (type == REND_TRANSPARENT) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
         else qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
         
-        // Set texture-related uniforms once per model type
-        uint16_t firstInstance = visibleInstances[0].index; // Safe since visibleCount > 0
-        uint32_t texIndex = instances[firstInstance].texIndex;
-        uint32_t glowdex = (uint32_t)instances[firstInstance].glowIndex;
-        uint32_t specdex = (uint32_t)instances[firstInstance].specIndex;
-        uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
-        uint32_t normInstancePack = (uint32_t)instances[firstInstance].normIndex;
-        glUniform1ui(texIndexLoc_chunk, texIndex);
-        glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
-        glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
+            uint32_t texIndex = instances[i].texIndex;
+            uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+            uint32_t specdex = (uint32_t)instances[i].specIndex;
+            uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+            uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
+            glUniform1ui(texIndexLoc_chunk, texIndex);
+            glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+            glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));

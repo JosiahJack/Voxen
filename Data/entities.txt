@@ -424,7 +424,7 @@ glowtexture: 314
 texture: 315
 #chunk_exteriorpanel1
 index: 78
-model: 143
+model: 141
 cardchunk: 1
 texture: 1228
 #chunk_fan1
@@ -2257,6 +2257,7 @@ bounceCombine: 0
 #weapon_pistol
 index: 352
 model: 650
+texture: 878
 mass: 0.3
 linearDrag: 0.0
 angularDrag: 0.05
@@ -2558,6 +2559,7 @@ bounceCombine: 0
 #item_ammo_needle
 index: 373
 model: 4
+texture: 15
 collider: 1
 collider_centerx: -0.0004654949
 collider_centery: 0.0004549972
@@ -2578,7 +2580,8 @@ frictionCombine: 0
 bounceCombine: 0
 #item_ammo_tranq
 index: 374
-model: 626
+model: 4
+texture: 27
 collider: 1
 collider_centerx: -0.0004654949
 collider_centery: 0.0004549972
@@ -3432,6 +3435,7 @@ bounceCombine: 0
 #npc_humanoid_mutant
 index: 434
 model: 323
+texture: 563
 mass: 1.4
 linearDrag: 0.0
 angularDrag: 2.0
@@ -3678,6 +3682,7 @@ bounceCombine: 0
 #prop_phys_cart
 index: 461
 model: 40
+texture: 105
 mass: 2.5
 linearDrag: 0.0
 angularDrag: 0.05
@@ -4244,6 +4249,8 @@ index: 588
 index: 589
 #prop_weapon_rack
 index: 590
+model: 641
+texture: 113
 #prop_xray
 index: 591
 #text_decal
@@ -4714,3 +4721,7 @@ index: 754
 model: 670
 texture: 262
 // eng_wallpump surrounding walls
+#npc_sec3_bot
+index: 755
+model: 681
+texture: 553

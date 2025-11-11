@@ -1378,3 +1378,5 @@ index: 678
 index: 679
 #Models/battery_collider.fbx
 index: 680
+#Models/npc_security3.fbx
+index: 681

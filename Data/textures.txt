@@ -1204,7 +1204,8 @@ index: 548
 index: 550
 #Textures/npc_cyborg.png
 index: 552
-
+#Textures/npc_sec3bot.png
+index: 553
 #Textures/npc_cyborgwarrior.png
 index: 554
 #Textures/npc_exec.png
