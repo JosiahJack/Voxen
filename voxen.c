@@ -1198,15 +1198,6 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
     dst[dst_pos] = '\0'; return dst_pos;
 }
 
-char* safe_strdup(const char* s) {
-    if (!s) return NULL;
-    
-    size_t l = strlen(s) + 1;
-    char* p = malloc(l);
-    if (p) memcpy(p, s, l);
-    return p;
-}
-
 void LoadTextForLanguage(uint8_t lang) {
     if (stringTable) {
         for (int i = 0; i < TEXT_STRING_COUNT; ++i) {
@@ -1251,7 +1242,15 @@ void LoadTextForLanguage(uint8_t lang) {
         while (data_pos < (size_t)file_size) {
             uint16_t code = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
             data_pos += 2;
-            if (code == 0x000D || code == 0x000A) break;
+            if (code == 0x000D) {
+                // Peek ahead for \n
+                if (data_pos < (size_t)file_size) {
+                    uint16_t next = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
+                    if (next == 0x000A) data_pos += 2;
+                }
+                break;
+            }
+            if (code == 0x000A) break;
         }
         
         size_t utf16_len = data_pos - line_start; if (utf16_len == 0) continue;
@@ -1274,7 +1273,7 @@ void LoadTextForLanguage(uint8_t lang) {
 }
 
 void LoadLogTextForLanguage(uint8_t lang) {
-    if (audioLogImagesRefIndicesLH) free(audioLogImagesRefIndicesLH); // Free when changing languages mid-game
+    if (audioLogImagesRefIndicesLH) free(audioLogImagesRefIndicesLH);
     audioLogImagesRefIndicesLH = malloc(TEXT_LOGS_COUNT * sizeof(uint16_t));
     
     if (audioLogImagesRefIndicesRH) free(audioLogImagesRefIndicesRH);
@@ -1284,10 +1283,8 @@ void LoadLogTextForLanguage(uint8_t lang) {
         for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
             if (audiologNames[i]) { free(audiologNames[i]); audiologNames[i] = NULL; }
         }
-        
         free(audiologNames); audiologNames = NULL;
     }
-    
     audiologNames = malloc(TEXT_LOGS_COUNT * sizeof(char*));
     for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
         audiologNames[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
@@ -1298,10 +1295,8 @@ void LoadLogTextForLanguage(uint8_t lang) {
         for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
             if (audiologSenders[i]) { free(audiologSenders[i]); audiologSenders[i] = NULL; }
         }
-        
         free(audiologSenders); audiologSenders = NULL;
     }
-    
     audiologSenders = malloc(TEXT_LOGS_COUNT * sizeof(char*));
     for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
         audiologSenders[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
@@ -1312,10 +1307,8 @@ void LoadLogTextForLanguage(uint8_t lang) {
         for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
             if (audiologSubjects[i]) { free(audiologSubjects[i]); audiologSubjects[i] = NULL; }
         }
-        
         free(audiologSubjects); audiologSubjects = NULL;
     }
-    
     audiologSubjects = malloc(TEXT_LOGS_COUNT * sizeof(char*));
     for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
         audiologSubjects[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
@@ -1326,10 +1319,8 @@ void LoadLogTextForLanguage(uint8_t lang) {
         for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
             if (audioLogSpeech2Text[i]) { free(audioLogSpeech2Text[i]); audioLogSpeech2Text[i] = NULL; }
         }
-        
         free(audioLogSpeech2Text); audioLogSpeech2Text = NULL;
     }
-    
     audioLogSpeech2Text = malloc(TEXT_LOGS_COUNT * sizeof(char*));
     for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
         audioLogSpeech2Text[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
@@ -1359,27 +1350,75 @@ void LoadLogTextForLanguage(uint8_t lang) {
     fseek(fp, 0, SEEK_END); long file_size = ftell(fp); fseek(fp, 0, SEEK_SET);
     uint8_t* file_data = malloc(file_size);
     if (fread(file_data, 1, file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s?\n",textFile); exit(1); }
-    
     fclose(fp);
+
     size_t data_pos = 0;
-    if (file_size >= 2 && file_data[0] == 0xFF && file_data[1] == 0xFE) data_pos = 2;
+    int is_utf16le = 0;
+    int is_utf8 = 0;
+    if (file_size >= 2 && file_data[0] == 0xFF && file_data[1] == 0xFE) { // Check for UTF-16LE
+        data_pos = 2;
+        is_utf16le = 1;
+    } else if (file_size >= 3 && file_data[0] == 0xEF && file_data[1] == 0xBB && file_data[2] == 0xBF) {
+        data_pos = 3;
+        is_utf8 = 1;
+    } else { // No BOM: Heuristic detection, check if file looks like UTF-16LE (every other byte is 0)
+       
+        int null_bytes = 0;
+        for (size_t i = 1; i < (size_t)file_size && i < 1024; i += 2) {
+            if (file_data[i] == 0) null_bytes++;
+        }
+        if (null_bytes > (file_size / 3)) {
+            is_utf16le = 1;  // Likely UTF-16LE without BOM
+        } else {
+            is_utf8 = 1;     // Assume UTF-8
+        }
+    }
+
     int lineNum = 0, totalLines = 0;
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
+
     while (data_pos < (size_t)file_size) {
         totalLines++; size_t line_start = data_pos;
-        while (data_pos < (size_t)file_size) {
-            uint16_t code = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
-            data_pos += 2;
-            if (code == 0x000D || code == 0x000A) break;
-        }
-        
-        size_t utf16_len = data_pos - line_start; if (utf16_len == 0) continue;
 
-        utf8_line[0] = '\0';
-        utf16le_to_utf8(&file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
+        if (is_utf8) {
+            while (data_pos < (size_t)file_size) {
+                if (file_data[data_pos] == '\r') {
+                    data_pos++;
+                    if (data_pos < (size_t)file_size && file_data[data_pos] == '\n') data_pos++;
+                    break;
+                }
+                if (file_data[data_pos] == '\n') { data_pos++; break; }
+                data_pos++;
+            }
+            size_t len = data_pos - line_start;
+            if (len == 0) continue;
+            if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
+            memcpy(utf8_line, &file_data[line_start], len); utf8_line[len] = '\0';
+        } else if (is_utf16le) {
+            while (data_pos + 1 < (size_t)file_size) {
+                uint16_t code = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
+                data_pos += 2;
+                if (code == 0x000D) {
+                    if (data_pos < (size_t)file_size) {
+                        uint16_t next = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
+                        if (next == 0x000A) data_pos += 2;
+                    }
+                    break;
+                }
+                if (code == 0x000A) break;
+            }
+
+            size_t utf16_len = data_pos - line_start; if (utf16_len == 0) continue;
+            utf8_line[0] = '\0';
+            utf16le_to_utf8(&file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
+        } else {
+            DualLogError("Unknown encoding, not UTF-8 nor UTF-16LE for %s\n",textFile);
+            exit(1);
+        } 
+
         size_t len = strlen(utf8_line);
         while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) { utf8_line[--len] = '\0'; }
-        if (len == 0) { if (lineNum < TEXT_STRING_COUNT) { strcpy(stringTable[lineNum], ""); lineNum++; } continue; }
+        if (len == 0) { lineNum++; continue; }
 
         char logline[TEXT_LOCALIZATION_MAX_LENGTH]; strncpy(logline, utf8_line, sizeof(logline) - 1); logline[sizeof(logline) - 1] = '\0';
         char fields[32][TEXT_BUFFER_SIZE]; int num_fields = 0; char* saveptr = NULL; char* token = strtok_r(logline, ",", &saveptr);
@@ -1403,8 +1442,10 @@ void LoadLogTextForLanguage(uint8_t lang) {
         if (num_fields > 6) readLogType = atoi(fields[6]);
         if (num_fields > 7) readLogLevelFound = atoi(fields[7]);
         strcpy(readLogText, ""); for (int f = 8; f < num_fields; f++) { if (f > 8) strcat(readLogText, ","); strcat(readLogText, fields[f]); }
-        if (readIndexOfLog >= 0) {
-            audioLogImagesRefIndicesLH[readIndexOfLog] = (uint16_t)readLogImageLHIndex; audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
+
+        if (readIndexOfLog >= 0 && readIndexOfLog < TEXT_LOGS_COUNT) {
+            audioLogImagesRefIndicesLH[readIndexOfLog] = (uint16_t)readLogImageLHIndex;
+            audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
             if (audiologNames[readIndexOfLog]) free(audiologNames[readIndexOfLog]);
             audiologNames[readIndexOfLog] = strdup(readLogName);
             
@@ -1419,6 +1460,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
             
             if (audioLogSpeech2Text[readIndexOfLog]) free(audioLogSpeech2Text[readIndexOfLog]);
             audioLogSpeech2Text[readIndexOfLog] = strdup(readLogText);
+            lineNum++;
         }
     }
     
