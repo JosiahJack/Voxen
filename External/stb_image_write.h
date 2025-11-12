@@ -1,3 +1,4 @@
+// stb_image_write.h - Screenshot Write
 #ifndef INCLUDE_STB_IMAGE_WRITE_H
 #define INCLUDE_STB_IMAGE_WRITE_H
 
@@ -74,10 +75,10 @@ typedef void stbi_write_func(void *context, void *data, int size);
 #endif
 
 
-#ifndef STBIW_ASSERT
-#include <assert.h>
-#define STBIW_ASSERT(x) assert(x)
-#endif
+// #ifndef STBIW_ASSERT
+// #include <assert.h>
+// #define STBIW_ASSERT(x) assert(x)
+// #endif
 
 #define STBIW_UCHAR(x) (unsigned char) ((x) & 0xff)
 
@@ -158,7 +159,7 @@ static void *stbiw__sbgrowf(void **arr, int increment, int itemsize)
 {
    int m = *arr ? 2*stbiw__sbm(*arr)+increment : increment+1;
    void *p = STBIW_REALLOC_SIZED(*arr ? stbiw__sbraw(*arr) : 0, *arr ? (stbiw__sbm(*arr)*itemsize + sizeof(int)*2) : 0, itemsize * m + sizeof(int)*2);
-   STBIW_ASSERT(p);
+//    STBIW_ASSERT(p);
    if (p) {
       if (!*arr) ((int *) p)[1] = 0;
       *arr = (void *) ((int *) p + 2);
@@ -287,7 +288,7 @@ STBIWDEF unsigned char * stbi_zlib_compress(unsigned char *data, int data_len, i
 
       if (bestloc) {
          int d = (int) (data+i - bestloc); // distance back
-         STBIW_ASSERT(d <= 32767 && best <= 258);
+//          STBIW_ASSERT(d <= 32767 && best <= 258);
          for (j=0; best > lengthc[j+1]-1; ++j);
          stbiw__zlib_huff(j+257);
          if (lengtheb[j]) stbiw__zlib_add(best - lengthc[j], lengtheb[j]);
@@ -537,14 +538,15 @@ STBIWDEF unsigned char *stbi_write_png_to_mem(const unsigned char *pixels, int s
    stbiw__wptag(o, "IEND");
    stbiw__wpcrc(&o,0);
 
-   STBIW_ASSERT(o == out + *out_len);
+//    STBIW_ASSERT(o == out + *out_len);
 
    return out;
 }
 
+int malloc_trim(size_t pad); // #include <malloc.h>
+
 #ifndef STBI_WRITE_NO_STDIO
-STBIWDEF int stbi_write_png(char const *filename, int x, int y, int comp, const void *data, int stride_bytes)
-{
+STBIWDEF int stbi_write_png(char const *filename, int x, int y, int comp, const void *data, int stride_bytes) {
    FILE *f;
    int len;
    unsigned char *png = stbi_write_png_to_mem((const unsigned char *) data, stride_bytes, x, y, comp, &len);
@@ -555,6 +557,7 @@ STBIWDEF int stbi_write_png(char const *filename, int x, int y, int comp, const 
    fwrite(png, 1, len, f);
    fclose(f);
    STBIW_FREE(png);
+   malloc_trim(0);
    return 1;
 }
 #endif

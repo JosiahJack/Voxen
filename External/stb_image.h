@@ -1,3 +1,4 @@
+// stb_image.h - PNG Load System
 typedef unsigned short stbi__uint16;
 typedef   signed short stbi__int16;
 typedef unsigned int   stbi__uint32;

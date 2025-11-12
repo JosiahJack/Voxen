@@ -5,11 +5,10 @@
 
 // Generic Lib Includes
 #include <time.h>
-#include <stdint.h>
 #include <stdbool.h>
 #include <stdarg.h>
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include "./External/glfw3.h"
 #include "External/stb_truetype.h"
 #include "citadel_enumerations.h"
 #include "matvecquat.h"
@@ -488,9 +487,18 @@ extern bool noHUD;
 #define FONT_STOPD 1
 
 // Hefty 9mb table for localization support.  Could be sparsely stored instead via dynamic alloc.
+#define TEXT_STRING_COUNT 1100
 #define TEXT_LOCALIZATION_MAX_LENGTH 1207
-// extern char** stringTable[2048][TEXT_LOCALIZATION_MAX_LENGTH * 4]; // Times 4 to fit num characters times longest 4-byte UTF-8 character codepoint
+#define TEXT_LOGS_COUNT 134
 extern char** stringTable;
+extern uint16_t* audioLogImagesRefIndicesLH;
+extern uint16_t* audioLogImagesRefIndicesRH;
+extern char** audiologNames;
+extern char** audiologSubjects;
+extern char** audiologSenders;
+extern char** audioLogSpeech2Text;
+extern uint8_t* audioLogType;
+extern uint16_t* audioLogLevelFound;
 
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;

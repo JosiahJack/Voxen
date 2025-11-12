@@ -1,3 +1,4 @@
+// data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
 #define _GNU_SOURCE
 #include <errno.h>
 #include <stdlib.h>

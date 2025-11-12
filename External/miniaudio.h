@@ -1,3 +1,4 @@
+// miniaudio.h - Audio System
 // HEAVILY REDUCED BY JOSIAH JACK, YOU'VE BEEN WARNED
 #ifndef miniaudio_h
 #define miniaudio_h

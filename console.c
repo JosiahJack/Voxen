@@ -2,7 +2,6 @@
 #include "voxen.h"
 #include "event.h"
 #include <string.h>
-#include <ctype.h> // For potential future use
 #include <stdlib.h> // For atoi
 
 #define MAX_HISTORY 7

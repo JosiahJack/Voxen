@@ -1,8 +1,7 @@
 // citadel_enumerations.h
 #ifndef CITADEL_ENUMERATIONS_H
 #define CITADEL_ENUMERATIONS_H
-
-#include <stdint.h> // For uint8_t
+#define uint8_t unsigned char
 
 // BodyState
 typedef uint8_t BodyState;

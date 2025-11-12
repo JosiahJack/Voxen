@@ -21,7 +21,6 @@
 #include <malloc.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <math.h>
 #include <stdlib.h>
 #include "event.h"
 #define VOXEN_ENGINE_IMPLEMENTATION
@@ -37,6 +36,16 @@
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
 #include "citadel_playermovement.c"
+double tan(double x); // #include <math.h>, limited subset
+float sqrtf(float arg); // #include <math.h>, limited subset
+float ceilf(float arg); // #include <math.h>, limited subset
+double floor(double arg); // #include <math.h>, limited subset
+double fmin(double x, double y); // #include <math.h>, limited subset
+double fmax(double x, double y); // #include <math.h>, limited subset
+double fabs(double x); // #include <math.h>, limited subset
+float cosf(float x); // #include <math.h>, limited subset
+float sinf(float x); // #include <math.h>, limited subset
+int omp_get_thread_num(void); // #include <omp.h>
 #include "input.c"
 
 typedef struct {
@@ -187,6 +196,14 @@ GLuint uiImageVAO, uiImageVBO;
 
 //    Text
 char** stringTable = NULL;
+uint16_t* audioLogImagesRefIndicesLH = NULL;
+uint16_t* audioLogImagesRefIndicesRH = NULL;
+char** audiologNames = NULL;
+char** audiologSubjects = NULL;
+char** audiologSenders = NULL;
+char** audioLogSpeech2Text = NULL;
+uint8_t* audioLogType = NULL;
+uint16_t* audioLogLevelFound = NULL;
 
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
@@ -1162,37 +1179,50 @@ void CycleToNextMonitor(GLFWwindow* window) {
     DualLog("Window moved to monitor %d: %s at %d,%d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
 }
 
+size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
+    size_t dst_pos = 0; size_t src_pos = 0;
+    while (src_pos < src_len && dst_pos < dst_len - 4) {
+        if (src_pos + 1 >= src_len) break;
+        uint32_t code = (uint32_t)src[src_pos + 1] << 8 | src[src_pos]; src_pos += 2;
+        if (code < 0x80) {
+            dst[dst_pos++] = (char)code;
+        } else if (code < 0x800) {
+            dst[dst_pos++] = (char)(0xC0 | (code >> 6));
+            dst[dst_pos++] = (char)(0x80 | (code & 0x3F));
+        } else if (code < 0x10000) {
+            dst[dst_pos++] = (char)(0xE0 | (code >> 12));
+            dst[dst_pos++] = (char)(0x80 | ((code >> 6) & 0x3F));
+            dst[dst_pos++] = (char)(0x80 | (code & 0x3F));
+        } else continue; // Skip surrogates
+    }
+    dst[dst_pos] = '\0'; return dst_pos;
+}
+
+char* safe_strdup(const char* s) {
+    if (!s) return NULL;
+    
+    size_t l = strlen(s) + 1;
+    char* p = malloc(l);
+    if (p) memcpy(p, s, l);
+    return p;
+}
+
 void LoadTextForLanguage(uint8_t lang) {
-    // Clear previous language allocations
     if (stringTable) {
-        for (int i = 0; i < 2048; ++i) {
-            if (stringTable[i]) {
-                free(stringTable[i]);
-                stringTable[i] = NULL;
-            }
+        for (int i = 0; i < TEXT_STRING_COUNT; ++i) {
+            if (stringTable[i]) { free(stringTable[i]); stringTable[i] = NULL; }
         }
-        free(stringTable);
-        stringTable = NULL;
+        
+        free(stringTable); stringTable = NULL;
     }
     
-    // Allocate for normal stringTable
-    stringTable = malloc(2048 * sizeof(char*));
-    if (!stringTable) {
-        DualLog("Failed to allocate stringTable\n");
-        return;
+    stringTable = malloc(TEXT_STRING_COUNT * sizeof(char*));
+    for (int i = 0; i < TEXT_STRING_COUNT; ++i) {
+        stringTable[i] = malloc(128 * sizeof(char));
+        stringTable[i][0] = '\0';
     }
-    for (int i = 0; i < 2048; ++i) {
-        stringTable[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
-        if (!stringTable[i]) {
-            DualLog("Failed to allocate stringTable[%d]\n", i);
-            // Handle error, perhaps free previous
-            return;
-        }
-        stringTable[i][0] = '\0'; // Initialize empty
-    }
-    
-    char textFile[256];
-    strcpy(textFile, "./Data/text_english.txt"); // Default
+
+    char textFile[256]; strcpy(textFile, "./Data/text_english.txt");
     switch (lang) {
         case 0: strcpy(textFile, "./Data/text_english.txt"); break;
         case 1: strcpy(textFile, "./Data/text_espanol.txt"); break;
@@ -1202,76 +1232,198 @@ void LoadTextForLanguage(uint8_t lang) {
         case 5: strcpy(textFile, "./Data/text_russkiy.txt"); break;
         case 6: strcpy(textFile, "./Data/text_italiano.txt"); break;
         case 7: strcpy(textFile, "./Data/text_portugues.txt"); break;
-        default: break;
     }
-    
-    FILE* fp = fopen(textFile, "rb"); // Binary mode to handle any line endings consistently
-    if (!fp) {
-        DualLog("Failed to open text file: %s\n", textFile);
-        return;
-    }
-    
-    int lineNum = 0;
-    char line[TEXT_LOCALIZATION_MAX_LENGTH];
-    bool logSection = false;
-    bool firstLine = true;
-    while (fgets(line, sizeof(line), fp)) {
-        // Trim trailing newline and carriage return
-        size_t len = strlen(line);
-        while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
-            line[len - 1] = '\0';
-            len--;
-        }
-        
-        // Handle UTF-8 BOM on first line
-        if (firstLine && len >= 3 && line[0] == (char)0xEF && line[1] == (char)0xBB && line[2] == (char)0xBF) {
-            memmove(line, line + 3, len - 2);
-            len -= 3;
-            line[len] = '\0';
-        }
-        firstLine = false;
-        
-        if (len == 0) {
-            continue; // Skip completely empty lines
-        }
-        
-        if (strcmp(line, "#") == 0) {
-            logSection = true;
-            DualLog("Entered log section\n");
-            continue; // Skip the # marker line
-        }
-        
-        if (!logSection) {
-            // Load normal text snippets sequentially
-            if (lineNum < 2048) {
-                strncpy(stringTable[lineNum], line, TEXT_LOCALIZATION_MAX_LENGTH - 1);
-                stringTable[lineNum][TEXT_LOCALIZATION_MAX_LENGTH - 1] = '\0';
-                DualLog("stringTable[%d] = '%s'\n", lineNum, stringTable[lineNum]);
-                lineNum++;
-            } else {
-                DualLog("Exceeded max normal strings: %d\n", lineNum);
-            }
-        } else {
-            // Parse log text section: CSV lines for audio logs
-            // (Your existing log parsing code here, unchanged)
-            // For example:
-            // char* token = strtok(line, ",");
-            // etc.
-            // Note: Since strtok modifies line, copy to temp if needed
-            char logline[TEXT_LOCALIZATION_MAX_LENGTH];
-            strncpy(logline, line, sizeof(logline) - 1);
-            logline[sizeof(logline) - 1] = '\0';
-            
-            // Rest of parsing...
-            // (Omit for brevity, add your log parsing)
-        }
-    }
+
+    FILE* fp = fopen(textFile, "rb"); if (!fp) { DualLog("Failed to open text file: %s\n", textFile); return; }
+
+    fseek(fp, 0, SEEK_END); long file_size = ftell(fp); fseek(fp, 0, SEEK_SET);
+    uint8_t* file_data = malloc(file_size);
+    if (fread(file_data, 1, file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s?\n",textFile); exit(1); }
     
     fclose(fp);
-    DualLog("Loaded %d normal text lines from %s\n", lineNum, textFile);
     
-    // If lineNum < 1000, check your text_english.txt file - it may have fewer lines than expected before the # marker.
-    // Ensure the file has at least 1016+ lines of normal text before the # for indices like 1000-1015.
+    size_t data_pos = 0;
+    if (file_size >= 2 && file_data[0] == 0xFF && file_data[1] == 0xFE) data_pos = 2;
+    int lineNum = 0, totalLines = 0;
+    char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
+    while (data_pos < (size_t)file_size) {
+        totalLines++; size_t line_start = data_pos;
+        while (data_pos < (size_t)file_size) {
+            uint16_t code = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
+            data_pos += 2;
+            if (code == 0x000D || code == 0x000A) break;
+        }
+        
+        size_t utf16_len = data_pos - line_start; if (utf16_len == 0) continue;
+
+        utf8_line[0] = '\0';
+        utf16le_to_utf8(&file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
+        size_t len = strlen(utf8_line);
+        while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) { utf8_line[--len] = '\0'; }
+        if (len == 0) { if (lineNum < TEXT_STRING_COUNT) { strcpy(stringTable[lineNum], ""); lineNum++; } continue; }
+        
+        if (lineNum < TEXT_STRING_COUNT) {
+            strncpy(stringTable[lineNum], utf8_line, TEXT_LOCALIZATION_MAX_LENGTH - 1);
+            stringTable[lineNum][TEXT_LOCALIZATION_MAX_LENGTH - 1] = '\0';
+            lineNum++;
+        }
+    }
+    
+    free(file_data);
+    DualLog("Loaded %d normal text lines from %s (total lines read: %d)\n", lineNum, textFile, totalLines);
+}
+
+void LoadLogTextForLanguage(uint8_t lang) {
+    if (audioLogImagesRefIndicesLH) free(audioLogImagesRefIndicesLH); // Free when changing languages mid-game
+    audioLogImagesRefIndicesLH = malloc(TEXT_LOGS_COUNT * sizeof(uint16_t));
+    
+    if (audioLogImagesRefIndicesRH) free(audioLogImagesRefIndicesRH);
+    audioLogImagesRefIndicesRH = malloc(TEXT_LOGS_COUNT * sizeof(uint16_t));
+    
+    if (audiologNames) {
+        for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+            if (audiologNames[i]) { free(audiologNames[i]); audiologNames[i] = NULL; }
+        }
+        
+        free(audiologNames); audiologNames = NULL;
+    }
+    
+    audiologNames = malloc(TEXT_LOGS_COUNT * sizeof(char*));
+    for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+        audiologNames[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
+        audiologNames[i][0] = '\0';
+    }
+    
+    if (audiologSenders) {
+        for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+            if (audiologSenders[i]) { free(audiologSenders[i]); audiologSenders[i] = NULL; }
+        }
+        
+        free(audiologSenders); audiologSenders = NULL;
+    }
+    
+    audiologSenders = malloc(TEXT_LOGS_COUNT * sizeof(char*));
+    for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+        audiologSenders[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
+        audiologSenders[i][0] = '\0';
+    }
+    
+    if (audiologSubjects) {
+        for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+            if (audiologSubjects[i]) { free(audiologSubjects[i]); audiologSubjects[i] = NULL; }
+        }
+        
+        free(audiologSubjects); audiologSubjects = NULL;
+    }
+    
+    audiologSubjects = malloc(TEXT_LOGS_COUNT * sizeof(char*));
+    for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+        audiologSubjects[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
+        audiologSubjects[i][0] = '\0';
+    }
+    
+    if (audioLogSpeech2Text) {
+        for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+            if (audioLogSpeech2Text[i]) { free(audioLogSpeech2Text[i]); audioLogSpeech2Text[i] = NULL; }
+        }
+        
+        free(audioLogSpeech2Text); audioLogSpeech2Text = NULL;
+    }
+    
+    audioLogSpeech2Text = malloc(TEXT_LOGS_COUNT * sizeof(char*));
+    for (int i = 0; i < TEXT_LOGS_COUNT; ++i) {
+        audioLogSpeech2Text[i] = malloc(TEXT_LOCALIZATION_MAX_LENGTH * sizeof(char));
+        audioLogSpeech2Text[i][0] = '\0';
+    }
+    
+    if (audioLogType) free(audioLogType);
+    audioLogType = malloc(TEXT_LOGS_COUNT * sizeof(uint8_t));
+    
+    if (audioLogLevelFound) free(audioLogLevelFound);
+    audioLogLevelFound = malloc(TEXT_LOGS_COUNT * sizeof(uint16_t));
+
+    char textFile[256]; strcpy(textFile, "./Data/logs_text_english.txt");
+    switch (lang) {
+        case 0: strcpy(textFile, "./Data/logs_text_english.txt"); break;
+        case 1: strcpy(textFile, "./Data/logs_text_espanol.txt"); break;
+        case 2: strcpy(textFile, "./Data/logs_text_deutsch.txt"); break;
+        case 3: strcpy(textFile, "./Data/logs_text_francais.txt"); break;
+        case 4: strcpy(textFile, "./Data/logs_text_nihongo.txt"); break;
+        case 5: strcpy(textFile, "./Data/logs_text_russkiy.txt"); break;
+        case 6: strcpy(textFile, "./Data/logs_text_italiano.txt"); break;
+        case 7: strcpy(textFile, "./Data/logs_text_portugues.txt"); break;
+    }
+
+    FILE* fp = fopen(textFile, "rb"); if (!fp) { DualLog("Failed to open logs text file: %s\n", textFile); return; }
+
+    fseek(fp, 0, SEEK_END); long file_size = ftell(fp); fseek(fp, 0, SEEK_SET);
+    uint8_t* file_data = malloc(file_size);
+    if (fread(file_data, 1, file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s?\n",textFile); exit(1); }
+    
+    fclose(fp);
+    size_t data_pos = 0;
+    if (file_size >= 2 && file_data[0] == 0xFF && file_data[1] == 0xFE) data_pos = 2;
+    int lineNum = 0, totalLines = 0;
+    char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
+    while (data_pos < (size_t)file_size) {
+        totalLines++; size_t line_start = data_pos;
+        while (data_pos < (size_t)file_size) {
+            uint16_t code = (data_pos + 1 < (size_t)file_size) ? ((uint16_t)file_data[data_pos + 1] << 8 | file_data[data_pos]) : 0;
+            data_pos += 2;
+            if (code == 0x000D || code == 0x000A) break;
+        }
+        
+        size_t utf16_len = data_pos - line_start; if (utf16_len == 0) continue;
+
+        utf8_line[0] = '\0';
+        utf16le_to_utf8(&file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
+        size_t len = strlen(utf8_line);
+        while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) { utf8_line[--len] = '\0'; }
+        if (len == 0) { if (lineNum < TEXT_STRING_COUNT) { strcpy(stringTable[lineNum], ""); lineNum++; } continue; }
+
+        char logline[TEXT_LOCALIZATION_MAX_LENGTH]; strncpy(logline, utf8_line, sizeof(logline) - 1); logline[sizeof(logline) - 1] = '\0';
+        char fields[32][TEXT_BUFFER_SIZE]; int num_fields = 0; char* saveptr = NULL; char* token = strtok_r(logline, ",", &saveptr);
+        while (token && num_fields < 32) {
+            if (token[0] == '"') token++;
+            size_t tlen = strlen(token);
+            if (tlen && token[tlen - 1] == '"') token[--tlen] = '\0';
+            strncpy(fields[num_fields], token, sizeof(fields[0]) - 1);
+            fields[num_fields][sizeof(fields[0]) - 1] = '\0';
+            num_fields++; token = strtok_r(NULL, ",", &saveptr);
+        }
+        
+        int readIndexOfLog = -1, readLogImageLHIndex = -1, readLogImageRHIndex = -1, readLogType = 0, readLogLevelFound = 0;
+        char readLogName[TEXT_BUFFER_SIZE] = {0}, readLogSender[TEXT_BUFFER_SIZE] = {0}, readLogSubject[TEXT_BUFFER_SIZE] = {0}, readLogText[TEXT_LOCALIZATION_MAX_LENGTH * 2] = {0};
+        if (num_fields > 0) readIndexOfLog = atoi(fields[0]);
+        if (num_fields > 1) readLogImageLHIndex = atoi(fields[1]);
+        if (num_fields > 2) readLogImageRHIndex = atoi(fields[2]);
+        if (num_fields > 3) strncpy(readLogName, fields[3], sizeof(readLogName) - 1);
+        if (num_fields > 4) strncpy(readLogSender, fields[4], sizeof(readLogSender) - 1);
+        if (num_fields > 5) strncpy(readLogSubject, fields[5], sizeof(readLogSubject) - 1);
+        if (num_fields > 6) readLogType = atoi(fields[6]);
+        if (num_fields > 7) readLogLevelFound = atoi(fields[7]);
+        strcpy(readLogText, ""); for (int f = 8; f < num_fields; f++) { if (f > 8) strcat(readLogText, ","); strcat(readLogText, fields[f]); }
+        if (readIndexOfLog >= 0) {
+            audioLogImagesRefIndicesLH[readIndexOfLog] = (uint16_t)readLogImageLHIndex; audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
+            if (audiologNames[readIndexOfLog]) free(audiologNames[readIndexOfLog]);
+            audiologNames[readIndexOfLog] = strdup(readLogName);
+            
+            if (audiologSenders[readIndexOfLog]) free(audiologSenders[readIndexOfLog]);
+            audiologSenders[readIndexOfLog] = strdup(readLogSender);
+            
+            if (audiologSubjects[readIndexOfLog]) free(audiologSubjects[readIndexOfLog]);
+            audiologSubjects[readIndexOfLog] = strdup(readLogSubject);
+            
+            audioLogType[readIndexOfLog] = (uint8_t)readLogType;
+            audioLogLevelFound[readIndexOfLog] = (uint16_t)readLogLevelFound;
+            
+            if (audioLogSpeech2Text[readIndexOfLog]) free(audioLogSpeech2Text[readIndexOfLog]);
+            audioLogSpeech2Text[readIndexOfLog] = strdup(readLogText);
+        }
+    }
+    
+    free(file_data);
+    DualLog("Loaded %d logs text lines from %s (total lines read: %d)\n", lineNum, textFile, totalLines);
 }
 
 void InitializeEnvironment(void) {
@@ -1283,15 +1435,13 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_FALSE);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
+    glfwWindowHint(GLFW_RESIZABLE, 0);
     window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
-    malloc_trim(0);
-    if (!window) { DualLogError("glfwCreateWindow failed\n"); glfwTerminate(); exit(1); }
+    if (!window) { DualLogError("glfwCreateWindow failed\n"); exit(1); }
     
     glfwMakeContextCurrent(window);
     UpdateScreenSize();
-    malloc_trim(0);
     DebugRAM("window init");
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
@@ -1302,12 +1452,12 @@ void InitializeEnvironment(void) {
         int xpos = mx + (mode->width - screen_width) / 2;
         int ypos = my + (mode->height - screen_height) / 2;
         glfwSetWindowPos(window, xpos, ypos);
-        DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\n", glfwGetMonitorName(target_monitor), xpos, ypos);
+        DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\nUsing GLFW %s\n", glfwGetMonitorName(target_monitor), xpos, ypos,glfwGetVersionString());
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glewExperimental = GL_TRUE; // Enable modern OpenGL support
-    if (glewInit() != GLEW_OK) { DualLog("GLEW initialization failed\n"); exit(1); }
+    if (glewInit() != GLEW_OK) { DualLogError("GLEW initialization failed\n"); exit(1); }
 
     malloc_trim(0);
     const GLubyte* version = glGetString(GL_VERSION);
@@ -1315,122 +1465,125 @@ void InitializeEnvironment(void) {
     if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
     
     DualLog("OpenGL Version: %s\n", (const char*)version);
-    DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");
-    glfwSwapInterval(settings_Vsync ? 1 : 0);
-    Input_Init(window);
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_MULTISAMPLE);
-    glMinSampleShading(0.0f);
-    glCullFace(GL_BACK);
-    glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
-    glViewport(0, 0, screen_width, screen_height);
-    malloc_trim(0);
-    CompileShaders();
-    malloc_trim(0);
-    glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
-    glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
-    glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1ui(chunkShaderProgram, screenWidthLoc_chunk, screen_width);
-    glProgramUniform1ui(chunkShaderProgram, screenHeightLoc_chunk, screen_height);
-    glProgramUniform1f( chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
-    glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
-    glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
-        
-    glCreateBuffers(1, &quadVBO);
-    glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
-    glCreateVertexArrays(1, &quadVAO);
-    glEnableVertexArrayAttrib(quadVAO, 0);
-    glEnableVertexArrayAttrib(quadVAO, 1);
-    glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
-    glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
-    glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-    glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
-    glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
-    
-    glGenVertexArrays(1, &vao_chunk);
-    glBindVertexArray(vao_chunk);
-    glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
-    glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
-    glBindVertexArray(0);
-    DebugRAM("after vao chunk bind");
-    
-    glCreateBuffers(1, &uiImageVBO);
-    glCreateVertexArrays(1, &uiImageVAO);
-    glEnableVertexArrayAttrib(uiImageVAO, 0);
-    glEnableVertexArrayAttrib(uiImageVAO, 1);
-    glVertexArrayAttribFormat(uiImageVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // UV (vec2)
-    glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 5 * sizeof(float));
-    glVertexArrayAttribBinding(uiImageVAO, 0, 0);
-    glVertexArrayAttribBinding(uiImageVAO, 1, 0);
-    DebugRAM("after ui image vao chunk bind");
+    DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");  
+    #pragma omp parallel num_threads(4)
+    {
+        if (omp_get_thread_num() == 0) {
+            Input_Init(window);
+            glfwSwapInterval(settings_Vsync ? 1 : 0);
+            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_MULTISAMPLE);
+            glMinSampleShading(0.0f);
+            glCullFace(GL_BACK);
+            glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
+            glViewport(0, 0, screen_width, screen_height);
+            CompileShaders();
+            malloc_trim(0);
+            glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
+            glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
+            glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
+            glProgramUniform1ui(chunkShaderProgram, screenWidthLoc_chunk, screen_width);
+            glProgramUniform1ui(chunkShaderProgram, screenHeightLoc_chunk, screen_height);
+            glProgramUniform1f( chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
+            glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
+            glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
+            glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
+                
+            glCreateBuffers(1, &quadVBO);
+            glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
+            glCreateVertexArrays(1, &quadVAO);
+            glEnableVertexArrayAttrib(quadVAO, 0);
+            glEnableVertexArrayAttrib(quadVAO, 1);
+            glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
+            glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
+            glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
+            glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
+            glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
+            
+            glGenVertexArrays(1, &vao_chunk);
+            glBindVertexArray(vao_chunk);
+            glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
+            glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
+            glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
+            for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
+            glBindVertexArray(0);
+            DebugRAM("after vao chunk bind");
+            
+            glCreateBuffers(1, &uiImageVBO);
+            glCreateVertexArrays(1, &uiImageVAO);
+            glEnableVertexArrayAttrib(uiImageVAO, 0);
+            glEnableVertexArrayAttrib(uiImageVAO, 1);
+            glVertexArrayAttribFormat(uiImageVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
+            glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // UV (vec2)
+            glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 5 * sizeof(float));
+            glVertexArrayAttribBinding(uiImageVAO, 0, 0);
+            glVertexArrayAttribBinding(uiImageVAO, 1, 0);
+            DebugRAM("after ui image vao chunk bind");
 
-    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    glGenTextures(1, &outputImageID);
-    glBindTexture(GL_TEXTURE_2D, outputImageID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glGenFramebuffers(1, &gBufferFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, drawBuffers);
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) {
-        switch (status) {
-            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
-            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
-            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
-            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
+            GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+            GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+            GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+            glGenTextures(1, &outputImageID);
+            glBindTexture(GL_TEXTURE_2D, outputImageID);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glGenFramebuffers(1, &gBufferFBO);
+            glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
+            GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+            glDrawBuffers(2, drawBuffers);
+            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (status != GL_FRAMEBUFFER_COMPLETE) {
+                switch (status) {
+                    case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
+                    case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
+                    case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
+                    default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
+                }
+            }
+            
+            glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
+            glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+            //                 3 = depth
+            glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
+            glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
+            glBindTexture(GL_TEXTURE_2D, inputDepthID);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, outputImageID);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            DebugRAM("setup gbuffer end");
+            
+            InitFontAtlasses();
+            glCreateBuffers(1, &textVBO);
+            glCreateVertexArrays(1, &textVAO);    
+            glEnableVertexArrayAttrib(textVAO, 0);
+            glEnableVertexArrayAttrib(textVAO, 1);
+            glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+            glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
+            glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
+            glVertexArrayAttribBinding(textVAO, 0, 0);
+            glVertexArrayAttribBinding(textVAO, 1, 0);
+
+            Input_MouselookApply(); // Input
+            InitializeAudio(); // Audio
         }
+        if (omp_get_thread_num() == 1) LoadTextForLanguage(settings_Language);
+        if (omp_get_thread_num() == 2) LoadLogTextForLanguage(settings_Language);
+        if (omp_get_thread_num() == 3) ParseGameData();
     }
     
-    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-    //                 3 = depth
-    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
-    glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
-    glBindTexture(GL_TEXTURE_2D, inputDepthID);
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, outputImageID);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    DebugRAM("setup gbuffer end");
-    RenderLoadingProgress(100,"Loading..."); // Early load screen to immediately clear what's in the window
-
-    InitFontAtlasses();
-    glCreateBuffers(1, &textVBO);
-    glCreateVertexArrays(1, &textVAO);    
-    glEnableVertexArrayAttrib(textVAO, 0);
-    glEnableVertexArrayAttrib(textVAO, 1);
-    glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
-    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
-    glVertexArrayAttribBinding(textVAO, 0, 0);
-    glVertexArrayAttribBinding(textVAO, 1, 0);
-
-    Input_MouselookApply(); // Input
-    InitializeAudio(); // Audio
-    DebugRAM("audio init");
-    RenderLoadingProgress(50,"Loading...");
-    ParseGameData();
     RenderLoadingProgress(100,"Loading textures...");
     DualLog("Window and GL Init took %f seconds\n", get_time() - init_start_time);
-    LoadTextures();
+    LoadTextures(); // Sequential due to GPU transfers
     RenderLoadingProgress(100,"Loading models...");
-    LoadModels();
-    RenderLoadingProgress(100,"Loading entities...");
-    LoadEntities(); // Must be after models and textures else entity types can't be validated.
+    LoadModels(); // Sequential due to GPU transfers
+    RenderLoadingProgress(100,"Loading data...");
+    LoadEntities(); // Had a note to do this after textures and models, didn't seem necessary but giving it a thread didn't help init times.
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
-    LoadTextForLanguage(settings_Language);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -1923,6 +2076,6 @@ int32_t main(int32_t argc, char* argv[]) {
             else if (globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
         #endif
     }
-    glfwTerminate();
+    
     return 0;
 }

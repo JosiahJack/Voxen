@@ -1,3 +1,4 @@
+// event.c - Handle unified event system for engine actions
 #include <stdio.h>
 #include "event.h"
 #include "voxen.h"

@@ -1,3 +1,4 @@
+// helpers.c - Helper Functions for various things
 #include <string.h>
 #include <sys/stat.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION

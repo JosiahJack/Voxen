@@ -1,8 +1,8 @@
+// data_fonts.c - Load Font Atlasses
 // #include "voxen.h" limited includes
-#include <stdint.h>
 #include <stdbool.h>
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include "./External/glfw3.h"
 #define MAX_GLYPHS 8192      // Rough estimate for all ranges
 #define FONT_ATLAS_SIZE 4096
 #define FONT_NORMAL 0

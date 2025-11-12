@@ -1,3 +1,10 @@
+// #include <stddef.h>
+// #include <string.h>
+// float cosf(float x); // #include <math.h>, limited subset
+// float sinf(float x); // #include <math.h>, limited subset
+// float sqrtf(float arg); // #include <math.h>, limited subset
+// #include "voxen.h"
+// #include "event.h"
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
 
@@ -129,7 +136,7 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
     
     // Normalize quaterrnion
-    float len = sqrt(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
+    float len = sqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
     if (len > 1e-6f) { q->x /= len; q->y /= len; q->z /= len; q->w /= len; }
     else { q->x = 0.0f; q->y = 0.0f; q->z = 0.0f; q->w = 1.0f; }
 }

@@ -1,6 +1,5 @@
+// physics.c - Physics System
 #include "voxen.h"
-#include <stdint.h>
-#include <stdbool.h>
 #include <math.h>
 void ProcessInput(void);
 

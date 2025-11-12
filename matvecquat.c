@@ -1,4 +1,4 @@
-// Matrices, Vectors, Quaternions
+// matvecquat.c - Matrices, Vectors, Quaternions
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>

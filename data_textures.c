@@ -1,3 +1,4 @@
+// data_textures.c - Load textures from raw .png files on disk
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #define STBI_MAX_DIMENSIONS 2048

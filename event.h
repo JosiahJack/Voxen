@@ -1,3 +1,4 @@
+// event.h - Unified Event system declarations
 #ifndef VOXEN_EVENT_H
 #define VOXEN_EVENT_H
 

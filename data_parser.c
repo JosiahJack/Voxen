@@ -1,3 +1,4 @@
+// data_parser.c - Load game definition files for mod, textures indices and metadata, model indices and metadata, level data, game save data
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
