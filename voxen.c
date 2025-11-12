@@ -1069,9 +1069,9 @@ void CenterStatusPrint(const char* fmt, ...) {
 }
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) {
-    instances[playerIdx].position.x = -22.0f;//-20.4f;
-    instances[playerIdx].position.y = -44.0f;//-43.79f + 0.84f; // Added 0.84f for cam offset from center
-    instances[playerIdx].position.z = -13.0f;//10.2f;
+    instances[playerIdx].position.x = -20.4f;
+    instances[playerIdx].position.y = -43.79f + 0.84f; // Added 0.84f for cam offset from center
+    instances[playerIdx].position.z = 10.2f;
     instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
     instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
     instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
