@@ -1380,3 +1380,11 @@ index: 679
 index: 680
 #Models/npc_security3.fbx
 index: 681
+#Models/beaker_collider.fbx
+index: 682
+#Models/beverage_collider.fbx
+index: 683
+#Models/fireextinguisher_collider.fbx
+index: 684
+#Models/flask_collider.fbx
+index: 685
