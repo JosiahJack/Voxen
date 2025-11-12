@@ -486,10 +486,6 @@ extern bool noHUD;
 #define FONT_NORMAL 0
 #define FONT_STOPD 1
 
-// Hefty 9mb table for localization support.  Could be sparsely stored instead via dynamic alloc.
-#define TEXT_STRING_COUNT 1100
-#define TEXT_LOCALIZATION_MAX_LENGTH 1207
-#define TEXT_LOGS_COUNT 134
 extern char** stringTable;
 extern uint16_t* audioLogImagesRefIndicesLH;
 extern uint16_t* audioLogImagesRefIndicesRH;
@@ -500,6 +496,8 @@ extern char** audioLogSpeech2Text;
 extern uint8_t* audioLogType;
 extern uint16_t* audioLogLevelFound;
 
+void LoadTextForLanguage(uint8_t lang);
+void LoadLogTextForLanguage(uint8_t lang);
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;
