@@ -316,7 +316,7 @@ bool CollideConvexBox(const Entity* convex, const Entity* box, Manifold* m) {
     if (modelIdx >= loadedModels) return false;
 
     // Transform box into convex local space
-    Vector3 boxHalf = scale_vector3(box->colliderSize, 0.5f);
+    Vector3 boxHalf =g scale_vector3(box->colliderSize, 0.5f);
 
     // Get convex vertices
     uint32_t vcount = modelVertexCounts[modelIdx];
