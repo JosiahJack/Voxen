@@ -1,4 +1,5 @@
 // citadel_playermovement.c - PlayerMovement
+#include "entity.h"
 #include "voxen.h"
 
 typedef struct {
@@ -899,7 +900,7 @@ void OnCollisionExit (){
     }
 }
 
-private ContactPoint contactPoint;
+private Manifold contactManifold;
 
 // Sets grounded based on normal angle of the impact point (NOTE: This is not the surface normal!)
 void OnCollisionStay(Collision collision) {
@@ -909,8 +910,8 @@ void OnCollisionStay(Collision collision) {
     float maxSlope = 0.35f;
     if (Inventory.a.BoosterActive()) maxSlope = 0.7f;
     for(tempInt=0;tempInt<collision.contactCount;tempInt++) {
-        contactPoint = collision.GetContact(tempInt);;
-        floorAng = contactPoint.normal;
+        contactManifold = GetContact(tempInt,&contactPoint);
+        floorAng = contactManifold.normal;
         floorDot = Vector3.Dot(floorAng,Vector3.up);
         if (floorDot <= 1f && floorDot >= maxSlope) {
             if (!grounded) stepFinished = PauseScript.a.relativeTime;

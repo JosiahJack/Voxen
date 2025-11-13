@@ -4,7 +4,7 @@ clear
 TEMP_DIR=temp_build
 export TMPDIR=/dev/shm
 mkdir -p $TEMP_DIR
-rm -f "$TEMP_DIR"/*.o
+rm -f "$TEMP_DIR"/*.o ./Shaders/*.h
 
 echo "Compiling voxen..."
 now_ms() { date +%s%3N; }
@@ -37,7 +37,7 @@ export CC="ccache gcc"
 CC=gcc
 CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og -D_POSIX_C_SOURCE=200809L"
 LDFLAGS="-flto=auto -s -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGLEW -lGL -lm -lfontconfig -fopenmp"
-SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c console.c event.c data_models.c data_textures.c data_text.c"
+SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c console.c event.c data_models.c data_textures.c data_text.c entity.c"
 export CC=gcc
 export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og -D_POSIX_C_SOURCE=200809L"
 export TEMP_DIR=temp_build

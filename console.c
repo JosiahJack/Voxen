@@ -1,7 +1,6 @@
 // console.c - Console Emulator
 #include "voxen.h"
 #include "event.h"
-#include <string.h>
 #include <stdlib.h> // For atoi
 
 #define MAX_HISTORY 7

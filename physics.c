@@ -1,5 +1,7 @@
 // physics.c - Physics System
 #include "voxen.h"
+#include "entity.h"
+#include "matvecquat.h"
 #include <math.h>
 void ProcessInput(void);
 
@@ -9,7 +11,6 @@ void ProcessInput(void);
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
-#define PLAYER_CAMERA_OFFSET_Y 0.84f
 float move_speed = 0.06;
 bool noclip = true; // Testing, TODO
 bool god = true; // Testing, TODO
@@ -18,12 +19,11 @@ bool fatigueCheat = false;
 bool redbull = false;
 float testLight_x, testLight_y, testLight_z;
 
-// ================================= Particle System ==================================
-int32_t ParticleSystemStep(void) {
-    if (gamePaused || menuActive) return 0; // No particle movement on the menu or paused
-    
-    return 0;
-}
+typedef struct {
+    Vector3 normal;
+    float penetration;
+    Vector3 contactPoint; // Max 4 for box resting on ground
+} Manifold;
 
 // ================================= Vector Logic ==================================
 void UpdatePlayerFacingAngles() {
@@ -39,23 +39,69 @@ void UpdatePlayerFacingAngles() {
     normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
 }
 
-// ================================= Collision Detection ==================================
-// Point to segment squared distance, outputs closest points
-static float dist_point_segment_sq(Vector3 p, Vector3 a, Vector3 b, Vector3* closest_on_seg, Vector3* closest_on_p) {
-    Vector3 ab = sub_vector3(b, a);
-    float len2 = dot_vector3(ab, ab);
-    Vector3 ap = sub_vector3(p, a);
-    float proj = dot_vector3(ap, ab);
-    float t = 0.0f;
-    if (len2 > 1e-6f) {
-        t = clampf(proj / len2, 0.0f, 1.0f);
-    }
-    *closest_on_seg = add_vector3(a, scale_vector3(ab, t));
-    *closest_on_p = p;  // Point to itself
-    Vector3 diff = sub_vector3(p, *closest_on_seg);
-    return dot_vector3(diff, diff);
+Vector3 GetWorldCenter(const Entity* e) {
+    Vector3 scaledCenter = {
+        e->colliderCenter.x * e->scale.x,
+        e->colliderCenter.y * e->scale.y,
+        e->colliderCenter.z * e->scale.z
+    };
+    Vector3 rotatedCenter = rotate_quaternion(e->rotation, scaledCenter);
+    return add_vector3(e->position, rotatedCenter);
 }
 
+bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
+    if (e->collider == COLLIDER_TYPE_NONE) return false;
+
+    if (e->collider == COLLIDER_TYPE_SPHERE) {
+        // ... existing ...
+
+    } else if (e->collider == COLLIDER_TYPE_BOX || e->collider == COLLIDER_TYPE_CAPSULE) {
+        // ... existing ...
+
+    } else if (e->collider == COLLIDER_TYPE_CONVEXMESH) {
+        uint16_t modelIdx = e->colliderMeshIndex;
+        if (modelIdx >= loadedModels) return false;
+
+        uint32_t base = modelIdx * BOUNDS_ATTRIBUTES_COUNT;
+        Vector3 local_min = {
+            modelBounds[base + BOUNDS_DATA_OFFSET_MINX],
+            modelBounds[base + BOUNDS_DATA_OFFSET_MINY],
+            modelBounds[base + BOUNDS_DATA_OFFSET_MINZ]
+        };
+        Vector3 local_max = {
+            modelBounds[base + BOUNDS_DATA_OFFSET_MAXX],
+            modelBounds[base + BOUNDS_DATA_OFFSET_MAXY],
+            modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ]
+        };
+
+        // Transform 8 corners of local AABB
+        Vector3 world_min = {FLT_MAX, FLT_MAX, FLT_MAX};
+        Vector3 world_max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+        float signs[2] = {-1.0f, 1.0f};
+        for (int ix = 0; ix < 2; ++ix) {
+            for (int iy = 0; iy < 2; ++iy) {
+                for (int iz = 0; iz < 2; ++iz) {
+                    Vector3 local = {
+                        (local_min.x + local_max.x)*0.5f + signs[ix] * (local_max.x - local_min.x)*0.5f,
+                        (local_min.y + local_max.y)*0.5f + signs[iy] * (local_max.y - local_min.y)*0.5f,
+                        (local_min.z + local_max.z)*0.5f + signs[iz] * (local_max.z - local_min.z)*0.5f
+                    };
+                    Vector3 rotated = rotate_quaternion(e->rotation, local);
+                    Vector3 world = add_vector3(e->position, rotated);
+                    world_min = min_vector3(world_min, world);
+                    world_max = max_vector3(world_max, world);
+                }
+            }
+        }
+        *aabb_min = world_min;
+        *aabb_max = world_max;
+        return true;
+    }
+    
+    return false;
+}
+
+// ================================= Collision Detection ==================================
 // Segment to segment squared distance (clamped)
 static float dist_segment_segment_sq(Vector3 a0, Vector3 a1, Vector3 b0, Vector3 b1, Vector3* closest_a, Vector3* closest_b) {
     Vector3 d1 = sub_vector3(a1, a0);
@@ -78,89 +124,6 @@ static float dist_segment_segment_sq(Vector3 a0, Vector3 a1, Vector3 b0, Vector3
     return dot_vector3(diff, diff);
 }
 
-// Point to triangle squared distance (barycentric), outputs closest on tri
-static float point_tri_dist_sq(Vector3 p, Vector3 a, Vector3 b, Vector3 c, Vector3* closest) {
-    Vector3 ab = sub_vector3(b, a);
-    Vector3 ac = sub_vector3(c, a);
-    Vector3 ap = sub_vector3(p, a);
-    float d00 = dot_vector3(ab, ab);
-    float d01 = dot_vector3(ab, ac);
-    float d11 = dot_vector3(ac, ac);
-    float d20 = dot_vector3(ap, ab);
-    float d21 = dot_vector3(ap, ac);
-    float denom = d00 * d11 - d01 * d01;
-    float v = 0.0f, w = 0.0f;
-    if (fabsf(denom) > 1e-6f) {
-        v = clampf((d11 * d20 - d01 * d21) / denom, 0.0f, 1.0f);
-        w = clampf((d00 * d21 - d01 * d20) / denom, 0.0f, 1.0f);
-        if (v + w > 1.0f) {
-            float vv = (v + w - 1.0f);
-            v = clampf(v - vv, 0.0f, 1.0f);
-            w = clampf(w - vv, 0.0f, 1.0f);
-        }
-    }
-    *closest = add_vector3(a, add_vector3(scale_vector3(ab, v), scale_vector3(ac, w)));
-    Vector3 diff = sub_vector3(p, *closest);
-    return dot_vector3(diff, diff);
-}
-
-// Capsule vs triangle: Returns true if colliding, updates cap_center by pushing out
-static bool capsule_vs_tri(Vector3* cap_center, float half_h, float r, Vector3 t0, Vector3 t1, Vector3 t2) {
-    Vector3 cap_bot = {cap_center->x, cap_center->y - half_h, cap_center->z};
-    Vector3 cap_top = {cap_center->x, cap_center->y + half_h, cap_center->z};
-    Vector3 seg_closest, tri_closest;
-    tri_closest = t0;
-    float min_dist_sq = 1e30f;
-
-    // Vert to segment (3)
-    Vector3 tris[3] = {t0, t1, t2};
-    for (int i = 0; i < 3; i++) {
-        Vector3 dummy;
-        float d = dist_point_segment_sq(tris[i], cap_bot, cap_top, &seg_closest, &dummy);
-        if (d < min_dist_sq) {
-            min_dist_sq = d;
-            tri_closest = tris[i];
-        }
-    }
-
-    // Edges to segment (3)
-    Vector3 edges[3][2] = {{t0, t1}, {t1, t2}, {t2, t0}};
-    for (int i = 0; i < 3; i++) {
-        Vector3 dummy_b;
-        float d = dist_segment_segment_sq(cap_bot, cap_top, edges[i][0], edges[i][1], &seg_closest, &dummy_b);
-        if (d < min_dist_sq) {
-            min_dist_sq = d;
-            tri_closest = dummy_b;
-        }
-    }
-
-    // Segment to plane clamped (1)
-    Vector3 n = normalize_vector3(cross_vector3(sub_vector3(t1, t0), sub_vector3(t2, t0)));
-    float d0 = dot_vector3(sub_vector3(cap_bot, t0), n);
-    float d1 = dot_vector3(sub_vector3(cap_top, t0), n);
-    if (fabsf(d0) > 1e-6f || fabsf(d1) > 1e-6f) {
-        float t = clampf(-d0 / (d1 - d0), 0.0f, 1.0f);
-        Vector3 foot = add_vector3(cap_bot, scale_vector3(sub_vector3(cap_top, cap_bot), t));
-        Vector3 cp;
-        float d = point_tri_dist_sq(foot, t0, t1, t2, &cp);
-        if (d < min_dist_sq) {
-            min_dist_sq = d;
-            seg_closest = foot;
-            tri_closest = cp;
-        }
-    }
-
-    float min_dist = sqrtf(min_dist_sq);
-    if (min_dist > r) return false;  // No collision
-
-    // Resolve: Push along connecting vector
-    Vector3 push_dir = sub_vector3(seg_closest, tri_closest);
-    push_dir = normalize_vector3(push_dir);
-    float pen = r - min_dist + 0.001f;  // Epsilon
-    *cap_center = add_vector3(*cap_center, scale_vector3(push_dir, pen));
-    return true;
-}
-
 int32_t absi(int32_t input) {
     if (input >= 0) return input;
     return input * -1;
@@ -175,6 +138,435 @@ static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint3
     return absi(inst_x - object_x) <= 1 && absi(inst_z - object_z) <= 1; // 0 means same cell, 1 means one of the 8 neighbors, accept all.
 }
 
+bool CollideAABB(const Vector3 min1, const Vector3 max1, const Vector3 min2, const Vector3 max2) {
+    return (max1.x > min2.x && min1.x < max2.x &&
+            max1.y > min2.y && min1.y < max2.y &&
+            max1.z > min2.z && min1.z < max2.z);
+}
+
+bool CollideSphereSphere(const Entity* a, const Entity* b, Manifold* m) {
+    Vector3 ca = GetWorldCenter(a);
+    float ra = a->colliderSize.x * a->scale.x;
+    Vector3 cb = GetWorldCenter(b);
+    float rb = b->colliderSize.x * b->scale.x;
+    Vector3 delta = sub_vector3(ca, cb);
+    float dist = magnitude_vector3(delta);
+    if (dist >= ra + rb || dist < 1e-6f) return false;
+    m->penetration = ra + rb - dist;
+    m->normal = (dist > 0) ? normalize_vector3(delta) : (Vector3){1.0f, 0.0f, 0.0f};
+    m->contactPoint = add_vector3(cb, scale_vector3(m->normal, rb));
+    return true;
+}
+
+bool CollideSphereBox(const Entity* sphere, const Entity* box, Manifold* m) {
+    Vector3 ws = GetWorldCenter(sphere);
+    float rs = sphere->colliderSize.x * sphere->scale.x;
+    
+    // Transform to box local space
+    Vector3 temp = sub_vector3(ws, box->position);
+    temp = rotate_quaternion(conjugate_quaternion(box->rotation), temp);
+    Vector3 local_pos = {
+        temp.x / box->scale.x - box->colliderCenter.x,
+        temp.y / box->scale.y - box->colliderCenter.y,
+        temp.z / box->scale.z - box->colliderCenter.z
+    };
+    Vector3 half = scale_vector3(box->colliderSize, 0.5f);
+    Vector3 closest = {
+        clampf(local_pos.x, -half.x, half.x),
+        clampf(local_pos.y, -half.y, half.y),
+        clampf(local_pos.z, -half.z, half.z)
+    };
+    Vector3 delta_local = sub_vector3(local_pos, closest);
+    float dist_sq = dot_vector3(delta_local, delta_local);
+    if (dist_sq > rs * rs + 1e-6f) return false;
+    float dist = (dist_sq > 0) ? sqrtf(dist_sq) : 0.0f;
+    
+    // Penetration, stop.  Don't.  No.
+    m->penetration = rs - dist;
+    if (dist > 0) {
+        m->normal = normalize_vector3(delta_local);
+    } else {
+        // Inside: choose escape direction
+        float dx = half.x - fabsf(local_pos.x);
+        float dy = half.y - fabsf(local_pos.y);
+        float dz = half.z - fabsf(local_pos.z);
+        float min_pen = fminf(fminf(dx, dy), dz);
+        m->penetration = min_pen;
+        if (dx == min_pen) {
+            m->normal = (Vector3){local_pos.x > 0 ? 1.0f : -1.0f, 0, 0};
+        } else if (dy == min_pen) {
+            m->normal = (Vector3){0, local_pos.y > 0 ? 1.0f : -1.0f, 0};
+        } else {
+            m->normal = (Vector3){0, 0, local_pos.z > 0 ? 1.0f : -1.0f};
+        }
+    }
+   
+    m->normal = rotate_quaternion(box->rotation, m->normal); // Normal to world
+    m->contactPoint = sub_vector3(ws, scale_vector3(m->normal, rs)); // On sphere surface
+    return true;
+}
+
+static bool CollideCapsuleCapsule(const Entity* a, const Entity* b, Manifold* m) {
+    Vector3 ca = GetWorldCenter(a);
+    float ra = a->colliderSize.x * a->scale.x;
+    float ha = a->colliderSize.y * a->scale.y * 0.5f - ra;   // half-height of line segment
+
+    Vector3 cb = GetWorldCenter(b);
+    float rb = b->colliderSize.x * b->scale.x;
+    float hb = b->colliderSize.y * b->scale.y * 0.5f - rb;
+
+    Vector3 a0 = {ca.x, ca.y - ha, ca.z};
+    Vector3 a1 = {ca.x, ca.y + ha, ca.z};
+    Vector3 b0 = {cb.x, cb.y - hb, cb.z};
+    Vector3 b1 = {cb.x, cb.y + hb, cb.z};
+
+    Vector3 cA, cB;
+    float distSq = dist_segment_segment_sq(a0, a1, b0, b1, &cA, &cB);
+    float dist = sqrtf(distSq);
+    if (dist >= ra + rb + 1e-6f) return false;
+
+    m->penetration = ra + rb - dist;
+    m->normal = (dist > 0.0f) ? normalize_vector3(sub_vector3(cA, cB))
+                             : (Vector3){0,1,0}; // fallback
+    m->contactPoint = add_vector3(cB, scale_vector3(m->normal, rb));
+    return true;
+}
+
+static bool CollideCapsuleBox(const Entity* cap, const Entity* box, Manifold* m) {
+    Vector3 c = GetWorldCenter(cap);
+    float r = cap->colliderSize.x * cap->scale.x;
+    float h = cap->colliderSize.y * cap->scale.y * 0.5f - r;
+    Vector3 bot = {c.x, c.y - h, c.z};
+    Vector3 top = {c.x, c.y + h, c.z};
+
+    // Treat capsule as two spheres + line segment; test each part
+    Manifold tmp = {0};
+    float bestPen = -1e30f;
+    Vector3 bestNorm = {0,0,0};
+    Vector3 bestCP  = {0,0,0};
+
+    // 1) Sphere (bot) vs Box
+    Entity fake = *cap;
+    fake.collider = COLLIDER_TYPE_SPHERE;
+    fake.colliderCenter = sub_vector3(bot, cap->position);
+    if (CollideSphereBox(&fake, box, &tmp) && tmp.penetration > bestPen) {
+        bestPen = tmp.penetration; bestNorm = tmp.normal; bestCP = tmp.contactPoint;
+    }
+
+    // 2) Sphere (top) vs Box
+    fake.colliderCenter = sub_vector3(top, cap->position);
+    if (CollideSphereBox(&fake, box, &tmp) && tmp.penetration > bestPen) {
+        bestPen = tmp.penetration; bestNorm = tmp.normal; bestCP = tmp.contactPoint;
+    }
+
+    // 3) Line segment vs Box (SAT-style closest point)
+    // Transform segment to box local space
+    Quaternion qinv = conjugate_quaternion(box->rotation);
+    Vector3 p0 = add_vector3(sub_vector3(bot, box->position), (Vector3){0,0,0});
+    p0 = rotate_quaternion(qinv, p0);
+    Vector3 p1 = add_vector3(sub_vector3(top, box->position), (Vector3){0,0,0});
+    p1 = rotate_quaternion(qinv, p1);
+
+    Vector3 half = scale_vector3(box->colliderSize, 0.5f);
+    Vector3 localCenter = { box->colliderCenter.x, box->colliderCenter.y, box->colliderCenter.z };
+
+    // Clamp segment endpoints to box
+    Vector3 cp0 = {
+        clampf(p0.x / box->scale.x - localCenter.x, -half.x, half.x),
+        clampf(p0.y / box->scale.y - localCenter.y, -half.y, half.y),
+        clampf(p0.z / box->scale.z - localCenter.z, -half.z, half.z)
+    };
+
+    // Closest point on segment to box interior
+    Vector3 segDir = sub_vector3(p1, p0);
+    float len2 = dot_vector3(segDir, segDir);
+    float t = 0.0f;
+    if (len2 > 1e-6f) {
+        t = clampf(dot_vector3(sub_vector3(cp0, p0), segDir) / len2, 0.0f, 1.0f);
+    }
+    Vector3 closestOnSeg = add_vector3(p0, scale_vector3(segDir, t));
+    Vector3 delta = sub_vector3(closestOnSeg, cp0);
+    float d2 = dot_vector3(delta, delta);
+    if (d2 < r*r + 1e-6f) {
+        float d = sqrtf(d2);
+        Vector3 n = (d > 0) ? normalize_vector3(delta) : (Vector3){0,1,0};
+        n = rotate_quaternion(box->rotation, n);
+        float pen = r - d;
+        if (pen > bestPen) {
+            bestPen = pen;
+            bestNorm = n;
+            bestCP = add_vector3(closestOnSeg, scale_vector3(n, -r));
+            bestCP = add_vector3(box->position, rotate_quaternion(box->rotation,
+                     add_vector3(scale_vector3(bestCP, box->scale.x), 
+                                 (Vector3){localCenter.x*box->scale.x,
+                                           localCenter.y*box->scale.y,
+                                           localCenter.z*box->scale.z})));
+        }
+    }
+
+    if (bestPen <= 0.0f) return false;
+    m->penetration = bestPen;
+    m->normal = bestNorm;
+    m->contactPoint = bestCP;
+    return true;
+}
+
+bool CollideConvexBox(const Entity* convex, const Entity* box, Manifold* m) {
+    uint16_t modelIdx = convex->colliderMeshIndex;
+    if (modelIdx >= loadedModels) return false;
+
+    // Transform box into convex local space
+    Vector3 boxHalf = scale_vector3(box->colliderSize, 0.5f);
+
+    // Get convex vertices
+    uint32_t vcount = modelVertexCounts[modelIdx];
+    float* verts = modelVertices[modelIdx];
+
+    // We'll test: box faces + convex faces + edge cross products
+    Vector3 bestNormal = {0,0,0};
+    float bestPen = -FLT_MAX;
+    bool hit = false;
+
+    // 1. Box face normals (6)
+    Vector3 boxFaces[6] = {
+        {1,0,0}, {-1,0,0},
+        {0,1,0}, {0,-1,0},
+        {0,0,1}, {0,0,-1}
+    };
+    for (int i = 0; i < 6; ++i) {
+        Vector3 n = rotate_quaternion(convex->rotation, boxFaces[i]);
+        float d_convex = -FLT_MAX;
+        float d_box = (i%2==0 ? boxHalf.x : -boxHalf.x);
+        if (i>=2 && i<4) d_box = (i==2 ? boxHalf.y : -boxHalf.y);
+        if (i>=4) d_box = (i==4 ? boxHalf.z : -boxHalf.z);
+
+        for (uint32_t v = 0; v < vcount; ++v) {
+            Vector3 p = {
+                verts[v*VERTEX_ATTRIBUTES_COUNT + 0],
+                verts[v*VERTEX_ATTRIBUTES_COUNT + 1],
+                verts[v*VERTEX_ATTRIBUTES_COUNT + 2]
+            };
+            float d = dot_vector3(p, n);
+            d_convex = fmaxf(d_convex, d);
+        }
+        float pen = d_box - d_convex;
+        if (pen > 0 && pen > bestPen) {
+            bestPen = pen;
+            bestNormal = n;
+            hit = true;
+        }
+    }
+
+    if (!hit) return false;
+
+    m->penetration = bestPen;
+    m->normal = normalize_vector3(bestNormal);
+    m->contactPoint = add_vector3(convex->position, scale_vector3(m->normal, -bestPen * 0.5f));
+    return true;
+}
+
+float Combine(const float a, const float b, PhysCombineType combine) {
+    switch (combine) {
+        case PHYS_COMBINE_AVG: return (a + b) * 0.5f;
+        case PHYS_COMBINE_MIN: return fminf(a, b);
+        case PHYS_COMBINE_MUL: return sqrtf(a * b);
+        case PHYS_COMBINE_MAX: return fmaxf(a, b);
+        default: return a; // or average
+    }
+}
+
+void ResolveCollision(Entity* a, Entity* b, Manifold* m) {
+    if (a->mass <= 0.0f && b->mass <= 0.0f) return;
+    // Relative velocity at contact
+    Vector3 ra = sub_vector3(m->contactPoint, a->position);
+    Vector3 va = add_vector3(a->velocity, cross_vector3(a->angularVelocity, ra));
+    Vector3 rb = sub_vector3(m->contactPoint, b->position);
+    Vector3 vb = add_vector3(b->velocity, cross_vector3(b->angularVelocity, rb));
+    Vector3 rel_vel = sub_vector3(va, vb);
+    float vel_n = dot_vector3(rel_vel, m->normal);
+    if (vel_n > 0.0f) return; // Separating
+    float inv_ma = (a->mass > 0.0f) ? 1.0f / a->mass : 0.0f;
+    float inv_mb = (b->mass > 0.0f) ? 1.0f / b->mass : 0.0f;
+    float inv_m_sum = inv_ma + inv_mb;
+    if (inv_m_sum < 1e-6f) return;
+    // Bounce
+    float e = Combine(a->bounciness, b->bounciness, a->bounceCombine); // Assume same combine type
+    float j = -(1.0f + e) * vel_n / inv_m_sum;
+    Vector3 impulse = scale_vector3(m->normal, j);
+    // Apply linear
+    if (a->mass > 0.0f) a->velocity = sub_vector3(a->velocity, scale_vector3(impulse, inv_ma));
+    if (b->mass > 0.0f) b->velocity = add_vector3(b->velocity, scale_vector3(impulse, inv_mb));
+    // Friction (dynamic for sliding)
+    Vector3 tangent_vel = sub_vector3(rel_vel, scale_vector3(m->normal, vel_n));
+    float tangent_len = magnitude_vector3(tangent_vel);
+    if (tangent_len > 1e-6f) {
+        Vector3 tangent = normalize_vector3(tangent_vel);
+        float mu_d = Combine(a->dynamicFriction, b->dynamicFriction, a->frictionCombine);
+        float jt_max = fabsf(j) * mu_d;
+        float jt = -tangent_len / inv_m_sum;
+        if (fabsf(jt) > jt_max) jt = (jt > 0.0f ? jt_max : -jt_max);
+        Vector3 friction_impulse = scale_vector3(tangent, jt);
+        if (a->mass > 0.0f) a->velocity = sub_vector3(a->velocity, scale_vector3(friction_impulse, inv_ma));
+        if (b->mass > 0.0f) b->velocity = add_vector3(b->velocity, scale_vector3(friction_impulse, inv_mb));
+    }
+    // Torque (only for non-NPC/player)
+    if (!(ConstIndexIsNPC(a->index) || a == &instances[PLAYER1] || a == &instances[PLAYER2])) {
+        if (a->inertia > 0.0f) {
+            float inv_ia = 1.0f / a->inertia;
+            Vector3 torque_a = cross_vector3(ra, impulse);
+            a->angularVelocity = add_vector3(a->angularVelocity, scale_vector3(torque_a, inv_ia));
+            // Friction torque similar, omitted for minimal.
+        }
+    }
+    if (!(ConstIndexIsNPC(b->index) || b == &instances[PLAYER1] || b == &instances[PLAYER2])) {
+        if (b->inertia > 0.0f) {
+            float inv_ib = 1.0f / b->inertia;
+            Vector3 torque_b = cross_vector3(rb, scale_vector3(impulse, -1.0f)); // Opposite
+            b->angularVelocity = add_vector3(b->angularVelocity, scale_vector3(torque_b, inv_ib));
+        }
+    }
+    // Positional correction
+    float percent = 0.2f;
+    float slop = 0.01f;
+    float correction = fmaxf(m->penetration - slop, 0.0f) * percent / inv_m_sum;
+    Vector3 correction_vec = scale_vector3(m->normal, correction);
+    if (a->mass > 0.0f) a->position = sub_vector3(a->position, scale_vector3(correction_vec, inv_ma));
+    if (b->mass > 0.0f) b->position = add_vector3(b->position, scale_vector3(correction_vec, inv_mb));
+    // Dirty matrices
+    dirtyInstances[a - instances] = true;
+    dirtyInstances[b - instances] = true;
+}
+
+void ComputeInertiaFromCollider(Entity* e) {
+    if (e->mass <= 0.0f || e->collider == COLLIDER_TYPE_NONE) {
+        e->inertia = 0.0f;
+        return;
+    }
+    
+    Vector3 size = e->colliderSize;
+    size.x *= e->scale.x; size.y *= e->scale.y; size.z *= e->scale.z;
+    if (e->collider == COLLIDER_TYPE_SPHERE) {
+        float r2 = size.x * size.x;
+        e->inertia = 0.4f * e->mass * r2;
+    } else if (e->collider == COLLIDER_TYPE_BOX) {
+        float ly2 = size.y*size.y, lz2 = size.z*size.z;
+        e->inertia = e->mass * (ly2 + lz2) / 12.0f; // scalar approx
+    } else if (e->collider == COLLIDER_TYPE_CAPSULE) {
+        // Approx as cylinder + spheres
+        float r2 = size.x * size.x;
+        float h = size.y;
+        e->inertia = e->mass * (0.25f * r2 + h * h / 12.0f); // About perpendicular axis.
+    }
+    // For mesh, approx from bounds.
+    // Clamp to avoid zero.
+    if (e->inertia < 1e-6f) e->inertia = e->mass; // Fallback.
+}
+
+void IntegratePhysics(float dt) {
+    for (uint16_t i = 0; i < INSTANCE_COUNT; ++i) {
+        Entity* e = &instances[i];
+        if (!(e->entflags & ENTFLAG_ACTIVE)) continue;
+        if ((e->entflags & ENTFLAG_KINEMATIC)) continue;
+        if (e->mass <= 0.0f) continue;  // Safety; set mass >0 for dynamics.
+
+        // Accumulate gravity as force.
+        if ((e->entflags & ENTFLAG_USEGRAVITY)) e->accumulatedForce = add_vector3(e->accumulatedForce, scale_vector3((Vector3){0.0f,-9.81f,0.0f}, e->mass));
+
+        Vector3 accel = scale_vector3(e->accumulatedForce, 1.0f / e->mass); // Linear integration (semi-implicit Euler).
+        e->velocity = add_vector3(e->velocity, scale_vector3(accel, dt));
+        e->velocity = scale_vector3(e->velocity, (1.0f - e->linearDrag * dt)); // Apply linear drag (simple exponential approx).
+        e->position = add_vector3(e->position, scale_vector3(e->velocity, dt)); // Integrate position.
+
+        // Angular integration (only for non-player/NPC; skip torque/rot for them).
+        if (ConstIndexIsNPC(e->index) || i == PLAYER1 || i == PLAYER2) {
+            e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
+            e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
+        } else if (e->inertia > 0.0f) {
+            // Angular accel (scalar I approx; for full tensor, extend later if needed).
+            float invI = 1.0f / e->inertia;
+            Vector3 angAccel = scale_vector3(e->accumulatedTorque, invI);
+            e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(angAccel, dt));
+            // Apply angular drag.
+            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * dt));
+            // Integrate rotation (world-space axis-angle approx; good for small dt).
+            float angMag = magnitude_vector3(e->angularVelocity);
+            if (angMag > 1e-6f) {
+                float angle = angMag * dt;
+                Vector3 axis = normalize_vector3(e->angularVelocity);
+                Quaternion deltaQ = axis_angle_quaternion(axis, angle);
+                e->rotation = mul_quaternion(deltaQ, e->rotation);
+                normalize_quaternion(&e->rotation);
+            }
+        }
+
+        // Clear accumulators.
+        e->accumulatedForce = (Vector3){0.0f,0.0f,0.0f};
+        e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
+    }
+}
+
+// AddForce (mimics Unity AddForce; isImpulse=true for ForceMode.Impulse, false for Force).
+void AddForce(uint16_t idx, Vector3 force, bool isImpulse) {
+    Entity* e = &instances[idx];
+    if ((e->entflags & ENTFLAG_KINEMATIC) || e->mass <= 0.0f) return;
+    if (isImpulse) {
+        e->velocity = add_vector3(e->velocity, scale_vector3(force, 1.0f / e->mass));
+    } else {
+        e->accumulatedForce = add_vector3(e->accumulatedForce, force);
+    }
+}
+
+// AddRelativeForce (local -> world transform via quat).
+void AddRelativeForce(uint16_t idx, Vector3 localForce, bool isImpulse) {
+    Entity* e = &instances[idx];
+    if ((e->entflags & ENTFLAG_KINEMATIC) || e->mass <= 0.0f) return;
+    Vector3 worldForce = rotate_quaternion(e->rotation, localForce);
+    AddForce(idx, worldForce, isImpulse);
+}
+
+// AddForceAtPosition (applies force + torque; mimics Unity, assumes CoM at position).
+void AddForceAtPosition(uint16_t idx, Vector3 force, Vector3 position, bool isImpulse) {
+    Entity* e = &instances[idx];
+    if ((e->entflags & ENTFLAG_KINEMATIC) || e->mass <= 0.0f) return;
+    if (isImpulse) {
+        e->velocity = add_vector3(e->velocity, scale_vector3(force, 1.0f / e->mass));
+    } else {
+        e->accumulatedForce = add_vector3(e->accumulatedForce, force);
+    }
+    // Torque (world space).
+    if (! (ConstIndexIsNPC(e->index) || idx == PLAYER1 || idx == PLAYER2) && e->inertia > 0.0f) {
+        Vector3 relPos = sub_vector3(position, e->position);
+        Vector3 torque = cross_vector3(relPos, force);
+        if (isImpulse) {
+            // For impulse torque, integrate angVel directly (approx).
+            float invI = 1.0f / e->inertia;
+            e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(torque, invI));
+        } else {
+            e->accumulatedTorque = add_vector3(e->accumulatedTorque, torque);
+        }
+    }
+}
+
+// AddExplosionForce (mimics Unity; linear falloff, upwardsModifier on Y; assume up={0,1,0}).
+void AddExplosionForce(uint16_t idx, float power, Vector3 explosionPos, float radius, float upwardsModifier, bool isImpulse) {
+    Entity* e = &instances[idx];
+    if ((e->entflags & ENTFLAG_KINEMATIC) || e->mass <= 0.0f) return;
+    Vector3 dir = sub_vector3(e->position, explosionPos);  // From explosion to entity CoM.
+    float dist = magnitude_vector3(dir);
+    if (dist > radius || dist < 1e-6f) return;
+    dir = normalize_vector3(dir);
+    float falloff = 1.0f - (dist / radius);
+    if (falloff < 0.0f) falloff = 0.0f;
+    Vector3 explosionForce = scale_vector3(dir, power * falloff);
+    // Upwards component (Unity adds to Y).
+    explosionForce.y += upwardsModifier * power * falloff;
+    if (isImpulse) {
+        e->velocity = add_vector3(e->velocity, scale_vector3(explosionForce, 1.0f / e->mass));
+    } else {
+        e->accumulatedForce = add_vector3(e->accumulatedForce, explosionForce);
+    }
+}
+
 // ================================= Physics ==================================
 void PlayerPhysics(void) {
     // Player Movement from Input
@@ -184,62 +576,101 @@ void PlayerPhysics(void) {
     }
 
     // Player Physics: Capsule-triangle naive collision
-    if (noclip) return;
-    
-    // Apply gravity to camera (affects bottom of capsule)
-    if (instances[PLAYER1].entflags & ENTFLAG_USEGRAVITY) instances[PLAYER1].position.y -= 0.01f;
-    
-    // Capsule setup: radius=0.48, height=2.0, center at instances[PLAYER1].position.y - 1.84
-    float capsule_offset = currentLevel == LEVEL_CYBERSPACE ? 0.0f : PLAYER_CAMERA_OFFSET_Y;  // Center below camera (1.84 below, 0.16 above for total capsule heights including end radii).
-    Vector3 cap_center = {instances[PLAYER1].position.x, instances[PLAYER1].position.y - capsule_offset, instances[PLAYER1].position.z};          // Cyberspace in Unity version of Citadel had sphere collider at 0.84f offset to center on camera,
-                                                                          // here we center the camera on the capsule center which is the player center for cyberspace, simpler.
-    float half_height = currentLevel == LEVEL_CYBERSPACE ? PLAYER_CAPSULE_RADIUS : (2.0f - (PLAYER_CAPSULE_RADIUS * 2.0f)) * 0.5f;  // Half of 2.0f height
-
-//     float body_state_add = 0.0f;
-//     if (currentLevel != LEVEL_CYBERSPACE) {
-//         switch (playerMovement.bodyState) {
-//             case BodyState_Standing: body_state_add = 0.32f; break;//(PLAYER_HEIGHT * 0.5f); break; TODO
-//             // Add cases for crouch/prone: adjust half_height, offset
-//         }
-//         // For now, assume fixed; extend as needed
-//     }
-    
-    // Naive loop over all instances and their triangles
-    uint32_t numTrisProcessed = 0;
-    for (uint32_t i = 3; i < loadedInstances; i++) { // Skip player indices and start at 3
-        if (instances[i].modelIndex > loadedModels) continue;
-        if (!is_instance_in_neighbor_cells(cellIndexForInstance[i],playerCellIdx)) continue;
-        
-        int32_t mid = instances[i].entflags & ENTFLAG_CARDCHUNK ? GEOMETRY_LOD_CARD_MODEL_IDX : instances[i].modelIndex;
-        if (mid > loadedModels || mid < 0) continue;
-        if (modelVertexCounts[mid] < 3 || modelTriangleCounts[mid] == 0) continue;
-
-        const float* world_mat = &modelMatrices[i * 16];
-        uint32_t num_tris = modelTriangleCounts[mid];
-        for (uint32_t t = 0; t < num_tris; t++) {
-            uint32_t i0 = modelTriangles[mid][t * 3 + 0] * VERTEX_ATTRIBUTES_COUNT;
-            uint32_t i1 = modelTriangles[mid][t * 3 + 1] * VERTEX_ATTRIBUTES_COUNT;
-            uint32_t i2 = modelTriangles[mid][t * 3 + 2] * VERTEX_ATTRIBUTES_COUNT;
-            
-            // Transform positions to world
-            Vector3 v0 = mul_mat4_vector3(world_mat, (Vector3){ modelVertices[mid][i0 + 0], modelVertices[mid][i0 + 1], modelVertices[mid][i0 + 2] });
-            Vector3 v1 = mul_mat4_vector3(world_mat, (Vector3){ modelVertices[mid][i1 + 0], modelVertices[mid][i1 + 1], modelVertices[mid][i1 + 2] });
-            Vector3 v2 = mul_mat4_vector3(world_mat, (Vector3){ modelVertices[mid][i2 + 0], modelVertices[mid][i2 + 1], modelVertices[mid][i2 + 2] });
-            numTrisProcessed++;
-            
-            // Test and resolve
-            capsule_vs_tri(&cap_center, half_height, PLAYER_CAPSULE_RADIUS, v0, v1, v2);
-        }
+    if (noclip) {
+        instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
+        instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_USEGRAVITY) | (-false & ENTFLAG_USEGRAVITY);
+        instances[PLAYER1].velocity = (Vector3){0.0f,0.0f,0.0f};
+    } else {
+        instances[PLAYER1].collider = COLLIDER_TYPE_CAPSULE;
+        instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_USEGRAVITY) | (-true & ENTFLAG_USEGRAVITY);
     }
+}
 
-    instances[PLAYER1].position.x = cap_center.x; // Update camera from resolved capsule center
-    instances[PLAYER1].position.y = cap_center.y + capsule_offset;  // Restore offset
-    instances[PLAYER1].position.z = cap_center.z;
+static bool ShouldTestPair(uint16_t i, uint16_t j) {
+    if (!is_instance_in_neighbor_cells(cellIndexForInstance[i], cellIndexForInstance[j]))
+        return false;
+    return true;
 }
 
 int32_t Physics(void) {
-    if (gamePaused || menuActive) return 0; // No physics on the menu or paused
-    
+    if (gamePaused || menuActive) return 0;
+
     PlayerPhysics();
+    IntegratePhysics(timeSinceLastPhysicsTick);
+
+    uint16_t dynamics[MAX_DYNAMIC_ENTITIES];
+    int32_t num_dynamics = 0;
+    for (uint16_t i = 1; i < INSTANCE_COUNT; ++i) {
+        Entity* e = &instances[i];
+        if ((e->entflags & (ENTFLAG_ACTIVE|ENTFLAG_RIGIDBODY)) != (ENTFLAG_ACTIVE|ENTFLAG_RIGIDBODY)) continue;
+        if (e->entflags & ENTFLAG_KINEMATIC) continue;
+        if (e->mass <= 0.0f || e->collider == COLLIDER_TYPE_NONE) continue;
+        if (num_dynamics < MAX_DYNAMIC_ENTITIES) dynamics[num_dynamics++] = i;
+    }
+
+    // Dynamic vs Dynamic
+    for (int32_t p = 0; p < num_dynamics; ++p) {
+        uint16_t i = dynamics[p]; Entity* ea = &instances[i];
+        Vector3 mina, maxa; if (!GetAABB(ea, &mina, &maxa)) continue;
+        for (int32_t q = p+1; q < num_dynamics; ++q) {
+            uint16_t j = dynamics[q]; Entity* eb = &instances[j];
+            if (!ShouldTestPair(i,j)) continue;
+            Vector3 minb, maxb; if (!GetAABB(eb, &minb, &maxb)) continue;
+            if (!CollideAABB(mina,maxa, minb,maxb)) continue;
+
+            Manifold m = {0};
+            bool hit = false;
+            if (ea->collider == COLLIDER_TYPE_SPHERE && eb->collider == COLLIDER_TYPE_SPHERE) {
+                hit = CollideSphereSphere(ea, eb, &m);
+            } else if (ea->collider == COLLIDER_TYPE_SPHERE && eb->collider == COLLIDER_TYPE_BOX) {
+                hit = CollideSphereBox(ea, eb, &m);
+            } else if (ea->collider == COLLIDER_TYPE_BOX && eb->collider == COLLIDER_TYPE_SPHERE) {
+                hit = CollideSphereBox(eb, ea, &m);
+                m.normal = scale_vector3(m.normal, -1.0f);
+            } else if (ea->collider == COLLIDER_TYPE_CAPSULE && eb->collider == COLLIDER_TYPE_CAPSULE) {
+                hit = CollideCapsuleCapsule(ea, eb, &m);
+            } else if (ea->collider == COLLIDER_TYPE_CAPSULE && eb->collider == COLLIDER_TYPE_BOX) {
+                hit = CollideCapsuleBox(ea, eb, &m);
+            } else if (ea->collider == COLLIDER_TYPE_BOX && eb->collider == COLLIDER_TYPE_CAPSULE) {
+                hit = CollideCapsuleBox(eb, ea, &m);
+                m.normal = scale_vector3(m.normal, -1.0f);
+            }else if (ea->collider == COLLIDER_TYPE_CONVEXMESH && eb->collider == COLLIDER_TYPE_BOX) {
+                hit = CollideConvexBox(ea, eb, &m);
+            } else if (ea->collider == COLLIDER_TYPE_BOX && eb->collider == COLLIDER_TYPE_CONVEXMESH) {
+                hit = CollideConvexBox(eb, ea, &m);
+                m.normal = scale_vector3(m.normal, -1.0f);
+            }
+
+            if (hit) ResolveCollision(ea, eb, &m);
+        }
+    }
+
+    // Dynamic vs Static
+    for (int32_t p = 0; p < num_dynamics; ++p) {
+        uint16_t i = dynamics[p]; Entity* ea = &instances[i];
+        Vector3 mina, maxa; if (!GetAABB(ea, &mina, &maxa)) continue;
+        for (uint16_t j = 1; j < INSTANCE_COUNT; ++j) {
+            if (j == i || !(instances[j].entflags & ENTFLAG_ACTIVE)) continue;
+            Entity* eb = &instances[j];
+            if (eb->entflags & ENTFLAG_RIGIDBODY || eb->mass > 0.0f) continue;
+            if (eb->collider == COLLIDER_TYPE_NONE) continue;
+            if (!ShouldTestPair(i,j)) continue;
+            Vector3 minb, maxb; if (!GetAABB(eb, &minb, &maxb)) continue;
+            if (!CollideAABB(mina,maxa, minb,maxb)) continue;
+
+            Manifold m = {0};
+            bool hit = false;
+                 if (ea->collider == COLLIDER_TYPE_SPHERE && eb->collider == COLLIDER_TYPE_BOX)      hit = CollideSphereBox(ea, eb, &m);
+            else if (ea->collider == COLLIDER_TYPE_CAPSULE && eb->collider == COLLIDER_TYPE_BOX)     hit = CollideCapsuleBox(ea, eb, &m);
+            else if (ea->collider == COLLIDER_TYPE_CAPSULE && eb->collider == COLLIDER_TYPE_CAPSULE) hit = CollideCapsuleCapsule(ea, eb, &m);
+            else if (ea->collider == COLLIDER_TYPE_CONVEXMESH && eb->collider == COLLIDER_TYPE_BOX)  hit = CollideConvexBox(ea, eb, &m);
+
+            if (hit) ResolveCollision(ea, eb, &m);
+        }
+    }
+
+    for (uint16_t i = 0; i < INSTANCE_COUNT; ++i)
+        if (dirtyInstances[i]) { UpdateInstanceMatrix(i); dirtyInstances[i] = false; }
+
     return 0;
 }

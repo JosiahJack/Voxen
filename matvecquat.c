@@ -25,6 +25,26 @@ Vector3 scale_vector3(Vector3 v, float s) {
     return res;
 }
 
+float magnitude_vector3(const Vector3 v) {
+    return sqrtf(dot_vector3(v, v));
+}
+
+Vector3 min_vector3(Vector3 a, Vector3 b) {
+    return (Vector3){
+        a.x < b.x ? a.x : b.x,
+        a.y < b.y ? a.y : b.y,
+        a.z < b.z ? a.z : b.z
+    };
+}
+
+Vector3 max_vector3(Vector3 a, Vector3 b) {
+    return (Vector3){
+        a.x > b.x ? a.x : b.x,
+        a.y > b.y ? a.y : b.y,
+        a.z > b.z ? a.z : b.z
+    };
+}
+
 float dot(float x1, float y1, float z1, float x2, float y2, float z2) {
     return x1 * x2 + y1 * y2 + z1 * z2;
 }
@@ -92,3 +112,43 @@ void quat_to_matrix(Quaternion* q, float* m) {
     m[14] = 0.0f;
     m[15] = 1.0f;
 }
+
+Quaternion conjugate_quaternion(const Quaternion q) {
+    Quaternion res = {q.w, -q.x, -q.y, -q.z};
+    return res;
+}
+
+Quaternion mul_quaternion(const Quaternion a, const Quaternion b) {
+    Quaternion res;
+    res.w = a.w * b.w - dot_vector3((Vector3){a.x, a.y, a.z}, (Vector3){b.x, b.y, b.z});
+    Vector3 cross_part = cross_vector3((Vector3){a.x, a.y, a.z}, (Vector3){b.x, b.y, b.z});
+    Vector3 w_parts = scale_vector3((Vector3){a.x, a.y, a.z}, b.w);
+    Vector3 wb_parts = scale_vector3((Vector3){b.x, b.y, b.z}, a.w);
+    Vector3 xyz = add_vector3(add_vector3(cross_part, w_parts), wb_parts);
+    res.x = xyz.x; res.y = xyz.y; res.z = xyz.z;
+    return res;
+}
+
+Vector3 rotate_quaternion(const Quaternion q, const Vector3 v) {
+    Quaternion vq = {0.0f, v.x, v.y, v.z};
+    Quaternion temp = mul_quaternion(vq, conjugate_quaternion(q));
+    Quaternion result = mul_quaternion(q, temp);
+    return (Vector3){result.x, result.y, result.z};
+}
+
+Quaternion axis_angle_quaternion(const Vector3 axis, float angle) {
+    float half = angle * 0.5f;
+    float s = sinf(half);
+    Quaternion res = {cosf(half), s * axis.x, s * axis.y, s * axis.z};
+    return res;
+}
+
+void normalize_quaternion(Quaternion* q) {
+    float mag = sqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
+    if (mag > 1e-6f) {
+        q->w /= mag; q->x /= mag; q->y /= mag; q->z /= mag;
+    } else {
+        q->w = 1.0f; q->x = q->y = q->z = 0.0f;
+    }
+}
+

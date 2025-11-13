@@ -96,16 +96,6 @@ int32_t CodepointToPackedIndex(int32_t codepoint, int fontID) {
 float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
 float fixedNumberAdvanceWidthStopD = 0.0f;
 
-float GetTextAdvanceAmount(int32_t packedIdx, uint8_t font) {
-    if (font == FONT_STOPD) {
-        if (packedIdx < 0 || packedIdx >= numPackedGlyphsStopD) return 0.0f;
-        return fontPackedCharStopD[packedIdx].xadvance;
-    } else {
-        if (packedIdx < 0 || packedIdx >= numPackedGlyphs) return 0.0f;
-        return fontPackedChar[packedIdx].xadvance;
-    }
-}
-
 static int Utf8ToCodepoint(const char **p) {
     const unsigned char *s = (const unsigned char*)*p;
     int cp = 0;
@@ -286,6 +276,7 @@ static bool load_font_cache(const char *path, uint32_t expected_glyphs, const ui
 
 void InitFontAtlasses(void) {
     double t0 = get_time();
+    DualLog("Loaded    2 fonts...");
     const char *pri_path = "./Fonts/SystemShockText.ttf";
     const char *sec_path = "./Fonts/StopD.ttf";
     FILE *f = fopen(pri_path, "rb"); if (!f) { DualLogError("Missing %s\n", pri_path); exit(1); }
@@ -315,7 +306,7 @@ void InitFontAtlasses(void) {
     if (pri_hit && sec_hit) {
         free(primaryFontData); free(sec_data);
         malloc_trim(0);
-        DualLog("Fonts loaded from cache in %.3f s\n", get_time() - t0);
+        DualLog("in %.3f s\n", get_time() - t0);
         return;
     }
 
@@ -407,7 +398,7 @@ void InitFontAtlasses(void) {
     free(primaryFontData);
     free(sec_data);
     malloc_trim(0);
-    DualLog("Fonts regenerated in %.3f s\n", get_time() - t0);
+    DualLog(" regenerated in %.3f s\n", get_time() - t0);
 }
 
 uint32_t DecodeUTF8(const char **p) {

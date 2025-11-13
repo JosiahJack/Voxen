@@ -17,14 +17,14 @@
 // TODO: Voxel GI?
 // TODO: Scripting engine for gameplay
 // TODO: Save/Load system
-#define VERSION_STRING "v0.7.2"
 #include <malloc.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include "event.h"
 #define VOXEN_ENGINE_IMPLEMENTATION
+#include "entity.h"
 #include "voxen.h"
+#include "matvecquat.h"
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
 #include "Shaders/chunk_vert.glsl.h"
@@ -1054,18 +1054,13 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
     glfwSwapBuffers(window);
 }
 
-float GetTextHCenter(float pointToCenterOn, int32_t numCharactersNoNullTerminator) {
-    float characterWidth = genericTextHeightFac * 0.75f * screen_height; // Measured some and found between 0.6 and 0.82 in Gimp for width to height ratio.
-    return (pointToCenterOn - ((float)numCharactersNoNullTerminator * 0.5f) * characterWidth); // This could be mid character ;)
-}
-
 void CenterStatusPrint(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     statusTextLengthWithoutNullTerminator = vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
     va_end(args);
     DualLog("%s\n",statusText);
-    statusTextDecayFinished = get_time() + 2.0f; // 2 second decay time before text dissappears.
+    statusTextDecayFinished = get_time() + 2.5f; // 2.5 second decay time before text dissappears.
 }
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) {
@@ -1082,16 +1077,16 @@ void InitializePlayer(uint16_t playerIdx) {
     instances[playerIdx].bodyState = BodyState_Standing;
     instances[playerIdx].collider = COLLIDER_TYPE_CAPSULE;
     instances[playerIdx].colliderCenter.x = 0.0f;
-    instances[playerIdx].colliderCenter.y = 0.0f;
+    instances[playerIdx].colliderCenter.y = 0.84f;
     instances[playerIdx].colliderCenter.z = 0.0f;
     instances[playerIdx].colliderSize.x = 0.48f; // Radius
     instances[playerIdx].colliderSize.y = 2.0f;  // Overall height including end radii (Unity convention, blech)
-    instances[playerIdx].colliderSize.z = COLLIDER_CAPSULE_DIRECTION_X_F; // Direction, 1.0 == Y-Axis
-    instances[playerIdx].mass = 1.0f;
-    instances[playerIdx].linearDrag = 0.0f;
+    instances[playerIdx].colliderSize.z = COLLIDER_CAPSULE_DIRECTION_Y_F; // Direction, 1.0 == Y-Axis
+    instances[playerIdx].mass = 80.0f;
+    instances[playerIdx].linearDrag = 8.0f;
     instances[playerIdx].angularDrag = 0.0f;
-    instances[playerIdx].dynamicFriction = 0.0f;
-    instances[playerIdx].staticFriction = 0.0f;
+    instances[playerIdx].dynamicFriction = 0.6f;
+    instances[playerIdx].staticFriction = 0.8f;
     instances[playerIdx].bounciness = 0.0f;
     instances[playerIdx].frictionCombine = PHYS_COMBINE_MUL;
     instances[playerIdx].bounceCombine = PHYS_COMBINE_AVG;
@@ -1117,9 +1112,9 @@ void NewGame(void) {
     loadedLights = 0;
     LoadLevel(startLevel); // Must be after entities!
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
-    RenderLoadingProgress(110,"Loading cull system...");
+//     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-    RenderLoadingProgress(120,"Loading voxel lighting data...");
+//     RenderLoadingProgress(120,"Loading voxel lighting data...");
     glClearColor(0.0f, 0.0f, 0.0f, 0.2f); // Set after shadowmap rendering.
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
     VoxelLists();
@@ -1135,7 +1130,7 @@ void NewGame(void) {
     DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
     pauseRelativeTime = 0.0f;
     levelCurrentlyLoading = false;
-    DualLogEntity(PLAYER1);
+//     DualLogEntity(PLAYER1);
 }
 
 static const float quadBlit_vertices[] = {
@@ -1184,6 +1179,7 @@ void InitializeEnvironment(void) {
     
     glfwMakeContextCurrent(window);
     UpdateScreenSize();
+    malloc_trim(0);
     DebugRAM("window init");
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
@@ -1207,7 +1203,9 @@ void InitializeEnvironment(void) {
     if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
     
     DualLog("OpenGL Version: %s\n", (const char*)version);
-    DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");  
+    DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");
+    double parallelInitStart = get_time();
+    DualLog("Window Init took %f secs\n", get_time() - init_start_time);
     #pragma omp parallel num_threads(4)
     {
         if (omp_get_thread_num() == 0) {
@@ -1312,6 +1310,7 @@ void InitializeEnvironment(void) {
 
             Input_MouselookApply(); // Input
             InitializeAudio(); // Audio
+            malloc_trim(0);
         }
         if (omp_get_thread_num() == 1) LoadTextForLanguage(settings_Language);
         if (omp_get_thread_num() == 2) LoadLogTextForLanguage(settings_Language);
@@ -1319,7 +1318,7 @@ void InitializeEnvironment(void) {
     }
     
     RenderLoadingProgress(100,"Loading textures...");
-    DualLog("Window and GL Init took %f seconds\n", get_time() - init_start_time);
+    DualLog("Parallel Inits took %f secs\n", get_time() - parallelInitStart);
     LoadTextures(); // Sequential due to GPU transfers
     RenderLoadingProgress(100,"Loading models...");
     LoadModels(); // Sequential due to GPU transfers
@@ -1440,6 +1439,8 @@ void SetFog() {
     fogColorBUsed = fogColorB * fogBaseDensityForLevel;
 }
 
+double timeSinceLastPhysicsTick = 0.0;
+
 int32_t main(int32_t argc, char* argv[]) {
     game_start_time = get_time();
     DebugRAM("program start");
@@ -1521,11 +1522,11 @@ int32_t main(int32_t argc, char* argv[]) {
         // Enqueue input events
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
-        double timeSinceLastPhysicsTick = current_time - last_physics_time;
-        if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
+        timeSinceLastPhysicsTick = current_time - last_physics_time;
+//         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
             last_physics_time = current_time;
             EnqueueEvent_Simple(EV_PHYSICS_TICK);
-        }
+//         }
 
         // Enqueue all logged events for the current frame.
         if (log_playback) {
@@ -1767,7 +1768,7 @@ int32_t main(int32_t argc, char* argv[]) {
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > current_time) RenderFormattedText(GetTextHCenter(screenCenterX,statusTextLengthWithoutNullTerminator), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (statusTextDecayFinished > current_time) RenderFormattedText(screenCenterX - (TextWidth(statusText,FONT_NORMAL) * 0.5f), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
         RenderUIImages();

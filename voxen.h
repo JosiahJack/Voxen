@@ -1,11 +1,12 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
-#define VERSION_STRING "v0.7.2"
+#define VERSION_STRING "v0.7.3"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <time.h>
 #include <stdbool.h>
+#include <string.h>
 #include <stdarg.h>
 #include <GL/glew.h>
 #include "./External/glfw3.h"
@@ -20,6 +21,7 @@
 // Global Types
 typedef struct { float r,g,b,a; } Color;
 
+#define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define NULLENT 0
 #define PLAYER1 1
 #define PLAYER2 2
@@ -31,58 +33,9 @@ typedef struct { float r,g,b,a; } Color;
 #define ENTFLAG_KINEMATIC 16
 #define ENTFLAG_RIGIDBODY 32
 
+extern double timeSinceLastPhysicsTick;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
-
-typedef struct {
-    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    uint32_t entflags;
-    
-    uint16_t modelIndex;
-    uint16_t texIndex;
-    uint16_t glowIndex;
-    uint16_t specIndex;
-    uint16_t normIndex;
-    uint16_t lodIndex;
-
-    Vector3 position; // global worldspace xyz location
-    Quaternion rotation; // Orientation matching Unity convention
-    Vector3 scale;
-    Vector3 velocity;
-    Vector3 angularVelocity;
-    
-    BodyState bodyState;
-    
-    ColliderType collider;
-    Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
-    Vector3 colliderSize; // x,y,z for Box,
-                          // x for Sphere radius,
-                          // x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
-    uint16_t colliderMeshIndex;
-    float mass;
-    float linearDrag;
-    float angularDrag;
-    float inertia;
-    Vector3 accumulatedForce;
-    Vector3 accumulatedTorque;
-    float dynamicFriction;
-    float staticFriction;
-    float bounciness;
-    PhysCombineType frictionCombine;
-    PhysCombineType bounceCombine;
-    
-    float volume;
-    
-    uint16_t   child0;
-    Vector3    child0_offset;
-    Quaternion child0_rotation;
-    Vector3    child0_scale;
-    
-    uint16_t   child1;
-    Vector3    child1_offset;
-    Quaternion child1_rotation;
-    Vector3    child1_scale;
-} Entity;
 
 typedef struct {
     Vector3 mins;
@@ -224,36 +177,11 @@ extern float* modelBounds;
 
 extern GLuint* vbos;
 extern GLuint* tbos;
-extern uint16_t renderableCount;
-extern uint16_t loadedInstances;
 extern uint16_t loadedTextures;
 extern uint16_t loadedModels;
 extern uint16_t loadedLights;
 extern uint16_t gameObjectCount;
 void LoadModels(void);
-
-// Entities
-#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
-#define GEOMETRY_LOD_CARD_MODEL_IDX 178
-extern Entity entities[MAX_ENTITIES];
-extern Entity instances[INSTANCE_COUNT];
-extern uint16_t* modelTypeCountsOpaque;
-extern uint16_t* modelTypeCountsDoubleSided;
-extern uint16_t* modelTypeCountsTransparent;
-extern uint16_t invalidModelIndexCount;
-extern uint16_t* modelTypeOffsetsOpaque;
-extern uint16_t* modelTypeOffsetsDoubleSided;
-extern uint16_t* modelTypeOffsetsTransparent;
-extern uint16_t opaqueInstancesHead;
-extern uint16_t doubleSidedInstancesHead;
-extern uint16_t transparentInstancesHead;
-extern float modelMatrices[INSTANCE_COUNT * 16];
-extern uint8_t dirtyInstances[INSTANCE_COUNT];
-extern uint16_t startOfDoubleSidedInstances;
-extern uint16_t startOfTransparentInstances;
-int32_t SetupInstances(void);
-void LoadEntities(void);
 
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
@@ -299,8 +227,7 @@ extern uint8_t currentLevel;
 extern bool gamePaused;
 extern bool menuActive;
 extern bool levelCurrentlyLoading;
-void LoadLevel(uint8_t curlevel);
-void SortInstances();
+
 // ----------------------------------------------------------------------------
 // Dynamic Culling
 #define WORLDX 64
@@ -367,7 +294,6 @@ bool get_cull_bit(const uint32_t* arr, size_t idx);
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 // TODO: Ensure that npc corpses get dynamicFriction of 10.0f, staticFriction of 10.0f, bounciness of 0.0f, frictionCombine of 2, bounceCombine of 3
 extern double time_PhysicsStep;
-extern uint16_t physHead;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;
 static const uint8_t PhysicsLayer_TransparentFX    = 1;
@@ -400,7 +326,6 @@ static const uint8_t PhysicsLayer_Clip             = 26;
 //static const uint8_t PhysicsLayer_               = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 extern float move_speed;
-int32_t ParticleSystemStep(void);
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
 // ----------------------------------------------------------------------------
@@ -543,28 +468,23 @@ void DualLogError(const char* fmt, ...);
 void DebugRAM(const char *context);
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
 void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
-void DualLogEntity(uint16_t idx);
 // ============================================================================
 // ----------------------------------------------------------------------------
 // Helper Functions
 extern uint32_t random_range_rng;
 double get_time(void);
 void md5(const uint8_t *data, size_t len, uint8_t out[16]);
-void normalize_vector(float* x, float* y, float* z);
-Vector3 add_vector3(Vector3 a, Vector3 b);
-Vector3 sub_vector3(Vector3 a, Vector3 b);
-Vector3 scale_vector3(Vector3 v, float s);
-float dot(float x1, float y1, float z1, float x2, float y2, float z2);
-float dot_vector3(Vector3 a, Vector3 b);
-float dist_sq_vector3(Vector3 a, Vector3 b);
-Vector3 cross_vector3(Vector3 a, Vector3 b);
-float length_vector3(Vector3 v);
-Vector3 normalize_vector3(Vector3 v);
-Vector3 mul_mat4_vector3(const float* mat, Vector3 v);
-void quat_to_matrix(Quaternion* q, float* m);
 float clampf(float x, float a, float b);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
+int data_parser_isspace(char c);
+
+uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum);
+uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum);
+uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum);
+bool parse_bool(const char* str, const char* line, uint32_t lineNum);
+float parse_float(const char* str, const char* line, uint32_t lineNum);
+
 bool ConstIndexInBounds(int constdex);
 bool ConstIndexIsGeometry(int constdex);
 bool ConstIndexIsDynamicObject(uint16_t constIndex);
@@ -630,6 +550,32 @@ static inline void flag_disable(uint32_t *flags, uint32_t bit) {
 
 static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
     *flags = (*flags & ~bit) | (-state & bit);
+}
+
+static inline void sanitize_utf8_ascii(char *s) {
+    char *dst = s;
+    while (*s) {
+        if (!memcmp(s, "\xE2\x80\x90", 3) || !memcmp(s, "\xE2\x80\x91", 3) ||
+            !memcmp(s, "\xE2\x80\x92", 3) || !memcmp(s, "\xE2\x80\x93", 3) ||
+            !memcmp(s, "\xE2\x80\x94", 3) || !memcmp(s, "\xE2\x80\x95", 3) ||  // Added: Horizontal bar
+            !memcmp(s, "\xE2\x88\x92", 3)) {
+            dst[0] = '-'; dst++; s += 3; continue;
+        }
+        if (!memcmp(s, "\xC2\xAD", 2)) { dst[0] = '-'; dst++; s += 2; continue; }
+        if (!memcmp(s, "\xE2\x80\x9C", 3) || !memcmp(s, "\xE2\x80\x9D", 3)) { dst[0] = '"'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xE2\x80\x98", 3) || !memcmp(s, "\xE2\x80\x99", 3)) { dst[0] = '\''; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8B", 3)) { dst[0] = '+'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8F", 3)) { dst[0] = '/'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x88", 3)) { dst[0] = '('; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x89", 3)) { dst[0] = ')'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x9A", 3)) { dst[0] = ':'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x9B", 3)) { dst[0] = ';'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8C", 3)) { dst[0] = ','; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8E", 3)) { dst[0] = '.'; dst++; s += 3; continue; }
+        if (!memcmp(s, "\xEF\xBC\x8D", 3)) { dst[0] = '-'; dst++; s += 3; continue; }
+        dst[0] = *s; dst++; s++;
+    }
+    *dst = '\0';
 }
 
 // // // // //

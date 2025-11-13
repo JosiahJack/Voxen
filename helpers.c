@@ -1,9 +1,9 @@
 // helpers.c - Helper Functions for various things
-#include <string.h>
 #include <sys/stat.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
+#include "entity.h"
 #include "voxen.h"
 #include "event.h"
 
@@ -205,3 +205,5 @@ uint8_t random_range_u8(uint8_t a, uint8_t b) {
     do v = (uint8_t)xs32(&random_range_rng); while (v >= 256u - t);
     return (uint8_t)(a + (v % n));
 }
+
+int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }

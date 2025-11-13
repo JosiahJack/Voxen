@@ -195,7 +195,7 @@ void LoadTextures(void) {
 //         malloc_trim(0);
     }
 
-    DualLog(" total pallete colors: %u, totalPixels was: %u... ", totalPaletteColors, totalPixels);
+    DualLog(" total pallete colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     free(all_indices);
     free(index_offsets);
     for (uint16_t i = 0; i < loadedTextures; i++) free(per_texture_palettes[i]);
@@ -223,6 +223,6 @@ void LoadTextures(void) {
     CHECK_GL_ERROR();
     malloc_trim(0);
     double end_time = get_time();
-    DualLog(" took %f seconds\n", end_time - start_time);
+    DualLog(" took %f secs\n", end_time - start_time);
     DebugRAM("After LoadTextures");
 }

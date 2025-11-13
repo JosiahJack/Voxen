@@ -1,10 +1,3 @@
-// #include <stddef.h>
-// #include <string.h>
-// float cosf(float x); // #include <math.h>, limited subset
-// float sinf(float x); // #include <math.h>, limited subset
-// float sqrtf(float arg); // #include <math.h>, limited subset
-// #include "voxen.h"
-// #include "event.h"
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
 

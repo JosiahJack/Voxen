@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "./External/miniaudio.h"
 #include "voxen.h"
+#include "entity.h"
 
 #define MAX_CHANNELS 64
 ma_engine audio_engine;

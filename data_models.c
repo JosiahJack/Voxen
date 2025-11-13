@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -28,9 +27,6 @@ DataParser model_parser;
 // Models
 uint32_t* modelVertexCounts = NULL;
 uint32_t* modelTriangleCounts = NULL;
-uint16_t* modelTypeCountsOpaque = NULL;
-uint16_t* modelTypeCountsDoubleSided = NULL;
-uint16_t* modelTypeCountsTransparent = NULL;
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
 GLuint* vbos = NULL;
@@ -325,11 +321,15 @@ void LoadModels(void) {
     tbos = mmap(NULL, loadedModels * sizeof(GLuint), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     glGenBuffers(loadedModels, vbos);
     glGenBuffers(loadedModels, tbos);
+    uint32_t totalVertices = 0;
+    uint32_t totalTris = 0;
     for (int i = 0; i < loadedModels; ++i) {
         if (modelVertexCounts[i] == 0) continue;
 
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
+        totalVertices += vertSize;
         size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
+        totalTris += triSize;
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
@@ -347,7 +347,7 @@ void LoadModels(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    DualLog(" took %f seconds\n", get_time() - start_time);
+    DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
     DebugRAM("After Load Models");
     free(indexToParser);
     malloc_trim(0);
