@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <omp.h>
 #include "voxen.h"
+#include "vmath.h"
 #define C_STRUCT struct // #include <assimp/defs.h>
 #define ASSIMP_API
 struct aiFileIO; // #include <assimp/cimport.h>
@@ -235,12 +236,12 @@ void LoadModels(void) {
                         float v = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].y : 0.0f;
                         modelVertices[i][vertexIndex++] = u;
                         modelVertices[i][vertexIndex++] = v;
-                        minx = fminf(minx, mesh->mVertices[vert].x);
-                        maxx = fmaxf(maxx, mesh->mVertices[vert].x);
-                        miny = fminf(miny, mesh->mVertices[vert].y);
-                        maxy = fmaxf(maxy, mesh->mVertices[vert].y);
-                        minz = fminf(minz, mesh->mVertices[vert].z);
-                        maxz = fmaxf(maxz, mesh->mVertices[vert].z);
+                        minx = vmin(minx, mesh->mVertices[vert].x);
+                        maxx = vmax(maxx, mesh->mVertices[vert].x);
+                        miny = vmin(miny, mesh->mVertices[vert].y);
+                        maxy = vmax(maxy, mesh->mVertices[vert].y);
+                        minz = vmin(minz, mesh->mVertices[vert].z);
+                        maxz = vmax(maxz, mesh->mVertices[vert].z);
                     }
 
                     for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
@@ -269,8 +270,8 @@ void LoadModels(void) {
                 modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
                 modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
                 float r = 0.0f;
-                r = fmaxf(r, fabsf(minx)); r = fmaxf(r, fabsf(miny)); r = fmaxf(r, fabsf(minz));
-                r = fmaxf(r, maxx);        r = fmaxf(r, maxy);        r = fmaxf(r, maxz);
+                r = vmax(r, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
+                r = vmax(r, maxx);        r = vmax(r, maxy);        r = vmax(r, maxz);
                 modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
                 write_vmdl(vmdl_path, fbx_md5, modelVertices[i], vertexCount, modelTriangles[i], triCount);
                 aiReleaseImport(scene);
@@ -288,9 +289,9 @@ void LoadModels(void) {
                     float x = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 0];
                     float y = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 1];
                     float z = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 2];
-                    minx = fminf(minx, x); maxx = fmaxf(maxx, x);
-                    miny = fminf(miny, y); maxy = fmaxf(maxy, y);
-                    minz = fminf(minz, z); maxz = fmaxf(maxz, z);
+                    minx = vmin(minx, x); maxx = vmax(maxx, x);
+                    miny = vmin(miny, y); maxy = vmax(maxy, y);
+                    minz = vmin(minz, z); maxz = vmax(maxz, z);
                 }
                 uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
                 modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
@@ -300,8 +301,8 @@ void LoadModels(void) {
                 modelBounds[base + BOUNDS_DATA_OFFSET_MAXY] = maxy;
                 modelBounds[base + BOUNDS_DATA_OFFSET_MAXZ] = maxz;
                 float r = 0.0f;
-                r = fmaxf(r, fabsf(minx)); r = fmaxf(r, fabsf(miny)); r = fmaxf(r, fabsf(minz));
-                r = fmaxf(r, maxx);        r = fmaxf(r, maxy);        r = fmaxf(r, maxz);
+                r = vmax(r, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
+                r = vmax(r, maxx);        r = vmax(r, maxy);        r = vmax(r, maxz);
                 modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
                 add_mmap_cleanup(mmap_map, mmap_size);  // defer munmap
             }

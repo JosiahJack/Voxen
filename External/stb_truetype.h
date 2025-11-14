@@ -13,20 +13,9 @@
    typedef char stbtt__check_size32[sizeof(stbtt_int32)==4 ? 1 : -1];
    typedef char stbtt__check_size16[sizeof(stbtt_int16)==2 ? 1 : -1];
 
-   #include <math.h>
-   #define STBTT_ifloor(x)   ((int) floor(x))
-   #define STBTT_iceil(x)    ((int) ceil(x))
-   #define STBTT_sqrt(x)      sqrt(x)
-   #define STBTT_pow(x,y)     pow(x,y)
-   #define STBTT_fmod(x,y)    fmod(x,y)
-   #define STBTT_cos(x)       cos(x)
-   #define STBTT_acos(x)      acos(x)
-   #define STBTT_fabs(x)      fabs(x)
-
    #include <stdlib.h>
    #define STBTT_malloc(x,u)  ((void)(u),malloc(x))
    #define STBTT_free(x,u)    ((void)(u),free(x))
-
 
    #ifndef STBTT_assert
 //    #include <assert.h>

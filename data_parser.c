@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <math.h>
 #include "voxen.h"
 #include "entity.h"
 #include "citadel_enumerations.h"

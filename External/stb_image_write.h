@@ -46,10 +46,7 @@ typedef void stbi_write_func(void *context, void *data, int size);
 #include <stdio.h>
 #endif // STBI_WRITE_NO_STDIO
 
-#include <stdarg.h>
-#include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #if defined(STBIW_MALLOC) && defined(STBIW_FREE) && (defined(STBIW_REALLOC) || defined(STBIW_REALLOC_SIZED))
 // ok

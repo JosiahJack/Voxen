@@ -24,6 +24,7 @@
 #define VOXEN_ENGINE_IMPLEMENTATION
 #include "entity.h"
 #include "voxen.h"
+#include "vmath.h"
 #include "matvecquat.h"
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
@@ -35,16 +36,6 @@
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
-#include "citadel_playermovement.c"
-double tan(double x); // #include <math.h>, limited subset
-float sqrtf(float arg); // #include <math.h>, limited subset
-float ceilf(float arg); // #include <math.h>, limited subset
-double floor(double arg); // #include <math.h>, limited subset
-double fmin(double x, double y); // #include <math.h>, limited subset
-double fmax(double x, double y); // #include <math.h>, limited subset
-double fabs(double x); // #include <math.h>, limited subset
-float cosf(float x); // #include <math.h>, limited subset
-float sinf(float x); // #include <math.h>, limited subset
 int omp_get_thread_num(void); // #include <omp.h>
 #include "input.c"
 
@@ -429,7 +420,8 @@ void UpdateScreenSize(void) {
     m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
     aspect3D = (float)screen_width / (float)screen_height;
-    float f = 1.0f / tan(cam_fov * M_PI / 360.0f);
+//     float f = 1.0f / vtan(cam_fov * PI / 360.0f);
+    float f = vcot(cam_fov * PI / 360.0f);
     m = rasterPerspectiveProjection;
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
     m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
@@ -437,7 +429,9 @@ void UpdateScreenSize(void) {
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
     
     aspect2D = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
-    f = 1.0f / tan(SHADOWMAP_FOV * M_PI / 360.0f);
+//     f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f);
+    f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f);
+    f = vcot(SHADOWMAP_FOV * PI / 360.0f);
     m = shadowmapsPerspectiveProjection;
     m[0] = f / aspect2D; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
     m[4] =         0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
@@ -502,7 +496,7 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14]; // Near
     planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14]; // Far
     for (int i = 0; i < 6; i++) {
-        float len = sqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
+        float len = vsqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
         if (len > 0.0f) {
             planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len; // Normalize
         }
@@ -520,9 +514,9 @@ void UpdateVoxelLightLists() {
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE]; // Can't early out here for range to player as it breaks shadows!
         int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip);
-        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) * cellWidthRecip);
+        int32_t maxCellX = (int32_t)vceil((litX + range - worldMin_x) * cellWidthRecip);
         int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip);
-        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) * cellWidthRecip);
+        int32_t maxCellZ = (int32_t)vceil((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
@@ -578,7 +572,7 @@ void UpdateVoxelLightLists() {
         if(!inPVS) {
             int x = cellIndexForLightX[lightIdx];
             int z = cellIndexForLightZ[lightIdx];
-            int r = floor(range * 0.390625f); // 6 max
+            int r = vfloor(range * 0.390625f); // 6 max
             for(int ix=x-r; ix<=x+r && !inPVS; ix++){
                 for(int iz=z-r; iz<=z+r; iz++){
                     if(!XZPairInBounds(ix,iz)) continue;
@@ -594,9 +588,9 @@ void UpdateVoxelLightLists() {
         if(!inPVS) continue; // Only include lights that the voxel can actually see
         
         int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip); // cast to int truncates, no floorf
-        int32_t maxCellX = (int32_t)ceilf((litX + range - worldMin_x) * cellWidthRecip);
+        int32_t maxCellX = (int32_t)vceil((litX + range - worldMin_x) * cellWidthRecip);
         int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip); // cast to int truncates, no floorf
-        int32_t maxCellZ = (int32_t)ceilf((litZ + range - worldMin_z) * cellWidthRecip);
+        int32_t maxCellZ = (int32_t)vceil((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
         maxCellX = 63 < maxCellX ? 63 : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
@@ -690,7 +684,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-    float effectiveRadius = fmin(lightRadius, 15.36f);
+    float effectiveRadius = vmin(lightRadius, 15.36f);
     float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
     if (distSqrd >= FAR_PLANE_SQUARED) return;
 
@@ -701,7 +695,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
         int x = cellIndexForLightX[lightIdx];
         int y = cellIndexForLightZ[lightIdx];
-        int range = floor(lightRadius * 0.390625f); // 1 / 2.56f
+        int range = vfloor(lightRadius * 0.390625f); // 1 / 2.56f
         int xMin = x - range; int xMax = x + range;
         int yMin = y - range; int yMax = y + range;
         for (int ix = xMin;ix <= xMax; ix++) {
@@ -811,7 +805,7 @@ void RenderShadowmaps(void) {
             int x = cellIndexForLightX[i];
             int z = cellIndexForLightZ[i];
             float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-            int r = floor(range * 0.390625f);
+            int r = vfloor(range * 0.390625f);
             for (int ix = x - r; ix <= x + r && !inPVS; ix++) {
                 for (int iz = z - r; iz <= z + r; iz++) {
                     if (!XZPairInBounds(ix, iz)) continue;
@@ -828,7 +822,7 @@ void RenderShadowmaps(void) {
 
         // Score: lower score = closer and brighter (higher priority)
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        float score = distSqrd / fmax(intensity, 0.01f);  // Avoid div by 0, favor bright lights
+        float score = distSqrd / vmax(intensity, 0.01f);  // Avoid div by 0, favor bright lights
 
         candidates[candidateCount++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
     }
@@ -838,7 +832,7 @@ void RenderShadowmaps(void) {
 
 //     DualLog("Sorting time for lights: %f\n",get_time() - sortStart);
     // Render top MAX_SHADOWMAPS candidates
-    uint32_t numToRender = fmin(candidateCount, MAX_SHADOWMAPS);
+    uint32_t numToRender = vmin(candidateCount, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) {
         uint16_t lightIdx = candidates[c].index;
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
@@ -1780,7 +1774,7 @@ int32_t main(int32_t argc, char* argv[]) {
         double thisFrameTime = (time_now - last_time) * 1000.0f;
         double cpuFrameTime = cpuTime * 1000.0f;
         uint8_t timingColor = TEXT_WHITE;
-        if (fabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_ORANGE;
+        if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_ORANGE;
         if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
         RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
         RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame);

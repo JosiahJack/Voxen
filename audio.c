@@ -1,9 +1,9 @@
 // audio.c
 #include <stdio.h>
-#include <math.h>
 #include <stdlib.h>
 #include "./External/miniaudio.h"
 #include "voxen.h"
+#include "vmath.h"
 #include "entity.h"
 
 #define MAX_CHANNELS 64
@@ -126,7 +126,7 @@ void UpdateAmbientSounds(void) {
         if (!def) { DualLogError("  [SKIP] Entity %u has unknown index %u\n", ent_idx, ent->index); continue; }
 
         const float dist_sq = squareDistance3D(player->x, player->y, player->z, ent->position.x, ent->position.y, ent->position.z);
-        const float distance = sqrtf(dist_sq);
+        const float distance = vsqrtf(dist_sq);
         bool in_range = (dist_sq < max_range_sq);
         uint16_t ix, iy;
         PosToCellCoords(ent->position.x, ent->position.z, &ix, &iy);

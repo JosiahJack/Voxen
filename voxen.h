@@ -15,7 +15,6 @@
 #include "matvecquat.h"
 
 // Generic Constants
-#define M_PI 3.141592653f
 #define MAX_PATH 128
 
 // Global Types
@@ -497,8 +496,6 @@ bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
 void Screenshot();
 bool CursorVisible(void);
-static inline float deg2rad(float degrees) { return degrees * (M_PI / 180.0f); }
-static inline float rad2deg(float radians) { return radians * (180.0f / M_PI); }
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);

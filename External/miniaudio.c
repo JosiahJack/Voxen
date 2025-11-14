@@ -11,7 +11,8 @@
 #define MA_NO_GENERATION // Disable waveform/noise generation (not needed for file playback)
 #define MA_NO_FLAC
 #define MA_NO_NEON
-#include "./External/miniaudio.h"
+#include "../vmath.h"
+#include "miniaudio.h"
 // Minor modification made to miniaudio.h, otherwise unchanged vs https://github.com/mackron/miniaudio version 0.11.22 (350784a...)
 // In file included from audio.c:3:
 // miniaudio.h: In function ‘ma_data_source_read_pcm_frames’:

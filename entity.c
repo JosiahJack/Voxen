@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 #include <errno.h>
 #include "entity.h"
 #include "voxen.h"
+#include "vmath.h"
 
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 Entity* entities = NULL; // Global array of entity definitions
@@ -566,8 +566,8 @@ void SortInstances(void) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) { // Skip player index and start at 3?
         float x = instances[i].position.x;
         float z = instances[i].position.z;
-        int32_t cellX = (int32_t)floorf((x - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t cellZ = (int32_t)floorf((z - worldMin_z) / WORLDCELL_WIDTH_F);
+        int32_t cellX = (int32_t)vfloor((x - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t cellZ = (int32_t)vfloor((z - worldMin_z) / WORLDCELL_WIDTH_F);
         cellX = clamp(cellX, 0, 63);
         cellZ = clamp(cellZ, 0, 63);
         cellIndexForInstance[i] = cellZ * 64 + cellX;

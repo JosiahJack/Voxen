@@ -5188,7 +5188,6 @@ This is for preventing greying out of the implementation section.
 
 #include <assert.h>
 #include <limits.h>         /* For INT_MAX */
-#include <math.h>           /* sin(), etc. */
 #include <stdlib.h>         /* For malloc(), free(), wcstombs(). */
 #include <string.h>         /* For memset() */
 
@@ -5964,31 +5963,31 @@ static MA_INLINE void ma_zero_memory_default(void* p, size_t sz)
 static MA_INLINE double ma_sind(double x)
 {
     /* TODO: Implement custom sin(x). */
-    return sin(x);
+    return vsinf(x);
 }
 
 static MA_INLINE double ma_expd(double x)
 {
     /* TODO: Implement custom exp(x). */
-    return exp(x);
+    return vexp(x);
 }
 
 static MA_INLINE double ma_logd(double x)
 {
     /* TODO: Implement custom log(x). */
-    return log(x);
+    return vlog(x);
 }
 
 static MA_INLINE double ma_powd(double x, double y)
 {
     /* TODO: Implement custom pow(x, y). */
-    return pow(x, y);
+    return vpow(x, y);
 }
 
 static MA_INLINE double ma_sqrtd(double x)
 {
     /* TODO: Implement custom sqrt(x). */
-    return sqrt(x);
+    return vsqrtf(x);
 }
 
 

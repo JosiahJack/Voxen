@@ -19,6 +19,11 @@ void DualLogError(const char* fmt, ...);
 #include <malloc.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include "vmath.h"
+#define STBTT_ifloor(x)   ((int) vfloor(x))
+#define STBTT_iceil(x)    ((int) vceil(x))
+#define STBTT_sqrt(x)      vsqrtf(x)
+#define STBTT_fabs(x)      vabs(x)
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 #include <fontconfig/fontconfig.h>
@@ -334,7 +339,7 @@ void InitFontAtlasses(void) {
             if (font != &primaryFontInfo) height *= 1.2f;
             stbtt_PackFontRange(&pc, data, 0, height, cp, 1, &fontPackedChar[numPackedGlyphs]);
             int idx = numPackedGlyphs++;
-            if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidth = fmaxf(fixedNumberAdvanceWidth, fontPackedChar[idx].xadvance);
+            if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidth = vmax(fixedNumberAdvanceWidth, fontPackedChar[idx].xadvance);
         }
     }
     
@@ -379,7 +384,7 @@ void InitFontAtlasses(void) {
             if (font != &secondaryFontInfo) height *= 1.2f;
             stbtt_PackFontRange(&pc2, data, 0, height, cp, 1, &fontPackedCharStopD[numPackedGlyphsStopD]);
             int idx = numPackedGlyphsStopD++;
-            if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidthStopD = fmaxf(fixedNumberAdvanceWidthStopD, fontPackedCharStopD[idx].xadvance);
+            if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidthStopD = vmax(fixedNumberAdvanceWidthStopD, fontPackedCharStopD[idx].xadvance);
         }
     }
     
