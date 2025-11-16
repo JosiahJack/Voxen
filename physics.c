@@ -4,108 +4,23 @@
 #include "matvecquat.h"
 #include "vmath.h"
 void ProcessInput(void);
+void UpdatePlayerFacingAngles(void);
 
 // Player
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
-float move_speed = 0.06;
 bool noclip = true; // Testing, TODO
 bool god = true;
 bool notarget = false;
 bool fatigueCheat = false;
 bool redbull = false;
-float testLight_x, testLight_y, testLight_z;
-float mouse_sensitivity = 0.1f;
 
 typedef struct {
     Vector3 normal;
     float penetration;
     Vector3 contactPoint; // Max 4 for box resting on ground
 } Manifold;
-
-void UpdatePlayerFacingAngles() {
-    float rotation[16]; // Extract forward and right vectors from quaternion
-    quat_to_matrix(&cam_rotation, rotation);
-    cam_forwardx = rotation[8];  // Forward X
-    cam_forwardy = rotation[9];  // Forward Y
-    cam_forwardz = rotation[10]; // Forward Z
-    cam_rightx = rotation[0];  // Right X
-    cam_righty = rotation[1];  // Right Y
-    cam_rightz = rotation[2];  // Right Z
-    normalize_vector(&cam_forwardx, &cam_forwardy, &cam_forwardz); // Normalize forward
-    normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
-}
-
-// Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
-void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
-    float yaw = deg2rad(yaw_deg);   // Around Y (up)
-    float pitch = deg2rad(pitch_deg); // Around X (right)
-    float roll = deg2rad(roll_deg);  // Around Z (forward)
-    float cy = vcosf(yaw * 0.5f);
-    float sy = vsinf(yaw * 0.5f);
-    float cp = vcosf(pitch * 0.5f);
-    float sp = vsinf(pitch * 0.5f); // using vsinf breaks it!
-    float cr = vcosf(roll * 0.5f);
-    float sr = vsinf(roll * 0.5f);
-    q->w = cy * cp * cr + sy * sp * sr;
-    q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
-    q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
-    q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
-    
-    // Normalize quaterrnion
-    float len = vsqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
-    if (len > 1e-6f) { q->x /= len; q->y /= len; q->z /= len; q->w /= len; }
-    else { q->x = 0.0f; q->y = 0.0f; q->z = 0.0f; q->w = 1.0f; }
-}
-
-void Input_MouselookApply() {
-    if (currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
-    else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
-}
-
-int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
-    if (CursorVisible()) {
-        int32_t newX = cursorPosition_x + xrel;
-        if (newX > screen_width) newX = screen_width;
-        if (newX < 0) newX = 0;
-        cursorPosition_x = newX;
-        int32_t newY = cursorPosition_y + yrel;
-        if (newY > screen_height) newY = screen_height;
-        if (newY < 0) newY = 0;
-        cursorPosition_y = newY;
-    }
-    
-    if (gamePaused || inventoryMode) return 0;
-    
-    cam_yaw += (float)xrel * mouse_sensitivity;
-    if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
-    if (cam_yaw < 0.0f) cam_yaw += 360.0f;
-    cam_pitch += (float)yrel * mouse_sensitivity;
-    if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
-    if (cam_pitch < -89.0f) cam_pitch = -89.0f;
-    Input_MouselookApply();
-    return 0;
-}
-
-void ProcessInput(void) {
-    if (gamePaused || consoleActive) return;
-
-    float ms = keys[GLFW_KEY_LEFT_SHIFT] ? move_speed * 1.75f : move_speed;
-    Vector3 delta = {0};
-    if (keys[GLFW_KEY_F]) delta = add_vector3(delta, scale_vector3((Vector3){cam_forwardx, cam_forwardy, cam_forwardz},  ms));
-    if (keys[GLFW_KEY_S]) delta = add_vector3(delta, scale_vector3((Vector3){cam_forwardx, cam_forwardy, cam_forwardz}, -ms));
-    if (keys[GLFW_KEY_D]) delta = add_vector3(delta, scale_vector3((Vector3){cam_rightx,   cam_righty,   cam_rightz},    ms));
-    if (keys[GLFW_KEY_A]) delta = add_vector3(delta, scale_vector3((Vector3){cam_rightx,   cam_righty,   cam_rightz},   -ms));
-    if (noclip) {
-        if (keys[GLFW_KEY_V])    delta.y += ms;
-        if (keys[GLFW_KEY_C])    delta.y -= ms;
-    } else if (currentLevel != LEVEL_CYBERSPACE) delta.y = 0;
-
-    instances[PLAYER1].position = add_vector3(instances[PLAYER1].position, delta);
-    if (keys[GLFW_KEY_Q]) { cam_roll += move_speed * 5.0f; Input_MouselookApply(); }
-    if (keys[GLFW_KEY_T]) { cam_roll -= move_speed * 5.0f; Input_MouselookApply(); }
-}
 
 Quaternion mul_quaternion(const Quaternion a, const Quaternion b) {
     Quaternion res;

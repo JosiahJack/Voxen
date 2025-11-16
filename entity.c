@@ -392,13 +392,7 @@ void LoadLevel(uint8_t curlevel) {
         if (isLight) {
             loadedLights++;
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-            if (lightsIdx == 817) {
-                testLight_x = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-                testLight_y = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-                testLight_z = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-                lightIsDynamic[lightsIdx] = true;
-            }
-            
+            // TODO: Set lightIsDynamic[lightsIdx] = true when light has animation data values set from file
             if (lightType == 1) {
                 if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Light %d on line %d loaded with spotAngle less than 5deg but was marked as spotlight type!\n",lightsIdx,lineNum);
             } else if (lightType == 2) {

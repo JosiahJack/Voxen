@@ -1583,22 +1583,16 @@ int32_t main(int32_t argc, char* argv[]) {
             glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
             
             // 3. Dynamic Shadowmaps
-            uint32_t lightBase = 817;
-            uint32_t litIdx = lightBase * LIGHT_DATA_SIZE;
-            if ((lights[litIdx + LIGHT_DATA_OFFSET_POSX]) != testLight_x) { lights[litIdx + LIGHT_DATA_OFFSET_POSX] = testLight_x; lightDirty[lightBase] = true; }
-            if ((lights[litIdx + LIGHT_DATA_OFFSET_POSY]) != testLight_y) { lights[litIdx + LIGHT_DATA_OFFSET_POSY] = testLight_y; lightDirty[lightBase] = true; }
-            if ((lights[litIdx + LIGHT_DATA_OFFSET_POSZ]) != testLight_z) { lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = testLight_z; lightDirty[lightBase] = true; }
-            uint16_t numLightsFoundDirty = 0;
             for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) numLightsFoundDirty++;
-            }
-
-            if (numLightsFoundDirty > 0) {
-                UpdateVoxelLightLists(); // Takes 1.4ms of total frametime!!
-                if (settings_Shadows > 0u) RenderShadowmaps();
-                else {
-                    memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
-                    glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+                if (lightDirty[i]) {
+                    UpdateVoxelLightLists(); // Takes 1.4ms of total frametime!!
+                    if (settings_Shadows > 0u) RenderShadowmaps();
+                    else {
+                        memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
+                        glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+                    }
+                    
+                    break;
                 }
             }
             
