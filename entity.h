@@ -80,8 +80,4 @@ void DualLogEntity(uint16_t idx);
 void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
 void SortInstances(void);
-void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum);
-void AddChild0(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum);
-void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum);
-
 #endif // VOXEN_ENTITY_H

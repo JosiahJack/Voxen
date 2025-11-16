@@ -337,61 +337,61 @@ static bool CollideCapsuleBox(const Entity* cap, const Entity* box, Manifold* m)
     return true;
 }
 
-bool CollideConvexBox(const Entity* convex, const Entity* box, Manifold* m) {
-    uint16_t modelIdx = convex->colliderMeshIndex;
-    if (modelIdx >= loadedModels) return false;
-
-    // Transform box into convex local space
-    Vector3 boxHalf = scale_vector3(box->colliderSize, 0.5f);
-
-    // Get convex vertices
-    uint32_t vcount = modelVertexCounts[modelIdx];
-    float* verts = modelVertices[modelIdx];
-
-    // We'll test: box faces + convex faces + edge cross products
-    Vector3 bestNormal = {0,0,0};
-    float bestPen = -FLT_MAX;
-    bool hit = false;
-
-    // 1. Box face normals (6)
-    Vector3 boxFaces[6] = {
-        {1,0,0}, {-1,0,0},
-        {0,1,0}, {0,-1,0},
-        {0,0,1}, {0,0,-1}
-    };
-    for (int i = 0; i < 6; ++i) {
-        Vector3 n = rotate_quaternion(convex->rotation, boxFaces[i]);
-        float d_convex = -FLT_MAX;
-        
-        // Project the *box* onto the axis that lives in *convex local space*
-        // The axis is already rotated into convex space (n), so the box extent is just half-size.
-        float boxExtent = (i%2==0) ? boxHalf.x : (i>=2 && i<4) ? boxHalf.y : boxHalf.z;
-        float d_box = (i%2==1) ? -boxExtent : boxExtent;
-
-        for (uint32_t v = 0; v < vcount; ++v) {
-            Vector3 p = {
-                verts[v*VERTEX_ATTRIBUTES_COUNT + 0],
-                verts[v*VERTEX_ATTRIBUTES_COUNT + 1],
-                verts[v*VERTEX_ATTRIBUTES_COUNT + 2]
-            };
-            float d = dot_vector3(p, n);
-            d_convex = vmax(d_convex, d);
-        }
-        float pen = d_box - d_convex;
-        if (pen > 0 && pen > bestPen) {
-            bestPen = pen;
-            bestNormal = n;
-            hit = true;
-        }
-    }
-
-    if (!hit) return false;
-
-    m->penetration = bestPen;
-    m->normal = normalize_vector3(bestNormal);
-    m->contactPoint = add_vector3(convex->position, scale_vector3(m->normal, -bestPen * 0.5f));
-    return true;
-}
+// bool CollideConvexBox(const Entity* convex, const Entity* box, Manifold* m) {
+//     uint16_t modelIdx = convex->colliderMeshIndex;
+//     if (modelIdx >= loadedModels) return false;
+// 
+//     // Transform box into convex local space
+//     Vector3 boxHalf = scale_vector3(box->colliderSize, 0.5f);
+// 
+//     // Get convex vertices
+//     uint32_t vcount = modelVertexCounts[modelIdx];
+//     float* verts = modelVertices[modelIdx];
+// 
+//     // We'll test: box faces + convex faces + edge cross products
+//     Vector3 bestNormal = {0,0,0};
+//     float bestPen = -FLT_MAX;
+//     bool hit = false;
+// 
+//     // 1. Box face normals (6)
+//     Vector3 boxFaces[6] = {
+//         {1,0,0}, {-1,0,0},
+//         {0,1,0}, {0,-1,0},
+//         {0,0,1}, {0,0,-1}
+//     };
+//     for (int i = 0; i < 6; ++i) {
+//         Vector3 n = rotate_quaternion(convex->rotation, boxFaces[i]);
+//         float d_convex = -FLT_MAX;
+//         
+//         // Project the *box* onto the axis that lives in *convex local space*
+//         // The axis is already rotated into convex space (n), so the box extent is just half-size.
+//         float boxExtent = (i%2==0) ? boxHalf.x : (i>=2 && i<4) ? boxHalf.y : boxHalf.z;
+//         float d_box = (i%2==1) ? -boxExtent : boxExtent;
+// 
+//         for (uint32_t v = 0; v < vcount; ++v) {
+//             Vector3 p = {
+//                 verts[v*VERTEX_ATTRIBUTES_COUNT + 0],
+//                 verts[v*VERTEX_ATTRIBUTES_COUNT + 1],
+//                 verts[v*VERTEX_ATTRIBUTES_COUNT + 2]
+//             };
+//             float d = dot_vector3(p, n);
+//             d_convex = vmax(d_convex, d);
+//         }
+//         float pen = d_box - d_convex;
+//         if (pen > 0 && pen > bestPen) {
+//             bestPen = pen;
+//             bestNormal = n;
+//             hit = true;
+//         }
+//     }
+// 
+//     if (!hit) return false;
+// 
+//     m->penetration = bestPen;
+//     m->normal = normalize_vector3(bestNormal);
+//     m->contactPoint = add_vector3(convex->position, scale_vector3(m->normal, -bestPen * 0.5f));
+//     return true;
+// }
 
 float Combine(const float a, const float b, PhysCombineType combine) {
     switch (combine) {
@@ -663,11 +663,11 @@ int32_t Physics(void) {
                 hit = CollideCapsuleBox(ea, eb, &m);
             } else if (ea->collider == COLLIDER_TYPE_BOX && eb->collider == COLLIDER_TYPE_CAPSULE) {
                 hit = CollideCapsuleBox(eb, ea, &m); m.normal = scale_vector3(m.normal, -1.0f);
-            } else if (ea->collider == COLLIDER_TYPE_CONVEXMESH && eb->collider == COLLIDER_TYPE_BOX) {
+            }/* else if (ea->collider == COLLIDER_TYPE_CONVEXMESH && eb->collider == COLLIDER_TYPE_BOX) {
                 hit = CollideConvexBox(ea, eb, &m);
             } else if (ea->collider == COLLIDER_TYPE_BOX && eb->collider == COLLIDER_TYPE_CONVEXMESH) {
                 hit = CollideConvexBox(eb, ea, &m); m.normal = scale_vector3(m.normal, -1.0f);
-            }
+            }*/
 
             if (hit) {
                 DualLog("  HIT! pen=%.3f  normal=(%.2f,%.2f,%.2f)\n", m.penetration, m.normal.x, m.normal.y, m.normal.z);

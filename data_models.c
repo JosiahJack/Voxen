@@ -214,7 +214,7 @@ void LoadModels(void) {
                     triCount    += scene->mMeshes[m]->mNumFaces;
                 }
                 
-                if (vertexCount > MAX_VERT_COUNT || triCount > MAX_TRI_COUNT) { DualLogError("Model %s exceeds limits\n", fbx_path); aiReleaseImport(scene); continue; }
+                if (vertexCount > 40000 || triCount > 32768) { DualLogError("Model %s exceeds limits\n", fbx_path); aiReleaseImport(scene); continue; }
 
                 modelVertexCounts[i]   = vertexCount;
                 modelTriangleCounts[i] = triCount;
@@ -246,11 +246,8 @@ void LoadModels(void) {
 
                     for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
                         struct aiFace *face = &mesh->mFaces[f];
-                        if (face->mNumIndices != 3) {
-                            DualLogError("Non-tri face in %s\n", fbx_path);
-                            aiReleaseImport(scene);
-                            continue;
-                        }
+                        if (face->mNumIndices != 3) { DualLogError("Non-tri face in %s\n", fbx_path); aiReleaseImport(scene); continue; }
+                        
                         uint32_t a = face->mIndices[0] + globalVertexOffset;
                         uint32_t b = face->mIndices[1] + globalVertexOffset;
                         uint32_t c = face->mIndices[2] + globalVertexOffset;
@@ -258,6 +255,7 @@ void LoadModels(void) {
                         modelTriangles[i][triangleIndex++] = b;
                         modelTriangles[i][triangleIndex++] = c;
                     }
+                    
                     globalVertexOffset += mesh->mNumVertices;
                 }
 
@@ -336,11 +334,16 @@ void LoadModels(void) {
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
+        free(modelVertices[i]);
+        malloc_trim(0);
+
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        free(modelTriangles[i]);
+        malloc_trim(0);
     }
     
     DebugRAM("after to model to gpu transfer");

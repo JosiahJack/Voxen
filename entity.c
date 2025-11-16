@@ -265,10 +265,90 @@ void LoadEntities(void) {
     DebugRAM("after loading all entities");
 }
 
+void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
+    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); exit(1); }
+            
+    instances[instanceIdx].index = entIdx;
+    instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
+    if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
+    instances[instanceIdx].texIndex = entities[entIdx].texIndex;
+    instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
+    if (instances[instanceIdx].glowIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].glowIndex = BLACK_TEXTURE_IDX;
+    instances[instanceIdx].specIndex = entities[entIdx].specIndex;
+    if (instances[instanceIdx].specIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].specIndex = BLACK_TEXTURE_IDX;
+    instances[instanceIdx].normIndex = entities[entIdx].normIndex;
+    if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
+    instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
+
+//     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets:
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    instances[instanceIdx].collider = entities[entIdx].collider = COLLIDER_TYPE_BOX;
+    instances[instanceIdx].colliderCenter.x = entities[entIdx].colliderCenter.x;
+    instances[instanceIdx].colliderCenter.y = entities[entIdx].colliderCenter.y;
+    instances[instanceIdx].colliderCenter.z = entities[entIdx].colliderCenter.z;
+    instances[instanceIdx].colliderSize.x = entities[entIdx].colliderSize.x;
+    instances[instanceIdx].colliderSize.y = entities[entIdx].colliderSize.y;
+    instances[instanceIdx].colliderSize.z = entities[entIdx].colliderSize.z;
+    instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
+    instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
+    instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+
+    if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
+        if (ConstIndexIsDoor(entIdx)) {
+            instances[instanceIdx].position.x += correctionX + 0.6001f;
+            instances[instanceIdx].position.y += correctionY - 0.5681f;
+            instances[instanceIdx].position.z += correctionZ - 0.905f;
+//         } else if (ConstIndexIsStaticObjectSaveable(entIdx)) { // TODO: Fix positioning of non-chunk objects and non-dynamic objects
+//             instances[instanceIdx].position.x += 5.12f;
+//             instances[instanceIdx].position.y += 48.2291f;
+//             instances[instanceIdx].position.z += -15.36f;
+        } else {
+            instances[instanceIdx].position.x += correctionX;   
+            instances[instanceIdx].position.y += correctionY;
+            instances[instanceIdx].position.z += correctionZ;
+        }
+    }
+
+    loadedInstances++;
+}
+
+void AddChild0(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
+    if (child == UINT16_MAX) return;
+    
+    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
+    AddInstance(child, *instanceIdx, lineNum);
+    instances[*instanceIdx].index = child;
+    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child0_offset.x;
+    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child0_offset.y;
+    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child0_offset.z;
+    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child0_scale.x;
+    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child0_scale.y;
+    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child0_scale.z;
+}
+
+void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
+    if (child == UINT16_MAX) return;
+
+    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
+    AddInstance(child, *instanceIdx, lineNum);
+    instances[*instanceIdx].index = child;
+    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child1_offset.x;
+    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child1_offset.y;
+    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child1_offset.z;
+    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child1_scale.x;
+    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child1_scale.y;
+    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child1_scale.z;
+}
+
 void LoadLevel(uint8_t curlevel) {
-    currentLevel = curlevel;
-    DebugRAM("start of LoadLevel");
     double start_time = get_time();
+    DebugRAM("start of LoadLevel");
+    currentLevel = curlevel;
+    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
+    
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { // Start AFTER player indices and NULLENT
         instances[idx].modelIndex = MODEL_IDX_MAX;
         instances[idx].texIndex = instances[idx].glowIndex = instances[idx].specIndex = instances[idx].normIndex = MATERIAL_IDX_MAX;
@@ -279,8 +359,6 @@ void LoadLevel(uint8_t curlevel) {
     }
 
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
-    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
-    
     char filename[20]; // Minimum size for 0 through 13.
     snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     FILE *file = fopen(filename, "r");
@@ -584,82 +662,4 @@ void SortInstances(void) {
     }
 
     DualLog("Loaded   %d ambient noises...in %f secs", loadedAmbients, get_time() - ambtime);
-}
-
-void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
-    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); exit(1); }
-            
-    instances[instanceIdx].index = entIdx;
-    instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
-    if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
-    instances[instanceIdx].texIndex = entities[entIdx].texIndex;
-    instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
-    if (instances[instanceIdx].glowIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].glowIndex = BLACK_TEXTURE_IDX;
-    instances[instanceIdx].specIndex = entities[entIdx].specIndex;
-    if (instances[instanceIdx].specIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].specIndex = BLACK_TEXTURE_IDX;
-    instances[instanceIdx].normIndex = entities[entIdx].normIndex;
-    if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
-    instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
-
-//     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets:
-    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
-    flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
-    flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
-    flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
-    instances[instanceIdx].collider = entities[entIdx].collider = COLLIDER_TYPE_BOX;
-    instances[instanceIdx].colliderCenter.x = entities[entIdx].colliderCenter.x;
-    instances[instanceIdx].colliderCenter.y = entities[entIdx].colliderCenter.y;
-    instances[instanceIdx].colliderCenter.z = entities[entIdx].colliderCenter.z;
-    instances[instanceIdx].colliderSize.x = entities[entIdx].colliderSize.x;
-    instances[instanceIdx].colliderSize.y = entities[entIdx].colliderSize.y;
-    instances[instanceIdx].colliderSize.z = entities[entIdx].colliderSize.z;
-    instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
-    instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
-    instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
-
-    if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
-        if (ConstIndexIsDoor(entIdx)) {
-            instances[instanceIdx].position.x += correctionX + 0.6001f;
-            instances[instanceIdx].position.y += correctionY - 0.5681f;
-            instances[instanceIdx].position.z += correctionZ - 0.905f;
-//         } else if (ConstIndexIsStaticObjectSaveable(entIdx)) { // TODO: Fix positioning of non-chunk objects and non-dynamic objects
-//             instances[instanceIdx].position.x += 5.12f;
-//             instances[instanceIdx].position.y += 48.2291f;
-//             instances[instanceIdx].position.z += -15.36f;
-        } else {
-            instances[instanceIdx].position.x += correctionX;   
-            instances[instanceIdx].position.y += correctionY;
-            instances[instanceIdx].position.z += correctionZ;
-        }
-    }
-
-    loadedInstances++;
-}
-
-void AddChild0(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
-    if (child == UINT16_MAX) return;
-    
-    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
-    AddInstance(child, *instanceIdx, lineNum);
-    instances[*instanceIdx].index = child;
-    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child0_offset.x;
-    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child0_offset.y;
-    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child0_offset.z;
-    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child0_scale.x;
-    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child0_scale.y;
-    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child0_scale.z;
-}
-
-void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
-    if (child == UINT16_MAX) return;
-
-    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
-    AddInstance(child, *instanceIdx, lineNum);
-    instances[*instanceIdx].index = child;
-    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child1_offset.x;
-    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child1_offset.y;
-    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child1_offset.z;
-    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child1_scale.x;
-    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child1_scale.y;
-    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child1_scale.z;
 }

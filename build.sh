@@ -35,11 +35,11 @@ gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
 
 export CC="ccache gcc"
 CC=gcc
-CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og -D_POSIX_C_SOURCE=200809L"
+CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
 LDFLAGS="-flto=auto -s -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGLEW -lGL -lfontconfig -fopenmp"
 SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c console.c event.c data_models.c data_textures.c data_text.c entity.c"
 export CC=gcc
-export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og -D_POSIX_C_SOURCE=200809L"
+export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 $CC "$TEMP_DIR"/*.o -o voxen $LDFLAGS

@@ -146,7 +146,7 @@ bool parse_data_file(DataParser *parser, const char *filename);
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
-#define BLACK_TEXTURE_IDX 41
+#define BLACK_TEXTURE_IDX 41 // TODO: Make settable from gamedata.txt
 extern bool* doubleSidedTexture;
 extern bool* transparentTexture;
 bool isDoubleSided(uint32_t texIndexToCheck);
@@ -156,14 +156,7 @@ void LoadTextures(void);
 // Models
 #define MODEL_COUNT 680
 #define MODEL_IDX_MAX 1024 // Max value the bit packing bits allow
-#define MAX_VERT_COUNT 40000
-#define MAX_TRI_COUNT 32768
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
-extern uint32_t* modelVertexCounts;
-extern uint32_t* modelTriangleCounts;
-extern float** modelVertices;
-extern uint32_t** modelTriangles;
-
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
 #define BOUNDS_DATA_OFFSET_MINY 1
@@ -180,6 +173,8 @@ extern uint16_t loadedTextures;
 extern uint16_t loadedModels;
 extern uint16_t loadedLights;
 extern uint16_t gameObjectCount;
+extern uint32_t* modelVertexCounts;
+extern uint32_t* modelTriangleCounts;
 void LoadModels(void);
 
 // Lights
@@ -209,7 +204,7 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 256u
+#define SHADOW_MAP_SIZE 64u
 #define MAX_SHADOWMAPS 80u
 #define SHADOWMAP_FOV 90.0f
 
