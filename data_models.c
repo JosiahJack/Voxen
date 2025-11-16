@@ -126,6 +126,7 @@ void add_mmap_cleanup(void* ptr, size_t size) {
 void cleanup_all_mmaps(void) {
     for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
     free(mmap_cleanup);
+    malloc_trim(0);
 }
 
 void LoadModels(void) {

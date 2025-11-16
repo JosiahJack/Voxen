@@ -1,3 +1,4 @@
+#include <malloc.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -166,6 +167,7 @@ void LoadTextForLanguage(uint8_t lang) {
     }
 
     free(file_data);
+    malloc_trim(0);
     DualLog("Loaded %d normal text lines from %s (total lines read: %d) [%s] in %f secs\n", lineNum, textFile, totalLines, is_utf8 ? "UTF-8" : "UTF-16LE", get_time() - loadtextTimeStart);
 }
 
@@ -190,6 +192,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
     if (audioLogImagesRefIndicesRH) { free(audioLogImagesRefIndicesRH); audioLogImagesRefIndicesRH = NULL; }
     if (audioLogType)               { free(audioLogType);               audioLogType               = NULL; }
     if (audioLogLevelFound)         { free(audioLogLevelFound);         audioLogLevelFound         = NULL; }
+    malloc_trim(0);
     audioLogImagesRefIndicesLH = calloc(TEXT_LOGS_COUNT, sizeof(uint16_t));
     audioLogImagesRefIndicesRH = calloc(TEXT_LOGS_COUNT, sizeof(uint16_t));
     audioLogType               = calloc(TEXT_LOGS_COUNT, sizeof(uint8_t));
@@ -335,5 +338,6 @@ void LoadLogTextForLanguage(uint8_t lang) {
     }
 
     free(file_data);
+    malloc_trim(0);
     DualLog("Loaded  %d logs text lines from %s (total lines read: %d) [%s] in %f secs\n", lineNum, textFile, totalLines, is_utf8 ? "UTF-8" : "UTF-16LE", get_time() - loadLogsTextStart);
 }

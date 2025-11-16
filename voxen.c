@@ -1289,9 +1289,11 @@ void InitializeEnvironment(void) {
             glActiveTexture(GL_TEXTURE4);
             glBindTexture(GL_TEXTURE_2D, outputImageID);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            malloc_trim(0);
             DebugRAM("setup gbuffer end");
             
             InitFontAtlasses();
+            malloc_trim(0);
             glCreateBuffers(1, &textVBO);
             glCreateVertexArrays(1, &textVAO);    
             glEnableVertexArrayAttrib(textVAO, 0);
@@ -1305,10 +1307,20 @@ void InitializeEnvironment(void) {
             Input_MouselookApply(); // Input
             InitializeAudio(); // Audio
             malloc_trim(0);
+            DebugRAM("GL inits end");
         }
-        if (omp_get_thread_num() == 1) LoadTextForLanguage(settings_Language);
-        if (omp_get_thread_num() == 2) LoadLogTextForLanguage(settings_Language);
-        if (omp_get_thread_num() == 3) ParseGameData();
+        if (omp_get_thread_num() == 1) {
+            LoadTextForLanguage(settings_Language);
+            DebugRAM("LoadTextForLanguage end");
+        }
+        if (omp_get_thread_num() == 2) {
+            LoadLogTextForLanguage(settings_Language);
+            DebugRAM("LoadLogTextForLanguage end");
+        }
+        if (omp_get_thread_num() == 3) {
+            ParseGameData();
+            DebugRAM("ParseGameData end");
+        }
     }
     
     RenderLoadingProgress(100,"Loading textures...");

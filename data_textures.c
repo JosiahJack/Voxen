@@ -191,8 +191,7 @@ void LoadTextures(void) {
         palette_offset += palette_size;
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;        
-        free(image_data[i]);
-//         malloc_trim(0);
+        free(image_data[i]); // malloc_trim after this hasn't so far, after multiple tries, affected RAM loading.  Textures only increase ~3mb typically or less.
     }
 
     DualLog(" total pallete colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);

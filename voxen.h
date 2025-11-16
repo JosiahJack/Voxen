@@ -1,7 +1,7 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.3"
-// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <time.h>

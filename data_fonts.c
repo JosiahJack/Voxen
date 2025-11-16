@@ -212,6 +212,7 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     
     LoadedFont *lf = LoadFallbackFont(fontfile);
     free(fontfile);
+    malloc_trim(0);
     if (!lf) return 0;
     
     glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
