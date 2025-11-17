@@ -170,6 +170,18 @@ bool cursorVisible = false;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 // ----------------------------------------------------------------------------
 // UI
+//    Text
+#define TEXT_WHITE 0
+#define TEXT_YELLOW 1
+#define TEXT_DARK_YELLOW 2
+#define TEXT_GREEN 3
+#define TEXT_RED 4
+#define TEXT_ORANGE 5
+#define TEXT_STOPD_RED 6
+#define TEXT_STOPD_RED_HIGHLIGHT 7
+#define TEXT_STOPD_RED_PAUSETITLE 8
+#define TEXT_COLOR_COUNT 9
+
 //    Images
 #define MAX_UI_IMAGES 1024 // Adjust based on needs
 bool noHUD = false;
