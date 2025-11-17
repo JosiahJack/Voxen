@@ -66,8 +66,8 @@ bool process_key_value(Entity *entry, const char *key, const char *value, const 
     char *val_end = trimmed_value + strlen(trimmed_value) - 1;
     while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
     while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
-    sanitize_utf8_ascii(trimmed_key);
-    sanitize_utf8_ascii(trimmed_value);
+//     sanitize_utf8_ascii(trimmed_key);
+//     sanitize_utf8_ascii(trimmed_value);
     if (strncmp(trimmed_key, "chunk_", 6) == 0) {
         strncpy(entry->path, trimmed_key, sizeof(entry->path) - 1);
         entry->path[sizeof(entry->path) - 1] = '\0';
@@ -161,8 +161,8 @@ bool process_gamedata_key_value(Entity *entry, const char *key, const char *valu
     char *val_end = trimmed_value + strlen(trimmed_value) - 1;
     while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
     while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
-    sanitize_utf8_ascii(trimmed_key);
-    sanitize_utf8_ascii(trimmed_value);
+//     sanitize_utf8_ascii(trimmed_key);
+//     sanitize_utf8_ascii(trimmed_value);
     
          if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
     else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);

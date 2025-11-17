@@ -559,21 +559,15 @@ void LoadLevel(uint8_t curlevel) {
             char *key = kvString;    // Assign key to before colon
             char *value = colon + 1; // Assing value to after colon
             if (!key || !value) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); exit(1); }
-            
-            while (data_parser_isspace((unsigned char)*key)) key++;
-            while (data_parser_isspace((unsigned char)*value)) value++;
-            char trimmed_key[256];
+
+            char trimmed_key[64];
             char trimmed_value[256];
             snprintf(trimmed_key, sizeof(trimmed_key), "%s", key);
             snprintf(trimmed_value, sizeof(trimmed_value), "%s", value);
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-            char *key_end = trimmed_key + strlen(trimmed_key) - 1;
-            char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-            while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
-            while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
-            sanitize_utf8_ascii(trimmed_key);
-            sanitize_utf8_ascii(trimmed_value);
+//             sanitize_utf8_ascii(trimmed_key);
+//             sanitize_utf8_ascii(trimmed_value);
             if (isLight) {
                      if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightX;
                 else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum) + correctionLightY;
