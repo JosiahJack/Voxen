@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
-#include <GL/glew.h>
+#include "./External/glad/gl.h"
 #include "./External/glfw3.h"
 #include "External/stb_truetype.h"
 #include "citadel_enumerations.h"

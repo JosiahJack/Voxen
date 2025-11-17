@@ -36,8 +36,12 @@ gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
 export CC="ccache gcc"
 CC=gcc
 CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
-LDFLAGS="-flto=auto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGLEW -lGL -lfontconfig -fopenmp"
-SOURCES="voxen.c data_parser.c physics.c data_fonts.c matvecquat.c audio.c helpers.c console.c event.c data_models.c data_textures.c data_text.c entity.c"
+LDFLAGS="-flto=auto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGL -lfontconfig -fopenmp"
+SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c data_text.c entity.c"
+cp ./External/glad/glad.c.o ./$TEMP_DIR/glad.c.o
+cp ./data_models.c.o ./$TEMP_DIR/data_models.c.o
+cp ./data_textures.c.o ./$TEMP_DIR/data_textures.c.o
+cp ./data_fonts.c.o ./$TEMP_DIR/data_fonts.c.o
 export CC=gcc
 export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
 export TEMP_DIR=temp_build

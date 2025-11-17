@@ -1,24 +1,12 @@
 // data_fonts.c - Load Font Atlasses
 // #include "voxen.h" limited includes
-#include <stdbool.h>
-#include <GL/glew.h>
-#include "./External/glfw3.h"
-#define MAX_GLYPHS 8192      // Rough estimate for all ranges
-#define FONT_ATLAS_SIZE 4096
-#define FONT_NORMAL 0
-#define FONT_STOPD 1
-float GetScreenRelativeX(float percentage);
-float GetScreenRelativeY(float percentage);
-double get_time(void);
-void md5(const uint8_t *data, size_t len, uint8_t out[16]);
-void DualLog(const char* fmt, ...);
-void DualLogWarn(const char* fmt, ...);
-void DualLogError(const char* fmt, ...);
-// end #include "voxen.h" limited includes
-
 #include <malloc.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include "./External/glad/gl.h"
+#include "./External/glfw3.h"
+#include "voxen.h"
 #include "vmath.h"
 #define STBTT_ifloor(x)   ((int) vfloor(x))
 #define STBTT_iceil(x)    ((int) vceil(x))

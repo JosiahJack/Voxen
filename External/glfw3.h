@@ -523,6 +523,7 @@ GLFWAPI int glfwGetGamepadState(int jid, GLFWgamepadstate* state);
 #define GLFW_OPENGL_PROFILE         0x00022008
 #define GLFW_CLIENT_API             0x00022001
 
+GLFWAPI GLFWglproc glfwGetProcAddress(const char* procname);
 GLFWAPI int glfwInit(void);
 GLFWAPI const char* glfwGetVersionString(void);
 GLFWAPI GLFWmonitor** glfwGetMonitors(int* count);

@@ -1182,8 +1182,9 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_RESIZABLE, 0);
     window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
     if (!window) { DualLogError("glfwCreateWindow failed\n"); exit(1); }
-    
+        
     glfwMakeContextCurrent(window);
+    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { fprintf(stderr, "Failed to initialize GLAD\n"); exit(1); }
     UpdateScreenSize();
     malloc_trim(0);
     DebugRAM("window init");
@@ -1200,9 +1201,6 @@ void InitializeEnvironment(void) {
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glewExperimental = GL_TRUE; // Enable modern OpenGL support
-    if (glewInit() != GLEW_OK) { DualLogError("GLEW initialization failed\n"); exit(1); }
-
     malloc_trim(0);
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);

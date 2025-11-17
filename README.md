@@ -65,18 +65,16 @@ Build by calling ./build.sh build script.
 
 Project must be linked against the following libraries which your system must install.  I'll continue to reduce these as much as I can:
  * -lglfw (`sudo apt install libglfw3-dev`)
- * -lGLEW (`sudo apt install libglew-dev`)
  * -lGL (`sudo apt install libgl1-mesa-dev`)
  * -lm
  * -lrt
- * -lpthread (for multithread support)
  * -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ (Prebuilt, included in ./External/, for model loading from .fbx (for now))
- * -fopenmp (Will hopefully remove after only loading needed items for current level at a time)
+ * -fopenmp
 
 Single command:
 
 ```bash
-sudo apt install libglfw3-dev libglew-dev libgl1-mesa-dev libassimp-dev
+sudo apt install libglfw3-dev libgl1-mesa-dev libassimp-dev
 ```
 
 ## System Architecture
