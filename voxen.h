@@ -1,7 +1,7 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
-#define VERSION_STRING "v0.7.3"
-#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+#define VERSION_STRING "v0.7.4"
+// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <time.h>
@@ -20,18 +20,6 @@
 // Global Types
 typedef struct { float r,g,b,a; } Color;
 
-#define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
-#define NULLENT 0
-#define PLAYER1 1
-#define PLAYER2 2
-#define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE     1
-#define ENTFLAG_CARDCHUNK  2
-#define ENTFLAG_GROUNDED   4
-#define ENTFLAG_USEGRAVITY 8
-#define ENTFLAG_KINEMATIC 16
-#define ENTFLAG_RIGIDBODY 32
-
 extern double timeSinceLastPhysicsTick;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
@@ -41,49 +29,6 @@ typedef struct {
     Vector3 maxs;
     uint8_t type;
 } Trigger;
-
-typedef struct {
-    uint16_t index;
-    uint16_t modelIndex;
-    uint16_t lodIndex;
-    uint16_t texIndex;
-    uint16_t glowIndex;
-    uint16_t specIndex;
-    uint16_t normIndex;
-    
-    bool doublesided;
-    bool transparent;
-    bool cardchunk;
-    
-    ColliderType collider;
-    Vector3 colliderCenter;
-    Vector3 colliderSize;
-    uint16_t colliderMeshIndex;
-    float mass;
-    bool kinematic;
-    bool useGravity;
-    float linearDrag;
-    float angularDrag;
-    float dynamicFriction;
-    float staticFriction;
-    float bounciness;
-    PhysCombineType frictionCombine;
-    PhysCombineType bounceCombine;
-    
-    float volume;
-    
-    uint16_t   child0;
-    Vector3    child0_offset;
-    Quaternion child0_rotation;
-    Vector3    child0_scale;
-    
-    uint16_t   child1;
-    Vector3    child1_offset;
-    Quaternion child1_rotation;
-    Vector3    child1_scale;
-    
-    char path[MAX_PATH];
-} ResourceEntry;
 
 typedef struct {
 	int lev1SecCode;
@@ -121,12 +66,6 @@ typedef struct {
 } QuestBits;
 extern QuestBits questData;
 
-typedef struct {
-    ResourceEntry* entries;
-    int32_t count;
-    int32_t capacity;
-} DataParser;
-
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32
@@ -137,11 +76,6 @@ void play_wav(const char* path, float volume);
 void InitializeAudio();
 void UpdateAmbientSounds(void);
 // ----------------------------------------------------------------------------
-// Data Parsing
-#define MAX_ENTRIES 6000
-void ParseGameData();
-bool parse_data_file(DataParser *parser, const char *filename);
-
 // Textures
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
@@ -152,7 +86,7 @@ extern bool* transparentTexture;
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
-
+// ----------------------------------------------------------------------------
 // Models
 #define MODEL_COUNT 680
 #define MODEL_IDX_MAX 1024 // Max value the bit packing bits allow
@@ -256,10 +190,6 @@ extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
-extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
-extern uint16_t cellIndexForLight[LIGHT_COUNT];
-extern uint16_t cellIndexForLightX[LIGHT_COUNT];
-extern uint16_t cellIndexForLightZ[LIGHT_COUNT];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
 void CullCore(void);

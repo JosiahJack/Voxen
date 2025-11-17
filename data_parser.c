@@ -51,79 +51,7 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
     return val;
 }
 
-void init_data_entry(ResourceEntry *entry) {
-    entry->index = UINT16_MAX;
-    entry->modelIndex = MODEL_IDX_MAX;
-    entry->lodIndex  = MODEL_IDX_MAX;
-    entry->texIndex  = MATERIAL_IDX_MAX;
-    entry->glowIndex = MATERIAL_IDX_MAX;
-    entry->specIndex = MATERIAL_IDX_MAX;
-    entry->normIndex = MATERIAL_IDX_MAX;
-    
-    entry->doublesided = false;
-    entry->transparent = false;
-    entry->cardchunk = false;
-    
-    entry->collider = 0u;
-    entry->colliderCenter.x = 0.0f;
-    entry->colliderCenter.y = 0.0f;
-    entry->colliderCenter.z = 0.0f;
-    entry->colliderSize.x = 0.0f;
-    entry->colliderSize.y = 0.0f;
-    entry->colliderSize.z = 0.0f;
-    entry->colliderMeshIndex = MODEL_IDX_MAX;
-    entry->mass = 1.0f;
-    entry->kinematic = false;
-    entry->useGravity = false;
-    entry->linearDrag = 0.0f;
-    entry->angularDrag = 0.05f;
-    entry->dynamicFriction = 0.6f;
-    entry->staticFriction = 0.6f;
-    entry->bounciness = 0.00f;
-    entry->frictionCombine = PHYS_COMBINE_AVG;
-    entry->bounceCombine = PHYS_COMBINE_AVG;
-    
-    entry->volume = 1.0f;
-    
-    entry->child0 = UINT16_MAX;
-    entry->child0_offset.x = 0.0f;
-    entry->child0_offset.y = 0.0f;
-    entry->child0_offset.z = 0.0f;
-    entry->child0_rotation.x = 0.0f;
-    entry->child0_rotation.y = 0.0f;
-    entry->child0_rotation.z = 0.0f;
-    entry->child0_rotation.w = 1.0f;
-    entry->child0_scale.x = 1.0f;
-    entry->child0_scale.y = 1.0f;
-    entry->child0_scale.z = 1.0f;
-    
-    entry->child1 = UINT16_MAX;
-    entry->child1_offset.x = 0.0f;
-    entry->child1_offset.y = 0.0f;
-    entry->child1_offset.z = 0.0f;
-    entry->child1_rotation.x = 0.0f;
-    entry->child1_rotation.y = 0.0f;
-    entry->child1_rotation.z = 0.0f;
-    entry->child1_rotation.w = 1.0f;
-    entry->child1_scale.x = 1.0f;
-    entry->child1_scale.y = 1.0f;
-    entry->child1_scale.z = 1.0f;
-    entry->path[0] = '\0';
-}
-
-void allocate_entries(DataParser *parser, int32_t entry_count) {
-    if (entry_count > MAX_ENTRIES) { DualLogWarn("\033[38;5;208mEntry count %d exceeds %d\033[0m\n", entry_count, MAX_ENTRIES); entry_count = MAX_ENTRIES; }
-    
-    if (entry_count > parser->capacity) {
-        ResourceEntry *new_entries = realloc(parser->entries, entry_count * sizeof(ResourceEntry));  
-        parser->entries = new_entries;
-        for (int32_t i = parser->capacity; i < entry_count; ++i) init_data_entry(&parser->entries[i]);
-        parser->capacity = entry_count;
-    }
-    parser->count = entry_count;
-}
-
-bool process_key_value(ResourceEntry *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
+bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
     if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
     
     while (data_parser_isspace((unsigned char)*key)) key++;
@@ -151,9 +79,9 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
     else if (strcmp(trimmed_key, "glowtexture") == 0)       entry->glowIndex = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "spectexture") == 0)       entry->specIndex = parse_numberu16(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "normtexture") == 0)       entry->normIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "doublesided") == 0)       entry->doublesided = parse_bool(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "transparent") == 0)       entry->transparent = parse_bool(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "cardchunk") == 0)         entry->cardchunk = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "doublesided") == 0)       flag_set(&entry->entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, line, lineNum));
+    else if (strcmp(trimmed_key, "transparent") == 0)       flag_set(&entry->entflags,ENTFLAG_TRANSPARENT,parse_bool(trimmed_value, line, lineNum));
+    else if (strcmp(trimmed_key, "cardchunk") == 0)         flag_set(&entry->entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, line, lineNum));
 
     else if (strcmp(trimmed_key, "collider") == 0)          entry->collider = parse_numberu8(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "collider_centerx") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
@@ -166,8 +94,8 @@ bool process_key_value(ResourceEntry *entry, const char *key, const char *value,
     else if (strcmp(trimmed_key, "mass") == 0)              entry->mass = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "linearDrag") == 0)        entry->linearDrag = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "angularDrag") == 0)       entry->angularDrag = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "kinematic") == 0)         entry->kinematic = parse_bool(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "useGravity") == 0)        entry->useGravity = parse_bool(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "kinematic") == 0)         flag_set(&entry->entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, line, lineNum));
+    else if (strcmp(trimmed_key, "useGravity") == 0)        flag_set(&entry->entflags,ENTFLAG_USEGRAVITY,parse_bool(trimmed_value, line, lineNum));
     else if (strcmp(trimmed_key, "bounciness") == 0)        entry->bounciness = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry->dynamicFriction = parse_float(trimmed_value, line, lineNum);
     else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry->frictionCombine = parse_numberu8(trimmed_value, line, lineNum);
@@ -217,20 +145,46 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
     return pos > 0;
 }
 
+// Unique set separate from savedata path and resource data to keep it focussed
+bool process_gamedata_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
+    if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
+    
+    while (data_parser_isspace((unsigned char)*key)) key++;
+    while (data_parser_isspace((unsigned char)*value)) value++;
+    char trimmed_key[256];
+    char trimmed_value[256];
+    strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
+    strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
+    trimmed_key[sizeof(trimmed_key) - 1] = '\0';
+    trimmed_value[sizeof(trimmed_value) - 1] = '\0';
+    char *key_end = trimmed_key + strlen(trimmed_key) - 1;
+    char *val_end = trimmed_value + strlen(trimmed_value) - 1;
+    while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
+    while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+    sanitize_utf8_ascii(trimmed_key);
+    sanitize_utf8_ascii(trimmed_value);
+    
+         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
+    else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "startlevel") == 0)      startLevel = parse_numberu8(trimmed_value, line, lineNum);
+    else return false;
+    return true;
+}
+
 // Load Game/Mod Definition
 void ParseGameData() {
     double start_time = get_time();
     const char* filename = "./Data/gamedata.txt";
     DualLog("Loading game definition from %s...",filename);    
-    ResourceEntry entry;
-    init_data_entry(&entry);
+    Entity entry;
+    InitializeEntity(&entry);
     FILE *gamedatfile = fopen(filename, "r");
     if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); exit(1); }
     
     uint32_t lineNum = 0;
     bool is_eof;
     while (!feof(gamedatfile)) {
-        char token[1024];
+        char token[256];
         bool is_comment, is_newline;
         if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
             if (is_comment || is_newline) {
@@ -244,7 +198,7 @@ void ParseGameData() {
         key[sizeof(key) - 1] = '\0';
         if (!read_token(gamedatfile, token, sizeof(token), '\n', &is_comment, &is_eof, &is_newline, &lineNum)) continue;
         
-        process_key_value(&entry, key, token, key, lineNum);
+        process_gamedata_key_value(&entry, key, token, key, lineNum);
         lineNum += 1;
     }
     
@@ -256,7 +210,6 @@ void ParseGameData() {
 static bool ParseResourceData(DataParser *parser, FILE* file, const char *filename) {
     char line[1024];
     uint32_t lineNum = 0;
-    int32_t entry_count = 0;
     uint32_t max_index = 0;
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;        
@@ -265,7 +218,7 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
         char *end = start + strlen(start) - 1;
         while (end > start && data_parser_isspace((unsigned char)*end)) { *end = '\0'; end--; }
         if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
-        if (line[0] == '#') { entry_count++; continue; }
+        if (line[0] == '#') { continue; }
 
         char *colon = strchr(start, ':');
         if (colon && strncmp(start, "index", colon - start) == 0) {
@@ -278,10 +231,18 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
 
     if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
 
-    allocate_entries(parser, max_index + 1);  // Second pass: parse entries
+    uint32_t entry_count = max_index + 1;
+    if (entry_count > parser->capacity) {
+        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
+        parser->entries = new_entries;
+        for (uint32_t i = parser->capacity; i < entry_count; ++i) InitializeEntity(&parser->entries[i]);
+        parser->capacity = entry_count;
+    }
+    
+    parser->count = entry_count;
     rewind(file);
-    ResourceEntry entry;
-    init_data_entry(&entry);
+    Entity entry;
+    InitializeEntity(&entry);
     int32_t entries_stored = 0;
     lineNum = 0;
     while (fgets(line, sizeof(line), file)) {
@@ -301,7 +262,7 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
             }
             
             // Start new entry
-            init_data_entry(&entry);
+            InitializeEntity(&entry);
             strncpy(entry.path, start + 1, sizeof(entry.path) - 1);
             entry.path[sizeof(entry.path) - 1] = '\0';
             continue;
@@ -315,11 +276,8 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
             char *value = colon + 1;
             while (data_parser_isspace((unsigned char)*key)) key++;
             while (data_parser_isspace((unsigned char)*value)) value++;
-            if (*key && *value) {
-                process_key_value(&entry, key, value, start, lineNum);
-            } else {
-                DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
-            }
+            if (*key && *value) process_key_value(&entry, key, value, start, lineNum);
+            else                DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
         } else {
             DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
         }

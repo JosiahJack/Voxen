@@ -144,7 +144,7 @@ uint32_t totalShadowmapPixels = 0;
 uint32_t shadSizeSquared = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE;
 
 //    SSR (Screen Space Reflections)
-#define SSR_RES 2 // 50% of render resolution.
+#define SSR_RES 4 // 50% of render resolution.
 GLuint ssrShaderProgram;
 GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr;
 

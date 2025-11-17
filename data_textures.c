@@ -9,6 +9,7 @@
 #include <uthash.h>
 #include <omp.h>
 #include "voxen.h"
+#include "entity.h"
 int malloc_trim(size_t pad); // #include <malloc.h>
 int close (int filedes); // #include <unistd.h>
 size_t read(int fd, void* buf, size_t count); // #include <unistd.h>
@@ -50,7 +51,7 @@ void LoadTextures(void) {
     if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); exit(1); }
 
     int32_t maxIndex = -1;
-    for (int32_t k = 0; k < texture_parser.count; k++) {
+    for (uint32_t k = 0; k < texture_parser.count; k++) {
         if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) maxIndex = texture_parser.entries[k].index;
     }
 
@@ -75,7 +76,7 @@ void LoadTextures(void) {
         matchedParserIdxes[i] = -1;
     }
 
-    for (int32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
+    for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
         if (texture_parser.entries[k].index < loadedTextures) matchedParserIdxes[texture_parser.entries[k].index] = k;
     }
     
@@ -100,8 +101,8 @@ void LoadTextures(void) {
             
             widths[matchedParserIdxes[i]] = w;
             heights[matchedParserIdxes[i]] = h;
-            doubleSidedTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].doublesided > 0 ? 1 : 0;
-            transparentTexture[matchedParserIdxes[i]] = texture_parser.entries[matchedParserIdxes[i]].transparent > 0 ? 1 : 0;
+            doubleSidedTexture[matchedParserIdxes[i]] = (texture_parser.entries[matchedParserIdxes[i]].entflags & ENTFLAG_DOUBLESIDED);
+            transparentTexture[matchedParserIdxes[i]] = (texture_parser.entries[matchedParserIdxes[i]].entflags & ENTFLAG_TRANSPARENT);
             munmap(file_buffer, file_size);
         }
     }

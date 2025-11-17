@@ -1,3 +1,4 @@
+#include <malloc.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -149,10 +150,85 @@ void DualLogEntity(uint16_t idx) {
 }
 #pragma GCC diagnostic pop
 
+void InitializeEntity(Entity* entry) {
+    entry->index = UINT16_MAX;
+    entry->entflags = 0x00000000000000000000000000000000u;
+    flag_enable(&entry->entflags,ENTFLAG_KINEMATIC);
+    
+    entry->modelIndex = MODEL_IDX_MAX;
+    entry->texIndex  = MATERIAL_IDX_MAX;
+    entry->glowIndex = MATERIAL_IDX_MAX;
+    entry->specIndex = MATERIAL_IDX_MAX;
+    entry->normIndex = MATERIAL_IDX_MAX;
+    entry->lodIndex  = MODEL_IDX_MAX;
+    
+    entry->position.x = 0.0f;
+    entry->position.y = 0.0f;
+    entry->position.z = 0.0f;
+    entry->rotation.x = 0.0f;
+    entry->rotation.y = 0.0f;
+    entry->rotation.z = 0.0f;
+    entry->rotation.w = 1.0f; // Quaternion identity
+    entry->scale.x = 1.0f;
+    entry->scale.y = 1.0f;
+    entry->scale.z = 1.0f;
+    entry->velocity.x = 0.0f;
+    entry->velocity.y = 0.0f;
+    entry->velocity.z = 0.0f;
+    entry->angularVelocity.x = 0.0f;
+    entry->angularVelocity.y = 0.0f;
+    entry->angularVelocity.z = 0.0f;
+    
+    entry->bodyState = BodyState_Standing;
+    
+    entry->collider = 0u;
+    entry->colliderCenter.x = 0.0f;
+    entry->colliderCenter.y = 0.0f;
+    entry->colliderCenter.z = 0.0f;
+    entry->colliderSize.x = 0.0f;
+    entry->colliderSize.y = 0.0f;
+    entry->colliderSize.z = 0.0f;
+    entry->colliderMeshIndex = MODEL_IDX_MAX;
+    entry->mass = 1.0f;
+    entry->linearDrag = 0.0f;
+    entry->angularDrag = 0.05f;
+    entry->dynamicFriction = 0.6f;
+    entry->staticFriction = 0.6f;
+    entry->bounciness = 0.0f;
+    entry->frictionCombine = PHYS_COMBINE_AVG;
+    entry->bounceCombine = PHYS_COMBINE_AVG;
+    
+    entry->volume = 1.0f;
+    
+    entry->child0 = UINT16_MAX;
+    entry->child0_offset.x = 0.0f;
+    entry->child0_offset.y = 0.0f;
+    entry->child0_offset.z = 0.0f;
+    entry->child0_rotation.x = 0.0f;
+    entry->child0_rotation.y = 0.0f;
+    entry->child0_rotation.z = 0.0f;
+    entry->child0_rotation.w = 1.0f;
+    entry->child0_scale.x = 1.0f;
+    entry->child0_scale.y = 1.0f;
+    entry->child0_scale.z = 1.0f;
+    
+    entry->child1 = UINT16_MAX;
+    entry->child1_offset.x = 0.0f;
+    entry->child1_offset.y = 0.0f;
+    entry->child1_offset.z = 0.0f;
+    entry->child1_rotation.x = 0.0f;
+    entry->child1_rotation.y = 0.0f;
+    entry->child1_rotation.z = 0.0f;
+    entry->child1_rotation.w = 1.0f;
+    entry->child1_scale.x = 1.0f;
+    entry->child1_scale.y = 1.0f;
+    entry->child1_scale.z = 1.0f;
+    
+    entry->path[0] = '\0';    
+}
+
 void LoadEntities(void) {
     double start_time = get_time();
-    
-    // Initialize parser with entity-specific keys
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
     
     entityCount = entity_parser.count;
@@ -161,27 +237,16 @@ void LoadEntities(void) {
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); exit(1); }
 
     DualLog("Loading  %d entities...", entityCount);
-
-    // Populate entities array
+//     #pragma omp parallel for // Found twas faster without
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
-        entities[i].index = entity_parser.entries[i].index;           // Different struct types, can't just wholesale assign.
-        bool isCardChunk = entity_parser.entries[i].cardchunk;
+        entities[i] = entity_parser.entries[i];
         flag_enable(&entities[i].entflags, ENTFLAG_ACTIVE);
-        flag_set(&entities[i].entflags,    ENTFLAG_CARDCHUNK, isCardChunk);
         flag_set(&entities[i].entflags,    ENTFLAG_GROUNDED, false);
-        flag_set(&entities[i].entflags,    ENTFLAG_USEGRAVITY, entity_parser.entries[i].useGravity);
-        flag_set(&entities[i].entflags,    ENTFLAG_KINEMATIC, entity_parser.entries[i].kinematic);
         flag_set(&entities[i].entflags,    ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(entities[i].index));
-        
-        entities[i].modelIndex = entity_parser.entries[i].modelIndex;
-        entities[i].texIndex = entity_parser.entries[i].texIndex;
-        entities[i].glowIndex = entity_parser.entries[i].glowIndex;
-        entities[i].specIndex = entity_parser.entries[i].specIndex;
-        entities[i].normIndex = entity_parser.entries[i].normIndex;
-        entities[i].lodIndex = isCardChunk ? GEOMETRY_LOD_CARD_MODEL_IDX : entity_parser.entries[i].lodIndex; // Generic LOD card
-        if (isCardChunk) {
+        if (entity_parser.entries[i].entflags & ENTFLAG_CARDCHUNK) {
+            entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX; // Generic LOD card
             entities[i].collider = COLLIDER_TYPE_BOX;
             entities[i].colliderCenter.x = 0.0f;
             entities[i].colliderCenter.y = 1.44f;
@@ -191,36 +256,6 @@ void LoadEntities(void) {
             entities[i].colliderSize.z = 2.56f;
         }
 
-        entities[i].position.x = 0.0f;
-        entities[i].position.y = 0.0f;
-        entities[i].position.z = 0.0f;
-        entities[i].rotation.x = 0.0f;
-        entities[i].rotation.y = 0.0f;
-        entities[i].rotation.z = 0.0f;
-        entities[i].rotation.w = 1.0f;
-        entities[i].scale.x = 1.0f;
-        entities[i].scale.y = 1.0f;
-        entities[i].scale.z = 1.0f;
-        entities[i].velocity.x = 0.0f;
-        entities[i].velocity.y = 0.0f;
-        entities[i].velocity.z = 0.0f;
-        entities[i].angularVelocity.x = 0.0f;
-        entities[i].angularVelocity.y = 0.0f;
-        entities[i].angularVelocity.z = 0.0f;
-        
-        entities[i].bodyState = BodyState_Standing;
-        
-        entities[i].collider = entity_parser.entries[i].collider;
-        entities[i].colliderCenter.x = entity_parser.entries[i].colliderCenter.x;
-        entities[i].colliderCenter.y = entity_parser.entries[i].colliderCenter.y;
-        entities[i].colliderCenter.z = entity_parser.entries[i].colliderCenter.z;
-        entities[i].colliderSize.x = entity_parser.entries[i].colliderSize.x;
-        entities[i].colliderSize.y = entity_parser.entries[i].colliderSize.y;
-        entities[i].colliderSize.z = entity_parser.entries[i].colliderSize.z;
-        entities[i].colliderMeshIndex = entity_parser.entries[i].colliderMeshIndex;
-        entities[i].mass = entity_parser.entries[i].mass;
-        entities[i].linearDrag = entity_parser.entries[i].linearDrag;
-        entities[i].angularDrag = entity_parser.entries[i].angularDrag;
         entities[i].inertia = 0.0f;
         entities[i].accumulatedForce.x = 0.0f;
         entities[i].accumulatedForce.y = 0.0f;
@@ -228,37 +263,6 @@ void LoadEntities(void) {
         entities[i].accumulatedTorque.x = 0.0f;
         entities[i].accumulatedTorque.y = 0.0f;
         entities[i].accumulatedTorque.z = 0.0f;
-        entities[i].dynamicFriction = entity_parser.entries[i].dynamicFriction;
-        entities[i].staticFriction = entity_parser.entries[i].staticFriction;
-        entities[i].bounciness = entity_parser.entries[i].bounciness;
-        entities[i].frictionCombine = entity_parser.entries[i].frictionCombine;
-        entities[i].bounceCombine = entity_parser.entries[i].bounceCombine;
-
-        entities[i].volume = entity_parser.entries[i].volume;
-
-        entities[i].child0 = entity_parser.entries[i].child0;
-        entities[i].child0_offset.x = entity_parser.entries[i].child0_offset.x;
-        entities[i].child0_offset.y = entity_parser.entries[i].child0_offset.y;
-        entities[i].child0_offset.z = entity_parser.entries[i].child0_offset.z;
-        entities[i].child0_rotation.x = entity_parser.entries[i].child0_rotation.x;
-        entities[i].child0_rotation.y = entity_parser.entries[i].child0_rotation.y;
-        entities[i].child0_rotation.z = entity_parser.entries[i].child0_rotation.z;
-        entities[i].child0_rotation.w = entity_parser.entries[i].child0_rotation.w;
-        entities[i].child0_scale.x = entity_parser.entries[i].child0_scale.x;
-        entities[i].child0_scale.y = entity_parser.entries[i].child0_scale.y;
-        entities[i].child0_scale.z = entity_parser.entries[i].child0_scale.z;
-        
-        entities[i].child1 = entity_parser.entries[i].child1;
-        entities[i].child1_offset.x = entity_parser.entries[i].child1_offset.x;
-        entities[i].child1_offset.y = entity_parser.entries[i].child1_offset.y;
-        entities[i].child1_offset.z = entity_parser.entries[i].child1_offset.z;
-        entities[i].child1_rotation.x = entity_parser.entries[i].child1_rotation.x;
-        entities[i].child1_rotation.y = entity_parser.entries[i].child1_rotation.y;
-        entities[i].child1_rotation.z = entity_parser.entries[i].child1_rotation.z;
-        entities[i].child1_rotation.w = entity_parser.entries[i].child1_rotation.w;
-        entities[i].child1_scale.x = entity_parser.entries[i].child1_scale.x;
-        entities[i].child1_scale.y = entity_parser.entries[i].child1_scale.y;
-        entities[i].child1_scale.z = entity_parser.entries[i].child1_scale.z;
     }
 
     DualLog(" took %f secs\n", get_time() - start_time);
@@ -279,7 +283,6 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
     if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
-
 //     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
@@ -295,16 +298,11 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
-
     if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
         if (ConstIndexIsDoor(entIdx)) {
             instances[instanceIdx].position.x += correctionX + 0.6001f;
             instances[instanceIdx].position.y += correctionY - 0.5681f;
             instances[instanceIdx].position.z += correctionZ - 0.905f;
-//         } else if (ConstIndexIsStaticObjectSaveable(entIdx)) { // TODO: Fix positioning of non-chunk objects and non-dynamic objects
-//             instances[instanceIdx].position.x += 5.12f;
-//             instances[instanceIdx].position.y += 48.2291f;
-//             instances[instanceIdx].position.z += -15.36f;
         } else {
             instances[instanceIdx].position.x += correctionX;   
             instances[instanceIdx].position.y += correctionY;
@@ -349,15 +347,7 @@ void LoadLevel(uint8_t curlevel) {
     currentLevel = curlevel;
     if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
     
-    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { // Start AFTER player indices and NULLENT
-        instances[idx].modelIndex = MODEL_IDX_MAX;
-        instances[idx].texIndex = instances[idx].glowIndex = instances[idx].specIndex = instances[idx].normIndex = MATERIAL_IDX_MAX;
-        instances[idx].lodIndex = UINT16_MAX;
-        instances[idx].scale.x = instances[idx].scale.y = instances[idx].scale.z = 1.0f; // Default scale
-        instances[idx].rotation.x = instances[idx].rotation.y = instances[idx].rotation.z = 0.0f; instances[idx].rotation.w = 1.0f; // Quaternion identity (other fields left at 0.0f)
-        dirtyInstances[idx] = true;
-    }
-
+    for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
@@ -378,12 +368,10 @@ void LoadLevel(uint8_t curlevel) {
         size_t len = strlen(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
         lineSpace[--len] = '\0';
-
         line = lineSpace;
         snprintf(initialLine, sizeof(initialLine), "%s", line);
         memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
-        
         bool isLight = true;
         if (strcmp(firstKeyCheck, "constIndex") == 0) isLight = false;  // constIndex specified indicating this is a real entity?
         if (isLight) {
@@ -420,8 +408,8 @@ void LoadLevel(uint8_t curlevel) {
             
             while (data_parser_isspace((unsigned char)*key)) key++;
             while (data_parser_isspace((unsigned char)*value)) value++;
-            char trimmed_key[8192];
-            char trimmed_value[8192];
+            char trimmed_key[256];
+            char trimmed_value[256];
             snprintf(trimmed_key, sizeof(trimmed_key), "%s", key);
             snprintf(trimmed_value, sizeof(trimmed_value), "%s", value);
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
@@ -480,7 +468,7 @@ void LoadLevel(uint8_t curlevel) {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
         } else {
-            uint16_t parent = instanceIdx;
+            uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
             AddInstance(entIdx, parent, lineNum);
             AddChild0(entities[entIdx].child0, parent, entIdx, &instanceIdx, lineNum);
@@ -510,6 +498,7 @@ void LoadLevel(uint8_t curlevel) {
 
     fogBaseDensityForLevel *= 4.0f; // Global multiplier to get it to look similar to Unity's
     SetFog();
+    malloc_trim(0);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f secs\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel");
 }
@@ -558,23 +547,14 @@ void SortInstances(void) {
 
     // Step 2: Compute offsets
     uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
-    for (uint16_t i = 0; i < loadedModels; i++) {
-        modelTypeOffsetsOpaque[i] = currentOffset;
-        currentOffset += modelTypeCountsOpaque[i];
-    }
+    for (uint16_t i = 0; i < loadedModels; i++) { modelTypeOffsetsOpaque[i] = currentOffset; currentOffset += modelTypeCountsOpaque[i]; }
+    
     startOfDoubleSidedInstances = currentOffset;
-    for (uint16_t i = 0; i < loadedModels; i++) {
-        modelTypeOffsetsDoubleSided[i] = currentOffset;
-        currentOffset += modelTypeCountsDoubleSided[i];
-    }
+    for (uint16_t i = 0; i < loadedModels; i++) { modelTypeOffsetsDoubleSided[i] = currentOffset; currentOffset += modelTypeCountsDoubleSided[i]; }
     
     startOfTransparentInstances = currentOffset;
-    for (uint16_t i = 0; i < loadedModels; i++) {
-        modelTypeOffsetsTransparent[i] = currentOffset;
-        currentOffset += modelTypeCountsTransparent[i];
-    }
-
-    if ((uint32_t)(startOfTransparentInstances + transparentInstancesHead) > (uint32_t)(loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
+    for (uint16_t i = 0; i < loadedModels; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
+    if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
 
     // Step 3: Reorder instances
     Entity tempInstances[INSTANCE_COUNT];
@@ -628,10 +608,7 @@ void SortInstances(void) {
     
     // Put all the invisible entities at the end of the list now
     for (uint16_t i = 0; i < loadedInstances; ++i) {
-        if (tempInstances[i].modelIndex > loadedModels) {
-            instances[targetIdx] = tempInstances[i];
-            targetIdx++;
-        }
+        if (tempInstances[i].modelIndex > loadedModels) { instances[targetIdx] = tempInstances[i]; targetIdx++; }
     }
 
     // Update cellIndexForInstance
@@ -661,5 +638,5 @@ void SortInstances(void) {
         }
     }
 
-    DualLog("Loaded   %d ambient noises...in %f secs", loadedAmbients, get_time() - ambtime);
+    DualLog("Loaded   %d ambient noises...in %f secs\n", loadedAmbients, get_time() - ambtime);
 }

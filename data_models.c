@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <omp.h>
 #include "voxen.h"
+#include "entity.h"
 #include "vmath.h"
 #define C_STRUCT struct // #include <assimp/defs.h>
 #define ASSIMP_API
@@ -126,7 +127,7 @@ void add_mmap_cleanup(void* ptr, size_t size) {
 void cleanup_all_mmaps(void) {
     for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
     free(mmap_cleanup);
-    malloc_trim(0);
+//     malloc_trim(0); // Pay 20mb ram for fast development iteration.  TODO: Uncomment for releases!
 }
 
 void LoadModels(void) {
@@ -136,7 +137,7 @@ void LoadModels(void) {
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
 
     int32_t maxIndex = -1;
-    for (int32_t k = 0; k < model_parser.count; k++) {
+    for (uint32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
@@ -149,10 +150,8 @@ void LoadModels(void) {
     modelBounds         = mmap(NULL, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
     DebugRAM("after main mmap block");
     int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
-    for (int32_t k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index != UINT16_MAX) {
-            indexToParser[model_parser.entries[k].index] = k;
-        }
+    for (uint32_t k = 0; k < model_parser.count; k++) {
+        if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = k;
     }
     
     struct aiPropertyStore* props = aiCreatePropertyStore();
@@ -336,7 +335,7 @@ void LoadModels(void) {
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         free(modelVertices[i]);
-        malloc_trim(0);
+//         malloc_trim(0); // Pay 20mb ram for fast development iteration.  TODO: Uncomment for releases!
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
@@ -344,7 +343,7 @@ void LoadModels(void) {
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         free(modelTriangles[i]);
-        malloc_trim(0);
+//         malloc_trim(0); // Pay 20mb ram for fast development iteration.  TODO: Uncomment for releases!
     }
     
     DebugRAM("after to model to gpu transfer");

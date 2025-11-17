@@ -36,7 +36,7 @@ uniform float shadowmapSize;
 uniform mat4 viewProjection;
 uniform mat3 invViewRot;
 
-const int SSR_RES = 2; // 1/SSR_RES = scale factor, e.g. 1/4 = 25% resolution vs main screen.
+const int SSR_RES = 4; // 1/SSR_RES = scale factor, e.g. 1/4 = 25% resolution vs main screen.
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
