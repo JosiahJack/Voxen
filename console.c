@@ -124,6 +124,9 @@ void ProcessConsoleCommand(const char* command) {
             notarget = false;
         }
         commandProcessed = true;
+    } else if (strstr(ts, "cull")) {
+        settings_CullEnabled = !settings_CullEnabled;
+        CenterStatusPrint("Culling: %s", settings_CullEnabled ? stringTable[1000] : stringTable[717]);     
     } else if (strstr(ts, "notarget") || strstr(ts, "no target")) {
         notarget = !notarget;
         CenterStatusPrint("notarget: %s", notarget ? stringTable[1000] : stringTable[717]);

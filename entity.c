@@ -25,6 +25,11 @@ uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
 uint16_t doubleSidedInstancesHead = 0;
 uint16_t transparentInstancesHead = 0;
 float correctionX, correctionY, correctionZ;
+float correctionNPCX, correctionNPCY, correctionNPCZ;
+float correctionDoorsX, correctionDoorsY, correctionDoorsZ;
+float correctionDynamicsX, correctionDynamicsY, correctionDynamicsZ;
+float correctionLightsSaveableX, correctionLightsSaveableY, correctionLightsSaveableZ;
+float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticImmutableZ;
 float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
 float correctionLightX, correctionLightY, correctionLightZ;
 bool lightIsDynamic[LIGHT_COUNT];
@@ -48,6 +53,28 @@ void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, floa
         case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
         case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
         case LEVEL_CYBERSPACE: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    }
+}
+
+void GetLevel_Dynamic_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
+    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+
+    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DynamicObjectsSaveableInstantiated
+        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
+        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 2:  *ofsx = -0.98611f; *ofsy = 0.84f; *ofsz = 1.1906f; break;
+        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 5:  *ofsx = 0.0f; *ofsy = 0.07f; *ofsz = 0.0f; break;
+        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 7:  *ofsx = 0.0f; *ofsy = 0.04f; *ofsz = 0.0f; break;
+        case 8:  *ofsx = 0.0f; *ofsy = 0.16f; *ofsz = 0.0f; break;
+        case 9:  *ofsx = 0.0f; *ofsy = 0.08f; *ofsz = 0.0f; break;
+        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 11: *ofsx = 0.0f; *ofsy = 0.32f; *ofsz = 0.0f; break;
+        case 12: *ofsx = 0.0f; *ofsy = 0.2f; *ofsz = 0.0f; break;
+        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
     }
 }
@@ -306,7 +333,7 @@ void DualLogEntity(uint16_t idx) {
 
 void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX;
-    entry->entflags = 0x00000000000000000000000000000000u;
+    entry->entflags = 0x00000000000000000000000000000000u; // Bit excessive but patently obvious that every bit is off.
     flag_enable(&entry->entflags,ENTFLAG_KINEMATIC);
     
     entry->modelIndex = MODEL_IDX_MAX;
@@ -437,7 +464,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
     if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
-//     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets:
+//     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
@@ -452,16 +479,40 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+    
+    // Apply the Unity hierarchy nonsense
     if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
+        instances[instanceIdx].position.x += correctionX;   
+        instances[instanceIdx].position.y += correctionY;
+        instances[instanceIdx].position.z += correctionZ;
         if (ConstIndexIsDoor(entIdx)) {
-            instances[instanceIdx].position.x += correctionX +  0.589f;
-            instances[instanceIdx].position.y += correctionY + -0.554f;
-            instances[instanceIdx].position.z += correctionZ + -0.907f;
-        } else {
-            instances[instanceIdx].position.x += correctionX;   
-            instances[instanceIdx].position.y += correctionY;
-            instances[instanceIdx].position.z += correctionZ;
-        }
+            instances[instanceIdx].position.x += correctionDoorsX;
+            instances[instanceIdx].position.y += correctionDoorsY;
+            instances[instanceIdx].position.z += correctionDoorsZ;
+        } else if (ConstIndexIsNPC(entIdx)) {
+            instances[instanceIdx].position.x += correctionNPCX;
+            instances[instanceIdx].position.y += correctionNPCY - 1.0f; // Offset to center them up in their capsule
+            instances[instanceIdx].position.z += correctionNPCZ;
+            
+            Vector3 axis = (Vector3){0.0f, 0.0f, 1.0f}; // X-axis
+            instances[instanceIdx].rotation = axis_angle_quaternion(axis, deg2rad(-90.0f));
+        } else if (ConstIndexIsLightStaticSaveable(entIdx)) {
+            instances[instanceIdx].position.x += correctionLightX;
+            instances[instanceIdx].position.y += correctionLightY;
+            instances[instanceIdx].position.z += correctionLightZ;
+        } else if (ConstIndexIsStaticObjectSaveable(entIdx)) {
+            instances[instanceIdx].position.x += correctionStaticSaveableX;
+            instances[instanceIdx].position.y += correctionStaticSaveableY;
+            instances[instanceIdx].position.z += correctionStaticSaveableZ;
+        } else if (ConstIndexIsStaticObjectImmutable(entIdx)) {
+            instances[instanceIdx].position.x += correctionStaticImmutableX;
+            instances[instanceIdx].position.y += correctionStaticImmutableY;
+            instances[instanceIdx].position.z += correctionStaticImmutableZ;
+        } else if (ConstIndexIsDynamicObject(entIdx)) { // MUST BE LAST AS IT OVERLAPS WITH NPC AND LIGHTS SAVEABLE!
+            instances[instanceIdx].position.x += correctionDynamicsX;
+            instances[instanceIdx].position.y += correctionDynamicsY;
+            instances[instanceIdx].position.z += correctionDynamicsZ;
+        } 
     }
 
     loadedInstances++;
@@ -516,8 +567,14 @@ void LoadLevel(uint8_t curlevel) {
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[lineLengthMax];
-    GetLevel_Transform_Offsets(curlevel,&correctionX,&correctionY,&correctionZ);
-    GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel,&correctionLightX,&correctionLightY,&correctionLightZ);
+    GetLevel_Transform_Offsets(curlevel, &correctionX, &correctionY, &correctionZ);
+    GetLevel_Dynamic_ContainerOffsets(curlevel, &correctionDynamicsX, &correctionDynamicsY, &correctionDynamicsZ);
+    GetLevel_LightsStaticSaveable_ContainerOffsets(curlevel, &correctionLightsSaveableX, &correctionLightsSaveableY, &correctionLightsSaveableZ);
+    GetLevel_StaticObjectsSaveable_ContainerOffsets(curlevel, &correctionStaticSaveableX, &correctionStaticSaveableY, &correctionStaticSaveableZ);
+    GetLevel_StaticObjectsImmutable_ContainerOffsets(curlevel, &correctionStaticImmutableX, &correctionStaticImmutableY, &correctionStaticImmutableZ);
+    GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel, &correctionLightX, &correctionLightY, &correctionLightZ);
+    GetLevel_DoorsStaticSaveable_ContainerOffsets(curlevel, &correctionDoorsX, &correctionDoorsY, &correctionDoorsZ);
+    GetLevel_NPCsSaveableInstantiated_ContainerOffsets(curlevel, &correctionNPCX, &correctionNPCY, &correctionNPCZ);
     while (fgets(lineSpace, lineLengthMax, file)) {
         size_t len = strlen(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
@@ -587,8 +644,7 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "color.g") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_G] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "color.b") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_B] = parse_float(trimmed_value, initialLine, lineNum);
             } else {
-                     if (strcmp(trimmed_key, "index") == 0)           instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                     if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.x") == 0) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.y") == 0) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.z") == 0) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
@@ -608,7 +664,7 @@ void LoadLevel(uint8_t curlevel) {
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             // TODO: Set lightIsDynamic[lightsIdx] = true when light has animation data values set from file
             if (lightType == 1) {
-                if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Light %d on line %d loaded with spotAngle less than 5deg but was marked as spotlight type!\n",lightsIdx,lineNum);
+                if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Light %d on line %d loaded with spotAngle less than 5deg but was marked as spotlight type!\n",lightsIdx,lineNum+1);
             } else if (lightType == 2) {
                 // TODO: Handle directional lights for cyberspace
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light

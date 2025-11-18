@@ -3392,6 +3392,8 @@ bounceCombine: 0
 #npc_autobomb
 index: 419
 model: 299
+texture: 542
+glowtexture: 541
 mass: 1.0
 linearDrag: 0.0
 angularDrag: 1.0
@@ -3405,6 +3407,8 @@ bounceCombine: 3
 #npc_cyborg_assassin
 index: 420
 model: 306
+texture: 545
+glowtexture: 544
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 1.5
@@ -3418,6 +3422,7 @@ bounceCombine: 3
 #npc_avian_mutant
 index: 421
 model: 328
+texture: 568
 mass: 2.0
 linearDrag: 0.0
 angularDrag: 1.0
@@ -3431,6 +3436,7 @@ bounceCombine: 3
 #npc_exec_bot
 index: 422
 model: 316
+texture: 555
 mass: 2.2
 linearDrag: 0.0
 angularDrag: 1.5
@@ -3444,6 +3450,7 @@ bounceCombine: 3
 #npc_cyborg_drone
 index: 423
 model: 312
+texture: 547
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 2.0
@@ -3457,6 +3464,7 @@ bounceCombine: 3
 #npc_cortex_reaver
 index: 424
 model: 300
+texture: 543
 mass: 5.0
 linearDrag: 0.0
 angularDrag: 3.0
@@ -3470,6 +3478,7 @@ bounceCombine: 3
 #npc_cyborg_warrior
 index: 425
 model: 315
+texture: 554
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 2.0
@@ -3483,6 +3492,7 @@ bounceCombine: 3
 #npc_cyborg_enforcer
 index: 426
 model: 314
+texture: 550
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 2.2
@@ -3496,6 +3506,7 @@ bounceCombine: 3
 #npc_cyborg_elite
 index: 427
 model: 313
+texture: 548
 mass: 3.5
 linearDrag: 0.0
 angularDrag: 2.2
@@ -3509,6 +3520,7 @@ bounceCombine: 3
 #npc_cyborg_diego
 index: 428
 model: 309
+texture: 546
 mass: 2.0
 linearDrag: 0.0
 angularDrag: 2.2
@@ -3522,6 +3534,7 @@ bounceCombine: 3
 #npc_sec1_bot
 index: 429
 model: 333
+texture: 573
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 0.8
@@ -3535,6 +3548,7 @@ bounceCombine: 3
 #npc_sec2_bot
 index: 430
 model: 335
+texture: 574
 mass: 4.51
 linearDrag: 0.0
 angularDrag: 2.2
@@ -3548,6 +3562,7 @@ bounceCombine: 3
 #npc_maint_bot
 index: 431
 model: 325
+texture: 567
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 1.5
@@ -3561,6 +3576,7 @@ bounceCombine: 3
 #npc_mutant_cyborg
 index: 432
 model: 329
+texture: 569
 mass: 3.0
 linearDrag: 0.0
 angularDrag: 2.2
@@ -3574,6 +3590,7 @@ bounceCombine: 3
 #npc_hopper
 index: 433
 model: 322
+texture: 562
 mass: 1.0
 linearDrag: 0.0
 angularDrag: 1000.451
@@ -3601,6 +3618,7 @@ bounceCombine: 3
 #npc_invisomut
 index: 435
 model: 324
+texture: 565
 mass: 1.3
 linearDrag: 0.0
 angularDrag: 0.8
@@ -3614,6 +3632,7 @@ bounceCombine: 3
 #npc_virus_mutant
 index: 436
 model: 330
+texture: 576
 mass: 1.4
 linearDrag: 0.0
 angularDrag: 2.0
@@ -3627,6 +3646,7 @@ bounceCombine: 3
 #npc_servbot
 index: 437
 model: 337
+texture: 575
 mass: 2.5
 linearDrag: 0.0
 angularDrag: 1.0
@@ -3640,6 +3660,7 @@ bounceCombine: 3
 #npc_flier_bot
 index: 438
 model: 318
+texture: 558
 mass: 1.75
 linearDrag: 0.0
 angularDrag: 0.8
@@ -3653,6 +3674,7 @@ bounceCombine: 3
 #npc_zerog_mutant
 index: 439
 model: 395
+texture: 1170
 mass: 1.3
 linearDrag: 0.0
 angularDrag: 1.0
@@ -3666,6 +3688,7 @@ bounceCombine: 3
 #npc_gorilla_tiger_mutant
 index: 440
 model: 320
+texture: 560
 mass: 2.0
 linearDrag: 0.0
 angularDrag: 2.2
@@ -3679,6 +3702,7 @@ bounceCombine: 3
 #npc_repairbot
 index: 441
 model: 331
+texture: 572
 mass: 1.5
 linearDrag: 0.0
 angularDrag: 2.0
@@ -3692,6 +3716,7 @@ bounceCombine: 3
 #npc_plant_mutant
 index: 442
 model: 330
+texture: 570
 mass: 0.8
 linearDrag: 0.0
 angularDrag: 1.5

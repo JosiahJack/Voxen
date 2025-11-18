@@ -67,6 +67,9 @@ typedef struct {
 extern QuestBits questData;
 
 // ----------------------------------------------------------------------------
+// Settings
+extern uint8_t settings_CullEnabled;
+// ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32
 extern uint16_t loadedAmbients;
@@ -406,6 +409,7 @@ bool ConstIndexIsDoor(int constdex);
 bool ConstIndexIsLightStaticSaveable(int constdex);
 bool ConstIndexIsGenericTransform(int constdex);
 bool ConstIndexIsStaticObjectImmutable(int constdex);
+bool ConstIndexIsStaticObjectSaveable(int constdex);
 bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);

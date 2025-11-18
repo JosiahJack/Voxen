@@ -76,7 +76,7 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     *out_idx    = (uint32_t*)p;
     *out_map = map;
     *out_mapsz = st.st_size;
-//     DualLog("vmdl loaded: v=%u, i=%u, vert_bytes=%zu, idx_bytes=%zu\n", vcnt, icnt, vert_bytes, idx_bytes);
+//     DualLog("%s vmdl loaded: v=%u, i=%u, vert_bytes=%zu, idx_bytes=%zu\n", vmdl_path, vcnt, icnt, vert_bytes, idx_bytes);
     return true;
 }
 
@@ -334,7 +334,6 @@ void LoadModels(void) {
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
-        free(modelVertices[i]);
 //         malloc_trim(0); // Pay 20mb ram for fast development iteration.  TODO: Uncomment for releases!
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
@@ -342,7 +341,6 @@ void LoadModels(void) {
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-        free(modelTriangles[i]);
 //         malloc_trim(0); // Pay 20mb ram for fast development iteration.  TODO: Uncomment for releases!
     }
     

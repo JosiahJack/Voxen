@@ -77,6 +77,7 @@ uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
 uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
+uint8_t settings_CullEnabled = 1;
 bool settings_Vsync = false;
 float lodRangeSqrd = 38.4f * 38.4f;
 // ----------------------------------------------------------------------------
@@ -1442,13 +1443,16 @@ void RenderInstances(uint8_t type) {
         uint16_t visibleCount = 0;
         for (uint16_t i = start; i < start + count && i < startOfNextType; i++) { // Filter visible instances
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
-            if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+            float distSqrd = 0.0f;
+            if (settings_CullEnabled) {
+                if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+                
+                float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
+                                                instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+                
+                if (distSqrd >= FAR_PLANE_SQUARED) continue;
+            }
             
-            float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
-                                              instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-            
-            if (distSqrd >= FAR_PLANE_SQUARED) continue;
-
             visibleInstances[visibleCount].index = i;
             visibleInstances[visibleCount].depth = distSqrd;
             visibleCount++;
