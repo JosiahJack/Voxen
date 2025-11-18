@@ -653,7 +653,7 @@ void LoadLevel(uint8_t curlevel) {
 
 void SortInstances(void) {
     double start_time = get_time();
-    DualLog("Sorting instances...");
+    DualLog("Sorting entity instances... ");
     modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
     modelTypeCountsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
     modelTypeCountsTransparent = calloc(loadedModels,sizeof(uint16_t));
@@ -770,7 +770,6 @@ void SortInstances(void) {
         cellIndexForInstance[i] = cellZ * 64 + cellX;
     }
     
-    double ambtime = get_time();
     DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
     DualLog(" took %f secs\n", get_time() - start_time);
     // Perform post-sort registrations:
@@ -785,6 +784,4 @@ void SortInstances(void) {
             instances[i].volume = entities[entIdx].volume * 0.5f;
         }
     }
-
-    DualLog("Loaded   %d ambient noises...in %f secs\n", loadedAmbients, get_time() - ambtime);
 }

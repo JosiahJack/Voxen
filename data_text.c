@@ -42,7 +42,6 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
 }
 
 void LoadTextForLanguage(uint8_t lang) {
-    double loadtextTimeStart = get_time();
     if (stringTable) {
         for (int i = 0; i < TEXT_STRING_COUNT; ++i) {
             if (stringTable[i]) { free(stringTable[i]); stringTable[i] = NULL; }
@@ -168,12 +167,9 @@ void LoadTextForLanguage(uint8_t lang) {
 
     free(file_data);
     malloc_trim(0);
-    DualLog("Loaded %d normal text lines from %s (total lines read: %d) [%s] in %f secs\n", lineNum, textFile, totalLines, is_utf8 ? "UTF-8" : "UTF-16LE", get_time() - loadtextTimeStart);
 }
 
-void LoadLogTextForLanguage(uint8_t lang) {
-    double loadLogsTextStart = get_time();
-    
+void LoadLogTextForLanguage(uint8_t lang) {    
     // Unload language for when changing languages at runtime from settings.
     #define FREE_ARRAY(ptr, count) do { \
         if (ptr) { \
@@ -339,5 +335,4 @@ void LoadLogTextForLanguage(uint8_t lang) {
 
     free(file_data);
     malloc_trim(0);
-    DualLog("Loaded  %d logs text lines from %s (total lines read: %d) [%s] in %f secs\n", lineNum, textFile, totalLines, is_utf8 ? "UTF-8" : "UTF-16LE", get_time() - loadLogsTextStart);
 }

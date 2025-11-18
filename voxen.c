@@ -19,13 +19,18 @@
 // TODO: Save/Load system
 #include <malloc.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "event.h"
 #define VOXEN_ENGINE_IMPLEMENTATION
 #include "entity.h"
 #include "voxen.h"
 #include "vmath.h"
 #include "matvecquat.h"
+#include "External/stb_image.h"
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
 #include "Shaders/chunk_vert.glsl.h"
@@ -1197,7 +1202,7 @@ void InitializeEnvironment(void) {
         int xpos = mx + (mode->width - screen_width) / 2;
         int ypos = my + (mode->height - screen_height) / 2;
         glfwSetWindowPos(window, xpos, ypos);
-        DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\nUsing GLFW %s\n", glfwGetMonitorName(target_monitor), xpos, ypos,glfwGetVersionString());
+        DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\nUsing GLFW %s, ", glfwGetMonitorName(target_monitor), xpos, ypos,glfwGetVersionString());
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -1206,10 +1211,30 @@ void InitializeEnvironment(void) {
     const GLubyte* renderer = glGetString(GL_RENDERER);
     if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
     
-    DualLog("OpenGL Version: %s\n", (const char*)version);
-    DualLog("GPU: %s\n", renderer ? (const char*)renderer : "unknown");
-    double parallelInitStart = get_time();
-    DualLog("Window Init took %f secs\n", get_time() - init_start_time);
+    DualLog("OpenGL Version: %s, ", (const char*)version);
+    DualLog("GPU: %s", renderer ? (const char*)renderer : "unknown");
+    char cpu_brand[256] = "Unknown CPU";
+    int logical_cores = 1;
+    FILE* f = fopen("/proc/cpuinfo", "r");
+    if (f) {
+        char line[512];
+        while (fgets(line, sizeof(line), f)) {
+            if (!strncmp(line, "model name", 10)) {
+                char* colon = strchr(line, ':');
+                if (colon) {
+                    strncpy(cpu_brand, colon + 2, sizeof(cpu_brand) - 1);
+                    char* nl = strchr(cpu_brand, '\n');
+                    if (nl) *nl = '\0';
+                }
+                break;
+            }
+        }
+        fclose(f);
+    }
+    logical_cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (logical_cores <= 0) logical_cores = 1;
+    DualLog("CPU: %s | Logical cores: %d\n", cpu_brand, logical_cores);
+    
     #pragma omp parallel num_threads(4)
     {
         if (omp_get_thread_num() == 0) {
@@ -1333,8 +1358,29 @@ void InitializeEnvironment(void) {
         }
     }
     
+    glfwSetWindowTitle(window,global_modname);
+    int fp = open("./Textures/UI/menudot1.png", O_RDONLY);
+    if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png: %s\n", strerror(errno)); exit(1); }
+            
+    struct stat file_stat;
+    fstat(fp, &file_stat);
+    size_t file_size = file_stat.st_size;            
+    uint8_t* file_buffer = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fp, 0);
+    close(fp);
+    if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap ./Textures/UI/menudot1.png\n"); exit(1); }
+                
+    int w = 1, h = 1, n = 1;
+    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, 4);
+    if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
+
+    GLFWimage image;
+    image.width  = w;
+    image.height = h;
+    image.pixels = pixels;
+    glfwSetWindowIcon(window, 1, &image);
+    free(pixels);
     RenderLoadingProgress(100,"Loading textures...");
-    DualLog("Parallel Inits took %f secs\n", get_time() - parallelInitStart);
+    DualLog("Parallel Inits and window init took %f secs\n", get_time() - init_start_time);
     LoadTextures(); // Sequential due to GPU transfers
     RenderLoadingProgress(100,"Loading models...");
     LoadModels(); // Sequential due to GPU transfers
