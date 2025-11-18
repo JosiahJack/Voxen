@@ -33,30 +33,12 @@ gen_header ./Shaders/composite_frag.glsl        quadFragmentShaderSource
 gen_header ./Shaders/shadowmap_vert.glsl        shadowmapVertexShaderSource
 gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
 
-export CC="ccache gcc"
+export CC="gcc"
 CC=gcc
+export LD=mold
 CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
-LDFLAGS="-flto=auto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGL -lfontconfig -fopenmp"
-SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c data_text.c entity.c"
-declare -A static_files=(
-    ["./glad.c"]="glad.c.o"
-    ["./data_models.c"]="data_models.c.o"
-    ["./data_textures.c"]="data_textures.c.o"
-    ["./data_fonts.c"]="data_fonts.c.o"
-)
-
-for src in "${!static_files[@]}"; do
-    obj_name="${static_files[$src]}"
-    dst="$TEMP_DIR/$obj_name"
-    prebuilt="./$obj_name"
-    if [ -f "$src" ] && [ "$src" -nt "$prebuilt" ]; then
-        echo "Rebuilding $src → $obj_name (source changed)"
-        $CC -c "$src" $CFLAGS -o "$dst"
-        cp "$dst" "$prebuilt"  # update the shipped version
-    else
-        cp "$prebuilt" "$dst"
-    fi
-done
+LDFLAGS="-fuse-ld=mold -flto=auto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGL -lfontconfig -fopenmp"
+SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c data_text.c entity.c data_textures.c data_models.c data_fonts.c glad.c"
 export CC=gcc
 export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
 export TEMP_DIR=temp_build
@@ -67,6 +49,7 @@ if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
     exit 1
 fi
+
 rm -f "$TEMP_DIR"/*.o ./Shaders/*.h
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))

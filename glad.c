@@ -21,8 +21,6 @@
 extern "C" {
 #endif
 
-
-
 int GLAD_GL_VERSION_1_0 = 0;
 int GLAD_GL_VERSION_1_1 = 0;
 int GLAD_GL_VERSION_1_2 = 0;
@@ -48,8 +46,6 @@ int GLAD_GL_ARB_shader_storage_buffer_object = 0;
 int GLAD_GL_ARB_texture_storage = 0;
 int GLAD_GL_ARB_texture_view = 0;
 int GLAD_GL_KHR_debug = 0;
-
-
 
 PFNGLACTIVESHADERPROGRAMPROC glad_glActiveShaderProgram = NULL;
 PFNGLACTIVETEXTUREPROC glad_glActiveTexture = NULL;
