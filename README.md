@@ -64,11 +64,11 @@ Build by calling ./build.sh build script.
 ### Prerequisites
 
 Project must be linked against the following libraries which your system must install.  I'll continue to reduce these as much as I can:
- * -lglfw (`sudo apt install libglfw3-dev`)
+ * mold linker
  * -lGL (`sudo apt install libgl1-mesa-dev`)
- * -lm
- * -lrt
  * -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ (Prebuilt, included in ./External/, for model loading from .fbx (for now))
+ * libstdc++
+ * -lfontconfig
  * -fopenmp
 
 Single command:
@@ -233,27 +233,22 @@ Log ouput from standard run:
 
 ```
 Compiling voxen...
-Shaders converted to string constants in 13 ms
-Linking completed in 128 ms
-Build completed in 1783 ms
-Voxen v0.7.2 by W. Josiah Jack, MIT-0 licensed
+Build completed in 323 ms
+Voxen v0.7.4 by W. Josiah Jack, MIT-0 licensed
 Window positioned (windowed, centered) on monitor: DVI-I-1 (primary) at 2717,141
-OpenGL Version: 4.3.0 NVIDIA 550.144.03
-GPU: NVIDIA GeForce GTX 970/PCIe/SSE2
-Loading fonts(2)... took 0.029695
-Loading game definition from ./Data/gamedata.txt... loaded Game Definition for Citadel:: num levels: 14, start level: 1
-Window and GL Init took 0.139654 seconds
-Loading textures(1267) with max index 1266, using stb_image version:  2.28... total pallete colors: 79391, totalPixels was: 33438148... 
- took 0.241318 seconds
-Loading   models( 672) with max index  671, using    Assimp version: 6.0.2... took 0.609319 seconds
-Loading  755 entities... took 0.000400 seconds
-Loaded 6054 geometry chunks and 892 static lights for Level 1... took 0.020778 seconds
-Sorting instances... took 0.002496 secs
-Total opaque instances: 5427, double-sided: 42, transparent: 40, invisible: 545
-Culling...Found 1170 open cells for level 1, Found closed edges north: 368, south: 364, east: 337, west: 341... took 0.087656 seconds
-Generating voxel lighting data... took 0.016571 seconds, total list size: 1008105
-Rendering shadowmaps... took 0.482151 seconds to render 892 static shadow maps
-Game Initialized in 1.602535 secs
+Using GLFW 3.5.0 Wayland X11 GLX Null EGL OSMesa monotonic, OpenGL Version: 4.3.0 NVIDIA 550.144.03, GPU: NVIDIA GeForce GTX 970/PCIe/SSE2CPU: AMD Ryzen 5 5500 | Logical cores: 12
+Loading game definition from ./Data/gamedata.txt... loaded Game Definition for Citadel:: num levels: 14, start level: 1... took 0.000256 secs
+Loaded    2 fonts...in 0.019 s
+Parallel Inits and window init took 0.141993 secs
+Loading textures(1271) with max index 1270, using stb_image version:  2.28... total pallete colors: 80227, total pixels: 34152900... took 0.136199 secs
+Loading   models( 698) with max index  697 ... total vertices: 57506112, total tris: 7188264, took 0.064184 secs
+Loading  756 entities... took 0.000910 secs
+Loaded 6056 geometry chunks and 893 static lights for Level 1... took 0.021124 secs
+Sorting entity instances... opaque: 5461, double-sided: 42, transparent: 40, invisible: 510... took 0.007388 secs
+Culling...found 1170 open cells, closed edges N: 368, S: 364, E: 337, W: 341... took 0.129602 secs
+Number of lights with shadows: 893
+0 dynamic lights in level 1
+Game Initialized in 0.553212 secs
 ```
 
 Log output from one run with DEBUG_RAM_OUTPUT declared in voxen.h:
