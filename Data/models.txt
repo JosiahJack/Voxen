@@ -636,8 +636,8 @@ index: 307
 index: 308
 #Models/npc_cyborg_diego_die.fbx
 index: 309
-// #Models/npc_cyborg_diego.fbx
-// index: 310
+#Models/npc_cyborg_diego.fbx
+index: 310
 #Models/npc_cyborg_diegoteleportfx.fbx
 index: 311
 #Models/npc_cyborg_drone.fbx
@@ -670,8 +670,7 @@ index: 324
 index: 325
 #Models/npc_maintenancebot_gibs.fbx
 index: 326
-#Models/npc_mutant_avian_corpse.fbx
-index: 327
+
 #Models/npc_mutant_avian.fbx
 index: 328
 #Models/npc_mutant_cyborg.fbx
@@ -694,296 +693,7 @@ index: 336
 index: 337
 #Models/npc_servbot_gibs.fbx
 index: 338
-#Models/npc_zerogmut100.fbx
-index: 339
-#Models/npc_zerogmut101.fbx
-index: 340
-#Models/npc_zerogmut102.fbx
-index: 341
-#Models/npc_zerogmut103.fbx
-index: 342
-#Models/npc_zerogmut104.fbx
-index: 343
-#Models/npc_zerogmut105.fbx
-index: 344
-#Models/npc_zerogmut106.fbx
-index: 345
-#Models/npc_zerogmut107.fbx
-index: 346
-#Models/npc_zerogmut108.fbx
-index: 347
-#Models/npc_zerogmut109.fbx
-index: 348
-#Models/npc_zerogmut10.fbx
-index: 349
-#Models/npc_zerogmut110.fbx
-index: 350
-#Models/npc_zerogmut111.fbx
-index: 351
-#Models/npc_zerogmut112.fbx
-index: 352
-#Models/npc_zerogmut113.fbx
-index: 353
-#Models/npc_zerogmut114.fbx
-index: 354
-#Models/npc_zerogmut115.fbx
-index: 355
-#Models/npc_zerogmut116.fbx
-index: 356
-#Models/npc_zerogmut117.fbx
-index: 357
-#Models/npc_zerogmut118.fbx
-index: 358
-#Models/npc_zerogmut119.fbx
-index: 359
-#Models/npc_zerogmut11.fbx
-index: 360
-#Models/npc_zerogmut120.fbx
-index: 361
-#Models/npc_zerogmut121.fbx
-index: 362
-#Models/npc_zerogmut122.fbx
-index: 363
-#Models/npc_zerogmut123.fbx
-index: 364
-#Models/npc_zerogmut124.fbx
-index: 365
-#Models/npc_zerogmut125.fbx
-index: 366
-#Models/npc_zerogmut126.fbx
-index: 367
-#Models/npc_zerogmut127.fbx
-index: 368
-#Models/npc_zerogmut128.fbx
-index: 369
-#Models/npc_zerogmut129.fbx
-index: 370
-#Models/npc_zerogmut12.fbx
-index: 371
-#Models/npc_zerogmut130.fbx
-index: 372
-#Models/npc_zerogmut131.fbx
-index: 373
-#Models/npc_zerogmut132.fbx
-index: 374
-#Models/npc_zerogmut133.fbx
-index: 375
-#Models/npc_zerogmut134.fbx
-index: 376
-#Models/npc_zerogmut135.fbx
-index: 377
-#Models/npc_zerogmut136.fbx
-index: 378
-#Models/npc_zerogmut137.fbx
-index: 379
-#Models/npc_zerogmut138.fbx
-index: 380
-#Models/npc_zerogmut139.fbx
-index: 381
-#Models/npc_zerogmut13.fbx
-index: 382
-#Models/npc_zerogmut140.fbx
-index: 383
-#Models/npc_zerogmut141.fbx
-index: 384
-#Models/npc_zerogmut142.fbx
-index: 385
-#Models/npc_zerogmut143.fbx
-index: 386
-#Models/npc_zerogmut144.fbx
-index: 387
-#Models/npc_zerogmut145.fbx
-index: 388
-#Models/npc_zerogmut14.fbx
-index: 389
-#Models/npc_zerogmut15.fbx
-index: 390
-#Models/npc_zerogmut16.fbx
-index: 391
-#Models/npc_zerogmut17.fbx
-index: 392
-#Models/npc_zerogmut18.fbx
-index: 393
-#Models/npc_zerogmut19.fbx
-index: 394
-#Models/npc_zerogmut1.fbx
-index: 395
-#Models/npc_zerogmut20.fbx
-index: 396
-#Models/npc_zerogmut21.fbx
-index: 397
-#Models/npc_zerogmut22.fbx
-index: 398
-#Models/npc_zerogmut23.fbx
-index: 399
-#Models/npc_zerogmut24.fbx
-index: 400
-#Models/npc_zerogmut25.fbx
-index: 401
-#Models/npc_zerogmut26.fbx
-index: 402
-#Models/npc_zerogmut27.fbx
-index: 403
-#Models/npc_zerogmut28.fbx
-index: 404
-#Models/npc_zerogmut29.fbx
-index: 405
-#Models/npc_zerogmut2.fbx
-index: 406
-#Models/npc_zerogmut30.fbx
-index: 407
-#Models/npc_zerogmut31.fbx
-index: 408
-#Models/npc_zerogmut32.fbx
-index: 409
-#Models/npc_zerogmut33.fbx
-index: 410
-#Models/npc_zerogmut34.fbx
-index: 411
-#Models/npc_zerogmut35.fbx
-index: 412
-#Models/npc_zerogmut36.fbx
-index: 413
-#Models/npc_zerogmut37.fbx
-index: 414
-#Models/npc_zerogmut38.fbx
-index: 415
-#Models/npc_zerogmut39.fbx
-index: 416
-#Models/npc_zerogmut3.fbx
-index: 417
-#Models/npc_zerogmut40.fbx
-index: 418
-#Models/npc_zerogmut41.fbx
-index: 419
-#Models/npc_zerogmut42.fbx
-index: 420
-#Models/npc_zerogmut43.fbx
-index: 421
-#Models/npc_zerogmut44.fbx
-index: 422
-#Models/npc_zerogmut45.fbx
-index: 423
-#Models/npc_zerogmut46.fbx
-index: 424
-#Models/npc_zerogmut47.fbx
-index: 425
-#Models/npc_zerogmut48.fbx
-index: 426
-#Models/npc_zerogmut49.fbx
-index: 427
-#Models/npc_zerogmut4.fbx
-index: 428
-#Models/npc_zerogmut50.fbx
-index: 429
-#Models/npc_zerogmut51.fbx
-index: 430
-#Models/npc_zerogmut52.fbx
-index: 431
-#Models/npc_zerogmut53.fbx
-index: 432
-#Models/npc_zerogmut54.fbx
-index: 433
-#Models/npc_zerogmut55.fbx
-index: 434
-#Models/npc_zerogmut56.fbx
-index: 435
-#Models/npc_zerogmut57.fbx
-index: 436
-#Models/npc_zerogmut58.fbx
-index: 437
-#Models/npc_zerogmut59.fbx
-index: 438
-#Models/npc_zerogmut5.fbx
-index: 439
-#Models/npc_zerogmut60.fbx
-index: 440
-#Models/npc_zerogmut61.fbx
-index: 441
-#Models/npc_zerogmut62.fbx
-index: 442
-#Models/npc_zerogmut63.fbx
-index: 443
-#Models/npc_zerogmut64.fbx
-index: 444
-#Models/npc_zerogmut65.fbx
-index: 445
-#Models/npc_zerogmut66.fbx
-index: 446
-#Models/npc_zerogmut67.fbx
-index: 447
-#Models/npc_zerogmut68.fbx
-index: 448
-#Models/npc_zerogmut69.fbx
-index: 449
-#Models/npc_zerogmut6.fbx
-index: 450
-#Models/npc_zerogmut70.fbx
-index: 451
-#Models/npc_zerogmut71.fbx
-index: 452
-#Models/npc_zerogmut72.fbx
-index: 453
-#Models/npc_zerogmut73.fbx
-index: 454
-#Models/npc_zerogmut74.fbx
-index: 455
-#Models/npc_zerogmut75.fbx
-index: 456
-#Models/npc_zerogmut76.fbx
-index: 457
-#Models/npc_zerogmut77.fbx
-index: 458
-#Models/npc_zerogmut78.fbx
-index: 459
-#Models/npc_zerogmut79.fbx
-index: 460
-#Models/npc_zerogmut7.fbx
-index: 461
-#Models/npc_zerogmut80.fbx
-index: 462
-#Models/npc_zerogmut81.fbx
-index: 463
-#Models/npc_zerogmut82.fbx
-index: 464
-#Models/npc_zerogmut83.fbx
-index: 465
-#Models/npc_zerogmut84.fbx
-index: 466
-#Models/npc_zerogmut85.fbx
-index: 467
-#Models/npc_zerogmut86.fbx
-index: 468
-#Models/npc_zerogmut87.fbx
-index: 469
-#Models/npc_zerogmut88.fbx
-index: 470
-#Models/npc_zerogmut89.fbx
-index: 471
-#Models/npc_zerogmut8.fbx
-index: 472
-#Models/npc_zerogmut90.fbx
-index: 473
-#Models/npc_zerogmut91.fbx
-index: 474
-#Models/npc_zerogmut92.fbx
-index: 475
-#Models/npc_zerogmut93.fbx
-index: 476
-#Models/npc_zerogmut94.fbx
-index: 477
-#Models/npc_zerogmut95.fbx
-index: 478
-#Models/npc_zerogmut96.fbx
-index: 479
-#Models/npc_zerogmut97.fbx
-index: 480
-#Models/npc_zerogmut98.fbx
-index: 481
-#Models/npc_zerogmut99.fbx
-index: 482
-#Models/npc_zerogmut9.fbx
-index: 483
+
 #Models/papers01.fbx
 index: 484
 #Models/papers02.fbx
@@ -1203,8 +913,7 @@ index: 591
 index: 592
 #Models/skull.fbx
 index: 593
-#Models/skysphere.fbx
-index: 594
+
 #Models/sleeping_cables.fbx
 index: 595
 #Models/sparkingwire.fbx
@@ -1255,10 +964,7 @@ index: 617
 index: 618
 #Models/table.fbx
 index: 619
-#Models/test_cube.fbx
-index: 620
-#Models/test_light.fbx
-index: 621
+
 #Models/testtube.fbx
 index: 622
 #Models/thermos.fbx
@@ -1309,8 +1015,7 @@ index: 644
 index: 645
 #Models/w_mk3.fbx
 index: 646
-#Models/w_muzzleflashcard.fbx
-index: 647
+
 #Models/workerhelmet.fbx
 index: 648
 #Models/w_pipe.fbx
@@ -1377,8 +1082,7 @@ index: 678
 index: 679
 #Models/battery_collider.fbx
 index: 680
-#Models/npc_security3.fbx
-index: 681
+
 #Models/beaker_collider.fbx
 index: 682
 #Models/beverage_collider.fbx

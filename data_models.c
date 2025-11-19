@@ -76,7 +76,7 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     *out_idx    = (uint32_t*)p;
     *out_map = map;
     *out_mapsz = st.st_size;
-    DualLog("%s vmdl loaded: v=%u, i=%u, vert_bytes=%zu, idx_bytes=%zu\n", vmdl_path, vcnt, icnt, vert_bytes, idx_bytes);
+//     DualLog("%s vmdl loaded: v=%u, i=%u, vert_bytes=%zu, idx_bytes=%zu\n", vmdl_path, vcnt, icnt, vert_bytes, idx_bytes);
     return true;
 }
 
