@@ -6,8 +6,7 @@ layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
 
-uniform uint texIndex;
-uniform uint glowSpecIndex;
+// uniform uint glowSpecIndex;
 uniform uint normInstanceIndex;
 uniform mat4 matrix;
 uniform mat4 viewProjection;
@@ -16,15 +15,9 @@ uniform uint isUI;
 out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
-flat out uint TexIndex;
-flat out uint GlowIndex;
-flat out uint SpecIndex;
 flat out uint NormalIndex;
 
 void main() {
-    TexIndex = texIndex;
-    GlowIndex = glowSpecIndex & 0xFFFFu;
-    SpecIndex = (glowSpecIndex >> 16);
     NormalIndex = normInstanceIndex;
     if (isUI > 0) {
         TexCoord = aNormal.xy; // uiImageVAO only has pos and uvs so uvs are at location 1 (2nd)

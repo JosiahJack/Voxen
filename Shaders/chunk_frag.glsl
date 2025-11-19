@@ -21,6 +21,9 @@ uniform uint reflectionsEnabled;
 uniform uint shadowsEnabled;
 uniform float shadowmapSize;
 uniform uint unlit;
+uniform uint texIndex;
+uniform uint glowIndex;
+uniform uint specIndex;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -131,7 +134,7 @@ void main() {
     float distToPixel = length(viewDir);
     viewDir = normalize(viewDir);
     int texIndexChecked = 0;
-    if (TexIndex >= 0) texIndexChecked = int(TexIndex); 
+    if (texIndex >= 0) texIndexChecked = int(texIndex); 
     ivec2 texSize = textureSizes[texIndexChecked];
     vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
     ivec2 pixel = ivec2(uv);
@@ -165,23 +168,23 @@ void main() {
     }
 
     vec4 glowColor = vec4(0.0,0.0,0.0,0.0);
-    if (GlowIndex != BLACK_TEXTURE_IDX) {
-        ivec2 texSizeGlow = textureSizes[GlowIndex];
+    if (glowIndex != BLACK_TEXTURE_IDX) {
+        ivec2 texSizeGlow = textureSizes[glowIndex];
         vec2 uvGlow = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
         int xGlow = int(floor(uvGlow.x * float(texSizeGlow.x)));
         int yGlow = int(floor(uvGlow.y * float(texSizeGlow.y)));
         ivec2 texUVGlow = ivec2(xGlow,yGlow);
-        glowColor = getTextureColor(GlowIndex,texUVGlow);
+        glowColor = getTextureColor(glowIndex,texUVGlow);
     }
 
     if (reflectionsEnabled > 0) {
         vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
-        ivec2 texSizeSpec = textureSizes[SpecIndex];
+        ivec2 texSizeSpec = textureSizes[specIndex];
         vec2 uvSpec = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
         int xSpec = int(floor(uvSpec.x * float(texSizeSpec.x)));
         int ySpec = int(floor(uvSpec.y * float(texSizeSpec.y)));
         ivec2 texUVSpec = ivec2(xSpec,ySpec);
-        vec4 specColor = getTextureColor(SpecIndex,texUVSpec);
+        vec4 specColor = getTextureColor(specIndex,texUVSpec);
         vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
                                 uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
                                 uintBitsToFloat(packColor(normalPack)),
@@ -235,11 +238,11 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0 && shadowIndex < 1600) {
-            float NdL = max(dot(normal, normalize(toLight)), 0.0);
+            float NdL = max(dot(normal, toLight), 0.0);
             float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
-            float biasBase = ((0.125 * (1.0 - attenuation) * (1.0 - attenuation))) - 0.02;
-            float bias = clamp(biasBase, 0.01, 1.0) + 0.1;
-            bias += (1.0 - NdL) * 0.07;
+            float invertAtten = 1.0 - attenuation;
+            float biasBase = ((0.14 * invertAtten * invertAtten));
+            float bias = clamp(biasBase, 0.01, 1.0) + (distOverRange * distOverRange * 0.54) + 0.08;
             bias = 2.0 * dist * bias + bias * bias;
             vec3 a = abs(-toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
@@ -259,7 +262,7 @@ void main() {
             uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
             uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
             vec2 tc = uv * shadowmapSize;
-            if (shadowsEnabled > 1 && distToPixel < 10.0) {
+            if (shadowsEnabled > 1 && distToPixel < 20.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
                 float invSamples = 1.0 / float(PCF_SAMPLES);

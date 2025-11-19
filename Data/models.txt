@@ -1096,8 +1096,7 @@ index: 537
 index: 538
 #Models/reac6_3.fbx
 index: 539
-#Models/saturn.fbx
-index: 540
+
 #Models/sci1_1d.fbx
 index: 541
 #Models/sci1_1_slice45_top_lh.fbx

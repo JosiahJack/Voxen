@@ -36,13 +36,14 @@ gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
 export CC="gcc"
 CC=gcc
 export LD=mold
-CFLAGS="-flto=auto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
-LDFLAGS="-fuse-ld=mold -flto=auto -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGL -lfontconfig -fopenmp"
+CFLAGS="-flto -pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -fdata-sections -ffunction-sections -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
+LDFLAGS="-fuse-ld=mold -Wl,--gc-sections -flto -L./External -lz -lstdc++ -static-libstdc++ -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lm -lGL -lfontconfig -fopenmp"
 SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c data_text.c entity.c data_textures.c data_models.c data_fonts.c glad.c"
 export CC=gcc
 export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fno-stack-protector -g0 -fopenmp -std=c11 -Wall -Wextra -Og"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
+cp ./External/assimp/*.o "$TEMP_DIR"/
 $CC "$TEMP_DIR"/*.o -o voxen $LDFLAGS
 link_status=$?
 if [ $link_status -ne 0 ]; then

@@ -133,7 +133,7 @@ GLuint inputImageID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; /
 //    Chunk Geometery Unlit Raster Shader
 GLuint chunkShaderProgram;
 GLuint vao_chunk; // Vertex Array Object
-GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowSpecIndexLoc_chunk, normInstanceIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
+GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowIndexLoc_chunk, specIndexLoc_chunk, normInstanceIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
       worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk,
       isUILoc_chunk, unlitLoc_chunk;
       
@@ -303,7 +303,8 @@ void CompileShaders(void) {
     viewProjLoc_chunk = glGetUniformLocation(chunkShaderProgram, "viewProjection");
     matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
     texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
-    glowSpecIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowSpecIndex");
+    glowIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowIndex");
+    specIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "specIndex");
     normInstanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
     debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
     debugValueLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugValue");
@@ -935,7 +936,8 @@ void RenderUIImages() {
 
         if (vertexCount > 0) {
             glUniform1ui(texIndexLoc_chunk, currentTex);
-            glUniform1ui(glowSpecIndexLoc_chunk,     BLACK_TEXTURE_IDX);
+            glUniform1ui(glowIndexLoc_chunk, BLACK_TEXTURE_IDX);
+            glUniform1ui(specIndexLoc_chunk, BLACK_TEXTURE_IDX);
             glUniform1ui(normInstanceIndexLoc_chunk, BLACK_TEXTURE_IDX);
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, (float[16]){1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1});
             glNamedBufferData(uiImageVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
@@ -1467,12 +1469,13 @@ void RenderInstances(uint8_t type) {
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
             uint32_t texIndex = instances[i].texIndex;
-            uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-            uint32_t specdex = (uint32_t)instances[i].specIndex;
-            uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
+//             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
+//             uint32_t specdex = (uint32_t)instances[i].specIndex;
+//             uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
             uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
             glUniform1ui(texIndexLoc_chunk, texIndex);
-            glUniform1ui(glowSpecIndexLoc_chunk, glowSpecPack);
+            glUniform1ui(glowIndexLoc_chunk, (uint32_t)instances[i].glowIndex);
+            glUniform1ui(specIndexLoc_chunk, (uint32_t)instances[i].specIndex);
             glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
