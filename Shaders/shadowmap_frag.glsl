@@ -10,7 +10,7 @@ void main() {
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     int ssbo_index = ssbo_indexBase + texelCoord.y * shadowmapSize + texelCoord.x;
     vec3 toLight = lightPos - FragPos;
-    float dist = dot(toLight,toLight);
-    uint distInt = uint(dist * 10.0);
+    float dist = length(toLight);
+    uint distInt = uint(dist * 10000.0);
     atomicMin(depthData[ssbo_index], distInt);
 }

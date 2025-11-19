@@ -109,6 +109,8 @@ extern GLuint* tbos;
 extern uint16_t loadedTextures;
 extern uint16_t loadedModels;
 extern uint16_t loadedLights;
+extern uint16_t numDynamicLights;
+extern uint32_t totalShadowmapPixels;
 extern uint16_t gameObjectCount;
 extern uint32_t* modelVertexCounts;
 extern uint32_t* modelTriangleCounts;
@@ -142,12 +144,19 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
 #define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
+
 #define MAX_SHADOWMAPS 128u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
 extern bool lightIsDynamic[LIGHT_COUNT];
+extern GLuint shadowMapSSBO;
+void VoxelLists();
+extern GLuint shadowmapsClearShaderProgram;
+void RenderShadowmaps(void);
+void RenderLoadingProgress(int32_t offset, const char* format, ...);
 
 // Levels / Game Management
 #define LEVEL_CYBERSPACE 13

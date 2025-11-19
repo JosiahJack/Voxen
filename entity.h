@@ -111,5 +111,4 @@ void InitializeEntity(Entity* entry);
 void DualLogEntity(uint16_t idx);
 void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
-void SortInstances(void);
 #endif // VOXEN_ENTITY_H

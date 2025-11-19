@@ -145,9 +145,8 @@ GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
 GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightPosLoc_shadowmaps, ssbo_indexBaseLoc_shadowmaps,
       shadowmapSizeLoc_shadowmaps, viewProjArrayLoc_shadowmaps;
-GLuint shadowMapSSBO; // SSBO for storing all shadow maps
+GLuint shadowMapSSBO;
 uint32_t totalShadowmapPixels = 0;
-uint32_t shadSizeSquared = SHADOW_MAP_SIZE * SHADOW_MAP_SIZE;
 
 //    SSR (Screen Space Reflections)
 #define SSR_RES 4 // 50% of render resolution.
@@ -227,7 +226,7 @@ GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnab
 uint32_t* voxelLightListsRaw = NULL;
 uint32_t* voxelLightListIndices = NULL;
 uint32_t* shadowmapIndirectionList = NULL;
-uint32_t numDynamicLights;
+uint16_t numDynamicLights;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
 float lightsRangeSquared[LIGHT_COUNT] = {0.0f};
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
@@ -755,7 +754,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 
     glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
     for (uint8_t face = 0; face < 6; face++) {
-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, (shadowmapIndirectionList[lightIdx] * (6 * shadSizeSquared)) + (face * shadSizeSquared));
+        glUniform1i(ssbo_indexBaseLoc_shadowmaps, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -1108,9 +1107,7 @@ void InitializePlayer(uint16_t playerIdx) {
 
 void NewGame(void) {
     RenderLoadingProgress(100,"Loading new game...");
-    levelCurrentlyLoading = true;
     memset(&ambientRegistry, 0, sizeof(uint16_t));
-    loadedAmbients = 0;
     memset(&questData, 0, sizeof(QuestBits));
     questData.lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
     questData.lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
@@ -1118,33 +1115,11 @@ void NewGame(void) {
     questData.lev4SecCode = random_range_u8(0u,9u);
     questData.lev5SecCode = random_range_u8(0u,9u);
     questData.lev6SecCode = random_range_u8(0u,9u);
-    renderableCount = 0;
-    loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    InitializePlayer(PLAYER1);
-    InitializePlayer(PLAYER2);
-    loadedLights = 0;
+    memset(instances,0,3 * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    InitializePlayer(PLAYER1); InitializePlayer(PLAYER2);
+    levelCurrentlyLoading = true;
     LoadLevel(startLevel); // Must be after entities!
-    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
-//     RenderLoadingProgress(110,"Loading cull system...");
-    CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
-//     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    glClearColor(0.0f, 0.0f, 0.0f, 0.2f); // Set after shadowmap rendering.
-    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
-    VoxelLists();
-    uint32_t shadowmapPixelCount = shadSizeSquared * 6u;
-    totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
-    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    glUseProgram(shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    numDynamicLights = 0;
-    for (int i=0;i<loadedLights;++i) { if (lightIsDynamic[i]) numDynamicLights++; }
-    DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
     pauseRelativeTime = 0.0f;
-    levelCurrentlyLoading = false;
-//     DualLogEntity(PLAYER1);
 }
 
 static const float quadBlit_vertices[] = {
@@ -1450,7 +1425,7 @@ void RenderInstances(uint8_t type) {
                 if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
                 
                 float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
-                                                instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+                                                  instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
                 
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
             }
@@ -1464,19 +1439,15 @@ void RenderInstances(uint8_t type) {
         if (visibleCount == 0) continue;
         
         if (type == REND_TRANSPARENT) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
-        else qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+        else                          qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
         
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
             uint32_t texIndex = instances[i].texIndex;
-//             uint32_t glowdex = (uint32_t)instances[i].glowIndex;
-//             uint32_t specdex = (uint32_t)instances[i].specIndex;
-//             uint32_t glowSpecPack = (glowdex & 0xFFFFu) | ((specdex & 0xFFFFu) << 16);
-            uint32_t normInstancePack = (uint32_t)instances[i].normIndex;
             glUniform1ui(texIndexLoc_chunk, texIndex);
             glUniform1ui(glowIndexLoc_chunk, (uint32_t)instances[i].glowIndex);
             glUniform1ui(specIndexLoc_chunk, (uint32_t)instances[i].specIndex);
-            glUniform1ui(normInstanceIndexLoc_chunk, normInstancePack);
+            glUniform1ui(normInstanceIndexLoc_chunk, (uint32_t)instances[i].normIndex);
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, &modelMatrices[i * 16]);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1569,12 +1540,10 @@ int32_t main(int32_t argc, char* argv[]) {
     }
 
     InitializeEnvironment();
-    double last_physics_time = get_time();
+//     double last_physics_time = get_time();
     last_time = get_time();
-    DebugRAM("prior to game loop");
-    Input_MouselookApply();
     lastJournalWriteTime = get_time();
-    RenderShadowmaps();
+    DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - game_start_time);
     while(1) {
         current_time = get_time();
@@ -1591,9 +1560,9 @@ int32_t main(int32_t argc, char* argv[]) {
         // Enqueue input events
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
-        timeSinceLastPhysicsTick = current_time - last_physics_time;
+//         timeSinceLastPhysicsTick = current_time - last_physics_time;
 //         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
-            last_physics_time = current_time;
+//             last_physics_time = current_time;
             EnqueueEvent_Simple(EV_PHYSICS_TICK);
 //         }
 

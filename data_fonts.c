@@ -1,7 +1,9 @@
 // data_fonts.c - Load Font Atlasses
 // #include "voxen.h" limited includes
+// #define FONT_GEN // Turn on when wanting to rebuild Font Atlases
 #include <malloc.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include "./External/glad/gl.h"
@@ -14,16 +16,20 @@
 #define STBTT_fabs(x)      vabs(x)
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
-#include <fontconfig/fontconfig.h>
+#ifdef FONT_GEN
+    #include <fontconfig/fontconfig.h>
+#endif
 int close (int filedes); // #include <unistd.h>
 
 #define MAX_FALLBACK_FONTS 32
-static char *xstrdup(const char *s) {
-    size_t len = strlen(s) + 1;
-    char *p = malloc(len);
-    if (p) memcpy(p, s, len);
-    return p;
-}
+#ifdef FONT_GEN
+    static char *xstrdup(const char *s) {
+        size_t len = strlen(s) + 1;
+        char *p = malloc(len);
+        if (p) memcpy(p, s, len);
+        return p;
+    }
+#endif
 #define strdup xstrdup
 // ----------------------------------------------------------------------------
 // Text
@@ -48,9 +54,11 @@ typedef struct {
 static stbtt_fontinfo primaryFontInfo;
 static stbtt_fontinfo secondaryFontInfo;
 static unsigned char *primaryFontData;
-static int32_t numFallbackFonts = 0;
-static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
-static FcConfig *fontCfg = NULL;
+#ifdef FONT_GEN
+    static int32_t numFallbackFonts = 0;
+    static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
+    static FcConfig *fontCfg = NULL;
+#endif
 
 typedef struct {
     int32_t first;   // first codepoint in range
@@ -139,6 +147,7 @@ float TextWidth(const char *utf8, int fontID) {
     return width;
 }
 
+#ifdef FONT_GEN
 static LoadedFont *LoadFallbackFont(const char *path) {
     for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
         if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
@@ -220,6 +229,7 @@ static void write_font_cache(const char *path, uint32_t expected_glyphs, const u
     fwrite(bitmap, 1, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, f);
     fclose(f);
 }
+#endif
 
 static bool load_font_cache(const char *path, uint32_t expected_glyphs, const uint8_t expected_md5[16], stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
     int fd = open(path, O_RDONLY);
@@ -306,6 +316,7 @@ void InitFontAtlasses(void) {
 
     DualLog("Font ranges changed or .vfnt files not present – regenerating...\n");
 
+#ifdef FONT_GEN
     // Primary
     unsigned char *bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
@@ -393,6 +404,9 @@ void InitFontAtlasses(void) {
     free(sec_data);
     malloc_trim(0);
     DualLog(" regenerated in %.3f s\n", get_time() - t0);
+#else
+    DualLog("Font config not turned on, go set FONT_GEN at top of data_fonts.c\n");
+#endif
 }
 
 uint32_t DecodeUTF8(const char **p) {

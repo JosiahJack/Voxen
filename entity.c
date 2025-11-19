@@ -333,19 +333,13 @@ void DualLogEntity(uint16_t idx) {
 
 void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX;
-    entry->entflags = 0x00000000000000000000000000000000u; // Bit excessive but patently obvious that every bit is off.
-    flag_enable(&entry->entflags,ENTFLAG_KINEMATIC);
-    
+    entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
     entry->texIndex  = MATERIAL_IDX_MAX;
     entry->glowIndex = MATERIAL_IDX_MAX;
     entry->specIndex = MATERIAL_IDX_MAX;
     entry->normIndex = MATERIAL_IDX_MAX;
     entry->lodIndex  = MODEL_IDX_MAX;
-    
-    entry->position.x = 0.0f;
-    entry->position.y = 0.0f;
-    entry->position.z = 0.0f;
     entry->rotation.x = 0.0f;
     entry->rotation.y = 0.0f;
     entry->rotation.z = 0.0f;
@@ -353,38 +347,15 @@ void InitializeEntity(Entity* entry) {
     entry->scale.x = 1.0f;
     entry->scale.y = 1.0f;
     entry->scale.z = 1.0f;
-    entry->velocity.x = 0.0f;
-    entry->velocity.y = 0.0f;
-    entry->velocity.z = 0.0f;
-    entry->angularVelocity.x = 0.0f;
-    entry->angularVelocity.y = 0.0f;
-    entry->angularVelocity.z = 0.0f;
-    
-    entry->bodyState = BodyState_Standing;
-    
-    entry->collider = 0u;
-    entry->colliderCenter.x = 0.0f;
-    entry->colliderCenter.y = 0.0f;
-    entry->colliderCenter.z = 0.0f;
-    entry->colliderSize.x = 0.0f;
-    entry->colliderSize.y = 0.0f;
-    entry->colliderSize.z = 0.0f;
     entry->colliderMeshIndex = MODEL_IDX_MAX;
     entry->mass = 1.0f;
-    entry->linearDrag = 0.0f;
     entry->angularDrag = 0.05f;
     entry->dynamicFriction = 0.6f;
     entry->staticFriction = 0.6f;
-    entry->bounciness = 0.0f;
     entry->frictionCombine = PHYS_COMBINE_AVG;
     entry->bounceCombine = PHYS_COMBINE_AVG;
-    
     entry->volume = 1.0f;
-    
     entry->child0 = UINT16_MAX;
-    entry->child0_offset.x = 0.0f;
-    entry->child0_offset.y = 0.0f;
-    entry->child0_offset.z = 0.0f;
     entry->child0_rotation.x = 0.0f;
     entry->child0_rotation.y = 0.0f;
     entry->child0_rotation.z = 0.0f;
@@ -392,11 +363,7 @@ void InitializeEntity(Entity* entry) {
     entry->child0_scale.x = 1.0f;
     entry->child0_scale.y = 1.0f;
     entry->child0_scale.z = 1.0f;
-    
     entry->child1 = UINT16_MAX;
-    entry->child1_offset.x = 0.0f;
-    entry->child1_offset.y = 0.0f;
-    entry->child1_offset.z = 0.0f;
     entry->child1_rotation.x = 0.0f;
     entry->child1_rotation.y = 0.0f;
     entry->child1_rotation.z = 0.0f;
@@ -404,7 +371,6 @@ void InitializeEntity(Entity* entry) {
     entry->child1_scale.x = 1.0f;
     entry->child1_scale.y = 1.0f;
     entry->child1_scale.z = 1.0f;
-    
     entry->path[0] = '\0';    
 }
 
@@ -450,6 +416,104 @@ void LoadEntities(void) {
     DebugRAM("after loading all entities");
 }
 
+void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* tempInstances, uint16_t* targetIndex, uint16_t nextRegionStart) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
+        for (uint16_t j = 0; j < head; j++) {
+            uint16_t i = instanceTypeArray[j];
+            if (tempInstances[i].modelIndex == modelIdx) {
+                if (*targetIndex >= nextRegionStart) { DualLogError("Instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, *targetIndex); exit(1); }
+                
+                instances[*targetIndex] = tempInstances[i];
+                (*targetIndex) += 1;
+            }
+        }
+    }
+}
+
+void SortInstances(void) {
+    double start_time = get_time();
+    DualLog("Sorting entity instances... ");
+    if (modelTypeCountsOpaque      ) { free(modelTypeCountsOpaque      ); }   modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
+    if (modelTypeCountsDoubleSided ) { free(modelTypeCountsDoubleSided ); }   modelTypeCountsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
+    if (modelTypeCountsTransparent ) { free(modelTypeCountsTransparent ); }   modelTypeCountsTransparent = calloc(loadedModels,sizeof(uint16_t));
+    if (modelTypeOffsetsOpaque     ) { free(modelTypeOffsetsOpaque     ); }   modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16_t));
+    if (modelTypeOffsetsDoubleSided) { free(modelTypeOffsetsDoubleSided); }   modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
+    if (modelTypeOffsetsTransparent) { free(modelTypeOffsetsTransparent); }   modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
+    uint16_t opaqueInstances[INSTANCE_COUNT] = {0};
+    uint16_t doubleSidedInstances[INSTANCE_COUNT] = {0};
+    uint16_t transparentInstances[INSTANCE_COUNT] = {0};
+    opaqueInstancesHead = doubleSidedInstancesHead = transparentInstancesHead = invalidModelIndexCount = 0;
+    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
+        if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != MATERIAL_IDX_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
+        if (instances[i].modelIndex >= loadedModels || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
+        if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
+
+        bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
+        if (isTransparent(instances[i].texIndex)) {
+            if (transparentInstancesHead >= INSTANCE_COUNT) { DualLogError("Transparent instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
+
+            transparentInstances[transparentInstancesHead++] = i;
+            modelTypeCountsTransparent[instances[i].modelIndex]++;
+        } else if (is_double_sided) {
+            if (doubleSidedInstancesHead >= INSTANCE_COUNT) { DualLogError("Double-sided instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
+
+            doubleSidedInstances[doubleSidedInstancesHead++] = i;
+            modelTypeCountsDoubleSided[instances[i].modelIndex]++;
+        } else {
+            if (opaqueInstancesHead >= INSTANCE_COUNT) { DualLogError("Opaque instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
+
+            opaqueInstances[opaqueInstancesHead++] = i;
+            modelTypeCountsOpaque[instances[i].modelIndex]++;
+        }
+    }
+
+    // Compute offsets
+    uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
+    uint16_t i = 0;
+    for (; i < loadedModels; i++) { modelTypeOffsetsOpaque[i] = currentOffset; currentOffset += modelTypeCountsOpaque[i]; }
+    startOfDoubleSidedInstances = currentOffset;
+    for (i = 0; i < loadedModels; i++) { modelTypeOffsetsDoubleSided[i] = currentOffset; currentOffset += modelTypeCountsDoubleSided[i]; }
+    startOfTransparentInstances = currentOffset;
+    for (i = 0; i < loadedModels; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
+    if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
+
+    // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
+    Entity tempInstances[INSTANCE_COUNT];
+    memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
+    uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
+    CopyInstanceRegion(opaqueInstancesHead,           opaqueInstances, tempInstances, &targetIdx, startOfDoubleSidedInstances); // Copy opaque instances
+    CopyInstanceRegion(doubleSidedInstancesHead, doubleSidedInstances, tempInstances, &targetIdx, startOfTransparentInstances); // Copy doublesided instances
+    CopyInstanceRegion(transparentInstancesHead, transparentInstances, tempInstances, &targetIdx,             loadedInstances); // Copy transparent instances
+    for (i = 0; i < loadedInstances; ++i) { // Put all the invisible entities at the end of the list now
+        if (tempInstances[i].modelIndex > loadedModels) { instances[targetIdx] = tempInstances[i]; targetIdx++; }
+    }
+
+    // Update cellIndexForInstance
+    for (i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) { // Skip player index and start at 3?
+        float x = instances[i].position.x;
+        float z = instances[i].position.z;
+        int32_t cellX = (int32_t)vfloor((x - worldMin_x) / WORLDCELL_WIDTH_F);
+        int32_t cellZ = (int32_t)vfloor((z - worldMin_z) / WORLDCELL_WIDTH_F);
+        cellX = clamp(cellX, 0, 63);
+        cellZ = clamp(cellZ, 0, 63);
+        cellIndexForInstance[i] = cellZ * 64 + cellX;
+    }
+    
+    DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
+    DualLog(" took %f secs\n", get_time() - start_time);
+    loadedAmbients = 0;
+    for (i = opaqueInstancesHead + doubleSidedInstancesHead + transparentInstancesHead; i<loadedInstances;++i) {
+        uint16_t entIdx = instances[i].index;
+        if (ConstIndexIsAmbient(entIdx)) {
+            ambientRegistry[loadedAmbients] = i;
+            loadedAmbients++;
+            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); exit(1); }
+            
+            instances[i].volume = entities[entIdx].volume * 0.5f;
+        }
+    }
+}
+
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); exit(1); }
             
@@ -480,7 +544,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
     
-    // Apply the Unity hierarchy nonsense
+    // Apply the Unity hierarchy nonsense, TODO: Save out level#.txt from the engine just once and then delete all this.
     if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
         instances[instanceIdx].position.x += correctionX;   
         instances[instanceIdx].position.y += correctionY;
@@ -548,8 +612,14 @@ void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instan
 
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
+    if (!levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    levelCurrentlyLoading = true;
     DebugRAM("start of LoadLevel");
     currentLevel = curlevel;
+    renderableCount = 0;
+    loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
+    loadedLights = 0;
+    loadedAmbients = 0;
     if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
@@ -704,140 +774,24 @@ void LoadLevel(uint8_t curlevel) {
     SetFog();
     malloc_trim(0);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f secs\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
-    DebugRAM("end of LoadLevel");
-}
-
-void SortInstances(void) {
-    double start_time = get_time();
-    DualLog("Sorting entity instances... ");
-    modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
-    modelTypeCountsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
-    modelTypeCountsTransparent = calloc(loadedModels,sizeof(uint16_t));
-    modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16_t));
-    modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
-    modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
-    uint16_t opaqueInstances[INSTANCE_COUNT] = {0};
-    uint16_t doubleSidedInstances[INSTANCE_COUNT] = {0};
-    uint16_t transparentInstances[INSTANCE_COUNT] = {0};
-    opaqueInstancesHead = 0;
-    doubleSidedInstancesHead = 0;
-    transparentInstancesHead = 0;
-    invalidModelIndexCount = 0;
-
-    // Step 1: Categorize instances and count model types per category
-    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
-        if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != MATERIAL_IDX_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
-        if (instances[i].modelIndex >= loadedModels || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
-        if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
-
-        bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
-        if (isTransparent(instances[i].texIndex)) {
-            if (transparentInstancesHead >= INSTANCE_COUNT) { DualLogError("Transparent instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
-
-            transparentInstances[transparentInstancesHead++] = i;
-            modelTypeCountsTransparent[instances[i].modelIndex]++;
-        } else if (is_double_sided) {
-            if (doubleSidedInstancesHead >= INSTANCE_COUNT) { DualLogError("Double-sided instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
-
-            doubleSidedInstances[doubleSidedInstancesHead++] = i;
-            modelTypeCountsDoubleSided[instances[i].modelIndex]++;
-        } else {
-            if (opaqueInstancesHead >= INSTANCE_COUNT) { DualLogError("Opaque instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
-
-            opaqueInstances[opaqueInstancesHead++] = i;
-            modelTypeCountsOpaque[instances[i].modelIndex]++;
-        }
-    }
-
-    // Step 2: Compute offsets
-    uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
-    for (uint16_t i = 0; i < loadedModels; i++) { modelTypeOffsetsOpaque[i] = currentOffset; currentOffset += modelTypeCountsOpaque[i]; }
-    
-    startOfDoubleSidedInstances = currentOffset;
-    for (uint16_t i = 0; i < loadedModels; i++) { modelTypeOffsetsDoubleSided[i] = currentOffset; currentOffset += modelTypeCountsDoubleSided[i]; }
-    
-    startOfTransparentInstances = currentOffset;
-    for (uint16_t i = 0; i < loadedModels; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
-    if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
-
-    // Step 3: Reorder instances
-    Entity tempInstances[INSTANCE_COUNT];
-    memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
-    uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
-    
-    // Copy opaque instances
-    for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
-        for (uint16_t j = 0; j < opaqueInstancesHead; j++) {
-            uint16_t i = opaqueInstances[j];
-            if (i >= START_INDEX_LEVEL_INSTANCES) {
-                if (tempInstances[i].modelIndex == modelIdx) {
-                    if (targetIdx >= startOfDoubleSidedInstances) { DualLogError("Opaque instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
-                    
-                    instances[targetIdx] = tempInstances[i];
-                    targetIdx++;
-                }
-            }
-        }
-    }
-
-    // Copy double-sided instances
-    for (uint16_t modelIdx = 0; modelIdx < loadedModels; ++modelIdx) {
-        for (uint16_t j = 0; j < doubleSidedInstancesHead; j++) {
-            uint16_t i = doubleSidedInstances[j];
-            if (i >= START_INDEX_LEVEL_INSTANCES) {
-                if (tempInstances[i].modelIndex == modelIdx) {
-                    if (targetIdx >= startOfTransparentInstances) { DualLogError("Double-sided instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
-                    
-                    instances[targetIdx] = tempInstances[i];
-                    targetIdx++;
-                }
-            }
-        }
-    }
-
-    // Copy transparent instances
-    for (uint16_t modelIdx = 0; modelIdx < loadedModels; ++modelIdx) {
-        for (uint16_t j = 0; j < transparentInstancesHead; j++) {
-            uint16_t i = transparentInstances[j];
-            if (i >= START_INDEX_LEVEL_INSTANCES) {
-                if (tempInstances[i].modelIndex == modelIdx) {
-                    if (targetIdx >= loadedInstances - invalidModelIndexCount) { DualLogError("Transparent instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, targetIdx); exit(1); }
-                    
-                    instances[targetIdx] = tempInstances[i];
-                    targetIdx++;
-                }
-            }
-        }
-    }
-    
-    // Put all the invisible entities at the end of the list now
-    for (uint16_t i = 0; i < loadedInstances; ++i) {
-        if (tempInstances[i].modelIndex > loadedModels) { instances[targetIdx] = tempInstances[i]; targetIdx++; }
-    }
-
-    // Update cellIndexForInstance
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) { // Skip player index and start at 3?
-        float x = instances[i].position.x;
-        float z = instances[i].position.z;
-        int32_t cellX = (int32_t)vfloor((x - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t cellZ = (int32_t)vfloor((z - worldMin_z) / WORLDCELL_WIDTH_F);
-        cellX = clamp(cellX, 0, 63);
-        cellZ = clamp(cellZ, 0, 63);
-        cellIndexForInstance[i] = cellZ * 64 + cellX;
-    }
-    
-    DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
-    DualLog(" took %f secs\n", get_time() - start_time);
-    // Perform post-sort registrations:
-    loadedAmbients = 0;
-    for (uint16_t i = opaqueInstancesHead + doubleSidedInstancesHead + transparentInstancesHead; i<loadedInstances;++i) {
-        uint16_t entIdx = instances[i].index;
-        if (ConstIndexIsAmbient(entIdx)) {
-            ambientRegistry[loadedAmbients] = i;
-            loadedAmbients++;
-            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); exit(1); }
-            
-            instances[i].volume = entities[entIdx].volume * 0.5f;
-        }
-    }
+    DebugRAM("end of LoadLevel instances");
+    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
+    RenderLoadingProgress(110,"Loading cull system...");
+    CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
+    RenderLoadingProgress(120,"Loading voxel lighting data...");
+    VoxelLists();
+    uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE_SQD * 6u;
+    totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
+    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    glUseProgram(shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    numDynamicLights = 0;
+    for (int i=0;i<loadedLights;++i) { if (lightIsDynamic[i]) numDynamicLights++; }
+    DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
+    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
+    RenderShadowmaps();
+    Input_MouselookApply();
+    levelCurrentlyLoading = false;
 }
