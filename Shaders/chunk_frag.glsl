@@ -153,10 +153,7 @@ void main() {
     if (texIndex >= 0) texIndexChecked = int(texIndex); 
     ivec2 texSize = textureSizes[texIndexChecked];
     vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
-    ivec2 pixel = ivec2(uv);
-    int x = int(floor(uv.x * float(texSize.x)));
-    int y = int(floor(uv.y * float(texSize.y)));
-    ivec2 texUV = ivec2(x,y);
+    ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 

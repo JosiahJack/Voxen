@@ -61,7 +61,7 @@ void LoadTextures(void) {
     DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);
     unsigned char** image_data  =   malloc(loadedTextures * sizeof(unsigned char*));
     textureOffsets              = calloc(loadedTextures, sizeof(uint32_t));
-    textureSizes                = calloc(loadedTextures * 2, sizeof(int));
+    textureSizes                = calloc(loadedTextures * 2, sizeof(int32_t));
     texturePaletteOffsets       = calloc(loadedTextures, sizeof(uint32_t));
     doubleSidedTexture          = calloc(loadedTextures,sizeof(bool));
     transparentTexture          = calloc(loadedTextures,sizeof(bool));
@@ -113,8 +113,6 @@ void LoadTextures(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, stagingBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, (((MAX_TEXTURE_DIMENSION * MAX_TEXTURE_DIMENSION) + 3) / 4) * sizeof(uint32_t), NULL, GL_DYNAMIC_COPY);
     ColorEntry* color_pool = malloc(loadedTextures * MAX_PALETTE_SIZE * sizeof(ColorEntry));
-    uint32_t* pool_indices = malloc(loadedTextures * sizeof(uint32_t));
-    memset(pool_indices, 0, loadedTextures * sizeof(uint32_t));
     uint32_t** per_texture_palettes = malloc(loadedTextures * sizeof(uint32_t*));
     uint32_t* per_texture_palette_sizes = malloc(loadedTextures * sizeof(uint32_t));
     uint32_t* index_offsets = malloc(loadedTextures * sizeof(uint32_t));
@@ -202,7 +200,6 @@ void LoadTextures(void) {
     free(per_texture_palettes);
     free(per_texture_palette_sizes);
     free(color_pool);
-    free(pool_indices);
     free(image_data);
     free(widths);
     free(heights);
