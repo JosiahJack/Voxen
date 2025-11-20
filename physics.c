@@ -624,7 +624,6 @@ int32_t Physics(void) {
     if (gamePaused || menuActive) return 0;
 
     PlayerPhysics();
-    return 0;
     IntegratePhysics(timeSinceLastPhysicsTick);
     for (int32_t p = PLAYER1; p < PLAYER1 + 1; ++p) {
         Entity* ea = &instances[p];

@@ -499,28 +499,35 @@ cardchunk: 1
 texture: 362
 #chunk_grove1_2
 index: 94
+model: 178
 cardchunk: 1
 texture: 363
 #chunk_grove1_2_slice45
 index: 95
+model: 180
 texture: 363
 #chunk_grove1_3
 index: 96
+model: 178
 texture: 364
 #chunk_grove1_4
 index: 97
+model: 178
 cardchunk: 1
 texture: 365
 #chunk_grove1_5
 index: 98
+model: 178
 cardchunk: 1
 texture: 367
 #chunk_grove1_6
 index: 99
+model: 178
 cardchunk: 1
 texture: 368
 #chunk_grove1_7
 index: 100
+model: 178
 cardchunk: 1
 texture: 369
 #chunk_grove2_1
