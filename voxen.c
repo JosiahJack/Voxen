@@ -408,6 +408,7 @@ static inline void invertAffineMat4(float *out, const float *m) {
     out[13] = -(out[1]*tx + out[5]*ty + out[9]*tz);
     out[14] = -(out[2]*tx + out[6]*ty + out[10]*tz);
 }
+
 // ============================================================================
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
     float rot[16];
