@@ -150,7 +150,7 @@ void main() {
     float distToPixel = length(viewDir);
     viewDir = normalize(viewDir);
     int texIndexChecked = 0;
-    if (texIndex >= 0) texIndexChecked = int(texIndex); 
+    if (texIndex >= 0) texIndexChecked = int(texIndex);
     ivec2 texSize = textureSizes[texIndexChecked];
     vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
@@ -170,10 +170,7 @@ void main() {
             vec3 b = normalize(dp1 * duv2.x - dp2 * duv1.x);
             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
             ivec2 texSizeNorm = textureSizes[NormalIndex];
-            vec2 uvNorm = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
-            int xNorm = int(floor(uvNorm.x * float(texSizeNorm.x)));
-            int yNorm = int(floor(uvNorm.y * float(texSizeNorm.y)));
-            ivec2 texUVNorm = ivec2(xNorm,yNorm);
+            ivec2 texUVNorm = ivec2(int(floor(uv.x * float(texSizeNorm.x))), int(floor(uv.y * float(texSizeNorm.y))));
             vec3 normalColor = (getTextureColor(NormalIndex,texUVNorm).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
@@ -183,10 +180,7 @@ void main() {
     vec4 glowColor = vec4(0.0,0.0,0.0,0.0);
     if (glowIndex != BLACK_TEXTURE_IDX) {
         ivec2 texSizeGlow = textureSizes[glowIndex];
-        vec2 uvGlow = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
-        int xGlow = int(floor(uvGlow.x * float(texSizeGlow.x)));
-        int yGlow = int(floor(uvGlow.y * float(texSizeGlow.y)));
-        ivec2 texUVGlow = ivec2(xGlow,yGlow);
+        ivec2 texUVGlow = ivec2(int(floor(uv.x * float(texSizeGlow.x))), int(floor(uv.y * float(texSizeGlow.y))));
         glowColor = getTextureColor(glowIndex,texUVGlow);
     }
 
@@ -251,9 +245,10 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0 && shadowIndex < 1600) {
-            float NdL = max(dot(normal, toLight), 0.0);
-            float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
-            vec3 a = abs(-toLight);
+//             float NdL = max(dot(normal, toLight), 0.0);
+//             float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
+            float smearness = distOverRange * distOverRange * 20.0;
+            vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
             vec3 dir = -toLight * invMax;
