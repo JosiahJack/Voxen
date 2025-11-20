@@ -133,41 +133,9 @@ int32_t Input_KeyDown(int32_t keycode) {
         glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
         glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
     }
-
-    if (keys[GLFW_KEY_E]) {
-        play_wav("./Audio/weapons/wpistol.wav",0.5f);
-    }
-
-    if (keys[GLFW_KEY_1]) {
-        fogColorRUsed += 0.01f;
-            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
-
-    } else if (keys[GLFW_KEY_2]) {
-        fogColorRUsed -= 0.01f;
-            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
-
-    }
     
-    if (keys[GLFW_KEY_3]) {
-        fogColorGUsed += 0.01f;
-            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
-
-    } else if (keys[GLFW_KEY_4]) {
-        fogColorGUsed -= 0.01f;
-            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
-
-    }
-    
-    if (keys[GLFW_KEY_5]) {
-        fogColorBUsed += 0.01f;
-            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
-
-    } else if (keys[GLFW_KEY_6]) {
-        fogColorBUsed -= 0.01f;
-            DualLog("Set fog to %f %f %f\n",fogColorRUsed,fogColorGUsed,fogColorBUsed);
-
-    }
-
+    if (keys[GLFW_KEY_B]) CycleToNextMonitor(window);
+    if (keys[GLFW_KEY_E]) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     return 0;
 }
 

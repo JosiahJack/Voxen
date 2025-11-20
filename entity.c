@@ -741,6 +741,8 @@ void LoadLevel(uint8_t curlevel) {
             } else {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
+            
+            if (lightsIdx == 817) DualLog("Loaded light 817 positiong %f %f %f\n",lights[litIdx + LIGHT_DATA_OFFSET_POSX],lights[litIdx + LIGHT_DATA_OFFSET_POSY],lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;

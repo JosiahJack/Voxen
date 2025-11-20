@@ -143,7 +143,7 @@ float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUs
 GLuint shadowCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
-GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightPosLoc_shadowmaps, ssbo_indexBaseLoc_shadowmaps,
+GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightIndex_shadowmaps, ssbo_indexBaseLoc_shadowmaps,
       shadowmapSizeLoc_shadowmaps, viewProjArrayLoc_shadowmaps;
 GLuint shadowMapSSBO;
 uint32_t totalShadowmapPixels = 0;
@@ -326,9 +326,9 @@ void CompileShaders(void) {
     texIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "texIndex");
     glowSpecIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "glowSpecIndex");
     normInstanceIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "normInstanceIndex");
-    lightPosLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "lightPos");
     ssbo_indexBaseLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "ssbo_indexBase");
     shadowmapSizeLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "shadowmapSize");
+    lightIndex_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "lightIndex");
 
     screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
     screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
@@ -438,7 +438,6 @@ void UpdateScreenSize(void) {
     m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
     aspect3D = (float)screen_width / (float)screen_height;
-//     float f = 1.0f / vtan(cam_fov * PI / 360.0f);
     float f = vcot(cam_fov * PI / 360.0f);
     m = rasterPerspectiveProjection;
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
@@ -447,9 +446,7 @@ void UpdateScreenSize(void) {
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
     
     aspect2D = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
-//     f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f);
-    f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f);
-    f = vcot(SHADOWMAP_FOV * PI / 360.0f);
+    f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
     m = shadowmapsPerspectiveProjection;
     m[0] = f / aspect2D; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
     m[4] =         0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
@@ -682,16 +679,9 @@ void VoxelLists() {
     for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     lightShadowsEnabled = malloc(loadedLights * sizeof(uint32_t));
-    memset(lightShadowsEnabled,0u,loadedLights * sizeof(uint32_t));
-    uint16_t numLightsWithShadows = 0;
-    for (int i=0;i<loadedLights;++i) {        
-        lightShadowsEnabled[i] = 1u;
-        numLightsWithShadows++;
-    }
-    
+    memset(lightShadowsEnabled,1u,loadedLights * sizeof(uint32_t));
     lightShadowsEnabledID = SetupSSBO(lightShadowsEnabledID, 6, loadedLights * sizeof(uint32_t), lightShadowsEnabled, GL_STATIC_DRAW);
     shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    DualLog("Number of lights with shadows: %u\n",numLightsWithShadows);
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
@@ -713,7 +703,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
         int x = cellIndexForLightX[lightIdx];
         int y = cellIndexForLightZ[lightIdx];
-        int range = vfloor(lightRadius * 0.390625f); // 1 / 2.56f
+        int range = vfloor(lightRadius * 0.3906251f); // 1 / 2.56f, strangely exact in IEE-754 but added 0.0000001 cushion
         int xMin = x - range; int xMax = x + range;
         int yMin = y - range; int yMax = y + range;
         for (int ix = xMin;ix <= xMax; ix++) {
@@ -752,7 +742,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         nearbyMeshCount++;
     }
 
-    glUniform3f(lightPosLoc_shadowmaps, lightPosX, lightPosY, lightPosZ);
+    glUniform1ui(lightIndex_shadowmaps, lightIdx);
     for (uint8_t face = 0; face < 6; face++) {
         glUniform1i(ssbo_indexBaseLoc_shadowmaps, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
         glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
@@ -793,15 +783,8 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-
-    // Alternate form to find all lights without actual sorting:
-    // first for over lights to get distance to player once
-    // set short threshold of like 2.56 and use that first in one for loop.
-    // another for loop, keeping head of the found lights but starting over at the beginning of the list and checking against a wider dist
-    // another for loop, same as above but a little wider dist
-    // another for loop, same as above but a little wider dist
     
-    // This method is 0.027ms so not too worried about it at the moment.
+    // This sort method is 0.027ms so not too worried about it at the moment.
 //     double sortStart = get_time();
     // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
     LightCandidate candidates[loadedLights];
@@ -1122,13 +1105,6 @@ void NewGame(void) {
     pauseRelativeTime = 0.0f;
 }
 
-static const float quadBlit_vertices[] = {
-     1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
-     1.0f,  1.0f, 1.0f, 1.0f, // Top-right
-    -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
-    -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
-};
-
 int currentMonitorIndex = 0;
 bool ignore_next_mouse_delta = false;
 void CycleToNextMonitor(GLFWwindow* window) {
@@ -1149,12 +1125,11 @@ void CycleToNextMonitor(GLFWwindow* window) {
     int ypos = my + (mode->height - screen_height) / 2;
     glfwSetWindowPos(window, xpos, ypos);
     ignore_next_mouse_delta = true;
-    DualLog("Window moved to monitor %d: %s at %d,%d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
+    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
 }
 
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
-    DebugRAM("InitializeEnvironment start");   
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); exit(1); }
     
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
@@ -1170,13 +1145,11 @@ void InitializeEnvironment(void) {
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { fprintf(stderr, "Failed to initialize GLAD\n"); exit(1); }
     UpdateScreenSize();
     malloc_trim(0);
-    DebugRAM("window init");
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
         const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
         int mx, my;
         glfwGetMonitorPos(target_monitor, &mx, &my);
-        // Center the window on the monitor (windowed mode)
         int xpos = mx + (mode->width - screen_width) / 2;
         int ypos = my + (mode->height - screen_height) / 2;
         glfwSetWindowPos(window, xpos, ypos);
@@ -1212,15 +1185,13 @@ void InitializeEnvironment(void) {
     logical_cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (logical_cores <= 0) logical_cores = 1;
     DualLog("CPU: %s | Logical cores: %d\n", cpu_brand, logical_cores);
-    
+    DebugRAM("Prior to parallel inits");
     #pragma omp parallel num_threads(4)
     {
         if (omp_get_thread_num() == 0) {
             Input_Init(window);
             glfwSwapInterval(settings_Vsync ? 1 : 0);
             glEnable(GL_DEPTH_TEST);
-            glDisable(GL_MULTISAMPLE);
-            glMinSampleShading(0.0f);
             glCullFace(GL_BACK);
             glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
             glViewport(0, 0, screen_width, screen_height);
@@ -1237,6 +1208,12 @@ void InitializeEnvironment(void) {
             glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
                 
             glCreateBuffers(1, &quadVBO);
+            float quadBlit_vertices[] = {
+                1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
+                1.0f,  1.0f, 1.0f, 1.0f, // Top-right
+                -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
+                -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
+            };
             glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
             glCreateVertexArrays(1, &quadVAO);
             glEnableVertexArrayAttrib(quadVAO, 0);
@@ -1477,6 +1454,9 @@ void SetFog() {
     fogColorRUsed = fogColorR * fogBaseDensityForLevel;
     fogColorGUsed = fogColorG * fogBaseDensityForLevel;
     fogColorBUsed = fogColorB * fogBaseDensityForLevel;
+    glProgramUniform1f(chunkShaderProgram, fogColorRLoc_chunk, fogColorRUsed);
+    glProgramUniform1f(chunkShaderProgram, fogColorGLoc_chunk, fogColorGUsed);
+    glProgramUniform1f(chunkShaderProgram, fogColorBLoc_chunk, fogColorBUsed);
 }
 
 double timeSinceLastPhysicsTick = 0.0;
@@ -1650,9 +1630,6 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1f(worldMin_xLoc_chunk, worldMin_x);
             glUniform1f(worldMin_zLoc_chunk, worldMin_z);
             glUniform3f(camPosLoc_chunk, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-            glUniform1f(fogColorRLoc_chunk, fogColorRUsed);
-            glUniform1f(fogColorGLoc_chunk, fogColorGUsed);
-            glUniform1f(fogColorBLoc_chunk, fogColorBUsed);
             glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 0u);
             glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk,0u);
             glProgramUniform1ui(chunkShaderProgram, reflectionsEnabledLoc_chunk, settings_Reflections);
