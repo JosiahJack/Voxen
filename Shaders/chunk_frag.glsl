@@ -152,8 +152,10 @@ void main() {
     int texIndexChecked = 0;
     if (texIndex >= 0) texIndexChecked = int(texIndex);
     ivec2 texSize = textureSizes[texIndexChecked];
-    vec2 uv = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+    vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y));//, 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
+    texUV.x = texUV.x % texSize.x;
+    texUV.y = texUV.y % texSize.y;
     vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
@@ -171,6 +173,8 @@ void main() {
             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
             ivec2 texSizeNorm = textureSizes[NormalIndex];
             ivec2 texUVNorm = ivec2(int(floor(uv.x * float(texSizeNorm.x))), int(floor(uv.y * float(texSizeNorm.y))));
+            texUVNorm.x = texUVNorm.x % texSizeNorm.x;
+            texUVNorm.y = texUVNorm.y % texSizeNorm.y;
             vec3 normalColor = (getTextureColor(NormalIndex,texUVNorm).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
@@ -181,6 +185,8 @@ void main() {
     if (glowIndex != BLACK_TEXTURE_IDX) {
         ivec2 texSizeGlow = textureSizes[glowIndex];
         ivec2 texUVGlow = ivec2(int(floor(uv.x * float(texSizeGlow.x))), int(floor(uv.y * float(texSizeGlow.y))));
+        texUVGlow.x = texUVGlow.x % texSizeGlow.x;
+        texUVGlow.y = texUVGlow.y % texSizeGlow.y;
         glowColor = getTextureColor(glowIndex,texUVGlow);
     }
 
@@ -191,6 +197,8 @@ void main() {
         int xSpec = int(floor(uvSpec.x * float(texSizeSpec.x)));
         int ySpec = int(floor(uvSpec.y * float(texSizeSpec.y)));
         ivec2 texUVSpec = ivec2(xSpec,ySpec);
+        texUVSpec.x = texUVSpec.x % texSizeSpec.x;
+        texUVSpec.y = texUVSpec.y % texSizeSpec.y;
         vec4 specColor = getTextureColor(specIndex,texUVSpec);
         vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
                                 uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
@@ -219,7 +227,7 @@ void main() {
         if (dist > range) continue;
 
         vec3 lightDir = normalize(toLight);
-        float lambertian = max(dot(normal, lightDir), 0.0);
+        float lambertian = clamp(max(dot(normal, lightDir), 0.0),0.0,1.0);
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
         if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.

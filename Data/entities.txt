@@ -4278,7 +4278,6 @@ bounceCombine: 0
 index: 496
 model: 79
 texture: 185
-glowtexture: 186
 #doorB
 index: 497
 model: 80

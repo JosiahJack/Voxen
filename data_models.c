@@ -232,8 +232,8 @@ void LoadModels(void) {
                         modelVertices[i][vertexIndex++] = mesh->mNormals[vert].x;
                         modelVertices[i][vertexIndex++] = mesh->mNormals[vert].y;
                         modelVertices[i][vertexIndex++] = mesh->mNormals[vert].z;
-                        float u = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].x : 0.0f;
-                        float v = mesh->mTextureCoords[0] ? mesh->mTextureCoords[0][vert].y : 0.0f;
+                        float u = (mesh->mTextureCoords[0] && mesh->mNumUVComponents[0] > 0) ? mesh->mTextureCoords[0][vert].x : 0.0f;
+                        float v = (mesh->mTextureCoords[0] && mesh->mNumUVComponents[0] > 0) ? mesh->mTextureCoords[0][vert].y : 0.0f;
                         modelVertices[i][vertexIndex++] = u;
                         modelVertices[i][vertexIndex++] = v;
                         minx = vmin(minx, mesh->mVertices[vert].x);
