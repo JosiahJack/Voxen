@@ -143,7 +143,7 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define MAX_VISIBLE_LIGHTS 90
-#define SHADOW_MAP_SIZE 512u
+#define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
 
 #define MAX_SHADOWMAPS 32u
@@ -264,6 +264,7 @@ static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 extern float move_speed;
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
+void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
 // ----------------------------------------------------------------------------
 // Input
 #define NUM_KEYS 350

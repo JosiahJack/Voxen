@@ -656,6 +656,7 @@ void UpdateVoxelLightLists() {
 uint32_t* lightShadowsEnabled = NULL;
 
 void VoxelLists() {
+    DebugRAM("start of VoxelLists");
     voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
     voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
@@ -676,6 +677,7 @@ void VoxelLists() {
         }
     }
     
+    DebugRAM("prior to UpdateVoxelLightLists");
     UpdateVoxelLightLists();
     for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
@@ -683,6 +685,7 @@ void VoxelLists() {
     memset(lightShadowsEnabled,1u,loadedLights * sizeof(uint32_t));
     lightShadowsEnabledID = SetupSSBO(lightShadowsEnabledID, 6, loadedLights * sizeof(uint32_t), lightShadowsEnabled, GL_STATIC_DRAW);
     shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    DebugRAM("end of VoxelLists");
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
@@ -848,6 +851,7 @@ void RenderShadowmaps(void) {
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    DebugRAM("end of RenderShadowmaps");
 }
 
 // ============================================================================
@@ -1061,6 +1065,7 @@ void CenterStatusPrint(const char* fmt, ...) {
 }
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) {
+    instances[playerIdx].index = 767;
     instances[playerIdx].position.x = 10.2f;
     instances[playerIdx].position.y = -43.792f + 0.84f; // Added 0.84f for cam offset from center
     instances[playerIdx].position.z = 20.40001f;
@@ -1143,9 +1148,8 @@ void InitializeEnvironment(void) {
     if (!window) { DualLogError("glfwCreateWindow failed\n"); exit(1); }
         
     glfwMakeContextCurrent(window);
-    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { fprintf(stderr, "Failed to initialize GLAD\n"); exit(1); }
+    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); exit(1); }
     UpdateScreenSize();
-    malloc_trim(0);
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
         const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
@@ -1158,7 +1162,6 @@ void InitializeEnvironment(void) {
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    malloc_trim(0);
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
@@ -1197,7 +1200,6 @@ void InitializeEnvironment(void) {
             glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
             glViewport(0, 0, screen_width, screen_height);
             CompileShaders();
-            malloc_trim(0);
             glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
             glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
             glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
@@ -1207,7 +1209,7 @@ void InitializeEnvironment(void) {
             glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
             glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
             glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
-                
+
             glCreateBuffers(1, &quadVBO);
             float quadBlit_vertices[] = {
                 1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
@@ -1280,11 +1282,9 @@ void InitializeEnvironment(void) {
             glActiveTexture(GL_TEXTURE4);
             glBindTexture(GL_TEXTURE_2D, outputImageID);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            malloc_trim(0);
             DebugRAM("setup gbuffer end");
             
             InitFontAtlasses();
-            malloc_trim(0);
             glCreateBuffers(1, &textVBO);
             glCreateVertexArrays(1, &textVAO);    
             glEnableVertexArrayAttrib(textVAO, 0);
@@ -1772,6 +1772,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);

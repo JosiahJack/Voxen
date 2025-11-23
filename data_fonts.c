@@ -345,7 +345,6 @@ void InitFontAtlasses(void) {
     
     free(pc.nodes);
     free(pc.pack_info);
-    malloc_trim(0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
     glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);
@@ -355,7 +354,6 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(pri_cache, pri_expected, pri_md5, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
     free(bmp);
-    malloc_trim(0);
 
     // Secondary
     bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
@@ -390,7 +388,6 @@ void InitFontAtlasses(void) {
     
     free(pc2.nodes);
     free(pc2.pack_info);
-    malloc_trim(0);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(fontAtlasTexStopD, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, bmp);

@@ -211,18 +211,24 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
 void ProcessInput(void) {
     if (gamePaused || consoleActive) return;
 
-    float ms = keys[GLFW_KEY_LEFT_SHIFT] ? move_speed * 1.75f : move_speed;
-    Vector3 delta = {0};
-    if (keys[GLFW_KEY_F]) delta = add_vector3(delta, scale_vector3((Vector3){cam_forwardx, cam_forwardy, cam_forwardz},  ms));
-    if (keys[GLFW_KEY_S]) delta = add_vector3(delta, scale_vector3((Vector3){cam_forwardx, cam_forwardy, cam_forwardz}, -ms));
-    if (keys[GLFW_KEY_D]) delta = add_vector3(delta, scale_vector3((Vector3){cam_rightx,   cam_righty,   cam_rightz},    ms));
-    if (keys[GLFW_KEY_A]) delta = add_vector3(delta, scale_vector3((Vector3){cam_rightx,   cam_righty,   cam_rightz},   -ms));
-    if (noclip) {
-        if (keys[GLFW_KEY_V])    delta.y += ms;
-        if (keys[GLFW_KEY_C])    delta.y -= ms;
-    } else if (currentLevel != LEVEL_CYBERSPACE) delta.y = 0;
+    float moveForce = 1800.0f;  // Tune this — 80kg player needs ~1800N to feel snappy
+    float sprintMul = keys[GLFW_KEY_LEFT_SHIFT] ? 1.75f : 1.0f;
+    Vector3 input = {0};
 
-    instances[PLAYER1].position = add_vector3(instances[PLAYER1].position, delta);
-    if (keys[GLFW_KEY_Q]) { cam_roll += move_speed * 5.0f; Input_MouselookApply(); }
-    if (keys[GLFW_KEY_T]) { cam_roll -= move_speed * 5.0f; Input_MouselookApply(); }
+    if (keys[GLFW_KEY_F]) input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
+    if (keys[GLFW_KEY_S]) input = sub_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
+    if (keys[GLFW_KEY_D]) input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+    if (keys[GLFW_KEY_A]) input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+
+    if (magnitude_vector3(input) > 0.1f) {
+        input = normalize_vector3(input);
+        Vector3 force = scale_vector3(input, moveForce * sprintMul);
+        AddForce(PLAYER1, force, false);  // false = accumulated force
+    }
+
+    // Jump
+    if (keys[GLFW_KEY_SPACE] && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) {
+        AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, true);  // impulse
+        flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
+    }
 }

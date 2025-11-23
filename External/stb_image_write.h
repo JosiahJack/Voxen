@@ -554,7 +554,6 @@ STBIWDEF int stbi_write_png(char const *filename, int x, int y, int comp, const 
    fwrite(png, 1, len, f);
    fclose(f);
    STBIW_FREE(png);
-   malloc_trim(0);
    return 1;
 }
 #endif

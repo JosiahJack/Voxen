@@ -10,7 +10,7 @@ void UpdatePlayerFacingAngles(void);
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
-bool noclip = true; // Testing, TODO
+bool noclip = false;
 bool god = true;
 bool notarget = false;
 bool fatigueCheat = false;
@@ -61,17 +61,14 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
         *aabb_min = (Vector3){c.x - r, c.y - r, c.z - r};
         *aabb_max = (Vector3){c.x + r, c.y + r, c.z + r};
         return true;
-
-    } else if (e->collider == COLLIDER_TYPE_BOX || e->collider == COLLIDER_TYPE_CAPSULE) {
-        // Local half-extents (including scale)
-        Vector3 half = {
+    } else if (e->collider == COLLIDER_TYPE_BOX) {
+        Vector3 half = { // Local half-extents (including scale)
             e->colliderSize.x * e->scale.x * 0.5f,
             e->colliderSize.y * e->scale.y * 0.5f,
             e->colliderSize.z * e->scale.z * 0.5f
         };
 
-        // 8 corners in local space
-        Vector3 corners[8] = {
+        Vector3 corners[8] = { // 8 corners in local space
             { -half.x, -half.y, -half.z },
             {  half.x, -half.y, -half.z },
             { -half.x,  half.y, -half.z },
@@ -84,7 +81,46 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
 
         Vector3 world_min = { FLT_MAX, FLT_MAX, FLT_MAX };
         Vector3 world_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+        for (int i = 0; i < 8; ++i) {
+            Vector3 rotated = rotate_quaternion(e->rotation, corners[i]);
+            Vector3 world = add_vector3(e->position, rotated);
+            world_min = min_vector3(world_min, world);
+            world_max = max_vector3(world_max, world);
+        }
 
+        *aabb_min = world_min;
+        *aabb_max = world_max;
+        return true;
+    } else if (e->collider == COLLIDER_TYPE_CAPSULE) {
+        float radius = e->colliderSize.x * e->scale.x;           // actual world-space radius
+        float totalHeight = e->colliderSize.y * e->scale.y;      // full height including caps
+//         float cylinderHeight = totalHeight - 2.0f * radius;      // height of the straight part
+        Vector3 local_min, local_max;
+        if (vabs(e->colliderSize.z - COLLIDER_CAPSULE_DIRECTION_Y_F) < 0.1f) { // Y-axis capsule (most common)
+            local_min = (Vector3){ -radius, -totalHeight * 0.5f, -radius };
+            local_max = (Vector3){  radius,  totalHeight * 0.5f,  radius };
+        } else if (vabs(e->colliderSize.z - COLLIDER_CAPSULE_DIRECTION_X_F) < 0.1f) { // X-axis capsule
+            local_min = (Vector3){ -totalHeight * 0.5f, -radius, -radius };
+            local_max = (Vector3){  totalHeight * 0.5f,  radius,  radius };
+        } else { // Z-axis capsule
+            local_min = (Vector3){ -radius, -radius, -totalHeight * 0.5f };
+            local_max = (Vector3){  radius,  radius,  totalHeight * 0.5f };
+        }
+
+        // Transform the 8 corners of this local AABB (same method as box — now valid!)
+        Vector3 corners[8] = {
+            { local_min.x, local_min.y, local_min.z },
+            { local_max.x, local_min.y, local_min.z },
+            { local_min.x, local_max.y, local_min.z },
+            { local_max.x, local_max.y, local_min.z },
+            { local_min.x, local_min.y, local_max.z },
+            { local_max.x, local_min.y, local_max.z },
+            { local_min.x, local_max.y, local_max.z },
+            { local_max.x, local_max.y, local_max.z }
+        };
+
+        Vector3 world_min = { FLT_MAX, FLT_MAX, FLT_MAX };
+        Vector3 world_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
         for (int i = 0; i < 8; ++i) {
             Vector3 rotated = rotate_quaternion(e->rotation, corners[i]);
             Vector3 world = add_vector3(e->position, rotated);
@@ -625,6 +661,8 @@ int32_t Physics(void) {
 
     PlayerPhysics();
     IntegratePhysics(timeSinceLastPhysicsTick);
+    return 0; // Test just speeds first
+    
     for (int32_t p = PLAYER1; p < PLAYER1 + 1; ++p) {
         Entity* ea = &instances[p];
         Vector3 mina, maxa;
@@ -640,8 +678,9 @@ int32_t Physics(void) {
             if (!GetAABB(eb, &minb, &maxb)) continue;
             DualLog("  [2] AABB computed\n");
             
-            DualLog("AABB A: (%.2f,%.2f,%.2f) -> (%.2f,%.2f,%.2f)\n", mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z);
-            DualLog("AABB B: (%.2f,%.2f,%.2f) -> (%.2f,%.2f,%.2f)\n", minb.x, minb.y, minb.z, maxb.x, maxb.y, maxb.z);
+            if (ea->index == 767) DualLog("Instance %u (entIdx: PLAYER) AABB A: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", p, mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z, maxa.x - mina.x, maxa.y - mina.y, maxa.z - mina.z);
+            else DualLog("Instance %u (entIdx: %u) AABB A: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", p, ea->index, mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z, maxa.x - mina.x, maxa.y - mina.y, maxa.z - mina.z);
+            DualLog("Instance %u (entIdx: %u) AABB B: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", q, eb->index, minb.x, minb.y, minb.z, maxb.x, maxb.y, maxb.z, maxb.x - minb.x, maxb.y - minb.y, maxb.z - minb.z);
 
             if (!CollideAABB(mina, maxa, minb, maxb)) continue;
             DualLog("  [3] AABB overlap – entering narrow phase\n");

@@ -1,4 +1,5 @@
 // data_textures.c - Load textures from raw .png files on disk
+#define _GNU_SOURCE
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #define STBI_MAX_DIMENSIONS 2048
@@ -14,7 +15,7 @@ int malloc_trim(size_t pad); // #include <malloc.h>
 int close (int filedes); // #include <unistd.h>
 size_t read(int fd, void* buf, size_t count); // #include <unistd.h>
 int  open(const char *, int, ...); // #include <fcntl.h>
-#define O_RDONLY 0
+#define O_RDONLY 0 // #include <fcntl.h>
 
 DataParser texture_parser;
 
@@ -30,12 +31,8 @@ GLuint textureSizesID = 0;
 GLuint textureOffsetsID = 0;
 GLuint texturePalettesID = 0;
 GLuint texturePaletteOffsetsID = 0;
-uint32_t* textureOffsets = NULL;
-uint32_t* texturePaletteOffsets = NULL;
-uint32_t* texturePalettes = NULL;
 uint32_t totalPixels = 0;
 uint32_t totalPaletteColors = 0;
-int* textureSizes = NULL;
 uint16_t loadedTextures = 0;
 bool* doubleSidedTexture = NULL;
 bool* transparentTexture = NULL;
@@ -57,19 +54,37 @@ void LoadTextures(void) {
 
     loadedTextures = maxIndex + 1;
     if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
-
-    DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);
-    unsigned char** image_data  =   malloc(loadedTextures * sizeof(unsigned char*));
-    textureOffsets              = calloc(loadedTextures, sizeof(uint32_t));
-    textureSizes                = calloc(loadedTextures * 2, sizeof(int32_t));
-    texturePaletteOffsets       = calloc(loadedTextures, sizeof(uint32_t));
+    
     doubleSidedTexture          = calloc(loadedTextures,sizeof(bool));
     transparentTexture          = calloc(loadedTextures,sizeof(bool));
-    uint32_t totalPaletteColorsExtraSized = 200000;
-    texturePalettes             =   malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
-    int32_t* widths             =   malloc(loadedTextures * sizeof(int32_t));
-    int32_t* heights            =   malloc(loadedTextures * sizeof(int32_t));
-    int32_t* matchedParserIdxes =   malloc(loadedTextures * sizeof(int32_t));
+    DualLog("(%d) with max index %d, using stb_image version:  2.28...", loadedTextures, maxIndex);
+    size_t image_data_size = loadedTextures * sizeof(unsigned char*);
+    size_t textureOffsets_size = loadedTextures * sizeof(int32_t);
+    size_t textureSizes_size = loadedTextures * 2 * sizeof(uint32_t);
+    size_t texturePaletteOffsets_size = loadedTextures * sizeof(uint32_t);
+    uint32_t totalPaletteColorsExtraSized = 100000;
+    size_t texturePalettes_size = totalPaletteColorsExtraSized * sizeof(uint32_t);
+    size_t widths_size = loadedTextures * sizeof(int32_t);
+    size_t heights_size = loadedTextures * sizeof(int32_t);
+    size_t matchedParserIdxes_size = loadedTextures * sizeof(int32_t);
+    size_t Arena_textureLoading_size = image_data_size
+                                       + textureOffsets_size
+                                       + textureSizes_size
+                                       + texturePaletteOffsets_size
+                                       + texturePalettes_size
+                                       + widths_size
+                                       + heights_size
+                                       + matchedParserIdxes_size;
+    void* Arena_textureLoading = mmap(NULL, Arena_textureLoading_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    uint8_t* arenaCursor = (uint8_t*)Arena_textureLoading;
+    uint32_t* textureOffsets        = (uint32_t*)arenaCursor;       arenaCursor += textureOffsets_size;
+    int32_t* textureSizes           = (int32_t*)arenaCursor;        arenaCursor += textureSizes_size;
+    uint32_t* texturePaletteOffsets = (uint32_t*)arenaCursor;       arenaCursor +=  texturePaletteOffsets_size;
+    uint32_t* texturePalettes       = (uint32_t*)arenaCursor;       arenaCursor +=  texturePalettes_size;
+    int32_t* widths                 = (int32_t*)arenaCursor;        arenaCursor +=  widths_size;
+    int32_t* heights                = (int32_t*)arenaCursor;        arenaCursor +=  heights_size;
+    int32_t* matchedParserIdxes     = (int32_t*)arenaCursor;        arenaCursor +=  matchedParserIdxes_size;
+    unsigned char* image_data[loadedTextures];
     for (int32_t i = 0; i < loadedTextures; i++) {
         image_data[i] = NULL;
         widths[i] = heights[i] = 0;
@@ -125,7 +140,11 @@ void LoadTextures(void) {
     }
 
     malloc_trim(0);
-    uint8_t* all_indices = malloc(max_total_pixels * sizeof(uint8_t));
+    size_t all_indices_size = max_total_pixels * sizeof(uint8_t);
+    size_t Arena_textureLoading2_size = all_indices_size;
+    void* Arena_textureLoading2 = mmap(NULL, Arena_textureLoading2_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    uint8_t* cursorArena2 = (uint8_t*)Arena_textureLoading2;
+    uint8_t* all_indices = (uint8_t*)cursorArena2; cursorArena2 += all_indices_size;
     
     // Parallel loop for palette construction
     #pragma omp parallel
@@ -133,6 +152,7 @@ void LoadTextures(void) {
         #pragma omp for schedule(dynamic)
         for (uint16_t i = 0; i < loadedTextures; i++) {
             if (matchedParserIdxes[i] < 0 || !image_data[i]) continue;
+
             ColorEntry* color_table = NULL;
             uint32_t palette_size = 0; // Oversized larger than max pallete size for catching overflows.
             uint8_t* texture_indices = &all_indices[index_offsets[i]];
@@ -151,6 +171,7 @@ void LoadTextures(void) {
                     HASH_ADD_INT(color_table, color, entry);
                     per_texture_palettes[i][entry->index] = color;
                 }
+                
                 texture_indices[j / 4] = entry->index;
             }
             
@@ -190,34 +211,28 @@ void LoadTextures(void) {
         palette_offset += palette_size;
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;        
-        free(image_data[i]); // malloc_trim after this hasn't so far, after multiple tries, affected RAM loading.  Textures only increase ~3mb typically or less.
+        free(image_data[i]);
+        malloc_trim(0);
     }
 
     DualLog(" total pallete colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
-    free(all_indices);
     free(index_offsets);
     for (uint16_t i = 0; i < loadedTextures; i++) free(per_texture_palettes[i]);
     free(per_texture_palettes);
     free(per_texture_palette_sizes);
     free(color_pool);
-    free(image_data);
-    free(widths);
-    free(heights);
-    free(matchedParserIdxes);
     glDeleteBuffers(1, &stagingBuffer);
     malloc_trim(0);
     texturePalettesID = SetupSSBO(texturePalettesID, 16, totalPaletteColors * sizeof(uint32_t), texturePalettes, GL_STATIC_DRAW);
-    free(texturePalettes);
     textureOffsetsID = SetupSSBO(textureOffsetsID, 14, loadedTextures * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
-    free(textureOffsets);
     textureSizesID = SetupSSBO(textureSizesID, 15, loadedTextures * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
-    free(textureSizes);
     texturePaletteOffsetsID = SetupSSBO(texturePaletteOffsetsID, 17, loadedTextures * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
-    free(texturePaletteOffsets);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
     CHECK_GL_ERROR();
+    munmap(Arena_textureLoading , Arena_textureLoading_size );
+    munmap(Arena_textureLoading2, Arena_textureLoading2_size);
     malloc_trim(0);
     double end_time = get_time();
     DualLog(" took %f secs\n", end_time - start_time);

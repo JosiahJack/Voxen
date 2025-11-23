@@ -4995,3 +4995,5 @@ texture: 262
 index: 755
 model: 681
 texture: 553
+#player
+index: 767
