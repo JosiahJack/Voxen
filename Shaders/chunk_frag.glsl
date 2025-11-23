@@ -33,7 +33,6 @@ flat in uint NormalIndex;
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
-layout(std430, binding = 6) buffer LightShadowsEnabled { uint lightShadowsEnabled[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -152,7 +151,7 @@ void main() {
     int texIndexChecked = 0;
     if (texIndex >= 0) texIndexChecked = int(texIndex);
     ivec2 texSize = textureSizes[texIndexChecked];
-    vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y));//, 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
+    vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
@@ -252,9 +251,7 @@ void main() {
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
-        if (debugValue != 2 && shadowsEnabled > 0 && lightShadowsEnabled[lightIdxInPVS] > 0 && shadowIndex < 1600) {
-//             float NdL = max(dot(normal, toLight), 0.0);
-//             float smearness = attenuation * attenuation * 38.0 * clamp(distOverRange, 0.1, 1.0) * mix(8.0, 1.0, NdL);
+        if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
             float smearness = distOverRange * distOverRange * 20.0;
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);

@@ -17,6 +17,7 @@
 // TODO: Voxel GI?
 // TODO: Scripting engine for gameplay
 // TODO: Save/Load system
+#define _GNU_SOURCE
 #include <malloc.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -222,7 +223,7 @@ float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
 // Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
-GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, lightShadowsEnabledID, shadowMapsIndirectionID;
+GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, shadowMapsIndirectionID;
 uint32_t* voxelLightListsRaw = NULL;
 uint32_t* voxelLightListIndices = NULL;
 uint32_t* shadowmapIndirectionList = NULL;
@@ -230,9 +231,9 @@ uint16_t numDynamicLights;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
 float lightsRangeSquared[LIGHT_COUNT] = {0.0f};
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
-float*** lightViewProj = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
-float*** lightView = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
-FrustumPlane*** lightFrustumPlanes = NULL; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
+float (*lightView)[6][4][4] = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
+float (*lightViewProj)[6][4][4] = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
+FrustumPlane (*lightFrustumPlanes)[6][6] = NULL; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 // ----------------------------------------------------------------------------
 // ============================================================================
 // OpenGL / Rendering Helper Functions
@@ -642,9 +643,9 @@ void UpdateVoxelLightLists() {
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         #pragma GCC unroll 6
         for (int j=0;j<6;++j) {
-            mat4_lookat_from(lightView[i][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
-            mul_mat4(lightViewProj[i][j], shadowmapsPerspectiveProjection, lightView[i][j]);
-            ExtractFrustumPlanes(lightViewProj[i][j], lightFrustumPlanes[i][j]);
+            mat4_lookat_from((float*)lightView[i][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
+            mul_mat4((float*)lightViewProj[i][j], shadowmapsPerspectiveProjection, (float*)lightView[i][j]);
+            ExtractFrustumPlanes((float*)lightViewProj[i][j], lightFrustumPlanes[i][j]);
         }
     }
     
@@ -652,8 +653,6 @@ void UpdateVoxelLightLists() {
     glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
     glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
-
-uint32_t* lightShadowsEnabled = NULL;
 
 void VoxelLists() {
     DebugRAM("start of VoxelLists");
@@ -663,34 +662,18 @@ void VoxelLists() {
     voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  1008105 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     shadowmapIndirectionList = malloc(loadedLights * sizeof(uint32_t));
     lightsID = SetupSSBO(lightsID, 19, loadedLights * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    lightView = malloc(loadedLights * sizeof(float**));
-    lightViewProj = malloc(loadedLights * sizeof(float**));
-    lightFrustumPlanes = malloc(loadedLights * sizeof(FrustumPlane**));
-    for (int i=0;i<loadedLights;++i) {
-        lightView[i] = malloc(6 * sizeof(float*));
-        lightViewProj[i] = malloc(6 * sizeof(float*));
-        lightFrustumPlanes[i] = malloc(6 * sizeof(FrustumPlane*));
-        for (int j=0;j<6;++j) {
-            lightView[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
-            lightViewProj[i][j] = malloc(4 * 4 * sizeof(float)); // Matrix 4x4 for this cubemap face
-            lightFrustumPlanes[i][j] = malloc(6 * sizeof(FrustumPlane)); // Frustum Planes for this cubemap face
-        }
-    }
-    
+    lightView      = calloc(loadedLights * 6 * 4 * 4, sizeof(float));
+    lightViewProj  = calloc(loadedLights * 6 * 4 * 4, sizeof(float));
+    lightFrustumPlanes   = calloc(loadedLights * 6 * 6, sizeof(FrustumPlane));
     DebugRAM("prior to UpdateVoxelLightLists");
     UpdateVoxelLightLists();
     for (uint16_t i = 3; i < loadedInstances; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-    lightShadowsEnabled = malloc(loadedLights * sizeof(uint32_t));
-    memset(lightShadowsEnabled,1u,loadedLights * sizeof(uint32_t));
-    lightShadowsEnabledID = SetupSSBO(lightShadowsEnabledID, 6, loadedLights * sizeof(uint32_t), lightShadowsEnabled, GL_STATIC_DRAW);
     shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     DebugRAM("end of VoxelLists");
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
-    if (lightShadowsEnabled[lightIdx] == 0u) return;
-    
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -749,7 +732,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     glUniform1ui(lightIndex_shadowmaps, lightIdx);
     for (uint8_t face = 0; face < 6; face++) {
         glUniform1i(ssbo_indexBaseLoc_shadowmaps, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
-        glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, lightViewProj[lightIdx][face]);
+        glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
             if (instances[i].modelIndex >= loadedModels) continue;
@@ -770,6 +753,7 @@ void RenderShadowmap(uint16_t lightIdx) {
 }
 
 void RenderShadowmaps(void) {
+    DebugRAM("start of RenderShadowmaps");
     if (settings_Shadows < 1u) return;
 
     glUseProgram(shadowmapsClearShaderProgram);
@@ -788,14 +772,12 @@ void RenderShadowmaps(void) {
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
     
-    // This sort method is 0.027ms so not too worried about it at the moment.
+    // This sort method is 0.027ms... now that we do this whenever changing world cells, so like 0 to 3 times per second, it's rather worrisome.
 //     double sortStart = get_time();
     // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
     LightCandidate candidates[loadedLights];
     uint32_t candidateCount = 0;
     for (uint16_t i = 0; i < loadedLights; ++i) {
-        if (lightShadowsEnabled[i] == 0u) continue;
-
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -1285,6 +1267,7 @@ void InitializeEnvironment(void) {
             DebugRAM("setup gbuffer end");
             
             InitFontAtlasses();
+            DebugRAM("after InitFontAtlasses");
             glCreateBuffers(1, &textVBO);
             glCreateVertexArrays(1, &textVAO);    
             glEnableVertexArrayAttrib(textVAO, 0);
@@ -1294,9 +1277,11 @@ void InitializeEnvironment(void) {
             glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
             glVertexArrayAttribBinding(textVAO, 0, 0);
             glVertexArrayAttribBinding(textVAO, 1, 0);
+            DebugRAM("after textVBO, textVAO buffer creation");
 
             Input_MouselookApply(); // Input
             InitializeAudio(); // Audio
+            DebugRAM("after InitializeAudio");
             malloc_trim(0);
             DebugRAM("GL inits end");
         }
@@ -1317,7 +1302,8 @@ void InitializeEnvironment(void) {
     glfwSetWindowTitle(window,global_modname);
     int fp = open("./Textures/UI/menudot1.png", O_RDONLY);
     if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png: %s\n", strerror(errno)); exit(1); }
-            
+ 
+    DebugRAM("after setting window title");
     struct stat file_stat;
     fstat(fp, &file_stat);
     size_t file_size = file_stat.st_size;            
@@ -1329,18 +1315,24 @@ void InitializeEnvironment(void) {
     unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, 4);
     if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
 
+    DebugRAM("after loading window bar icon");
     GLFWimage image;
     image.width  = w;
     image.height = h;
     image.pixels = pixels;
     glfwSetWindowIcon(window, 1, &image);
     free(pixels);
-    RenderLoadingProgress(100,"Loading textures...");
+    munmap(file_buffer,file_size);
+    madvise(pixels, w * h * 4, MADV_DONTNEED);
+    malloc_trim(0);
+    DebugRAM("after freeing window bar icon");
+//     RenderLoadingProgress(100,"Loading textures...");
+//     DebugRAM("after RenderLoadingProgress for 'Loading textures...'");
     DualLog("Parallel Inits and window init took %f secs\n", get_time() - init_start_time);
     LoadTextures(); // Sequential due to GPU transfers
-    RenderLoadingProgress(100,"Loading models...");
+//     RenderLoadingProgress(100,"Loading models...");
     LoadModels(); // Sequential due to GPU transfers
-    RenderLoadingProgress(100,"Loading data...");
+//     RenderLoadingProgress(100,"Loading data...");
     LoadEntities(); // Had a note to do this after textures and models, didn't seem necessary but giving it a thread didn't help init times.
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol

@@ -333,7 +333,7 @@ extern bool noHUD;
 // ----------------------------------------------------------------------------
 // Text
 #define TEXT_BUFFER_SIZE 1024
-#define FONT_ATLAS_SIZE 4096
+#define FONT_ATLAS_SIZE 3072
 #define MAX_GLYPHS 8192      // Rough estimate for all ranges
 #define FONT_NORMAL 0
 #define FONT_STOPD 1
@@ -543,9 +543,6 @@ void DebugRAM(const char *context) {
 #pragma GCC diagnostic pop
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
-
-static inline float random() { return ((float)rand() / RAND_MAX); }
-static inline float crandom() { return 2.0f * (random() - 0.5f); }
 // ============================================================================
 #endif // VOXEN_ENGINE_IMPLEMENTATION
 // ----------------------------------------------------------------------------

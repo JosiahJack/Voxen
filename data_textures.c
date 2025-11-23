@@ -2,7 +2,6 @@
 #define _GNU_SOURCE
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
-#define STBI_MAX_DIMENSIONS 2048
 #include "External/stb_image.h"
 #include <errno.h>
 #include <sys/stat.h>
@@ -212,7 +211,7 @@ void LoadTextures(void) {
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;        
         free(image_data[i]);
-        malloc_trim(0);
+//         malloc_trim(0);
     }
 
     DualLog(" total pallete colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);

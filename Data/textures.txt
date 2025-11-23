@@ -1220,8 +1220,7 @@ index: 558
 index: 559
 #Textures/npc_gortiger.png
 index: 560
-#Textures/npc_hopper_detail.png
-index: 561
+
 #Textures/npc_hopper.png
 index: 562
 #Textures/npc_humanoidmutant.png

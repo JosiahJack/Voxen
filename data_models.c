@@ -29,8 +29,6 @@ DataParser model_parser;
 // Models
 uint32_t* modelVertexCounts = NULL;
 uint32_t* modelTriangleCounts = NULL;
-float** modelVertices = NULL;
-uint32_t** modelTriangles = NULL;
 GLuint* vbos = NULL;
 GLuint* tbos = NULL;
 GLuint modelBoundsID;
@@ -121,6 +119,7 @@ void add_mmap_cleanup(void* ptr, size_t size) {
 void cleanup_all_mmaps(void) {
     for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
     free(mmap_cleanup);
+    malloc_trim(0);
 }
 
 void LoadModels(void) {
@@ -138,8 +137,8 @@ void LoadModels(void) {
     DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
     modelVertexCounts   = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     modelTriangleCounts = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    float**  modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    uint32_t** modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     modelBounds         = mmap(NULL, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
     int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
@@ -187,6 +186,7 @@ void LoadModels(void) {
                 fclose(f);
                 md5(buf, sz, fbx_md5);
                 free(buf);
+                malloc_trim(0);
             }
 
             float  *cached_verts = NULL;
@@ -333,8 +333,14 @@ void LoadModels(void) {
     modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
-    DebugRAM("After Load Models");
     free(indexToParser);
     cleanup_all_mmaps();
+    for (int i = 0; i < loadedModels; ++i) {
+        if (modelVertexCounts[i] == 0) continue;
+        madvise(modelVertices[i], modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), MADV_DONTNEED);
+        madvise(modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t), MADV_DONTNEED);
+    }
+
     malloc_trim(0);
+    DebugRAM("After Load Models");
 }
