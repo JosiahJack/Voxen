@@ -201,8 +201,6 @@ typedef struct {
 
 UIImage uiImages[MAX_UI_IMAGES];
 uint32_t uiImageCount = 0;
-GLuint uiImageVAO, uiImageVBO;
-
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
 Color textColors[TEXT_COLOR_COUNT] = {
@@ -861,7 +859,7 @@ void RenderUIImages() {
     if (uiImageCount == 0) return;
 
     glUseProgram(chunkShaderProgram);
-    glBindVertexArray(uiImageVAO);
+    glBindVertexArray(textVAO);
     glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 1u);
     glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk, 1u);
     glProgramUniformMatrix4fv(chunkShaderProgram, viewProjLoc_chunk, 1, GL_FALSE, uiOrthoProjection);
@@ -910,7 +908,7 @@ void RenderUIImages() {
             glUniform1ui(specIndexLoc_chunk, BLACK_TEXTURE_IDX);
             glUniform1ui(normInstanceIndexLoc_chunk, BLACK_TEXTURE_IDX);
             glUniformMatrix4fv(matrixLoc_chunk, 1, GL_FALSE, (float[16]){1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1});
-            glNamedBufferData(uiImageVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
+            glNamedBufferData(textVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
             drawCallsRenderedThisFrame++;
             uiImageDrawCallsRenderedThisFrame++;
@@ -1218,17 +1216,6 @@ void InitializeEnvironment(void) {
             for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
             glBindVertexArray(0);
             DebugRAM("after vao chunk bind");
-            
-            glCreateBuffers(1, &uiImageVBO);
-            glCreateVertexArrays(1, &uiImageVAO);
-            glEnableVertexArrayAttrib(uiImageVAO, 0);
-            glEnableVertexArrayAttrib(uiImageVAO, 1);
-            glVertexArrayAttribFormat(uiImageVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-            glVertexArrayAttribFormat(uiImageVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // UV (vec2)
-            glVertexArrayVertexBuffer(uiImageVAO, 0, uiImageVBO, 0, 5 * sizeof(float));
-            glVertexArrayAttribBinding(uiImageVAO, 0, 0);
-            glVertexArrayAttribBinding(uiImageVAO, 1, 0);
-            DebugRAM("after ui image vao chunk bind");
 
             GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
             GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
@@ -1279,7 +1266,6 @@ void InitializeEnvironment(void) {
             glVertexArrayAttribBinding(textVAO, 0, 0);
             glVertexArrayAttribBinding(textVAO, 1, 0);
             DebugRAM("after textVBO, textVAO buffer creation");
-
             Input_MouselookApply(); // Input
             InitializeAudio(); // Audio
             DebugRAM("after InitializeAudio");
