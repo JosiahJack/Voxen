@@ -833,6 +833,7 @@ void RenderShadowmaps(void) {
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    malloc_trim(0);
     DebugRAM("end of RenderShadowmaps");
 }
 

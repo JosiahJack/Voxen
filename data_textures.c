@@ -118,6 +118,7 @@ void LoadTextures(void) {
             doubleSidedTexture[matchedParserIdxes[i]] = (texture_parser.entries[matchedParserIdxes[i]].entflags & ENTFLAG_DOUBLESIDED);
             transparentTexture[matchedParserIdxes[i]] = (texture_parser.entries[matchedParserIdxes[i]].entflags & ENTFLAG_TRANSPARENT);
             munmap(file_buffer, file_size);
+            malloc_trim(0);
         }
     }
 
@@ -211,11 +212,12 @@ void LoadTextures(void) {
         totalPixels += numberOfPixelsForThisTexture;
         totalPaletteColors += palette_size;        
         free(image_data[i]);
-//         malloc_trim(0);
+        malloc_trim(0);
     }
 
     DualLog(" total pallete colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     free(index_offsets);
+    malloc_trim(0);
     for (uint16_t i = 0; i < loadedTextures; i++) free(per_texture_palettes[i]);
     free(per_texture_palettes);
     free(per_texture_palette_sizes);

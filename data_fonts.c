@@ -1,5 +1,6 @@
 // data_fonts.c - Load Font Atlasses
 // #include "voxen.h" limited includes
+#define _GNU_SOURCE
 // #define FONT_GEN // Turn on when wanting to rebuild Font Atlases
 #include <malloc.h>
 #include <sys/mman.h>
@@ -270,11 +271,13 @@ static bool load_font_cache(const char *path, uint32_t expected_glyphs, const ui
     glCreateTextures(GL_TEXTURE_2D, 1, out_tex);
     glTextureStorage2D(*out_tex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(*out_tex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, p);
+    glFinish();
+    munmap(map, sz);
+    madvise(map, sz, MADV_DONTNEED);
     glTextureParameteri(*out_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(*out_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    munmap(map, sz);
     return true;
 }
 

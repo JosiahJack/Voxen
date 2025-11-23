@@ -1,5 +1,6 @@
 // stb_image.h - PNG Load System
 extern unsigned char *stbi_load_from_memory   (unsigned char const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
+void DualLog(const char* fmt, ...);
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 typedef unsigned short stbi__uint16;
@@ -12,12 +13,10 @@ typedef unsigned short stbi_us;
 typedef struct {
    stbi__uint32 img_x, img_y;
    int img_n, img_out_n;
-   int buflen;
-   unsigned char buffer_start[128];
    unsigned char *img_buffer, *img_buffer_end;
-   unsigned char *img_buffer_original, *img_buffer_original_end;
 } stbi__context;
 
+#include <malloc.h>
 #include <stdlib.h>
 void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
 void *memset(void *s, int c, size_t n);
@@ -48,27 +47,21 @@ inline static stbi_uc stbi__get8(stbi__context *s) {
    return 0;
 }
 
-static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp);
-static unsigned char *stbi__convert_format(unsigned char *data, int img_n, int req_comp, unsigned int x, unsigned int y);
+static int stbi__parse_png_file(stbi__png *z, int req_comp);
 
 extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp) {
    stbi__context s;
-   s.img_buffer = s.img_buffer_original = (stbi_uc *) buffer;
-   s.img_buffer_end = s.img_buffer_original_end = (stbi_uc *)buffer+len;
+   s.img_buffer = (stbi_uc *) buffer;
+   s.img_buffer_end = (stbi_uc *)buffer+len;
    void* result = NULL;
    stbi__png p;
    p.s = &s;
    if (req_comp < 0 || req_comp > 4) return 0;
-   if (stbi__parse_png_file(&p, 0, req_comp)) {
+   if (stbi__parse_png_file(&p, req_comp)) {
       if (p.depth > 8) return 0;
       
       result = p.out;
       p.out = NULL;
-      if (req_comp && req_comp != p.s->img_out_n) {
-         result = (void*)stbi__convert_format((unsigned char *) result, p.s->img_out_n, req_comp, p.s->img_x, p.s->img_y);
-         p.s->img_out_n = req_comp;
-         if (result == NULL) goto Label_ResultCheck;
-      }
       *x = p.s->img_x;
       *y = p.s->img_y;
       if (comp) *comp = p.s->img_n;
@@ -77,16 +70,9 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
    free(p.out);      p.out      = NULL;
    free(p.expanded); p.expanded = NULL;
    free(p.idata);    p.idata    = NULL;
-   Label_ResultCheck:
    if (result == NULL) return NULL;
    return (unsigned char *)result;
 }
-
-enum {
-   STBI__SCAN_load=0,
-   STBI__SCAN_type,
-   STBI__SCAN_header
-};
 
 static void stbi__skip(stbi__context *s, int n) {
    if (n == 0) return;  // already there!
@@ -115,46 +101,6 @@ static stbi__uint32 stbi__get32be(stbi__context *s) {
 }
 
 #define STBI__BYTECAST(x)  ((stbi_uc) ((x) & 255))  // truncate int to byte without warnings
-
-static stbi_uc stbi__compute_y(int r, int g, int b) {
-   return (stbi_uc) (((r*77) + (g*150) +  (29*b)) >> 8);
-}
-
-static unsigned char *stbi__convert_format(unsigned char *data, int img_n, int req_comp, unsigned int x, unsigned int y) {
-   int i,j;
-   unsigned char *good;
-   if (req_comp == img_n) return data;
-
-   good = (unsigned char *)malloc(req_comp * x * y);
-   for (j=0; j < (int) y; ++j) {
-      unsigned char *src  = data + j * x * img_n   ;
-      unsigned char *dest = good + j * x * req_comp;
-
-      #define STBI__COMBO(a,b)  ((a)*8+(b))
-      #define STBI__CASE(a,b)   case STBI__COMBO(a,b): for(i=x-1; i >= 0; --i, src += a, dest += b)
-      // convert source image with img_n components to one with req_comp components;
-      // avoid switch per pixel, so use switch per scanline and massive macros
-      switch (STBI__COMBO(img_n, req_comp)) {
-         STBI__CASE(1,2) { dest[0]=src[0]; dest[1]=255;                                     } break;
-         STBI__CASE(1,3) { dest[0]=dest[1]=dest[2]=src[0];                                  } break;
-         STBI__CASE(1,4) { dest[0]=dest[1]=dest[2]=src[0]; dest[3]=255;                     } break;
-         STBI__CASE(2,1) { dest[0]=src[0];                                                  } break;
-         STBI__CASE(2,3) { dest[0]=dest[1]=dest[2]=src[0];                                  } break;
-         STBI__CASE(2,4) { dest[0]=dest[1]=dest[2]=src[0]; dest[3]=src[1];                  } break;
-         STBI__CASE(3,4) { dest[0]=src[0];dest[1]=src[1];dest[2]=src[2];dest[3]=255;        } break;
-         STBI__CASE(3,1) { dest[0]=stbi__compute_y(src[0],src[1],src[2]);                   } break;
-         STBI__CASE(3,2) { dest[0]=stbi__compute_y(src[0],src[1],src[2]); dest[1] = 255;    } break;
-         STBI__CASE(4,1) { dest[0]=stbi__compute_y(src[0],src[1],src[2]);                   } break;
-         STBI__CASE(4,2) { dest[0]=stbi__compute_y(src[0],src[1],src[2]); dest[1] = src[3]; } break;
-         STBI__CASE(4,3) { dest[0]=src[0];dest[1]=src[1];dest[2]=src[2];                    } break;
-         default: free(data); free(good); return 0;
-      }
-      #undef STBI__CASE
-   }
-
-   free(data);
-   return good;
-}
 
 typedef struct {
    stbi__uint16 fast[1 << 9];
@@ -294,28 +240,6 @@ inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
    return stbi__zhuffman_decode_slowpath(a, z);
 }
 
-static int stbi__zexpand(stbi__zbuf *z, char *zout, int n) { // need to make room for n bytes
-   char *q;
-   unsigned int cur, limit, old_limit;
-   z->zout = zout;
-   if (!z->z_expandable) return 0;
-   
-   cur   = (unsigned int) (z->zout - z->zout_start);
-   limit = old_limit = (unsigned) (z->zout_end - z->zout_start);
-   if (UINT_MAX - cur < (unsigned) n) return 0;
-   
-   while (cur + n > limit) {
-      if(limit > UINT_MAX / 2) return 0;
-      
-      limit *= 2;
-   }
-   q = (char *) realloc(z->zout_start, limit);
-   z->zout_start = q;
-   z->zout       = q + cur;
-   z->zout_end   = q + limit;
-   return 1;
-}
-
 static const int stbi__zlength_base[31] = { 3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,0,0 };
 static const int stbi__zlength_extra[31] = { 0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0 };
 static const int stbi__zdist_base[32] = { 1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577,0,0};
@@ -327,10 +251,8 @@ static int stbi__parse_huffman_block(stbi__zbuf *a) {
       int z = stbi__zhuffman_decode(a, &a->z_length);
       if (z < 256) {
          if (z < 0) return 0; // error in huffman codes
-         if (zout >= a->zout_end) {
-            if (!stbi__zexpand(a, zout, 1)) return 0;
-            zout = a->zout;
-         }
+         if (zout >= a->zout_end) return 0;
+         
          *zout++ = (char) z;
       } else {
          stbi_uc *p;
@@ -348,10 +270,8 @@ static int stbi__parse_huffman_block(stbi__zbuf *a) {
          dist = stbi__zdist_base[z];
          if (stbi__zdist_extra[z]) dist += stbi__zreceive(a, stbi__zdist_extra[z]);
          if (zout - a->zout_start < dist) return 0;
-         if (zout + len > a->zout_end) {
-            if (!stbi__zexpand(a, zout, len)) return 0;
-            zout = a->zout;
-         }
+         if (zout + len > a->zout_end) return 0;
+
          p = (stbi_uc *) (zout - dist);
          if (dist == 1) { // run of one byte; common in images.
             stbi_uc v = *p;
@@ -433,8 +353,7 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    nlen = header[3] * 256 + header[2];
    if (nlen != (len ^ 0xffff)) return 0;
    if (a->zbuffer + len > a->zbuffer_end) return 0;
-   if (a->zout + len > a->zout_end)
-      if (!stbi__zexpand(a, a->zout, len)) return 0;
+   if (a->zout + len > a->zout_end) return 0;
    memcpy(a->zout, a->zbuffer, len);
    a->zbuffer += len;
    a->zout += len;
@@ -467,10 +386,9 @@ static const stbi_uc stbi__zdefault_distance[32] = {
    5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5
 };
 
-static int stbi__parse_zlib(stbi__zbuf *a, int parse_header) {
+static int stbi__parse_zlib(stbi__zbuf *a) {
    int final, type;
-   if (parse_header)
-      if (!stbi__parse_zlib_header(a)) return 0;
+   if (!stbi__parse_zlib_header(a)) return 0;
    a->num_bits = 0;
    a->code_buffer = 0;
    do {
@@ -494,42 +412,20 @@ static int stbi__parse_zlib(stbi__zbuf *a, int parse_header) {
    return 1;
 }
 
-static int stbi__do_zlib(stbi__zbuf *a, char *obuf, int olen, int exp, int parse_header) {
-   a->zout_start = obuf;
-   a->zout       = obuf;
-   a->zout_end   = obuf + olen;
-   a->z_expandable = exp;
-   return stbi__parse_zlib(a, parse_header);
-}
-
-char *stbi_zlib_decode_malloc_guesssize(const char *buffer, int len, int initial_size, int *outlen) {
+char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, int initial_size, int *outlen) {
    stbi__zbuf a;
-   char *p = (char *) malloc(initial_size);
+   char *p = (char *)malloc(initial_size);
    if (p == NULL) return NULL;
    a.zbuffer = (stbi_uc *) buffer;
    a.zbuffer_end = (stbi_uc *) buffer + len;
-   if (stbi__do_zlib(&a, p, initial_size, 1, 1)) {
+   a.zout_start = p;
+   a.zout       = p;
+   a.zout_end   = p + initial_size;
+   a.z_expandable = 1;
+   if (stbi__parse_zlib(&a)) {
       if (outlen) *outlen = (int) (a.zout - a.zout_start);
       return a.zout_start;
-   } else {
-      free(a.zout_start);
-      return NULL;
-   }
-}
-
-char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, int initial_size, int *outlen, int parse_header) {
-   stbi__zbuf a;
-   char *p = (char *) malloc(initial_size);
-   if (p == NULL) return NULL;
-   a.zbuffer = (stbi_uc *) buffer;
-   a.zbuffer_end = (stbi_uc *) buffer + len;
-   if (stbi__do_zlib(&a, p, initial_size, 1, parse_header)) {
-      if (outlen) *outlen = (int) (a.zout - a.zout_start);
-      return a.zout_start;
-   } else {
-      free(a.zout_start);
-      return NULL;
-   }
+   } else return NULL;
 }
 
 typedef struct {
@@ -560,7 +456,7 @@ static stbi_uc first_row_filter[5] = {
    STBI__F_paeth_first
 };
 
-static int stbi__paeth(int a, int b, int c) {
+inline static int stbi__paeth(int a, int b, int c) {
    int p = a + b - c;
    int pa = abs(p-a);
    int pb = abs(p-b);
@@ -698,17 +594,16 @@ static int stbi__expand_png_palette(stbi__png *a, stbi_uc *palette, int pal_img_
 
 #define STBI__PNG_TYPE(a,b,c,d)  (((unsigned) (a) << 24) + ((unsigned) (b) << 16) + ((unsigned) (c) << 8) + (unsigned) (d))
 
-static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp) {
+static int stbi__parse_png_file(stbi__png *z, int req_comp) {
    stbi_uc palette[1024], pal_img_n=0;
    stbi_uc has_trans=0, tc[3]={0};
    stbi__uint32 ioff=0, idata_limit=0, i, pal_len=0;
-   int first=1,k, color=0;
+   int first=1, color=0;
    stbi__context *s = z->s;
    z->expanded = NULL;
    z->idata = NULL;
    z->out = NULL;
    if (!stbi__check_png_header(s)) return 0;
-   if (scan == STBI__SCAN_type) return 1;
 
    for (;;) {
       stbi__pngchunk c = stbi__get_chunk_header(s);
@@ -759,19 +654,11 @@ static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp) {
             if (first) return 0;
             if (z->idata) return 0;
             if (pal_img_n) {
-               if (scan == STBI__SCAN_header) { s->img_n = 4; return 1; }
                if (pal_len == 0) return 0;
                if (c.length > pal_len) return 0;
                
                pal_img_n = 4;
                for (i=0; i < c.length; ++i) palette[i*4+3] = stbi__get8(s);
-            } else {
-               if (!(s->img_n & 1)) return 0;
-               if (c.length != (stbi__uint32) s->img_n*2) return 0;
-               has_trans = 1;
-               // non-paletted with tRNS = constant alpha. if header-scanning, we can stop now.
-               if (scan == STBI__SCAN_header) { ++s->img_n; return 1; }
-               for (k = 0; k < s->img_n; ++k) tc[k] = (stbi_uc)(stbi__get16be(s) & 255) * stbi__depth_scale_table[z->depth]; // non 8-bit images will be larger
             }
             break;
          }
@@ -779,19 +666,13 @@ static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp) {
          case STBI__PNG_TYPE('I','D','A','T'): {
             if (first) return 0;
             if (pal_img_n && !pal_len) return 0;
-            if (scan == STBI__SCAN_header) {
-               // header scan definitely stops at first IDAT
-               if (pal_img_n) s->img_n = pal_img_n;
-               return 1;
-            }
-            
             if (c.length > (1u << 30)) return 0;
             if ((int)(ioff + c.length) < (int)ioff) return 0;
             if (ioff + c.length > idata_limit) {
                stbi_uc *p;
                if (idata_limit == 0) idata_limit = c.length > 4096 ? c.length : 4096;
                while (ioff + c.length > idata_limit) idata_limit *= 2;
-               p = (stbi_uc *) realloc(z->idata,idata_limit);
+               p = (stbi_uc *)realloc(z->idata,idata_limit);
                z->idata = p;
             }
             
@@ -803,12 +684,11 @@ static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp) {
          case STBI__PNG_TYPE('I','E','N','D'): {
             stbi__uint32 raw_len, bpl;
             if (first) return 0;
-            if (scan != STBI__SCAN_load) return 1;
             if (z->idata == NULL) return 0;
             // initial guess for decoded data size to avoid unnecessary reallocs
             bpl = (s->img_x * 8 + 7) / 8; // bytes per line, per component
             raw_len = bpl * s->img_y * s->img_n /* pixels */ + s->img_y /* filter mode per row */;
-            z->expanded = (stbi_uc *) stbi_zlib_decode_malloc_guesssize_headerflag((char *) z->idata, ioff, raw_len, (int *) &raw_len, 1);
+            z->expanded = (stbi_uc *)stbi_zlib_decode_malloc_guesssize_headerflag((char *) z->idata, ioff, raw_len, (int *) &raw_len);
             if (z->expanded == NULL) return 0; // zlib should set error
             free(z->idata); z->idata = NULL;
             if ((req_comp == s->img_n+1 && req_comp != 3 && !pal_img_n) || has_trans)
