@@ -7,19 +7,9 @@
 #include "./External/glad/gl.h"
 
 #ifndef GLAD_IMPL_UTIL_C_
-#define GLAD_IMPL_UTIL_C_
-
-#ifdef _MSC_VER
-#define GLAD_IMPL_UTIL_SSCANF sscanf_s
-#else
-#define GLAD_IMPL_UTIL_SSCANF sscanf
-#endif
-
+    #define GLAD_IMPL_UTIL_C_
+    #define GLAD_IMPL_UTIL_SSCANF sscanf
 #endif /* GLAD_IMPL_UTIL_C_ */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 int GLAD_GL_VERSION_1_0 = 0;
 int GLAD_GL_VERSION_1_1 = 0;
@@ -1788,7 +1778,3 @@ void gladLoaderUnloadGL(void) {
 }
 
 #endif /* GLAD_GL */
-
-#ifdef __cplusplus
-}
-#endif

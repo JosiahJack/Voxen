@@ -138,7 +138,7 @@
 #elif defined(_WIN32) && defined(GLFW_DLL)
  /* We are calling a GLFW Win32 DLL */
  #define GLFWAPI __declspec(dllimport)
-#elif defined(__GNUC__) && defined(_GLFW_BUILD_DLL)
+#elif defined(_GLFW_BUILD_DLL)
  /* We are building GLFW as a Unix shared library */
  #define GLFWAPI __attribute__((visibility("default")))
 #else

@@ -29,10 +29,6 @@
 #ifndef GLAD_GL_H_
 #define GLAD_GL_H_
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wreserved-id-macro"
-#endif
 #ifdef __gl_h_
   #error OpenGL (gl.h) header already included (API: gl), remove previous include!
 #endif
@@ -49,16 +45,9 @@
   #error OpenGL (gl3ext.h) header already included (API: gl), remove previous include!
 #endif
 #define __gl3ext_h_ 1
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 
 #define GLAD_GL
 #define GLAD_OPTION_GL_LOADER
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #ifndef GLAD_PLATFORM_H_
 #define GLAD_PLATFORM_H_
@@ -88,16 +77,6 @@ extern "C" {
 #endif
 
 #ifndef GLAD_PLATFORM_UWP
-  #if defined(_MSC_VER) && !defined(GLAD_INTERNAL_HAVE_WINAPIFAMILY)
-    #ifdef __has_include
-      #if __has_include(<winapifamily.h>)
-        #define GLAD_INTERNAL_HAVE_WINAPIFAMILY 1
-      #endif
-    #elif _MSC_VER >= 1700 && !_USING_V110_SDK71_
-      #define GLAD_INTERNAL_HAVE_WINAPIFAMILY 1
-    #endif
-  #endif
-
   #ifdef GLAD_INTERNAL_HAVE_WINAPIFAMILY
     #include <winapifamily.h>
     #if !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP) && WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP)
@@ -110,31 +89,18 @@ extern "C" {
   #endif
 #endif
 
-#ifdef __GNUC__
-  #define GLAD_GNUC_EXTENSION __extension__
-#else
-  #define GLAD_GNUC_EXTENSION
-#endif
-
+#define GLAD_GNUC_EXTENSION __extension__
 #define GLAD_UNUSED(x) (void)(x)
 
 #ifndef GLAD_API_CALL
   #if defined(GLAD_API_CALL_EXPORT)
     #if GLAD_PLATFORM_WIN32 || defined(__CYGWIN__)
       #if defined(GLAD_API_CALL_EXPORT_BUILD)
-        #if defined(__GNUC__)
-          #define GLAD_API_CALL __attribute__ ((dllexport)) extern
-        #else
-          #define GLAD_API_CALL __declspec(dllexport) extern
-        #endif
+        #define GLAD_API_CALL __attribute__ ((dllexport)) extern
       #else
-        #if defined(__GNUC__)
-          #define GLAD_API_CALL __attribute__ ((dllimport)) extern
-        #else
-          #define GLAD_API_CALL __declspec(dllimport) extern
-        #endif
+        #define GLAD_API_CALL __attribute__ ((dllimport)) extern
       #endif
-    #elif defined(__GNUC__) && defined(GLAD_API_CALL_EXPORT_BUILD)
+    #elif defined(GLAD_API_CALL_EXPORT_BUILD)
       #define GLAD_API_CALL __attribute__ ((visibility ("default"))) extern
     #else
       #define GLAD_API_CALL extern
@@ -3555,7 +3521,4 @@ GLAD_API_CALL void gladLoaderUnloadGL(void);
 
 #endif
 
-#ifdef __cplusplus
-}
-#endif
 #endif

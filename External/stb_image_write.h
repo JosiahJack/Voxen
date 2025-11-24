@@ -113,16 +113,7 @@ static FILE *stbiw__fopen(char const *filename, char const *mode)
    if (0 == MultiByteToWideChar(65001 /* UTF8 */, 0, mode, -1, wMode, sizeof(wMode)/sizeof(*wMode)))
       return 0;
 
-#if defined(_MSC_VER) && _MSC_VER >= 1400
-   if (0 != _wfopen_s(&f, wFilename, wMode))
-      f = 0;
-#else
    f = _wfopen(wFilename, wMode);
-#endif
-
-#elif defined(_MSC_VER) && _MSC_VER >= 1400
-   if (0 != fopen_s(&f, filename, mode))
-      f=0;
 #else
    f = fopen(filename, mode);
 #endif

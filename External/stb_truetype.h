@@ -249,11 +249,7 @@ typedef int stbtt__test_oversample_pow2[(STBTT_MAX_OVERSAMPLE & (STBTT_MAX_OVERS
 #define STBTT_RASTERIZER_VERSION 2
 #endif
 
-#ifdef _MSC_VER
-#define STBTT__NOTUSED(v)  (void)(v)
-#else
 #define STBTT__NOTUSED(v)  (void)sizeof(v)
-#endif
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -3057,11 +3053,8 @@ STBTT_DEF void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int
    *xpos += b->xadvance;
 }
 
-#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
-#endif
-
 STBTT_DEF int stbtt_GetFontOffsetForIndex(const unsigned char *data, int index) {
    return stbtt_GetFontOffsetForIndex_internal((unsigned char *) data, index);
 }
@@ -3069,9 +3062,6 @@ STBTT_DEF int stbtt_GetFontOffsetForIndex(const unsigned char *data, int index) 
 STBTT_DEF int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, int offset) {
    return stbtt_InitFont_internal(info, (unsigned char *) data, offset);
 }
-
-#if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
-#endif
 
 #endif // STB_TRUETYPE_IMPLEMENTATION
