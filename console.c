@@ -44,27 +44,26 @@ static void AddToHistory(const char* entry) {
     }
 }
 
-// TODO: Hook up to up arrow, down arrow!
-// static void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
-//     if (direction == 1) { // up
-//         if (historyPos > 0) {
-//             historyPos--;
-//             strcpy(consoleEntryText, history[historyPos]);
-//             currentEntryLength = strlen(consoleEntryText);
-//         }
-//     } else if (direction == -1) { // down
-//         if (historyPos < numHistory) {
-//             historyPos++;
-//             if (historyPos == numHistory) {
-//                 consoleEntryText[0] = '\0';
-//                 currentEntryLength = 0;
-//             } else {
-//                 strcpy(consoleEntryText, history[historyPos]);
-//                 currentEntryLength = strlen(consoleEntryText);
-//             }
-//         }
-//     }
-// }
+static void RecallHistory(int direction) { // direction 1 up (older), -1 down (newer)
+    if (direction == 1) { // up
+        if (historyPos > 0) {
+            historyPos--;
+            strcpy(consoleEntryText, history[historyPos]);
+            currentEntryLength = strlen(consoleEntryText);
+        }
+    } else if (direction == -1) { // down
+        if (historyPos < numHistory) {
+            historyPos++;
+            if (historyPos == numHistory) {
+                consoleEntryText[0] = '\0';
+                currentEntryLength = 0;
+            } else {
+                strcpy(consoleEntryText, history[historyPos]);
+                currentEntryLength = strlen(consoleEntryText);
+            }
+        }
+    }
+}
 
 static void EnterNoclip(void) {
     // PlayerMovement.a.CheatNoclip = true;
@@ -428,6 +427,12 @@ void ProcessConsoleCommand(const char* command) {
 }
 
 void ConsoleEmulator(int32_t keycode) {
+    if (keycode == GLFW_KEY_UP) {
+        RecallHistory(1);
+    } else if (keycode == GLFW_KEY_DOWN) {
+        RecallHistory(-1);
+    } 
+    
     if (keycode == GLFW_KEY_U && keyStates[GLFW_KEY_LEFT_CONTROL].down) {
         consoleEntryText[0] = '\0'; // Clear the input
         currentEntryLength = 0;

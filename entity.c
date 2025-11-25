@@ -746,7 +746,6 @@ void LoadLevel(uint8_t curlevel) {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
             AddInstance(entIdx, parent, lineNum);
-            DualLogWarn("Instance %u (entIdx %u) has collider type %d\n", instanceIdx, entIdx, instances[parent].collider);
             AddChild0(entities[entIdx].child0, parent, entIdx, &instanceIdx, lineNum);
             AddChild1(entities[entIdx].child1, parent, entIdx, &instanceIdx, lineNum);
         }

@@ -10,7 +10,7 @@ void UpdatePlayerFacingAngles(void);
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
-bool noclip = false;
+bool noclip = true;
 bool god = true;
 bool notarget = false;
 bool fatigueCheat = false;
@@ -140,7 +140,7 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
         *aabb_min = world_min;
         *aabb_max = world_max;
         return true;
-    } else if (e->collider == COLLIDER_TYPE_CONVEXMESH) {
+    }/* else if (e->collider == COLLIDER_TYPE_CONVEXMESH) {
         uint16_t modelIdx = e->colliderMeshIndex;
         if (modelIdx >= loadedModels) { DualLogError("Invalid mesh for GetAABB\n"); return false; }
 
@@ -179,9 +179,9 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
         *aabb_min = world_min;
         *aabb_max = world_max;
         return true;
-    }
+    }*/
     
-    DualLogError("Invalid collider for GetAABB\n");
+//     DualLogError("Invalid collider for GetAABB\n");
     return false;
 }
 

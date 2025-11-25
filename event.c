@@ -8,6 +8,7 @@ double lastJournalWriteTime = 0;
 FILE* activeLogFile = NULL;
 FILE* console_log_file = NULL;
 const char* manualLogName;
+bool usingManualLog = false;
 bool log_playback = false;
 Event eventQueue[MAX_EVENTS_PER_FRAME]; // Queue for events to process this frame
 Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
@@ -80,9 +81,13 @@ int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float p
 void JournalLog(void) {
     FILE* fp;
     if (journalFirstWrite) {
-        fp = fopen("./voxen.dem", "wb"); // Overwrite for first write.
+        if (usingManualLog) fp = fopen(manualLogName, "wb"); // Overwrite for first write.
+        else fp = fopen("voxen.dem", "wb"); // Overwrite for first write.
         journalFirstWrite = false;
-    } else fp = fopen("./voxen.dem", "ab"); // Append
+    } else {
+        if (usingManualLog) fp = fopen(manualLogName, "ab"); // Append
+        else fp = fopen("voxen.dem", "ab"); // Append
+    }
 
     if (!fp) { DualLogError("Failed to open voxen.dem for journal log\n"); return; }
 
@@ -141,10 +146,10 @@ int32_t ReadActiveLog() {
 // Convert the binary .dem file into human readable text
 void JournalDump(const char* dem_file) {
     FILE* fpR = fopen(dem_file, "rb");
-    if (!fpR) { DualLogError("Failed to open .dem file\n"); exit(1); }
+    if (!fpR) { DualLogError("JournalDump failed to open .dem file\n"); exit(1); }
 
     FILE* fpW = fopen("./log_dump.txt", "wb");
-    if (!fpW) { DualLogError("Failed to open voxen.dem\n"); exit(1); }
+    if (!fpW) { DualLogError("JournalDump failed to open .txt\n"); exit(1); }
 
     Event event;
     while (fread(&event, sizeof(Event), 1, fpR) == 1) {
@@ -181,11 +186,13 @@ void EventSystemInit(int32_t argc, char* command, char* command_input1) {
     eventQueue[eventIndex].timestamp = get_time();
     clear_ev_journal(); // Initialize the event journal as empty.
     eventJournal[eventJournalIndex].timestamp = get_time();
+    usingManualLog = false;
     if (argc == 3 && strcmp(command, "play") == 0) { // Log playback
         DualLog("Playing log: %s\n", command_input1);
         OpenLogForPlayback(command_input1);
     } else if (argc == 3 && strcmp(command, "record") == 0) { // Log record
-        manualLogName = command_input1; // TODO: Add manual log naming support from this cli arg.
+        manualLogName = command_input1;
+        usingManualLog = true;
     }
     
     last_time = get_time();

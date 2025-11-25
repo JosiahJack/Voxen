@@ -3594,36 +3594,12 @@ typedef struct
 
 MA_API ma_resource_manager_pipeline_notifications ma_resource_manager_pipeline_notifications_init(void);
 
-
-
-/* BEGIN BACKWARDS COMPATIBILITY */
-/* TODO: Remove this block in version 0.12. */
-#if 1
-#define ma_resource_manager_job                         ma_job
-#define ma_resource_manager_job_init                    ma_job_init
-#define MA_JOB_TYPE_RESOURCE_MANAGER_QUEUE_FLAG_NON_BLOCKING MA_JOB_QUEUE_FLAG_NON_BLOCKING
-#define ma_resource_manager_job_queue_config            ma_job_queue_config
-#define ma_resource_manager_job_queue_config_init       ma_job_queue_config_init
-#define ma_resource_manager_job_queue                   ma_job_queue
-#define ma_resource_manager_job_queue_get_heap_size     ma_job_queue_get_heap_size
-#define ma_resource_manager_job_queue_init_preallocated ma_job_queue_init_preallocated
-#define ma_resource_manager_job_queue_init              ma_job_queue_init
-#define ma_resource_manager_job_queue_uninit            ma_job_queue_uninit
-#define ma_resource_manager_job_queue_post              ma_job_queue_post
-#define ma_resource_manager_job_queue_next              ma_job_queue_next
-#endif
-/* END BACKWARDS COMPATIBILITY */
-
-
-
-
 /* Maximum job thread count will be restricted to this, but this may be removed later and replaced with a heap allocation thereby removing any limitation. */
 #ifndef MA_RESOURCE_MANAGER_MAX_JOB_THREAD_COUNT
 #define MA_RESOURCE_MANAGER_MAX_JOB_THREAD_COUNT    64
 #endif
 
-typedef enum
-{
+typedef enum {
     /* Indicates ma_resource_manager_next_job() should not block. Only valid when the job thread count is 0. */
     MA_RESOURCE_MANAGER_FLAG_NON_BLOCKING = 0x00000001,
 
@@ -5340,31 +5316,26 @@ static MA_INLINE void ma_zero_memory_default(void* p, size_t sz)
 
 static MA_INLINE double ma_sind(double x)
 {
-    /* TODO: Implement custom sin(x). */
     return vsinf(x);
 }
 
 static MA_INLINE double ma_expd(double x)
 {
-    /* TODO: Implement custom exp(x). */
     return vexp(x);
 }
 
 static MA_INLINE double ma_logd(double x)
 {
-    /* TODO: Implement custom log(x). */
     return vlog(x);
 }
 
 static MA_INLINE double ma_powd(double x, double y)
 {
-    /* TODO: Implement custom pow(x, y). */
     return vpow(x, y);
 }
 
 static MA_INLINE double ma_sqrtd(double x)
 {
-    /* TODO: Implement custom sqrt(x). */
     return vsqrtf(x);
 }
 

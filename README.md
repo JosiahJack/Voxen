@@ -765,3 +765,41 @@ Individual static variable impacts:
 000000000068205a 0000000000000001 B currentLevel
 0000000000676940 0000000000000001 B consoleActive
 ```
+
+cloc --by-file --exclude-dir=temp_build,.git,Audio,Data,Fonts,Models,Screenshots,Scripts,Shaders,Textures,Tools,External ./
+      31 text files.
+      31 unique files.                              
+       5 files ignored.
+
+github.com/AlDanial/cloc v 1.90  T=0.02 s (1086.0 files/s, 439666.1 lines/s)
+----------------------------------------------------------------------------------
+File                                           blank        comment           code
+----------------------------------------------------------------------------------
+./voxen.c                                        172            151           1476
+./entity.c                                        73             12            714
+./dynamic_culling.c                               89             30            588
+./physics.c                                       69            116            542
+./voxen.h                                         40             57            461
+./data_fonts.c                                    49              8            380
+./console.c                                       20             80            372
+./data_models.c                                   37              3            306
+./data_text.c                                     32              3            303
+./citadel_enumerations.h                          28             28            297
+./data_parser.c                                   37             11            263
+./data_textures.c                                 22              5            214
+./event.c                                         36             16            187
+./helpers.c                                       25              5            179
+./input.c                                         29              5            167
+./audio.c                                         26              7            140
+./entity.h                                        13              6             95
+./build.sh                                         5              3             53
+./event.h                                          6              4             48
+./matvecquat.c                                     4              3             41
+./vmath.h                                          2              0             38
+./.github/workflows/main.yml                       0              0             28
+./matvecquat.h                                     0              0             24
+./test_voxen_restart_x_times.sh                    2              0             17
+./patches.c                                        2             91             15
+----------------------------------------------------------------------------------
+SUM:                                             818            644           6948
+----------------------------------------------------------------------------------
