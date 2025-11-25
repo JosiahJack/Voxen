@@ -46,3 +46,22 @@ void normalize_quaternion(Quaternion* q) {
     if (mag > 1e-6f) {q->w /= mag; q->x /= mag;  q->y /= mag; q->z /= mag; }
     else { q->w = 1.0f; q->x = q->y = q->z = 0.0f; }
 }
+
+Quaternion mul_quaternion(const Quaternion a, const Quaternion b) {
+    Quaternion res;
+    res.w = a.w * b.w - dot_vector3((Vector3){a.x, a.y, a.z}, (Vector3){b.x, b.y, b.z});
+    Vector3 cross_part = cross_vector3((Vector3){a.x, a.y, a.z}, (Vector3){b.x, b.y, b.z});
+    Vector3 w_parts = scale_vector3((Vector3){a.x, a.y, a.z}, b.w);
+    Vector3 wb_parts = scale_vector3((Vector3){b.x, b.y, b.z}, a.w);
+    Vector3 xyz = add_vector3(add_vector3(cross_part, w_parts), wb_parts);
+    res.x = xyz.x; res.y = xyz.y; res.z = xyz.z;
+    return res;
+}
+
+Vector3 rotate_quaternion(const Quaternion q, const Vector3 v) {
+    Quaternion vq = {0.0f, v.x, v.y, v.z};
+    Quaternion q_conj = conjugate_quaternion(q);
+    Quaternion temp = mul_quaternion(q, vq);
+    Quaternion result = mul_quaternion(temp, q_conj);
+    return (Vector3){result.x, result.y, result.z};
+}

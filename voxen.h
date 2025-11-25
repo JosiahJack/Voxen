@@ -103,7 +103,7 @@ void LoadTextures(void);
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 extern float* modelBounds;
-
+extern float** modelVertices;
 extern GLuint* vbos;
 extern GLuint* tbos;
 extern uint16_t loadedTextures;

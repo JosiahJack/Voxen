@@ -151,6 +151,28 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
 }
 
 void ProcessInput(void) {
+    if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
+    if (keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(window);
+    if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
+    
+    // Debug inputs
+    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_R].pressed) {
+        debugView++;
+        if (debugView > 4) debugView = 0;
+        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
+        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
+    }
+
+    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_Y].pressed) {
+        debugValue++;
+        if (debugValue > 6) debugValue = 0;
+        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
+        glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
+    }
+    
+    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
+    // End Debug Inputs
+    
     if (gamePaused || consoleActive) return;
 
     float moveForce = 1800.0f;
@@ -168,34 +190,13 @@ void ProcessInput(void) {
         AddForce(PLAYER1, force, FORCEMODE_ACCUMULATE);
     }
 
-    // Jump
-    if (keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) {
+    if (keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) { // Jump
         AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, FORCEMODE_IMPULSE);
         flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
     }
-    
-    if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
-    if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
     
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;
         inventoryMode = !inventoryMode;
     }
-    
-    if (keyStates[GLFW_KEY_R].pressed) {
-        debugView++;
-        if (debugView > 4) debugView = 0;
-        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
-        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
-    }
-
-    if (keyStates[GLFW_KEY_Y].pressed) {
-        debugValue++;
-        if (debugValue > 6) debugValue = 0;
-        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
-        glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
-    }
-    
-    if (keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(window);
-    if (keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
 }

@@ -86,10 +86,7 @@ static void ExitNoclip(void) {
 }
 
 void ProcessConsoleCommand(const char* command) {
-    if (command == NULL || strlen(command) == 0) {
-        ToggleConsole();
-        return;
-    }
+    if (command == NULL || strlen(command) == 0) { ToggleConsole(); return; }
 
     char ts[TEXT_BUFFER_SIZE];
     strncpy(ts, command, TEXT_BUFFER_SIZE - 1);
@@ -427,11 +424,8 @@ void ProcessConsoleCommand(const char* command) {
 }
 
 void ConsoleEmulator(int32_t keycode) {
-    if (keycode == GLFW_KEY_UP) {
-        RecallHistory(1);
-    } else if (keycode == GLFW_KEY_DOWN) {
-        RecallHistory(-1);
-    } 
+    if (keycode == GLFW_KEY_UP) RecallHistory(1);
+    else if (keycode == GLFW_KEY_DOWN) RecallHistory(-1);
     
     if (keycode == GLFW_KEY_U && keyStates[GLFW_KEY_LEFT_CONTROL].down) {
         consoleEntryText[0] = '\0'; // Clear the input

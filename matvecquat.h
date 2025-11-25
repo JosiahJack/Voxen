@@ -21,4 +21,6 @@ void quat_to_matrix(Quaternion* q, float* m);
 Quaternion conjugate_quaternion(const Quaternion q);
 Quaternion axis_angle_quaternion(const Vector3 axis, float angle);
 void normalize_quaternion(Quaternion* q);
+Quaternion mul_quaternion(const Quaternion a, const Quaternion b);
+Vector3 rotate_quaternion(const Quaternion q, const Vector3 v);
 #endif // VOXEN_MATVECQUAT_H

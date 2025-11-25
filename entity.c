@@ -213,26 +213,22 @@ void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float*
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
-void DualLogEntity(uint16_t idx) {
-    DualLog("Entity instance[%u]::\n"
+void DualLogEntity(Entity ent) {
+    DualLog("Entity::\n"
             "    index: %u\n"
             "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
-            
             "    modelIndex: %u\n"
             "    texIndex:   %u\n"
             "    glowIndex:  %u\n"
             "    specIndex:  %u\n"
             "    normIndex:  %u\n"
             "    lodIndex:  %u\n"
-            
             "    position.x: %f, .y: %f, .z: %f\n"
             "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
             "    scale.x: %f, .y: %f, .z: %f\n"
             "    velocity.x: %f, .y: %f, .z: %f\n"
             "    angularVelocity.x: %f, .y: %f, .z: %f\n"
-            
             "    bodyState: %u\n"
-            
             "    collider: %u\n"
             "    colliderCenter.x: %f, .y: %f, .z: %f\n"
             "    colliderSize.x: %f, .y: %f, .z: %f\n"
@@ -248,86 +244,65 @@ void DualLogEntity(uint16_t idx) {
             "    staticFriction: %f\n"
             "    frictionCombine: %u\n"
             "    bounceCombine: %u\n"
-            
             "    volume: %f\n"
-            
             "    child0: %u\n"
             "    child0_offset.x: %f, .y: %f, .z: %f\n"
             "    child0_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
             "    child0_scale.x: %f, .y: %f, .z: %f\n"
-            
             "    child1: %u\n"
             "    child1_offset.x: %f, .y: %f, .z: %f\n"
             "    child1_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
             "    child1_scale.x: %f, .y: %f, .z: %f\n"
             ,
-            idx,
-            instances[idx].index,
-            instances[idx].entflags,
-                (instances[idx].entflags & ENTFLAG_ACTIVE) > 0,
-                (instances[idx].entflags & ENTFLAG_CARDCHUNK) > 0,
-                (instances[idx].entflags & ENTFLAG_GROUNDED) > 0,
-                (instances[idx].entflags & ENTFLAG_USEGRAVITY) > 0,
-                (instances[idx].entflags & ENTFLAG_KINEMATIC) > 0,
-                (instances[idx].entflags & ENTFLAG_RIGIDBODY) > 0,
-            
-            instances[idx].modelIndex,
-            instances[idx].texIndex,
-            instances[idx].glowIndex,
-            instances[idx].specIndex,
-            instances[idx].normIndex,
-            instances[idx].lodIndex,
-            
-            instances[idx].position.x, instances[idx].position.y, instances[idx].position.z,
-            instances[idx].rotation.x, instances[idx].rotation.y, instances[idx].rotation.z, instances[idx].rotation.w,
-            instances[idx].scale.x, instances[idx].scale.y, instances[idx].scale.z,
-            instances[idx].velocity.x, instances[idx].velocity.y, instances[idx].velocity.z,
-            instances[idx].angularVelocity.x, instances[idx].angularVelocity.y, instances[idx].angularVelocity.z,
-            
-            instances[idx].bodyState,
-            
-            instances[idx].collider,
-            instances[idx].colliderCenter.x, instances[idx].colliderCenter.y, instances[idx].colliderCenter.z,
-            instances[idx].colliderSize.x, instances[idx].colliderSize.y, instances[idx].colliderSize.z,
-            instances[idx].colliderMeshIndex,
-            instances[idx].mass,
-            instances[idx].linearDrag,
-            instances[idx].angularDrag,
-            instances[idx].inertia,
-            instances[idx].accumulatedForce.x, instances[idx].accumulatedForce.y, instances[idx].accumulatedForce.z,
-            instances[idx].accumulatedTorque.x, instances[idx].accumulatedTorque.y, instances[idx].accumulatedTorque.z,
-            instances[idx].dynamicFriction,
-            instances[idx].staticFriction,
-            instances[idx].bounciness,
-            instances[idx].frictionCombine,
-            instances[idx].bounceCombine,
-            
-            instances[idx].volume,
-            
-            instances[idx].child0,
-            instances[idx].child0_offset.x,
-            instances[idx].child0_offset.y,
-            instances[idx].child0_offset.z,
-            instances[idx].child0_rotation.x,
-            instances[idx].child0_rotation.y,
-            instances[idx].child0_rotation.z,
-            instances[idx].child0_rotation.w,
-            instances[idx].child0_scale.x,
-            instances[idx].child0_scale.y,
-            instances[idx].child0_scale.z,
-            
-            instances[idx].child1,
-            instances[idx].child1_offset.x,
-            instances[idx].child1_offset.y,
-            instances[idx].child1_offset.z,
-            instances[idx].child1_rotation.x,
-            instances[idx].child1_rotation.y,
-            instances[idx].child1_rotation.z,
-            instances[idx].child1_rotation.w,
-            instances[idx].child1_scale.x,
-            instances[idx].child1_scale.y,
-            instances[idx].child1_scale.z
-            );
+            ent.index,
+            ent.entflags,
+                (ent.entflags & ENTFLAG_ACTIVE) > 0,
+                (ent.entflags & ENTFLAG_CARDCHUNK) > 0,
+                (ent.entflags & ENTFLAG_GROUNDED) > 0,
+                (ent.entflags & ENTFLAG_USEGRAVITY) > 0,
+                (ent.entflags & ENTFLAG_KINEMATIC) > 0,
+                (ent.entflags & ENTFLAG_RIGIDBODY) > 0,
+            ent.modelIndex,
+            ent.texIndex,
+            ent.glowIndex,
+            ent.specIndex,
+            ent.normIndex,
+            ent.lodIndex,
+            ent.position.x, ent.position.y, ent.position.z,
+            ent.rotation.x, ent.rotation.y, ent.rotation.z, ent.rotation.w,
+            ent.scale.x, ent.scale.y, ent.scale.z,
+            ent.velocity.x, ent.velocity.y, ent.velocity.z,
+            ent.angularVelocity.x, ent.angularVelocity.y, ent.angularVelocity.z,
+            ent.bodyState,
+            ent.collider,
+            ent.colliderCenter.x, ent.colliderCenter.y, ent.colliderCenter.z,
+            ent.colliderSize.x, ent.colliderSize.y, ent.colliderSize.z,
+            ent.colliderMeshIndex,
+            ent.mass,
+            ent.linearDrag,
+            ent.angularDrag,
+            ent.inertia,
+            ent.accumulatedForce.x, ent.accumulatedForce.y, ent.accumulatedForce.z,
+            ent.accumulatedTorque.x, ent.accumulatedTorque.y, ent.accumulatedTorque.z,
+            ent.dynamicFriction,
+            ent.staticFriction,
+            ent.bounciness,
+            ent.frictionCombine,
+            ent.bounceCombine,
+            ent.volume,
+            ent.child0,
+            ent.child0_offset.x, ent.child0_offset.y, ent.child0_offset.z,
+            ent.child0_rotation.x, ent.child0_rotation.y, ent.child0_rotation.z, ent.child0_rotation.w,
+            ent.child0_scale.x, ent.child0_scale.y, ent.child0_scale.z,
+            ent.child1,
+            ent.child1_offset.x, ent.child1_offset.y, ent.child1_offset.z,
+            ent.child1_rotation.x, ent.child1_rotation.y, ent.child1_rotation.z, ent.child1_rotation.w,
+            ent.child1_scale.x, ent.child1_scale.y, ent.child1_scale.z);
+}
+
+void DualLogEntityInstance(uint16_t idx) {
+    DualLog("Logging instance[%u] ",idx);
+    DualLogEntity(instances[idx]);
 }
 #pragma GCC diagnostic pop
 
@@ -335,42 +310,23 @@ void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
-    entry->texIndex  = MATERIAL_IDX_MAX;
-    entry->glowIndex = MATERIAL_IDX_MAX;
-    entry->specIndex = MATERIAL_IDX_MAX;
-    entry->normIndex = MATERIAL_IDX_MAX;
+    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
     entry->lodIndex  = MODEL_IDX_MAX;
-    entry->rotation.x = 0.0f;
-    entry->rotation.y = 0.0f;
-    entry->rotation.z = 0.0f;
-    entry->rotation.w = 1.0f; // Quaternion identity
-    entry->scale.x = 1.0f;
-    entry->scale.y = 1.0f;
-    entry->scale.z = 1.0f;
+    entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
+    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
+    entry->collider = COLLIDER_TYPE_NONE;
     entry->colliderMeshIndex = MODEL_IDX_MAX;
     entry->mass = 1.0f;
     entry->angularDrag = 0.05f;
-    entry->dynamicFriction = 0.6f;
-    entry->staticFriction = 0.6f;
-    entry->frictionCombine = PHYS_COMBINE_AVG;
-    entry->bounceCombine = PHYS_COMBINE_AVG;
+    entry->dynamicFriction = entry->staticFriction = 0.6f;
+    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
     entry->child0 = UINT16_MAX;
-    entry->child0_rotation.x = 0.0f;
-    entry->child0_rotation.y = 0.0f;
-    entry->child0_rotation.z = 0.0f;
-    entry->child0_rotation.w = 1.0f;
-    entry->child0_scale.x = 1.0f;
-    entry->child0_scale.y = 1.0f;
-    entry->child0_scale.z = 1.0f;
+    entry->child0_rotation.x = entry->child0_rotation.y = entry->child0_rotation.z = 0.0f; entry->child0_rotation.w = 1.0f;
+    entry->child0_scale.x = entry->child0_scale.y = entry->child0_scale.z = 1.0f;
     entry->child1 = UINT16_MAX;
-    entry->child1_rotation.x = 0.0f;
-    entry->child1_rotation.y = 0.0f;
-    entry->child1_rotation.z = 0.0f;
-    entry->child1_rotation.w = 1.0f;
-    entry->child1_scale.x = 1.0f;
-    entry->child1_scale.y = 1.0f;
-    entry->child1_scale.z = 1.0f;
+    entry->child1_rotation.x = entry->child1_rotation.y = entry->child1_rotation.z = 0.0f; entry->child1_rotation.w = 1.0f;
+    entry->child1_scale.x = entry->child1_scale.y = entry->child1_scale.z = 1.0f;
     entry->path[0] = '\0';    
 }
 
@@ -409,6 +365,7 @@ void LoadEntities(void) {
         entities[i].accumulatedTorque.x = 0.0f;
         entities[i].accumulatedTorque.y = 0.0f;
         entities[i].accumulatedTorque.z = 0.0f;
+//         DualLogEntity(entities[i]);
     }
 
     DualLog(" took %f secs\n", get_time() - start_time);
@@ -429,7 +386,7 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
     }
 }
 
-void SortInstances(void) {
+void SortInstances(void) { // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
     double start_time = get_time();
     DualLog("Sorting entity instances... ");
     if (modelTypeCountsOpaque      ) { free(modelTypeCountsOpaque      ); }   modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
@@ -476,7 +433,6 @@ void SortInstances(void) {
     for (i = 0; i < loadedModels; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
     if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
 
-    // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
     Entity tempInstances[INSTANCE_COUNT];
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
     uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
@@ -539,6 +495,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].colliderSize.x = entities[entIdx].colliderSize.x;
     instances[instanceIdx].colliderSize.y = entities[entIdx].colliderSize.y;
     instances[instanceIdx].colliderSize.z = entities[entIdx].colliderSize.z;
+    instances[instanceIdx].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;

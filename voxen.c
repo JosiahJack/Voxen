@@ -773,9 +773,7 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    
-    // This sort method is 0.027ms... now that we do this whenever changing world cells, so like 0 to 3 times per second, it's rather worrisome.
-//     double sortStart = get_time();
+
     // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
     LightCandidate candidates[loadedLights];
     uint32_t candidateCount = 0;
@@ -819,7 +817,6 @@ void RenderShadowmaps(void) {
     // Sort candidates by score (ascending: best first)
     qsort(candidates, candidateCount, sizeof(LightCandidate), compareLightCandidates);
 
-//     DualLog("Sorting time for lights: %f\n",get_time() - sortStart);
     // Render top MAX_SHADOWMAPS candidates
     uint32_t numToRender = vmin(candidateCount, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) {
@@ -1069,7 +1066,7 @@ void InitializePlayer(uint16_t playerIdx) {
     instances[playerIdx].colliderSize.x = 0.48f; // Radius
     instances[playerIdx].colliderSize.y = 2.0f;  // Overall height including end radii (Unity convention, blech)
     instances[playerIdx].colliderSize.z = COLLIDER_CAPSULE_DIRECTION_Y_F; // Direction, 1.0 == Y-Axis
-    instances[playerIdx].mass = 80.0f;
+    instances[playerIdx].mass = 1.0f;
     instances[playerIdx].linearDrag = 8.0f;
     instances[playerIdx].angularDrag = 0.0f;
     instances[playerIdx].dynamicFriction = 0.6f;
@@ -1486,9 +1483,7 @@ int32_t main(int32_t argc, char* argv[]) {
 
     globalFrameNum = 0;
     DebugRAM("prior to event system init");
-    DualLog("Voxen "
-            VERSION_STRING
-            " by W. Josiah Jack, MIT-0 licensed\n");
+    DualLog("Voxen " VERSION_STRING " by W. Josiah Jack, MIT-0 licensed\n");
     EventSystemInit(argc,argv[1],argv[2]);
     InitializeEnvironment();
     double last_physics_time = get_time();
@@ -1501,23 +1496,17 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // Handle Berserk Effect for Compositing Shader
         float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
-        if (berserkFinished < pauseRelativeTime && berserkFinished > 0.0001f) {
-            berserkFinished = 0.0f;
-            berserkTimeRemainingNormalized = 0.0f;
-        }
-
+        if (berserkFinished < pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
         InputClearRisingAndFallingEdges();
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-        timeSinceLastPhysicsTick = current_time - last_physics_time;
+        timeSinceLastPhysicsTick = pauseRelativeTime - last_physics_time;
 //         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
-            last_physics_time = current_time;
+            last_physics_time = pauseRelativeTime;
             EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
 //         }
 
-        // Enqueue all logged events for the current frame.
-        if (log_playback) {
-            // Read the log file for current frame and enqueue events from log.
+        if (log_playback) { // Enqueue all logged events for the current frame.
             int32_t read_status = ReadActiveLog();
             if (read_status == 2) { // EOF reached, no more events
                 DualLog("Log playback completed.  Control returned.\n");
@@ -1527,14 +1516,8 @@ int32_t main(int32_t argc, char* argv[]) {
             }
         }
 
-        // Server Actions
-        // ====================================================================
-        // Server Event Queue
         if (EventQueueProcess()) break; // Do everything
         
-        // Client Actions
-        // ====================================================================
-        // Client Render
         drawCallsRenderedThisFrame = 0; // Reset per frame
         textDrawCallsRenderedThisFrame = 0;
         uiImageDrawCallsRenderedThisFrame = 0;
@@ -1578,7 +1561,7 @@ int32_t main(int32_t argc, char* argv[]) {
             // 3. Dynamic Shadowmaps
             for (int i = 0; i < loadedLights; ++i) {
                 if (lightDirty[i]) {
-                    UpdateVoxelLightLists(); // Takes 1.4ms of total frametime!!
+                    UpdateVoxelLightLists(); // Takes 12ms of total frametime!!
                     if (settings_Shadows > 0u) RenderShadowmaps();
                     else {
                         memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
@@ -1683,8 +1666,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
-//         glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
+//         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
+        glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
         glDisable(GL_CULL_FACE);
         
         //    Cursor

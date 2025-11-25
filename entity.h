@@ -108,7 +108,8 @@ extern uint16_t doubleSidedInstancesHead;
 extern uint16_t transparentInstancesHead;
 
 void InitializeEntity(Entity* entry);
-void DualLogEntity(uint16_t idx);
+void DualLogEntityInstance(uint16_t idx);
+void DualLogEntity(Entity ent);
 void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
 #endif // VOXEN_ENTITY_H

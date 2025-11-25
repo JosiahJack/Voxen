@@ -27,6 +27,7 @@ int close (int filedes); // #include <unistd.h>
 DataParser model_parser;
 
 // Models
+float** modelVertices = NULL;
 uint32_t* modelVertexCounts = NULL;
 uint32_t* modelTriangleCounts = NULL;
 GLuint* vbos = NULL;
@@ -137,7 +138,7 @@ void LoadModels(void) {
     DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
     modelVertexCounts   = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     modelTriangleCounts = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    float**  modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     uint32_t** modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     modelBounds         = mmap(NULL, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
@@ -337,7 +338,7 @@ void LoadModels(void) {
     cleanup_all_mmaps();
     for (int i = 0; i < loadedModels; ++i) {
         if (modelVertexCounts[i] == 0) continue;
-        madvise(modelVertices[i], modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), MADV_DONTNEED);
+//         madvise(modelVertices[i], modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float), MADV_DONTNEED);
         madvise(modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t), MADV_DONTNEED);
     }
 
