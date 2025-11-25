@@ -23,8 +23,7 @@ void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args
     vfprintf(stream, fmt, args);
     fprintf(stream, "\033[0m"); fflush(stream);
     if (prefix) fprintf(console_log_file, "%s ", prefix);
-    vfprintf(console_log_file, fmt, copy);
-    fflush(console_log_file);
+    vfprintf(console_log_file, fmt, copy); fflush(console_log_file);
     va_end(copy);
 }
 

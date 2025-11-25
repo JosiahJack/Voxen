@@ -218,6 +218,8 @@ bool get_cull_bit(const uint32_t* arr, size_t idx);
 #define PHYS_COMBINE_MIN 1
 #define PHYS_COMBINE_MUL 2
 #define PHYS_COMBINE_MAX 3
+#define FORCEMODE_ACCUMULATE 0
+#define FORCEMODE_IMPULSE 1
 #define COLLIDER_TYPE_NONE 0
 #define COLLIDER_TYPE_BOX 1
 #define COLLIDER_TYPE_SPHERE 2

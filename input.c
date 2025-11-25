@@ -165,12 +165,12 @@ void ProcessInput(void) {
     if (magnitude_vector3(input) > 0.1f) {
         input = normalize_vector3(input);
         Vector3 force = scale_vector3(input, moveForce * sprintMul);
-        AddForce(PLAYER1, force, false);  // false = accumulated force
+        AddForce(PLAYER1, force, FORCEMODE_ACCUMULATE);
     }
 
     // Jump
     if (keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) {
-        AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, true);  // impulse
+        AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, FORCEMODE_IMPULSE);
         flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
     }
     

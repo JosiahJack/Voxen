@@ -541,20 +541,17 @@ void IntegratePhysics(float dt) {
         e->velocity = scale_vector3(e->velocity, (1.0f - e->linearDrag * dt)); // Apply linear drag (simple exponential approx).
         e->position = add_vector3(e->position, scale_vector3(e->velocity, dt)); // Integrate position.
 
-        // Angular integration (only for non-player/NPC; skip torque/rot for them).
+        // Torque/Angular
         if (ConstIndexIsNPC(e->index) || i == PLAYER1 || i == PLAYER2) {
             e->angularVelocity = (Vector3){0.0f,0.0f,0.0f};
             e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
         } else if (e->inertia > 0.0f) {
-            // Angular accel (scalar I approx; for full tensor, extend later if needed).
             float invI = 1.0f / e->inertia;
             Vector3 angAccel = scale_vector3(e->accumulatedTorque, invI);
             e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(angAccel, dt));
-            // Apply angular drag.
-            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * dt));
-            // Integrate rotation (world-space axis-angle approx; good for small dt).
+            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * dt)); // Apply angular drag.
             float angMag = magnitude_vector3(e->angularVelocity);
-            if (angMag > 1e-6f) {
+            if (angMag > 1e-6f) { // Integrate rotation (world-space axis-angle approx; good for small dt).
                 float angle = angMag * dt;
                 Vector3 axis = normalize_vector3(e->angularVelocity);
                 Quaternion deltaQ = axis_angle_quaternion(axis, angle);

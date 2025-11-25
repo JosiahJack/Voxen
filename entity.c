@@ -332,7 +332,7 @@ void DualLogEntity(uint16_t idx) {
 #pragma GCC diagnostic pop
 
 void InitializeEntity(Entity* entry) {
-    entry->index = UINT16_MAX;
+    entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
     entry->texIndex  = MATERIAL_IDX_MAX;
@@ -384,7 +384,6 @@ void LoadEntities(void) {
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); exit(1); }
 
     DualLog("Loading  %d entities...", entityCount);
-//     #pragma omp parallel for // Found twas faster without
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 

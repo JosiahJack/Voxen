@@ -1488,7 +1488,7 @@ int32_t main(int32_t argc, char* argv[]) {
             " by W. Josiah Jack, MIT-0 licensed\n");
     EventSystemInit(argc,argv[1],argv[2]);
     InitializeEnvironment();
-//     double last_physics_time = get_time();
+    double last_physics_time = get_time();
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) {
@@ -1506,9 +1506,9 @@ int32_t main(int32_t argc, char* argv[]) {
         InputClearRisingAndFallingEdges();
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-//         timeSinceLastPhysicsTick = current_time - last_physics_time;
+        timeSinceLastPhysicsTick = current_time - last_physics_time;
 //         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
-//             last_physics_time = current_time;
+            last_physics_time = current_time;
             EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
 //         }
 
@@ -1737,7 +1737,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
