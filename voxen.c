@@ -1490,7 +1490,7 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment();
 //     double last_physics_time = get_time();
     DebugRAM("prior to game loop");
-    DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - game_start_time);
+    DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) {
         current_time = get_time();
         double frame_time = current_time - last_time;
