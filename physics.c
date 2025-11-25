@@ -32,11 +32,19 @@ Quaternion mul_quaternion(const Quaternion a, const Quaternion b) {
     res.x = xyz.x; res.y = xyz.y; res.z = xyz.z;
     return res;
 }
-
+/*
 Vector3 rotate_quaternion(const Quaternion q, const Vector3 v) {
     Quaternion vq = {0.0f, v.x, v.y, v.z};
     Quaternion temp = mul_quaternion(vq, conjugate_quaternion(q));
     Quaternion result = mul_quaternion(q, temp);
+    return (Vector3){result.x, result.y, result.z};
+}*/
+
+Vector3 rotate_quaternion(const Quaternion q, const Vector3 v) {
+    Quaternion vq = {0.0f, v.x, v.y, v.z};
+    Quaternion q_conj = conjugate_quaternion(q);
+    Quaternion temp = mul_quaternion(q, vq);
+    Quaternion result = mul_quaternion(temp, q_conj);
     return (Vector3){result.x, result.y, result.z};
 }
 
@@ -62,25 +70,26 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
         *aabb_max = (Vector3){c.x + r, c.y + r, c.z + r};
         return true;
     } else if (e->collider == COLLIDER_TYPE_BOX) {
-        Vector3 half = { // Local half-extents (including scale)
+        Vector3 half = {
             e->colliderSize.x * e->scale.x * 0.5f,
             e->colliderSize.y * e->scale.y * 0.5f,
             e->colliderSize.z * e->scale.z * 0.5f
         };
 
-        Vector3 corners[8] = { // 8 corners in local space
-            { -half.x, -half.y, -half.z },
-            {  half.x, -half.y, -half.z },
-            { -half.x,  half.y, -half.z },
-            {  half.x,  half.y, -half.z },
-            { -half.x, -half.y,  half.z },
-            {  half.x, -half.y,  half.z },
-            { -half.x,  half.y,  half.z },
-            {  half.x,  half.y,  half.z }
+        Vector3 corners[8] = {
+            {-half.x, -half.y, -half.z},
+            { half.x, -half.y, -half.z},
+            {-half.x,  half.y, -half.z},
+            { half.x,  half.y, -half.z},
+            {-half.x, -half.y,  half.z},
+            { half.x, -half.y,  half.z},
+            {-half.x,  half.y,  half.z},
+            { half.x,  half.y,  half.z}
         };
 
-        Vector3 world_min = { FLT_MAX, FLT_MAX, FLT_MAX };
-        Vector3 world_max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+        Vector3 world_min = {FLT_MAX, FLT_MAX, FLT_MAX};
+        Vector3 world_max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+
         for (int i = 0; i < 8; ++i) {
             Vector3 rotated = rotate_quaternion(e->rotation, corners[i]);
             Vector3 world = add_vector3(e->position, rotated);
@@ -295,6 +304,7 @@ static bool CollideCapsuleCapsule(const Entity* a, const Entity* b, Manifold* m)
 }
 
 static bool CollideCapsuleBox(const Entity* cap, const Entity* box, Manifold* m) {
+    DualLog("Entered CollideCapsuleBox!\n");
     Vector3 c = GetWorldCenter(cap);
     float r = cap->colliderSize.x * cap->scale.x;
     float h = cap->colliderSize.y * cap->scale.y * 0.5f - r;
@@ -657,9 +667,7 @@ int32_t Physics(void) {
     if (gamePaused || menuActive) return 0;
 
     PlayerPhysics();
-    IntegratePhysics(timeSinceLastPhysicsTick);
-    return 0; // Test just speeds first
-    
+    IntegratePhysics(timeSinceLastPhysicsTick);    
     for (int32_t p = PLAYER1; p < PLAYER1 + 1; ++p) {
         Entity* ea = &instances[p];
         Vector3 mina, maxa;
@@ -669,18 +677,16 @@ int32_t Physics(void) {
             Entity* eb = &instances[q];
 
             if (!ShouldTestPair(p, q)) continue;
-            DualLog("  [1] cell test passed\n");
 
             Vector3 minb, maxb;
             if (!GetAABB(eb, &minb, &maxb)) continue;
-            DualLog("  [2] AABB computed\n");
             
-            if (ea->index == 767) DualLog("Instance %u (entIdx: PLAYER) AABB A: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", p, mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z, maxa.x - mina.x, maxa.y - mina.y, maxa.z - mina.z);
-            else DualLog("Instance %u (entIdx: %u) AABB A: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", p, ea->index, mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z, maxa.x - mina.x, maxa.y - mina.y, maxa.z - mina.z);
-            DualLog("Instance %u (entIdx: %u) AABB B: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", q, eb->index, minb.x, minb.y, minb.z, maxb.x, maxb.y, maxb.z, maxb.x - minb.x, maxb.y - minb.y, maxb.z - minb.z);
+//             if (ea->index == 767) DualLog("Instance %u (entIdx: PLAYER) AABB A: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", p, mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z, maxa.x - mina.x, maxa.y - mina.y, maxa.z - mina.z);
+//             else DualLog("Instance %u (entIdx: %u) AABB A: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", p, ea->index, mina.x, mina.y, mina.z, maxa.x, maxa.y, maxa.z, maxa.x - mina.x, maxa.y - mina.y, maxa.z - mina.z);
+//             DualLog("Instance %u (entIdx: %u) AABB B: min(%.2f, %.2f, %.2f) max(%.2f, %.2f, %.2f), size(%.2f, %.2f, %.2f)\n", q, eb->index, minb.x, minb.y, minb.z, maxb.x, maxb.y, maxb.z, maxb.x - minb.x, maxb.y - minb.y, maxb.z - minb.z);
 
             if (!CollideAABB(mina, maxa, minb, maxb)) continue;
-            DualLog("  [3] AABB overlap – entering narrow phase\n");
+//             DualLogWarn("AABB overlap – entering narrow phase! ea collider: %u, eb collider: %u\n", ea->collider, eb->collider);
 
             Manifold m = {0};
             bool hit = false;

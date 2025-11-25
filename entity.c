@@ -532,7 +532,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
-    instances[instanceIdx].collider = entities[entIdx].collider = COLLIDER_TYPE_BOX;
+    instances[instanceIdx].collider = entities[entIdx].collider;
     instances[instanceIdx].colliderCenter.x = entities[entIdx].colliderCenter.x;
     instances[instanceIdx].colliderCenter.y = entities[entIdx].colliderCenter.y;
     instances[instanceIdx].colliderCenter.z = entities[entIdx].colliderCenter.z;
@@ -746,6 +746,7 @@ void LoadLevel(uint8_t curlevel) {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
             AddInstance(entIdx, parent, lineNum);
+            DualLogWarn("Instance %u (entIdx %u) has collider type %d\n", instanceIdx, entIdx, instances[parent].collider);
             AddChild0(entities[entIdx].child0, parent, entIdx, &instanceIdx, lineNum);
             AddChild1(entities[entIdx].child1, parent, entIdx, &instanceIdx, lineNum);
         }
