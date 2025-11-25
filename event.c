@@ -2,12 +2,10 @@
 #include <stdio.h>
 #include "event.h"
 #include "voxen.h"
-
 void exit(int status);
 
-int32_t maxEventCount_debug = 0;
 double lastJournalWriteTime = 0;
-FILE* activeLogFile;
+FILE* activeLogFile = NULL;
 FILE* console_log_file = NULL;
 const char* manualLogName;
 bool log_playback = false;
@@ -37,10 +35,6 @@ void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); Dua
 void OpenConsoleLogFile() {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
-}
-
-void ActiveLogFileInit() {
-    activeLogFile = NULL;
 }
 
 void OpenLogForPlayback(const char* path) {
@@ -73,7 +67,6 @@ int32_t EventExecute(Event* event) {
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f) {
     if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { DualLogError("Queue buffer filled!\n"); return 1; }
 
-    //DualLog("Enqueued event type %d, at index %d\n",type,eventQueueEnd);
     eventQueue[eventQueueEnd].frameNum = globalFrameNum;
     eventQueue[eventQueueEnd].type = type;
     eventQueue[eventQueueEnd].timestamp = 0;
@@ -83,41 +76,6 @@ int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float p
     eventQueue[eventQueueEnd].payload2f = payload2f;
     eventQueueEnd++;
     return 0;
-}
-
-int32_t EnqueueEvent_IntInt(uint8_t type, int32_t payload1i, int32_t payload2i) {
-    return EnqueueEvent(type,payload1i,payload2i,0.0f,0.0f);
-}
-
-int32_t EnqueueEvent_Int(uint8_t type, int32_t payload1i) {
-    return EnqueueEvent(type,payload1i,0u,0.0f,0.0f);
-}
-
-int32_t EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f) {
-    return EnqueueEvent(type,0u,0u,payload1f,payload2f);
-}
-
-int32_t EnqueueEvent_Float(uint8_t type, float payload1f) {
-    return EnqueueEvent(type,0u,0u,payload1f,0.0f);
-}
-
-// Enqueues an event with type only and no payload values.
-int32_t EnqueueEvent_Simple(uint8_t type) {
-    return EnqueueEvent(type,0u,0u,0.0f,0.0f);
-}
-
-// Intended to be called after each buffered write to the logfile in .dem
-// format which is custom but similar concept to Quake 1 demos.
-void clear_ev_journal(void) {
-    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
-    for (int32_t i=0;i<EVENT_JOURNAL_BUFFER_SIZE;i++) {
-        eventJournal[i].type = EV_NULL;
-        eventJournal[i].frameNum = 0;
-        eventJournal[i].timestamp = 0.0;
-        eventJournal[i].deltaTime_ns = 0.0;
-    }
-
-    eventJournalIndex = 0; // Restart at the beginning.
 }
 
 void JournalLog(void) {
@@ -205,50 +163,57 @@ void JournalDump(const char* dem_file) {
     fclose(fpR);
 }
 
+// Intended to be called after each buffered write to the logfile in .dem
+// format which is custom but similar concept to Quake 1 demos.
+void clear_ev_journal(void) {
+    memset(eventJournal, 0, sizeof(eventJournal));
+    eventJournalIndex = 0; // Restart at the beginning.
+    eventJournal[eventJournalIndex].timestamp = get_time();
+}
+
 // Queue was processed for the frame, clear it so next frame starts fresh.
 void clear_ev_queue(void) {
-    //  Events will be buffer written until EV_NULL is seen so clear to EV_NULL.
-    for (int32_t i=0;i<MAX_EVENTS_PER_FRAME;i++) {
-        eventQueue[i].type = EV_NULL;
-        eventQueue[i].frameNum = 0;
-        eventQueue[i].timestamp = 0.0;
-        eventQueue[i].deltaTime_ns = 0.0;
-    }
+    memset(eventQueue, 0, sizeof(eventQueue));    
+    eventIndex = eventQueueEnd = 0;
+    eventQueue[eventIndex].type = EV_NULL;
+    eventQueue[eventIndex].timestamp = get_time();
+    eventQueue[eventIndex].deltaTime_ns = 0.0;
+}
 
-    eventIndex = 0;
-    eventQueueEnd = 0;
+void EventSystemInit(int32_t argc, char* command, char* command_input1) {
+    journalFirstWrite = true;
+    clear_ev_queue();  // Initialize the eventQueue as empty
+    clear_ev_journal(); // Initialize the event journal as empty.
+    if (argc == 3 && strcmp(command, "play") == 0) { // Log playback
+        DualLog("Playing log: %s\n", command_input1);
+        OpenLogForPlayback(command_input1);
+    } else if (argc == 3 && strcmp(command, "record") == 0) { // Log record
+        manualLogName = command_input1; // TODO: Add manual log naming support from this cli arg.
+    }
+    
+    last_time = get_time();
+    lastJournalWriteTime = get_time();
 }
 
 // Process the entire event queue. Events might add more new events to the queue.
 // Intended to be called once per loop iteration by the main loop.
 int32_t EventQueueProcess(void) {
     int32_t status = 0;
-    double timestamp = 0.0;
     int32_t eventCount = 0;
     for (int32_t i=0;i<MAX_EVENTS_PER_FRAME;i++) {
-        if (eventQueue[i].type != EV_NULL) {
-            eventCount++;
-        }
+        if (eventQueue[i].type != EV_NULL) eventCount++;
     }
 
-    if (eventCount > maxEventCount_debug) maxEventCount_debug = eventCount;
     eventIndex = 0;
     while (eventIndex < MAX_EVENTS_PER_FRAME) {
         if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
 
         eventQueue[eventIndex].frameNum = globalFrameNum;
-        timestamp = current_time;
-        eventQueue[eventIndex].timestamp = timestamp;
-        eventQueue[eventIndex].deltaTime_ns = timestamp - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
-
-        // Journal buffer entry of this event.  Still written to during playback for time deltas but never logged to .dem
-        eventJournalIndex++; // Increment now to then write event into the journal.
-        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (timestamp - lastJournalWriteTime) > 5.0) {
-            if (!log_playback) {
-                JournalLog();
-                lastJournalWriteTime = get_time();
-            }
-
+        eventQueue[eventIndex].timestamp = current_time;
+        eventQueue[eventIndex].deltaTime_ns = current_time - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
+        eventJournalIndex++; // Increment now to then write event into the journal.  Still written to during playback for time deltas but never logged to .dem
+        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (current_time - lastJournalWriteTime) > 5.0) {
+            if (!log_playback) { JournalLog(); lastJournalWriteTime = get_time(); }
             clear_ev_journal(); // Also sets eventJournalIndex to 0.
         }
 

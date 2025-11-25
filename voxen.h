@@ -260,7 +260,6 @@ static const uint8_t PhysicsLayer_Clip             = 26;
 //static const uint8_t PhysicsLayer_               = 27;
 //static const uint8_t PhysicsLayer_               = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
-extern float move_speed;
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);

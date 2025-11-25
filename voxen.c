@@ -1,4 +1,4 @@
-// File: voxen.c
+// voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 // TODO: Figure out how to handle info_ressurection_points that needed to live outside the levels:
 // Level R -27.386 -55.488 26.5941
@@ -13,8 +13,9 @@
 // TODO: Animated lights
 // TODO: Multiview renders for sensaround
 // TODO: Proper physics
+// TODO: Particle system
 // TODO: Raycasts
-// TODO: Voxel GI?
+// TODO: Voxel GI
 // TODO: Scripting engine for gameplay
 // TODO: Save/Load system
 #define _GNU_SOURCE
@@ -1450,13 +1451,13 @@ int32_t main(int32_t argc, char* argv[]) {
         printf("-----------------------------------------------------------\n");
         printf("Voxen "
                VERSION_STRING
-               "10/20/2025\nthe OpenGL Voxel Lit Rendering Engine\n\nby W. Josiah Jack\nMIT-0 licensed\n\n\n");
+               "10/20/2025\nthe OpenGL Voxel Lit Game Engine\n\nby W. Josiah Jack\nMIT-0 licensed\n\n\n");
         return 0;
     }
 
     if ((argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
         || (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) ) {
-        printf("Voxen the OpenGL Voxel Lit Rendering Engine\n");
+        printf("Voxen the Voxel Lit Open Source Game Engine\n");
         printf("-----------------------------------------------------------\n");
         printf("        This is a rendering engine designed for optimized focused\n");
         printf("        usage of OpenGL making maximal use of GPU Driven rendering\n");
@@ -1481,28 +1482,13 @@ int32_t main(int32_t argc, char* argv[]) {
     if (argc == 3 && strcmp(argv[1], "dump") == 0) { DualLog("Converting log to plaintext: %s ...", argv[2]); JournalDump(argv[2]); DualLog("DONE!\n"); return 0; }
 
     globalFrameNum = 0;
-    ActiveLogFileInit();
     DebugRAM("prior to event system init");
     DualLog("Voxen "
             VERSION_STRING
             " by W. Josiah Jack, MIT-0 licensed\n");
-    journalFirstWrite = true;
-    clear_ev_queue();  // Initialize the eventQueue as empty
-    clear_ev_journal(); // Initialize the event journal as empty.
-    eventQueue[eventIndex].type = EV_NULL;
-    eventQueue[eventIndex].timestamp = get_time();
-    eventQueue[eventIndex].deltaTime_ns = 0.0;
-    if (argc == 3 && strcmp(argv[1], "play") == 0) { // Log playback
-        DualLog("Playing log: %s\n", argv[2]);
-        OpenLogForPlayback(argv[2]);
-    } else if (argc == 3 && strcmp(argv[1], "record") == 0) { // Log record
-        manualLogName = argv[2]; // TODO: Add manual log naming support from cli arg.
-    }
-
+    EventSystemInit(argc,argv[1],argv[2]);
     InitializeEnvironment();
 //     double last_physics_time = get_time();
-    last_time = get_time();
-    lastJournalWriteTime = get_time();
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",lastJournalWriteTime - game_start_time);
     while(1) {
@@ -1517,13 +1503,13 @@ int32_t main(int32_t argc, char* argv[]) {
             berserkTimeRemainingNormalized = 0.0f;
         }
 
-        // Enqueue input events
+        InputClearRisingAndFallingEdges();
         glfwPollEvents();
-        if (glfwWindowShouldClose(window)) EnqueueEvent_Simple(EV_QUIT);
+        if (glfwWindowShouldClose(window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
 //         timeSinceLastPhysicsTick = current_time - last_physics_time;
 //         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
 //             last_physics_time = current_time;
-            EnqueueEvent_Simple(EV_PHYSICS_TICK);
+            EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
 //         }
 
         // Enqueue all logged events for the current frame.
@@ -1534,7 +1520,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 DualLog("Log playback completed.  Control returned.\n");
             } else if (read_status == -1) { // Read error
                 DualLogError("Error reading log file, exiting playback\n");
-                EnqueueEvent_Simple(EV_QUIT);
+                EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
             }
         }
 
@@ -1751,8 +1737,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_4, TEXT_WHITE, "Peak frame queue count: %d", maxEventCount_debug);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
@@ -1799,7 +1784,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_CULL_FACE);
         cpuTime = get_time() - current_time;
         glfwSwapBuffers(window); // Present frame
-        InputEndFrame(); // Clear keypress rising and falling edge triggers
         CHECK_GL_ERROR();
         globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT

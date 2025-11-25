@@ -4,28 +4,26 @@ KeyState mouseButtons[MAX_MOUSE_BUTTONS] = {{0}};
 double scrollDelta;
 double last_mouse_x = 0.0, last_mouse_y = 0.0;
 float mouse_sensitivity = 0.1f;
-float move_speed = 0.06;
 bool window_has_focus = false;
-uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
 
 // GLFW Callbacks
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
     if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         if (log_playback) {
             log_playback = false;
             DualLog("Exited log playback manually.  Control returned\n");
         } else {
-            EnqueueEvent_Simple(EV_QUIT);
+            EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
         }
 
         return;
     }
     
     if (!log_playback) {
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent_Int(EV_KEYDOWN, key);
-        else if (action == GLFW_RELEASE) EnqueueEvent_Int(EV_KEYUP, key);
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent(EV_KEYDOWN, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
+        else if (action == GLFW_RELEASE) EnqueueEvent(EV_KEYUP, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
@@ -37,26 +35,26 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
         last_mouse_y = ypos;
         if (ignore_next_mouse_delta) { ignore_next_mouse_delta = false; return; }
         
-        if (globalFrameNum > 1) EnqueueEvent_IntInt(EV_MOUSEMOVE, dx, dy);
+        if (globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
-static void window_focus_callback(GLFWwindow* window, int focused) {
+static void window_focus_callback(GLFWwindow* window, int32_t focused) {
     window_has_focus = focused != 0;
     ignore_next_mouse_delta = true;
     glfwSetInputMode(window, GLFW_CURSOR, window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
-static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
     if (button < 0 || button >= MAX_MOUSE_BUTTONS) return;
     if (action == GLFW_PRESS) {
         mouseButtons[button].down = true;
         mouseButtons[button].pressed = true;
-        EnqueueEvent_Int(EV_KEYDOWN, button + 1000); // offset mouse events if needed
+        EnqueueEvent(EV_KEYDOWN, button + 1000, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED); // offset mouse events if needed
     } else if (action == GLFW_RELEASE) {
         mouseButtons[button].down = false;
         mouseButtons[button].released = true;
-        EnqueueEvent_Int(EV_KEYUP, button + 1000);
+        EnqueueEvent(EV_KEYUP, button + 1000, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
@@ -82,9 +80,9 @@ int32_t Input_KeyUp(int32_t keycode) {
     return 0;
 }
 
-void InputEndFrame() { // Clear keypress rising and falling edge triggers
-    for (int32_t i=0;i<MAX_KEYS;++i) keyStates[i].pressed = keyStates[i].released = false;
-    for (int i = 0; i < MAX_MOUSE_BUTTONS; i++) mouseButtons[i].pressed = mouseButtons[i].released = false;
+void InputClearRisingAndFallingEdges() { // Clear keypress rising and falling edge triggers
+    for (int32_t i=0;i<MAX_KEYS;++i)          keyStates[i].pressed = keyStates[i].released = false;       // Can't memset as we want to preserve down state
+    for (int32_t i=0;i<MAX_MOUSE_BUTTONS;i++) mouseButtons[i].pressed = mouseButtons[i].released = false; // Can't memset as we want to preserve down state
     scrollDelta = 0;
 }
 

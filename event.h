@@ -20,6 +20,8 @@
 #define EV_PARTICLE_TICK 60u
 #define EV_PAUSE 254u
 #define EV_QUIT 255u
+#define EV_INT_FIELD_UNUSED 0
+#define EV_FLOAT_FIELD_UNUSED 0.0f
 
 // Event Journal Buffer
 #define EVENT_JOURNAL_BUFFER_SIZE 1000
@@ -50,7 +52,6 @@ extern bool log_playback;
 extern double lastJournalWriteTime;
 extern double cpuTime;
 extern const char* manualLogName;
-extern int32_t maxEventCount_debug;
 extern uint32_t globalFrameNum;
 extern double last_time;
 extern double current_time;
@@ -58,16 +59,10 @@ extern float pauseRelativeTime;
 void ActiveLogFileInit();
 void OpenLogForPlayback(const char* path);
 int32_t ReadActiveLog();
-void clear_ev_queue(void);
 int32_t EventExecute(Event* event);
+void EventSystemInit(int32_t argc, char* command, char* command_input1);
 int32_t EventInit(void);
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
-int32_t EnqueueEvent_IntInt(uint8_t type, int32_t payload1i, int32_t payload2i);
-int32_t EnqueueEvent_Int(uint8_t type, int32_t payload1i);
-int32_t EnqueueEvent_FloatFloat(uint8_t type, float payload1f, float payload2f);
-int32_t EnqueueEvent_Float(uint8_t type, float payload1f);
-int32_t EnqueueEvent_Simple(uint8_t type);
-void clear_ev_journal(void);
 void JournalLog(void);
 double get_time(void);
 int32_t EventQueueProcess(void);
