@@ -1443,9 +1443,9 @@ double timeSinceLastPhysicsTick = 0.0;
 
 int32_t main(int32_t argc, char* argv[]) {
     game_start_time = get_time();
-    DebugRAM("program start");
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
     OpenConsoleLogFile();
+    DebugRAM("program start");
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
         printf("-----------------------------------------------------------\n");
         printf("Voxen "
@@ -1786,7 +1786,7 @@ int32_t main(int32_t argc, char* argv[]) {
             lastFrameSecCount = globalFrameNum;
         }
         
-        if (keys[GLFW_KEY_F12]) {
+        if (keyStates[GLFW_KEY_F12].pressed) {
             if (time_now > screenshotTimeout) {
                 Screenshot();
                 screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
@@ -1799,6 +1799,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_CULL_FACE);
         cpuTime = get_time() - current_time;
         glfwSwapBuffers(window); // Present frame
+        InputEndFrame(); // Clear keypress rising and falling edge triggers
         CHECK_GL_ERROR();
         globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT

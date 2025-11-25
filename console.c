@@ -428,7 +428,7 @@ void ProcessConsoleCommand(const char* command) {
 }
 
 void ConsoleEmulator(int32_t keycode) {
-    if (keycode == GLFW_KEY_U && keys[GLFW_KEY_LEFT_CONTROL]) {
+    if (keycode == GLFW_KEY_U && keyStates[GLFW_KEY_LEFT_CONTROL].down) {
         consoleEntryText[0] = '\0'; // Clear the input
         currentEntryLength = 0;
         return;

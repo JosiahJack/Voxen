@@ -1,42 +1,12 @@
-#define MAX_KEYS 512
-#define MAX_MOUSE_BUTTONS 8
-
-typedef struct {
-    bool down;
-    bool pressed;
-    bool released;
-} KeyState;
-
-static KeyState keyStates[MAX_KEYS];
-static KeyState mouseButtons[MAX_MOUSE_BUTTONS];
-static double scrollDelta;
-static bool cursorLocked = true;
+// input.c - Input System for keyboard, mouse, and gamepads
+KeyState keyStates[MAX_KEYS] = {{0}};
+KeyState mouseButtons[MAX_MOUSE_BUTTONS] = {{0}};
+double scrollDelta;
 double last_mouse_x = 0.0, last_mouse_y = 0.0;
 float mouse_sensitivity = 0.1f;
 float move_speed = 0.06;
-
-void Input_ClearFrame(void) {
-    for (int i = 0; i < MAX_KEYS; i++) {
-        keyStates[i].pressed = false;
-        keyStates[i].released = false;
-    }
-    
-    for (int i = 0; i < MAX_MOUSE_BUTTONS; i++) {
-        mouseButtons[i].pressed = false;
-        mouseButtons[i].released = false;
-    }
-    
-    scrollDelta = 0;
-}
-
-bool GetInput_Key(int key)              { return keyStates[key].down; }
-bool GetInput_KeyDown(int key)          { return keyStates[key].pressed; }
-bool GetInput_KeyUp(int key)            { return keyStates[key].released; }
-bool GetInput_MouseButton(int b)        { return mouseButtons[b].down; }
-bool GetInput_MouseButtonDown(int b)    { return mouseButtons[b].pressed; }
-bool GetInput_MouseButtonUp(int b)      { return mouseButtons[b].released; }
-double GetInput_ScrollDelta(void)       { return scrollDelta; }
-void Input_LockCursor(bool locked) { cursorLocked = locked; }
+bool window_has_focus = false;
+uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
 
 // GLFW Callbacks
 #pragma GCC diagnostic push
@@ -49,14 +19,13 @@ static void key_callback(GLFWwindow* window, int key, int scancode, int action, 
         } else {
             EnqueueEvent_Simple(EV_QUIT);
         }
+
         return;
     }
+    
     if (!log_playback) {
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-            EnqueueEvent_Int(EV_KEYDOWN, key);
-        } else if (action == GLFW_RELEASE) {
-            EnqueueEvent_Int(EV_KEYUP, key);
-        }
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent_Int(EV_KEYDOWN, key);
+        else if (action == GLFW_RELEASE) EnqueueEvent_Int(EV_KEYUP, key);
     }
 }
 
@@ -74,11 +43,8 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
 
 static void window_focus_callback(GLFWwindow* window, int focused) {
     window_has_focus = focused != 0;
-    if (window_has_focus) {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    } else {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    }
+    ignore_next_mouse_delta = true;
+    glfwSetInputMode(window, GLFW_CURSOR, window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
 }
 
 static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
@@ -94,14 +60,10 @@ static void mouse_button_callback(GLFWwindow* window, int button, int action, in
     }
 }
 
-static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    scrollDelta += yoffset;
-}
+static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { scrollDelta += yoffset; }
 #pragma GCC diagnostic pop
 
 void Input_Init(GLFWwindow* window) {
-    memset(keyStates, 0, sizeof(keyStates));
-    memset(mouseButtons, 0, sizeof(mouseButtons));
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, cursor_pos_callback);
     glfwSetWindowFocusCallback(window, window_focus_callback);
@@ -109,39 +71,21 @@ void Input_Init(GLFWwindow* window) {
     glfwSetScrollCallback(window, scroll_callback);
 }
 
-bool window_has_focus = false;
-bool keys[NUM_KEYS] = {0};
-uint16_t mouse_x = 0, mouse_y = 0; // Mouse position
-
 int32_t Input_KeyDown(int32_t keycode) {
-    if (keycode >= 0 && keycode < NUM_KEYS) keys[keycode] = true;    
-    if (keys[GLFW_KEY_ESCAPE]) gamePaused = !gamePaused;
-    if (keys[GLFW_KEY_GRAVE_ACCENT]) ToggleConsole();
+    if (keycode >= 0 && keycode < MAX_KEYS) keyStates[keycode].pressed = keyStates[keycode].down = true;
     if (consoleActive) { ConsoleEmulator(keycode); return 0; }
-    
-    if (keys[GLFW_KEY_TAB]) inventoryMode = !inventoryMode; // After consoleActive check to allow tab completion
-    if (keys[GLFW_KEY_R]) {
-        debugView++;
-        if (debugView > 4) debugView = 0;
-        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
-        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
-    }
-
-    if (keys[GLFW_KEY_Y]) {
-        debugValue++;
-        if (debugValue > 6) debugValue = 0;
-        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
-        glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
-    }
-    
-    if (keys[GLFW_KEY_B]) CycleToNextMonitor(window);
-    if (keys[GLFW_KEY_E]) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     return 0;
 }
 
 int32_t Input_KeyUp(int32_t keycode) {
-    if (keycode >= 0 && keycode < NUM_KEYS) keys[keycode] = false;
+    if (keycode >= 0 && keycode < MAX_KEYS) keyStates[keycode].pressed = keyStates[keycode].down = false;
     return 0;
+}
+
+void InputEndFrame() { // Clear keypress rising and falling edge triggers
+    for (int32_t i=0;i<MAX_KEYS;++i) keyStates[i].pressed = keyStates[i].released = false;
+    for (int i = 0; i < MAX_MOUSE_BUTTONS; i++) mouseButtons[i].pressed = mouseButtons[i].released = false;
+    scrollDelta = 0;
 }
 
 void UpdatePlayerFacingAngles() {
@@ -211,14 +155,14 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
 void ProcessInput(void) {
     if (gamePaused || consoleActive) return;
 
-    float moveForce = 1800.0f;  // Tune this — 80kg player needs ~1800N to feel snappy
-    float sprintMul = keys[GLFW_KEY_LEFT_SHIFT] ? 1.75f : 1.0f;
+    float moveForce = 1800.0f;
+    float sprintMul = keyStates[GLFW_KEY_LEFT_SHIFT].down ? 1.75f : 1.0f;
     Vector3 input = {0};
 
-    if (keys[GLFW_KEY_F]) input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
-    if (keys[GLFW_KEY_S]) input = sub_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
-    if (keys[GLFW_KEY_D]) input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
-    if (keys[GLFW_KEY_A]) input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+    if (keyStates[GLFW_KEY_F].down) input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
+    if (keyStates[GLFW_KEY_S].down) input = sub_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
+    if (keyStates[GLFW_KEY_D].down) input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+    if (keyStates[GLFW_KEY_A].down) input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
 
     if (magnitude_vector3(input) > 0.1f) {
         input = normalize_vector3(input);
@@ -227,8 +171,33 @@ void ProcessInput(void) {
     }
 
     // Jump
-    if (keys[GLFW_KEY_SPACE] && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) {
+    if (keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) {
         AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, true);  // impulse
         flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
     }
+    
+    if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
+    if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
+    
+    if (keyStates[GLFW_KEY_TAB].pressed) {
+        ignore_next_mouse_delta = true;
+        inventoryMode = !inventoryMode;
+    }
+    
+    if (keyStates[GLFW_KEY_R].pressed) {
+        debugView++;
+        if (debugView > 4) debugView = 0;
+        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
+        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
+    }
+
+    if (keyStates[GLFW_KEY_Y].pressed) {
+        debugValue++;
+        if (debugValue > 6) debugValue = 0;
+        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
+        glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
+    }
+    
+    if (keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(window);
+    if (keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
 }

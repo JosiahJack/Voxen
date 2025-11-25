@@ -266,10 +266,19 @@ void UpdateInstanceMatrix(int32_t i);
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
 // ----------------------------------------------------------------------------
 // Input
-#define NUM_KEYS 350
+#define MAX_KEYS 512
+#define MAX_MOUSE_BUTTONS 8
+
+typedef struct {
+    bool down;
+    bool pressed;
+    bool released;
+} KeyState;
+
 extern bool editMode;
 extern GLFWwindow *window;
-extern bool keys[NUM_KEYS];
+extern KeyState keyStates[MAX_KEYS];
+extern KeyState mouseButtons[MAX_MOUSE_BUTTONS];
 extern bool window_has_focus;
 extern double last_mouse_x, last_mouse_y;
 extern bool ignore_next_mouse_delta;
