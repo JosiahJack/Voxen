@@ -168,22 +168,20 @@ void JournalDump(const char* dem_file) {
 void clear_ev_journal(void) {
     memset(eventJournal, 0, sizeof(eventJournal));
     eventJournalIndex = 0; // Restart at the beginning.
-    eventJournal[eventJournalIndex].timestamp = get_time();
 }
 
 // Queue was processed for the frame, clear it so next frame starts fresh.
 void clear_ev_queue(void) {
     memset(eventQueue, 0, sizeof(eventQueue));    
     eventIndex = eventQueueEnd = 0;
-    eventQueue[eventIndex].type = EV_NULL;
-    eventQueue[eventIndex].timestamp = get_time();
-    eventQueue[eventIndex].deltaTime_ns = 0.0;
 }
 
 void EventSystemInit(int32_t argc, char* command, char* command_input1) {
     journalFirstWrite = true;
     clear_ev_queue();  // Initialize the eventQueue as empty
+    eventQueue[eventIndex].timestamp = get_time();
     clear_ev_journal(); // Initialize the event journal as empty.
+    eventJournal[eventJournalIndex].timestamp = get_time();
     if (argc == 3 && strcmp(command, "play") == 0) { // Log playback
         DualLog("Playing log: %s\n", command_input1);
         OpenLogForPlayback(command_input1);
@@ -200,12 +198,12 @@ void EventSystemInit(int32_t argc, char* command, char* command_input1) {
 int32_t EventQueueProcess(void) {
     int32_t status = 0;
     int32_t eventCount = 0;
-    for (int32_t i=0;i<MAX_EVENTS_PER_FRAME;i++) {
+    for (int32_t i=0;i<eventQueueEnd;i++) {
         if (eventQueue[i].type != EV_NULL) eventCount++;
     }
 
     eventIndex = 0;
-    while (eventIndex < MAX_EVENTS_PER_FRAME) {
+    while (eventIndex < eventQueueEnd) {
         if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
 
         eventQueue[eventIndex].frameNum = globalFrameNum;
