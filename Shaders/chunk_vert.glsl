@@ -6,7 +6,7 @@ layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec2 aTexCoord;
 
-layout(std430, binding = 11) buffer ModelMatrices { float modelMatrices[]; };
+layout(std430, binding = 11) buffer ModelMatrices { mat4 modelMatrices[]; };
 
 uniform uint instanceIndex;
 uniform uint normInstanceIndex;
@@ -27,11 +27,7 @@ void main() {
         Normal = vec3(0.0, 0.0, 1.0);
     } else {
         TexCoord = aTexCoord;
-        uint matbase = instanceIndex * 16;
-        mat4 matrix = mat4(modelMatrices[matbase + 0], modelMatrices[matbase + 1], modelMatrices[matbase + 2], modelMatrices[matbase + 3],
-                           modelMatrices[matbase + 4], modelMatrices[matbase + 5], modelMatrices[matbase + 6], modelMatrices[matbase + 7],
-                           modelMatrices[matbase + 8], modelMatrices[matbase + 9], modelMatrices[matbase +10], modelMatrices[matbase +11],
-                           modelMatrices[matbase +12], modelMatrices[matbase +13], modelMatrices[matbase +14], modelMatrices[matbase +15]);
+        mat4 matrix = modelMatrices[instanceIndex];
         vec4 worldPos = matrix * vec4(aPos, 1.0);
         FragPos = vec3(worldPos);
         gl_Position = viewProjection * worldPos;
