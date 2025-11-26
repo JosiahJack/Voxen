@@ -183,6 +183,11 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_S].down) input = sub_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
     if (keyStates[GLFW_KEY_D].down) input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
     if (keyStates[GLFW_KEY_A].down) input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+    
+    if (noclip) {
+        if (keyStates[GLFW_KEY_C].down) input = add_vector3(input, (Vector3){0,  -1.0f, 0});
+        else if (keyStates[GLFW_KEY_V].down) input = add_vector3(input, (Vector3){0,  1.0f, 0});
+    }
 
     if (magnitude_vector3(input) > 0.1f) {
         input = normalize_vector3(input);

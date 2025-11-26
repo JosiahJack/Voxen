@@ -501,7 +501,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
     
     // Apply the Unity hierarchy nonsense, TODO: Save out level#.txt from the engine just once and then delete all this.
-    if (entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
+    if (levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
         instances[instanceIdx].position.x += correctionX;   
         instances[instanceIdx].position.y += correctionY;
         instances[instanceIdx].position.z += correctionZ;
@@ -535,6 +535,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         } 
     }
 
+    dirtyInstances[instanceIdx] = true;
     loadedInstances++;
 }
 

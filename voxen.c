@@ -81,7 +81,7 @@ uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
 uint8_t settings_CullEnabled = 1;
 bool settings_Vsync = false;
-float lodRangeSqrd = 38.4f * 38.4f;
+float lodRangeSqrd = 35.4f * 35.4f;
 // ----------------------------------------------------------------------------
 // Instances
 Entity instances[INSTANCE_COUNT];
@@ -1220,7 +1220,7 @@ void InitializeEnvironment(void) {
 
             GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
             GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-            GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT24, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+            GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT16, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
             glGenTextures(1, &outputImageID);
             glBindTexture(GL_TEXTURE_2D, outputImageID);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -1378,13 +1378,10 @@ void RenderInstances(uint8_t type) {
         uint16_t visibleCount = 0;
         for (uint16_t i = start; i < start + count && i < startOfNextType; i++) { // Filter visible instances
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
-            float distSqrd = 0.0f;
+            float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
+                                              instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
             if (settings_CullEnabled) {
                 if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
-                
-                float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
-                                                  instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-                
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
             }
             
@@ -1408,11 +1405,12 @@ void RenderInstances(uint8_t type) {
             glUniform1ui(specIndexLoc_chunk, (uint32_t)instances[i].specIndex);
             glUniform1ui(normIndexLoc_chunk, (uint32_t)instances[i].normIndex);
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
+            uint32_t vertCount = modelTriangleCounts[modelType] * 3;
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
-            glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+            glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += modelVertexCounts[modelType];
+            verticesRenderedThisFrame += vertCount;
         }
     }
     
