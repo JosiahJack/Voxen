@@ -80,6 +80,9 @@ uint8_t settings_Brightness = 100u; // Default 100 (for %)
 uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
 uint8_t settings_CullEnabled = 1;
+float settings_SSRStepSize = 0.26f;
+uint16_t settings_SSRStepCount = 90;//100;
+float settings_SSRSampleWeight = 0.12f;//0.0256f;
 bool settings_Vsync = false;
 float lodRangeSqrd = 35.4f * 35.4f;
 // ----------------------------------------------------------------------------
@@ -151,9 +154,9 @@ GLuint shadowMapSSBO;
 uint32_t totalShadowmapPixels = 0;
 
 //    SSR (Screen Space Reflections)
-#define SSR_RES 4 // 50% of render resolution.
+#define SSR_RES 8 // 0.125 * render resolution.
 GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr;
+GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr, stepSizeLoc_ssr, stepCountLoc_ssr, sampleWeightLoc_ssr;
 
 //    Shadowmaps Clear
 GLuint shadowmapsClearShaderProgram;
@@ -336,7 +339,10 @@ void CompileShaders(void) {
     viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
     camPosLoc_ssr = glGetUniformLocation(ssrShaderProgram, "camPos");
     outputImageLoc_ssr = glGetUniformLocation(ssrShaderProgram, "outputImage");
-    
+    stepSizeLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepSize");
+    stepCountLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepCount");
+    sampleWeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "sampleWeight");
+
     texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
     debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
     debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
@@ -389,28 +395,6 @@ static inline void mul_mat4(float *out, const float *a, const float *b) {
         out[i] = result[i];
 }
 
-// Invert an affine 4x4 matrix (last row = [0 0 0 1])
-// out = inverse(m)
-static inline void invertAffineMat4(float *out, const float *m) {
-    // Extract rotation 3x3
-    float r00 = m[0], r01 = m[1], r02 = m[2];
-    float r10 = m[4], r11 = m[5], r12 = m[6];
-    float r20 = m[8], r21 = m[9], r22 = m[10];
-
-    // Transpose rotation
-    out[0] = r00; out[1] = r10; out[2] = r20; out[3] = 0.0f;
-    out[4] = r01; out[5] = r11; out[6] = r21; out[7] = 0.0f;
-    out[8] = r02; out[9] = r12; out[10] = r22; out[11] = 0.0f;
-    out[15] = 1.0f;
-
-    // Invert translation
-    float tx = m[12], ty = m[13], tz = m[14];
-    out[12] = -(out[0]*tx + out[4]*ty + out[8]*tz);
-    out[13] = -(out[1]*tx + out[5]*ty + out[9]*tz);
-    out[14] = -(out[2]*tx + out[6]*ty + out[10]*tz);
-}
-
-// ============================================================================
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
     float rot[16];
     quat_to_matrix(quat,rot);
@@ -904,7 +888,6 @@ void RenderUIImages() {
         }
 
         if (vertexCount > 0) {
-//             glUniform1ui(instanceIndexLoc_chunk, 0);
             glUniform1ui(texIndexLoc_chunk, currentTex);
             glUniform1ui(glowIndexLoc_chunk, BLACK_TEXTURE_IDX);
             glUniform1ui(specIndexLoc_chunk, BLACK_TEXTURE_IDX);
@@ -1220,7 +1203,7 @@ void InitializeEnvironment(void) {
 
             GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
             GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-            GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT16, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+            GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
             glGenTextures(1, &outputImageID);
             glBindTexture(GL_TEXTURE_2D, outputImageID);
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -1314,13 +1297,9 @@ void InitializeEnvironment(void) {
     madvise(pixels, w * h * 4, MADV_DONTNEED);
     malloc_trim(0);
     DebugRAM("after freeing window bar icon");
-//     RenderLoadingProgress(100,"Loading textures...");
-//     DebugRAM("after RenderLoadingProgress for 'Loading textures...'");
     DualLog("Parallel Inits and window init took %f secs\n", get_time() - init_start_time);
     LoadTextures(); // Sequential due to GPU transfers
-//     RenderLoadingProgress(100,"Loading models...");
     LoadModels(); // Sequential due to GPU transfers
-//     RenderLoadingProgress(100,"Loading data...");
     LoadEntities(); // Had a note to do this after textures and models, didn't seem necessary but giving it a thread didn't help init times.
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
@@ -1532,9 +1511,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float view[16]; // Also known as view matrix
         mat4_lookat_from(view,&cam_rotation, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         float viewProj[16]; // view-projection matrix
-        float invViewProj[16]; // inverse view-projection matrix
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
-        invertAffineMat4(invViewProj, viewProj);
         float invViewRot[9];
         invViewRot[0] = view[0];
         invViewRot[1] = view[4];
@@ -1596,8 +1573,11 @@ int32_t main(int32_t argc, char* argv[]) {
             // 5. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
-                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);                
+                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
                 glUniform3f(camPosLoc_ssr, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+                glUniform1f(stepSizeLoc_ssr, settings_SSRStepSize);
+                glUniform1f(sampleWeightLoc_ssr, settings_SSRSampleWeight);
+                glUniform1ui(stepCountLoc_ssr, settings_SSRStepCount);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -1721,6 +1701,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
+        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "SSR step size: %.2f, step count: %u, sample weight: %.2f", settings_SSRStepSize, settings_SSRStepCount, settings_SSRSampleWeight);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
 //         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);

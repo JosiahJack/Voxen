@@ -68,7 +68,16 @@ extern QuestBits questData;
 
 // ----------------------------------------------------------------------------
 // Settings
+extern uint8_t settings_Reflections;
+extern uint8_t settings_Shadows;
+extern uint8_t settings_AntiAliasing;
+extern uint8_t settings_Brightness;
+extern uint8_t settings_VolumeMusic;
+extern uint8_t settings_Language;
 extern uint8_t settings_CullEnabled;
+extern float settings_SSRStepSize;
+extern uint16_t settings_SSRStepCount;
+extern float settings_SSRSampleWeight;
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32

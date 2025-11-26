@@ -170,6 +170,24 @@ void ProcessInput(void) {
         glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
     }
     
+    if (keyStates[GLFW_KEY_1].pressed) {
+        settings_SSRStepSize += 0.01f;
+    } else if (keyStates[GLFW_KEY_2].pressed) {
+        settings_SSRStepSize -= 0.01f;
+    }
+    
+    if (keyStates[GLFW_KEY_3].pressed) {
+        settings_SSRStepCount += 1;
+    } else if (keyStates[GLFW_KEY_4].pressed) {
+        settings_SSRStepCount -= 1;
+    }
+    
+    if (keyStates[GLFW_KEY_5].pressed) {
+        settings_SSRSampleWeight += 0.01f;
+    } else if (keyStates[GLFW_KEY_6].pressed) {
+        settings_SSRSampleWeight -= 0.01f;
+    }
+    
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     // End Debug Inputs
     
