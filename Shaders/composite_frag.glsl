@@ -441,7 +441,6 @@ void main() {
         surfPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
     }
 
-    if (reflectionsEnabled > 0) specColor = unpackColor32(floatBitsToUint(wpPack.a));
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
@@ -450,6 +449,7 @@ void main() {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);
+            vec4 specColor = unpackColor32(floatBitsToUint(wpPack.a));
             reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.75;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 

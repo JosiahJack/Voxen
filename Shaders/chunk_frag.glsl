@@ -80,27 +80,42 @@ uint GetVoxelIndex(vec3 worldPos) {
 const float INV_FOG_DIST = 1.0 / 71.68;
 
 // Small Poisson disk for stochastic PCF.
-const int PCF_SAMPLES = 6;
-const vec2 poissonDisk[6] = vec2[](
-    vec2(-0.04, -0.04), vec2(0.07, -0.07), vec2(-0.10, -0.10),
-    vec2(0.04, 0.04), vec2(0.07, 0.07), vec2(0.10, 0.10)
-);
-/*
+// const int PCF_SAMPLES = 6;
+// const vec2 poissonDisk[6] = vec2[](
+//     vec2(-0.04, -0.04), vec2(0.07, -0.07), vec2(-0.10, -0.10),
+//     vec2(0.04, 0.04), vec2(0.07, 0.07), vec2(0.10, 0.10)
+// );
+
 const int PCF_SAMPLES = 12;
+// const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
+//     vec2(-0.326212f, -0.405810f),
+//     vec2(-0.840144f, -0.073580f),
+//     vec2(-0.695914f,  0.457137f),
+//     vec2(-0.203345f,  0.620716f),
+//     vec2( 0.962340f, -0.194983f),
+//     vec2( 0.473434f, -0.480026f),
+//     vec2( 0.519456f,  0.767022f),
+//     vec2( 0.185461f, -0.893124f),
+//     vec2( 0.507431f,  0.064425f),
+//     vec2( 0.896420f,  0.412458f),
+//     vec2(-0.321942f,  0.932615f),
+//     vec2(-0.791559f,  0.597710f)
+// );
+
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2(-0.326212f, -0.405810f),
-    vec2(-0.840144f, -0.073580f),
-    vec2(-0.695914f,  0.457137f),
-    vec2(-0.203345f,  0.620716f),
-    vec2( 0.962340f, -0.194983f),
-    vec2( 0.473434f, -0.480026f),
-    vec2( 0.519456f,  0.767022f),
-    vec2( 0.185461f, -0.893124f),
-    vec2( 0.507431f,  0.064425f),
-    vec2( 0.896420f,  0.412458f),
-    vec2(-0.321942f,  0.932615f),
-    vec2(-0.791559f,  0.597710f)
-);*/
+    vec2(-0.0326212f, -0.0405810f),
+    vec2(-0.0840144f, -0.0073580f),
+    vec2(-0.0695914f,  0.0457137f),
+    vec2(-0.0203345f,  0.0620716f),
+    vec2( 0.0962340f, -0.0194983f),
+    vec2( 0.0473434f, -0.0480026f),
+    vec2( 0.0519456f,  0.0767022f),
+    vec2( 0.0185461f, -0.0893124f),
+    vec2( 0.0507431f,  0.0064425f),
+    vec2( 0.0896420f,  0.0412458f),
+    vec2(-0.0321942f,  0.0932615f),
+    vec2(-0.0791559f,  0.0597710f)
+);
 
 vec3 quat_rotate(vec4 q, vec3 v) {
     float x2 = q.x + q.x;
@@ -252,7 +267,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRange * distOverRange * 20.0;
+            float smearness = distOverRange * distOverRange * 24.0;
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
