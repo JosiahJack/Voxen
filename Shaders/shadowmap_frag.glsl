@@ -3,9 +3,13 @@
 in vec3 FragPos;
 layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
-uniform int ssbo_indexBase;
-uniform uint lightIndex;
-uniform int shadowmapSize;
+
+// layout(location = 0) uniform mat4 modelMatrix; // start vert shader uniforms
+layout(location = 0) uniform uint instanceIndex;
+layout(location = 1) uniform mat4 viewProjMatrix; // end vert shader uniforms
+layout(location = 2) uniform int ssbo_indexBase;
+layout(location = 3) uniform uint lightIndex;
+layout(location = 4) uniform int shadowmapSize;
 
 const int LIGHT_DATA_SIZE = 13;
 const int LIGHT_DATA_OFFSET_POSX = 0;

@@ -7,23 +7,27 @@ in vec2 TexCoord;
 in vec3 Normal;
 in vec3 FragPos;
 
-uniform int debugView;
-uniform int debugValue;
-uniform uint screenWidth;
-uniform uint screenHeight;
-uniform float worldMin_x;
-uniform float worldMin_z;
-uniform vec3 camPos;
-uniform float fogColorR;
-uniform float fogColorG;
-uniform float fogColorB;
-uniform uint reflectionsEnabled;
-uniform uint shadowsEnabled;
-uniform float shadowmapSize;
-uniform uint unlit;
-uniform uint texIndex;
-uniform uint glowIndex;
-uniform uint specIndex;
+layout(location =  0) uniform uint instanceIndex; // start vert shader uniforms
+layout(location =  1) uniform uint normInstanceIndex;
+layout(location =  2) uniform mat4 viewProjection;
+layout(location =  3) uniform uint isUI; // end vert shader uniforms
+layout(location =  4) uniform int debugView;
+layout(location =  5) uniform int debugValue;
+layout(location =  6) uniform uint screenWidth;
+layout(location =  7) uniform uint screenHeight;
+layout(location =  8) uniform float worldMin_x;
+layout(location =  9) uniform float worldMin_z;
+layout(location = 10) uniform vec3 camPos;
+layout(location = 11) uniform float fogColorR;
+layout(location = 12) uniform float fogColorG;
+layout(location = 13) uniform float fogColorB;
+layout(location = 14) uniform uint reflectionsEnabled;
+layout(location = 15) uniform uint shadowsEnabled;
+layout(location = 16) uniform float shadowmapSize;
+layout(location = 17) uniform uint unlit;
+layout(location = 18) uniform uint texIndex;
+layout(location = 19) uniform uint glowIndex;
+layout(location = 20) uniform uint specIndex;
 
 flat in uint TexIndex;
 flat in uint GlowIndex;
@@ -78,30 +82,7 @@ uint GetVoxelIndex(vec3 worldPos) {
 }
 
 const float INV_FOG_DIST = 1.0 / 71.68;
-
-// Small Poisson disk for stochastic PCF.
-// const int PCF_SAMPLES = 6;
-// const vec2 poissonDisk[6] = vec2[](
-//     vec2(-0.04, -0.04), vec2(0.07, -0.07), vec2(-0.10, -0.10),
-//     vec2(0.04, 0.04), vec2(0.07, 0.07), vec2(0.10, 0.10)
-// );
-
 const int PCF_SAMPLES = 12;
-// const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-//     vec2(-0.326212f, -0.405810f),
-//     vec2(-0.840144f, -0.073580f),
-//     vec2(-0.695914f,  0.457137f),
-//     vec2(-0.203345f,  0.620716f),
-//     vec2( 0.962340f, -0.194983f),
-//     vec2( 0.473434f, -0.480026f),
-//     vec2( 0.519456f,  0.767022f),
-//     vec2( 0.185461f, -0.893124f),
-//     vec2( 0.507431f,  0.064425f),
-//     vec2( 0.896420f,  0.412458f),
-//     vec2(-0.321942f,  0.932615f),
-//     vec2(-0.791559f,  0.597710f)
-// );
-
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
     vec2(-0.0326212f, -0.0405810f),
     vec2(-0.0840144f, -0.0073580f),
@@ -329,7 +310,7 @@ void main() {
             float strength = texIndexChecked == 36 || texIndexChecked == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
             float shininess = 150.0;
             float spec = pow(ndh, shininess);
-            lighting += lightColor * intensity * attenuation * spotFalloff * spec * shadowFactor * strength;
+            lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength * 10.0;
         }
     }
 

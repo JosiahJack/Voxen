@@ -159,15 +159,15 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_R].pressed) {
         debugView++;
         if (debugView > 4) debugView = 0;
-        glProgramUniform1i(chunkShaderProgram, debugViewLoc_chunk, debugView);
-        glProgramUniform1i(imageBlitShaderProgram, debugViewLoc_quadblit, debugView);
+        glProgramUniform1i(chunkShaderProgram, 4, debugView);
+        glProgramUniform1i(imageBlitShaderProgram, 0, debugView);
     }
 
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_Y].pressed) {
         debugValue++;
         if (debugValue > 6) debugValue = 0;
-        glProgramUniform1i(imageBlitShaderProgram, debugValueLoc_quadblit, debugValue);
-        glProgramUniform1i(chunkShaderProgram, debugValueLoc_chunk, debugValue);
+        glProgramUniform1i(imageBlitShaderProgram, 1, debugValue);
+        glProgramUniform1i(chunkShaderProgram, 5, debugValue);
     }
     
     if (keyStates[GLFW_KEY_1].pressed) {
@@ -221,5 +221,7 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;
         inventoryMode = !inventoryMode;
+        cursorPosition_x = screen_width / 2;
+        cursorPosition_y = screen_height / 2;
     }
 }

@@ -3,21 +3,17 @@
 in vec2 TexCoord;
 out vec4 FragColor;
 
-uniform sampler2D textTexture;  // GL_R8 SDF atlas
-uniform uint fontType;              // 0 = SystemShockText, 1 = StopD
-uniform vec4 textColor;
-uniform vec2 texelSize;         // (1.0 / atlasWidth, 1.0 / atlasHeight)
+layout(location = 0) uniform mat4 projection; // vert shader uniform only
+layout(location = 1) uniform sampler2D textTexture;  // GL_R8 SDF atlas
+layout(location = 2) uniform uint fontType; // 0 = SystemShockText, 1 = StopD
+layout(location = 3) uniform vec4 textColor;
+layout(location = 4) uniform vec2 texelSize;         // (1.0 / atlasWidth, 1.0 / atlasHeight)
 
 void main() {
     float sdf = texture(textTexture, TexCoord).r;
 
-    if (sdf >= 0.8) { FragColor = vec4(textColor.rgb,1.0); return; } // Center of glyph (fully filled)
-
-    // Outside glyph: fully transparent
-    if (sdf <= 0.00001) {
-        FragColor = vec4(0.0);
-        return;
-    }
+    if (sdf >= 0.8) { FragColor = vec4(textColor.rgb,1.0); return; } // Center of glyph, solid color
+    if (sdf <= 0.00001) { FragColor = vec4(0.0); return; } // Outside glyph, fully transparent
 
     // We're in the border region: 0.0 < sdf < 0.5
     // Sample neighbors to detect edge direction
@@ -25,15 +21,11 @@ void main() {
     float sdfLeft   = texture(textTexture, TexCoord + vec2(-texelSize.x, 0.0)).r;
     float sdfUp     = texture(textTexture, TexCoord + vec2(0.0, texelSize.y)).r;
     float sdfDown   = texture(textTexture, TexCoord + vec2(0.0, -texelSize.y)).r;
-
-    // Compute approximate gradient direction using central differences
     vec2 grad = vec2(sdfRight - sdfLeft, sdfUp - sdfDown);
     float gradLen = length(grad);
     if (gradLen < 0.001) discard; // No strong direction — fallback or ignore
 
     vec2 gradNorm = grad / gradLen; // Normalize gradient
-
-    // Determine if on a vertical edge
     float verticalComponent = gradNorm.y; // +1 = pointing up (bottom edge), -1 = pointing down (top edge)
     if (fontType == 1) { // StopD: directional colored borders
         if (abs(verticalComponent) > 0.1) { // Only strong vertical edges

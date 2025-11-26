@@ -108,7 +108,6 @@ bool bottomless = false;
 bool superoverride;
 // ----------------------------------------------------------------------------
 // Camera variables
-// Start Actual: Puts player on Medical Level in actual game start position
 float cam_yaw = 90.0f;
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
@@ -132,48 +131,27 @@ uint32_t uiImageDrawCallsRenderedThisFrame = 0;
 uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsLODArray[INSTANCE_COUNT];
-GLuint inputImageID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
-// ----------------------------------------------------------------------------
-// Shaders
-//    Chunk Geometery Unlit Raster Shader
-GLuint chunkShaderProgram;
-GLuint vao_chunk; // Vertex Array Object
-GLint viewProjLoc_chunk, matrixLoc_chunk, texIndexLoc_chunk, debugViewLoc_chunk, debugValueLoc_chunk, glowIndexLoc_chunk, specIndexLoc_chunk, normIndexLoc_chunk, screenWidthLoc_chunk, screenHeightLoc_chunk, 
-      worldMin_xLoc_chunk, worldMin_zLoc_chunk, camPosLoc_chunk, fogColorRLoc_chunk, fogColorGLoc_chunk, fogColorBLoc_chunk, shadowmapSizeLoc_chunk, reflectionsEnabledLoc_chunk, shadowsEnabledLoc_chunk,
-      isUILoc_chunk, unlitLoc_chunk, instanceIndexLoc_chunk;
-      
 float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;
+GLuint inputImageID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
 
-//    Shadowmap Rastered Depth Shader
+GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
+GLuint vao_chunk; // Vertex Array Object
+
 GLuint shadowCubeMap;
 GLuint shadowFBO;
 GLuint shadowmapsShaderProgram;
-GLint modelMatrixLoc_shadowmaps, viewProjMatrixLoc_shadowmaps, texIndexLoc_shadowmaps, glowSpecIndexLoc_shadowmaps, normInstanceIndexLoc_shadowmaps, lightIndex_shadowmaps, ssbo_indexBaseLoc_shadowmaps,
-      shadowmapSizeLoc_shadowmaps, viewProjArrayLoc_shadowmaps;
+GLuint shadowmapsClearShaderProgram;
 GLuint shadowMapSSBO;
 uint32_t totalShadowmapPixels = 0;
 
-//    SSR (Screen Space Reflections)
-#define SSR_RES 8 // 0.125 * render resolution.
-GLuint ssrShaderProgram;
-GLint screenWidthLoc_ssr, screenHeightLoc_ssr, viewProjectionLoc_ssr, camPosLoc_ssr, outputImageLoc_ssr, stepSizeLoc_ssr, stepCountLoc_ssr, sampleWeightLoc_ssr;
+#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
+GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
 
-//    Shadowmaps Clear
-GLuint shadowmapsClearShaderProgram;
-
-//    Full Screen Quad Blit for rendering final output/image effect passes
-GLuint imageBlitShaderProgram;
+GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
 GLuint quadVAO, quadVBO;
-GLint texLoc_quadblit, debugViewLoc_quadblit, debugValueLoc_quadblit, screenWidthLoc_imageBlit, screenHeightLoc_imageBlit, outputImageLoc_imageBlit, skyVisibleLoc_imageBlit, planetaryBodiesVisibleLoc_imageBlit,
-      groveShieldVisibleLoc_imageBlit, stationShieldVisibleLoc_imageBlit, reflectionsEnabledLoc_imageBlit, aaEnabledLoc_imageBlit, brightnessSettingLoc_imageBlit, fovLoc_imageBlit, camRotLoc_imageBlit, timeValLoc_imageBlit,
-      aspectLoc_imageBlit, shadowsSettingLoc_imageBlit, shadowmapSizeLoc_imageBlit, worldMin_xLoc_imageBlit, worldMin_zLoc_imageBlit, viewProjectionLoc_imageBlit, camPosLoc_imageBlit, invViewRotLoc_imageBlit,
-      berserkTimeRemainingLoc_imageBlit, berserkSeedTimestampLoc_imageBlit;
-      
-//    Text Shader
+
 GLuint textShaderProgram;
 GLuint textVAO, textVBO;
-GLint projectionLoc_text, textColorLoc_text, textTextureLoc_text, texelSizeLoc_text, fontTypeLoc_text;
-
 // ----------------------------------------------------------------------------
 // UI Cursor
 bool cursorVisible = false;
@@ -268,109 +246,27 @@ GLuint LinkProgram(GLuint *shaders, int32_t count, const char *programName) {
 
 void CompileShaders(void) {
     GLuint vertShader, fragShader, computeShader;
-
-    // Chunk Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader");
     chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");
     
-    // Shadowmaps Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, shadowmapVertexShaderSource, "Shadowmaps Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, shadowmapFragmentShaderSource, "Shadowmaps Fragment Shader");
     shadowmapsShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmaps Shader Program");
 
-    // Text Shader
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader");
     textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");
 
-    // Screen Space Reflections Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader");
     ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
     
-    // Shadowmaps Clear Compute Shader Program
     computeShader = CompileShader(GL_COMPUTE_SHADER, shadowmaps_clear_computeShader, "Shadowmaps Clear Compute Shader");
     shadowmapsClearShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Shadowmaps Clear Shader Program");
 
-    // Image Blit Shader (For full screen image effects, rendering compute results, etc.)
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");
     imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
-
-    // Cache uniform locations after shader compile!
-    viewProjLoc_chunk = glGetUniformLocation(chunkShaderProgram, "viewProjection");
-    matrixLoc_chunk = glGetUniformLocation(chunkShaderProgram, "matrix");
-    texIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "texIndex");
-    glowIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "glowIndex");
-    specIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "specIndex");
-    normIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "normInstanceIndex");
-    debugViewLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugView");
-    debugValueLoc_chunk = glGetUniformLocation(chunkShaderProgram, "debugValue");
-    screenWidthLoc_chunk = glGetUniformLocation(chunkShaderProgram, "screenWidth");
-    screenHeightLoc_chunk = glGetUniformLocation(chunkShaderProgram, "screenHeight");
-    worldMin_xLoc_chunk = glGetUniformLocation(chunkShaderProgram, "worldMin_x");
-    worldMin_zLoc_chunk = glGetUniformLocation(chunkShaderProgram, "worldMin_z");
-    camPosLoc_chunk = glGetUniformLocation(chunkShaderProgram, "camPos");
-    fogColorRLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorR");
-    fogColorGLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorG");
-    fogColorBLoc_chunk = glGetUniformLocation(chunkShaderProgram, "fogColorB");
-    shadowmapSizeLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowmapSize");
-    reflectionsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "reflectionsEnabled");
-    shadowsEnabledLoc_chunk = glGetUniformLocation(chunkShaderProgram, "shadowsEnabled");
-    isUILoc_chunk = glGetUniformLocation(chunkShaderProgram, "isUI");
-    unlitLoc_chunk = glGetUniformLocation(chunkShaderProgram, "unlit");
-    instanceIndexLoc_chunk = glGetUniformLocation(chunkShaderProgram, "instanceIndex");
-
-    modelMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "modelMatrix");
-    viewProjMatrixLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "viewProjMatrix");
-    texIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "texIndex");
-    glowSpecIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "glowSpecIndex");
-    normInstanceIndexLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "normInstanceIndex");
-    ssbo_indexBaseLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "ssbo_indexBase");
-    shadowmapSizeLoc_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "shadowmapSize");
-    lightIndex_shadowmaps = glGetUniformLocation(shadowmapsShaderProgram, "lightIndex");
-
-    screenWidthLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenWidth");
-    screenHeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "screenHeight");
-    viewProjectionLoc_ssr = glGetUniformLocation(ssrShaderProgram, "viewProjection");
-    camPosLoc_ssr = glGetUniformLocation(ssrShaderProgram, "camPos");
-    outputImageLoc_ssr = glGetUniformLocation(ssrShaderProgram, "outputImage");
-    stepSizeLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepSize");
-    stepCountLoc_ssr = glGetUniformLocation(ssrShaderProgram, "stepCount");
-    sampleWeightLoc_ssr = glGetUniformLocation(ssrShaderProgram, "sampleWeight");
-
-    texLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "tex");
-    debugViewLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugView");
-    debugValueLoc_quadblit = glGetUniformLocation(imageBlitShaderProgram, "debugValue");
-    screenWidthLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "screenWidth");
-    screenHeightLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "screenHeight");
-    outputImageLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "outputImage");
-    skyVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "skyVisible");
-    planetaryBodiesVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "planetaryBodiesVisible");
-    groveShieldVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "groveShieldVisible");
-    stationShieldVisibleLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "stationShieldVisible");
-    reflectionsEnabledLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "reflectionsEnabled");
-    aaEnabledLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "aaEnabled");
-    brightnessSettingLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "brightnessSetting");
-    fovLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "fov");
-    camRotLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "camRot");
-    timeValLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "timeVal");
-    aspectLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "aspect");
-    shadowsSettingLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "shadowsEnabled");
-    shadowmapSizeLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "shadowmapSize");
-    worldMin_xLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "worldMin_x");
-    worldMin_zLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "worldMin_z");
-    viewProjectionLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "viewProjection");
-    camPosLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "camPos");
-    invViewRotLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "invViewRot");
-    berserkTimeRemainingLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "berserkTimeRemaining");
-    berserkSeedTimestampLoc_imageBlit = glGetUniformLocation(imageBlitShaderProgram, "berserkSeedTimestamp");
-    
-    projectionLoc_text = glGetUniformLocation(textShaderProgram, "projection");
-    textColorLoc_text = glGetUniformLocation(textShaderProgram, "textColor");
-    textTextureLoc_text = glGetUniformLocation(textShaderProgram, "textTexture");
-    texelSizeLoc_text = glGetUniformLocation(textShaderProgram, "texelSize");
-    fontTypeLoc_text = glGetUniformLocation(textShaderProgram, "fontType");
     CHECK_GL_ERROR();
 }
 
@@ -433,15 +329,17 @@ void UpdateScreenSize(void) {
     m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
     
-    glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
-    glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
-    glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1ui(chunkShaderProgram, screenWidthLoc_chunk, screen_width);
-    glProgramUniform1ui(chunkShaderProgram, screenHeightLoc_chunk, screen_height);
-    glProgramUniform1f( chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
-    glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
-    glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
+    glProgramUniform1ui(imageBlitShaderProgram, 2, screen_width);
+    glProgramUniform1ui(imageBlitShaderProgram, 3, screen_height);
+    glProgramUniform1f(imageBlitShaderProgram, 23, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1i(imageBlitShaderProgram, 26, SSR_RES);
+    glProgramUniform1ui(chunkShaderProgram, 6, screen_width);
+    glProgramUniform1ui(chunkShaderProgram, 7, screen_height);
+    glProgramUniform1f(chunkShaderProgram, 16, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1ui(ssrShaderProgram, 0, screen_width / SSR_RES);
+    glProgramUniform1ui(ssrShaderProgram, 1, screen_height / SSR_RES);
+    glProgramUniform1i(ssrShaderProgram, 4, 4); // outputImage texture binding point
+    glProgramUniform1i(ssrShaderProgram, 7, SSR_RES);
 }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
@@ -671,10 +569,10 @@ void RenderShadowmap(uint16_t lightIdx) {
         nearbyMeshCount++;
     }
 
-    glUniform1ui(lightIndex_shadowmaps, lightIdx);
+    glUniform1ui(3, lightIdx);
     for (uint8_t face = 0; face < 6; face++) {
-        glUniform1i(ssbo_indexBaseLoc_shadowmaps, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
-        glUniformMatrix4fv(viewProjMatrixLoc_shadowmaps, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
+        glUniform1i(2, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
+        glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
             if (instances[i].modelIndex >= loadedModels) continue;
@@ -684,7 +582,7 @@ void RenderShadowmap(uint16_t lightIdx) {
             if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
 
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
-            glUniformMatrix4fv(modelMatrixLoc_shadowmaps, 1, GL_FALSE, &modelMatrices[i * 16]);
+            glUniform1ui(0, i);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
@@ -718,24 +616,24 @@ void RenderShadowmaps(void) {
     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
-    glProgramUniform1i(shadowmapsShaderProgram, shadowmapSizeLoc_shadowmaps, (int32_t)SHADOW_MAP_SIZE);
+    glProgramUniform1i(shadowmapsShaderProgram, 4, (int32_t)SHADOW_MAP_SIZE);
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-
-    // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
     LightCandidate candidates[loadedLights];
     uint32_t candidateCount = 0;
-    for (uint16_t i = 0; i < loadedLights; ++i) {
+    for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
+        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        if (intensity < 0.1f) continue;
+        
         float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
         if (distSqrd >= FAR_PLANE_SQUARED) continue;
-
-        // Your inPVS check
+        
         int lightCellIdx = cellIndexForLight[i];
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
@@ -758,18 +656,13 @@ void RenderShadowmaps(void) {
         if (!inPVS) continue;
 
         // Score: lower score = closer and brighter (higher priority)
-        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
         float score = distSqrd / vmax(intensity, 0.01f);  // Avoid div by 0, favor bright lights
-
         candidates[candidateCount++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
     }
 
-    // Sort candidates by score (ascending: best first)
     qsort(candidates, candidateCount, sizeof(LightCandidate), compareLightCandidates);
-
-    // Render top MAX_SHADOWMAPS candidates
     uint32_t numToRender = vmin(candidateCount, MAX_SHADOWMAPS);
-    for (uint32_t c = 0; c < numToRender; ++c) {
+    for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
@@ -811,12 +704,10 @@ void RenderUIImages() {
 
     glUseProgram(chunkShaderProgram);
     glBindVertexArray(textVAO);
-    glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 1u);
-    glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk, 1u);
-    glProgramUniformMatrix4fv(chunkShaderProgram, viewProjLoc_chunk, 1, GL_FALSE, uiOrthoProjection);
-
-    // Sort images by texIndex to minimize state changes.  Simple bubble sort for small N
-    for (uint32_t i = 0; i < uiImageCount; i++) {
+    glProgramUniform1ui(chunkShaderProgram, 3, 1u); // isUI true
+    glProgramUniform1ui(chunkShaderProgram, 17, 1u); // unlit is true
+    glProgramUniformMatrix4fv(chunkShaderProgram, 2, 1, GL_FALSE, uiOrthoProjection);
+    for (uint32_t i = 0; i < uiImageCount; i++) { // Sort images by texIndex to minimize state changes.  Simple bubble sort for small N
         for (uint32_t j = i + 1; j < uiImageCount; j++) {
             if (uiImages[j].texIndex < uiImages[i].texIndex) {
                 UIImage temp = uiImages[i];
@@ -840,24 +731,22 @@ void RenderUIImages() {
             float z0 = uiImages[i].z;
             float x1 = x0 + uiImages[i].width;
             float y1 = y0 + uiImages[i].height;
-            float vertices[30] = {
-                x0, y1, z0, 0.0f, 0.0f,
-                x1, y0, z0, 1.0f, 1.0f,
-                x1, y1, z0, 1.0f, 0.0f,
-                x0, y1, z0, 0.0f, 0.0f,
-                x0, y0, z0, 0.0f, 1.0f,
-                x1, y0, z0, 1.0f, 1.0f
-            };
+            float vertices[30] = { x0, y1, z0, 0.0f, 0.0f,
+                                   x1, y0, z0, 1.0f, 1.0f,
+                                   x1, y1, z0, 1.0f, 0.0f,
+                                   x0, y1, z0, 0.0f, 0.0f,
+                                   x0, y0, z0, 0.0f, 1.0f,
+                                   x1, y0, z0, 1.0f, 1.0f };
 
             memcpy(uiImageVertexData + vertexCount * 30, vertices, sizeof(vertices));
             vertexCount++;
         }
 
         if (vertexCount > 0) {
-            glUniform1ui(texIndexLoc_chunk, currentTex);
-            glUniform1ui(glowIndexLoc_chunk, BLACK_TEXTURE_IDX);
-            glUniform1ui(specIndexLoc_chunk, BLACK_TEXTURE_IDX);
-            glUniform1ui(normIndexLoc_chunk, BLACK_TEXTURE_IDX);
+            glUniform1ui(1, BLACK_TEXTURE_IDX);
+            glUniform1ui(18, currentTex);
+            glUniform1ui(19, BLACK_TEXTURE_IDX);
+            glUniform1ui(20, BLACK_TEXTURE_IDX);
             glNamedBufferData(textVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
             drawCallsRenderedThisFrame++;
@@ -880,31 +769,25 @@ bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
 void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t fontID, const char* format, ...) {
     va_list args;
-    va_start(args, format);
-    vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args);
-    va_end(args);
+    va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(textShaderProgram);
-    glProgramUniformMatrix4fv(textShaderProgram, projectionLoc_text, 1, GL_FALSE, uiOrthoProjection);
-    glProgramUniform4f(textShaderProgram, textColorLoc_text, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
+    glProgramUniformMatrix4fv(textShaderProgram, 0, 1, GL_FALSE, uiOrthoProjection);
+    glProgramUniform4f(textShaderProgram, 3, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
     if (fontID == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
     else glBindTextureUnit(6, fontAtlasTex);
-    glProgramUniform2f(textShaderProgram, texelSizeLoc_text, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
-    glProgramUniform1ui(textShaderProgram, fontTypeLoc_text, fontID);
-    glProgramUniform1i(textShaderProgram, textTextureLoc_text, 6);
+    
+    glProgramUniform2f(textShaderProgram, 4, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
+    glProgramUniform1ui(textShaderProgram, 2, fontID);
+    glProgramUniform1i(textShaderProgram, 1, 6); // textTexture sampler2D
     glBindVertexArray(textVAO);
-
-    // Batch vertices for all glyphs
     size_t vertexCount = 0;
     const char* p = uiTextBuffer;
     float xpos = x, ypos = y + GetScreenRelativeY(0.0211f);
     float lineSpacing = GetScreenRelativeY(0.03f); // Match RenderUI
     stbtt_aligned_quad q;
     int characterCount = 0;
-    // Define padding for SDF outline (in pixels)
-    float paddingPixels = 12.0f;
-    float paddingUV = paddingPixels / (float)FONT_ATLAS_SIZE;
+    float paddingUV = 12.0f / (float)FONT_ATLAS_SIZE; // This is for the black outline around all text for readability.
     float borderWidthPixels = 2.0f;
-
     while (*p) {
         uint32_t codepoint = DecodeUTF8(&p);
         characterCount++;
@@ -920,33 +803,23 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
 
         if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
-
-        // Expand vertex quad
         float vx0 = q.x0 - borderWidthPixels;
         float vy0 = q.y0 - borderWidthPixels;
         float vx1 = q.x1 + borderWidthPixels;
         float vy1 = q.y1 + borderWidthPixels;
-
-        // Expand UVs by padding
         float s0 = q.s0 - paddingUV;
         float t0 = q.t0 - paddingUV;
         float s1 = q.s1 + paddingUV;
         float t1 = q.t1 + paddingUV;
-
-        float textVertices[30] = {
-            // Triangle 1
-            vx0, vy0, z, s0, t0,
-            vx1, vy1, z, s1, t1,
-            vx1, vy0, z, s1, t0,
-            // Triangle 2
-            vx0, vy0, z, s0, t0,
-            vx0, vy1, z, s0, t1,
-            vx1, vy1, z, s1, t1
-        };
+        float textVertices[30] = { vx0, vy0, z, s0, t0, // Triangle 1
+                                   vx1, vy1, z, s1, t1,
+                                   vx1, vy0, z, s1, t0,
+                                   vx0, vy0, z, s0, t0, // Triangle 2
+                                   vx0, vy1, z, s0, t1,
+                                   vx1, vy1, z, s1, t1 };
 
         memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
         vertexCount++;
-
         if (codepoint >= '0' && codepoint <= '9') {
             if (fontID == FONT_STOPD) xpos = q.x0 + fixedNumberAdvanceWidthStopD;
             else xpos = q.x0 + fixedNumberAdvanceWidth;
@@ -967,7 +840,7 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
     glUseProgram(imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, inputImageID);
-    glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
+    glProgramUniform1i(imageBlitShaderProgram, 27, 0); // Texture 0 for the rendered geometry color buffer
     glBindVertexArray(quadVAO);
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
@@ -995,34 +868,27 @@ void CenterStatusPrint(const char* fmt, ...) {
     statusTextDecayFinished = get_time() + 2.5f; // 2.5 second decay time before text dissappears.
 }
 // ============================================================================
-void InitializePlayer(uint16_t playerIdx) {
+void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
     instances[playerIdx].index = 767;
-    instances[playerIdx].position.x = 10.2f;
+    instances[playerIdx].position.x = 10.2f; // Start Actual: Puts player on Medical Level in actual game start position
     instances[playerIdx].position.y = -43.792f + 0.84f; // Added 0.84f for cam offset from center
     instances[playerIdx].position.z = 20.40001f;
     instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
     instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
     instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
-    instances[playerIdx].entflags = 0x00000000000000000000000000000000u; // Zero out all bits (yes I realize this representation is excessive lol)
     flag_enable(&instances[playerIdx].entflags, ENTFLAG_ACTIVE);
     flag_enable(&instances[playerIdx].entflags, ENTFLAG_USEGRAVITY);
     flag_enable(&instances[playerIdx].entflags, ENTFLAG_RIGIDBODY);
-    instances[playerIdx].bodyState = BodyState_Standing;
     instances[playerIdx].collider = COLLIDER_TYPE_CAPSULE;
-    instances[playerIdx].colliderCenter.x = 0.0f;
     instances[playerIdx].colliderCenter.y = 0.84f;
-    instances[playerIdx].colliderCenter.z = 0.0f;
     instances[playerIdx].colliderSize.x = 0.48f; // Radius
     instances[playerIdx].colliderSize.y = 2.0f;  // Overall height including end radii (Unity convention, blech)
     instances[playerIdx].colliderSize.z = COLLIDER_CAPSULE_DIRECTION_Y_F; // Direction, 1.0 == Y-Axis
     instances[playerIdx].mass = 1.0f;
     instances[playerIdx].linearDrag = 8.0f;
-    instances[playerIdx].angularDrag = 0.0f;
     instances[playerIdx].dynamicFriction = 0.6f;
     instances[playerIdx].staticFriction = 0.8f;
-    instances[playerIdx].bounciness = 0.0f;
     instances[playerIdx].frictionCombine = PHYS_COMBINE_MUL;
-    instances[playerIdx].bounceCombine = PHYS_COMBINE_AVG;
 }
 
 void NewGame(void) {
@@ -1326,11 +1192,11 @@ void RenderInstances(uint8_t type) {
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
             uint32_t texIndex = instances[i].texIndex;
-            glUniform1ui(instanceIndexLoc_chunk, i);
-            glUniform1ui(texIndexLoc_chunk, texIndex);
-            glUniform1ui(glowIndexLoc_chunk, (uint32_t)instances[i].glowIndex);
-            glUniform1ui(specIndexLoc_chunk, (uint32_t)instances[i].specIndex);
-            glUniform1ui(normIndexLoc_chunk, (uint32_t)instances[i].normIndex);
+            glUniform1ui(0, i);
+            glUniform1ui(1, (uint32_t)instances[i].normIndex);
+            glUniform1ui(18, texIndex);
+            glUniform1ui(19, (uint32_t)instances[i].glowIndex);
+            glUniform1ui(20, (uint32_t)instances[i].specIndex);
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
             uint32_t vertCount = modelTriangleCounts[modelType] * 3;
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1360,9 +1226,9 @@ void SetFog() {
     fogColorRUsed = fogColorR * fogBaseDensityForLevel;
     fogColorGUsed = fogColorG * fogBaseDensityForLevel;
     fogColorBUsed = fogColorB * fogBaseDensityForLevel;
-    glProgramUniform1f(chunkShaderProgram, fogColorRLoc_chunk, fogColorRUsed);
-    glProgramUniform1f(chunkShaderProgram, fogColorGLoc_chunk, fogColorGUsed);
-    glProgramUniform1f(chunkShaderProgram, fogColorBLoc_chunk, fogColorBUsed);
+    glProgramUniform1f(chunkShaderProgram, 11, fogColorRUsed);
+    glProgramUniform1f(chunkShaderProgram, 12, fogColorGUsed);
+    glProgramUniform1f(chunkShaderProgram, 13, fogColorBUsed);
 }
 
 double timeSinceLastPhysicsTick = 0.0;
@@ -1372,35 +1238,28 @@ int32_t main(int32_t argc, char* argv[]) {
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
     OpenConsoleLogFile();
     DebugRAM("program start");
-    if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) {
-        printf("-----------------------------------------------------------\n");
-        printf("Voxen "
-               VERSION_STRING
-               "10/20/2025\nthe OpenGL Voxel Lit Game Engine\n\nby W. Josiah Jack\nMIT-0 licensed\n\n\n");
-        return 0;
-    }
-
+    if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { DualLog("-----------------------------------------------------------\nVoxen " VERSION_STRING "\nthe Voxel Lit Open Source Game Engine\nby W. Josiah Jack\nMIT-0 licensed\n"); return 0; }
     if ((argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
         || (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) ) {
-        printf("Voxen the Voxel Lit Open Source Game Engine\n");
-        printf("-----------------------------------------------------------\n");
-        printf("        This is a rendering engine designed for optimized focused\n");
-        printf("        usage of OpenGL making maximal use of GPU Driven rendering\n");
-        printf("        techniques, a unified event system for debugging and log\n");
-        printf("        playback, full mod support loading all data from external\n");
-        printf("        files and using definition files for what to do with the\n");
-        printf("        data.\n\n");
-        printf("        This project aims to have minimal overhead, profiling,\n");
-        printf("        traceability, robustness, and low level control.\n\n");
-        printf("\n");
-        printf("Valid arguments:\n");
-        printf(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
-        printf("-v, --version\n    Prints version information\n\n");
-        printf("play <file>\n    Plays back recorded log from current directory\n\n");
-        printf("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
-        printf("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
-        printf("-h, --help\n    Provides this help text.  Neat!\n\n");
-        printf("-----------------------------------------------------------\n");
+        DualLog("Voxen the Voxel Lit Open Source Game Engine\n");
+        DualLog("-------------------------------------------------------------\n");
+        DualLog("   This is a game engine designed for optimized focused usage\n");
+        DualLog("   of OpenGL, making heavy use of GPU Driven rendering\n");
+        DualLog("   techniques, a unified event system for debugging and log\n");
+        DualLog("   playback, full mod support loading all data from external\n");
+        DualLog("   files and using definition files for what to do with the\n");
+        DualLog("   data.\n\n");
+        DualLog("   This project aims to have minimal overhead, profiling,\n");
+        DualLog("   traceability, robustness, and low level control.\n\n");
+        DualLog("\n");
+        DualLog("Valid arguments:\n");
+        DualLog(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
+        DualLog("-v, --version\n    Prints version information\n\n");
+        DualLog("play <file>\n    Plays back recorded log from current directory\n\n");
+        DualLog("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
+        DualLog("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
+        DualLog("-h, --help\n    Provides this help text.  Neat!\n");
+        DualLog("-----------------------------------------------------------\n");
         return 0;
     }
 
@@ -1452,25 +1311,15 @@ int32_t main(int32_t argc, char* argv[]) {
         uiImageCount = 0;
         memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));
         
-        // 0. Clear Frame Buffers and Depth
-        if (!gamePaused) glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
-    
-        // 0.5 Set View and Projection Matrices
+        // 0. View Matrix, and Projection Matrix
         float view[16]; // Also known as view matrix
         mat4_lookat_from(view,&cam_rotation, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         float viewProj[16]; // view-projection matrix
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
         float invViewRot[9];
-        invViewRot[0] = view[0];
-        invViewRot[1] = view[4];
-        invViewRot[2] = view[8];
-        invViewRot[3] = view[1];
-        invViewRot[4] = view[5];
-        invViewRot[5] = view[9];
-        invViewRot[6] = view[2];
-        invViewRot[7] = view[6];
-        invViewRot[8] = view[10];
+        invViewRot[0] = view[0]; invViewRot[3] = view[1]; invViewRot[6] = view[2];
+        invViewRot[1] = view[4]; invViewRot[4] = view[5]; invViewRot[7] = view[6];
+        invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
         if (!gamePaused && !menuActive) { // !PAUSED BLOCK -------------------------------------------------
             UpdateAmbientSounds();
             
@@ -1496,20 +1345,19 @@ int32_t main(int32_t argc, char* argv[]) {
                 }
             }
             
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
 
-            // 4. Raterized Geometry
-            //        Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
+            // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
             glUseProgram(chunkShaderProgram);
-            glUniformMatrix4fv(viewProjLoc_chunk, 1, GL_FALSE, viewProj);
-            glUniform1f(worldMin_xLoc_chunk, worldMin_x);
-            glUniform1f(worldMin_zLoc_chunk, worldMin_z);
-            glUniform3f(camPosLoc_chunk, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-            glProgramUniform1ui(chunkShaderProgram, isUILoc_chunk, 0u);
-            glProgramUniform1ui(chunkShaderProgram, unlitLoc_chunk,0u);
-            glProgramUniform1ui(chunkShaderProgram, reflectionsEnabledLoc_chunk, settings_Reflections);
-            glProgramUniform1ui(chunkShaderProgram, shadowsEnabledLoc_chunk, settings_Shadows);
+            glProgramUniformMatrix4fv(chunkShaderProgram, 2, 1, GL_FALSE, viewProj);
+            glProgramUniform1ui(chunkShaderProgram, 3, 0u); // isUI false
+            glProgramUniform1f(chunkShaderProgram, 8, worldMin_x);
+            glProgramUniform1f(chunkShaderProgram, 9, worldMin_z);
+            glProgramUniform3f(chunkShaderProgram, 10, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+            glProgramUniform1ui(chunkShaderProgram, 14, settings_Reflections);
+            glProgramUniform1ui(chunkShaderProgram, 15, settings_Shadows);
+            glProgramUniform1ui(chunkShaderProgram, 17, 0u); // unlit false
             glBindVertexArray(vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
@@ -1518,15 +1366,15 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindVertexArray(0);
             glUseProgram(0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            // ====================================================================
+
             // 5. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
-                glUniformMatrix4fv(viewProjectionLoc_ssr, 1, GL_FALSE, viewProj);
-                glUniform3f(camPosLoc_ssr, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-                glUniform1f(stepSizeLoc_ssr, settings_SSRStepSize);
-                glUniform1f(sampleWeightLoc_ssr, settings_SSRSampleWeight);
-                glUniform1ui(stepCountLoc_ssr, settings_SSRStepCount);
+                glUniform1f(2, settings_SSRStepSize);
+                glUniform1f(3, settings_SSRSampleWeight);
+                glUniform1ui(4, settings_SSRStepCount);
+                glUniformMatrix4fv(5, 1, GL_FALSE, viewProj);
+                glUniform3f(6, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
                 GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -1542,32 +1390,35 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindTexture(GL_TEXTURE_2D, inputImageID);
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, outputImageID);
-        glProgramUniform1i(imageBlitShaderProgram, outputImageLoc_imageBlit, 4);
-        glProgramUniform1ui(imageBlitShaderProgram, skyVisibleLoc_imageBlit, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || currentLevel == 13);
-        glProgramUniform1ui(imageBlitShaderProgram, planetaryBodiesVisibleLoc_imageBlit, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && currentLevel != 13);
-        glProgramUniform1ui(imageBlitShaderProgram, groveShieldVisibleLoc_imageBlit, ((currentLevel >= 10 && currentLevel < 13) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+        glProgramUniform1i(imageBlitShaderProgram, 6, 4); // outputImage texture sampler2D
+        glProgramUniform1ui(imageBlitShaderProgram, 17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || currentLevel == 13);
+        glProgramUniform1ui(imageBlitShaderProgram, 18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && currentLevel != 13);
+        glProgramUniform1ui(imageBlitShaderProgram, 19, ((currentLevel >= 10 && currentLevel < 13) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
         uint32_t shieldOnType = 0u; // No shield green tint.
         if (questData.ShieldActivated) {
             if (currentLevel == 6 || currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
             else if (currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
         }
-        glProgramUniform1ui(imageBlitShaderProgram, stationShieldVisibleLoc_imageBlit, shieldOnType);
-        glProgramUniform1ui(imageBlitShaderProgram, reflectionsEnabledLoc_imageBlit, settings_Reflections);
-        glProgramUniform1ui(imageBlitShaderProgram, aaEnabledLoc_imageBlit, settings_AntiAliasing);
-        glProgramUniform1ui(imageBlitShaderProgram, brightnessSettingLoc_imageBlit, settings_Brightness);
-        glProgramUniform1ui(imageBlitShaderProgram, shadowsSettingLoc_imageBlit, settings_Shadows);
-        glProgramUniform1f(imageBlitShaderProgram, worldMin_xLoc_imageBlit, worldMin_x);
-        glProgramUniform1f(imageBlitShaderProgram, worldMin_zLoc_imageBlit, worldMin_z);
-        glProgramUniform3f(imageBlitShaderProgram, camPosLoc_imageBlit, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        glUniformMatrix4fv(viewProjectionLoc_imageBlit, 1, GL_FALSE, viewProj);
-        glUniformMatrix3fv(invViewRotLoc_imageBlit, 1, GL_FALSE, invViewRot);
-        glProgramUniform1f(imageBlitShaderProgram, berserkTimeRemainingLoc_imageBlit, berserkTimeRemainingNormalized);
-        glProgramUniform1f(imageBlitShaderProgram, berserkSeedTimestampLoc_imageBlit, berserkSeedTime);
-        glProgramUniform1f(imageBlitShaderProgram, fovLoc_imageBlit, cam_fov);
-        glProgramUniform1i(imageBlitShaderProgram, texLoc_quadblit, 0);
-        glUniform3f(camRotLoc_imageBlit, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-        glProgramUniform1f(imageBlitShaderProgram, timeValLoc_imageBlit, pauseRelativeTime * 0.1);
-        glProgramUniform1f(imageBlitShaderProgram, aspectLoc_imageBlit, aspect3D);
+        glProgramUniform1f(imageBlitShaderProgram, 4, worldMin_x);
+        glProgramUniform1f(imageBlitShaderProgram, 5, worldMin_z);
+        glProgramUniform1ui(imageBlitShaderProgram, 7, settings_Reflections);
+        glProgramUniform1ui(imageBlitShaderProgram, 8, settings_AntiAliasing);
+        glProgramUniform1f(imageBlitShaderProgram, 9, berserkTimeRemainingNormalized);
+        glProgramUniform1f(imageBlitShaderProgram, 10, berserkSeedTime);
+        glProgramUniform1ui(imageBlitShaderProgram, 11, settings_Brightness);
+        glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+        glProgramUniform3f(imageBlitShaderProgram, 13, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+        glProgramUniform1f(imageBlitShaderProgram, 14, cam_fov);
+        glProgramUniform1f(imageBlitShaderProgram, 15, pauseRelativeTime * 0.1);
+        glProgramUniform1f(imageBlitShaderProgram, 16, aspect3D);
+        glProgramUniform1ui(imageBlitShaderProgram, 20, shieldOnType);
+        glProgramUniform1ui(imageBlitShaderProgram, 22, settings_Shadows);
+        glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
+        glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
+        glProgramUniform1i(imageBlitShaderProgram, 27, 0); // Texture 0 for the rendered geometry color buffer
+        float coloredStatic = 0.0f; // TODO: Hook into pain/health management and shield impact effect
+        glProgramUniform1f(imageBlitShaderProgram, 28, coloredStatic);
+        glProgramUniform3f(imageBlitShaderProgram, 29, 1.0f, 0.0f, 0.0f); // TODO: Hook staticColor up to red or blue for pain or shield impact.
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
@@ -1578,8 +1429,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindTextureUnit(0, 0);
         glUseProgram(0);
         // End world rendering
-        // ------------------------------------
-        // ====================================
+
         // HUD
         // UI Common GL traits
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
@@ -1591,10 +1441,10 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // 7. UI
         glEnable(GL_BLEND);
-        glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!
+        glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
-        glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
+        glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
+//         glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
         glDisable(GL_CULL_FACE);
         
         //    Cursor
@@ -1611,8 +1461,10 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!gamePaused) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
         if (inventoryMode) {
             if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
-                if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-                    DualLog("Clicked the Shoot Mode button %u\n", globalFrameNum);
+                if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
+                    inventoryMode = false;
+                    cursorPosition_x = screen_width / 2;
+                    cursorPosition_y = screen_height / 2;
                 }
             }
         }

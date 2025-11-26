@@ -7,14 +7,14 @@ layout(rgba8,   binding = 0) readonly uniform image2D inputImage;
 layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
 layout(rgba8,   binding = 4) writeonly uniform image2D outputImage;
 
-uniform uint screenWidth;
-uniform uint screenHeight;
-uniform float stepSize;
-uniform float sampleWeight;
-uniform uint stepCount;
-uniform mat4 viewProjection;
-uniform vec3 camPos;
-const int SSR_RES = 8;
+layout(location = 0) uniform uint screenWidth;
+layout(location = 1) uniform uint screenHeight;
+layout(location = 2) uniform float stepSize;
+layout(location = 3) uniform float sampleWeight;
+layout(location = 4) uniform uint stepCount;
+layout(location = 5) uniform mat4 viewProjection;
+layout(location = 6) uniform vec3 camPos;
+layout(location = 7) uniform int SSR_RES;
 
 vec4 unpackColor32(uint color) {
     return vec4(float((color >> 24) & 0xFFu) / 255.0,  // r

@@ -28,9 +28,7 @@ Vector3 GetWorldCenter(const Entity* e) {
 }
 
 static inline bool CollideAABB(Vector3 min1, Vector3 max1, Vector3 min2, Vector3 max2) {
-    return (min1.x <= max2.x && max1.x >= min2.x &&
-            min1.y <= max2.y && max1.y >= min2.y &&
-            min1.z <= max2.z && max1.z >= min2.z);
+    return (min1.x <= max2.x && max1.x >= min2.x && min1.y <= max2.y && max1.y >= min2.y && min1.z <= max2.z && max1.z >= min2.z);
 }
 
 bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
@@ -43,12 +41,7 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
         *aabb_max = (Vector3){c.x + r, c.y + r, c.z + r};
         return true;
     } else if (e->collider == COLLIDER_TYPE_BOX) {
-        Vector3 half = {
-            e->colliderSize.x * e->scale.x * 0.5f,
-            e->colliderSize.y * e->scale.y * 0.5f,
-            e->colliderSize.z * e->scale.z * 0.5f
-        };
-
+        Vector3 half = { e->colliderSize.x * e->scale.x * 0.5f, e->colliderSize.y * e->scale.y * 0.5f, e->colliderSize.z * e->scale.z * 0.5f };
         Vector3 corners[8] = {
             {-half.x, -half.y, -half.z},
             { half.x, -half.y, -half.z},
@@ -62,7 +55,6 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
 
         Vector3 world_min = {FLT_MAX, FLT_MAX, FLT_MAX};
         Vector3 world_max = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
-
         for (int i = 0; i < 8; ++i) {
             Vector3 rotated = rotate_quaternion(e->rotation, corners[i]);
             Vector3 world = add_vector3(e->position, rotated);

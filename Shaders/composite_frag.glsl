@@ -2,55 +2,52 @@
 #version 430 core
 in vec2 TexCoord;
 out vec4 FragColor;
-uniform sampler2D tex;
 layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
 layout(std430, binding = 5)  buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
-
-uniform int debugView;
-uniform int debugValue;
-uniform uint screenWidth;
-uniform uint screenHeight;
-uniform float worldMin_x;
-uniform float worldMin_z;
-uniform sampler2D outputImage;
-uniform uint reflectionsEnabled;
-uniform uint aaEnabled;
-uniform float berserkTimeRemaining;
-uniform float berserkSeedTimestamp;
-uniform uint brightnessSetting;
-uniform vec3 camRot;
-uniform vec3 camPos;
-uniform float fov;
-uniform float timeVal;
-uniform float aspect;
-uniform uint skyVisible;
-uniform uint planetaryBodiesVisible;
-uniform uint groveShieldVisible;
-uniform uint stationShieldVisible;
-uniform uint empEffectActive;
-uniform uint  shadowsEnabled;
-uniform float shadowmapSize;
-uniform mat4 viewProjection;
-uniform mat3 invViewRot;
-
-const int SSR_RES = 4; // 1/SSR_RES = scale factor, e.g. 1/4 = 25% resolution vs main screen.
+layout(location =  0) uniform int debugView;
+layout(location =  1) uniform int debugValue;
+layout(location =  2) uniform uint screenWidth;
+layout(location =  3) uniform uint screenHeight;
+layout(location =  4) uniform float worldMin_x;
+layout(location =  5) uniform float worldMin_z;
+layout(location =  6) uniform sampler2D outputImage;
+layout(location =  7) uniform uint reflectionsEnabled;
+layout(location =  8) uniform uint aaEnabled;
+layout(location =  9) uniform float berserkTimeRemaining;
+layout(location = 10) uniform float berserkSeedTimestamp;
+layout(location = 11) uniform uint brightnessSetting;
+layout(location = 12) uniform vec3 camRot;
+layout(location = 13) uniform vec3 camPos;
+layout(location = 14) uniform float fov;
+layout(location = 15) uniform float timeVal;
+layout(location = 16) uniform float aspect;
+layout(location = 17) uniform uint skyVisible;
+layout(location = 18) uniform uint planetaryBodiesVisible;
+layout(location = 19) uniform uint groveShieldVisible;
+layout(location = 20) uniform uint stationShieldVisible;
+layout(location = 21) uniform uint empEffectActive;
+layout(location = 22) uniform uint  shadowsEnabled;
+layout(location = 23) uniform float shadowmapSize;
+layout(location = 24) uniform mat4 viewProjection;
+layout(location = 25) uniform mat3 invViewRot;
+layout(location = 26) uniform int SSR_RES;
+layout(location = 27) uniform sampler2D tex;
+layout(location = 28) uniform float staticIntensity;
+layout(location = 29) uniform vec3 staticColor;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
-
-const float staticIntensity = 0.0;      // 0.0 .. 1.0
 const float staticBandThickness = 0.005;
 const float staticScrollSpeed = 200.0;
-const vec3  staticColor = vec3(1.0, 0.0, 0.0);
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
 const float PI = 3.14159265359;
 const float aaThreshold = 0.2;
 
-// Simplex noise implementation (2D)
+// Simplex noise
 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
@@ -450,7 +447,7 @@ void main() {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);
             vec4 specColor = unpackColor32(floatBitsToUint(wpPack.a));
-            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.75;
+            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.5;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
             color.rgb += reflectionColor.rgb;
@@ -503,7 +500,6 @@ void main() {
         // Banded Static
         if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed);
 
-        // Gamma/Brightness Setting
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
 
         // Berserk last as it's a brain effect not an eye effect

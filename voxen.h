@@ -329,8 +329,6 @@ extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, c
 extern Quaternion cam_rotation;
 extern GLuint chunkShaderProgram;
 extern GLuint imageBlitShaderProgram;
-extern GLint debugViewLoc_quadblit, debugValueLoc_quadblit;
-extern GLint debugViewLoc_chunk, debugValueLoc_chunk;
 void CacheUniformLocationsForShaders(void);
 GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 void Screenshot(void);

@@ -8,10 +8,10 @@ layout(location = 2) in vec2 aTexCoord;
 
 layout(std430, binding = 11) buffer ModelMatrices { mat4 modelMatrices[]; };
 
-uniform uint instanceIndex;
-uniform uint normInstanceIndex;
-uniform mat4 viewProjection;
-uniform uint isUI;
+layout(location = 0) uniform uint instanceIndex;
+layout(location = 1) uniform uint normInstanceIndex;
+layout(location = 2) uniform mat4 viewProjection;
+layout(location = 3) uniform uint isUI;
 
 out vec3 FragPos;
 out vec3 Normal;
