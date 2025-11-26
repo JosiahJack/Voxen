@@ -367,7 +367,7 @@ Binary static variable impacts:
 Individual static variable impacts:
 
 ```
-❯ nm -S --size-sort -r ./voxen | grep ' [BD] '
+❯ 
 0000000000324420 0000000000200000 B precomputedVisibleCellsFromHere
 000000000056a560 000000000009c400 B modelMatrices
 0000000000606960 00000000000927c0 B instances

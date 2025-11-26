@@ -68,10 +68,10 @@ typedef struct {
 } GlyphRange;
 
 GlyphRange fontRanges[] = {
-    {0x0020, 0x7E - 0x20+1, 0},       // ASCII
-    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1
-    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic
-    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana
+    {0x0020, 0x7E - 0x20+1, 0},       // ASCII 94
+    {0x00A0, 0xFF - 0xA0+1, 95},      // Latin-1 95
+    {0x0400, 0x04FF - 0x0400+1, 95+96}, // Cyrillic 255
+    {0x3040, 0x30FF - 0x3040+1, 95+96+256}, // Hiragana/Katakana 191
 };
 
 GlyphRange fontRangesStopD[] = {

@@ -6,7 +6,7 @@
 #include "vmath.h"
 #include "entity.h"
 
-#define MAX_CHANNELS 64
+#define MAX_CHANNELS 16
 ma_engine audio_engine;
 ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];

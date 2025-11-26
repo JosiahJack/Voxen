@@ -292,31 +292,6 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_COMPARE_REF_TO_TEXTURE 0x884E
 #define GL_COMPATIBLE_SUBROUTINES 0x8E4B
 #define GL_COMPILE_STATUS 0x8B81
-#define GL_COMPRESSED_R11_EAC 0x9270
-#define GL_COMPRESSED_RED 0x8225
-#define GL_COMPRESSED_RED_RGTC1 0x8DBB
-#define GL_COMPRESSED_RG 0x8226
-#define GL_COMPRESSED_RG11_EAC 0x9272
-#define GL_COMPRESSED_RGB 0x84ED
-#define GL_COMPRESSED_RGB8_ETC2 0x9274
-#define GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 0x9276
-#define GL_COMPRESSED_RGBA 0x84EE
-#define GL_COMPRESSED_RGBA8_ETC2_EAC 0x9278
-#define GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
-#define GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT 0x8E8E
-#define GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT 0x8E8F
-#define GL_COMPRESSED_RG_RGTC2 0x8DBD
-#define GL_COMPRESSED_SIGNED_R11_EAC 0x9271
-#define GL_COMPRESSED_SIGNED_RED_RGTC1 0x8DBC
-#define GL_COMPRESSED_SIGNED_RG11_EAC 0x9273
-#define GL_COMPRESSED_SIGNED_RG_RGTC2 0x8DBE
-#define GL_COMPRESSED_SRGB 0x8C48
-#define GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC 0x9279
-#define GL_COMPRESSED_SRGB8_ETC2 0x9275
-#define GL_COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 0x9277
-#define GL_COMPRESSED_SRGB_ALPHA 0x8C49
-#define GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM 0x8E8D
-#define GL_COMPRESSED_TEXTURE_FORMATS 0x86A3
 #define GL_COMPUTE_SHADER 0x91B9
 #define GL_COMPUTE_SHADER_BIT 0x00000020
 #define GL_COMPUTE_SUBROUTINE 0x92ED
@@ -858,7 +833,6 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_NO_ERROR 0
 #define GL_NUM_ACTIVE_VARIABLES 0x9304
 #define GL_NUM_COMPATIBLE_SUBROUTINES 0x8E4A
-#define GL_NUM_COMPRESSED_TEXTURE_FORMATS 0x86A2
 #define GL_NUM_EXTENSIONS 0x821D
 #define GL_NUM_PROGRAM_BINARY_FORMATS 0x87FE
 #define GL_NUM_SAMPLE_COUNTS 0x9380
@@ -880,10 +854,6 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_OR_REVERSE 0x150B
 #define GL_OUT_OF_MEMORY 0x0505
 #define GL_PACK_ALIGNMENT 0x0D05
-#define GL_PACK_COMPRESSED_BLOCK_DEPTH 0x912D
-#define GL_PACK_COMPRESSED_BLOCK_HEIGHT 0x912C
-#define GL_PACK_COMPRESSED_BLOCK_SIZE 0x912E
-#define GL_PACK_COMPRESSED_BLOCK_WIDTH 0x912B
 #define GL_PACK_IMAGE_HEIGHT 0x806C
 #define GL_PACK_LSB_FIRST 0x0D01
 #define GL_PACK_ROW_LENGTH 0x0D02
@@ -1248,12 +1218,6 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_TEXTURE_BUFFER_SIZE 0x919E
 #define GL_TEXTURE_COMPARE_FUNC 0x884D
 #define GL_TEXTURE_COMPARE_MODE 0x884C
-#define GL_TEXTURE_COMPRESSED 0x86A1
-#define GL_TEXTURE_COMPRESSED_BLOCK_HEIGHT 0x82B2
-#define GL_TEXTURE_COMPRESSED_BLOCK_SIZE 0x82B3
-#define GL_TEXTURE_COMPRESSED_BLOCK_WIDTH 0x82B1
-#define GL_TEXTURE_COMPRESSED_IMAGE_SIZE 0x86A0
-#define GL_TEXTURE_COMPRESSION_HINT 0x84EF
 #define GL_TEXTURE_CUBE_MAP 0x8513
 #define GL_TEXTURE_CUBE_MAP_ARRAY 0x9009
 #define GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0x8516
@@ -1366,10 +1330,6 @@ typedef void (*GLADpostcallback)(void *ret, const char *name, GLADapiproc apipro
 #define GL_UNIFORM_SIZE 0x8A38
 #define GL_UNIFORM_TYPE 0x8A37
 #define GL_UNPACK_ALIGNMENT 0x0CF5
-#define GL_UNPACK_COMPRESSED_BLOCK_DEPTH 0x9129
-#define GL_UNPACK_COMPRESSED_BLOCK_HEIGHT 0x9128
-#define GL_UNPACK_COMPRESSED_BLOCK_SIZE 0x912A
-#define GL_UNPACK_COMPRESSED_BLOCK_WIDTH 0x9127
 #define GL_UNPACK_IMAGE_HEIGHT 0x806E
 #define GL_UNPACK_LSB_FIRST 0x0CF1
 #define GL_UNPACK_ROW_LENGTH 0x0CF2
@@ -1657,15 +1617,6 @@ typedef GLenum (GLAD_API_PTR *PFNGLCLIENTWAITSYNCPROC)(GLsync sync, GLbitfield f
 typedef void (GLAD_API_PTR *PFNGLCOLORMASKPROC)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
 typedef void (GLAD_API_PTR *PFNGLCOLORMASKIPROC)(GLuint index, GLboolean r, GLboolean g, GLboolean b, GLboolean a);
 typedef void (GLAD_API_PTR *PFNGLCOMPILESHADERPROC)(GLuint shader);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXIMAGE1DPROC)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLint border, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXIMAGE2DPROC)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXIMAGE3DPROC)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXSUBIMAGE1DPROC)(GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXSUBIMAGE2DPROC)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXSUBIMAGE3DPROC)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXTURESUBIMAGE1DPROC)(GLuint texture, GLint level, GLint xoffset, GLsizei width, GLenum format, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXTURESUBIMAGE2DPROC)(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void * data);
-typedef void (GLAD_API_PTR *PFNGLCOMPRESSEDTEXTURESUBIMAGE3DPROC)(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const void * data);
 typedef void (GLAD_API_PTR *PFNGLCOPYBUFFERSUBDATAPROC)(GLenum readTarget, GLenum writeTarget, GLintptr readOffset, GLintptr writeOffset, GLsizeiptr size);
 typedef void (GLAD_API_PTR *PFNGLCOPYIMAGESUBDATAPROC)(GLuint srcName, GLenum srcTarget, GLint srcLevel, GLint srcX, GLint srcY, GLint srcZ, GLuint dstName, GLenum dstTarget, GLint dstLevel, GLint dstX, GLint dstY, GLint dstZ, GLsizei srcWidth, GLsizei srcHeight, GLsizei srcDepth);
 typedef void (GLAD_API_PTR *PFNGLCOPYNAMEDBUFFERSUBDATAPROC)(GLuint readBuffer, GLuint writeBuffer, GLintptr readOffset, GLintptr writeOffset, GLsizeiptr size);
@@ -1790,8 +1741,6 @@ typedef void (GLAD_API_PTR *PFNGLGETBUFFERPARAMETERI64VPROC)(GLenum target, GLen
 typedef void (GLAD_API_PTR *PFNGLGETBUFFERPARAMETERIVPROC)(GLenum target, GLenum pname, GLint * params);
 typedef void (GLAD_API_PTR *PFNGLGETBUFFERPOINTERVPROC)(GLenum target, GLenum pname, void ** params);
 typedef void (GLAD_API_PTR *PFNGLGETBUFFERSUBDATAPROC)(GLenum target, GLintptr offset, GLsizeiptr size, void * data);
-typedef void (GLAD_API_PTR *PFNGLGETCOMPRESSEDTEXIMAGEPROC)(GLenum target, GLint level, void * img);
-typedef void (GLAD_API_PTR *PFNGLGETCOMPRESSEDTEXTUREIMAGEPROC)(GLuint texture, GLint level, GLsizei bufSize, void * pixels);
 typedef GLuint (GLAD_API_PTR *PFNGLGETDEBUGMESSAGELOGPROC)(GLuint count, GLsizei bufSize, GLenum * sources, GLenum * types, GLuint * ids, GLenum * severities, GLsizei * lengths, GLchar * messageLog);
 typedef GLuint (GLAD_API_PTR *PFNGLGETDEBUGMESSAGELOGARBPROC)(GLuint count, GLsizei bufSize, GLenum * sources, GLenum * types, GLuint * ids, GLenum * severities, GLsizei * lengths, GLchar * messageLog);
 typedef void (GLAD_API_PTR *PFNGLGETDOUBLEI_VPROC)(GLenum target, GLuint index, GLdouble * data);
@@ -2345,8 +2294,6 @@ GLAD_API_CALL PFNGLCLEARNAMEDFRAMEBUFFERIVPROC glad_glClearNamedFramebufferiv;
 #define glClearNamedFramebufferiv glad_glClearNamedFramebufferiv
 GLAD_API_CALL PFNGLCLEARNAMEDFRAMEBUFFERUIVPROC glad_glClearNamedFramebufferuiv;
 #define glClearNamedFramebufferuiv glad_glClearNamedFramebufferuiv
-GLAD_API_CALL PFNGLCLEARSTENCILPROC glad_glClearStencil;
-#define glClearStencil glad_glClearStencil
 GLAD_API_CALL PFNGLCLIENTWAITSYNCPROC glad_glClientWaitSync;
 #define glClientWaitSync glad_glClientWaitSync
 GLAD_API_CALL PFNGLCOLORMASKPROC glad_glColorMask;
@@ -2355,24 +2302,6 @@ GLAD_API_CALL PFNGLCOLORMASKIPROC glad_glColorMaski;
 #define glColorMaski glad_glColorMaski
 GLAD_API_CALL PFNGLCOMPILESHADERPROC glad_glCompileShader;
 #define glCompileShader glad_glCompileShader
-GLAD_API_CALL PFNGLCOMPRESSEDTEXIMAGE1DPROC glad_glCompressedTexImage1D;
-#define glCompressedTexImage1D glad_glCompressedTexImage1D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXIMAGE2DPROC glad_glCompressedTexImage2D;
-#define glCompressedTexImage2D glad_glCompressedTexImage2D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXIMAGE3DPROC glad_glCompressedTexImage3D;
-#define glCompressedTexImage3D glad_glCompressedTexImage3D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXSUBIMAGE1DPROC glad_glCompressedTexSubImage1D;
-#define glCompressedTexSubImage1D glad_glCompressedTexSubImage1D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXSUBIMAGE2DPROC glad_glCompressedTexSubImage2D;
-#define glCompressedTexSubImage2D glad_glCompressedTexSubImage2D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXSUBIMAGE3DPROC glad_glCompressedTexSubImage3D;
-#define glCompressedTexSubImage3D glad_glCompressedTexSubImage3D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXTURESUBIMAGE1DPROC glad_glCompressedTextureSubImage1D;
-#define glCompressedTextureSubImage1D glad_glCompressedTextureSubImage1D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXTURESUBIMAGE2DPROC glad_glCompressedTextureSubImage2D;
-#define glCompressedTextureSubImage2D glad_glCompressedTextureSubImage2D
-GLAD_API_CALL PFNGLCOMPRESSEDTEXTURESUBIMAGE3DPROC glad_glCompressedTextureSubImage3D;
-#define glCompressedTextureSubImage3D glad_glCompressedTextureSubImage3D
 GLAD_API_CALL PFNGLCOPYBUFFERSUBDATAPROC glad_glCopyBufferSubData;
 #define glCopyBufferSubData glad_glCopyBufferSubData
 GLAD_API_CALL PFNGLCOPYIMAGESUBDATAPROC glad_glCopyImageSubData;
@@ -2609,10 +2538,6 @@ GLAD_API_CALL PFNGLGETBUFFERPOINTERVPROC glad_glGetBufferPointerv;
 #define glGetBufferPointerv glad_glGetBufferPointerv
 GLAD_API_CALL PFNGLGETBUFFERSUBDATAPROC glad_glGetBufferSubData;
 #define glGetBufferSubData glad_glGetBufferSubData
-GLAD_API_CALL PFNGLGETCOMPRESSEDTEXIMAGEPROC glad_glGetCompressedTexImage;
-#define glGetCompressedTexImage glad_glGetCompressedTexImage
-GLAD_API_CALL PFNGLGETCOMPRESSEDTEXTUREIMAGEPROC glad_glGetCompressedTextureImage;
-#define glGetCompressedTextureImage glad_glGetCompressedTextureImage
 GLAD_API_CALL PFNGLGETDEBUGMESSAGELOGPROC glad_glGetDebugMessageLog;
 #define glGetDebugMessageLog glad_glGetDebugMessageLog
 GLAD_API_CALL PFNGLGETDEBUGMESSAGELOGARBPROC glad_glGetDebugMessageLogARB;
@@ -3065,8 +2990,6 @@ GLAD_API_CALL PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC glad_glRenderbufferStorage
 #define glRenderbufferStorageMultisample glad_glRenderbufferStorageMultisample
 GLAD_API_CALL PFNGLRESUMETRANSFORMFEEDBACKPROC glad_glResumeTransformFeedback;
 #define glResumeTransformFeedback glad_glResumeTransformFeedback
-GLAD_API_CALL PFNGLSAMPLECOVERAGEPROC glad_glSampleCoverage;
-#define glSampleCoverage glad_glSampleCoverage
 GLAD_API_CALL PFNGLSAMPLEMASKIPROC glad_glSampleMaski;
 #define glSampleMaski glad_glSampleMaski
 GLAD_API_CALL PFNGLSAMPLERPARAMETERIIVPROC glad_glSamplerParameterIiv;

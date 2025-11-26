@@ -204,6 +204,7 @@ void main() {
         glowColor = getTextureColor(glowIndex,texUVGlow);
     }
 
+    vec4 specColor = vec4(0.0,0.0,0.0,0.0);
     if (reflectionsEnabled > 0) {
         vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
         ivec2 texSizeSpec = textureSizes[specIndex];
@@ -213,7 +214,7 @@ void main() {
         ivec2 texUVSpec = ivec2(xSpec,ySpec);
         texUVSpec.x = texUVSpec.x % texSizeSpec.x;
         texUVSpec.y = texUVSpec.y % texSizeSpec.y;
-        vec4 specColor = getTextureColor(specIndex,texUVSpec);
+        specColor = getTextureColor(specIndex,texUVSpec);
         vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
                                 uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
                                 uintBitsToFloat(packColor(normalPack)),
@@ -322,6 +323,14 @@ void main() {
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * lightColor * spotFalloff * shadowFactor);
+        if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
+            vec3 halfDir = normalize(lightDir + viewDir);
+            float ndh = max(dot(normal, halfDir), 0.0);
+            float strength = texIndexChecked == 36 || texIndexChecked == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
+            float shininess = 150.0;
+            float spec = pow(ndh, shininess);
+            lighting += lightColor * intensity * attenuation * spotFalloff * spec * shadowFactor * strength;
+        }
     }
 
     if (unlit > 0) lighting = albedoColor.rgb;

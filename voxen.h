@@ -154,7 +154,7 @@ void LoadModels(void);
 #define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
 
-#define MAX_SHADOWMAPS 96u
+#define MAX_SHADOWMAPS 64u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -352,7 +352,7 @@ extern bool noHUD;
 // Text
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 3072
-#define MAX_GLYPHS 8192      // Rough estimate for all ranges
+#define MAX_GLYPHS 639
 #define FONT_NORMAL 0
 #define FONT_STOPD 1
 

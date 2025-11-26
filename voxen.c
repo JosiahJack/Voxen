@@ -193,7 +193,7 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 #define TEXT_COLOR_COUNT 9
 
 //    Images
-#define MAX_UI_IMAGES 1024 // Adjust based on needs
+#define MAX_UI_IMAGES 64
 bool noHUD = false;
 
 typedef struct {
@@ -244,7 +244,6 @@ void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, in
     glBindTexture(target, *id);
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
     glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glBindTexture(target, 0);
 }
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
@@ -259,14 +258,11 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
 
 GLuint LinkProgram(GLuint *shaders, int32_t count, const char *programName) {
     GLuint program = glCreateProgram();
-    for (int32_t i = 0; i < count; i++) glAttachShader(program, shaders[i]);
+    for (int32_t i = 0; i < count; i++) { glAttachShader(program, shaders[i]); glDeleteShader(shaders[i]); }
     glLinkProgram(program);
-
     GLint success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) { char infoLog[512]; glGetProgramInfoLog(program, 512, NULL, infoLog); DualLogError("%s Linking Failed: %s\n", programName, infoLog); exit(1); }
-
-    for (int32_t i = 0; i < count; i++) glDeleteShader(shaders[i]);
     return program;
 }
 
@@ -378,8 +374,7 @@ void CompileShaders(void) {
     CHECK_GL_ERROR();
 }
 
-// out = a * b
-static inline void mul_mat4(float *out, const float *a, const float *b) {
+static inline void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
     float result[16];
     for (int32_t col = 0; col < 4; ++col) {
         for (int32_t row = 0; row < 4; ++row) {
@@ -390,9 +385,8 @@ static inline void mul_mat4(float *out, const float *a, const float *b) {
                 a[3*4 + row] * b[col*4 + 3];
         }
     }
-    // copy back
-    for (int32_t i = 0; i < 16; i++)
-        out[i] = result[i];
+   
+    for (int32_t i = 0; i < 16; i++) out[i] = result[i]; // copy back
 }
 
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
@@ -414,7 +408,7 @@ void UpdateInstanceMatrix(int32_t i) {
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
 }
-// ============================================================================
+
 void UpdateScreenSize(void) {
     float* m;
     m = uiOrthoProjection;
@@ -438,28 +432,17 @@ void UpdateScreenSize(void) {
     m[4] =         0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
     m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
+    
+    glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
+    glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
+    glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1ui(chunkShaderProgram, screenWidthLoc_chunk, screen_width);
+    glProgramUniform1ui(chunkShaderProgram, screenHeightLoc_chunk, screen_height);
+    glProgramUniform1f( chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
+    glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
+    glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
 }
-
-typedef struct {
-    uint16_t index; // Original index in lights array
-    float distanceSquared; // Distance to camera squared
-    float score; // Priority score (lower distance, higher intensity = higher priority)
-} LightCandidate;
-
-int32_t compareLightCandidates(const void* a, const void* b) {
-    const LightCandidate* ca = (const LightCandidate*)a;
-    const LightCandidate* cb = (const LightCandidate*)b;
-    return (ca->score < cb->score) ? -1 : ((ca->score > cb->score) ? 1 : 0);
-}
-
-Quaternion cubemapOrientationQuaternion[6] = {
-    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
-    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
-    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
-    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
-    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
-    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
-};
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
@@ -504,6 +487,15 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     }
 }
 
+Quaternion cubemapOrientationQuaternion[6] = {
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+};
+
 void UpdateVoxelLightLists() {
     memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -519,19 +511,18 @@ void UpdateVoxelLightLists() {
         int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip);
         int32_t maxCellZ = (int32_t)vceil((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
-        maxCellX = 63 < maxCellX ? 63 : maxCellX;
+        maxCellX = maxCellX > (WORLDX - 1) ? (WORLDX - 1) : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
-        maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
+        maxCellZ = maxCellZ > (WORLDZ - 1) ? (WORLDZ - 1) : maxCellZ;
         for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-                uint32_t cellIndex = cellZ * 64 + cellX;
-//                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue; // TODO should be able to do this somehow without it getting truncated and leaving half the cell black.
+                uint32_t cellIndex = cellZ * WORLDX + cellX;
                 
                 #pragma GCC unroll 8
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     #pragma GCC unroll 8
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                        uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+                        uint32_t voxelIndex = cellIndex * WORLDX + voxelZ * 8 + voxelX;
                         float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
                         float posZ = voxelMinCenterZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
@@ -593,19 +584,18 @@ void UpdateVoxelLightLists() {
         int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip); // cast to int truncates, no floorf
         int32_t maxCellZ = (int32_t)vceil((litZ + range - worldMin_z) * cellWidthRecip);
         minCellX = minCellX > 0 ? minCellX : 0;
-        maxCellX = 63 < maxCellX ? 63 : maxCellX;
+        maxCellX = maxCellX > (WORLDX - 1) ? (WORLDX - 1) : maxCellX;
         minCellZ = minCellZ > 0 ? minCellZ : 0;
-        maxCellZ = 63 < maxCellZ ? 63 : maxCellZ;
+        maxCellZ = maxCellZ > (WORLDZ - 1) ? (WORLDZ - 1) : maxCellZ;
         for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-                uint32_t cellIndex = cellZ * 64 + cellX;
-//                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue;
+                uint32_t cellIndex = cellZ * WORLDX + cellX;
 
                 #pragma GCC unroll 8
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
                     #pragma GCC unroll 8
                     for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                        uint32_t voxelIndex = cellIndex * 64 + voxelZ * 8 + voxelX;
+                        uint32_t voxelIndex = cellIndex * WORLDX + voxelZ * 8 + voxelX;
                         float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
                         float posZ = voxelMinCenterZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
                         float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
@@ -666,40 +656,6 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = vmin(lightRadius, 15.36f);
-    float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
-    if (distSqrd >= FAR_PLANE_SQUARED) return;
-
-    int lightCellIdx = cellIndexForLight[lightIdx];
-    bool inPVS = false;
-    if ((gridCellStates[lightCellIdx] & CELL_VISIBLE)) {// || !(gridCellStates[lightCellIdx] & CELL_OPEN)) {
-        inPVS = true; // Allow lights outside windows (and thus in non open cells) to still be applicable.
-    } else { // Check cells that aren't visible but whose lights can light up cells that are visible.
-        int x = cellIndexForLightX[lightIdx];
-        int y = cellIndexForLightZ[lightIdx];
-        int range = vfloor(lightRadius * 0.3906251f); // 1 / 2.56f, strangely exact in IEE-754 but added 0.0000001 cushion
-        int xMin = x - range; int xMax = x + range;
-        int yMin = y - range; int yMax = y + range;
-        for (int ix = xMin;ix <= xMax; ix++) {
-            for (int iy = yMin;iy <= yMax; iy++) {
-                if (!XZPairInBounds(ix,iy)) continue;
-
-                int subIdx = (iy * WORLDX) + ix;
-                int cellIdx = (lightCellIdx * ARRSIZE);
-                int flat_idx = cellIdx + subIdx;
-                if ((gridCellStates[subIdx] & CELL_VISIBLE) // Player can see cell in light's range.
-                    && get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) { // Light's cell can see the cell in light's range.
-                    
-                    inPVS = true;
-                    goto Label_PVSCheck; // Avoid checking any more.  One is enough to count.
-                }
-            }
-            
-        }
-    }
-    
-    Label_PVSCheck:    
-    if (!inPVS) return;
-
     uint16_t nearMeshes[loadedInstances];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
@@ -724,7 +680,7 @@ void RenderShadowmap(uint16_t lightIdx) {
             if (instances[i].modelIndex >= loadedModels) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 1.42f;
+            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.56f; // Could use 1.42f for diagonal length of unit square, but this is fine.
             if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
 
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModels ? instances[i].lodIndex : instances[i].modelIndex;
@@ -736,6 +692,18 @@ void RenderShadowmap(uint16_t lightIdx) {
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
+}
+
+typedef struct {
+    uint16_t index; // Original index in lights array
+    float distanceSquared; // Distance to camera squared
+    float score; // Priority score (lower distance, higher intensity = higher priority)
+} LightCandidate;
+
+int32_t compareLightCandidates(const void* a, const void* b) {
+    const LightCandidate* ca = (const LightCandidate*)a;
+    const LightCandidate* cb = (const LightCandidate*)b;
+    return (ca->score < cb->score) ? -1 : ((ca->score > cb->score) ? 1 : 0);
 }
 
 void RenderShadowmaps(void) {
@@ -1112,7 +1080,6 @@ void InitializeEnvironment(void) {
         
     glfwMakeContextCurrent(window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); exit(1); }
-    UpdateScreenSize();
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
         const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
@@ -1158,28 +1125,11 @@ void InitializeEnvironment(void) {
         if (omp_get_thread_num() == 0) {
             Input_Init(window);
             glfwSwapInterval(settings_Vsync ? 1 : 0);
-            glEnable(GL_DEPTH_TEST);
-            glCullFace(GL_BACK);
             glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
-            glViewport(0, 0, screen_width, screen_height);
             CompileShaders();
-            glProgramUniform1ui(imageBlitShaderProgram, screenWidthLoc_imageBlit, screen_width);
-            glProgramUniform1ui(imageBlitShaderProgram, screenHeightLoc_imageBlit, screen_height);
-            glProgramUniform1f( imageBlitShaderProgram, shadowmapSizeLoc_imageBlit, (float)(SHADOW_MAP_SIZE));
-            glProgramUniform1ui(chunkShaderProgram, screenWidthLoc_chunk, screen_width);
-            glProgramUniform1ui(chunkShaderProgram, screenHeightLoc_chunk, screen_height);
-            glProgramUniform1f( chunkShaderProgram, shadowmapSizeLoc_chunk, (float)(SHADOW_MAP_SIZE));
-            glProgramUniform1ui(ssrShaderProgram, screenWidthLoc_ssr, screen_width / SSR_RES);
-            glProgramUniform1ui(ssrShaderProgram, screenHeightLoc_ssr, screen_height / SSR_RES);
-            glProgramUniform1i( ssrShaderProgram, outputImageLoc_ssr, 4);
-
+            UpdateScreenSize();
             glCreateBuffers(1, &quadVBO);
-            float quadBlit_vertices[] = {
-                1.0f, -1.0f, 1.0f, 0.0f, // Bottom-right
-                1.0f,  1.0f, 1.0f, 1.0f, // Top-right
-                -1.0f,  1.0f, 0.0f, 1.0f, // Top-left
-                -1.0f, -1.0f, 0.0f, 0.0f  // Bottom-left
-            };
+            float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
             glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
             glCreateVertexArrays(1, &quadVAO);
             glEnableVertexArrayAttrib(quadVAO, 0);
@@ -1197,6 +1147,16 @@ void InitializeEnvironment(void) {
             glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
             for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
             glBindVertexArray(0);
+            
+            glCreateBuffers(1, &textVBO);
+            glCreateVertexArrays(1, &textVAO);    
+            glEnableVertexArrayAttrib(textVAO, 0);
+            glEnableVertexArrayAttrib(textVAO, 1);
+            glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+            glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
+            glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
+            glVertexArrayAttribBinding(textVAO, 0, 0);
+            glVertexArrayAttribBinding(textVAO, 1, 0);
             DebugRAM("after vao chunk bind");
 
             GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
@@ -1238,16 +1198,6 @@ void InitializeEnvironment(void) {
             
             InitFontAtlasses();
             DebugRAM("after InitFontAtlasses");
-            glCreateBuffers(1, &textVBO);
-            glCreateVertexArrays(1, &textVAO);    
-            glEnableVertexArrayAttrib(textVAO, 0);
-            glEnableVertexArrayAttrib(textVAO, 1);
-            glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-            glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
-            glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
-            glVertexArrayAttribBinding(textVAO, 0, 0);
-            glVertexArrayAttribBinding(textVAO, 1, 0);
-            DebugRAM("after textVBO, textVAO buffer creation");
             Input_MouselookApply(); // Input
             InitializeAudio(); // Audio
             DebugRAM("after InitializeAudio");
@@ -1461,6 +1411,7 @@ int32_t main(int32_t argc, char* argv[]) {
     DualLog("Voxen " VERSION_STRING " by W. Josiah Jack, MIT-0 licensed\n");
     EventSystemInit(argc,argv[1],argv[2]);
     InitializeEnvironment();
+    playerCellIdx_x = 0u; playerCellIdx_y = 0u; playerCellIdx_z = 0u; // Force a cull
     double last_physics_time = get_time();
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
