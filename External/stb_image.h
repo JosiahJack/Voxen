@@ -19,7 +19,6 @@ typedef struct {
 #include <stdlib.h>
 void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
 void *memset(void *s, int c, size_t n);
-#include <limits.h>
 
 typedef struct {
    stbi__context *s;
@@ -371,11 +370,6 @@ char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, 
    } else return NULL;
 }
 
-typedef struct {
-   stbi__uint32 length;
-   stbi__uint32 type;
-} stbi__pngchunk;
-
 static int stbi__check_png_header(stbi__context *s) {
    static const stbi_uc png_sig[8] = { 137,80,78,71,13,10,26,10 };
    int i;
@@ -502,16 +496,15 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
    if (!stbi__check_png_header(&s)) goto Label_parsefail;
 
    for (;;) {
-      stbi__pngchunk c;
-      c.length = stbi__get32be(&s);
-      c.type   = stbi__get32be(&s);
-      switch (c.type) {
+      stbi__uint32 length = stbi__get32be(&s);
+      stbi__uint32 type   = stbi__get32be(&s);
+      switch (type) {
          case STBI__PNG_TYPE('I','H','D','R'): {
             int comp,filter;
             if (!first) goto Label_parsefail;
             
             first = 0;
-            if (c.length != 13) goto Label_parsefail;
+            if (length != 13) goto Label_parsefail;
             
             s.img_x = stbi__get32be(&s);
             s.img_y = stbi__get32be(&s);
@@ -538,10 +531,10 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
 
          case STBI__PNG_TYPE('P','L','T','E'):  {
             if (first) goto Label_parsefail;
-            if (c.length > 256*3) goto Label_parsefail;
+            if (length > 256*3) goto Label_parsefail;
             
-            pal_len = c.length / 3;
-            if (pal_len * 3 != c.length) goto Label_parsefail;
+            pal_len = length / 3;
+            if (pal_len * 3 != length) goto Label_parsefail;
             
             for (i=0; i < pal_len; ++i) {
                palette[i*4+0] = stbi__get8(&s);
@@ -558,10 +551,10 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             
             if (pal_img_n) {
                if (pal_len == 0) goto Label_parsefail;
-               if (c.length > pal_len) goto Label_parsefail;
+               if (length > pal_len) goto Label_parsefail;
                
                pal_img_n = 4;
-               for (i=0; i < c.length; ++i) palette[i*4+3] = stbi__get8(&s);
+               for (i=0; i < length; ++i) palette[i*4+3] = stbi__get8(&s);
             }
             break;
          }
@@ -569,23 +562,23 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
          case STBI__PNG_TYPE('I','D','A','T'): {
             if (first) goto Label_parsefail;
             if (pal_img_n && !pal_len) goto Label_parsefail;
-            if (c.length > (1u << 30)) goto Label_parsefail;
-            if ((int)(ioff + c.length) < (int)ioff) goto Label_parsefail;
+            if (length > (1u << 30)) goto Label_parsefail;
+            if ((int)(ioff + length) < (int)ioff) goto Label_parsefail;
             
-            if (ioff + c.length > idata_limit) {
+            if (ioff + length > idata_limit) {
                stbi_uc *p;
-               if (idata_limit == 0) idata_limit = c.length > 4096 ? c.length : 4096;
-               while (ioff + c.length > idata_limit) idata_limit *= 2;
+               if (idata_limit == 0) idata_limit = length > 4096 ? length : 4096;
+               while (ioff + length > idata_limit) idata_limit *= 2;
                p = (stbi_uc *)realloc(z.idata,idata_limit);
                z.idata = p;
             }
 
-            if (s.img_buffer+c.length <= s.img_buffer_end) {
-               memcpy(z.idata+ioff, s.img_buffer, c.length);
-               s.img_buffer += c.length;
+            if (s.img_buffer + length <= s.img_buffer_end) {
+               memcpy(z.idata + ioff, s.img_buffer, length);
+               s.img_buffer += length;
             } else goto Label_parsefail;
 
-            ioff += c.length;
+            ioff += length;
             break;
          }
 
@@ -664,9 +657,9 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
          default:
             // if critical, fail
             if (first) goto Label_parsefail;
-            if ((c.type & (1 << 29)) == 0) goto Label_parsefail;
+            if ((type & (1 << 29)) == 0) goto Label_parsefail;
 
-            if (c.length != 0) s.img_buffer += c.length;
+            if (length != 0) s.img_buffer += length;
             break;
       }
       
