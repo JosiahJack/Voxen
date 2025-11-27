@@ -116,7 +116,7 @@ void LoadTextures(void) {
                     close(fd);
                     if (map == MAP_FAILED) { DualLogError("mmap failed for %s\n", filePath); exit(1); }
 
-                    unsigned char* pixels = stbi_load_from_memory(map, st.st_size, &widths[currentIndex], &heights[currentIndex], NULL, 4);
+                    unsigned char* pixels = stbi_load_from_memory(map, st.st_size, &widths[currentIndex], &heights[currentIndex]);
                     munmap(map, st.st_size);
                     if (!pixels) { DualLogError("stbi_load failed for %s\n", filePath); exit(1); }
 

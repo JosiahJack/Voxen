@@ -1,5 +1,5 @@
 // stb_image.h - PNG Load System
-extern unsigned char *stbi_load_from_memory(unsigned char const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
+extern unsigned char *stbi_load_from_memory(unsigned char const *buffer, int len   , int *x, int *y);
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 typedef unsigned short stbi__uint16;
@@ -162,11 +162,11 @@ static int stbi__zhuffman_decode_slowpath(stbi__zbuf *a, stbi__zhuffman *z) {
    int b,s,k;
    k = stbi__bit_reverse(a->code_buffer, 16);
    for (s=10; ;++s) { if (k < z->maxcode[s]) break; }
-   if (s >= 16) return -1;
+//    if (s >= 16) return -1;
    
    b = (k >> (16-s)) - z->firstcode[s] + z->firstsymbol[s];
-   if (b >= 288) return -1; // some data was corrupt somewhere!
-   if (z->size[b] != s) return -1;  // was originally an assert, but report failure instead.
+//    if (b >= 288) return -1; // some data was corrupt somewhere!
+//    if (z->size[b] != s) return -1;  // was originally an assert, but report failure instead.
    
    a->code_buffer >>= s;
    a->num_bits -= s;
@@ -176,7 +176,7 @@ static int stbi__zhuffman_decode_slowpath(stbi__zbuf *a, stbi__zhuffman *z) {
 inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
    int b,s;
    if (a->num_bits < 16) {
-      if ((a->zbuffer >= a->zbuffer_end)) return -1;   /* report error for unexpected end of data. */
+//       if ((a->zbuffer >= a->zbuffer_end)) return -1;   /* report error for unexpected end of data. */
 
       stbi__fill_bits(a);
    }
@@ -201,8 +201,8 @@ static int stbi__parse_huffman_block(stbi__zbuf *a) {
    for(;;) {
       int z = stbi__zhuffman_decode(a, &a->z_length);
       if (z < 256) {
-         if (z < 0) return 0; // error in huffman codes
-         if (zout >= a->zout_end) return 0;
+//          if (z < 0) return 0; // error in huffman codes
+//          if (zout >= a->zout_end) return 0;
          
          *zout++ = (char) z;
       } else {
@@ -212,16 +212,16 @@ static int stbi__parse_huffman_block(stbi__zbuf *a) {
             a->zout = zout;
             return 1;
          }
-         if (z >= 286) return 0; // per DEFLATE, length codes 286 and 287 must not appear in compressed data
+//          if (z >= 286) return 0; // per DEFLATE, length codes 286 and 287 must not appear in compressed data
          z -= 257;
          len = stbi__zlength_base[z];
          if (stbi__zlength_extra[z]) len += stbi__zreceive(a, stbi__zlength_extra[z]);
          z = stbi__zhuffman_decode(a, &a->z_distance);
-         if (z < 0 || z >= 30) return 0; // per DEFLATE, distance codes 30 and 31 must not appear in compressed data
+//          if (z < 0 || z >= 30) return 0; // per DEFLATE, distance codes 30 and 31 must not appear in compressed data
          dist = stbi__zdist_base[z];
          if (stbi__zdist_extra[z]) dist += stbi__zreceive(a, stbi__zdist_extra[z]);
-         if (zout - a->zout_start < dist) return 0;
-         if (zout + len > a->zout_end) return 0;
+//          if (zout - a->zout_start < dist) return 0;
+//          if (zout + len > a->zout_end) return 0;
 
          p = (stbi_uc *) (zout - dist);
          if (dist == 1) { // run of one byte; common in images.
@@ -255,7 +255,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
    n = 0;
    while (n < ntot) {
       int c = stbi__zhuffman_decode(a, &z_codelength);
-      if (c < 0 || c >= 19) return 0;
+//       if (c < 0 || c >= 19) return 0;
       
       if (c < 16) {
          lencodes[n++] = (stbi_uc) c;
@@ -263,7 +263,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
          stbi_uc fill = 0;
          if (c == 16) {
             c = stbi__zreceive(a,2)+3;
-            if (n == 0) return 0;
+//             if (n == 0) return 0;
             
             fill = lencodes[n-1];
          } else if (c == 17) {
@@ -271,14 +271,14 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
          } else if (c == 18) {
             c = stbi__zreceive(a,7)+11;
          } else return 0;
-         if (ntot - n < c) return 0;
+//          if (ntot - n < c) return 0;
          
          memset(lencodes+n, fill, c);
          n += c;
       }
    }
    
-   if (n != ntot) return 0;
+//    if (n != ntot) return 0;
    if (!stbi__zbuild_huffman(&a->z_length, lencodes, hlit)) return 0;
    if (!stbi__zbuild_huffman(&a->z_distance, lencodes+hlit, hdist)) return 0;
    return 1;
@@ -295,7 +295,7 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
       a->num_bits -= 8;
    }
    
-   if (a->num_bits < 0) return 0;
+//    if (a->num_bits < 0) return 0;
 
    if (k <= 0) header[0] = stbi__zget8(a);
    if (k <= 1) header[1] = stbi__zget8(a);
@@ -305,8 +305,9 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    len  = header[1] * 256 + header[0];
    nlen = header[3] * 256 + header[2];
    if (nlen != (len ^ 0xffff)) return 0;
-   if (a->zbuffer + len > a->zbuffer_end) return 0;
-   if (a->zout + len > a->zout_end) return 0;
+//    if (a->zbuffer + len > a->zbuffer_end) return 0;
+//    if (a->zout + len > a->zout_end) return 0;
+   
    memcpy(a->zout, a->zbuffer, len);
    a->zbuffer += len;
    a->zout += len;
@@ -463,9 +464,7 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
    return 1;
 }
 
-#define STBI__PNG_TYPE(a,b,c,d)  (((unsigned) (a) << 24) + ((unsigned) (b) << 16) + ((unsigned) (c) << 8) + (unsigned) (d))
-
-extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp) {
+extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y) {
    stbi__context s;
    s.img_x = s.img_y = 0;
    s.img_n = s.img_out_n = 0;
@@ -474,8 +473,6 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
    void* result = NULL;
    stbi__png z;
    z.s = &s;
-   if (req_comp < 0 || req_comp > 4) return 0;
-   
    stbi_uc palette[1024], pal_img_n=0;
    stbi_uc has_trans=0, tc[3]={0};
    stbi__uint32 ioff=0, idata_limit=0, i, pal_len=0;
@@ -495,7 +492,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
       stbi__uint32 length = stbi__get32be(&s);
       stbi__uint32 type   = stbi__get32be(&s);
       switch (type) {
-         case STBI__PNG_TYPE('I','H','D','R'): {
+         case 0x49484452: { // IHDR
             int comp,filter;
             if (!first) goto Label_parsefail;
             
@@ -525,7 +522,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             break; // even with SCAN_header, have to scan to see if we have a tRNS
          }
 
-         case STBI__PNG_TYPE('P','L','T','E'):  {
+         case 0x504C5445: { // PLTE
             if (first) goto Label_parsefail;
             if (length > 256*3) goto Label_parsefail;
             
@@ -541,7 +538,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             break;
          }
 
-         case STBI__PNG_TYPE('t','R','N','S'): {
+         case 0x74524E53: { // tRNS
             if (first) goto Label_parsefail;
             if (z.idata) goto Label_parsefail;
             
@@ -555,7 +552,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             break;
          }
 
-         case STBI__PNG_TYPE('I','D','A','T'): {
+         case 0x49444154: { // IDAT
             if (first) goto Label_parsefail;
             if (pal_img_n && !pal_len) goto Label_parsefail;
             if (length > (1u << 30)) goto Label_parsefail;
@@ -578,22 +575,21 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             break;
          }
 
-         case STBI__PNG_TYPE('I','E','N','D'): {
+         case 0x49454E44: { // IEND
             stbi__uint32 raw_len, bpl;
             if (first) goto Label_parsefail;
             if (z.idata == NULL) goto Label_parsefail;
             
             // initial guess for decoded data size to avoid unnecessary reallocs
-            bpl = (s.img_x * 8 + 7) / 8; // bytes per line, per component
+            bpl = (s.img_x);// * 8 + 7) / 8; // bytes per line, per component
             raw_len = bpl * s.img_y * s.img_n /* pixels */ + s.img_y /* filter mode per row */;
             z.expanded = (stbi_uc *)stbi_zlib_decode_malloc_guesssize_headerflag((char *) z.idata, ioff, raw_len, (int *) &raw_len);
             if (z.expanded == NULL) goto Label_parsefail; // zlib should set error
             
             free(z.idata); z.idata = NULL;
-            if ((req_comp == s.img_n+1 && req_comp != 3 && !pal_img_n) || has_trans)
-               s.img_out_n = s.img_n+1;
-            else
-               s.img_out_n = s.img_n;
+            if ((4 == s.img_n+1 && !pal_img_n) || has_trans) s.img_out_n = s.img_n+1;
+            else s.img_out_n = s.img_n;
+            
             if (!stbi__create_png_image_raw(&z, z.expanded, raw_len, s.img_out_n, s.img_x, s.img_y)) goto Label_parsefail;
             
             if (has_trans) {
@@ -615,7 +611,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             if (pal_img_n) { // pal_img_n == 3 or 4
                s.img_n = pal_img_n; // record the actual colors we had
                s.img_out_n = pal_img_n;
-               if (req_comp >= 3) s.img_out_n = req_comp;
+               s.img_out_n = 4;
                stbi__uint32 i, pixel_count = s.img_x * s.img_y;
                stbi_uc *p, *temp_out, *orig = z.out;
                p = (stbi_uc *)malloc(pixel_count * s.img_out_n);
@@ -669,7 +665,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
    z.out = NULL;
    *x = z.s->img_x;
    *y = z.s->img_y;
-   if (comp) *comp = z.s->img_n;
+//    if (comp) *comp = z.s->img_n;
    Label_parsefail:
    free(z.out);      z.out      = NULL;
    free(z.expanded); z.expanded = NULL;

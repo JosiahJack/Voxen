@@ -1078,8 +1078,8 @@ void InitializeEnvironment(void) {
     close(fp);
     if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap ./Textures/UI/menudot1.png\n"); exit(1); }
                 
-    int w = 1, h = 1, n = 1;
-    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h, &n, 4);
+    int w = 1, h = 1;
+    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h);
     if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
 
     DebugRAM("after loading window bar icon");

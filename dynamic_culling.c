@@ -44,7 +44,7 @@ void DetermineClosedEdges() {
     uint8_t* file_buffer = malloc(maxFileSize);
     FILE* fp;
     size_t file_size, read_size;
-    int32_t wpng, hpng, channels;
+    int32_t wpng, hpng;
     
     // ------------------- Open Cells ------------------
     char filename2[256];
@@ -60,7 +60,7 @@ void DetermineClosedEdges() {
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); exit(1); }
-    unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, 4); // I handmade them, well what can ya do
+    unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
 	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); exit(1); }
  
     unsigned char openData_r, openData_g, openData_b;
@@ -103,7 +103,7 @@ void DetermineClosedEdges() {
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); exit(1); }
 
-    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, 4); // I handmade them, well what can ya do
+    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
     if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); exit(1); }
 
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
@@ -156,7 +156,7 @@ void DetermineClosedEdges() {
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); exit(1); }
-    unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng, &channels, 4); // I handmade them, well what can ya do
+    unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
     if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); exit(1); }
 
     unsigned char skyData_r, skyData_g, skyData_b;
