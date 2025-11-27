@@ -196,7 +196,6 @@ static const int stbi__zlength_base[31] = { 3,4,5,6,7,8,9,10,11,13,15,17,19,23,2
 static const int stbi__zlength_extra[31] = { 0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0 };
 static const int stbi__zdist_base[32] = { 1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577,0,0};
 static const int stbi__zdist_extra[32] = { 0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13};
-
 static int stbi__parse_huffman_block(stbi__zbuf *a) {
    char *zout = a->zout;
    for(;;) {
@@ -298,7 +297,11 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    
    if (a->num_bits < 0) return 0;
 
-   while (k < 4) header[k++] = stbi__zget8(a);
+   if (k <= 0) header[0] = stbi__zget8(a);
+   if (k <= 1) header[1] = stbi__zget8(a);
+   if (k <= 2) header[2] = stbi__zget8(a);
+   if (k <= 3) header[3] = stbi__zget8(a);
+   k = 4;
    len  = header[1] * 256 + header[0];
    nlen = header[3] * 256 + header[2];
    if (nlen != (len ^ 0xffff)) return 0;
@@ -323,13 +326,9 @@ static const stbi_uc stbi__zdefault_length[288] = {
 };
 
 static int stbi__parse_zlib(stbi__zbuf *a) {
-   int cmf   = stbi__zget8(a);
-   int cm    = cmf & 15;
-   int flg   = stbi__zget8(a);
+   stbi__zget8(a); // Skip CMF, don't bother checking
+   stbi__zget8(a); // Skip FLG, don't bother checking
    if ((a->zbuffer >= a->zbuffer_end)) return 0;
-   if ((cmf*256+flg) % 31 != 0) return 0;
-   if (flg & 32) return 0;
-   if (cm != 8) return 0;
    
    a->num_bits = 0;
    a->code_buffer = 0;
@@ -368,14 +367,6 @@ char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, 
       if (outlen) *outlen = (int) (a.zout - a.zout_start);
       return a.zout_start;
    } else return NULL;
-}
-
-static int stbi__check_png_header(stbi__context *s) {
-   static const stbi_uc png_sig[8] = { 137,80,78,71,13,10,26,10 };
-   int i;
-   for (i=0; i < 8; ++i)
-      if (stbi__get8(s) != png_sig[i]) return 0;
-   return 1;
 }
 
 static stbi_uc first_row_filter[5] = {
@@ -429,7 +420,6 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
             case STBI__F_avg        : cur[k] = STBI__BYTECAST(raw[k] + (prior[k]>>1)); break;
             case STBI__F_paeth      : cur[k] = STBI__BYTECAST(raw[k] + stbi__paeth(0,prior[k],0)); break;
             case STBI__F_avg_first  : cur[k] = raw[k]; break;
-            case STBI__F_paeth_first: cur[k] = raw[k]; break;
          }
       }
 
@@ -450,7 +440,6 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
             STBI__CASE(STBI__F_avg)          { cur[k] = STBI__BYTECAST(raw[k] + ((prior[k] + cur[k-filter_bytes])>>1)); } break;
             STBI__CASE(STBI__F_paeth)        { cur[k] = STBI__BYTECAST(raw[k] + stbi__paeth(cur[k-filter_bytes],prior[k],prior[k-filter_bytes])); } break;
             STBI__CASE(STBI__F_avg_first)    { cur[k] = STBI__BYTECAST(raw[k] + (cur[k-filter_bytes] >> 1)); } break;
-            STBI__CASE(STBI__F_paeth_first)  { cur[k] = STBI__BYTECAST(raw[k] + stbi__paeth(cur[k-filter_bytes],0,0)); } break;
          }
          #undef STBI__CASE
          raw += nk;
@@ -461,12 +450,11 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
                    for (k=0; k < filter_bytes; ++k)
          switch (filter) {
             STBI__CASE(STBI__F_none)         { cur[k] = raw[k]; } break;
-            STBI__CASE(STBI__F_sub)          { cur[k] = STBI__BYTECAST(raw[k] + cur[k- output_bytes]); } break;
+            STBI__CASE(STBI__F_sub)          { cur[k] = STBI__BYTECAST(raw[k] + cur[k- output_bytes]); } break; // Supports RGB only, no A
             STBI__CASE(STBI__F_up)           { cur[k] = STBI__BYTECAST(raw[k] + prior[k]); } break;
-            STBI__CASE(STBI__F_avg)          { cur[k] = STBI__BYTECAST(raw[k] + ((prior[k] + cur[k- output_bytes])>>1)); } break;
-            STBI__CASE(STBI__F_paeth)        { cur[k] = STBI__BYTECAST(raw[k] + stbi__paeth(cur[k- output_bytes],prior[k],prior[k- output_bytes])); } break;
+            STBI__CASE(STBI__F_avg)          { cur[k] = STBI__BYTECAST(raw[k] + ((prior[k] + cur[k- output_bytes])>>1)); } break; // Also supports RGB only, no A
+            STBI__CASE(STBI__F_paeth)        { cur[k] = STBI__BYTECAST(raw[k] + stbi__paeth(cur[k- output_bytes],prior[k],prior[k- output_bytes])); } break; // Also supports RGB only, no A
             STBI__CASE(STBI__F_avg_first)    { cur[k] = STBI__BYTECAST(raw[k] + (cur[k- output_bytes] >> 1)); } break;
-            STBI__CASE(STBI__F_paeth_first)  { cur[k] = STBI__BYTECAST(raw[k] + stbi__paeth(cur[k- output_bytes],0,0)); } break;
          }
          #undef STBI__CASE
       }
@@ -479,6 +467,8 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
 
 extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp) {
    stbi__context s;
+   s.img_x = s.img_y = 0;
+   s.img_n = s.img_out_n = 0;
    s.img_buffer = (stbi_uc *) buffer;
    s.img_buffer_end = (stbi_uc *)buffer+len;
    void* result = NULL;
@@ -493,8 +483,14 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
    z.expanded = NULL;
    z.idata = NULL;
    z.out = NULL;
-   if (!stbi__check_png_header(&s)) goto Label_parsefail;
-
+   stbi__get8(&s); // Skip header check and trust it's a .png
+   stbi__get8(&s);
+   stbi__get8(&s);
+   stbi__get8(&s);
+   stbi__get8(&s);
+   stbi__get8(&s);
+   stbi__get8(&s);
+   stbi__get8(&s);
    for (;;) {
       stbi__uint32 length = stbi__get32be(&s);
       stbi__uint32 type   = stbi__get32be(&s);
