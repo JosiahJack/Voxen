@@ -122,7 +122,6 @@ float berserkSeedTime = 0.0f;
 int32_t debugView = 0;
 int32_t debugValue = 0;
 float aspect3D = 1.0f;
-float aspect2D = 1.0f;
 float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];
 uint32_t drawCallsRenderedThisFrame = 0; // Total draw calls this frame
@@ -202,7 +201,6 @@ int statusTextLengthWithoutNullTerminator = 6;
 float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
-// Could reduce spotAng to minimal bits.  I only have 6 spot lights and half are 151.7 and other half are 135.
 GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, shadowMapsIndirectionID;
 uint32_t* voxelLightListsRaw = NULL;
 uint32_t* voxelLightListIndices = NULL;
@@ -215,7 +213,6 @@ float (*lightView)[6][4][4] = NULL; // Array of Array of 6 Arrays of 16 floats (
 float (*lightViewProj)[6][4][4] = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane (*lightFrustumPlanes)[6][6] = NULL; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 // ----------------------------------------------------------------------------
-// ============================================================================
 // OpenGL / Rendering Helper Functions
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
     glGenTextures(1, id);
@@ -321,13 +318,13 @@ void UpdateScreenSize(void) {
     m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
     
-    aspect2D = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
+    float aspectShad = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
     f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
     m = shadowmapsPerspectiveProjection;
-    m[0] = f / aspect2D; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
+    m[0] = f / aspectShad; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
+    m[4] =           0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
+    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
     
     glProgramUniform1ui(imageBlitShaderProgram, 2, screen_width);
     glProgramUniform1ui(imageBlitShaderProgram, 3, screen_height);
@@ -337,8 +334,7 @@ void UpdateScreenSize(void) {
     glProgramUniform1ui(chunkShaderProgram, 7, screen_height);
     glProgramUniform1f(chunkShaderProgram, 16, (float)(SHADOW_MAP_SIZE));
     glProgramUniform1ui(ssrShaderProgram, 0, screen_width / SSR_RES);
-    glProgramUniform1ui(ssrShaderProgram, 1, screen_height / SSR_RES);
-    glProgramUniform1i(ssrShaderProgram, 4, 4); // outputImage texture binding point
+    glProgramUniform1ui(ssrShaderProgram, 1, screen_height / SSR_RES);       
     glProgramUniform1i(ssrShaderProgram, 7, SSR_RES);
 }
 
@@ -993,7 +989,6 @@ void InitializeEnvironment(void) {
             glfwSwapInterval(settings_Vsync ? 1 : 0);
             glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
             CompileShaders();
-            UpdateScreenSize();
             glCreateBuffers(1, &quadVBO);
             float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
             glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
@@ -1061,7 +1056,7 @@ void InitializeEnvironment(void) {
             glBindTexture(GL_TEXTURE_2D, outputImageID);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             DebugRAM("setup gbuffer end");
-            
+            UpdateScreenSize();
             InitFontAtlasses();
             DebugRAM("after InitFontAtlasses");
             Input_MouselookApply(); // Input
@@ -1083,7 +1078,7 @@ void InitializeEnvironment(void) {
             DebugRAM("ParseGameData end");
         }
     }
-    
+  
     glfwSetWindowTitle(window,global_modname);
     int fp = open("./Textures/UI/menudot1.png", O_RDONLY);
     if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png: %s\n", strerror(errno)); exit(1); }

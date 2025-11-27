@@ -29,11 +29,6 @@ layout(location = 18) uniform uint texIndex;
 layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
 
-flat in uint TexIndex;
-flat in uint GlowIndex;
-flat in uint SpecIndex;
-flat in uint NormalIndex;
-
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
@@ -127,10 +122,10 @@ vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
     return vec4(
-        float((color >> 24u) & 0xFFu) / 255.0,
-        float((color >> 16u) & 0xFFu) / 255.0,
+        float(color & 0xFFu) / 255.0,
         float((color >> 8u) & 0xFFu) / 255.0,
-        float(color & 0xFFu) / 255.0
+        float((color >> 16u) & 0xFFu) / 255.0,
+        float((color >> 24u) & 0xFFu) / 255.0
     );
 }
 
@@ -156,7 +151,7 @@ void main() {
 
     if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
-    if (NormalIndex != BLACK_TEXTURE_IDX && debugValue < 1 && distToPixel < 10.24) {
+    if (normInstanceIndex != BLACK_TEXTURE_IDX && debugValue < 1 && distToPixel < 10.24) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -166,11 +161,11 @@ void main() {
             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
             vec3 b = normalize(dp1 * duv2.x - dp2 * duv1.x);
             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
-            ivec2 texSizeNorm = textureSizes[NormalIndex];
+            ivec2 texSizeNorm = textureSizes[normInstanceIndex];
             ivec2 texUVNorm = ivec2(int(floor(uv.x * float(texSizeNorm.x))), int(floor(uv.y * float(texSizeNorm.y))));
             texUVNorm.x = texUVNorm.x % texSizeNorm.x;
             texUVNorm.y = texUVNorm.y % texSizeNorm.y;
-            vec3 normalColor = (getTextureColor(NormalIndex,texUVNorm).rgb * 2.0 - 1.0);
+            vec3 normalColor = (getTextureColor(normInstanceIndex,texUVNorm).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
         }
@@ -189,10 +184,7 @@ void main() {
     if (reflectionsEnabled > 0) {
         vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
         ivec2 texSizeSpec = textureSizes[specIndex];
-        vec2 uvSpec = clamp(vec2(TexCoord.x, 1.0 - TexCoord.y), 0.0, 1.0); // Invert V (aka Y), OpenGL convention vs import
-        int xSpec = int(floor(uvSpec.x * float(texSizeSpec.x)));
-        int ySpec = int(floor(uvSpec.y * float(texSizeSpec.y)));
-        ivec2 texUVSpec = ivec2(xSpec,ySpec);
+        ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
         texUVSpec.x = texUVSpec.x % texSizeSpec.x;
         texUVSpec.y = texUVSpec.y % texSizeSpec.y;
         specColor = getTextureColor(specIndex,texUVSpec);

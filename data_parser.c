@@ -51,75 +51,6 @@ float parse_float(const char* str, const char* line, uint32_t lineNum) {
     return val;
 }
 
-bool process_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
-    if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
-    
-    while (data_parser_isspace((unsigned char)*key)) key++;
-    while (data_parser_isspace((unsigned char)*value)) value++;
-    char trimmed_key[256];
-    char trimmed_value[256];
-    strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
-    strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
-    trimmed_key[sizeof(trimmed_key) - 1] = '\0';
-    trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-    char *key_end = trimmed_key + strlen(trimmed_key) - 1;
-    char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-    while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
-    while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
-//     sanitize_utf8_ascii(trimmed_key);
-//     sanitize_utf8_ascii(trimmed_value);
-    if (strncmp(trimmed_key, "chunk_", 6) == 0) {
-        strncpy(entry->path, trimmed_key, sizeof(entry->path) - 1);
-        entry->path[sizeof(entry->path) - 1] = '\0';
-        return true;
-    }
-         if (strcmp(trimmed_key, "index") == 0)             entry->index = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "model") == 0)             entry->modelIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "texture") == 0)           entry->texIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "glowtexture") == 0)       entry->glowIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "spectexture") == 0)       entry->specIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "normtexture") == 0)       entry->normIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "doublesided") == 0)       flag_set(&entry->entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, line, lineNum));
-    else if (strcmp(trimmed_key, "transparent") == 0)       flag_set(&entry->entflags,ENTFLAG_TRANSPARENT,parse_bool(trimmed_value, line, lineNum));
-    else if (strcmp(trimmed_key, "cardchunk") == 0)         flag_set(&entry->entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, line, lineNum));
-
-    else if (strcmp(trimmed_key, "collider") == 0)          entry->collider = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "collider_centerx") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "collider_centery") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "collider_centerz") == 0)  entry->colliderCenter.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "collider_sizex") == 0)    entry->colliderSize.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "collider_sizey") == 0)    entry->colliderSize.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "collider_sizez") == 0)    entry->colliderSize.z = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "colliderMeshIndex") == 0) entry->colliderMeshIndex = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "mass") == 0)              entry->mass = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "linearDrag") == 0)        entry->linearDrag = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "angularDrag") == 0)       entry->angularDrag = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "kinematic") == 0)         flag_set(&entry->entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, line, lineNum));
-    else if (strcmp(trimmed_key, "useGravity") == 0)        flag_set(&entry->entflags,ENTFLAG_USEGRAVITY,parse_bool(trimmed_value, line, lineNum));
-    else if (strcmp(trimmed_key, "bounciness") == 0)        entry->bounciness = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry->dynamicFriction = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry->frictionCombine = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry->bounceCombine = parse_numberu8(trimmed_value, line, lineNum);
-
-    else if (strcmp(trimmed_key, "volume") == 0)            entry->volume = parse_float(trimmed_value, line, lineNum);
-    
-    else if (strcmp(trimmed_key, "child0") == 0)            entry->child0 = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0_offsetx") == 0)    entry->child0_offset.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0_offsety") == 0)    entry->child0_offset.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child0_offsetz") == 0)    entry->child0_offset.z = parse_float(trimmed_value, line, lineNum);
-    
-    else if (strcmp(trimmed_key, "child1") == 0)            entry->child1 = parse_numberu16(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child1_offsetx") == 0)    entry->child1_offset.x = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child1_offsety") == 0)    entry->child1_offset.y = parse_float(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "child1_offsetz") == 0)    entry->child1_offset.z = parse_float(trimmed_value, line, lineNum);
-    
-    else if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
-    else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "startlevel") == 0)      startLevel = parse_numberu8(trimmed_value, line, lineNum);
-    else return false;
-    return true;
-}
-
 bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum) {
     *is_comment = false;
     *is_eof = false;
@@ -207,7 +138,10 @@ void ParseGameData() {
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",global_modname,numLevels,startLevel,get_time() - start_time);
 }
 
-static bool ParseResourceData(DataParser *parser, FILE* file, const char *filename) {
+bool parse_data_file(DataParser *parser, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
+    
     char line[1024];
     uint32_t lineNum = 0;
     uint32_t max_index = 0;
@@ -248,6 +182,8 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
     while (fgets(line, sizeof(line), file)) {
         lineNum++;
         char *start = line;
+        if (strlen(start) < 3) continue; // Must have at least k:v, skip if shorter
+
         while (data_parser_isspace((unsigned char)*start)) start++;
         char *end = start + strlen(start) - 1;
         while (end > start && data_parser_isspace((unsigned char)*end)) { *end = '\0'; end--; }
@@ -276,8 +212,66 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
             char *value = colon + 1;
             while (data_parser_isspace((unsigned char)*key)) key++;
             while (data_parser_isspace((unsigned char)*value)) value++;
-            if (*key && *value) process_key_value(&entry, key, value, start, lineNum);
-            else                DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
+            if (*key && *value) {
+                while (data_parser_isspace((unsigned char)*key)) key++;
+                while (data_parser_isspace((unsigned char)*value)) value++;
+                char trimmed_key[256];
+                char trimmed_value[256];
+                strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
+                strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
+                trimmed_key[sizeof(trimmed_key) - 1] = '\0';
+                trimmed_value[sizeof(trimmed_value) - 1] = '\0';
+                char *key_end = trimmed_key + strlen(trimmed_key) - 1;
+                char *val_end = trimmed_value + strlen(trimmed_value) - 1;
+                while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
+                while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+            //     sanitize_utf8_ascii(trimmed_key);
+            //     sanitize_utf8_ascii(trimmed_value);
+                if (strncmp(trimmed_key, "chunk_", 6) == 0) {
+                    strncpy(entry.path, trimmed_key, sizeof(entry.path) - 1);
+                    entry.path[sizeof(entry.path) - 1] = '\0';
+                } else {
+                            if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "spectexture") == 0)       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "normtexture") == 0)       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "doublesided") == 0)       flag_set(&entry.entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "transparent") == 0)       flag_set(&entry.entflags,ENTFLAG_TRANSPARENT,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "cardchunk") == 0)         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
+
+                    else if (strcmp(trimmed_key, "collider") == 0)          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_centerx") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_centery") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_centerz") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_sizex") == 0)    entry.colliderSize.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_sizey") == 0)    entry.colliderSize.y = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_sizez") == 0)    entry.colliderSize.z = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "colliderMeshIndex") == 0) entry.colliderMeshIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "mass") == 0)              entry.mass = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "linearDrag") == 0)        entry.linearDrag = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "angularDrag") == 0)       entry.angularDrag = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "kinematic") == 0)         flag_set(&entry.entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "useGravity") == 0)        flag_set(&entry.entflags,ENTFLAG_USEGRAVITY,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "bounciness") == 0)        entry.bounciness = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry.dynamicFriction = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry.frictionCombine = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry.bounceCombine = parse_numberu8(trimmed_value, start, lineNum);
+
+                    else if (strcmp(trimmed_key, "volume") == 0)            entry.volume = parse_float(trimmed_value, start, lineNum);
+                    
+                    else if (strcmp(trimmed_key, "child0") == 0)            entry.child0 = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child0_offsetx") == 0)    entry.child0_offset.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child0_offsety") == 0)    entry.child0_offset.y = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child0_offsetz") == 0)    entry.child0_offset.z = parse_float(trimmed_value, start, lineNum);
+                    
+                    else if (strcmp(trimmed_key, "child1") == 0)            entry.child1 = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child1_offsetx") == 0)    entry.child1_offset.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child1_offsety") == 0)    entry.child1_offset.y = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child1_offsetz") == 0)    entry.child1_offset.z = parse_float(trimmed_value, start, lineNum);
+                }
+            } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
         } else {
             DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
         }
@@ -291,12 +285,6 @@ static bool ParseResourceData(DataParser *parser, FILE* file, const char *filena
 
     fclose(file);
     return true;
-}
-
-bool parse_data_file(DataParser *parser, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
-    return ParseResourceData(parser, file, filename);
 }
 
 bool isDoubleSided(uint32_t texIndexToCheck) {

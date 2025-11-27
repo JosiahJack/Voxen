@@ -89,12 +89,13 @@ void InitializeAudio();
 void UpdateAmbientSounds(void);
 // ----------------------------------------------------------------------------
 // Textures
+#define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 #define BLACK_TEXTURE_IDX 41 // TODO: Make settable from gamedata.txt
-extern bool* doubleSidedTexture;
-extern bool* transparentTexture;
+extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
+extern bool transparentTexture[MAX_VALID_TEXTURE];
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);

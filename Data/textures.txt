@@ -13,6 +13,7 @@
 // definition for a model will specify texture by index)
 // example: index: 451
 //
+
 // To automate generation of this file, run the following command after cd ./Textures
 // ls *.png | sort | awk '{print "#Textures/"$0"\nindex: "NR-1}'
 //

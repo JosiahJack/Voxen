@@ -9,17 +9,14 @@ layout(location = 2) in vec2 aTexCoord;
 layout(std430, binding = 11) buffer ModelMatrices { mat4 modelMatrices[]; };
 
 layout(location = 0) uniform uint instanceIndex;
-layout(location = 1) uniform uint normInstanceIndex;
 layout(location = 2) uniform mat4 viewProjection;
 layout(location = 3) uniform uint isUI;
 
 out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
-flat out uint NormalIndex;
 
 void main() {
-    NormalIndex = normInstanceIndex;
     if (isUI > 0) {
         TexCoord = aNormal.xy; // uiImageVAO only has pos and uvs so uvs are at location 1 (2nd)
         FragPos = vec3(aPos);
