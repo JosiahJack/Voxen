@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <malloc.h>
 #include <stdint.h>
 #include <stdbool.h>

@@ -1,6 +1,5 @@
 // stb_image.h - PNG Load System
-extern unsigned char *stbi_load_from_memory   (unsigned char const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
-void DualLog(const char* fmt, ...);
+extern unsigned char *stbi_load_from_memory(unsigned char const *buffer, int len   , int *x, int *y, int *channels_in_file, int desired_channels);
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 typedef unsigned short stbi__uint16;
@@ -21,9 +20,6 @@ typedef struct {
 void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
 void *memset(void *s, int c, size_t n);
 #include <limits.h>
-
-// should produce compiler error if size is wrong
-typedef unsigned char validate_uint32[sizeof(stbi__uint32)==4 ? 1 : -1];
 
 typedef struct {
    stbi__context *s;
@@ -47,57 +43,9 @@ inline static stbi_uc stbi__get8(stbi__context *s) {
    return 0;
 }
 
-static int stbi__parse_png_file(stbi__png *z, int req_comp);
-
-extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp) {
-   stbi__context s;
-   s.img_buffer = (stbi_uc *) buffer;
-   s.img_buffer_end = (stbi_uc *)buffer+len;
-   void* result = NULL;
-   stbi__png p;
-   p.s = &s;
-   if (req_comp < 0 || req_comp > 4) return 0;
-   if (stbi__parse_png_file(&p, req_comp)) {
-      if (p.depth > 8) return 0;
-      
-      result = p.out;
-      p.out = NULL;
-      *x = p.s->img_x;
-      *y = p.s->img_y;
-      if (comp) *comp = p.s->img_n;
-   }
-   
-   free(p.out);      p.out      = NULL;
-   free(p.expanded); p.expanded = NULL;
-   free(p.idata);    p.idata    = NULL;
-   if (result == NULL) return NULL;
-   return (unsigned char *)result;
-}
-
-static void stbi__skip(stbi__context *s, int n) {
-   if (n == 0) return;  // already there!
-   if (n < 0) { s->img_buffer = s->img_buffer_end; return; }
-
-   s->img_buffer += n;
-}
-
-static int stbi__getn(stbi__context *s, stbi_uc *buffer, int n) {
-   if (s->img_buffer+n <= s->img_buffer_end) {
-      memcpy(buffer, s->img_buffer, n);
-      s->img_buffer += n;
-      return 1;
-   } else
-      return 0;
-}
-
-static int stbi__get16be(stbi__context *s) {
-   int z = stbi__get8(s);
-   return (z << 8) + stbi__get8(s);
-}
-
-static stbi__uint32 stbi__get32be(stbi__context *s) {
-   stbi__uint32 z = stbi__get16be(s);
-   return (z << 16) + stbi__get16be(s);
+inline static stbi__uint32 stbi__get32be(stbi__context *s) {
+   stbi__uint32 z = (stbi__get8(s) << 8) + stbi__get8(s);
+   return (z << 16) + (stbi__get8(s) << 8) + stbi__get8(s);
 }
 
 #define STBI__BYTECAST(x)  ((stbi_uc) ((x) & 255))  // truncate int to byte without warnings
@@ -110,6 +58,16 @@ typedef struct {
    stbi_uc  size[288];
    stbi__uint16 value[288];
 } stbi__zhuffman;
+
+typedef struct {
+   stbi_uc *zbuffer, *zbuffer_end;
+   int num_bits;
+   stbi__uint32 code_buffer;
+   char *zout;
+   char *zout_start;
+   char *zout_end;
+   stbi__zhuffman z_length, z_distance;
+} stbi__zbuf;
 
 inline static int stbi__bitreverse16(int n) {
   n = ((n & 0xAAAA) >>  1) | ((n & 0x5555) << 1);
@@ -130,27 +88,35 @@ static int stbi__zbuild_huffman(stbi__zhuffman *z, const stbi_uc *sizelist, int 
    // DEFLATE spec for generating codes
    memset(sizes, 0, sizeof(sizes));
    memset(z->fast, 0, sizeof(z->fast));
-   for (i=0; i < num; ++i)
-      ++sizes[sizelist[i]];
+   if (num != 32) {
+      for (i=0; i < num; ++i) ++sizes[sizelist[i]];      
+   }
+   
    sizes[0] = 0;
-   for (i=1; i < 16; ++i)
-      if (sizes[i] > (1 << i))
-         return 0;
+   for (i=1; i < 16; ++i) {
+      if (sizes[i] > (1 << i)) return 0;
+   }
+   
    code = 0;
+   
+   #pragma GCC unroll 16
    for (i=1; i < 16; ++i) {
       next_code[i] = code;
       z->firstcode[i] = (stbi__uint16) code;
       z->firstsymbol[i] = (stbi__uint16) k;
       code = (code + sizes[i]);
-      if (sizes[i])
+      if (sizes[i]) {
          if (code-1 >= (1 << i)) return 0;
+      }
+      
       z->maxcode[i] = code << (16-i); // preshift for inner loop
       code <<= 1;
       k += sizes[i];
    }
+   
    z->maxcode[16] = 0x10000; // sentinel
    for (i=0; i < num; ++i) {
-      int s = sizelist[i];
+      int s = num == 32 ? 5 : sizelist[i];
       if (s) {
          int c = next_code[s] - z->firstcode[s] + z->firstsymbol[s];
          stbi__uint16 fastv = (stbi__uint16) ((s << 9) | i);
@@ -169,26 +135,11 @@ static int stbi__zbuild_huffman(stbi__zhuffman *z, const stbi_uc *sizelist, int 
    return 1;
 }
 
-typedef struct {
-   stbi_uc *zbuffer, *zbuffer_end;
-   int num_bits;
-   stbi__uint32 code_buffer;
-   char *zout;
-   char *zout_start;
-   char *zout_end;
-   int   z_expandable;
-   stbi__zhuffman z_length, z_distance;
-} stbi__zbuf;
-
-inline static int stbi__zeof(stbi__zbuf *z) {
-   return (z->zbuffer >= z->zbuffer_end);
-}
-
 inline static stbi_uc stbi__zget8(stbi__zbuf *z) {
-   return stbi__zeof(z) ? 0 : *z->zbuffer++;
+   return (z->zbuffer >= z->zbuffer_end) ? 0 : *z->zbuffer++;
 }
 
-static void stbi__fill_bits(stbi__zbuf *z) {
+static inline void stbi__fill_bits(stbi__zbuf *z) {
    do {
       if (z->code_buffer >= (1U << z->num_bits)) {
         z->zbuffer = z->zbuffer_end;  /* treat this as EOF so we fail. */
@@ -226,10 +177,11 @@ static int stbi__zhuffman_decode_slowpath(stbi__zbuf *a, stbi__zhuffman *z) {
 inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
    int b,s;
    if (a->num_bits < 16) {
-      if (stbi__zeof(a)) return -1;   /* report error for unexpected end of data. */
+      if ((a->zbuffer >= a->zbuffer_end)) return -1;   /* report error for unexpected end of data. */
 
       stbi__fill_bits(a);
    }
+   
    b = z->fast[a->code_buffer & ((1 << 9) - 1)];
    if (b) {
       s = b >> 9;
@@ -237,6 +189,7 @@ inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
       a->num_bits -= s;
       return b & 511;
    }
+   
    return stbi__zhuffman_decode_slowpath(a, z);
 }
 
@@ -289,17 +242,16 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
    stbi_uc lencodes[286+32+137];
    stbi_uc codelength_sizes[19];
    int i,n;
-
    int hlit  = stbi__zreceive(a,5) + 257;
    int hdist = stbi__zreceive(a,5) + 1;
    int hclen = stbi__zreceive(a,4) + 4;
    int ntot  = hlit + hdist;
-
    memset(codelength_sizes, 0, sizeof(codelength_sizes));
    for (i=0; i < hclen; ++i) {
       int s = stbi__zreceive(a,3);
       codelength_sizes[length_dezigzag[i]] = (stbi_uc) s;
    }
+   
    if (!stbi__zbuild_huffman(&z_codelength, codelength_sizes, 19)) return 0;
 
    n = 0;
@@ -307,9 +259,9 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
       int c = stbi__zhuffman_decode(a, &z_codelength);
       if (c < 0 || c >= 19) return 0;
       
-      if (c < 16)
+      if (c < 16) {
          lencodes[n++] = (stbi_uc) c;
-      else {
+      } else {
          stbi_uc fill = 0;
          if (c == 16) {
             c = stbi__zreceive(a,2)+3;
@@ -321,13 +273,13 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
          } else if (c == 18) {
             c = stbi__zreceive(a,7)+11;
          } else return 0;
-
          if (ntot - n < c) return 0;
          
          memset(lencodes+n, fill, c);
          n += c;
       }
    }
+   
    if (n != ntot) return 0;
    if (!stbi__zbuild_huffman(&a->z_length, lencodes, hlit)) return 0;
    if (!stbi__zbuild_huffman(&a->z_distance, lencodes+hlit, hdist)) return 0;
@@ -347,8 +299,7 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    
    if (a->num_bits < 0) return 0;
 
-   while (k < 4)
-      header[k++] = stbi__zget8(a);
+   while (k < 4) header[k++] = stbi__zget8(a);
    len  = header[1] * 256 + header[0];
    nlen = header[3] * 256 + header[2];
    if (nlen != (len ^ 0xffff)) return 0;
@@ -357,17 +308,6 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    memcpy(a->zout, a->zbuffer, len);
    a->zbuffer += len;
    a->zout += len;
-   return 1;
-}
-
-static int stbi__parse_zlib_header(stbi__zbuf *a) {
-   int cmf   = stbi__zget8(a);
-   int cm    = cmf & 15;
-   int flg   = stbi__zget8(a);
-   if (stbi__zeof(a)) return 0;
-   if ((cmf*256+flg) % 31 != 0) return 0;
-   if (flg & 32) return 0;
-   if (cm != 8) return 0;
    return 1;
 }
 
@@ -382,17 +322,21 @@ static const stbi_uc stbi__zdefault_length[288] = {
    9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9, 9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,
    7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7, 7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,8
 };
-static const stbi_uc stbi__zdefault_distance[32] = {
-   5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5
-};
 
 static int stbi__parse_zlib(stbi__zbuf *a) {
-   int final, type;
-   if (!stbi__parse_zlib_header(a)) return 0;
+   int cmf   = stbi__zget8(a);
+   int cm    = cmf & 15;
+   int flg   = stbi__zget8(a);
+   if ((a->zbuffer >= a->zbuffer_end)) return 0;
+   if ((cmf*256+flg) % 31 != 0) return 0;
+   if (flg & 32) return 0;
+   if (cm != 8) return 0;
+   
    a->num_bits = 0;
    a->code_buffer = 0;
+   int finalOne, type;
    do {
-      final = stbi__zreceive(a,1);
+      finalOne = stbi__zreceive(a,1);
       type = stbi__zreceive(a,2);
       if (type == 0) {
          if (!stbi__parse_uncompressed_block(a)) return 0;
@@ -402,13 +346,13 @@ static int stbi__parse_zlib(stbi__zbuf *a) {
          if (type == 1) {
             // use fixed code lengths
             if (!stbi__zbuild_huffman(&a->z_length  , stbi__zdefault_length  , 288)) return 0;
-            if (!stbi__zbuild_huffman(&a->z_distance, stbi__zdefault_distance,  32)) return 0;
+            if (!stbi__zbuild_huffman(&a->z_distance, NULL,  32)) return 0;
          } else {
             if (!stbi__compute_huffman_codes(a)) return 0;
          }
          if (!stbi__parse_huffman_block(a)) return 0;
       }
-   } while (!final);
+   } while (!finalOne);
    return 1;
 }
 
@@ -421,7 +365,6 @@ char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, 
    a.zout_start = p;
    a.zout       = p;
    a.zout_end   = p + initial_size;
-   a.z_expandable = 1;
    if (stbi__parse_zlib(&a)) {
       if (outlen) *outlen = (int) (a.zout - a.zout_start);
       return a.zout_start;
@@ -432,13 +375,6 @@ typedef struct {
    stbi__uint32 length;
    stbi__uint32 type;
 } stbi__pngchunk;
-
-static stbi__pngchunk stbi__get_chunk_header(stbi__context *s) {
-   stbi__pngchunk c;
-   c.length = stbi__get32be(s);
-   c.type   = stbi__get32be(s);
-   return c;
-}
 
 static int stbi__check_png_header(stbi__context *s) {
    static const stbi_uc png_sig[8] = { 137,80,78,71,13,10,26,10 };
@@ -545,188 +481,212 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
    return 1;
 }
 
-static int stbi__compute_transparency(stbi__png *z, stbi_uc tc[3], int out_n) {
-   stbi__context *s = z->s;
-   stbi__uint32 i, pixel_count = s->img_x * s->img_y;
-   stbi_uc *p = z->out;
-   if (out_n == 2) {
-      for (i=0; i < pixel_count; ++i) {
-         p[1] = (p[0] == tc[0] ? 0 : 255);
-         p += 2;
-      }
-   } else {
-      for (i=0; i < pixel_count; ++i) {
-         if (p[0] == tc[0] && p[1] == tc[1] && p[2] == tc[2]) p[3] = 0;
-         p += 4;
-      }
-   }
-   return 1;
-}
-
-static int stbi__expand_png_palette(stbi__png *a, stbi_uc *palette, int pal_img_n) {
-   stbi__uint32 i, pixel_count = a->s->img_x * a->s->img_y;
-   stbi_uc *p, *temp_out, *orig = a->out;
-   p = (stbi_uc *)malloc(pixel_count * pal_img_n);
-   temp_out = p;
-   if (pal_img_n == 3) {
-      for (i=0; i < pixel_count; ++i) {
-         int n = orig[i]*4;
-         p[0] = palette[n  ];
-         p[1] = palette[n+1];
-         p[2] = palette[n+2];
-         p += 3;
-      }
-   } else {
-      for (i=0; i < pixel_count; ++i) {
-         int n = orig[i]*4;
-         p[0] = palette[n  ];
-         p[1] = palette[n+1];
-         p[2] = palette[n+2];
-         p[3] = palette[n+3];
-         p += 4;
-      }
-   }
-   
-   free(a->out);
-   a->out = temp_out;
-   return 1;
-}
-
 #define STBI__PNG_TYPE(a,b,c,d)  (((unsigned) (a) << 24) + ((unsigned) (b) << 16) + ((unsigned) (c) << 8) + (unsigned) (d))
 
-static int stbi__parse_png_file(stbi__png *z, int req_comp) {
+extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y, int *comp, int req_comp) {
+   stbi__context s;
+   s.img_buffer = (stbi_uc *) buffer;
+   s.img_buffer_end = (stbi_uc *)buffer+len;
+   void* result = NULL;
+   stbi__png z;
+   z.s = &s;
+   if (req_comp < 0 || req_comp > 4) return 0;
+   
    stbi_uc palette[1024], pal_img_n=0;
    stbi_uc has_trans=0, tc[3]={0};
    stbi__uint32 ioff=0, idata_limit=0, i, pal_len=0;
    int first=1, color=0;
-   stbi__context *s = z->s;
-   z->expanded = NULL;
-   z->idata = NULL;
-   z->out = NULL;
-   if (!stbi__check_png_header(s)) return 0;
+   z.expanded = NULL;
+   z.idata = NULL;
+   z.out = NULL;
+   if (!stbi__check_png_header(&s)) goto Label_parsefail;
 
    for (;;) {
-      stbi__pngchunk c = stbi__get_chunk_header(s);
+      stbi__pngchunk c;
+      c.length = stbi__get32be(&s);
+      c.type   = stbi__get32be(&s);
       switch (c.type) {
          case STBI__PNG_TYPE('I','H','D','R'): {
             int comp,filter;
-            if (!first) return 0;
+            if (!first) goto Label_parsefail;
+            
             first = 0;
-            if (c.length != 13) return 0;
-            s->img_x = stbi__get32be(s);
-            s->img_y = stbi__get32be(s);
-            z->depth = stbi__get8(s);  if (z->depth != 8) return 0;
-            color = stbi__get8(s);  if (color > 6)         return 0;
-            if (color == 3 && z->depth == 16)                  return 0;
-            if (color == 3) pal_img_n = 3; else if (color & 1) return 0;
-            comp  = stbi__get8(s);  if (comp) return 0;
-            filter= stbi__get8(s);  if (filter) return 0;
-            stbi__get8(s); // Shift the interlace byte
-            if (!s->img_x || !s->img_y) return 0;
+            if (c.length != 13) goto Label_parsefail;
+            
+            s.img_x = stbi__get32be(&s);
+            s.img_y = stbi__get32be(&s);
+            z.depth = stbi__get8(&s);  if (z.depth != 8) goto Label_parsefail;
+            color = stbi__get8(&s);  if (color > 6)         goto Label_parsefail;
+            if (color == 3 && z.depth == 16)                  goto Label_parsefail;
+            if (color == 3) pal_img_n = 3; else if (color & 1) goto Label_parsefail;
+            comp  = stbi__get8(&s);  if (comp) goto Label_parsefail;
+            filter= stbi__get8(&s);  if (filter) goto Label_parsefail;
+            stbi__get8(&s); // Shift the interlace byte
+            if (!s.img_x || !s.img_y) goto Label_parsefail;
+            
             if (!pal_img_n) {
-               s->img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
-               if ((1 << 30) / s->img_x / s->img_n < s->img_y) return 0;
+               s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
+               if ((1 << 30) / s.img_x / s.img_n < s.img_y) goto Label_parsefail;
             } else {
                // if paletted, then pal_n is our final components, and
-               // img_n is # components to decompress/filter.
-               s->img_n = 1;
-               if ((1 << 30) / s->img_x / 4 < s->img_y) return 0;
+               s.img_n = 1; // img_n is # components to decompress/filter.
+               if ((1 << 30) / s.img_x / 4 < s.img_y) goto Label_parsefail;
             }
-            // even with SCAN_header, have to scan to see if we have a tRNS
-            break;
+           
+            break; // even with SCAN_header, have to scan to see if we have a tRNS
          }
 
          case STBI__PNG_TYPE('P','L','T','E'):  {
-            if (first) return 0;
-            if (c.length > 256*3) return 0;
+            if (first) goto Label_parsefail;
+            if (c.length > 256*3) goto Label_parsefail;
+            
             pal_len = c.length / 3;
-            if (pal_len * 3 != c.length) return 0;
+            if (pal_len * 3 != c.length) goto Label_parsefail;
+            
             for (i=0; i < pal_len; ++i) {
-               palette[i*4+0] = stbi__get8(s);
-               palette[i*4+1] = stbi__get8(s);
-               palette[i*4+2] = stbi__get8(s);
+               palette[i*4+0] = stbi__get8(&s);
+               palette[i*4+1] = stbi__get8(&s);
+               palette[i*4+2] = stbi__get8(&s);
                palette[i*4+3] = 255;
             }
             break;
          }
 
          case STBI__PNG_TYPE('t','R','N','S'): {
-            if (first) return 0;
-            if (z->idata) return 0;
+            if (first) goto Label_parsefail;
+            if (z.idata) goto Label_parsefail;
+            
             if (pal_img_n) {
-               if (pal_len == 0) return 0;
-               if (c.length > pal_len) return 0;
+               if (pal_len == 0) goto Label_parsefail;
+               if (c.length > pal_len) goto Label_parsefail;
                
                pal_img_n = 4;
-               for (i=0; i < c.length; ++i) palette[i*4+3] = stbi__get8(s);
+               for (i=0; i < c.length; ++i) palette[i*4+3] = stbi__get8(&s);
             }
             break;
          }
 
          case STBI__PNG_TYPE('I','D','A','T'): {
-            if (first) return 0;
-            if (pal_img_n && !pal_len) return 0;
-            if (c.length > (1u << 30)) return 0;
-            if ((int)(ioff + c.length) < (int)ioff) return 0;
+            if (first) goto Label_parsefail;
+            if (pal_img_n && !pal_len) goto Label_parsefail;
+            if (c.length > (1u << 30)) goto Label_parsefail;
+            if ((int)(ioff + c.length) < (int)ioff) goto Label_parsefail;
+            
             if (ioff + c.length > idata_limit) {
                stbi_uc *p;
                if (idata_limit == 0) idata_limit = c.length > 4096 ? c.length : 4096;
                while (ioff + c.length > idata_limit) idata_limit *= 2;
-               p = (stbi_uc *)realloc(z->idata,idata_limit);
-               z->idata = p;
+               p = (stbi_uc *)realloc(z.idata,idata_limit);
+               z.idata = p;
             }
-            
-            if (!stbi__getn(s, z->idata+ioff,c.length)) return 0;
+
+            if (s.img_buffer+c.length <= s.img_buffer_end) {
+               memcpy(z.idata+ioff, s.img_buffer, c.length);
+               s.img_buffer += c.length;
+            } else goto Label_parsefail;
+
             ioff += c.length;
             break;
          }
 
          case STBI__PNG_TYPE('I','E','N','D'): {
             stbi__uint32 raw_len, bpl;
-            if (first) return 0;
-            if (z->idata == NULL) return 0;
+            if (first) goto Label_parsefail;
+            if (z.idata == NULL) goto Label_parsefail;
+            
             // initial guess for decoded data size to avoid unnecessary reallocs
-            bpl = (s->img_x * 8 + 7) / 8; // bytes per line, per component
-            raw_len = bpl * s->img_y * s->img_n /* pixels */ + s->img_y /* filter mode per row */;
-            z->expanded = (stbi_uc *)stbi_zlib_decode_malloc_guesssize_headerflag((char *) z->idata, ioff, raw_len, (int *) &raw_len);
-            if (z->expanded == NULL) return 0; // zlib should set error
-            free(z->idata); z->idata = NULL;
-            if ((req_comp == s->img_n+1 && req_comp != 3 && !pal_img_n) || has_trans)
-               s->img_out_n = s->img_n+1;
+            bpl = (s.img_x * 8 + 7) / 8; // bytes per line, per component
+            raw_len = bpl * s.img_y * s.img_n /* pixels */ + s.img_y /* filter mode per row */;
+            z.expanded = (stbi_uc *)stbi_zlib_decode_malloc_guesssize_headerflag((char *) z.idata, ioff, raw_len, (int *) &raw_len);
+            if (z.expanded == NULL) goto Label_parsefail; // zlib should set error
+            
+            free(z.idata); z.idata = NULL;
+            if ((req_comp == s.img_n+1 && req_comp != 3 && !pal_img_n) || has_trans)
+               s.img_out_n = s.img_n+1;
             else
-               s->img_out_n = s->img_n;
-            if (!stbi__create_png_image_raw(z, z->expanded, raw_len, s->img_out_n, z->s->img_x, z->s->img_y)) return 0;
+               s.img_out_n = s.img_n;
+            if (!stbi__create_png_image_raw(&z, z.expanded, raw_len, s.img_out_n, s.img_x, s.img_y)) goto Label_parsefail;
+            
             if (has_trans) {
-               if (!stbi__compute_transparency(z, tc, s->img_out_n)) return 0;
+               stbi__uint32 i, pixel_count = s.img_x * s.img_y;
+               stbi_uc *p = z.out;
+               if (s.img_out_n == 2) {
+                  for (i=0; i < pixel_count; ++i) {
+                     p[1] = (p[0] == tc[0] ? 0 : 255);
+                     p += 2;
+                  }
+               } else {
+                  for (i=0; i < pixel_count; ++i) {
+                     if (p[0] == tc[0] && p[1] == tc[1] && p[2] == tc[2]) p[3] = 0;
+                     p += 4;
+                  }
+               }
             }
             
-            if (pal_img_n) {
-               // pal_img_n == 3 or 4
-               s->img_n = pal_img_n; // record the actual colors we had
-               s->img_out_n = pal_img_n;
-               if (req_comp >= 3) s->img_out_n = req_comp;
-               if (!stbi__expand_png_palette(z, palette, s->img_out_n)) return 0;
-            } else if (has_trans) {
-               // non-paletted image with tRNS -> source image has (constant) alpha
-               ++s->img_n;
+            if (pal_img_n) { // pal_img_n == 3 or 4
+               s.img_n = pal_img_n; // record the actual colors we had
+               s.img_out_n = pal_img_n;
+               if (req_comp >= 3) s.img_out_n = req_comp;
+               stbi__uint32 i, pixel_count = s.img_x * s.img_y;
+               stbi_uc *p, *temp_out, *orig = z.out;
+               p = (stbi_uc *)malloc(pixel_count * s.img_out_n);
+               temp_out = p;
+               if (s.img_out_n == 3) {
+                  for (i=0; i < pixel_count; ++i) {
+                     int n = orig[i]*4;
+                     p[0] = palette[n  ];
+                     p[1] = palette[n+1];
+                     p[2] = palette[n+2];
+                     p += 3;
+                  }
+               } else {
+                  for (i=0; i < pixel_count; ++i) {
+                     int n = orig[i]*4;
+                     p[0] = palette[n  ];
+                     p[1] = palette[n+1];
+                     p[2] = palette[n+2];
+                     p[3] = palette[n+3];
+                     p += 4;
+                  }
+               }
+               
+               free(z.out);
+               z.out = temp_out;
+            } else if (has_trans) { // non-paletted image with tRNS -> source image has (constant) alpha
+               ++s.img_n;
             }
-            
-            free(z->expanded); z->expanded = NULL;
-            // end of PNG chunk, read and skip CRC
-            stbi__get32be(s);
-            return 1;
+
+            free(z.expanded); z.expanded = NULL;
+            stbi__get32be(&s); // end of PNG chunk, read and skip CRC
+            goto Label_parsesuccess;
          }
 
          default:
             // if critical, fail
-            if (first) return 0;
-            if ((c.type & (1 << 29)) == 0) return 0;
-            stbi__skip(s, c.length);
+            if (first) goto Label_parsefail;
+            if ((c.type & (1 << 29)) == 0) goto Label_parsefail;
+
+            if (c.length != 0) s.img_buffer += c.length;
             break;
       }
-      // end of PNG chunk, read and skip CRC
-      stbi__get32be(s);
+      
+      stbi__get32be(&s); // end of PNG chunk, read and skip CRC
    }
+
+   Label_parsesuccess:
+   if (z.depth > 8) return 0;
+   
+   result = z.out;
+   z.out = NULL;
+   *x = z.s->img_x;
+   *y = z.s->img_y;
+   if (comp) *comp = z.s->img_n;
+   Label_parsefail:
+   free(z.out);      z.out      = NULL;
+   free(z.expanded); z.expanded = NULL;
+   free(z.idata);    z.idata    = NULL;
+   if (result == NULL) return NULL;
+   return (unsigned char *)result;
 }
 
 #endif // STB_IMAGE_IMPLEMENTATION

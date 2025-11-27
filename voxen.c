@@ -43,7 +43,6 @@
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
-int omp_get_thread_num(void); // #include <omp.h>
 #include "input.c"
 
 typedef struct {
@@ -981,104 +980,92 @@ void InitializeEnvironment(void) {
     logical_cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
     if (logical_cores <= 0) logical_cores = 1;
     DualLog("CPU: %s | Logical cores: %d\n", cpu_brand, logical_cores);
-    DebugRAM("Prior to parallel inits");
-    #pragma omp parallel num_threads(4)
-    {
-        if (omp_get_thread_num() == 0) {
-            Input_Init(window);
-            glfwSwapInterval(settings_Vsync ? 1 : 0);
-            glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
-            CompileShaders();
-            glCreateBuffers(1, &quadVBO);
-            float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
-            glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
-            glCreateVertexArrays(1, &quadVAO);
-            glEnableVertexArrayAttrib(quadVAO, 0);
-            glEnableVertexArrayAttrib(quadVAO, 1);
-            glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
-            glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
-            glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-            glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
-            glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
-            
-            glGenVertexArrays(1, &vao_chunk);
-            glBindVertexArray(vao_chunk);
-            glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-            glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
-            glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-            for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
-            glBindVertexArray(0);
-            
-            glCreateBuffers(1, &textVBO);
-            glCreateVertexArrays(1, &textVAO);    
-            glEnableVertexArrayAttrib(textVAO, 0);
-            glEnableVertexArrayAttrib(textVAO, 1);
-            glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-            glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
-            glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
-            glVertexArrayAttribBinding(textVAO, 0, 0);
-            glVertexArrayAttribBinding(textVAO, 1, 0);
-            DebugRAM("after vao chunk bind");
+    DebugRAM("GL Buffer and shader setup");
+    Input_Init(window);
+    glfwSwapInterval(settings_Vsync ? 1 : 0);
+    glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
+    CompileShaders();
+    glCreateBuffers(1, &quadVBO);
+    float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
+    glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
+    glCreateVertexArrays(1, &quadVAO);
+    glEnableVertexArrayAttrib(quadVAO, 0);
+    glEnableVertexArrayAttrib(quadVAO, 1);
+    glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
+    glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
+    glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
+    glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
+    glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
+    
+    glGenVertexArrays(1, &vao_chunk);
+    glBindVertexArray(vao_chunk);
+    glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
+    glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
+    glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
+    for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
+    glBindVertexArray(0);
+    
+    glCreateBuffers(1, &textVBO);
+    glCreateVertexArrays(1, &textVAO);    
+    glEnableVertexArrayAttrib(textVAO, 0);
+    glEnableVertexArrayAttrib(textVAO, 1);
+    glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
+    glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
+    glVertexArrayAttribBinding(textVAO, 0, 0);
+    glVertexArrayAttribBinding(textVAO, 1, 0);
+    DebugRAM("after vao chunk bind");
 
-            GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-            GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-            GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-            glGenTextures(1, &outputImageID);
-            glBindTexture(GL_TEXTURE_2D, outputImageID);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glGenFramebuffers(1, &gBufferFBO);
-            glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-            GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-            glDrawBuffers(2, drawBuffers);
-            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-            if (status != GL_FRAMEBUFFER_COMPLETE) {
-                switch (status) {
-                    case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
-                    case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
-                    case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
-                    default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
-                }
-            }
-            
-            glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-            glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
-            //                 3 = depth
-            glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
-            glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
-            glBindTexture(GL_TEXTURE_2D, inputDepthID);
-            glActiveTexture(GL_TEXTURE4);
-            glBindTexture(GL_TEXTURE_2D, outputImageID);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            DebugRAM("setup gbuffer end");
-            UpdateScreenSize();
-            InitFontAtlasses();
-            DebugRAM("after InitFontAtlasses");
-            Input_MouselookApply(); // Input
-            InitializeAudio(); // Audio
-            DebugRAM("after InitializeAudio");
-            malloc_trim(0);
-            DebugRAM("GL inits end");
-        }
-        if (omp_get_thread_num() == 1) {
-            LoadTextForLanguage(settings_Language);
-            DebugRAM("LoadTextForLanguage end");
-        }
-        if (omp_get_thread_num() == 2) {
-            LoadLogTextForLanguage(settings_Language);
-            DebugRAM("LoadLogTextForLanguage end");
-        }
-        if (omp_get_thread_num() == 3) {
-            ParseGameData();
-            DebugRAM("ParseGameData end");
+    GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+    glGenTextures(1, &outputImageID);
+    glBindTexture(GL_TEXTURE_2D, outputImageID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glGenFramebuffers(1, &gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, drawBuffers);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) {
+        switch (status) {
+            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
+            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
+            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
+            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
         }
     }
-  
+    
+    glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
+    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    //                 3 = depth
+    glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
+    glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader
+    glBindTexture(GL_TEXTURE_2D, inputDepthID);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, outputImageID);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    DebugRAM("setup gbuffer end");
+    UpdateScreenSize();
+    InitFontAtlasses();
+    DebugRAM("after InitFontAtlasses");
+    Input_MouselookApply(); // Input
+    InitializeAudio(); // Audio
+    DebugRAM("after InitializeAudio");
+    malloc_trim(0);
+    DebugRAM("GL inits end");
+    LoadTextForLanguage(settings_Language);
+    DebugRAM("LoadTextForLanguage end");
+    LoadLogTextForLanguage(settings_Language);
+    DebugRAM("LoadLogTextForLanguage end");
+    ParseGameData();
+    DebugRAM("ParseGameData end");
     glfwSetWindowTitle(window,global_modname);
     int fp = open("./Textures/UI/menudot1.png", O_RDONLY);
     if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png: %s\n", strerror(errno)); exit(1); }
@@ -1106,7 +1093,7 @@ void InitializeEnvironment(void) {
     madvise(pixels, w * h * 4, MADV_DONTNEED);
     malloc_trim(0);
     DebugRAM("after freeing window bar icon");
-    DualLog("Parallel Inits and window init took %f secs\n", get_time() - init_start_time);
+    DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadTextures(); // Sequential due to GPU transfers
     LoadModels(); // Sequential due to GPU transfers
     LoadEntities(); // Had a note to do this after textures and models, didn't seem necessary but giving it a thread didn't help init times.
