@@ -33,6 +33,7 @@ void LoadTextures(void) {
     double start_time = get_time();
     DualLog("Loading textures");
     DebugRAM("start of LoadTextures");
+    stbi__arena_init();
     loadedTextures = 0u;
     totalPixels = 0U;
     totalPaletteColors = 0U;
@@ -149,8 +150,6 @@ void LoadTextures(void) {
                     }
                     
                     totalPaletteColors += pal_size;
-
-                    // Write back metadata
                     textureOffsets[currentIndex]        = pixel_base;
                     texturePaletteOffsets[currentIndex] = color_base;
                     textureSizes[currentIndex * 2]       = widths[currentIndex];
@@ -158,11 +157,9 @@ void LoadTextures(void) {
                     memcpy(texturePalettes + color_base, palette, pal_size * sizeof(uint32_t));
                     pixel_base += numPixels; if (pixel_base > maxTotalPixels) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n",pixel_base,maxTotalPixels); exit(1); }
                     color_base += pal_size;  if (color_base > maxUniqueColors) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n",color_base,maxUniqueColors); exit(1); }
-                    free(pixels);
                     continue;
                 } else if (currentIndex < 0) { DualLogError("index wasn't the first key after %s on line %u\n",filePath,lineNum); exit(1); }
 
-                // Load other properties for this texture
                      if (strcmp(trimmed_key, "doublesided") == 0) doubleSidedTexture[currentIndex] = parse_bool(trimmed_value, start, lineNum);
                 else if (strcmp(trimmed_key, "transparent") == 0) transparentTexture[currentIndex] = parse_bool(trimmed_value, start, lineNum);
             } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
@@ -172,6 +169,7 @@ void LoadTextures(void) {
     }
 
     fclose(file);
+    DebugRAM("After loop for load textures");
 
     if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
     
@@ -180,7 +178,7 @@ void LoadTextures(void) {
     int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
     colorBufferID = SetupSSBO(colorBufferID, 12, packed_size, NULL, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+    void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
     Packed4* out = (Packed4*)dst;
     uint8_t* in  = all_indices;
     for (uint32_t i = 0; i < totalPixels; i += 4) {
@@ -191,6 +189,7 @@ void LoadTextures(void) {
         out++;
     }
 
+    DebugRAM("prior to SSBO creation");
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     texturePalettesID       = SetupSSBO(texturePalettesID,       16, totalPaletteColors * sizeof(uint32_t), texturePalettes,       GL_STATIC_DRAW);
     textureOffsetsID        = SetupSSBO(textureOffsetsID,        14, loadedTextures * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
@@ -200,8 +199,10 @@ void LoadTextures(void) {
     glFlush();
     glFinish();
     CHECK_GL_ERROR();
-    munmap(arena, arena_size); madvise(arena, arena_size, MADV_DONTNEED);
+    DebugRAM("after SSBO creation and prior to munmap of LoadTextures arena and stbi_areena");
+    madvise(arena, arena_size, MADV_DONTNEED); munmap(arena, arena_size); arena = NULL;
+    madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     double end_time = get_time();
     DualLog(" took %.6f secs\n", end_time - start_time);
-    DebugRAM("After LoadTextures");
+    DebugRAM("After LoadTextures and after munmap of LoadTextures arena and stbi arena");
 }

@@ -327,12 +327,13 @@ void LoadModels(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
     free(indexToParser);
-    cleanup_all_mmaps();
     for (int i = 0; i < loadedModels; ++i) {
         if (modelVertexCounts[i] == 0) continue;
         
         madvise(modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t), MADV_DONTNEED);
     }
+    cleanup_all_mmaps();
+
 
     malloc_trim(0);
     DebugRAM("After Load Models");

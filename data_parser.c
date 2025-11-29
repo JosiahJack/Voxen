@@ -1,4 +1,7 @@
 // data_parser.c - Load game definition files for mod, textures indices and metadata, model indices and metadata, level data, game save data
+#define _GNU_SOURCE
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -6,9 +9,6 @@
 #include "entity.h"
 #include "citadel_enumerations.h"
 int malloc_trim(size_t pad); // #include <malloc.h>
-typedef unsigned char stbi_uc;
-stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y);
-
 float voxelMinCenterX, voxelMinCenterZ;
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {

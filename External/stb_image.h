@@ -1,5 +1,15 @@
 // stb_image.h - PNG Load System
+void DualLog(const char* fmt, ...);
+void DualLogError(const char* fmt, ...);
 extern unsigned char *stbi_load_from_memory(unsigned char const *buffer, int len   , int *x, int *y);
+#include <stdint.h>
+#include <stddef.h>
+#include <malloc.h>
+extern int stbi_arena_size;
+extern uint8_t*  stbi__arena_base;
+extern void stbi__arena_init(void);
+extern void stbi__arena_reset(void);
+#define STBI_ARENA_SIZE 32 * 1024 * 1024
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 typedef unsigned short stbi__uint16;
@@ -8,6 +18,41 @@ typedef unsigned int   stbi__uint32;
 typedef   signed int   stbi__int32;
 typedef unsigned char stbi_uc;
 typedef unsigned short stbi_us;
+#include <sys/mman.h>
+
+uint8_t*  stbi__arena_base = NULL;
+uint8_t*  stbi__arena_cursor = NULL;
+uint8_t*  stbi__arena_end = NULL;
+
+#define STBI_ALIGN_PTR(p) (uint8_t*)(((uintptr_t)(p) + 15) & ~15)
+
+void stbi__arena_init(void) {
+    if (!stbi__arena_base) {
+        stbi__arena_base = mmap(NULL, STBI_ARENA_SIZE,
+                                PROT_READ | PROT_WRITE,
+                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (stbi__arena_base == MAP_FAILED) {
+            stbi__arena_base = NULL;
+        } else {
+            stbi__arena_cursor = stbi__arena_base;
+            stbi__arena_end    = stbi__arena_base + STBI_ARENA_SIZE;
+        }
+    }
+}
+
+void* stbi__arena_alloc(size_t size) {
+    if (!stbi__arena_base) { DualLogError("stbi__arena_base was invalid\n"); return NULL; }
+
+    uint8_t* aligned = STBI_ALIGN_PTR(stbi__arena_cursor);
+    if (aligned + size > stbi__arena_end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %u vs %u\n",aligned + size,stbi__arena_end); return NULL; } // out of arena → stb_image will fall back or fail
+
+    stbi__arena_cursor = aligned + size;
+    return aligned;
+}
+
+void stbi__arena_reset(void) {
+    if (stbi__arena_base) stbi__arena_cursor = stbi__arena_base;
+}
 
 typedef struct {
    stbi__uint32 img_x, img_y;
@@ -15,7 +60,6 @@ typedef struct {
    unsigned char *img_buffer, *img_buffer_end;
 } stbi__context;
 
-#include <malloc.h>
 #include <stdlib.h>
 void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
 void *memset(void *s, int c, size_t n);
@@ -357,7 +401,8 @@ static int stbi__parse_zlib(stbi__zbuf *a) {
 
 char *stbi_zlib_decode_malloc_guesssize_headerflag(const char *buffer, int len, int initial_size, int *outlen) {
    stbi__zbuf a;
-   char *p = (char *)malloc(initial_size);
+   char *p = (char *)stbi__arena_alloc(initial_size);
+   if (!p) DualLogError("stbi_zlib_decode_malloc_guesssize_headerflag: Arena allocation failed\n");
    if (p == NULL) return NULL;
    a.zbuffer = (stbi_uc *) buffer;
    a.zbuffer_end = (stbi_uc *) buffer + len;
@@ -400,7 +445,8 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
    int output_bytes = out_n;
    int filter_bytes = img_n;
    int width = x;
-   a->out = (stbi_uc *)malloc(x * y * output_bytes); // extra bytes to write off the end into
+   a->out = (stbi_uc *)stbi__arena_alloc(x * y * output_bytes);
+   if (!a->out) DualLogError("stbi__create_png_image_raw: Arena allocation failed\n");
    img_width_bytes = (((img_n * x * 8) + 7) >> 3);
    img_len = (img_width_bytes + 1) * y;
    if (raw_len < img_len) return 0;
@@ -465,13 +511,14 @@ static int stbi__create_png_image_raw(stbi__png *a, stbi_uc *raw, stbi__uint32 r
 }
 
 extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, int *y) {
+   stbi__arena_reset();
    stbi__context s;
    s.img_x = s.img_y = 0;
    s.img_n = s.img_out_n = 0;
    s.img_buffer = (stbi_uc *) buffer;
    s.img_buffer_end = (stbi_uc *)buffer+len;
    void* result = NULL;
-   stbi__png z;
+   stbi__png z = {0};
    z.s = &s;
    stbi_uc palette[1024], pal_img_n=0;
    stbi_uc has_trans=0, tc[3]={0};
@@ -557,20 +604,23 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             if (pal_img_n && !pal_len) goto Label_parsefail;
             if (length > (1u << 30)) goto Label_parsefail;
             if ((int)(ioff + length) < (int)ioff) goto Label_parsefail;
-            
+
             if (ioff + length > idata_limit) {
-               stbi_uc *p;
-               if (idata_limit == 0) idata_limit = length > 4096 ? length : 4096;
-               while (ioff + length > idata_limit) idata_limit *= 2;
-               p = (stbi_uc *)realloc(z.idata,idata_limit);
-               z.idata = p;
+               size_t new_limit = idata_limit ? idata_limit * 2 : 4096;
+               while (ioff + length > new_limit) new_limit *= 2;
+               stbi_uc* new_buf = (stbi_uc*)stbi__arena_alloc(new_limit);
+               if (!new_buf) {
+                     DualLogError("IDAT: arena full\n");
+                     if (!new_buf) goto Label_parsefail;
+               }
+
+               if (z.idata) memcpy(new_buf, z.idata, idata_limit);  // old size = current idata_limit
+               z.idata = new_buf;
+               idata_limit = new_limit;
             }
 
-            if (s.img_buffer + length <= s.img_buffer_end) {
-               memcpy(z.idata + ioff, s.img_buffer, length);
-               s.img_buffer += length;
-            } else goto Label_parsefail;
-
+            memcpy(z.idata + ioff, s.img_buffer, length);
+            s.img_buffer += length;
             ioff += length;
             break;
          }
@@ -585,8 +635,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
             raw_len = bpl * s.img_y * s.img_n /* pixels */ + s.img_y /* filter mode per row */;
             z.expanded = (stbi_uc *)stbi_zlib_decode_malloc_guesssize_headerflag((char *) z.idata, ioff, raw_len, (int *) &raw_len);
             if (z.expanded == NULL) goto Label_parsefail; // zlib should set error
-            
-            free(z.idata); z.idata = NULL;
+
             if ((4 == s.img_n+1 && !pal_img_n) || has_trans) s.img_out_n = s.img_n+1;
             else s.img_out_n = s.img_n;
             
@@ -614,7 +663,7 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
                s.img_out_n = 4;
                stbi__uint32 i, pixel_count = s.img_x * s.img_y;
                stbi_uc *p, *temp_out, *orig = z.out;
-               p = (stbi_uc *)malloc(pixel_count * s.img_out_n);
+               p = (stbi_uc *)stbi__arena_alloc(pixel_count * s.img_out_n);//malloc(pixel_count * s.img_out_n);
                temp_out = p;
                if (s.img_out_n == 3) {
                   for (i=0; i < pixel_count; ++i) {
@@ -635,13 +684,11 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
                   }
                }
                
-               free(z.out);
                z.out = temp_out;
             } else if (has_trans) { // non-paletted image with tRNS -> source image has (constant) alpha
                ++s.img_n;
             }
 
-            free(z.expanded); z.expanded = NULL;
             stbi__get32be(&s); // end of PNG chunk, read and skip CRC
             goto Label_parsesuccess;
          }
@@ -667,9 +714,6 @@ extern stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len, int *x, in
    *y = z.s->img_y;
 //    if (comp) *comp = z.s->img_n;
    Label_parsefail:
-   free(z.out);      z.out      = NULL;
-   free(z.expanded); z.expanded = NULL;
-   free(z.idata);    z.idata    = NULL;
    if (result == NULL) return NULL;
    return (unsigned char *)result;
 }

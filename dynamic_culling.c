@@ -1,3 +1,11 @@
+typedef unsigned char stbi_uc;
+stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y);
+extern int stbi_arena_size;
+extern void stbi__arena_init(void);
+extern void stbi__arena_reset(void);
+extern uint8_t*  stbi__arena_base;
+#define STBI_ARENA_SIZE 32 * 1024 * 1024
+
 //=============================================================================
 // Culling System
 uint8_t gridCellStates[ARRSIZE];
@@ -42,6 +50,7 @@ void PutChunksInCells() {
 void DetermineClosedEdges() {
     size_t maxFileSize = 500000; // 0.5MB
     uint8_t* file_buffer = malloc(maxFileSize);
+    stbi__arena_init();
     FILE* fp;
     size_t file_size, read_size;
     int32_t wpng, hpng;
@@ -84,8 +93,8 @@ void DetermineClosedEdges() {
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-    free(openPixels);
-    malloc_trim(0);
+//     free(openPixels);
+//     malloc_trim(0);
     
     // ------------------- Closed Edges ------------------    
     char filename[256];
@@ -139,8 +148,8 @@ void DetermineClosedEdges() {
     }
     
     DualLog("found %d open cells, closed edges N: %d, S: %d, E: %d, W: %d...",totalOpenCells,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
-    free(edgePixels);
-    malloc_trim(0);
+//     free(edgePixels);
+//     malloc_trim(0);
     
     // ------------------- Sky/Sun Visibility ------------------    
     char filename3[256];
@@ -174,8 +183,9 @@ void DetermineClosedEdges() {
         }
     }
     
-    free(skyPixels);
+//     free(skyPixels);
     free(file_buffer);
+    munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED);
     malloc_trim(0);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
