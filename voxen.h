@@ -68,13 +68,14 @@ extern QuestBits questData;
 
 // ----------------------------------------------------------------------------
 // Settings
-extern uint8_t settings_Reflections;
 extern uint8_t settings_Shadows;
 extern uint8_t settings_AntiAliasing;
 extern uint8_t settings_Brightness;
 extern uint8_t settings_VolumeMusic;
 extern uint8_t settings_Language;
 extern uint8_t settings_CullEnabled;
+extern float settings_FOV;
+extern uint8_t settings_Reflections;
 extern float settings_SSRStepSize;
 extern uint16_t settings_SSRStepCount;
 extern float settings_SSRSampleWeight;
@@ -155,7 +156,7 @@ void LoadModels(void);
 #define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
 
-#define MAX_SHADOWMAPS 64u
+#define MAX_SHADOWMAPS 128u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -325,7 +326,7 @@ extern bool global_modIsCitadel;
 extern bool inventoryMode;
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
-extern float cam_yaw, cam_pitch, cam_roll, cam_fov;
+extern float cam_yaw, cam_pitch, cam_roll;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
 extern Quaternion cam_rotation;
 extern GLuint chunkShaderProgram;

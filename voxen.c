@@ -72,12 +72,13 @@ double time_PhysicsStep = 0.0;
 char statusText[TEXT_BUFFER_SIZE];
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
+uint8_t settings_Shadows = 1u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
 uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
 uint8_t settings_CullEnabled = 1;
+float settings_FOV = 65.0f;
 #define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
 uint8_t settings_Reflections = 1u; // Default 1
 float settings_SSRStepSize = 0.55f;
@@ -114,7 +115,6 @@ float cam_roll = 0.0f;
 Quaternion cam_rotation = { 0.0f, 0.0f, 0.0f, 1.0f };
 float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
 float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
-float cam_fov = 65.0f;
 float berserkFinished = 0.0f;
 float berserkSeedTime = 0.0f;
 // ----------------------------------------------------------------------------
@@ -310,7 +310,7 @@ void UpdateScreenSize(void) {
     m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
     aspect3D = (float)screen_width / (float)screen_height;
-    float f = vcot(cam_fov * PI / 360.0f);
+    float f = vcot(settings_FOV * PI / 360.0f);
     m = rasterPerspectiveProjection;
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
     m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
@@ -649,9 +649,8 @@ void RenderShadowmaps(void) {
             }
         }
         if (!inPVS) continue;
-
-        // Score: lower score = closer and brighter (higher priority)
-        float score = distSqrd / vmax(intensity, 0.01f);  // Avoid div by 0, favor bright lights
+        
+        float score = distSqrd / vmax(intensity, 0.01f);
         candidates[candidateCount++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
     }
 
@@ -1385,7 +1384,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glProgramUniform1ui(imageBlitShaderProgram, 11, settings_Brightness);
         glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
         glProgramUniform3f(imageBlitShaderProgram, 13, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        glProgramUniform1f(imageBlitShaderProgram, 14, cam_fov);
+        glProgramUniform1f(imageBlitShaderProgram, 14, settings_FOV);
         glProgramUniform1f(imageBlitShaderProgram, 15, pauseRelativeTime * 0.1);
         glProgramUniform1f(imageBlitShaderProgram, 16, aspect3D);
         glProgramUniform1ui(imageBlitShaderProgram, 20, shieldOnType);
