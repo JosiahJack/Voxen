@@ -1570,7 +1570,6 @@ typedef struct
 } ma_data_source_base;
 
 MA_API ma_result ma_data_source_init(const ma_data_source_config* pConfig, ma_data_source* pDataSource);
-MA_API void ma_data_source_uninit(ma_data_source* pDataSource);
 MA_API ma_result ma_data_source_read_pcm_frames(ma_data_source* pDataSource, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead);   /* Must support pFramesOut = NULL in which case a forward seek should be performed. */
 MA_API ma_result ma_data_source_seek_pcm_frames(ma_data_source* pDataSource, ma_uint64 frameCount, ma_uint64* pFramesSeeked); /* Can only seek forward. Equivalent to ma_data_source_read_pcm_frames(pDataSource, NULL, frameCount, &framesRead); */
 MA_API ma_result ma_data_source_seek_to_pcm_frame(ma_data_source* pDataSource, ma_uint64 frameIndex);
@@ -1607,7 +1606,6 @@ typedef struct
 } ma_audio_buffer_ref;
 
 MA_API ma_result ma_audio_buffer_ref_init(ma_format format, ma_uint32 channels, const void* pData, ma_uint64 sizeInFrames, ma_audio_buffer_ref* pAudioBufferRef);
-MA_API void ma_audio_buffer_ref_uninit(ma_audio_buffer_ref* pAudioBufferRef);
 MA_API ma_result ma_audio_buffer_ref_set_data(ma_audio_buffer_ref* pAudioBufferRef, const void* pData, ma_uint64 sizeInFrames);
 MA_API ma_uint64 ma_audio_buffer_ref_read_pcm_frames(ma_audio_buffer_ref* pAudioBufferRef, void* pFramesOut, ma_uint64 frameCount, ma_bool32 loop);
 MA_API ma_result ma_audio_buffer_ref_seek_to_pcm_frame(ma_audio_buffer_ref* pAudioBufferRef, ma_uint64 frameIndex);
@@ -1617,8 +1615,6 @@ MA_API ma_bool32 ma_audio_buffer_ref_at_end(const ma_audio_buffer_ref* pAudioBuf
 MA_API ma_result ma_audio_buffer_ref_get_cursor_in_pcm_frames(const ma_audio_buffer_ref* pAudioBufferRef, ma_uint64* pCursor);
 MA_API ma_result ma_audio_buffer_ref_get_length_in_pcm_frames(const ma_audio_buffer_ref* pAudioBufferRef, ma_uint64* pLength);
 MA_API ma_result ma_audio_buffer_ref_get_available_frames(const ma_audio_buffer_ref* pAudioBufferRef, ma_uint64* pAvailableFrames);
-
-
 
 typedef struct
 {
@@ -5679,444 +5675,25 @@ MA_API MA_NO_INLINE int ma_strappend(char* dst, size_t dstSize, const char* srcA
     return result;
 }
 
-MA_API MA_NO_INLINE char* ma_copy_string(const char* src, const ma_allocation_callbacks* pAllocationCallbacks)
-{
+MA_API MA_NO_INLINE char* ma_copy_string(const char* src, const ma_allocation_callbacks* pAllocationCallbacks) {
     size_t sz;
     char* dst;
-
-    if (src == NULL) {
-        return NULL;
-    }
+    if (src == NULL) return NULL;
 
     sz = strlen(src)+1;
     dst = (char*)ma_malloc(sz, pAllocationCallbacks);
-    if (dst == NULL) {
-        return NULL;
-    }
-
     ma_strcpy_s(dst, sz, src);
-
     return dst;
 }
 
-MA_API MA_NO_INLINE wchar_t* ma_copy_string_w(const wchar_t* src, const ma_allocation_callbacks* pAllocationCallbacks)
-{
+MA_API MA_NO_INLINE wchar_t* ma_copy_string_w(const wchar_t* src, const ma_allocation_callbacks* pAllocationCallbacks) {
     size_t sz = wcslen(src)+1;
     wchar_t* dst = (wchar_t*)ma_malloc(sz * sizeof(*dst), pAllocationCallbacks);
-    if (dst == NULL) {
-        return NULL;
-    }
-
     ma_wcscpy_s(dst, sz, src);
-
     return dst;
 }
 
-
-
 #include <errno.h>
-static ma_result ma_result_from_errno(int e)
-{
-    if (e == 0) {
-        return MA_SUCCESS;
-    }
-#ifdef EPERM
-    else if (e == EPERM) { return MA_INVALID_OPERATION; }
-#endif
-#ifdef ENOENT
-    else if (e == ENOENT) { return MA_DOES_NOT_EXIST; }
-#endif
-#ifdef ESRCH
-    else if (e == ESRCH) { return MA_DOES_NOT_EXIST; }
-#endif
-#ifdef EINTR
-    else if (e == EINTR) { return MA_INTERRUPT; }
-#endif
-#ifdef EIO
-    else if (e == EIO) { return MA_IO_ERROR; }
-#endif
-#ifdef ENXIO
-    else if (e == ENXIO) { return MA_DOES_NOT_EXIST; }
-#endif
-#ifdef E2BIG
-    else if (e == E2BIG) { return MA_INVALID_ARGS; }
-#endif
-#ifdef ENOEXEC
-    else if (e == ENOEXEC) { return MA_INVALID_FILE; }
-#endif
-#ifdef EBADF
-    else if (e == EBADF) { return MA_INVALID_FILE; }
-#endif
-#ifdef ECHILD
-    else if (e == ECHILD) { return MA_ERROR; }
-#endif
-#ifdef EAGAIN
-    else if (e == EAGAIN) { return MA_UNAVAILABLE; }
-#endif
-#ifdef ENOMEM
-    else if (e == ENOMEM) { return MA_OUT_OF_MEMORY; }
-#endif
-#ifdef EACCES
-    else if (e == EACCES) { return MA_ACCESS_DENIED; }
-#endif
-#ifdef EFAULT
-    else if (e == EFAULT) { return MA_BAD_ADDRESS; }
-#endif
-#ifdef ENOTBLK
-    else if (e == ENOTBLK) { return MA_ERROR; }
-#endif
-#ifdef EBUSY
-    else if (e == EBUSY) { return MA_BUSY; }
-#endif
-#ifdef EEXIST
-    else if (e == EEXIST) { return MA_ALREADY_EXISTS; }
-#endif
-#ifdef EXDEV
-    else if (e == EXDEV) { return MA_ERROR; }
-#endif
-#ifdef ENODEV
-    else if (e == ENODEV) { return MA_DOES_NOT_EXIST; }
-#endif
-#ifdef ENOTDIR
-    else if (e == ENOTDIR) { return MA_NOT_DIRECTORY; }
-#endif
-#ifdef EISDIR
-    else if (e == EISDIR) { return MA_IS_DIRECTORY; }
-#endif
-#ifdef EINVAL
-    else if (e == EINVAL) { return MA_INVALID_ARGS; }
-#endif
-#ifdef ENFILE
-    else if (e == ENFILE) { return MA_TOO_MANY_OPEN_FILES; }
-#endif
-#ifdef EMFILE
-    else if (e == EMFILE) { return MA_TOO_MANY_OPEN_FILES; }
-#endif
-#ifdef ENOTTY
-    else if (e == ENOTTY) { return MA_INVALID_OPERATION; }
-#endif
-#ifdef ETXTBSY
-    else if (e == ETXTBSY) { return MA_BUSY; }
-#endif
-#ifdef EFBIG
-    else if (e == EFBIG) { return MA_TOO_BIG; }
-#endif
-#ifdef ENOSPC
-    else if (e == ENOSPC) { return MA_NO_SPACE; }
-#endif
-#ifdef ESPIPE
-    else if (e == ESPIPE) { return MA_BAD_SEEK; }
-#endif
-#ifdef EROFS
-    else if (e == EROFS) { return MA_ACCESS_DENIED; }
-#endif
-#ifdef EMLINK
-    else if (e == EMLINK) { return MA_TOO_MANY_LINKS; }
-#endif
-#ifdef EPIPE
-    else if (e == EPIPE) { return MA_BAD_PIPE; }
-#endif
-#ifdef EDOM
-    else if (e == EDOM) { return MA_OUT_OF_RANGE; }
-#endif
-#ifdef ERANGE
-    else if (e == ERANGE) { return MA_OUT_OF_RANGE; }
-#endif
-#ifdef EDEADLK
-    else if (e == EDEADLK) { return MA_DEADLOCK; }
-#endif
-#ifdef ENAMETOOLONG
-    else if (e == ENAMETOOLONG) { return MA_PATH_TOO_LONG; }
-#endif
-#ifdef ENOLCK
-    else if (e == ENOLCK) { return MA_ERROR; }
-#endif
-#ifdef ENOSYS
-    else if (e == ENOSYS) { return MA_NOT_IMPLEMENTED; }
-#endif
-#ifdef ENOTEMPTY
-    else if (e == ENOTEMPTY) { return MA_DIRECTORY_NOT_EMPTY; }
-#endif
-#ifdef ELOOP
-    else if (e == ELOOP) { return MA_TOO_MANY_LINKS; }
-#endif
-#ifdef ENOMSG
-    else if (e == ENOMSG) { return MA_NO_MESSAGE; }
-#endif
-#ifdef EIDRM
-    else if (e == EIDRM) { return MA_ERROR; }
-#endif
-#ifdef ECHRNG
-    else if (e == ECHRNG) { return MA_ERROR; }
-#endif
-#ifdef EL2NSYNC
-    else if (e == EL2NSYNC) { return MA_ERROR; }
-#endif
-#ifdef EL3HLT
-    else if (e == EL3HLT) { return MA_ERROR; }
-#endif
-#ifdef EL3RST
-    else if (e == EL3RST) { return MA_ERROR; }
-#endif
-#ifdef ELNRNG
-    else if (e == ELNRNG) { return MA_OUT_OF_RANGE; }
-#endif
-#ifdef EUNATCH
-    else if (e == EUNATCH) { return MA_ERROR; }
-#endif
-#ifdef ENOCSI
-    else if (e == ENOCSI) { return MA_ERROR; }
-#endif
-#ifdef EL2HLT
-    else if (e == EL2HLT) { return MA_ERROR; }
-#endif
-#ifdef EBADE
-    else if (e == EBADE) { return MA_ERROR; }
-#endif
-#ifdef EBADR
-    else if (e == EBADR) { return MA_ERROR; }
-#endif
-#ifdef EXFULL
-    else if (e == EXFULL) { return MA_ERROR; }
-#endif
-#ifdef ENOANO
-    else if (e == ENOANO) { return MA_ERROR; }
-#endif
-#ifdef EBADRQC
-    else if (e == EBADRQC) { return MA_ERROR; }
-#endif
-#ifdef EBADSLT
-    else if (e == EBADSLT) { return MA_ERROR; }
-#endif
-#ifdef EBFONT
-    else if (e == EBFONT) { return MA_INVALID_FILE; }
-#endif
-#ifdef ENOSTR
-    else if (e == ENOSTR) { return MA_ERROR; }
-#endif
-#ifdef ENODATA
-    else if (e == ENODATA) { return MA_NO_DATA_AVAILABLE; }
-#endif
-#ifdef ETIME
-    else if (e == ETIME) { return MA_TIMEOUT; }
-#endif
-#ifdef ENOSR
-    else if (e == ENOSR) { return MA_NO_DATA_AVAILABLE; }
-#endif
-#ifdef ENONET
-    else if (e == ENONET) { return MA_NO_NETWORK; }
-#endif
-#ifdef ENOPKG
-    else if (e == ENOPKG) { return MA_ERROR; }
-#endif
-#ifdef EREMOTE
-    else if (e == EREMOTE) { return MA_ERROR; }
-#endif
-#ifdef ENOLINK
-    else if (e == ENOLINK) { return MA_ERROR; }
-#endif
-#ifdef EADV
-    else if (e == EADV) { return MA_ERROR; }
-#endif
-#ifdef ESRMNT
-    else if (e == ESRMNT) { return MA_ERROR; }
-#endif
-#ifdef ECOMM
-    else if (e == ECOMM) { return MA_ERROR; }
-#endif
-#ifdef EPROTO
-    else if (e == EPROTO) { return MA_ERROR; }
-#endif
-#ifdef EMULTIHOP
-    else if (e == EMULTIHOP) { return MA_ERROR; }
-#endif
-#ifdef EDOTDOT
-    else if (e == EDOTDOT) { return MA_ERROR; }
-#endif
-#ifdef EBADMSG
-    else if (e == EBADMSG) { return MA_BAD_MESSAGE; }
-#endif
-#ifdef EOVERFLOW
-    else if (e == EOVERFLOW) { return MA_TOO_BIG; }
-#endif
-#ifdef ENOTUNIQ
-    else if (e == ENOTUNIQ) { return MA_NOT_UNIQUE; }
-#endif
-#ifdef EBADFD
-    else if (e == EBADFD) { return MA_ERROR; }
-#endif
-#ifdef EREMCHG
-    else if (e == EREMCHG) { return MA_ERROR; }
-#endif
-#ifdef ELIBACC
-    else if (e == ELIBACC) { return MA_ACCESS_DENIED; }
-#endif
-#ifdef ELIBBAD
-    else if (e == ELIBBAD) { return MA_INVALID_FILE; }
-#endif
-#ifdef ELIBSCN
-    else if (e == ELIBSCN) { return MA_INVALID_FILE; }
-#endif
-#ifdef ELIBMAX
-    else if (e == ELIBMAX) { return MA_ERROR; }
-#endif
-#ifdef ELIBEXEC
-    else if (e == ELIBEXEC) { return MA_ERROR; }
-#endif
-#ifdef EILSEQ
-    else if (e == EILSEQ) { return MA_INVALID_DATA; }
-#endif
-#ifdef ERESTART
-    else if (e == ERESTART) { return MA_ERROR; }
-#endif
-#ifdef ESTRPIPE
-    else if (e == ESTRPIPE) { return MA_ERROR; }
-#endif
-#ifdef EUSERS
-    else if (e == EUSERS) { return MA_ERROR; }
-#endif
-#ifdef ENOTSOCK
-    else if (e == ENOTSOCK) { return MA_NOT_SOCKET; }
-#endif
-#ifdef EDESTADDRREQ
-    else if (e == EDESTADDRREQ) { return MA_NO_ADDRESS; }
-#endif
-#ifdef EMSGSIZE
-    else if (e == EMSGSIZE) { return MA_TOO_BIG; }
-#endif
-#ifdef EPROTOTYPE
-    else if (e == EPROTOTYPE) { return MA_BAD_PROTOCOL; }
-#endif
-#ifdef ENOPROTOOPT
-    else if (e == ENOPROTOOPT) { return MA_PROTOCOL_UNAVAILABLE; }
-#endif
-#ifdef EPROTONOSUPPORT
-    else if (e == EPROTONOSUPPORT) { return MA_PROTOCOL_NOT_SUPPORTED; }
-#endif
-#ifdef ESOCKTNOSUPPORT
-    else if (e == ESOCKTNOSUPPORT) { return MA_SOCKET_NOT_SUPPORTED; }
-#endif
-#ifdef EOPNOTSUPP
-    else if (e == EOPNOTSUPP) { return MA_INVALID_OPERATION; }
-#endif
-#ifdef EPFNOSUPPORT
-    else if (e == EPFNOSUPPORT) { return MA_PROTOCOL_FAMILY_NOT_SUPPORTED; }
-#endif
-#ifdef EAFNOSUPPORT
-    else if (e == EAFNOSUPPORT) { return MA_ADDRESS_FAMILY_NOT_SUPPORTED; }
-#endif
-#ifdef EADDRINUSE
-    else if (e == EADDRINUSE) { return MA_ALREADY_IN_USE; }
-#endif
-#ifdef EADDRNOTAVAIL
-    else if (e == EADDRNOTAVAIL) { return MA_ERROR; }
-#endif
-#ifdef ENETDOWN
-    else if (e == ENETDOWN) { return MA_NO_NETWORK; }
-#endif
-#ifdef ENETUNREACH
-    else if (e == ENETUNREACH) { return MA_NO_NETWORK; }
-#endif
-#ifdef ENETRESET
-    else if (e == ENETRESET) { return MA_NO_NETWORK; }
-#endif
-#ifdef ECONNABORTED
-    else if (e == ECONNABORTED) { return MA_NO_NETWORK; }
-#endif
-#ifdef ECONNRESET
-    else if (e == ECONNRESET) { return MA_CONNECTION_RESET; }
-#endif
-#ifdef ENOBUFS
-    else if (e == ENOBUFS) { return MA_NO_SPACE; }
-#endif
-#ifdef EISCONN
-    else if (e == EISCONN) { return MA_ALREADY_CONNECTED; }
-#endif
-#ifdef ENOTCONN
-    else if (e == ENOTCONN) { return MA_NOT_CONNECTED; }
-#endif
-#ifdef ESHUTDOWN
-    else if (e == ESHUTDOWN) { return MA_ERROR; }
-#endif
-#ifdef ETOOMANYREFS
-    else if (e == ETOOMANYREFS) { return MA_ERROR; }
-#endif
-#ifdef ETIMEDOUT
-    else if (e == ETIMEDOUT) { return MA_TIMEOUT; }
-#endif
-#ifdef ECONNREFUSED
-    else if (e == ECONNREFUSED) { return MA_CONNECTION_REFUSED; }
-#endif
-#ifdef EHOSTDOWN
-    else if (e == EHOSTDOWN) { return MA_NO_HOST; }
-#endif
-#ifdef EHOSTUNREACH
-    else if (e == EHOSTUNREACH) { return MA_NO_HOST; }
-#endif
-#ifdef EALREADY
-    else if (e == EALREADY) { return MA_IN_PROGRESS; }
-#endif
-#ifdef EINPROGRESS
-    else if (e == EINPROGRESS) { return MA_IN_PROGRESS; }
-#endif
-#ifdef ESTALE
-    else if (e == ESTALE) { return MA_INVALID_FILE; }
-#endif
-#ifdef EUCLEAN
-    else if (e == EUCLEAN) { return MA_ERROR; }
-#endif
-#ifdef ENOTNAM
-    else if (e == ENOTNAM) { return MA_ERROR; }
-#endif
-#ifdef ENAVAIL
-    else if (e == ENAVAIL) { return MA_ERROR; }
-#endif
-#ifdef EISNAM
-    else if (e == EISNAM) { return MA_ERROR; }
-#endif
-#ifdef EREMOTEIO
-    else if (e == EREMOTEIO) { return MA_IO_ERROR; }
-#endif
-#ifdef EDQUOT
-    else if (e == EDQUOT) { return MA_NO_SPACE; }
-#endif
-#ifdef ENOMEDIUM
-    else if (e == ENOMEDIUM) { return MA_DOES_NOT_EXIST; }
-#endif
-#ifdef EMEDIUMTYPE
-    else if (e == EMEDIUMTYPE) { return MA_ERROR; }
-#endif
-#ifdef ECANCELED
-    else if (e == ECANCELED) { return MA_CANCELLED; }
-#endif
-#ifdef ENOKEY
-    else if (e == ENOKEY) { return MA_ERROR; }
-#endif
-#ifdef EKEYEXPIRED
-    else if (e == EKEYEXPIRED) { return MA_ERROR; }
-#endif
-#ifdef EKEYREVOKED
-    else if (e == EKEYREVOKED) { return MA_ERROR; }
-#endif
-#ifdef EKEYREJECTED
-    else if (e == EKEYREJECTED) { return MA_ERROR; }
-#endif
-#ifdef EOWNERDEAD
-    else if (e == EOWNERDEAD) { return MA_ERROR; }
-#endif
-#ifdef ENOTRECOVERABLE
-    else if (e == ENOTRECOVERABLE) { return MA_ERROR; }
-#endif
-#ifdef ERFKILL
-    else if (e == ERFKILL) { return MA_ERROR; }
-#endif
-#ifdef EHWPOISON
-    else if (e == EHWPOISON) { return MA_ERROR; }
-#endif
-    else {
-        return MA_ERROR;
-    }
-}
 
 MA_API ma_result ma_fopen(FILE** ppFile, const char* pFilePath, const char* pOpenMode) {
     if (ppFile != NULL) *ppFile = NULL;
@@ -6173,19 +5750,11 @@ MA_API ma_result ma_wfopen(FILE** ppFile, const wchar_t* pFilePath, const wchar_
         const wchar_t* pFilePathTemp = pFilePath;
         char* pFilePathMB = NULL;
         char pOpenModeMB[32] = {0};
-
-        /* Get the length first. */
         MA_ZERO_OBJECT(&mbs);
         lenMB = wcsrtombs(NULL, &pFilePathTemp, 0, &mbs);
-        if (lenMB == (size_t)-1) {
-            return ma_result_from_errno(errno);
-        }
+        if (lenMB == (size_t)-1) return ma_result_from_errno(errno);
 
         pFilePathMB = (char*)ma_malloc(lenMB + 1, pAllocationCallbacks);
-        if (pFilePathMB == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
-
         pFilePathTemp = pFilePath;
         MA_ZERO_OBJECT(&mbs);
         wcsrtombs(pFilePathMB, &pFilePathTemp, lenMB + 1, &mbs);
@@ -6561,28 +6130,15 @@ MA_API ma_result ma_log_postv(ma_log* pLog, ma_uint32 level, const char* pFormat
         int length;
         char  pFormattedMessageStack[1024];
         char* pFormattedMessageHeap = NULL;
-
-        /* First try formatting into our fixed sized stack allocated buffer. If this is too small we'll fallback to a heap allocation. */
         length = vsnprintf(pFormattedMessageStack, sizeof(pFormattedMessageStack), pFormat, args);
-        if (length < 0) {
-            return MA_INVALID_OPERATION;    /* An error occurred when trying to convert the buffer. */
-        }
+        if (length < 0) return MA_INVALID_OPERATION;
 
         if ((size_t)length < sizeof(pFormattedMessageStack)) {
-            /* The string was written to the stack. */
             result = ma_log_post(pLog, level, pFormattedMessageStack);
         } else {
-            /* The stack buffer was too small, try the heap. */
             pFormattedMessageHeap = (char*)ma_malloc(length + 1, &pLog->allocationCallbacks);
-            if (pFormattedMessageHeap == NULL) {
-                return MA_OUT_OF_MEMORY;
-            }
-
             length = vsnprintf(pFormattedMessageHeap, length + 1, pFormat, args);
-            if (length < 0) {
-                ma_free(pFormattedMessageHeap, &pLog->allocationCallbacks);
-                return MA_INVALID_OPERATION;
-            }
+            if (length < 0) { ma_free(pFormattedMessageHeap, &pLog->allocationCallbacks); return MA_INVALID_OPERATION; }
 
             result = ma_log_post(pLog, level, pFormattedMessageHeap);
             ma_free(pFormattedMessageHeap, &pLog->allocationCallbacks);
@@ -19329,12 +18885,6 @@ static ma_result ma_device_init_by_type__alsa(ma_device* pDevice, const ma_devic
         }
     }
 
-
-    /*
-    We need to retrieve the poll descriptors so we can use poll() to wait for data to become
-    available for reading or writing. There's no well defined maximum for this so we're just going
-    to allocate this on the heap.
-    */
     pollDescriptorCount = ((ma_snd_pcm_poll_descriptors_count_proc)pDevice->pContext->alsa.snd_pcm_poll_descriptors_count)(pPCM);
     if (pollDescriptorCount <= 0) {
         ((ma_snd_pcm_close_proc)pDevice->pContext->alsa.snd_pcm_close)(pPCM);
@@ -19343,16 +18893,6 @@ static ma_result ma_device_init_by_type__alsa(ma_device* pDevice, const ma_devic
     }
 
     pPollDescriptors = (struct pollfd*)ma_malloc(sizeof(*pPollDescriptors) * (pollDescriptorCount + 1), &pDevice->pContext->allocationCallbacks);   /* +1 because we want room for the wakeup descriptor. */
-    if (pPollDescriptors == NULL) {
-        ((ma_snd_pcm_close_proc)pDevice->pContext->alsa.snd_pcm_close)(pPCM);
-        ma_log_post(ma_device_get_log(pDevice), MA_LOG_LEVEL_ERROR, "[ALSA] Failed to allocate memory for poll descriptors.");
-        return MA_OUT_OF_MEMORY;
-    }
-
-    /*
-    We need an eventfd to wakeup from poll() and avoid a deadlock in situations where the driver
-    never returns from writei() and readi(). This has been observed with the "pulse" device.
-    */
     wakeupfd = eventfd(0, 0);
     if (wakeupfd < 0) {
         ma_free(pPollDescriptors, &pDevice->pContext->allocationCallbacks);
@@ -22053,10 +21593,6 @@ static ma_result ma_get_device_object_ids__coreaudio(ma_context* pContext, UInt3
     }
 
     pDeviceObjectIDs = (AudioObjectID*)ma_malloc(deviceObjectsDataSize, &pContext->allocationCallbacks);
-    if (pDeviceObjectIDs == NULL) {
-        return MA_OUT_OF_MEMORY;
-    }
-
     status = ((ma_AudioObjectGetPropertyData_proc)pContext->coreaudio.AudioObjectGetPropertyData)(kAudioObjectSystemObject, &propAddressDevices, 0, NULL, &deviceObjectsDataSize, pDeviceObjectIDs);
     if (status != noErr) {
         ma_free(pDeviceObjectIDs, &pContext->allocationCallbacks);
@@ -22167,13 +21703,9 @@ static ma_result ma_get_AudioObject_stream_descriptions(ma_context* pContext, Au
     propAddress.mElement  = AUDIO_OBJECT_PROPERTY_ELEMENT;
     status = ((ma_AudioObjectGetPropertyDataSize_proc)pContext->coreaudio.AudioObjectGetPropertyDataSize)(deviceObjectID, &propAddress, 0, NULL, &dataSize);
     if (status != noErr) return ma_result_from_OSStatus(status);
-
     pDescriptions = (AudioStreamRangedDescription*)ma_malloc(dataSize, &pContext->allocationCallbacks);
-    if (pDescriptions == NULL) return MA_OUT_OF_MEMORY;
-
     status = ((ma_AudioObjectGetPropertyData_proc)pContext->coreaudio.AudioObjectGetPropertyData)(deviceObjectID, &propAddress, 0, NULL, &dataSize, pDescriptions);
     if (status != noErr) { ma_free(pDescriptions, &pContext->allocationCallbacks); return ma_result_from_OSStatus(status); }
-
     *pDescriptionCount = dataSize / sizeof(*pDescriptions);
     *ppDescriptions = pDescriptions;
     return MA_SUCCESS;
@@ -22239,8 +21771,6 @@ static ma_result ma_get_AudioObject_sample_rates(ma_context* pContext, AudioObje
     if (status != noErr) return ma_result_from_OSStatus(status);
 
     pSampleRateRanges = (AudioValueRange*)ma_malloc(dataSize, &pContext->allocationCallbacks);
-    if (pSampleRateRanges == NULL) return MA_OUT_OF_MEMORY;
-
     status = ((ma_AudioObjectGetPropertyData_proc)pContext->coreaudio.AudioObjectGetPropertyData)(deviceObjectID, &propAddress, 0, NULL, &dataSize, pSampleRateRanges);
     if (status != noErr) {
         ma_free(pSampleRateRanges, &pContext->allocationCallbacks);
@@ -22564,10 +22094,6 @@ static ma_result ma_get_AudioUnit_channel_map(ma_context* pContext, AudioUnit au
     }
 
     pChannelLayout = (AudioChannelLayout*)ma_malloc(channelLayoutSize, &pContext->allocationCallbacks);
-    if (pChannelLayout == NULL) {
-        return MA_OUT_OF_MEMORY;
-    }
-
     status = ((ma_AudioUnitGetProperty_proc)pContext->coreaudio.AudioUnitGetProperty)(audioUnit, kAudioUnitProperty_AudioChannelLayout, deviceScope, deviceBus, pChannelLayout, &channelLayoutSize);
     if (status != noErr) {
         ma_free(pChannelLayout, &pContext->allocationCallbacks);
@@ -22788,14 +22314,8 @@ static AudioBufferList* ma_allocate_AudioBufferList__coreaudio(ma_uint32 sizeInF
     }
 
     allocationSize += sizeInFrames * ma_get_bytes_per_frame(format, channels);
-
     pBufferList = (AudioBufferList*)ma_malloc(allocationSize, pAllocationCallbacks);
-    if (pBufferList == NULL) {
-        return NULL;
-    }
-
     audioBufferSizeInBytes = (UInt32)(sizeInFrames * ma_get_bytes_per_sample(format));
-
     if (layout == ma_stream_layout_interleaved) {
         pBufferList->mNumberBuffers = 1;
         pBufferList->mBuffers[0].mNumberChannels = channels;
@@ -26338,8 +25858,6 @@ static ma_result ma_device__post_init_setup(ma_device* pDevice, ma_device_type d
         converterConfig.resampling.linear.lpfOrder      = pDevice->resampling.linear.lpfOrder;
         converterConfig.resampling.pBackendVTable       = pDevice->resampling.pBackendVTable;
         converterConfig.resampling.pBackendUserData     = pDevice->resampling.pBackendUserData;
-
-        /* Make sure the old converter is uninitialized first. */
         if (ma_device_get_state(pDevice) != ma_device_state_uninitialized) {
             ma_data_converter_uninit(&pDevice->playback.converter, &pDevice->pContext->allocationCallbacks);
         }
@@ -26350,42 +25868,16 @@ static ma_result ma_device__post_init_setup(ma_device* pDevice, ma_device_type d
         }
     }
 
-
-    /*
-    If the device is doing playback (ma_device_type_playback or ma_device_type_duplex), there's
-    a couple of situations where we'll need a heap allocated cache.
-
-    The first is a duplex device for backends that use a callback for data delivery. The reason
-    this is needed is that the input stage needs to have a buffer to place the input data while it
-    waits for the playback stage, after which the miniaudio data callback will get fired. This is
-    not needed for backends that use a blocking API because miniaudio manages temporary buffers on
-    the stack to achieve this.
-
-    The other situation is when the data converter does not have the ability to query the number
-    of input frames that are required in order to process a given number of output frames. When
-    performing data conversion, it's useful if miniaudio know exactly how many frames it needs
-    from the client in order to generate a given number of output frames. This way, only exactly
-    the number of frames are needed to be read from the client which means no cache is necessary.
-    On the other hand, if miniaudio doesn't know how many frames to read, it is forced to read
-    in fixed sized chunks and then cache any residual unused input frames, those of which will be
-    processed at a later stage.
-    */
     if (deviceType == ma_device_type_playback || deviceType == ma_device_type_duplex) {
         ma_uint64 unused;
 
         pDevice->playback.inputCacheConsumed  = 0;
         pDevice->playback.inputCacheRemaining = 0;
-
-        if (pDevice->type == ma_device_type_duplex ||                                                                       /* Duplex. backend may decide to use ma_device_handle_backend_data_callback() which will require this cache. */
-            ma_data_converter_get_required_input_frame_count(&pDevice->playback.converter, 1, &unused) != MA_SUCCESS)       /* Data conversion required input frame calculation not supported. */
-        {
-            /* We need a heap allocated cache. We want to size this based on the period size. */
+        if (pDevice->type == ma_device_type_duplex || ma_data_converter_get_required_input_frame_count(&pDevice->playback.converter, 1, &unused) != MA_SUCCESS) {
             void* pNewInputCache;
             ma_uint64 newInputCacheCap;
             ma_uint64 newInputCacheSizeInBytes;
-
             newInputCacheCap = ma_calculate_frame_count_after_resampling(pDevice->playback.internalSampleRate, pDevice->sampleRate, pDevice->playback.internalPeriodSizeInFrames);
-
             newInputCacheSizeInBytes = newInputCacheCap * ma_get_bytes_per_frame(pDevice->playback.format, pDevice->playback.channels);
             if (newInputCacheSizeInBytes > MA_SIZE_MAX) {
                 ma_free(pDevice->playback.pInputCache, &pDevice->pContext->allocationCallbacks);
@@ -27487,14 +26979,7 @@ MA_API ma_result ma_device_init(ma_context* pContext, const ma_device_config* pC
             }
 
             intermediaryBufferSizeInBytes = pDevice->capture.intermediaryBufferCap * ma_get_bytes_per_frame(pDevice->capture.format, pDevice->capture.channels);
-
             pDevice->capture.pIntermediaryBuffer = ma_malloc((size_t)intermediaryBufferSizeInBytes, &pContext->allocationCallbacks);
-            if (pDevice->capture.pIntermediaryBuffer == NULL) {
-                ma_device_uninit(pDevice);
-                return MA_OUT_OF_MEMORY;
-            }
-
-            /* Silence the buffer for safety. */
             ma_silence_pcm_frames(pDevice->capture.pIntermediaryBuffer, pDevice->capture.intermediaryBufferCap, pDevice->capture.format, pDevice->capture.channels);
             pDevice->capture.intermediaryBufferLen = pDevice->capture.intermediaryBufferCap;
         }
@@ -27513,14 +26998,7 @@ MA_API ma_result ma_device_init(ma_context* pContext, const ma_device_config* pC
             }
 
             intermediaryBufferSizeInBytes = pDevice->playback.intermediaryBufferCap * ma_get_bytes_per_frame(pDevice->playback.format, pDevice->playback.channels);
-
             pDevice->playback.pIntermediaryBuffer = ma_malloc((size_t)intermediaryBufferSizeInBytes, &pContext->allocationCallbacks);
-            if (pDevice->playback.pIntermediaryBuffer == NULL) {
-                ma_device_uninit(pDevice);
-                return MA_OUT_OF_MEMORY;
-            }
-
-            /* Silence the buffer for safety. */
             ma_silence_pcm_frames(pDevice->playback.pIntermediaryBuffer, pDevice->playback.intermediaryBufferCap, pDevice->playback.format, pDevice->playback.channels);
             pDevice->playback.intermediaryBufferLen = 0;
         }
@@ -27640,10 +27118,6 @@ MA_API ma_result ma_device_init_ex(const ma_backend backends[], ma_uint32 backen
     }
 
     pContext = (ma_context*)ma_malloc(sizeof(*pContext), &allocationCallbacks);
-    if (pContext == NULL) {
-        return MA_OUT_OF_MEMORY;
-    }
-
     for (iBackend = 0; iBackend <= ma_backend_null; ++iBackend) {
         defaultBackends[iBackend] = (ma_backend)iBackend;
     }
@@ -30769,9 +30243,6 @@ MA_API ma_result ma_biquad_init(const ma_biquad_config* pConfig, const ma_alloca
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -31098,9 +30569,6 @@ MA_API ma_result ma_lpf1_init(const ma_lpf1_config* pConfig, const ma_allocation
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -31338,9 +30806,6 @@ MA_API ma_result ma_lpf2_init(const ma_lpf2_config* pConfig, const ma_allocation
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -31692,9 +31157,6 @@ MA_API ma_result ma_lpf_init(const ma_lpf_config* pConfig, const ma_allocation_c
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -31986,9 +31448,6 @@ MA_API ma_result ma_hpf1_init(const ma_hpf1_config* pConfig, const ma_allocation
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -32211,9 +31670,6 @@ MA_API ma_result ma_hpf2_init(const ma_hpf2_config* pConfig, const ma_allocation
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -32554,9 +32010,6 @@ MA_API ma_result ma_hpf_init(const ma_hpf_config* pConfig, const ma_allocation_c
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -32784,9 +32237,6 @@ MA_API ma_result ma_bpf2_init(const ma_bpf2_config* pConfig, const ma_allocation
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -33061,9 +32511,6 @@ MA_API ma_result ma_bpf_init(const ma_bpf_config* pConfig, const ma_allocation_c
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -33269,9 +32716,6 @@ MA_API ma_result ma_notch2_init(const ma_notch2_config* pConfig, const ma_alloca
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -33445,9 +32889,6 @@ MA_API ma_result ma_peak2_init(const ma_peak2_config* pConfig, const ma_allocati
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -33618,9 +33059,6 @@ MA_API ma_result ma_loshelf2_init(const ma_loshelf2_config* pConfig, const ma_al
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -33791,9 +33229,6 @@ MA_API ma_result ma_hishelf2_init(const ma_hishelf2_config* pConfig, const ma_al
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -33885,55 +33320,33 @@ MA_API ma_delay_config ma_delay_config_init(ma_uint32 channels, ma_uint32 sample
 }
 
 
-MA_API ma_result ma_delay_init(const ma_delay_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_delay* pDelay)
-{
-    if (pDelay == NULL) {
-        return MA_INVALID_ARGS;
-    }
+MA_API ma_result ma_delay_init(const ma_delay_config* pConfig, const ma_allocation_callbacks* pAllocationCallbacks, ma_delay* pDelay) {
+    if (pDelay == NULL) return MA_INVALID_ARGS;
 
     MA_ZERO_OBJECT(pDelay);
-
-    if (pConfig == NULL) {
-        return MA_INVALID_ARGS;
-    }
-
-    if (pConfig->decay < 0 || pConfig->decay > 1) {
-        return MA_INVALID_ARGS;
-    }
+    if (pConfig == NULL) return MA_INVALID_ARGS;
+    if (pConfig->decay < 0 || pConfig->decay > 1) return MA_INVALID_ARGS;
 
     pDelay->config             = *pConfig;
     pDelay->bufferSizeInFrames = pConfig->delayInFrames;
     pDelay->cursor             = 0;
-
     pDelay->pBuffer = (float*)ma_malloc((size_t)(pDelay->bufferSizeInFrames * ma_get_bytes_per_frame(ma_format_f32, pConfig->channels)), pAllocationCallbacks);
-    if (pDelay->pBuffer == NULL) {
-        return MA_OUT_OF_MEMORY;
-    }
-
     ma_silence_pcm_frames(pDelay->pBuffer, pDelay->bufferSizeInFrames, ma_format_f32, pConfig->channels);
-
     return MA_SUCCESS;
 }
 
-MA_API void ma_delay_uninit(ma_delay* pDelay, const ma_allocation_callbacks* pAllocationCallbacks)
-{
-    if (pDelay == NULL) {
-        return;
-    }
+MA_API void ma_delay_uninit(ma_delay* pDelay, const ma_allocation_callbacks* pAllocationCallbacks) {
+    if (pDelay == NULL) return;
 
     ma_free(pDelay->pBuffer, pAllocationCallbacks);
 }
 
-MA_API ma_result ma_delay_process_pcm_frames(ma_delay* pDelay, void* pFramesOut, const void* pFramesIn, ma_uint32 frameCount)
-{
+MA_API ma_result ma_delay_process_pcm_frames(ma_delay* pDelay, void* pFramesOut, const void* pFramesIn, ma_uint32 frameCount) {
     ma_uint32 iFrame;
     ma_uint32 iChannel;
     float* pFramesOutF32 = (float*)pFramesOut;
     const float* pFramesInF32 = (const float*)pFramesIn;
-
-    if (pDelay == NULL || pFramesOut == NULL || pFramesIn == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pDelay == NULL || pFramesOut == NULL || pFramesIn == NULL) return MA_INVALID_ARGS;
 
     for (iFrame = 0; iFrame < frameCount; iFrame += 1) {
         for (iChannel = 0; iChannel < pDelay->config.channels; iChannel += 1) {
@@ -34146,9 +33559,6 @@ MA_API ma_result ma_gainer_init(const ma_gainer_config* pConfig, const ma_alloca
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -35278,9 +34688,6 @@ MA_API ma_result ma_spatializer_listener_init(const ma_spatializer_listener_conf
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -35666,9 +35073,6 @@ MA_API ma_result ma_spatializer_init(const ma_spatializer_config* pConfig, const
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -36675,9 +36079,6 @@ MA_API ma_result ma_linear_resampler_init(const ma_linear_resampler_config* pCon
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -37483,9 +36884,6 @@ MA_API ma_result ma_resampler_init(const ma_resampler_config* pConfig, const ma_
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -38887,9 +38285,6 @@ MA_API ma_result ma_channel_converter_init(const ma_channel_converter_config* pC
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -39614,9 +39009,6 @@ MA_API ma_result ma_data_converter_init(const ma_data_converter_config* pConfig,
 
     if (heapSizeInBytes > 0) {
         pHeap = ma_malloc(heapSizeInBytes, pAllocationCallbacks);
-        if (pHeap == NULL) {
-            return MA_OUT_OF_MEMORY;
-        }
     } else {
         pHeap = NULL;
     }
@@ -41999,7 +41391,6 @@ MA_API void ma_pcm_rb_uninit(ma_pcm_rb* pRB)
         return;
     }
 
-    ma_data_source_uninit(&pRB->ds);
     ma_rb_uninit(&pRB->rb);
 }
 
@@ -42301,8 +41692,7 @@ MA_API const char* ma_result_description(ma_result result)
     }
 }
 
-MA_API void* ma_malloc(size_t sz, const ma_allocation_callbacks* pAllocationCallbacks)
-{
+MA_API void* ma_malloc(size_t sz, const ma_allocation_callbacks* pAllocationCallbacks) {
     if (pAllocationCallbacks != NULL) {
         if (pAllocationCallbacks->onMalloc != NULL) {
             return pAllocationCallbacks->onMalloc(sz, pAllocationCallbacks->pUserData);
@@ -42314,18 +41704,11 @@ MA_API void* ma_malloc(size_t sz, const ma_allocation_callbacks* pAllocationCall
     }
 }
 
-MA_API void* ma_calloc(size_t sz, const ma_allocation_callbacks* pAllocationCallbacks)
-{
-    void* p = ma_malloc(sz, pAllocationCallbacks);
-    if (p != NULL) {
-        MA_ZERO_MEMORY(p, sz);
-    }
-
-    return p;
+MA_API void* ma_calloc(size_t sz, const ma_allocation_callbacks* pAllocationCallbacks) {
+    return ma_malloc(sz, pAllocationCallbacks);
 }
 
-MA_API void* ma_realloc(void* p, size_t sz, const ma_allocation_callbacks* pAllocationCallbacks)
-{
+MA_API void* ma_realloc(void* p, size_t sz, const ma_allocation_callbacks* pAllocationCallbacks) {
     if (pAllocationCallbacks != NULL) {
         if (pAllocationCallbacks->onRealloc != NULL) {
             return pAllocationCallbacks->onRealloc(p, sz, pAllocationCallbacks->pUserData);
@@ -42337,11 +41720,8 @@ MA_API void* ma_realloc(void* p, size_t sz, const ma_allocation_callbacks* pAllo
     }
 }
 
-MA_API void ma_free(void* p, const ma_allocation_callbacks* pAllocationCallbacks)
-{
-    if (p == NULL) {
-        return;
-    }
+MA_API void ma_free(void* p, const ma_allocation_callbacks* pAllocationCallbacks) {
+    if (p == NULL) return;
 
     if (pAllocationCallbacks != NULL) {
         if (pAllocationCallbacks->onFree != NULL) {
@@ -42354,38 +41734,27 @@ MA_API void ma_free(void* p, const ma_allocation_callbacks* pAllocationCallbacks
     }
 }
 
-MA_API void* ma_aligned_malloc(size_t sz, size_t alignment, const ma_allocation_callbacks* pAllocationCallbacks)
-{
+MA_API void* ma_aligned_malloc(size_t sz, size_t alignment, const ma_allocation_callbacks* pAllocationCallbacks) {
     size_t extraBytes;
     void* pUnaligned;
     void* pAligned;
-
-    if (alignment == 0) {
-        return 0;
-    }
+    if (alignment == 0) return 0;
 
     extraBytes = alignment-1 + sizeof(void*);
-
     pUnaligned = ma_malloc(sz + extraBytes, pAllocationCallbacks);
-    if (pUnaligned == NULL) {
-        return NULL;
-    }
+    if (pUnaligned == NULL) return NULL;
 
     pAligned = (void*)(((ma_uintptr)pUnaligned + extraBytes) & ~((ma_uintptr)(alignment-1)));
     ((void**)pAligned)[-1] = pUnaligned;
-
     return pAligned;
 }
 
-MA_API void ma_aligned_free(void* p, const ma_allocation_callbacks* pAllocationCallbacks)
-{
+MA_API void ma_aligned_free(void* p, const ma_allocation_callbacks* pAllocationCallbacks) {
     ma_free(((void**)p)[-1], pAllocationCallbacks);
 }
 
-MA_API const char* ma_get_format_name(ma_format format)
-{
-    switch (format)
-    {
+MA_API const char* ma_get_format_name(ma_format format) {
+    switch (format) {
         case ma_format_unknown: return "Unknown";
         case ma_format_u8:      return "8-bit Unsigned Integer";
         case ma_format_s16:     return "16-bit Signed Integer";
@@ -42396,17 +41765,11 @@ MA_API const char* ma_get_format_name(ma_format format)
     }
 }
 
-MA_API void ma_blend_f32(float* pOut, float* pInA, float* pInB, float factor, ma_uint32 channels)
-{
-    ma_uint32 i;
-    for (i = 0; i < channels; ++i) {
-        pOut[i] = ma_mix_f32(pInA[i], pInB[i], factor);
-    }
+MA_API void ma_blend_f32(float* pOut, float* pInA, float* pInB, float factor, ma_uint32 channels) {
+    for (ma_uint32 i = 0; i < channels; ++i) pOut[i] = ma_mix_f32(pInA[i], pInB[i], factor);
 }
 
-
-MA_API ma_uint32 ma_get_bytes_per_sample(ma_format format)
-{
+MA_API ma_uint32 ma_get_bytes_per_sample(ma_format format) {
     ma_uint32 sizes[] = {
         0,  /* unknown */
         1,  /* u8 */
@@ -42418,40 +41781,24 @@ MA_API ma_uint32 ma_get_bytes_per_sample(ma_format format)
     return sizes[format];
 }
 
-
-
 #define MA_DATA_SOURCE_DEFAULT_RANGE_BEG        0
 #define MA_DATA_SOURCE_DEFAULT_RANGE_END        ~((ma_uint64)0)
 #define MA_DATA_SOURCE_DEFAULT_LOOP_POINT_BEG   0
 #define MA_DATA_SOURCE_DEFAULT_LOOP_POINT_END   ~((ma_uint64)0)
 
-MA_API ma_data_source_config ma_data_source_config_init(void)
-{
+MA_API ma_data_source_config ma_data_source_config_init(void) {
     ma_data_source_config config;
-
     MA_ZERO_OBJECT(&config);
-
     return config;
 }
 
-
-MA_API ma_result ma_data_source_init(const ma_data_source_config* pConfig, ma_data_source* pDataSource)
-{
+MA_API ma_result ma_data_source_init(const ma_data_source_config* pConfig, ma_data_source* pDataSource) {
     ma_data_source_base* pDataSourceBase = (ma_data_source_base*)pDataSource;
-
-    if (pDataSource == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pDataSource == NULL) return MA_INVALID_ARGS;
 
     MA_ZERO_OBJECT(pDataSourceBase);
-
-    if (pConfig == NULL) {
-        return MA_INVALID_ARGS;
-    }
-
-    if (pConfig->vtable == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pConfig == NULL) return MA_INVALID_ARGS;
+    if (pConfig->vtable == NULL) return MA_INVALID_ARGS;
 
     pDataSourceBase->vtable           = pConfig->vtable;
     pDataSourceBase->rangeBegInFrames = MA_DATA_SOURCE_DEFAULT_RANGE_BEG;
@@ -42465,20 +41812,7 @@ MA_API ma_result ma_data_source_init(const ma_data_source_config* pConfig, ma_da
     return MA_SUCCESS;
 }
 
-MA_API void ma_data_source_uninit(ma_data_source* pDataSource)
-{
-    if (pDataSource == NULL) {
-        return;
-    }
-
-    /*
-    This is placeholder in case we need this later. Data sources need to call this in their
-    uninitialization routine to ensure things work later on if something is added here.
-    */
-}
-
-static ma_result ma_data_source_resolve_current(ma_data_source* pDataSource, ma_data_source** ppCurrentDataSource)
-{
+static ma_result ma_data_source_resolve_current(ma_data_source* pDataSource, ma_data_source** ppCurrentDataSource) {
     ma_data_source_base* pCurrentDataSource = (ma_data_source_base*)pDataSource;
 
     MA_ASSERT(pDataSource         != NULL);
@@ -43337,24 +42671,16 @@ static ma_data_source_vtable g_ma_audio_buffer_ref_data_source_vtable =
     0
 };
 
-MA_API ma_result ma_audio_buffer_ref_init(ma_format format, ma_uint32 channels, const void* pData, ma_uint64 sizeInFrames, ma_audio_buffer_ref* pAudioBufferRef)
-{
+MA_API ma_result ma_audio_buffer_ref_init(ma_format format, ma_uint32 channels, const void* pData, ma_uint64 sizeInFrames, ma_audio_buffer_ref* pAudioBufferRef) {
     ma_result result;
     ma_data_source_config dataSourceConfig;
-
-    if (pAudioBufferRef == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pAudioBufferRef == NULL) return MA_INVALID_ARGS;
 
     MA_ZERO_OBJECT(pAudioBufferRef);
-
     dataSourceConfig = ma_data_source_config_init();
     dataSourceConfig.vtable = &g_ma_audio_buffer_ref_data_source_vtable;
-
     result = ma_data_source_init(&dataSourceConfig, &pAudioBufferRef->ds);
-    if (result != MA_SUCCESS) {
-        return result;
-    }
+    if (result != MA_SUCCESS) return result;
 
     pAudioBufferRef->format       = format;
     pAudioBufferRef->channels     = channels;
@@ -43362,60 +42688,31 @@ MA_API ma_result ma_audio_buffer_ref_init(ma_format format, ma_uint32 channels, 
     pAudioBufferRef->cursor       = 0;
     pAudioBufferRef->sizeInFrames = sizeInFrames;
     pAudioBufferRef->pData        = pData;
-
     return MA_SUCCESS;
 }
 
-MA_API void ma_audio_buffer_ref_uninit(ma_audio_buffer_ref* pAudioBufferRef)
-{
-    if (pAudioBufferRef == NULL) {
-        return;
-    }
-
-    ma_data_source_uninit(&pAudioBufferRef->ds);
-}
-
-MA_API ma_result ma_audio_buffer_ref_set_data(ma_audio_buffer_ref* pAudioBufferRef, const void* pData, ma_uint64 sizeInFrames)
-{
-    if (pAudioBufferRef == NULL) {
-        return MA_INVALID_ARGS;
-    }
+MA_API ma_result ma_audio_buffer_ref_set_data(ma_audio_buffer_ref* pAudioBufferRef, const void* pData, ma_uint64 sizeInFrames) {
+    if (pAudioBufferRef == NULL) return MA_INVALID_ARGS;
 
     pAudioBufferRef->cursor       = 0;
     pAudioBufferRef->sizeInFrames = sizeInFrames;
     pAudioBufferRef->pData        = pData;
-
     return MA_SUCCESS;
 }
 
-MA_API ma_uint64 ma_audio_buffer_ref_read_pcm_frames(ma_audio_buffer_ref* pAudioBufferRef, void* pFramesOut, ma_uint64 frameCount, ma_bool32 loop)
-{
+MA_API ma_uint64 ma_audio_buffer_ref_read_pcm_frames(ma_audio_buffer_ref* pAudioBufferRef, void* pFramesOut, ma_uint64 frameCount, ma_bool32 loop) {
     ma_uint64 totalFramesRead = 0;
-
-    if (pAudioBufferRef == NULL) {
-        return 0;
-    }
-
-    if (frameCount == 0) {
-        return 0;
-    }
+    if (pAudioBufferRef == NULL) return 0;
+    if (frameCount == 0) return 0;
 
     while (totalFramesRead < frameCount) {
         ma_uint64 framesAvailable = pAudioBufferRef->sizeInFrames - pAudioBufferRef->cursor;
         ma_uint64 framesRemaining = frameCount - totalFramesRead;
         ma_uint64 framesToRead;
-
         framesToRead = framesRemaining;
-        if (framesToRead > framesAvailable) {
-            framesToRead = framesAvailable;
-        }
-
-        if (pFramesOut != NULL) {
-            ma_copy_pcm_frames(ma_offset_ptr(pFramesOut, totalFramesRead * ma_get_bytes_per_frame(pAudioBufferRef->format, pAudioBufferRef->channels)), ma_offset_ptr(pAudioBufferRef->pData, pAudioBufferRef->cursor * ma_get_bytes_per_frame(pAudioBufferRef->format, pAudioBufferRef->channels)), framesToRead, pAudioBufferRef->format, pAudioBufferRef->channels);
-        }
-
+        if (framesToRead > framesAvailable) framesToRead = framesAvailable;
+        if (pFramesOut != NULL) ma_copy_pcm_frames(ma_offset_ptr(pFramesOut, totalFramesRead * ma_get_bytes_per_frame(pAudioBufferRef->format, pAudioBufferRef->channels)), ma_offset_ptr(pAudioBufferRef->pData, pAudioBufferRef->cursor * ma_get_bytes_per_frame(pAudioBufferRef->format, pAudioBufferRef->channels)), framesToRead, pAudioBufferRef->format, pAudioBufferRef->channels);
         totalFramesRead += framesToRead;
-
         pAudioBufferRef->cursor += framesToRead;
         if (pAudioBufferRef->cursor == pAudioBufferRef->sizeInFrames) {
             if (loop) {
@@ -43431,52 +42728,33 @@ MA_API ma_uint64 ma_audio_buffer_ref_read_pcm_frames(ma_audio_buffer_ref* pAudio
     return totalFramesRead;
 }
 
-MA_API ma_result ma_audio_buffer_ref_seek_to_pcm_frame(ma_audio_buffer_ref* pAudioBufferRef, ma_uint64 frameIndex)
-{
-    if (pAudioBufferRef == NULL) {
-        return MA_INVALID_ARGS;
-    }
-
-    if (frameIndex > pAudioBufferRef->sizeInFrames) {
-        return MA_INVALID_ARGS;
-    }
+MA_API ma_result ma_audio_buffer_ref_seek_to_pcm_frame(ma_audio_buffer_ref* pAudioBufferRef, ma_uint64 frameIndex) {
+    if (pAudioBufferRef == NULL) return MA_INVALID_ARGS;
+    if (frameIndex > pAudioBufferRef->sizeInFrames) return MA_INVALID_ARGS;
 
     pAudioBufferRef->cursor = (size_t)frameIndex;
-
     return MA_SUCCESS;
 }
 
-MA_API ma_result ma_audio_buffer_ref_map(ma_audio_buffer_ref* pAudioBufferRef, void** ppFramesOut, ma_uint64* pFrameCount)
-{
+MA_API ma_result ma_audio_buffer_ref_map(ma_audio_buffer_ref* pAudioBufferRef, void** ppFramesOut, ma_uint64* pFrameCount) {
     ma_uint64 framesAvailable;
     ma_uint64 frameCount = 0;
-
-    if (ppFramesOut != NULL) {
-        *ppFramesOut = NULL;    /* Safety. */
-    }
-
+    if (ppFramesOut != NULL) *ppFramesOut = NULL;    /* Safety. */
     if (pFrameCount != NULL) {
         frameCount = *pFrameCount;
         *pFrameCount = 0;       /* Safety. */
     }
 
-    if (pAudioBufferRef == NULL || ppFramesOut == NULL || pFrameCount == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pAudioBufferRef == NULL || ppFramesOut == NULL || pFrameCount == NULL) return MA_INVALID_ARGS;
 
     framesAvailable = pAudioBufferRef->sizeInFrames - pAudioBufferRef->cursor;
-    if (frameCount > framesAvailable) {
-        frameCount = framesAvailable;
-    }
-
+    if (frameCount > framesAvailable) frameCount = framesAvailable;
     *ppFramesOut = ma_offset_ptr(pAudioBufferRef->pData, pAudioBufferRef->cursor * ma_get_bytes_per_frame(pAudioBufferRef->format, pAudioBufferRef->channels));
     *pFrameCount = frameCount;
-
     return MA_SUCCESS;
 }
 
-MA_API ma_result ma_audio_buffer_ref_unmap(ma_audio_buffer_ref* pAudioBufferRef, ma_uint64 frameCount)
-{
+MA_API ma_result ma_audio_buffer_ref_unmap(ma_audio_buffer_ref* pAudioBufferRef, ma_uint64 frameCount) {
     ma_uint64 framesAvailable;
 
     if (pAudioBufferRef == NULL) {
@@ -43637,62 +42915,41 @@ static ma_result ma_audio_buffer_init_ex(const ma_audio_buffer_config* pConfig, 
     return MA_SUCCESS;
 }
 
-static void ma_audio_buffer_uninit_ex(ma_audio_buffer* pAudioBuffer, ma_bool32 doFree)
-{
-    if (pAudioBuffer == NULL) {
-        return;
-    }
+static void ma_audio_buffer_uninit_ex(ma_audio_buffer* pAudioBuffer, ma_bool32 doFree) {
+    if (pAudioBuffer == NULL) return;
 
     if (pAudioBuffer->ownsData && pAudioBuffer->ref.pData != &pAudioBuffer->_pExtraData[0]) {
         ma_free((void*)pAudioBuffer->ref.pData, &pAudioBuffer->allocationCallbacks);    /* Naugty const cast, but OK in this case since we've guarded it with the ownsData check. */
     }
 
-    if (doFree) {
-        ma_free(pAudioBuffer, &pAudioBuffer->allocationCallbacks);
-    }
-
-    ma_audio_buffer_ref_uninit(&pAudioBuffer->ref);
+    if (doFree) ma_free(pAudioBuffer, &pAudioBuffer->allocationCallbacks);
 }
 
-MA_API ma_result ma_audio_buffer_init(const ma_audio_buffer_config* pConfig, ma_audio_buffer* pAudioBuffer)
-{
+MA_API ma_result ma_audio_buffer_init(const ma_audio_buffer_config* pConfig, ma_audio_buffer* pAudioBuffer) {
     return ma_audio_buffer_init_ex(pConfig, MA_FALSE, pAudioBuffer);
 }
 
-MA_API ma_result ma_audio_buffer_init_copy(const ma_audio_buffer_config* pConfig, ma_audio_buffer* pAudioBuffer)
-{
+MA_API ma_result ma_audio_buffer_init_copy(const ma_audio_buffer_config* pConfig, ma_audio_buffer* pAudioBuffer) {
     return ma_audio_buffer_init_ex(pConfig, MA_TRUE, pAudioBuffer);
 }
 
-MA_API ma_result ma_audio_buffer_alloc_and_init(const ma_audio_buffer_config* pConfig, ma_audio_buffer** ppAudioBuffer)
-{
+MA_API ma_result ma_audio_buffer_alloc_and_init(const ma_audio_buffer_config* pConfig, ma_audio_buffer** ppAudioBuffer) {
     ma_result result;
     ma_audio_buffer* pAudioBuffer;
     ma_audio_buffer_config innerConfig; /* We'll be making some changes to the config, so need to make a copy. */
     ma_uint64 allocationSizeInBytes;
-
-    if (ppAudioBuffer == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (ppAudioBuffer == NULL) return MA_INVALID_ARGS;
 
     *ppAudioBuffer = NULL;  /* Safety. */
-
-    if (pConfig == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pConfig == NULL) return MA_INVALID_ARGS;
 
     innerConfig = *pConfig;
     ma_allocation_callbacks_init_copy(&innerConfig.allocationCallbacks, &pConfig->allocationCallbacks);
-
     allocationSizeInBytes = sizeof(*pAudioBuffer) - sizeof(pAudioBuffer->_pExtraData) + (pConfig->sizeInFrames * ma_get_bytes_per_frame(pConfig->format, pConfig->channels));
-    if (allocationSizeInBytes > MA_SIZE_MAX) {
-        return MA_OUT_OF_MEMORY;    /* Too big. */
-    }
+    if (allocationSizeInBytes > MA_SIZE_MAX) return MA_OUT_OF_MEMORY;    /* Too big. */
 
     pAudioBuffer = (ma_audio_buffer*)ma_malloc((size_t)allocationSizeInBytes, &innerConfig.allocationCallbacks);  /* Safe cast to size_t. */
-    if (pAudioBuffer == NULL) {
-        return MA_OUT_OF_MEMORY;
-    }
+    if (pAudioBuffer == NULL) return MA_OUT_OF_MEMORY;
 
     if (pConfig->pData != NULL) {
         ma_copy_pcm_frames(&pAudioBuffer->_pExtraData[0], pConfig->pData, pConfig->sizeInFrames, pConfig->format, pConfig->channels);
@@ -43709,17 +42966,14 @@ MA_API ma_result ma_audio_buffer_alloc_and_init(const ma_audio_buffer_config* pC
     }
 
     *ppAudioBuffer = pAudioBuffer;
-
     return MA_SUCCESS;
 }
 
-MA_API void ma_audio_buffer_uninit(ma_audio_buffer* pAudioBuffer)
-{
+MA_API void ma_audio_buffer_uninit(ma_audio_buffer* pAudioBuffer) {
     ma_audio_buffer_uninit_ex(pAudioBuffer, MA_FALSE);
 }
 
-MA_API void ma_audio_buffer_uninit_and_free(ma_audio_buffer* pAudioBuffer)
-{
+MA_API void ma_audio_buffer_uninit_and_free(ma_audio_buffer* pAudioBuffer) {
     ma_audio_buffer_uninit_ex(pAudioBuffer, MA_TRUE);
 }
 
@@ -46442,8 +45696,6 @@ MA_API void ma_wav_uninit(ma_wav* pWav, const ma_allocation_callbacks* pAllocati
         MA_ASSERT(MA_FALSE);
     }
     #endif
-
-    ma_data_source_uninit(&pWav->ds);
 }
 
 MA_API ma_result ma_wav_read_pcm_frames(ma_wav* pWav, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead)
@@ -47115,11 +46367,8 @@ MA_API ma_result ma_mp3_init_memory(const void* pData, size_t dataSize, const ma
     #endif
 }
 
-MA_API void ma_mp3_uninit(ma_mp3* pMP3, const ma_allocation_callbacks* pAllocationCallbacks)
-{
-    if (pMP3 == NULL) {
-        return;
-    }
+MA_API void ma_mp3_uninit(ma_mp3* pMP3, const ma_allocation_callbacks* pAllocationCallbacks) {
+    if (pMP3 == NULL) return;
 
     #if !defined(MA_NO_MP3)
     {
@@ -47134,8 +46383,6 @@ MA_API void ma_mp3_uninit(ma_mp3* pMP3, const ma_allocation_callbacks* pAllocati
 
     /* Seek points need to be freed after the MP3 decoder has been uninitialized to ensure they're no longer being referenced. */
     ma_free(pMP3->pSeekPoints, pAllocationCallbacks);
-
-    ma_data_source_uninit(&pMP3->ds);
 }
 
 MA_API ma_result ma_mp3_read_pcm_frames(ma_mp3* pMP3, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead)
@@ -47553,7 +46800,6 @@ static ma_result ma_decoder__preinit(ma_decoder_read_proc onRead, ma_decoder_see
 
     result = ma_decoder__init_allocation_callbacks(pConfig, pDecoder);
     if (result != MA_SUCCESS) {
-        ma_data_source_uninit(&pDecoder->ds);
         return result;
     }
 
@@ -48674,8 +47920,6 @@ MA_API ma_result ma_decoder_uninit(ma_decoder* pDecoder)
     }
 
     ma_data_converter_uninit(&pDecoder->converter, &pDecoder->allocationCallbacks);
-    ma_data_source_uninit(&pDecoder->ds);
-
     if (pDecoder->pInputCache != NULL) {
         ma_free(pDecoder->pInputCache, &pDecoder->allocationCallbacks);
     }
@@ -51077,29 +50321,16 @@ MA_API ma_result ma_resource_manager_data_buffer_init_copy(ma_resource_manager* 
     return ma_resource_manager_data_buffer_init_ex_internal(pResourceManager, &config, pExistingDataBuffer->pNode->hashedName32, pDataBuffer);
 }
 
-static ma_result ma_resource_manager_data_buffer_uninit_internal(ma_resource_manager_data_buffer* pDataBuffer)
-{
+static ma_result ma_resource_manager_data_buffer_uninit_internal(ma_resource_manager_data_buffer* pDataBuffer) {
     MA_ASSERT(pDataBuffer != NULL);
-
-    /* The connector should be uninitialized first. */
     ma_resource_manager_data_buffer_uninit_connector(pDataBuffer->pResourceManager, pDataBuffer);
-
-    /* With the connector uninitialized we can unacquire the node. */
     ma_resource_manager_data_buffer_node_unacquire(pDataBuffer->pResourceManager, pDataBuffer->pNode, NULL, NULL);
-
-    /* The base data source needs to be uninitialized as well. */
-    ma_data_source_uninit(&pDataBuffer->ds);
-
     return MA_SUCCESS;
 }
 
-MA_API ma_result ma_resource_manager_data_buffer_uninit(ma_resource_manager_data_buffer* pDataBuffer)
-{
+MA_API ma_result ma_resource_manager_data_buffer_uninit(ma_resource_manager_data_buffer* pDataBuffer) {
     ma_result result;
-
-    if (pDataBuffer == NULL) {
-        return MA_INVALID_ARGS;
-    }
+    if (pDataBuffer == NULL) return MA_INVALID_ARGS;
 
     if (ma_resource_manager_data_buffer_result(pDataBuffer) == MA_SUCCESS) {
         /* The data buffer can be deleted synchronously. */
@@ -53068,8 +52299,6 @@ static ma_result ma_job_process__resource_manager__free_data_stream(ma_job* pJob
         ma_free(pDataStream->pPageData, &pResourceManager->config.allocationCallbacks);
         pDataStream->pPageData = NULL;  /* Just in case... */
     }
-
-    ma_data_source_uninit(&pDataStream->ds);
 
     /* The event needs to be signalled last. */
     if (pJob->data.resourceManager.freeDataStream.pDoneNotification != NULL) {

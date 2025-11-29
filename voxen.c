@@ -72,16 +72,17 @@ double time_PhysicsStep = 0.0;
 char statusText[TEXT_BUFFER_SIZE];
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Reflections = 1u; // Default 1
 uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
 uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
 uint8_t settings_CullEnabled = 1;
-float settings_SSRStepSize = 0.26f;
-uint16_t settings_SSRStepCount = 90;//100;
-float settings_SSRSampleWeight = 0.12f;//0.0256f;
+#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
+uint8_t settings_Reflections = 1u; // Default 1
+float settings_SSRStepSize = 0.55f;
+uint16_t settings_SSRStepCount = 48;
+float settings_SSRSampleWeight = 2.15f;
 bool settings_Vsync = false;
 float lodRangeSqrd = 35.4f * 35.4f;
 // ----------------------------------------------------------------------------
@@ -130,7 +131,7 @@ uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
 bool instanceIsLODArray[INSTANCE_COUNT];
 float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;
-GLuint inputImageID, inputDepthID, inputWorldPosID, gBufferFBO, outputImageID; // FBO
+GLuint inputImageID, inputDepthID, inputWorldPosID, inputSpecID, gBufferFBO, outputImageID; // FBO
 
 GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
 GLuint vao_chunk; // Vertex Array Object
@@ -142,7 +143,6 @@ GLuint shadowmapsClearShaderProgram;
 GLuint shadowMapSSBO;
 uint32_t totalShadowmapPixels = 0;
 
-#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
 GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
 
 GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
@@ -1019,6 +1019,7 @@ void InitializeEnvironment(void) {
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
     GenerateAndBindTexture(&inputDepthID, GL_DEPTH_COMPONENT32, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+    GenerateAndBindTexture(&inputSpecID,              GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
     glGenTextures(1, &outputImageID);
     glBindTexture(GL_TEXTURE_2D, outputImageID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -1029,21 +1030,15 @@ void InitializeEnvironment(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, inputImageID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, inputSpecID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) {
-        switch (status) {
-            case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT: DualLogError("Framebuffer incomplete: Attachment issue\n"); break;
-            case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: DualLogError("Framebuffer incomplete: Missing attachment\n"); break;
-            case GL_FRAMEBUFFER_UNSUPPORTED: DualLogError("Framebuffer incomplete: Unsupported configuration\n"); break;
-            default: DualLogError("Framebuffer incomplete: Error code %d\n", status);
-        }
-    }
-    
+    if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
     glBindImageTexture(0, inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+    glBindImageTexture(1, inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F); // World Position XYZ 32bit, Normal XYZ 8bit, 8bits empty
+    glBindImageTexture(2, inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
     //                 3 = depth
     glBindImageTexture(4, outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
     glActiveTexture(GL_TEXTURE3); // Match binding = 3 in shader

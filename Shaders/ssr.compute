@@ -5,7 +5,8 @@ layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba8,   binding = 0) readonly uniform image2D inputImage;
 layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
-layout(rgba8,   binding = 4) writeonly uniform image2D outputImage;
+layout(rgba8,   binding = 2) readonly uniform image2D inputSpecular;
+layout(rgba8,   binding = 4) uniform image2D outputImage;
 
 layout(location = 0) uniform uint screenWidth;
 layout(location = 1) uniform uint screenHeight;
@@ -28,11 +29,9 @@ void main() {
     if (pixel.x >= screenWidth || pixel.y >= screenHeight) return;
 
     vec4 worldPosPack = imageLoad(inputWorldPos, ivec2(pixel * SSR_RES));
-    vec4 specColor = unpackColor32(floatBitsToUint(worldPosPack.a));
-    vec2 worldXY = unpackHalf2x16(floatBitsToUint(worldPosPack.r));
-    vec2 worldZInst = unpackHalf2x16(floatBitsToUint(worldPosPack.g));
-    vec3 worldPos = vec3(worldXY.x, worldXY.y, worldZInst.x); // Stable, does not warp with player camera position.
-    vec4 normalPack = unpackColor32(floatBitsToUint(worldPosPack.b));
+    vec3 worldPos = worldPosPack.xyz;
+    vec4 specColor = imageLoad(inputSpecular, ivec2(pixel * SSR_RES));
+    vec4 normalPack = unpackColor32(floatBitsToUint(worldPosPack.a));
     vec3 normal = vec3((normalPack.r * 2.0) - 1.0,(normalPack.g * 2.0) - 1.0,(normalPack.b * 2.0) - 1.0);
     normal = normalize(normal);
     vec3 viewDir = normalize(camPos - worldPos);
@@ -47,6 +46,7 @@ void main() {
     vec2 screenSize = vec2(screenWidth, screenHeight);
     ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1);
     ivec2 zeroIVec2 = ivec2(0, 0);
+    float confidence = 0.0;
     for (int i = 0; i < stepCount; ++i) {
         marchPos += rayStep;
         traveled += stepSize;
@@ -58,13 +58,12 @@ void main() {
         ivec2 samplePixel = ivec2(hitUV * screenSize);
         samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
         vec4 sampledWorldPosPack = imageLoad(inputWorldPos, samplePixel * SSR_RES);
-        vec4 sampledNormalPack = unpackColor32(floatBitsToUint(sampledWorldPosPack.b));
+        vec3 sampledWorldPos = sampledWorldPosPack.xyz;
+        vec4 sampledNormalPack = unpackColor32(floatBitsToUint(sampledWorldPosPack.a));
         vec3 sampledNormal = normalize(vec3(sampledNormalPack.r * 2.0 - 1.0, sampledNormalPack.g * 2.0 - 1.0, sampledNormalPack.b * 2.0 - 1.0));
+        sampledNormal = normalize(sampledNormal);
         if (dot(reflectDir, sampledNormal) >= 0.0) continue;
         
-        vec2 s_worldXY = unpackHalf2x16(floatBitsToUint(sampledWorldPosPack.r));
-        vec2 s_worldZInst = unpackHalf2x16(floatBitsToUint(sampledWorldPosPack.g));
-        vec3 sampledWorldPos = vec3(s_worldXY.x, s_worldXY.y, s_worldZInst.x);
         float dist2 = dot(marchPos - sampledWorldPos, marchPos - sampledWorldPos);
         float weight = exp(-dist2 / sampleWeight);
         if (weight > 0.01) { // Minimum weight threshold
@@ -73,7 +72,8 @@ void main() {
             vec4 sampleColor = imageLoad(inputImage, hitPixel * SSR_RES);
             reflectionColor += sampleColor.rgb * weight;
             totalWeight += weight;
-            if (totalWeight > 0.01) break;
+            confidence += weight;
+            if (totalWeight > 0.8) break;
         }
     }
 
@@ -81,5 +81,7 @@ void main() {
 
     reflectionColor /= totalWeight; // Normalize by total weight
     vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, vec3(1.0) * 0.451); // Just so happens to work well with, yes, another magical 451
-    imageStore(outputImage, ivec2(pixel), vec4(combined, 1.0));
+    vec3 prev = imageLoad(outputImage, ivec2(pixel)).rgb;
+    vec3 result = mix(prev, combined, confidence > 0.1 ? 0.9 : 0.1);
+    imageStore(outputImage, ivec2(pixel), vec4(result, 1.0));
 }

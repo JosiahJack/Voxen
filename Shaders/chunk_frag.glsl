@@ -2,6 +2,8 @@
 // enemies, doors, etc., without transparency for first pass prior to lighting.
 #version 430 core
 #extension GL_ARB_shading_language_packing : require
+#extension GL_ARB_shader_image_load_store : enable
+layout(early_fragment_tests) in;
 
 in vec2 TexCoord;
 in vec3 Normal;
@@ -31,6 +33,7 @@ layout(location = 20) uniform uint specIndex;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
+layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
@@ -77,21 +80,14 @@ uint GetVoxelIndex(vec3 worldPos) {
 }
 
 const float INV_FOG_DIST = 1.0 / 71.68;
-const int PCF_SAMPLES = 12;
+const int PCF_SAMPLES = 6;
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
     vec2(-0.0326212f, -0.0405810f),
     vec2(-0.0840144f, -0.0073580f),
     vec2(-0.0695914f,  0.0457137f),
     vec2(-0.0203345f,  0.0620716f),
     vec2( 0.0962340f, -0.0194983f),
-    vec2( 0.0473434f, -0.0480026f),
-    vec2( 0.0519456f,  0.0767022f),
-    vec2( 0.0185461f, -0.0893124f),
-    vec2( 0.0507431f,  0.0064425f),
-    vec2( 0.0896420f,  0.0412458f),
-    vec2(-0.0321942f,  0.0932615f),
-    vec2(-0.0791559f,  0.0597710f)
-);
+    vec2( 0.0473434f, -0.0480026f));
 
 vec3 quat_rotate(vec4 q, vec3 v) {
     float x2 = q.x + q.x;
@@ -188,11 +184,9 @@ void main() {
         texUVSpec.x = texUVSpec.x % texSizeSpec.x;
         texUVSpec.y = texUVSpec.y % texSizeSpec.y;
         specColor = getTextureColor(specIndex,texUVSpec);
-        vec4 worldPosPack = vec4(uintBitsToFloat(packHalf2x16(FragPos.xy)),
-                                uintBitsToFloat(packHalf2x16(vec2(FragPos.z,0.0))),
-                                uintBitsToFloat(packColor(normalPack)),
-                                uintBitsToFloat(packColor(specColor)) );
+        vec4 worldPosPack = vec4(FragPos.xyz, uintBitsToFloat(packColor(normalPack)));
         outWorldPos = worldPosPack;
+        outSpecular = specColor; 
     }
 
     uint voxelIdx = GetVoxelIndex(worldPos);
@@ -208,6 +202,7 @@ void main() {
         vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
         if (intensity < 0.05) continue;
+
 
         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
         vec3 toLight = lightPos - worldPos;
@@ -261,7 +256,7 @@ void main() {
             uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
             vec2 tc = uv * shadowmapSize;
             float bias = 0.0451 + 0.185 * distOverRangeSqd;   // distance bias (prevents acne on far geometry)
-            if (shadowsEnabled > 1 && distToPixel < 30.0) {
+            if (shadowsEnabled > 1 && distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
                 float invSamples = 1.0 / float(PCF_SAMPLES);

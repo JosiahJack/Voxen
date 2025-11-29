@@ -3,6 +3,7 @@
 in vec2 TexCoord;
 out vec4 FragColor;
 layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
+layout(rgba8,   binding = 2) readonly uniform image2D inputSpecular;
 layout(std430, binding = 5)  buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
@@ -428,16 +429,7 @@ void main() {
 
     ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     vec4 fog = vec4(0.0,0.0,0.0,0.0);
-    vec4 wpPack = vec4(0.0,0.0,0.0,0.0);
-    vec3 surfPos = vec3(0.0,0.0,0.0);
     vec4 specColor = vec4(0.0,0.0,0.0,0.0);
-    if (reflectionsEnabled > 0 || berserkTimeRemaining > 0.0) {
-        wpPack = imageLoad(inputWorldPos, uv);
-        vec2 worldXY = unpackHalf2x16(floatBitsToUint(wpPack.r));
-        vec2 worldZInst = unpackHalf2x16(floatBitsToUint(wpPack.g));
-        surfPos = vec3(worldXY.x, worldXY.y, worldZInst.x);
-    }
-
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
@@ -446,8 +438,8 @@ void main() {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);
-            vec4 specColor = unpackColor32(floatBitsToUint(wpPack.a));
-            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.5;
+            vec4 specColor = imageLoad(inputSpecular, uv);
+            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.75;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
             color.rgb += reflectionColor.rgb;
@@ -503,7 +495,7 @@ void main() {
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
 
         // Berserk last as it's a brain effect not an eye effect
-        if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(surfPos, aaColor);
+        if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor);
         FragColor = vec4(aaColor, 1.0);
     } else {
         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
