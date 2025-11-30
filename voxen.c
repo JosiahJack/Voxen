@@ -1123,7 +1123,11 @@ void RenderInstances(uint8_t type) {
     switch(type) {
         case REND_OPAQUE:      countsArray  =  modelTypeCountsOpaque; // Cull face enabled after transparents rendered.  Might have 1 frame junk but that's fine to minimize gl calls.
                                offsetsArray = modelTypeOffsetsOpaque;
-                               startOfNextType = startOfDoubleSidedInstances; break;
+                               startOfNextType = startOfDoubleSidedInstances;
+                               glDisable(GL_BLEND);
+                               glDepthMask(GL_TRUE);
+                               glEnable(GL_DEPTH_TEST);
+                               glEnable(GL_CULL_FACE); break;
         case REND_DOUBLESIDED: glDisable(GL_CULL_FACE);
                                countsArray  =  modelTypeCountsDoubleSided;
                                offsetsArray = modelTypeOffsetsDoubleSided;
@@ -1182,21 +1186,7 @@ void RenderInstances(uint8_t type) {
             verticesRenderedThisFrame += vertCount;
         }
     }
-    
-    if (type == REND_TRANSPARENT) {
-        glDisable(GL_BLEND);
-        glDepthMask(GL_TRUE);
-        glEnable(GL_CULL_FACE);
-    }
 }
-
-// static const char* debugViewNames[] = {
-//     "standard render", // 0
-//     "unlit",           // 1
-//     "surface normals", // 2
-//     "depth",           // 3
-//     "reflections"     // 4
-// };
 
 void SetFog() {
     fogColorRUsed = fogColorR * fogBaseDensityForLevel;
@@ -1340,7 +1330,6 @@ int32_t main(int32_t argc, char* argv[]) {
             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers
             glBindVertexArray(0);
-            glUseProgram(0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             // 5. SSR (Screen Space Reflections)
@@ -1401,10 +1390,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += 4;
-        glEnable(GL_DEPTH_TEST); // Turn on for UI Images
         glBindTextureUnit(0, 0);
-        glUseProgram(0);
-        // End world rendering
 
         // HUD
         // UI Common GL traits
@@ -1419,8 +1405,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
-//         glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
         glDisable(GL_CULL_FACE);
         
         //    Cursor
@@ -1477,20 +1463,13 @@ int32_t main(int32_t argc, char* argv[]) {
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "cam yaw: %.2f, cam pitch: %.2f, cam roll: %.2f", cam_yaw, cam_pitch, cam_roll);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "SSR step size: %.2f, step count: %u, sample weight: %.2f", settings_SSRStepSize, settings_SSRStepCount, settings_SSRSampleWeight);
         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "DebugView: %d (%s), DebugValue: %d", debugView, debugViewNames[debugView], debugValue);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), UI_LAYER_1, TEXT_WHITE, "Num cells: %d, Player cell(%d):: x: %d, y: %d, z: %d", numCellsVisible, playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z);
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Character set test: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,;:'\"`~!@#...");
-//         RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "  ...$%^&*()-=+\\/|<>äöüéóâêîôû123456789る。エレベーターでレベルを離れよБбвГгДдЁЖжзИиЙйкЛлмнПптФфЦцЧчШшЩщЪъЫыЬьЭэЮюЯя[{end test}]");
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(screenCenterX - (TextWidth(statusText,FONT_NORMAL) * 0.5f), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
-        RenderUIImages();
-        
-        // Frame stats (AFTER EVERYTHING ELSE)
+        RenderUIImages();    
         double time_now = get_time();
         drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
         drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
@@ -1501,10 +1480,6 @@ int32_t main(int32_t argc, char* argv[]) {
         if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
         RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
         RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame);
-        // End ALL rendering
-        // ------------------------------------
-        // ====================================
-        // Final Client Frame Actions
         last_time = time_now;
         if ((time_now - lastFrameSecCountTime) >= 1.00) {
             lastFrameSecCountTime = time_now;
@@ -1520,10 +1495,6 @@ int32_t main(int32_t argc, char* argv[]) {
             }
         }
         
-        glUseProgram(0);
-        glDisable(GL_BLEND);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
         cpuTime = get_time() - current_time;
         glfwSwapBuffers(window); // Present frame
         CHECK_GL_ERROR();
