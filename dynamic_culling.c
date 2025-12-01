@@ -1,13 +1,10 @@
-typedef unsigned char stbi_uc;
-stbi_uc *stbi_load_from_memory(stbi_uc const *buffer, int len   , int *x, int *y);
-extern int stbi_arena_size;
+uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
+extern int32_t stbi_arena_size;
 extern void stbi__arena_init(void);
 extern void stbi__arena_reset(void);
 extern uint8_t*  stbi__arena_base;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 
-//=============================================================================
-// Culling System
 uint8_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint32_t cellIndexForInstance[INSTANCE_COUNT];

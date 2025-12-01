@@ -45,11 +45,11 @@ void LoadTextures(void) {
     size_t offsets_size          = MAX_VALID_TEXTURE * sizeof(uint32_t);
     size_t sizes_size            = MAX_VALID_TEXTURE * 2 * sizeof(int32_t);
     size_t palette_offsets_size  = MAX_VALID_TEXTURE * sizeof(uint32_t);
-    uint32_t maxUniqueColors = 80000u; uint32_t maxTotalPixels = 33000000u;
+    uint32_t maxUniqueColors = 79010u; uint32_t maxTotalPixels = 32800000u;
     size_t palettes_size         = maxUniqueColors * sizeof(uint32_t);
     size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
-    void* arena = mmap(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    void* arena = mmap(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     if (arena == MAP_FAILED) { DualLogError("Failed to mmap texture arena\n"); exit(1); }
     uint8_t* cur = (uint8_t*)arena;
     uint32_t* textureOffsets        = (uint32_t*)cur; cur += offsets_size;
@@ -169,7 +169,6 @@ void LoadTextures(void) {
 
     fclose(file);
     DebugRAM("After loop for load textures");
-
     if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
     
     loadedTextures++; // Increase to be a 1-based count for the SSBO sizes and print reports.
@@ -178,17 +177,7 @@ void LoadTextures(void) {
     colorBufferID = SetupSSBO(colorBufferID, 12, packed_size, NULL, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
     void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-    Packed4* out = (Packed4*)dst;
-    uint8_t* in  = all_indices;
-    for (uint32_t i = 0; i < totalPixels; i += 4) {
-        out->u8[0] = in[i];
-        out->u8[1] = (i + 1 < totalPixels) ? in[i + 1] : 0;
-        out->u8[2] = (i + 2 < totalPixels) ? in[i + 2] : 0;
-        out->u8[3] = (i + 3 < totalPixels) ? in[i + 3] : 0;
-        out++;
-    }
-
-    DebugRAM("prior to SSBO creation");
+    memcpy(dst, all_indices,packed_size);
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
     texturePalettesID       = SetupSSBO(texturePalettesID,       16, totalPaletteColors * sizeof(uint32_t), texturePalettes,       GL_STATIC_DRAW);
     textureOffsetsID        = SetupSSBO(textureOffsetsID,        14, loadedTextures * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
@@ -198,7 +187,6 @@ void LoadTextures(void) {
     glFlush();
     glFinish();
     CHECK_GL_ERROR();
-    DebugRAM("after SSBO creation and prior to munmap of LoadTextures arena and stbi_areena");
     madvise(arena, arena_size, MADV_DONTNEED); munmap(arena, arena_size); arena = NULL;
     madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     double end_time = get_time();
