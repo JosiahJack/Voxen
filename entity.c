@@ -691,15 +691,13 @@ void LoadLevel(uint8_t curlevel) {
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             // TODO: Set lightIsDynamic[lightsIdx] = true when light has animation data values set from file
             if (lightType == 1) {
-                if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Light %d on line %d loaded with spotAngle less than 5deg but was marked as spotlight type!\n",lightsIdx,lineNum+1);
+                if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",lightsIdx,lineNum+1);
             } else if (lightType == 2) {
                 // TODO: Handle directional lights for cyberspace
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             } else {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
-            
-            if (lightsIdx == 817) DualLog("Loaded light 817 positiong %f %f %f\n",lights[litIdx + LIGHT_DATA_OFFSET_POSX],lights[litIdx + LIGHT_DATA_OFFSET_POSY],lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;

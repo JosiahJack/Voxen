@@ -54,8 +54,7 @@ index: 15
 index: 16
 #Textures/ammo_rail.png
 index: 17
-#Textures/ammo_rubber2.png
-index: 18
+
 #Textures/ammo_rubber.png
 index: 19
 #Textures/ammo_slaglarge.png
@@ -76,8 +75,7 @@ index: 26
 index: 27
 #Textures/arm.png
 index: 28
-#Textures/ascr_static2.png
-index: 29
+
 #Textures/barrel_chemical.png
 index: 30
 #Textures/barrel_explosive.png
@@ -95,12 +93,7 @@ index: 36
 transparent: 1
 #Textures/beverage01.png
 index: 37
-#Textures/beverage02.png
-index: 38
-#Textures/beverage03.png
-index: 39
-#Textures/beverage04.png
-index: 40
+
 #Textures/black.png
 index: 41
 #Textures/blood_core.png
@@ -112,8 +105,7 @@ index: 43
 index: 44
 #Textures/bridg1_2.png
 index: 45
-#Textures/bridg1_3b.png
-index: 46
+
 #Textures/bridg1_3.png
 index: 47
 #Textures/bridg1_4.png
@@ -267,10 +259,7 @@ index: 118
 index: 119
 #Textures/console3_4.png
 index: 120
-#Textures/console3_5.png
-index: 121
-#Textures/console3_6.png
-index: 122
+
 #Textures/console3_7.png
 index: 123
 #Textures/console3_8.png
@@ -312,12 +301,7 @@ index: 138
 transparent: 1
 #Textures/crate1_1.png
 index: 139
-#Textures/crate1_2.png
-index: 140
-#Textures/crate1_3.png
-index: 141
-#Textures/crate1_4.png
-index: 142
+
 #Textures/crate2_1.png
 index: 143
 #Textures/crate2_2.png
@@ -363,8 +347,7 @@ index: 160
 index: 161
 #Textures/dexmissile_glow.png
 index: 162
-#Textures/dexmissile_normal.png
-index: 163
+
 #Textures/dexmissile.png
 index: 164
 #Textures/d_logo10.png
@@ -935,20 +918,7 @@ index: 413
 index: 414
 #Textures/keypad2.png
 index: 415
-#Textures/keypad3.png
-index: 416
-#Textures/keypad4.png
-index: 417
-#Textures/keypad5.png
-index: 418
-#Textures/keypad6.png
-index: 419
-#Textures/keypad7.png
-index: 420
-#Textures/keypad8.png
-index: 421
-#Textures/lamp_green.png
-index: 422
+
 #Textures/lamp.png
 index: 423
 #Textures/lite1_1_glow.png
@@ -959,8 +929,6 @@ index: 425
 index: 426
 #Textures/logic_probe.png
 index: 427
-#Textures/magshot01.png
-index: 428
 #Textures/magshot02.png
 index: 429
 #Textures/maint1_1.png
@@ -1121,8 +1089,7 @@ index: 506
 index: 507
 #Textures/med2_1d_glow.png
 index: 508
-#Textures/med2_1_disp.png
-index: 509
+
 #Textures/med2_1d.png
 index: 510
 #Textures/med2_1_glow.png
@@ -1181,8 +1148,7 @@ index: 536
 index: 537
 #Textures/MessyStreakTrail.png
 index: 538
-#Textures/normal_blank.png
-index: 539
+
 #Textures/npc_autobombdark.png
 index: 540
 #Textures/npc_autobomb_glow.png
@@ -1281,16 +1247,14 @@ index: 590
 index: 591
 #Textures/p_genius.png
 index: 592
-#Textures/phone.png
-index: 593
+
 #Textures/pinetreem.png
 index: 594
 #Textures/pipe1.png
 index: 595
 #Textures/pipe2.png
 index: 596
-#Textures/pipe3_90deg.png
-index: 597
+
 #Textures/pipe3.png
 index: 598
 #Textures/plastique.png
@@ -1309,14 +1273,7 @@ index: 604
 index: 605
 #Textures/pnl13_on.png
 index: 606
-#Textures/pnl14_g_glow.png
-index: 607
-#Textures/pnl14_g.png
-index: 608
-#Textures/pnl14_r.png
-index: 609
-#Textures/pnl14_y.png
-index: 610
+
 #Textures/pnl1_cl.png
 index: 611
 #Textures/pnl1_off.png
@@ -1337,14 +1294,7 @@ index: 618
 index: 619
 #Textures/pnl3_on.png
 index: 620
-#Textures/pnl4_cl.png
-index: 621
-#Textures/pnl4_op.png
-index: 622
-#Textures/pnl5_cl.png
-index: 623
-#Textures/pnl5_op.png
-index: 624
+
 #Textures/pnl6_cl.png
 index: 625
 #Textures/pnl6_off.png
@@ -1611,24 +1561,7 @@ index: 756
 index: 757
 #Textures/sci3_6.png
 index: 758
-#Textures/screen1.png
-index: 759
-#Textures/screen2.png
-index: 760
-#Textures/screen3.png
-index: 761
-#Textures/screen4.png
-index: 762
-#Textures/screen5.png
-index: 763
-#Textures/screen8_1.png
-index: 764
-#Textures/screen8_2.png
-index: 765
-#Textures/screen8_3.png
-index: 766
-#Textures/screen8_4.png
-index: 767
+
 #Textures/screencode0.png
 index: 768
 #Textures/screencode1.png
@@ -1809,14 +1742,7 @@ index: 856
 index: 857
 #Textures/sw8_up.png
 index: 858
-#Textures/sw9_dn.png
-index: 859
-#Textures/sw9_lf.png
-index: 860
-#Textures/sw9_rt.png
-index: 861
-#Textures/sw9_up.png
-index: 862
+
 #Textures/thermos.png
 index: 863
 #Textures/toolbox_wheeled_normal.png

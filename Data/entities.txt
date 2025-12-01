@@ -4456,7 +4456,6 @@ index: 559
 model: 76
 texture: 164
 glowtexture: 162
-normtexture: 163
 #prop_foliage_fernpoison
 index: 560
 #prop_foliage_bush
@@ -4489,6 +4488,8 @@ index: 573
 index: 574
 #prop_lamp
 index: 575
+model: 212
+texture: 423
 #prop_light_emergsignal
 index: 576
 #prop_microscope

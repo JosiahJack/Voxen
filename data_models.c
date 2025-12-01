@@ -89,6 +89,7 @@ static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float
     size_t written = write(fd, buf, total);
     if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
     free(buf);
+    malloc_trim(0);
     close(fd);
 }
 
@@ -97,17 +98,10 @@ typedef struct {
     size_t size;
 } MMapEntry;
 
-MMapEntry* mmap_cleanup = NULL;
+MMapEntry mmap_cleanup[MODEL_IDX_MAX];
 int mmap_cleanup_count = 0;
-int mmap_cleanup_capacity = 0;
 
 void add_mmap_cleanup(void* ptr, size_t size) {
-    if (mmap_cleanup_count >= mmap_cleanup_capacity) {
-        mmap_cleanup_capacity = mmap_cleanup_capacity ? mmap_cleanup_capacity * 2 : 256;
-        mmap_cleanup = realloc(mmap_cleanup, mmap_cleanup_capacity * sizeof(MMapEntry));
-        if (!mmap_cleanup) { DualLogError("realloc failed in add_mmap_cleanup\n"); exit(1); }
-    }
-    
     mmap_cleanup[mmap_cleanup_count].ptr = ptr;
     mmap_cleanup[mmap_cleanup_count].size = size;
     mmap_cleanup_count++;
@@ -115,13 +109,10 @@ void add_mmap_cleanup(void* ptr, size_t size) {
 
 void cleanup_all_mmaps(void) {
     for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
-    free(mmap_cleanup);
-    malloc_trim(0);
 }
 
 void LoadModels(void) {
     double start_time = get_time();
-    DebugRAM("start of LoadModels");
     loadedModels = 0;
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
 

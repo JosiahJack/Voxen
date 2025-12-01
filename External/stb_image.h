@@ -9,7 +9,7 @@ extern int stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
 extern void stbi__arena_reset(void);
-#define STBI_ARENA_SIZE 32 * 1024 * 1024
+#define STBI_ARENA_SIZE 16 * 1024 * 1024
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 typedef unsigned short stbi__uint16;

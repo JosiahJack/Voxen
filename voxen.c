@@ -1405,8 +1405,8 @@ int32_t main(int32_t argc, char* argv[]) {
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
+//         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
+        glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
         glDisable(GL_CULL_FACE);
         
         //    Cursor

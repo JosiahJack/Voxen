@@ -4,7 +4,7 @@ extern int stbi_arena_size;
 extern void stbi__arena_init(void);
 extern void stbi__arena_reset(void);
 extern uint8_t*  stbi__arena_base;
-#define STBI_ARENA_SIZE 32 * 1024 * 1024
+#define STBI_ARENA_SIZE 16 * 1024 * 1024
 
 //=============================================================================
 // Culling System

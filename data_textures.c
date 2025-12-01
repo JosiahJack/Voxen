@@ -12,7 +12,6 @@
 #include "entity.h"
 int close (int filedes); // #include <unistd.h>
 
-
 GLuint colorBufferID = 0;
 GLuint textureSizesID = 0;
 GLuint textureOffsetsID = 0;
@@ -46,7 +45,7 @@ void LoadTextures(void) {
     size_t offsets_size          = MAX_VALID_TEXTURE * sizeof(uint32_t);
     size_t sizes_size            = MAX_VALID_TEXTURE * 2 * sizeof(int32_t);
     size_t palette_offsets_size  = MAX_VALID_TEXTURE * sizeof(uint32_t);
-    uint32_t maxUniqueColors = 84000u; uint32_t maxTotalPixels = 35000000u;
+    uint32_t maxUniqueColors = 80000u; uint32_t maxTotalPixels = 33000000u;
     size_t palettes_size         = maxUniqueColors * sizeof(uint32_t);
     size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
@@ -152,8 +151,8 @@ void LoadTextures(void) {
                     totalPaletteColors += pal_size;
                     textureOffsets[currentIndex]        = pixel_base;
                     texturePaletteOffsets[currentIndex] = color_base;
-                    textureSizes[currentIndex * 2]       = widths[currentIndex];
-                    textureSizes[currentIndex * 2 + 1]   = heights[currentIndex];
+                    textureSizes[currentIndex * 2]      = widths[currentIndex];
+                    textureSizes[currentIndex * 2 + 1]  = heights[currentIndex];
                     memcpy(texturePalettes + color_base, palette, pal_size * sizeof(uint32_t));
                     pixel_base += numPixels; if (pixel_base > maxTotalPixels) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n",pixel_base,maxTotalPixels); exit(1); }
                     color_base += pal_size;  if (color_base > maxUniqueColors) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n",color_base,maxUniqueColors); exit(1); }
@@ -178,7 +177,7 @@ void LoadTextures(void) {
     int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
     colorBufferID = SetupSSBO(colorBufferID, 12, packed_size, NULL, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT);
+    void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
     Packed4* out = (Packed4*)dst;
     uint8_t* in  = all_indices;
     for (uint32_t i = 0; i < totalPixels; i += 4) {
