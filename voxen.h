@@ -1,7 +1,7 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.4"
-#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <time.h>
@@ -347,6 +347,10 @@ extern bool fatigueCheat;
 extern bool redbull;
 extern bool consoleActive;
 extern bool noHUD;
+extern bool showLocation;
+extern bool showFPS;
+extern uint8_t dizzyLevel;
+extern float skyRotateSpeed;
 // ----------------------------------------------------------------------------
 // Text
 #define TEXT_BUFFER_SIZE 1024
@@ -377,8 +381,8 @@ extern float genericTextHeightFac;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-int32_t CodepointToPackedIndex(int32_t codepoint, int fontID);
-float TextWidth(const char *utf8, int fontID);
+int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
+float TextWidth(const char *utf8, int32_t fontID);
 uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses();
 // ----------------------------------------------------------------------------

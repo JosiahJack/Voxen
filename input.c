@@ -152,7 +152,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
 
 void ProcessInput(void) {
     if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
-    if (keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(window);
+    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(window);
     if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
     
     // Debug inputs
@@ -202,10 +202,10 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_D].down) input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
     if (keyStates[GLFW_KEY_A].down) input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
     
-    if (noclip) {
+//     if (noclip) {
         if (keyStates[GLFW_KEY_C].down) input = add_vector3(input, (Vector3){0,  -1.0f, 0});
         else if (keyStates[GLFW_KEY_V].down) input = add_vector3(input, (Vector3){0,  1.0f, 0});
-    }
+//     }
 
     if (magnitude_vector3(input) > 0.1f) {
         input = normalize_vector3(input);

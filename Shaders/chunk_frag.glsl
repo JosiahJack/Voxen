@@ -189,7 +189,7 @@ void main() {
     }
 
     uint voxelIdx = GetVoxelIndex(worldPos);
-    uint count  = min(voxelLightListIndices[voxelIdx * 2 + 1],16u);
+    uint count = voxelLightListIndices[voxelIdx * 2 + 1];
     if (unlit > 0) count = 0;
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = adjustedNormal;
@@ -201,7 +201,6 @@ void main() {
         vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
         if (intensity < 0.05) continue;
-
 
         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
         vec3 toLight = lightPos - worldPos;

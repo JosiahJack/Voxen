@@ -38,6 +38,7 @@ layout(location = 26) uniform int SSR_RES;
 layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform vec3 staticColor;
+layout(location = 30) uniform float skyRotateSpeed;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
@@ -289,15 +290,15 @@ void main() {
     vec4 color = texture(tex, texCoordUsed).rgba;
     bool isSky = false;
     if (skyVisible > 0) {
-        isSky = (color.a > 0.19 && color.a < 0.21); // Sky hack alpha
+        isSky = (color.a > 0.1 && color.a < 0.8); // Sky hack alpha
         float mappedLat = 0.0;
         if (isSky) {
             vec2 ndc = texCoordUsed * 2.0 - 1.0;
             float fovRad = fov * PI / 180.0; // Convert FOV to radians
             float tanHalfFov = tan(fovRad * 0.5);
             vec3 viewDir = normalize(vec3(ndc.x * tanHalfFov * aspect, ndc.y * tanHalfFov, -1.0));
-            float cy = cos(camRot.x + timeVal * 0.05); // Yaw + time-based rotation
-            float sy = sin(camRot.x + timeVal * 0.05);
+            float cy = cos(camRot.x + timeVal * skyRotateSpeed); // Yaw + time-based rotation
+            float sy = sin(camRot.x + timeVal * skyRotateSpeed);
             float cp = cos(camRot.y); // Pitch
             float sp = sin(camRot.y);
             mat3 yawMatrix = mat3(cy, 0.0, sy, 0.0, 1.0, 0.0, -sy, 0.0, cy);

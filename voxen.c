@@ -171,6 +171,10 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 //    Images
 #define MAX_UI_IMAGES 64
 bool noHUD = false;
+bool showFPS = true;
+bool showLocation = false;
+uint8_t dizzyLevel = 0;
+float skyRotateSpeed = 0.05f;
 
 typedef struct {
     float x, y, z;        // Top-left corner in screen space (pixels)
@@ -335,6 +339,7 @@ void UpdateScreenSize(void) {
     glProgramUniform1ui(ssrShaderProgram, 0, screen_width / SSR_RES);
     glProgramUniform1ui(ssrShaderProgram, 1, screen_height / SSR_RES);       
     glProgramUniform1i(ssrShaderProgram, 7, SSR_RES);
+    glProgramUniform1f(imageBlitShaderProgram, 30, skyRotateSpeed);
 }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
@@ -522,6 +527,8 @@ void UpdateVoxelLightLists() {
 }
 
 void VoxelLists() {
+    double start_time = get_time();
+    DualLog("Loading voxels(%u)...", VOXEL_COUNT);
     DebugRAM("start of VoxelLists");
     voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -542,6 +549,7 @@ void VoxelLists() {
     glFlush();
     glFinish();
     DebugRAM("end of VoxelLists");
+    DualLog(" took %f secs\n", get_time() - start_time);
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
@@ -1421,7 +1429,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
         float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
         float shootModePos_y = 0.0f;
-        if (!gamePaused) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+        if (!gamePaused && !noHUD) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
         if (inventoryMode) {
             if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
                 if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
@@ -1463,11 +1471,11 @@ int32_t main(int32_t argc, char* argv[]) {
         // Diagnostics / Debugging
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
-        RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "SSR step size: %.2f, step count: %u, sample weight: %.2f", settings_SSRStepSize, settings_SSRStepCount, settings_SSRSampleWeight);
-        RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
+        if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "SSR step size: %.2f, step count: %u, sample weight: %.2f", settings_SSRStepSize, settings_SSRStepCount, settings_SSRSampleWeight);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > current_time) RenderFormattedText(screenCenterX - (TextWidth(statusText,FONT_NORMAL) * 0.5f), screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (statusTextDecayFinished > current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
         RenderUIImages();    
@@ -1479,8 +1487,8 @@ int32_t main(int32_t argc, char* argv[]) {
         uint8_t timingColor = TEXT_WHITE;
         if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_ORANGE;
         if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
-        RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame);
+        if (showFPS) RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
+        if (showFPS) RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, editMode);
         last_time = time_now;
         if ((time_now - lastFrameSecCountTime) >= 1.00) {
             lastFrameSecCountTime = time_now;
