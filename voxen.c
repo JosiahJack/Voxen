@@ -539,6 +539,8 @@ void VoxelLists() {
     for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    glFlush();
+    glFinish();
     DebugRAM("end of VoxelLists");
 }
 
@@ -669,6 +671,8 @@ void RenderShadowmaps(void) {
     glViewport(0, 0, screen_width, screen_height);
     glEnable(GL_CULL_FACE);
     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    glFlush();
+    glFinish();
     malloc_trim(0);
     DebugRAM("end of RenderShadowmaps");
 }
@@ -1062,28 +1066,25 @@ void InitializeEnvironment(void) {
     DebugRAM("ParseGameData end");
     glfwSetWindowTitle(window,global_modname);
     int fp = open("./Textures/UI/menudot1.png", O_RDONLY);
-    if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png: %s\n", strerror(errno)); exit(1); }
+    if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png\n"); exit(1); }
  
-    DebugRAM("after setting window title");
     stbi__arena_init();
     struct stat file_stat;
     fstat(fp, &file_stat);
-    size_t file_size = file_stat.st_size;            
-    uint8_t* file_buffer = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fp, 0);
+    uint8_t* file_buffer = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, fp, 0);
     close(fp);
     if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap ./Textures/UI/menudot1.png\n"); exit(1); }
                 
     int w = 1, h = 1;
-    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h);
+    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_stat.st_size, &w, &h);
     if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
-
-    DebugRAM("after loading window bar icon");
+    
     GLFWimage image;
     image.width  = w;
     image.height = h;
     image.pixels = pixels;
     glfwSetWindowIcon(window, 1, &image);
-    madvise(pixels, w * h * 4, MADV_DONTNEED); munmap(file_buffer,file_size);
+    madvise(pixels, w * h * 4, MADV_DONTNEED); munmap(file_buffer,file_stat.st_size);
     madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     malloc_trim(0);
     DebugRAM("after freeing window bar icon");

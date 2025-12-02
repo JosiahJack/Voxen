@@ -1,7 +1,7 @@
 #ifndef VOXEN_HEADER_H
 #define VOXEN_HEADER_H
 #define VERSION_STRING "v0.7.4"
-// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <time.h>
@@ -112,18 +112,18 @@ void LoadTextures(void);
 #define BOUNDS_DATA_OFFSET_MAXY 4
 #define BOUNDS_DATA_OFFSET_MAXZ 5
 #define BOUNDS_DATA_OFFSET_RADIUS 6
-extern float* modelBounds;
+extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT];
 extern float** modelVertices;
-extern GLuint* vbos;
-extern GLuint* tbos;
+extern GLuint vbos[MODEL_IDX_MAX];
+extern GLuint tbos[MODEL_IDX_MAX];
 extern uint16_t loadedTextures;
 extern uint16_t loadedModels;
 extern uint16_t loadedLights;
 extern uint16_t numDynamicLights;
 extern uint32_t totalShadowmapPixels;
 extern uint16_t gameObjectCount;
-extern uint32_t* modelVertexCounts;
-extern uint32_t* modelTriangleCounts;
+extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
+extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
 void LoadModels(void);
 
 // Lights

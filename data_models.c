@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include "voxen.h"
 #include "entity.h"
 #include "vmath.h"
@@ -19,20 +20,17 @@ ASSIMP_API void aiReleasePropertyStore(C_STRUCT aiPropertyStore *p); // #include
 ASSIMP_API const char *aiGetErrorString(void); // #include <assimp/cimport.h>
 ASSIMP_API void aiReleaseImport(const C_STRUCT aiScene *pScene); // #include <assimp/cimport.h>
 #include <assimp/scene.h> // Only 514 lines and make use of most all of it so leaving unhoovered, unlike assimp/cimport.h.
-int malloc_trim(size_t pad); // #include <malloc.h>
 ssize_t write(int fd, const void *buf, size_t nbytes); // #include <unistd.h>
 int close (int filedes); // #include <unistd.h>
+ssize_t read(int fd, void *buf, size_t count);
 
 DataParser model_parser;
-
-// Models
-float** modelVertices = NULL;
-uint32_t* modelVertexCounts = NULL;
-uint32_t* modelTriangleCounts = NULL;
-GLuint* vbos = NULL;
-GLuint* tbos = NULL;
-GLuint modelBoundsID;
-float* modelBounds = NULL;
+float** modelVertices = NULL; // Persistent for physics convex hulls and raycasts
+uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
+uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
+GLuint vbos[MODEL_IDX_MAX] = {0}; // 4kb
+GLuint tbos[MODEL_IDX_MAX] = {0}; // 4kb
+float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
 uint16_t loadedModels = 0;
 
 static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
@@ -77,7 +75,7 @@ static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float
     if (fd < 0) return;
 
     size_t total = 16 + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
-    uint8_t *buf = malloc(total);
+    uint8_t *buf = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     if (!buf) { close(fd); return; }
 
     uint8_t *p = buf;
@@ -88,8 +86,7 @@ static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float
     memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
     size_t written = write(fd, buf, total);
     if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
-    free(buf);
-    malloc_trim(0);
+    munmap(buf,total);
     close(fd);
 }
 
@@ -123,13 +120,11 @@ void LoadModels(void) {
 
     loadedModels = maxIndex + 1;
     DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
-    modelVertexCounts   = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    modelTriangleCounts = mmap(NULL, loadedModels * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     uint32_t** modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    modelBounds         = mmap(NULL, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
-    int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
+    size_t indexToParser_size = loadedModels * sizeof(int32_t);
+    int32_t* indexToParser = mmap(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     for (uint32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = k;
     }
@@ -159,27 +154,21 @@ void LoadModels(void) {
         if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); exit(1); }
 
         uint8_t fbx_md5[16];
-        {
-            FILE *f = fopen(fbx_path, "rb");
-            if (!f) { DualLogError("Cannot open %s for MD5\n", fbx_path); continue; }
-            fseek(f, 0, SEEK_END);
-            long sz = ftell(f); fseek(f, 0, SEEK_SET);
-            uint8_t *buf = malloc(sz);
-            size_t read = fread(buf, 1, sz, f);
-            if (read != (size_t)sz) { DualLogError("Failed to read full FBX: %s\n", fbx_path); exit(1); }
-                
-            fclose(f);
-            md5(buf, sz, fbx_md5);
-            free(buf);
-            malloc_trim(0);
-        }
+        int fbx_fp = open(fbx_path, O_RDONLY);
+        if (!fbx_fp) { DualLogError("Failed to open %s\n", fbx_path); exit(1); }
 
-        float  *cached_verts = NULL;
-        uint32_t cached_vcnt = 0;
-        uint32_t *cached_idx  = NULL;
-        uint32_t cached_icnt = 0;
-        void* mmap_map = NULL;
-        size_t mmap_size = 0;
+        struct stat fbxstat;
+        fstat(fbx_fp, &fbxstat);
+        uint8_t* buf = mmap(NULL, fbxstat.st_size, PROT_READ, MAP_PRIVATE, fbx_fp, 0);
+        close(fbx_fp);
+        if (buf == MAP_FAILED) { DualLogError("mmap failed for %s\n", fbx_path); exit(1); }
+        
+        size_t fbxread = read(fbx_fp, buf, fbxstat.st_size);
+        if (fbxread == 0) DualLogError("Read failure for %s\n", fbx_path);
+                                                     
+        md5(buf, fbxstat.st_size, fbx_md5);
+        munmap(buf, fbxstat.st_size);
+        float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;
         bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
         if (!cache_hit) {
             DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
@@ -237,7 +226,6 @@ void LoadModels(void) {
                 globalVertexOffset += mesh->mNumVertices;
             }
 
-            /* ---- bounds ---- */
             uint32_t base = i * BOUNDS_ATTRIBUTES_COUNT;
             modelBounds[base + BOUNDS_DATA_OFFSET_MINX] = minx;
             modelBounds[base + BOUNDS_DATA_OFFSET_MINY] = miny;
@@ -282,20 +270,16 @@ void LoadModels(void) {
     }
 
     DebugRAM("after to parallel model load loop");
-
+    madvise(indexToParser, indexToParser_size, MADV_DONTNEED); munmap(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
-    malloc_trim(0);
-    vbos = mmap(NULL, loadedModels * sizeof(GLuint), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    tbos = mmap(NULL, loadedModels * sizeof(GLuint), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     glGenBuffers(loadedModels, vbos);
     glGenBuffers(loadedModels, tbos);
-    uint32_t totalVertices = 0;
-    uint32_t totalTris = 0;
+    uint32_t totalVertices = 0, totalTris = 0;
     for (int i = 0; i < loadedModels; ++i) {
         if (modelVertexCounts[i] == 0) continue;
 
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
-        totalVertices += vertSize;
+        totalVertices += modelVertexCounts[i];
         size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         totalTris += triSize;
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
@@ -309,23 +293,25 @@ void LoadModels(void) {
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
+        glFlush(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier
+        glFinish();
     }
     
     DebugRAM("after to model to gpu transfer");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    GLuint modelBoundsID = 0;
     modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    glFlush();
+    glFinish();
     DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
-    free(indexToParser);
     for (int i = 0; i < loadedModels; ++i) {
         if (modelVertexCounts[i] == 0) continue;
         
         madvise(modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t), MADV_DONTNEED);
     }
+    
     cleanup_all_mmaps();
-
-
-    malloc_trim(0);
     DebugRAM("After Load Models");
 }
