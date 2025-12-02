@@ -80,7 +80,7 @@ bool ConstIndexInBounds(int constdex) {
 }
 
 bool ConstIndexIsGeometry(int constdex) {
-	return (constdex >= 0 && constdex <= 306 && constdex != 112) || constdex == 760;
+	return (constdex >= 0 && constdex <= 306 && constdex != 112 && constdex != 279) || constdex == 760;
 }
 
 bool ConstIndexIsDoor(int constdex) {
@@ -106,8 +106,8 @@ bool ConstIndexIsDynamicObject(uint16_t constIndex) {
 }
 
 bool ConstIndexIsStaticObjectSaveable(int constdex) {
-	return (   constdex == 112 || 
-               (constdex >= 448 && constdex < 458)
+	return (   constdex == 112 || constdex == 279
+            || (constdex >= 448 && constdex < 458)
 			|| constdex == 480 || constdex == 516
 			|| (constdex >= 518 && constdex <= 526)
 			|| constdex == 530 || constdex == 531 || constdex == 546
