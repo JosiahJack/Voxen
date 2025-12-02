@@ -737,10 +737,10 @@ void RenderUIImages() {
         }
 
         if (vertexCount > 0) {
-            glUniform1ui(1, BLACK_TEXTURE_IDX);
+            glUniform1ui(1, 0);
             glUniform1ui(18, currentTex);
-            glUniform1ui(19, BLACK_TEXTURE_IDX);
-            glUniform1ui(20, BLACK_TEXTURE_IDX);
+            glUniform1ui(19, 0);
+            glUniform1ui(20, 0);
             glNamedBufferData(textVBO, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
             glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
             drawCallsRenderedThisFrame++;
@@ -1065,26 +1065,26 @@ void InitializeEnvironment(void) {
     if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png: %s\n", strerror(errno)); exit(1); }
  
     DebugRAM("after setting window title");
-//     struct stat file_stat;
-//     fstat(fp, &file_stat);
-//     size_t file_size = file_stat.st_size;            
-//     uint8_t* file_buffer = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fp, 0);
-//     close(fp);
-//     if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap ./Textures/UI/menudot1.png\n"); exit(1); }
+    stbi__arena_init();
+    struct stat file_stat;
+    fstat(fp, &file_stat);
+    size_t file_size = file_stat.st_size;            
+    uint8_t* file_buffer = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fp, 0);
+    close(fp);
+    if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap ./Textures/UI/menudot1.png\n"); exit(1); }
                 
-//     int w = 1, h = 1;
-//     unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h);
-//     if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
-// 
-//     DebugRAM("after loading window bar icon");
-//     GLFWimage image;
-//     image.width  = w;
-//     image.height = h;
-//     image.pixels = pixels;
-//     glfwSetWindowIcon(window, 1, &image);
-//     free(pixels);
-//     munmap(file_buffer,file_size);
-//     madvise(pixels, w * h * 4, MADV_DONTNEED);
+    int w = 1, h = 1;
+    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_size, &w, &h);
+    if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
+
+    DebugRAM("after loading window bar icon");
+    GLFWimage image;
+    image.width  = w;
+    image.height = h;
+    image.pixels = pixels;
+    glfwSetWindowIcon(window, 1, &image);
+    madvise(pixels, w * h * 4, MADV_DONTNEED); munmap(file_buffer,file_size);
+    madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     malloc_trim(0);
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);

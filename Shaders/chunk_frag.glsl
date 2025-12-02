@@ -61,7 +61,6 @@ const int LIGHT_DATA_OFFSET_G = 11;
 const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
-const int BLACK_TEXTURE_IDX = 41;
 const uint MAX_SHADOWMAPS = 96u;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
 
@@ -147,7 +146,7 @@ void main() {
 
     if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
-    if (normInstanceIndex != BLACK_TEXTURE_IDX && debugValue < 1 && distToPixel < 10.24) {
+    if (normInstanceIndex != 0 && debugValue < 1 && distToPixel < 10.24) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -168,7 +167,7 @@ void main() {
     }
 
     vec4 glowColor = vec4(0.0,0.0,0.0,0.0);
-    if (glowIndex != BLACK_TEXTURE_IDX) {
+    if (glowIndex != 0) {
         ivec2 texSizeGlow = textureSizes[glowIndex];
         ivec2 texUVGlow = ivec2(int(floor(uv.x * float(texSizeGlow.x))), int(floor(uv.y * float(texSizeGlow.y))));
         texUVGlow.x = texUVGlow.x % texSizeGlow.x;

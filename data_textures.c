@@ -3,6 +3,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "External/stb_image.h"
+#include <stdlib.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -45,7 +46,7 @@ void LoadTextures(void) {
     size_t offsets_size          = MAX_VALID_TEXTURE * sizeof(uint32_t);
     size_t sizes_size            = MAX_VALID_TEXTURE * 2 * sizeof(int32_t);
     size_t palette_offsets_size  = MAX_VALID_TEXTURE * sizeof(uint32_t);
-    uint32_t maxUniqueColors = 79010u; uint32_t maxTotalPixels = 32800000u;
+    uint32_t maxUniqueColors = 72428u; uint32_t maxTotalPixels = 23573300u;
     size_t palettes_size         = maxUniqueColors * sizeof(uint32_t);
     size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
@@ -57,9 +58,8 @@ void LoadTextures(void) {
     uint32_t* texturePaletteOffsets = (uint32_t*)cur; cur += palette_offsets_size;
     uint32_t* texturePalettes       = (uint32_t*)cur; cur += palettes_size;
     uint8_t*  all_indices           = (uint8_t*)cur;
-    uint32_t pixel_base = 0u, color_base = 0u;
+    uint32_t pixel_base = 0u, color_base = 0u, lineNum = 0u;
     char line[1024];
-    uint32_t lineNum = 0u;
     int32_t currentIndex = -1;
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;

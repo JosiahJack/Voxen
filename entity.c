@@ -477,11 +477,11 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
     instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
-    if (instances[instanceIdx].glowIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].glowIndex = BLACK_TEXTURE_IDX;
+    if (instances[instanceIdx].glowIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].glowIndex = 0;
     instances[instanceIdx].specIndex = entities[entIdx].specIndex;
-    if (instances[instanceIdx].specIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].specIndex = BLACK_TEXTURE_IDX;
+    if (instances[instanceIdx].specIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].specIndex = 0;
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
-    if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = BLACK_TEXTURE_IDX;
+    if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = 0;
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
 //     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);

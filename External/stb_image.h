@@ -1,4 +1,5 @@
 // stb_image.h - PNG Load System
+#include "../vmath.h"
 #include <stdint.h>
 void DualLog(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
@@ -8,7 +9,6 @@ extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, 
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
-extern void stbi__arena_reset(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 
 #ifdef STB_IMAGE_IMPLEMENTATION
@@ -21,15 +21,9 @@ uint8_t* stbi__arena_end = NULL;
 
 void stbi__arena_init(void) {
     if (!stbi__arena_base) {
-        stbi__arena_base = mmap(NULL, STBI_ARENA_SIZE,
-                                PROT_READ | PROT_WRITE,
-                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (stbi__arena_base == MAP_FAILED) {
-            stbi__arena_base = NULL;
-        } else {
-            stbi__arena_cursor = stbi__arena_base;
-            stbi__arena_end    = stbi__arena_base + STBI_ARENA_SIZE;
-        }
+        stbi__arena_base = mmap(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        stbi__arena_cursor = stbi__arena_base;
+        stbi__arena_end    = stbi__arena_base + STBI_ARENA_SIZE;
     }
 }
 
@@ -43,17 +37,13 @@ void* stbi__arena_alloc(size_t size) {
     return aligned;
 }
 
-void stbi__arena_reset(void) {
-    if (stbi__arena_base) stbi__arena_cursor = stbi__arena_base;
-}
-
 typedef struct {
    uint32_t img_x, img_y;
    int32_t img_n, img_out_n;
    uint8_t *img_buffer, *img_buffer_end;
 } stbi__context;
 
-#include <stdlib.h>
+// #include <stdlib.h>
 void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
 void *memset(void *s, int c, size_t n);
 
@@ -153,16 +143,15 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman *z, const uint8_t* sizelist, 
    return 1;
 }
 
-static inline void stbi__fill_bits(stbi__zbuf *z) {
-   do {
-      z->code_buffer |= (unsigned int)(*z->zbuffer++) << z->num_bits;
-      z->num_bits += 8;
-   } while (z->num_bits <= 24);
-}
-
 inline static unsigned int stbi__zreceive(stbi__zbuf *z, int n) {
    unsigned int k;
-   if (z->num_bits < n) stbi__fill_bits(z);
+   if (z->num_bits < n) {
+      #pragma GCC unroll 24
+      do {
+         z->code_buffer |= (unsigned int)(*z->zbuffer++) << z->num_bits;
+         z->num_bits += 8;
+      } while (z->num_bits <= 24);
+   }
    k = z->code_buffer & ((1 << n) - 1);
    z->code_buffer >>= n;
    z->num_bits -= n;
@@ -171,7 +160,13 @@ inline static unsigned int stbi__zreceive(stbi__zbuf *z, int n) {
 
 inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
    int s;
-   if (a->num_bits < 16) stbi__fill_bits(a);
+   if (a->num_bits < 16) {
+      #pragma GCC unroll 24
+      do {
+         a->code_buffer |= (unsigned int)(*a->zbuffer++) << a->num_bits;
+         a->num_bits += 8;
+      } while (a->num_bits <= 24);
+   }
    int b = z->fast[a->code_buffer & ((1 << 9) - 1)];
    if (b) {
       s = b >> 9;
@@ -335,9 +330,9 @@ static uint8_t first_row_filter[5] = {
 
 inline static int32_t stbi__paeth(int32_t a, int32_t b, int32_t c) {
    int32_t p = a + b - c;
-   int32_t pa = abs(p-a);
-   int32_t pb = abs(p-b);
-   int32_t pc = abs(p-c);
+   int32_t pa = vabs(p-a);
+   int32_t pb = vabs(p-b);
+   int32_t pc = vabs(p-c);
    if (pa <= pb && pa <= pc) return a;
    if (pb <= pc) return b;
    return c;
@@ -352,7 +347,6 @@ static int32_t stbi__create_png_image_raw(stbi__png* a, uint8_t* raw, uint32_t r
    int32_t k;
    int32_t output_bytes = out_n;
    int32_t filter_bytes = img_n;
-   int32_t width = x;
    a->out = (uint8_t*)stbi__arena_alloc(x * y * output_bytes);
    img_width_bytes = (((img_n * x * 8) + 7) >> 3);
    img_len = (img_width_bytes + 1) * y;
@@ -381,52 +375,34 @@ static int32_t stbi__create_png_image_raw(stbi__png* a, uint8_t* raw, uint32_t r
       raw += img_n;
       cur += out_n;
       prior += out_n;
-      if (img_n == out_n) { // this is a little gross, so that we don't switch per-pixel or per-component
-         int nk = (width - 1)*filter_bytes;
-         switch (filter) {
-            case STBI__F_none:         memcpy(cur, raw, nk); break;
-            case STBI__F_sub:       for (k=0; k < nk; ++k) { cur[k] = (raw[k] + cur[k-filter_bytes]); } break;
-            case STBI__F_up:        for (k=0; k < nk; ++k) { cur[k] = (raw[k] + prior[k]); } break;
-            case STBI__F_avg:       for (k=0; k < nk; ++k) { cur[k] = (raw[k] + ((prior[k] + cur[k-filter_bytes])>>1)); } break;
-            case STBI__F_paeth:     for (k=0; k < nk; ++k) { cur[k] = (raw[k] + stbi__paeth(cur[k-filter_bytes],prior[k],prior[k-filter_bytes])); } break;
-            case STBI__F_avg_first: for (k=0; k < nk; ++k) { cur[k] = (raw[k] + (cur[k-filter_bytes] >> 1)); } break;
-         }
-
-         raw += nk;
-      } else {
-         #define STBI__CASE(f) \
-             case f:     \
-                for (i=x-1; i >= 1; --i, cur[filter_bytes]=255,raw+=filter_bytes,cur+=output_bytes,prior+=output_bytes) \
-                   for (k=0; k < filter_bytes; ++k)
-         switch (filter) {
-            STBI__CASE(STBI__F_none)         { cur[k] = raw[k]; } break;
-            STBI__CASE(STBI__F_sub)          { cur[k] = (raw[k] + cur[k- output_bytes]); } break; // Supports RGB only, no A
-            STBI__CASE(STBI__F_up)           { cur[k] = (raw[k] + prior[k]); } break;
-            STBI__CASE(STBI__F_avg)          { cur[k] = (raw[k] + ((prior[k] + cur[k- output_bytes])>>1)); } break; // Also supports RGB only, no A
-            STBI__CASE(STBI__F_paeth)        { cur[k] = (raw[k] + stbi__paeth(cur[k- output_bytes],prior[k],prior[k- output_bytes])); } break; // Also supports RGB only, no A
-            STBI__CASE(STBI__F_avg_first)    { cur[k] = (raw[k] + (cur[k- output_bytes] >> 1)); } break;
-         }
-         #undef STBI__CASE
+      #define STBI__CASE(f) \
+            case f:     \
+               for (i=x-1; i >= 1; --i, cur[filter_bytes]=255,raw+=filter_bytes,cur+=output_bytes,prior+=output_bytes) \
+                  for (k=0; k < filter_bytes; ++k)
+      switch (filter) {
+         STBI__CASE(STBI__F_none)         { cur[k] = raw[k]; } break;
+         STBI__CASE(STBI__F_sub)          { cur[k] = (raw[k] + cur[k- output_bytes]); } break; // Supports RGB only, no A
+         STBI__CASE(STBI__F_up)           { cur[k] = (raw[k] + prior[k]); } break;
+         STBI__CASE(STBI__F_avg)          { cur[k] = (raw[k] + ((prior[k] + cur[k- output_bytes])>>1)); } break; // Also supports RGB only, no A
+         STBI__CASE(STBI__F_paeth)        { cur[k] = (raw[k] + stbi__paeth(cur[k- output_bytes],prior[k],prior[k- output_bytes])); } break; // Also supports RGB only, no A
+         STBI__CASE(STBI__F_avg_first)    { cur[k] = (raw[k] + (cur[k- output_bytes] >> 1)); } break;
       }
+      #undef STBI__CASE
    }
 
    return 1;
 }
 
 extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int *x, int *y) {
-   stbi__arena_reset();
+   if (stbi__arena_base) stbi__arena_cursor = stbi__arena_base;
    stbi__context s;
-   s.img_x = s.img_y = 0;
    s.img_n = s.img_out_n = 0;
    s.img_buffer = (uint8_t*)buffer;
    s.img_buffer_end = (uint8_t*)buffer+len;
    void* result = NULL;
    stbi__png z = {0};
    z.s = &s;
-   uint8_t palette[1024], pal_img_n=0;
-   uint8_t has_trans=0, tc[3]={0};
-   uint32_t ioff=0, idata_limit=0, i, pal_len=0;
-   int color = 0;
+   uint32_t ioff = 0;
    z.expanded = NULL;
    z.idata = NULL;
    z.out = NULL;
@@ -439,44 +415,18 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int *x, in
             s.img_x = stbi__get32be(&s);
             s.img_y = stbi__get32be(&s);
             s.img_buffer++;
-            color = (*s.img_buffer++);
-            if (color == 3) pal_img_n = 3;
+            int32_t color = (*s.img_buffer++);
             s.img_buffer += 3;
-            if (!pal_img_n) s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
-            else s.img_n = 1;
-           
+            s.img_n = (color & 2 ? 3 : 1) + (color & 4 ? 1 : 0);
             break;
          }
-
-         case 0x504C5445: { // PLTE
-            pal_len = length / 3;            
-            for (i=0; i < pal_len; ++i) {
-               palette[i*4+0] = (*s.img_buffer++);
-               palette[i*4+1] = (*s.img_buffer++);
-               palette[i*4+2] = (*s.img_buffer++);
-               palette[i*4+3] = 255;
-            }
-            break;
-         }
-
-         case 0x74524E53: { // tRNS
-            if (pal_img_n) {
-               pal_img_n = 4;
-               for (i=0; i < length; ++i) palette[i*4+3] = (*s.img_buffer++);
-            }
-            break;
-         }
-
+         
          case 0x49444154: { // IDAT
-            if (ioff + length > idata_limit) {
-               size_t new_limit = idata_limit ? idata_limit * 2 : 4096;
-               while (ioff + length > new_limit) new_limit *= 2;
-               uint8_t* new_buf = (uint8_t*)stbi__arena_alloc(new_limit);
-               if (z.idata) memcpy(new_buf, z.idata, idata_limit);  // old size = current idata_limit
-               z.idata = new_buf;
-               idata_limit = new_limit;
+            if (!z.idata) {
+               z.idata = stbi__arena_alloc(len + 16);
+               ioff = 0;
             }
-
+            
             memcpy(z.idata + ioff, s.img_buffer, length);
             s.img_buffer += length;
             ioff += length;
@@ -487,54 +437,15 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int *x, in
             uint32_t bpl = (s.img_x);
             uint32_t raw_len = bpl * s.img_y * s.img_n + s.img_y;
             z.expanded = (uint8_t*)stbi_zlib_decode_malloc_guesssize_headerflag((uint8_t*)z.idata, ioff, raw_len, (int32_t*)(&raw_len));
-            if ((4 == s.img_n+1 && !pal_img_n) || has_trans) s.img_out_n = s.img_n+1;
+            if (s.img_n+1 == 4) s.img_out_n = s.img_n+1;
             else s.img_out_n = s.img_n;
 
             stbi__create_png_image_raw(&z, z.expanded, raw_len, s.img_out_n, s.img_x, s.img_y, z.s->img_n);
-            if (has_trans) {
-               uint32_t i, pixel_count = s.img_x * s.img_y;
-               uint8_t* p = z.out;
-               if (s.img_out_n == 2) {
-                  for (i=0; i < pixel_count; ++i) {
-                     p[1] = (p[0] == tc[0] ? 0 : 255);
-                     p += 2;
-                  }
-               } else {
-                  for (i=0; i < pixel_count; ++i) {
-                     if (p[0] == tc[0] && p[1] == tc[1] && p[2] == tc[2]) p[3] = 0;
-                     p += 4;
-                  }
-               }
-            }
-            
-            if (pal_img_n) { // pal_img_n == 3 or 4
-               s.img_n = pal_img_n; // record the actual colors we had
-               s.img_out_n = pal_img_n;
-               s.img_out_n = 4;
-               uint32_t i, pixel_count = s.img_x * s.img_y;
-               uint8_t* p, *temp_out, *orig = z.out;
-               p = (uint8_t*)stbi__arena_alloc(pixel_count * s.img_out_n);
-               temp_out = p;
-               for (i=0; i < pixel_count; ++i) {
-                  int n = orig[i]*4;
-                  p[0] = palette[n  ];
-                  p[1] = palette[n+1];
-                  p[2] = palette[n+2];
-                  p[3] = palette[n+3];
-                  p += 4;
-               }
-               z.out = temp_out;
-            } else if (has_trans) { // non-paletted image with tRNS -> source image has (constant) alpha
-               ++s.img_n;
-            }
-
             stbi__get32be(&s); // end of PNG chunk, read and skip CRC
             goto Label_parsesuccess;
          }
 
-         default:
-            if (length != 0) s.img_buffer += length;
-            break;
+         default: s.img_buffer += length; break;
       }
       
       stbi__get32be(&s); // end of PNG chunk, read and skip CRC

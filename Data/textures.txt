@@ -18,7 +18,7 @@
 // ls *.png | sort | awk '{print "#Textures/"$0"\nindex: "NR-1}'
 //
 // Unneeded fields do not need to be specified.
-#Textures/UI/ss1_original_palette_FULL.png
+#Textures/black.png
 index: 0
 #Textures/access_card02.png
 index: 1
@@ -94,8 +94,6 @@ transparent: 1
 #Textures/beverage01.png
 index: 37
 
-#Textures/black.png
-index: 41
 #Textures/blood_core.png
 index: 42
 transparent: 1
@@ -195,8 +193,7 @@ index: 86
 index: 87
 #Textures/citmat1_5.png
 index: 88
-#Textures/citmat1_6.png
-index: 89
+
 #Textures/citmat1_7.png
 index: 90
 #Textures/citmat1_8mutated.png
@@ -253,8 +250,7 @@ index: 115
 index: 116
 #Textures/console3_1.png
 index: 117
-#Textures/console3_2.png
-index: 118
+
 #Textures/console3_3.png
 index: 119
 #Textures/console3_4.png
@@ -298,9 +294,6 @@ transparent: 1
 index: 137
 #Textures/corpse_tan.png
 index: 138
-transparent: 1
-#Textures/crate1_1.png
-index: 139
 
 #Textures/crate2_1.png
 index: 143
@@ -531,9 +524,7 @@ transparent: 1
 #Textures/d_scorchtiny.png
 index: 232
 transparent: 1
-#Textures/d_splat1.png
-index: 233
-transparent: 1
+
 #Textures/d_splat2.png
 index: 234
 transparent: 1
@@ -558,9 +549,7 @@ transparent: 1
 #Textures/d_words7.png
 index: 241
 transparent: 1
-#Textures/d_words8.png
-index: 242
-transparent: 1
+
 #Textures/ef_cyber0.png
 index: 243
 transparent: 1
@@ -570,18 +559,15 @@ transparent: 1
 #Textures/ef_shard.png
 index: 245
 transparent: 1
-#Textures/elev1_dn.png
-index: 246
+
 #Textures/elev1_up.png
 index: 247
-#Textures/elev2_dn.png
-index: 248
+
 #Textures/elev2_up.png
 index: 249
 #Textures/elev3_dn.png
 index: 250
-#Textures/elev3_up.png
-index: 251
+
 #Textures/EnemShot2.png
 index: 252
 transparent: 1
@@ -1169,8 +1155,7 @@ index: 547
 index: 548
 #Textures/npc_cyborg_enforcer256.png
 index: 550
-#Textures/npc_cyborg.png
-index: 552
+
 #Textures/npc_sec3bot.png
 index: 553
 #Textures/npc_cyborgwarrior.png
@@ -1263,14 +1248,12 @@ index: 599
 index: 600
 #Textures/pnl10_cl.png
 index: 601
-#Textures/pnl11_off.png
-index: 602
+
 #Textures/pnl12_on.png
 index: 603
 #Textures/pnl13_cl.png
 index: 604
-#Textures/pnl13_off.png
-index: 605
+
 #Textures/pnl13_on.png
 index: 606
 
@@ -1297,26 +1280,22 @@ index: 620
 
 #Textures/pnl6_cl.png
 index: 625
-#Textures/pnl6_off.png
-index: 626
+
 #Textures/pnl6_on.png
 index: 627
 #Textures/pnl7_cl.png
 index: 628
-#Textures/pnl7_off.png
-index: 629
+
 #Textures/pnl7_on.png
 index: 630
 #Textures/pnl8_cl.png
 index: 631
-#Textures/pnl8_off.png
-index: 632
+
 #Textures/pnl8_on.png
 index: 633
 #Textures/pnl9_cl.png
 index: 634
-#Textures/pnl9_off.png
-index: 635
+
 #Textures/pnl9_on.png
 index: 636
 #Textures/pnl_ded.png
@@ -1696,12 +1675,10 @@ index: 833
 index: 834
 #Textures/stunshot.png
 index: 835
-#Textures/Sun.png
-index: 836
+
 #Textures/sw1_dn.png
 index: 837
-#Textures/sw1_up.png
-index: 838
+
 #Textures/sw2_dn.png
 index: 839
 #Textures/sw2_up_glow.png
@@ -1714,24 +1691,14 @@ index: 842
 index: 843
 #Textures/sw3_up.png
 index: 844
-#Textures/sw4_dn.png
-index: 845
+
 #Textures/sw4_up.png
 index: 846
 #Textures/sw5_ded.png
 index: 847
 #Textures/sw5_dn.png
 index: 848
-#Textures/sw5_up_glow.png
-index: 849
-#Textures/sw5_up.png
-index: 850
-#Textures/sw6_dn.png
-index: 851
-#Textures/sw6_up.png
-index: 852
-#Textures/sw7_dn.png
-index: 853
+
 #Textures/sw7_up.png
 index: 854
 #Textures/sw8_dn_glow.png
@@ -1812,12 +1779,10 @@ index: 897
 index: 898
 #Textures/UI/ammopane_red.png
 index: 899
-#Textures/UI/biomonitorplaceholder.png
-index: 907
+
 #Textures/UI/buttonborder_orange.png
 index: 908
-#Textures/UI/centertab.png
-index: 909
+
 #Textures/UI/checkbox.png
 index: 910
 #Textures/UI/checkmark.png
@@ -1924,54 +1889,7 @@ index: 962
 index: 963
 #Textures/UI/health_tickred.png
 index: 964
-#Textures/UI/healthticks10.png
-index: 965
-#Textures/UI/healthticks11.png
-index: 966
-#Textures/UI/healthticks12.png
-index: 967
-#Textures/UI/healthticks13.png
-index: 968
-#Textures/UI/healthticks14.png
-index: 969
-#Textures/UI/healthticks15.png
-index: 970
-#Textures/UI/healthticks16.png
-index: 971
-#Textures/UI/healthticks17.png
-index: 972
-#Textures/UI/healthticks18.png
-index: 973
-#Textures/UI/healthticks19.png
-index: 974
-#Textures/UI/healthticks1.png
-index: 975
-#Textures/UI/healthticks20.png
-index: 976
-#Textures/UI/healthticks21.png
-index: 977
-#Textures/UI/healthticks22.png
-index: 978
-#Textures/UI/healthticks23.png
-index: 979
-#Textures/UI/healthticks24.png
-index: 980
-#Textures/UI/healthticks2.png
-index: 981
-#Textures/UI/healthticks3.png
-index: 982
-#Textures/UI/healthticks4.png
-index: 983
-#Textures/UI/healthticks5.png
-index: 984
-#Textures/UI/healthticks6.png
-index: 985
-#Textures/UI/healthticks7.png
-index: 986
-#Textures/UI/healthticks8.png
-index: 987
-#Textures/UI/healthticks9.png
-index: 988
+
 #Textures/UI/hud_hwico_biostats_off.png
 index: 989
 #Textures/UI/hud_hwico_biostats_v1.png
@@ -2046,18 +1964,7 @@ index: 1028
 index: 1029
 #Textures/UI/menu_config.png
 index: 1030
-#Textures/UI/menudot1.png
-index: 1031
-#Textures/UI/menudot2.png
-index: 1032
-#Textures/UI/menudot3.png
-index: 1033
-#Textures/UI/menudot4.png
-index: 1034
-#Textures/UI/menudot5.png
-index: 1035
-#Textures/UI/menudot6.png
-index: 1036
+
 #Textures/UI/menu_load.png
 index: 1037
 #Textures/UI/nav_e.png
@@ -2194,12 +2101,7 @@ index: 1116
 index: 1117
 #Textures/sequences/broken_clock02.png
 index: 1118
-#Textures/sequences/door_x1_01.png
-index: 1119
-#Textures/sequences/door_x1_02.png
-index: 1120
-#Textures/sequences/door_x1_03.png
-index: 1121
+
 #Textures/sequences/engpump_03_glow.png
 index: 1122
 #Textures/sequences/engscreen1_04.png
@@ -2278,8 +2180,7 @@ index: 1158
 index: 1159
 #Textures/sequences/scr_exp02.png
 index: 1160
-#Textures/sequences/scr_exp03.png
-index: 1161
+// Use white.png for 3rd frame
 #Textures/sequences/scr_exp04.png
 index: 1162
 #Textures/sequences/scr_exp05.png
@@ -2461,8 +2362,7 @@ index: 1249
 index: 1250
 #Textures/deb_warecasing.png
 index: 1251
-#Textures/sequences/engpump_00.png
-index: 1252
+
 #Textures/sequences/engpump_03.png
 index: 1253
 #Textures/med2_1_spec.png
