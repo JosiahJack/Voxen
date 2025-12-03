@@ -607,7 +607,8 @@ void CullInit(void) {
         case 12:worldMin_x = -34.53f + ( 0.00000f +   19.0400f); worldMin_z = -123.74f + (0.0f + 95.8f); break;
     }
     
-    worldMin_x -= 2.56f; // Add one cell gap around edges
+    // worldMin_x and worldMin_z are the center points of the cells at furthest extents, thus correspond to minimum x or z positions in open cells the player can access.
+    worldMin_x -= 2.56f; // Add one cell gap around edges, now they are floating in guaranteed closed cells instead of empty space
     worldMin_z -= 2.56f;
     voxelMinCenterX = worldMin_x + VOXEL_HALF;
     voxelMinCenterZ = worldMin_z + VOXEL_HALF;
@@ -666,7 +667,6 @@ void CullInit(void) {
         cellIndexForLight[i] = (z * WORLDX) + x;
         cellIndexForLightX[i] = x;
         cellIndexForLightZ[i] = z;
-        break;
     }
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.

@@ -72,7 +72,7 @@ double time_PhysicsStep = 0.0;
 char statusText[TEXT_BUFFER_SIZE];
 // ----------------------------------------------------------------------------
 // Settings
-uint8_t settings_Shadows = 1u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
+uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
 uint8_t settings_VolumeMusic = 20u;
@@ -172,7 +172,7 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384;
 #define MAX_UI_IMAGES 64
 bool noHUD = false;
 bool showFPS = true;
-bool showLocation = false;
+bool showLocation = true;
 uint8_t dizzyLevel = 0;
 float skyRotateSpeed = 0.05f;
 
@@ -418,6 +418,7 @@ void UpdateVoxelLightLists() {
         for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * WORLDX + cellX;
+//                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue;
                 
                 #pragma GCC unroll 8
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
@@ -491,6 +492,7 @@ void UpdateVoxelLightLists() {
         for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
             for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
                 uint32_t cellIndex = cellZ * WORLDX + cellX;
+//                 if (!(gridCellStates[cellIndex] & CELL_OPEN)) continue;
 
                 #pragma GCC unroll 8
                 for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
@@ -611,6 +613,8 @@ int32_t compareLightCandidates(const void* a, const void* b) {
     return (ca->score < cb->score) ? -1 : ((ca->score > cb->score) ? 1 : 0);
 }
 
+uint32_t numShadowsCouldRender = 0;
+
 void RenderShadowmaps(void) {
     DebugRAM("start of RenderShadowmaps");
     if (settings_Shadows < 1u) return;
@@ -629,11 +633,14 @@ void RenderShadowmaps(void) {
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
     LightCandidate candidates[loadedLights];
-    uint32_t candidateCount = 0;
+    numShadowsCouldRender = 0;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        if (intensity < 0.1f) continue;
+        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        float thresh = 0.02f;
+        float luminosity = (intensity / (range * range));
+        if (luminosity < thresh) continue;
         
         float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -641,7 +648,6 @@ void RenderShadowmaps(void) {
         float dx = lightPosX - instances[PLAYER1].position.x;
         float dy = lightPosY - instances[PLAYER1].position.y;
         float dz = lightPosZ - instances[PLAYER1].position.z;
-//         float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
         float distSqrd = dx * dx + dy * dy + dz * dz;
         if (distSqrd >= FAR_PLANE_SQUARED) continue;
         
@@ -650,8 +656,7 @@ void RenderShadowmaps(void) {
         if (!inPVS) {
             int x = cellIndexForLightX[i];
             int z = cellIndexForLightZ[i];
-            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-            int r = vfloor(range * 0.390625f);
+            int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F)); // 1 / 2.56f
             for (int ix = x - r; ix <= x + r && !inPVS; ix++) {
                 for (int iz = z - r; iz <= z + r; iz++) {
                     if (!XZPairInBounds(ix, iz)) continue;
@@ -670,13 +675,15 @@ void RenderShadowmaps(void) {
         float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
         if (dotResult > 0.5f) score *= 8.0f; // Favor lights in player's view cone
         else if (dotResult > 0.0f) score *= 4.0f; // Favor lights in player's view cone
-        candidates[candidateCount++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
+        
+        candidates[numShadowsCouldRender++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
     }
 
-    qsort(candidates, candidateCount, sizeof(LightCandidate), compareLightCandidates);
-    uint32_t numToRender = vmin(candidateCount, MAX_SHADOWMAPS);
+    qsort(candidates, numShadowsCouldRender, sizeof(LightCandidate), compareLightCandidates);
+    uint32_t numToRender = vmin(numShadowsCouldRender, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
+        uint16_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
         RenderShadowmap(lightIdx);
@@ -1488,7 +1495,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f", timeSinceLastPhysicsTick);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx);
         if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);

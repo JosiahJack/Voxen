@@ -155,7 +155,7 @@ void LoadModels(void);
 #define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
 
-#define MAX_SHADOWMAPS 32u
+#define MAX_SHADOWMAPS 72u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
