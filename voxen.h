@@ -155,7 +155,7 @@ void LoadModels(void);
 #define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
 
-#define MAX_SHADOWMAPS 128u
+#define MAX_SHADOWMAPS 32u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -241,6 +241,7 @@ bool get_cull_bit(const uint32_t* arr, size_t idx);
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 // TODO: Ensure that npc corpses get dynamicFriction of 10.0f, staticFriction of 10.0f, bounciness of 0.0f, frictionCombine of 2, bounceCombine of 3
 extern double time_PhysicsStep;
+extern uint8_t boosterActive;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;
 static const uint8_t PhysicsLayer_TransparentFX    = 1;
@@ -472,19 +473,6 @@ static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16
 
 static inline bool XZPairInBounds(int32_t x, int32_t z) {
     return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
-}
-
-inline float squareDistance2D(float x1, float z1, float x2, float z2) {
-    float dx = x2 - x1;
-    float dz = z2 - z1;
-    return dx * dx + dz * dz;
-}
-
-inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
-    float dx = x2 - x1;
-    float dy = y2 - y1;
-    float dz = z2 - z1;
-    return dx * dx + dy * dy + dz * dz;
 }
 
 static inline void flag_enable(uint32_t *flags, uint32_t bit) {

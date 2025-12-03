@@ -1,11 +1,20 @@
 // physics.c - Physics System
 #include "voxen.h"
+#include "event.h"
 #include "entity.h"
 #include "matvecquat.h"
 #include "vmath.h"
 void ProcessInput(void);
 void UpdatePlayerFacingAngles(void);
 
+#define PLAYER_MAX_WALK_SPEED 3.2f
+#define PLAYER_MAX_SPRINT_SPEED 8.8f
+#define PLAYER_MAX_CYBER_SPEED 5.0f
+#define PLAYER_MAX_CYBER_ULTIMATE_SPEED 12.0f
+#define PLAYER_MAX_SPRINT_SPEED_FATIGUED 5.5f
+#define PLAYER_MAX_CROUCH_SPEED 1.25f
+#define PLAYER_MAX_PRONE_SPEED 0.5f
+#define PLAYER_BOOSTER_SPEED_BOOST 1.2f
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
@@ -14,6 +23,7 @@ bool god = true;
 bool notarget = false;
 bool fatigueCheat = false;
 bool redbull = false;
+float fatigue;
 
 typedef struct {
     Vector3 normal;
@@ -433,37 +443,6 @@ void ComputeInertiaFromCollider(Entity* e) {
     if (e->inertia < 1e-6f) e->inertia = e->mass;
 }
 
-void IntegratePhysics(float dt) {
-    for (uint16_t i = PLAYER1; i < /*loadedInstances*/ PLAYER1 + 1; ++i) { // Temporarily only update player's position
-        Entity* e = &instances[i];
-        if ((!(e->entflags & ENTFLAG_ACTIVE)) || (e->entflags & ENTFLAG_KINEMATIC) || e->mass <= 0.0f) continue;
-
-        if ((e->entflags & ENTFLAG_USEGRAVITY)) e->accumulatedForce = add_vector3(e->accumulatedForce, scale_vector3((Vector3){0.0f,-9.81f,0.0f}, e->mass));
-        Vector3 accel = scale_vector3(e->accumulatedForce, 1.0f / e->mass);
-        e->velocity = add_vector3(e->velocity, scale_vector3(accel, dt));
-        e->velocity = scale_vector3(e->velocity, (1.0f - e->linearDrag * dt));
-        e->position = add_vector3(e->position, scale_vector3(e->velocity, dt));
-        if (ConstIndexIsNPC(e->index) || i == PLAYER1 || i == PLAYER2) {
-            e->angularVelocity = e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
-        } else if (e->inertia > 0.0f) {
-            float invI = 1.0f / e->inertia;
-            Vector3 angAccel = scale_vector3(e->accumulatedTorque, invI);
-            e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(angAccel, dt));
-            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * dt));
-            float angMag = magnitude_vector3(e->angularVelocity);
-            if (angMag > 1e-6f) {
-                float angle = angMag * dt;
-                Vector3 axis = normalize_vector3(e->angularVelocity);
-                Quaternion deltaQ = axis_angle_quaternion(axis, angle);
-                e->rotation = mul_quaternion(deltaQ, e->rotation);
-                normalize_quaternion(&e->rotation);
-            }
-        }
-
-        e->accumulatedForce = e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
-    }
-}
-
 // AddForce (mimics Unity AddForce; isImpulse=true for ForceMode.Impulse, false for Force).
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse) {
     Entity* e = &instances[idx];
@@ -521,8 +500,104 @@ void AddExplosionForce(uint16_t idx, float power, Vector3 explosionPos, float ra
     else           e->accumulatedForce = add_vector3(e->accumulatedForce, explosionForce);
 }
 
+float GetBasePlayerSpeed(bool running) {
+    bool isSprinting = keyStates[GLFW_KEY_LEFT_SHIFT].down; // TODO handle keybind
+    if (noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
+    if (noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
+    if (currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+
+    float retval = PLAYER_MAX_WALK_SPEED;
+    float bonus = 0.0f;
+    if (boosterActive > 0u) bonus = PLAYER_BOOSTER_SPEED_BOOST; // TODO proper booster hookup
+    BodyState bodyState = instances[PLAYER1].bodyState;
+    switch (bodyState) {
+        case BodyState_Standing: 		retval = PLAYER_MAX_WALK_SPEED;   break;
+        case BodyState_Crouch: 			retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case BodyState_CrouchingDown: 	retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case BodyState_StandingUp: 		retval = PLAYER_MAX_WALK_SPEED;   break;
+        case BodyState_Prone: 			retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case BodyState_ProningDown: 	retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case BodyState_ProningUp: 		retval = PLAYER_MAX_PRONE_SPEED;  break;
+    }
+
+    if ((isSprinting/* || Inventory.a.BoosterActive()*/) && running) { // TODO proper booster hookup
+        if (fatigue > 80.0f/* && !Inventory.a.BoosterActive()*/) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED; // TODO booster hookup
+        else                                                 retval = PLAYER_MAX_SPRINT_SPEED;
+
+        if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {
+            retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_CROUCH_SPEED) * 1.5f); // Subtract off the difference in speed between walking and crouching from the sprint speed
+        } else if (bodyState == BodyState_Prone || bodyState == BodyState_ProningDown || bodyState == BodyState_ProningUp) {
+            retval -= ((PLAYER_MAX_WALK_SPEED - PLAYER_MAX_PRONE_SPEED) * 2.0f); // Subtract off the difference in speed between walking and proning from the sprint speed.
+        }
+    }
+
+    return retval + bonus;
+}
+
+void IntegratePhysics(float dt) {
+    if (!log_playback) {
+        Entity* player = &instances[PLAYER1];
+        Vector3 input = {0};
+        if (keyStates[GLFW_KEY_F].down)     input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
+        if (keyStates[GLFW_KEY_S].down)     input = sub_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
+        if (keyStates[GLFW_KEY_D].down)     input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+        if (keyStates[GLFW_KEY_A].down)     input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
+        if (keyStates[GLFW_KEY_C].down/* && noclip*/) input.y -= 1.0f; // Temporarily allow for now until I have collision working
+        if (keyStates[GLFW_KEY_V].down/* && noclip*/) input.y += 1.0f;
+
+        float sprintMul = keyStates[GLFW_KEY_LEFT_SHIFT].down ? 1.75f : 1.0f;
+        const float moveForce = 1800.0f;
+
+        float floatWishSpeed = magnitude_vector3(input);
+        if (floatWishSpeed > 0.1f) {
+            input = normalize_vector3(input);
+            Vector3 force = scale_vector3(input, moveForce * sprintMul);
+            player->velocity = add_vector3(player->velocity, force);
+            float maxAchievableSpeed = GetBasePlayerSpeed(true);
+            if (magnitude_vector3(player->velocity) > maxAchievableSpeed) player->velocity = scale_vector3(normalize_vector3(player->velocity),maxAchievableSpeed);
+        }
+            
+        if (!noclip && keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) { // Jump
+            AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, FORCEMODE_IMPULSE);
+            flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
+        }
+    }
+    
+    for (uint16_t i = PLAYER1; i < /*loadedInstances*/ PLAYER1 + 1; ++i) { // Temporarily only update player's position
+        Entity* e = &instances[i];
+        if ((!(e->entflags & ENTFLAG_ACTIVE)) || (e->entflags & ENTFLAG_KINEMATIC) || e->mass <= 0.0f) continue;
+
+        if ((e->entflags & ENTFLAG_USEGRAVITY)) e->accumulatedForce = add_vector3(e->accumulatedForce, scale_vector3((Vector3){0.0f,-9.81f,0.0f}, e->mass));
+        Vector3 accel = scale_vector3(e->accumulatedForce, 1.0f / e->mass);
+        e->velocity = add_vector3(e->velocity, scale_vector3(accel, dt));
+        if (e->linearDrag > 0.0001f) {
+            float exp_factor = vexp(-(e->linearDrag) * dt);
+            e->velocity = scale_vector3(e->velocity, exp_factor);
+        }
+        e->position = add_vector3(e->position, scale_vector3(e->velocity, dt));
+        if (ConstIndexIsNPC(e->index) || i == PLAYER1 || i == PLAYER2) {
+            e->angularVelocity = e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
+        } else if (e->inertia > 0.0f) {
+            float invI = 1.0f / e->inertia;
+            Vector3 angAccel = scale_vector3(e->accumulatedTorque, invI);
+            e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(angAccel, dt));
+            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * dt));
+            float angMag = magnitude_vector3(e->angularVelocity);
+            if (angMag > 1e-6f) {
+                float angle = angMag * dt;
+                Vector3 axis = normalize_vector3(e->angularVelocity);
+                Quaternion deltaQ = axis_angle_quaternion(axis, angle);
+                e->rotation = mul_quaternion(deltaQ, e->rotation);
+                normalize_quaternion(&e->rotation);
+            }
+        }
+
+        e->accumulatedForce = e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
+    }
+}
+
 int32_t Physics(void) {
-    if (window_has_focus) {
+    if (window_has_focus && !log_playback) {
         if (!gamePaused && !consoleActive) UpdatePlayerFacingAngles();
         ProcessInput();
     }

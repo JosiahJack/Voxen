@@ -18,6 +18,18 @@ Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z *
 float length_vector3(Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
 Vector3 normalize_vector3(Vector3 v) { float len = length_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
 Vector3 mul_mat4_vector3(const float* m, Vector3 v) { return (Vector3){m[0]*v.x+m[4]*v.y+m[8]*v.z+m[12], m[1]*v.x+m[5]*v.y+m[9]*v.z+m[13], m[2]*v.x+m[6]*v.y+m[10]*v.z+m[14]}; }
+float squareDistance2D(float x1, float z1, float x2, float z2) {
+    float dx = x2 - x1;
+    float dz = z2 - z1;
+    return dx * dx + dz * dz;
+}
+
+float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float dz = z2 - z1;
+    return dx * dx + dy * dy + dz * dz;
+}
 
 // Construct rotation matrix (column-major, Unity: X+ right, Y+ up, Z+ forward)
 void quat_to_matrix(Quaternion* q, float* m) {

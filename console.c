@@ -1,8 +1,10 @@
 // console.c - Console Emulator
 #include "voxen.h"
 #include "event.h"
+#include "entity.h"
 #include <ctype.h> // For tolower
 #include <stdlib.h> // For atoi
+#include <stdio.h> // For snprintf
 
 #define MAX_HISTORY 7
 int32_t currentEntryLength = 0;
@@ -127,6 +129,60 @@ static void cmd_edit(void) {
         ExitNoclip();
         notarget = false;
     }
+}
+
+static void cmd_savegeometry(void) {
+    if (!editMode) {
+        CenterStatusPrint("savegeometry only works in edit mode!");
+        return;
+    }
+
+    char filename[64];
+    snprintf(filename, sizeof(filename), "./Data/level%u.txt", currentLevel);
+
+    FILE* f = fopen(filename, "w");
+    if (!f) {
+        CenterStatusPrint("Failed to open %s for writing!", filename);
+        return;
+    }
+
+    DualLog("Saving current level geometry to %s...", filename);
+
+    // We'll save only geometry chunks for now (constIndex 0–306 except 112, and 760)
+    int saved = 0;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) {
+        Entity* ent = &instances[i];
+        uint16_t idx = ent->index;
+
+        if (!ConstIndexIsGeometry(idx)) continue;
+
+        const char* name = "unknown";
+        if (idx < entityCount && entities[idx].path[0]) {
+            const char* slash = strrchr(entities[idx].path, '/');
+            name = slash ? slash + 1 : entities[idx].path;
+            const char* dot = strstr(name, ".fbx");
+            if (dot) name = dot - 4; // strip .fbx
+        }
+
+        fprintf(f, "constIndex:%u|%s (%u)|", idx, name, i - START_INDEX_LEVEL_INSTANCES + 1);
+        fprintf(f, "localPosition.x:%08.5f|", ent->position.x);
+        fprintf(f, "localPosition.y:%08.5f|", ent->position.y);
+        fprintf(f, "localPosition.z:%08.5f|", ent->position.z);
+        fprintf(f, "localRotation.x:%08.5f|", ent->rotation.x);
+        fprintf(f, "localRotation.y:%08.5f|", ent->rotation.y);
+        fprintf(f, "localRotation.z:%08.5f|", ent->rotation.z);
+        fprintf(f, "localRotation.w:%08.5f|", ent->rotation.w);
+        fprintf(f, "localScale.x:%08.5f|",    ent->scale.x);
+        fprintf(f, "localScale.y:%08.5f|",    ent->scale.y);
+        fprintf(f, "localScale.z:%08.5f|",     ent->scale.z);
+        fprintf(f, "go.activeSelf:%s|\n", (ent->entflags & ENTFLAG_ACTIVE) ? "True" : "False");
+
+        saved++;
+    }
+
+    fclose(f);
+    CenterStatusPrint("Saved %d geometry objects to %s", saved, filename);
+    DualLog("Saved %d geometry objects.", saved);
 }
 
 static int ParseLevelArg(const char* arg) {
@@ -392,6 +448,7 @@ static const ConsoleCommand g_ConsoleCommands[] = {
     { "claude",          {.noArg = cmd_ai},               CMD_NOARG },
     { "gemini",          {.noArg = cmd_ai},               CMD_NOARG },
     { "shodan",          {.noArg = cmd_aireal},           CMD_NOARG },
+    { "savegeometry",    {.noArg = cmd_savegeometry},     CMD_NOARG },
     { NULL, {.raw = NULL}, CMD_NOARG } // sizeof helper
 };
 

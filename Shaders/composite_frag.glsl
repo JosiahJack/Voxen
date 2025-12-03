@@ -435,7 +435,7 @@ void main() {
     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
     ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
-    if (debugView != 4) {
+    if (debugView != 4) { // Light index debugView
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);

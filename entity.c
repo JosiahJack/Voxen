@@ -41,6 +41,7 @@ void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, floa
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
         case 0:  *ofsx = 3.6f; *ofsy = -4.10195f; *ofsz = 1.0f; break;
         case 1:  *ofsx = 25.56f; *ofsy = -48.64f; *ofsz = -5.2f; break;
+//         case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 2:  *ofsx = -2.6f; *ofsy = 0.0f; *ofsz = -7.7f; break;
         case 3:  *ofsx = -45.12f; *ofsy = -0.700374f; *ofsz = -16.32f; break;
         case 4:  *ofsx = -20.4f; *ofsy = 0.0f; *ofsz = 11.48f; break;
@@ -653,9 +654,9 @@ void LoadLevel(uint8_t curlevel) {
 //             sanitize_utf8_ascii(trimmed_key);
 //             sanitize_utf8_ascii(trimmed_value);
             if (isLight) {
-                     if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum) + correctionX + correctionLightX;
-                else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum) + correctionY + correctionLightY;
-                else if (strcmp(trimmed_key, "localPosition.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum) + correctionZ + correctionLightZ;
+                     if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum) + /*correctionX*/25.56f + correctionLightX;
+                else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum) + /*correctionY*/-48.64f + correctionLightY;
+                else if (strcmp(trimmed_key, "localPosition.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum) + /*correctionZ*/-5.2f + correctionLightZ;
                 else if (strcmp(trimmed_key, "localRotation.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);

@@ -339,6 +339,9 @@ void UpdateScreenSize(void) {
     glProgramUniform1ui(ssrShaderProgram, 0, screen_width / SSR_RES);
     glProgramUniform1ui(ssrShaderProgram, 1, screen_height / SSR_RES);       
     glProgramUniform1i(ssrShaderProgram, 7, SSR_RES);
+    glProgramUniform1f(ssrShaderProgram, 2, settings_SSRStepSize);
+    glProgramUniform1f(ssrShaderProgram, 3, settings_SSRSampleWeight);
+    glProgramUniform1ui(ssrShaderProgram, 4, settings_SSRStepCount);
     glProgramUniform1f(imageBlitShaderProgram, 30, skyRotateSpeed);
 }
 
@@ -523,7 +526,6 @@ void UpdateVoxelLightLists() {
     
     glNamedBufferData(voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
     glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
-    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
 void VoxelLists() {
@@ -636,7 +638,11 @@ void RenderShadowmaps(void) {
         float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
+        float dx = lightPosX - instances[PLAYER1].position.x;
+        float dy = lightPosY - instances[PLAYER1].position.y;
+        float dz = lightPosZ - instances[PLAYER1].position.z;
+//         float distSqrd = squareDistance3D(instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, lightPosX, lightPosY, lightPosZ);
+        float distSqrd = dx * dx + dy * dy + dz * dz;
         if (distSqrd >= FAR_PLANE_SQUARED) continue;
         
         int lightCellIdx = cellIndexForLight[i];
@@ -661,6 +667,9 @@ void RenderShadowmaps(void) {
         if (!inPVS) continue;
         
         float score = distSqrd / vmax(intensity, 0.01f);
+        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        if (dotResult > 0.5f) score *= 8.0f; // Favor lights in player's view cone
+        else if (dotResult > 0.0f) score *= 4.0f; // Favor lights in player's view cone
         candidates[candidateCount++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
     }
 
@@ -1207,6 +1216,7 @@ void SetFog() {
 }
 
 double timeSinceLastPhysicsTick = 0.0;
+double last_topframe_time = 0.0;
 
 int32_t main(int32_t argc, char* argv[]) {
     game_start_time = get_time();
@@ -1247,11 +1257,13 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment();
     playerCellIdx_x = 0u; playerCellIdx_y = 0u; playerCellIdx_z = 0u; // Force a cull
     double last_physics_time = get_time();
+    last_topframe_time = last_physics_time - 0.05;
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) {
         current_time = get_time();
-        double frame_time = current_time - last_time;
+        double frame_time = current_time - last_topframe_time;
+        last_topframe_time = current_time;
         if (!gamePaused) pauseRelativeTime += (float)frame_time;
         
         // Handle Berserk Effect for Compositing Shader
@@ -1310,16 +1322,23 @@ int32_t main(int32_t argc, char* argv[]) {
             for (int i = 0; i < loadedLights; ++i) {
                 if (lightDirty[i]) {
                     UpdateVoxelLightLists(); // Takes 12ms of total frametime!!
-                    if (settings_Shadows > 0u) RenderShadowmaps();
-                    else {
-                        memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
-                        glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-                    }
+//                     if (settings_Shadows > 0u) RenderShadowmaps();
+//                     else {
+//                         memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
+//                         glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+//                     }
                     
                     break;
                 }
             }
             
+            // Dynamically update shadowmaps for dynamic objects TODO. takes 16ms!
+            if (settings_Shadows > 0u) RenderShadowmaps();
+            else {
+                memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
+                glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+            }
+            glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 
             // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
@@ -1344,9 +1363,6 @@ int32_t main(int32_t argc, char* argv[]) {
             // 5. SSR (Screen Space Reflections)
             if ((debugView == 0 || debugView == 4) && settings_Reflections > 0) {
                 glUseProgram(ssrShaderProgram);
-                glUniform1f(2, settings_SSRStepSize);
-                glUniform1f(3, settings_SSRSampleWeight);
-                glUniform1ui(4, settings_SSRStepCount);
                 glUniformMatrix4fv(5, 1, GL_FALSE, viewProj);
                 glUniform3f(6, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
                 GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
@@ -1472,7 +1488,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "SSR step size: %.2f, step count: %u, sample weight: %.2f", settings_SSRStepSize, settings_SSRStepCount, settings_SSRSampleWeight);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f", timeSinceLastPhysicsTick);
         if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);

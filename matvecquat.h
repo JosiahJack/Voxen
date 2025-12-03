@@ -17,6 +17,8 @@ Vector3 cross_vector3(Vector3 a, Vector3 b);
 float length_vector3(Vector3 v);
 Vector3 normalize_vector3(Vector3 v);
 Vector3 mul_mat4_vector3(const float* mat, Vector3 v);
+float squareDistance2D(float x1, float z1, float x2, float z2);
+float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2);
 void quat_to_matrix(Quaternion* q, float* m);
 Quaternion conjugate_quaternion(const Quaternion q);
 Quaternion axis_angle_quaternion(const Vector3 axis, float angle);

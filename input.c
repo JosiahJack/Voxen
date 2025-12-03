@@ -170,53 +170,11 @@ void ProcessInput(void) {
         glProgramUniform1i(chunkShaderProgram, 5, debugValue);
     }
     
-    if (keyStates[GLFW_KEY_1].pressed) {
-        settings_SSRStepSize += 0.01f;
-    } else if (keyStates[GLFW_KEY_2].pressed) {
-        settings_SSRStepSize -= 0.01f;
-    }
-    
-    if (keyStates[GLFW_KEY_3].pressed) {
-        settings_SSRStepCount += 1;
-    } else if (keyStates[GLFW_KEY_4].pressed) {
-        settings_SSRStepCount -= 1;
-    }
-    
-    if (keyStates[GLFW_KEY_5].pressed) {
-        settings_SSRSampleWeight += 0.01f;
-    } else if (keyStates[GLFW_KEY_6].pressed) {
-        settings_SSRSampleWeight -= 0.01f;
-    }
-    
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     // End Debug Inputs
     
+    // =========== PAUSE BARRIER ==================
     if (gamePaused || consoleActive) return;
-
-    float moveForce = 1800.0f;
-    float sprintMul = keyStates[GLFW_KEY_LEFT_SHIFT].down ? 1.75f : 1.0f;
-    Vector3 input = {0};
-
-    if (keyStates[GLFW_KEY_F].down) input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
-    if (keyStates[GLFW_KEY_S].down) input = sub_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
-    if (keyStates[GLFW_KEY_D].down) input = add_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
-    if (keyStates[GLFW_KEY_A].down) input = sub_vector3(input, (Vector3){cam_rightx,   0, cam_rightz});
-    
-//     if (noclip) {
-        if (keyStates[GLFW_KEY_C].down) input = add_vector3(input, (Vector3){0,  -1.0f, 0});
-        else if (keyStates[GLFW_KEY_V].down) input = add_vector3(input, (Vector3){0,  1.0f, 0});
-//     }
-
-    if (magnitude_vector3(input) > 0.1f) {
-        input = normalize_vector3(input);
-        Vector3 force = scale_vector3(input, moveForce * sprintMul);
-        AddForce(PLAYER1, force, FORCEMODE_ACCUMULATE);
-    }
-
-    if (keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) { // Jump
-        AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, FORCEMODE_IMPULSE);
-        flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
-    }
     
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;
