@@ -5,7 +5,9 @@
 #include "entity.h"
 #include "voxen.h"
 #include "vmath.h"
+#include "todo.h"
 
+//#define DEBUG_ENTITIES
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 Entity* entities = NULL; // Global array of entity definitions
 int32_t entityCount = 0;            // Number of entities loaded
@@ -32,280 +34,116 @@ float correctionLightsSaveableX, correctionLightsSaveableY, correctionLightsSave
 float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticImmutableZ;
 float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
 float correctionLightX, correctionLightY, correctionLightZ;
-bool lightIsDynamic[LIGHT_COUNT];
 uint16_t loadedLights = 0;
+float lightBaseIntensity[LIGHT_COUNT] = {0};
+float lightMinIntensity[LIGHT_COUNT] = {0};
+float lightMaxIntensity[LIGHT_COUNT] = {0};
+bool lightOn[LIGHT_COUNT] = {1};
+bool lightLerpOn[LIGHT_COUNT] = {0};
+bool lightLerpUp[LIGHT_COUNT] = {0};
+uint8_t lightCurrentStep[LIGHT_COUNT] = {0};
+float lightLerpValue[LIGHT_COUNT] = {0};
+float lightLerpTime[LIGHT_COUNT] = {0};
+float lightLerpStepTime[LIGHT_COUNT] = {0};
+float lightLerpStartTime[LIGHT_COUNT] = {0};
+uint8_t lightIntervalStepsLength[LIGHT_COUNT] = {0};
+float lightIntervalSteps[LIGHT_COUNT][30] = {0};
+uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT] = {0};
+float intervalStepisLerping[LIGHT_COUNT][30] = {0};
 
-void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; } // TODO: Resave levels with the offsets applied.
-    
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
-        case 0:  *ofsx = 3.6f; *ofsy = -4.10195f; *ofsz = 1.0f; break;
-        case 1:  *ofsx = 25.56f; *ofsy = -48.64f; *ofsz = -5.2f; break;
-//         case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 2:  *ofsx = -2.6f; *ofsy = 0.0f; *ofsz = -7.7f; break;
-        case 3:  *ofsx = -45.12f; *ofsy = -0.700374f; *ofsz = -16.32f; break;
-        case 4:  *ofsx = -20.4f; *ofsy = 0.0f; *ofsz = 11.48f; break;
-        case 5:  *ofsx = -10.14f; *ofsy = 0.065f; *ofsz = -0.0383f; break;
-        case 6:  *ofsx = -0.6728f; *ofsy = 0.1725f; *ofsz = 3.76f; break;
-        case 7: *ofsx = -6.7f; *ofsy = 0.24443f; *ofsz = 1.16f; break;
-        case 8:  *ofsx = 1.08f; *ofsy = -0.935f; *ofsz = 0.8f; break;
-        case 9:  *ofsx = 3.6f; *ofsy = 0.0f; *ofsz = -1.28f; break;
-        case 10: *ofsx = 107.37f; *ofsy = 101.2f; *ofsz = 35.48f; break;
-        case 11: *ofsx = 15.05f; *ofsy = 129.9f; *ofsz = -77.94f; break;
-        case 12:  *ofsx = 19.04f; *ofsy = 162.2f; *ofsz = 95.8f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 164.7f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+#ifdef DEBUG_ENTITIES
+    void DualLogEntity(Entity ent) {
+        DualLog("Entity::\n"
+                "    index: %u\n"
+                "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
+                "    modelIndex: %u\n"
+                "    texIndex:   %u\n"
+                "    glowIndex:  %u\n"
+                "    specIndex:  %u\n"
+                "    normIndex:  %u\n"
+                "    lodIndex:  %u\n"
+                "    position.x: %f, .y: %f, .z: %f\n"
+                "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+                "    scale.x: %f, .y: %f, .z: %f\n"
+                "    velocity.x: %f, .y: %f, .z: %f\n"
+                "    angularVelocity.x: %f, .y: %f, .z: %f\n"
+                "    bodyState: %u\n"
+                "    collider: %u\n"
+                "    colliderCenter.x: %f, .y: %f, .z: %f\n"
+                "    colliderSize.x: %f, .y: %f, .z: %f\n"
+                "    colliderMeshIndex: %u,\n"
+                "    mass: %f\n"
+                "    linearDrag: %f\n"
+                "    angularDrag: %f\n"
+                "    inertia: %f\n"
+                "    accumulatedForce.x: %f, .y: %f, .z: %f\n"
+                "    accumulatedTorque.x: %f, .y: %f, .z: %f\n"
+                "    bounciness: %f\n"
+                "    dynamicFriction: %f\n"
+                "    staticFriction: %f\n"
+                "    frictionCombine: %u\n"
+                "    bounceCombine: %u\n"
+                "    volume: %f\n"
+                "    child0: %u\n"
+                "    child0_offset.x: %f, .y: %f, .z: %f\n"
+                "    child0_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+                "    child0_scale.x: %f, .y: %f, .z: %f\n"
+                "    child1: %u\n"
+                "    child1_offset.x: %f, .y: %f, .z: %f\n"
+                "    child1_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
+                "    child1_scale.x: %f, .y: %f, .z: %f\n"
+                ,
+                ent.index,
+                ent.entflags,
+                    (ent.entflags & ENTFLAG_ACTIVE) > 0,
+                    (ent.entflags & ENTFLAG_CARDCHUNK) > 0,
+                    (ent.entflags & ENTFLAG_GROUNDED) > 0,
+                    (ent.entflags & ENTFLAG_USEGRAVITY) > 0,
+                    (ent.entflags & ENTFLAG_KINEMATIC) > 0,
+                    (ent.entflags & ENTFLAG_RIGIDBODY) > 0,
+                ent.modelIndex,
+                ent.texIndex,
+                ent.glowIndex,
+                ent.specIndex,
+                ent.normIndex,
+                ent.lodIndex,
+                ent.position.x, ent.position.y, ent.position.z,
+                ent.rotation.x, ent.rotation.y, ent.rotation.z, ent.rotation.w,
+                ent.scale.x, ent.scale.y, ent.scale.z,
+                ent.velocity.x, ent.velocity.y, ent.velocity.z,
+                ent.angularVelocity.x, ent.angularVelocity.y, ent.angularVelocity.z,
+                ent.bodyState,
+                ent.collider,
+                ent.colliderCenter.x, ent.colliderCenter.y, ent.colliderCenter.z,
+                ent.colliderSize.x, ent.colliderSize.y, ent.colliderSize.z,
+                ent.colliderMeshIndex,
+                ent.mass,
+                ent.linearDrag,
+                ent.angularDrag,
+                ent.inertia,
+                ent.accumulatedForce.x, ent.accumulatedForce.y, ent.accumulatedForce.z,
+                ent.accumulatedTorque.x, ent.accumulatedTorque.y, ent.accumulatedTorque.z,
+                ent.dynamicFriction,
+                ent.staticFriction,
+                ent.bounciness,
+                ent.frictionCombine,
+                ent.bounceCombine,
+                ent.volume,
+                ent.child0,
+                ent.child0_offset.x, ent.child0_offset.y, ent.child0_offset.z,
+                ent.child0_rotation.x, ent.child0_rotation.y, ent.child0_rotation.z, ent.child0_rotation.w,
+                ent.child0_scale.x, ent.child0_scale.y, ent.child0_scale.z,
+                ent.child1,
+                ent.child1_offset.x, ent.child1_offset.y, ent.child1_offset.z,
+                ent.child1_rotation.x, ent.child1_rotation.y, ent.child1_rotation.z, ent.child1_rotation.w,
+                ent.child1_scale.x, ent.child1_scale.y, ent.child1_scale.z);
     }
-}
 
-void GetLevel_Dynamic_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DynamicObjectsSaveableInstantiated
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.84f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.07f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.04f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.16f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.08f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.32f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.2f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+    void DualLogEntityInstance(uint16_t idx) {
+        DualLog("Logging instance[%u] ",idx);
+        DualLogEntity(instances[idx]);
     }
-}
-
-void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticSaveable
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
-        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = -14.528f; *ofsy = 48.269f; *ofsz = -26.836f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DoorsStaticSaveable
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsSaveable
-        case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
-        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
-        case 2:  *ofsx = -0.98611f; *ofsy = 0.82105f; *ofsz = 1.1906f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsImmutable
-        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
-
-    switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.NPCsSaveableInstantiated
-        case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = -33.28f; *ofsy = 48.64f; *ofsz = 7.679996f; break;
-        case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 5:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 6:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 7:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 8:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 9:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 10: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 11: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 12: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case LEVEL_CYBERSPACE: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        default: *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-    }
-}
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-void DualLogEntity(Entity ent) {
-    DualLog("Entity::\n"
-            "    index: %u\n"
-            "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
-            "    modelIndex: %u\n"
-            "    texIndex:   %u\n"
-            "    glowIndex:  %u\n"
-            "    specIndex:  %u\n"
-            "    normIndex:  %u\n"
-            "    lodIndex:  %u\n"
-            "    position.x: %f, .y: %f, .z: %f\n"
-            "    rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-            "    scale.x: %f, .y: %f, .z: %f\n"
-            "    velocity.x: %f, .y: %f, .z: %f\n"
-            "    angularVelocity.x: %f, .y: %f, .z: %f\n"
-            "    bodyState: %u\n"
-            "    collider: %u\n"
-            "    colliderCenter.x: %f, .y: %f, .z: %f\n"
-            "    colliderSize.x: %f, .y: %f, .z: %f\n"
-            "    colliderMeshIndex: %u,\n"
-            "    mass: %f\n"
-            "    linearDrag: %f\n"
-            "    angularDrag: %f\n"
-            "    inertia: %f\n"
-            "    accumulatedForce.x: %f, .y: %f, .z: %f\n"
-            "    accumulatedTorque.x: %f, .y: %f, .z: %f\n"
-            "    bounciness: %f\n"
-            "    dynamicFriction: %f\n"
-            "    staticFriction: %f\n"
-            "    frictionCombine: %u\n"
-            "    bounceCombine: %u\n"
-            "    volume: %f\n"
-            "    child0: %u\n"
-            "    child0_offset.x: %f, .y: %f, .z: %f\n"
-            "    child0_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-            "    child0_scale.x: %f, .y: %f, .z: %f\n"
-            "    child1: %u\n"
-            "    child1_offset.x: %f, .y: %f, .z: %f\n"
-            "    child1_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-            "    child1_scale.x: %f, .y: %f, .z: %f\n"
-            ,
-            ent.index,
-            ent.entflags,
-                (ent.entflags & ENTFLAG_ACTIVE) > 0,
-                (ent.entflags & ENTFLAG_CARDCHUNK) > 0,
-                (ent.entflags & ENTFLAG_GROUNDED) > 0,
-                (ent.entflags & ENTFLAG_USEGRAVITY) > 0,
-                (ent.entflags & ENTFLAG_KINEMATIC) > 0,
-                (ent.entflags & ENTFLAG_RIGIDBODY) > 0,
-            ent.modelIndex,
-            ent.texIndex,
-            ent.glowIndex,
-            ent.specIndex,
-            ent.normIndex,
-            ent.lodIndex,
-            ent.position.x, ent.position.y, ent.position.z,
-            ent.rotation.x, ent.rotation.y, ent.rotation.z, ent.rotation.w,
-            ent.scale.x, ent.scale.y, ent.scale.z,
-            ent.velocity.x, ent.velocity.y, ent.velocity.z,
-            ent.angularVelocity.x, ent.angularVelocity.y, ent.angularVelocity.z,
-            ent.bodyState,
-            ent.collider,
-            ent.colliderCenter.x, ent.colliderCenter.y, ent.colliderCenter.z,
-            ent.colliderSize.x, ent.colliderSize.y, ent.colliderSize.z,
-            ent.colliderMeshIndex,
-            ent.mass,
-            ent.linearDrag,
-            ent.angularDrag,
-            ent.inertia,
-            ent.accumulatedForce.x, ent.accumulatedForce.y, ent.accumulatedForce.z,
-            ent.accumulatedTorque.x, ent.accumulatedTorque.y, ent.accumulatedTorque.z,
-            ent.dynamicFriction,
-            ent.staticFriction,
-            ent.bounciness,
-            ent.frictionCombine,
-            ent.bounceCombine,
-            ent.volume,
-            ent.child0,
-            ent.child0_offset.x, ent.child0_offset.y, ent.child0_offset.z,
-            ent.child0_rotation.x, ent.child0_rotation.y, ent.child0_rotation.z, ent.child0_rotation.w,
-            ent.child0_scale.x, ent.child0_scale.y, ent.child0_scale.z,
-            ent.child1,
-            ent.child1_offset.x, ent.child1_offset.y, ent.child1_offset.z,
-            ent.child1_rotation.x, ent.child1_rotation.y, ent.child1_rotation.z, ent.child1_rotation.w,
-            ent.child1_scale.x, ent.child1_scale.y, ent.child1_scale.z);
-}
-
-void DualLogEntityInstance(uint16_t idx) {
-    DualLog("Logging instance[%u] ",idx);
-    DualLogEntity(instances[idx]);
-}
-#pragma GCC diagnostic pop
+#endif
 
 void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
@@ -366,7 +204,9 @@ void LoadEntities(void) {
         entities[i].accumulatedTorque.x = 0.0f;
         entities[i].accumulatedTorque.y = 0.0f;
         entities[i].accumulatedTorque.z = 0.0f;
-//         DualLogEntity(entities[i]);
+        #ifdef DEBUG_ENTITIES
+            DualLogEntity(entities[i]);
+        #endif
     }
 
     DualLog(" took %f secs\n", get_time() - start_time);
@@ -471,8 +311,8 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
 }
 
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
-    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading level geometry object %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); exit(1); }
-            
+    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); exit(1); }
+        
     instances[instanceIdx].index = entIdx;
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
     if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
@@ -484,8 +324,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
     if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = 0;
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
-//     instances[instanceIdx].entflags = entities[entIdx].entflags; // Decided this was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
-    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK); // Decided `instances[instanceIdx].entflags = entities[entIdx].entflags;` was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
@@ -500,42 +339,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
-    
-    // Apply the Unity hierarchy nonsense, TODO: Save out level#.txt from the engine just once and then delete all this.
-    if (levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
-        instances[instanceIdx].position.x += correctionX;   
-        instances[instanceIdx].position.y += correctionY;
-        instances[instanceIdx].position.z += correctionZ;
-        if (ConstIndexIsDoor(entIdx)) {
-            instances[instanceIdx].position.x += correctionDoorsX;
-            instances[instanceIdx].position.y += correctionDoorsY;
-            instances[instanceIdx].position.z += correctionDoorsZ;
-        } else if (ConstIndexIsNPC(entIdx)) {
-            instances[instanceIdx].position.x += correctionNPCX;
-            instances[instanceIdx].position.y += correctionNPCY - 1.0f; // Offset to center them up in their capsule
-            instances[instanceIdx].position.z += correctionNPCZ;
-            
-            Vector3 axis = (Vector3){0.0f, 0.0f, 1.0f}; // X-axis
-            instances[instanceIdx].rotation = axis_angle_quaternion(axis, deg2rad(-90.0f));
-        } else if (ConstIndexIsLightStaticSaveable(entIdx)) {
-            instances[instanceIdx].position.x += correctionLightX;
-            instances[instanceIdx].position.y += correctionLightY;
-            instances[instanceIdx].position.z += correctionLightZ;
-        } else if (ConstIndexIsStaticObjectSaveable(entIdx)) {
-            instances[instanceIdx].position.x += correctionStaticSaveableX;
-            instances[instanceIdx].position.y += correctionStaticSaveableY;
-            instances[instanceIdx].position.z += correctionStaticSaveableZ;
-        } else if (ConstIndexIsStaticObjectImmutable(entIdx)) {
-            instances[instanceIdx].position.x += correctionStaticImmutableX;
-            instances[instanceIdx].position.y += correctionStaticImmutableY;
-            instances[instanceIdx].position.z += correctionStaticImmutableZ;
-        } else if (ConstIndexIsDynamicObject(entIdx)) { // MUST BE LAST AS IT OVERLAPS WITH NPC AND LIGHTS SAVEABLE!
-            instances[instanceIdx].position.x += correctionDynamicsX;
-            instances[instanceIdx].position.y += correctionDynamicsY;
-            instances[instanceIdx].position.z += correctionDynamicsZ;
-        } 
-    }
-
+    ApplyUnityHierarchyCorrectionAtLevelLoad(instanceIdx, entIdx);
     dirtyInstances[instanceIdx] = true;
     loadedInstances++;
 }
@@ -595,14 +399,7 @@ void LoadLevel(uint8_t curlevel) {
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[lineLengthMax];
-    GetLevel_Transform_Offsets(curlevel, &correctionX, &correctionY, &correctionZ);
-    GetLevel_Dynamic_ContainerOffsets(curlevel, &correctionDynamicsX, &correctionDynamicsY, &correctionDynamicsZ);
-    GetLevel_LightsStaticSaveable_ContainerOffsets(curlevel, &correctionLightsSaveableX, &correctionLightsSaveableY, &correctionLightsSaveableZ);
-    GetLevel_StaticObjectsSaveable_ContainerOffsets(curlevel, &correctionStaticSaveableX, &correctionStaticSaveableY, &correctionStaticSaveableZ);
-    GetLevel_StaticObjectsImmutable_ContainerOffsets(curlevel, &correctionStaticImmutableX, &correctionStaticImmutableY, &correctionStaticImmutableZ);
-    GetLevel_LightsStaticImmutable_ContainerOffsets(curlevel, &correctionLightX, &correctionLightY, &correctionLightZ);
-    GetLevel_DoorsStaticSaveable_ContainerOffsets(curlevel, &correctionDoorsX, &correctionDoorsY, &correctionDoorsZ);
-    GetLevel_NPCsSaveableInstantiated_ContainerOffsets(curlevel, &correctionNPCX, &correctionNPCY, &correctionNPCZ);
+    SetUnityHierarchyOffsets(curlevel);
     while (fgets(lineSpace, lineLengthMax, file)) {
         size_t len = strlen(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
@@ -615,7 +412,6 @@ void LoadLevel(uint8_t curlevel) {
         if (strcmp(firstKeyCheck, "constIndex") == 0) isLight = false;  // constIndex specified indicating this is a real entity?
         if (isLight) {
             lightsIdx++;
-            lightIsDynamic[lightsIdx] = false;
             if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); exit(1); }
         } else {
             instanceIdx++;
@@ -624,6 +420,7 @@ void LoadLevel(uint8_t curlevel) {
         
         int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
         uint8_t lightType = 0u; // Point
+        bool lightOnRead = false;
         while(line[0] != '\0') {
             // Guaranteed no leading whitespaces,k comments, or blank lines, so don't bother
             char* pipe = strchr(line,'|');
@@ -671,6 +468,77 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "color.r") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_R] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "color.g") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_G] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "color.b") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_B] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "lightOn") == 0 && !lightOnRead) {       lightOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum); lightOnRead = true; } // Check lightOnRead in if here since TargetIO also has same value lightOn, whoops!  But guaranteed to be 2nd so get the real one here
+                else if (strcmp(trimmed_key, "lerpOn") == 0)          lightLerpOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "currentStep") == 0)     lightCurrentStep[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "lerpValue") == 0)       lightLerpValue[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "lerpTime") == 0)        lightLerpTime[lightsIdx] = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "stepTime") == 0)        lightLerpStepTime[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "lerpStartTime") == 0)   lightLerpStartTime[lightsIdx] = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps.Length") == 0) lightIntervalStepsLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[0]") == 0)     lightIntervalSteps[lightsIdx][0] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[1]") == 0)     lightIntervalSteps[lightsIdx][1] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[2]") == 0)     lightIntervalSteps[lightsIdx][2] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[3]") == 0)     lightIntervalSteps[lightsIdx][3] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[4]") == 0)     lightIntervalSteps[lightsIdx][4] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[5]") == 0)     lightIntervalSteps[lightsIdx][5] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[6]") == 0)     lightIntervalSteps[lightsIdx][6] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[7]") == 0)     lightIntervalSteps[lightsIdx][7] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[8]") == 0)     lightIntervalSteps[lightsIdx][8] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[9]") == 0)     lightIntervalSteps[lightsIdx][9] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[10]") == 0)    lightIntervalSteps[lightsIdx][10] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[11]") == 0)    lightIntervalSteps[lightsIdx][11] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[12]") == 0)    lightIntervalSteps[lightsIdx][12] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[13]") == 0)    lightIntervalSteps[lightsIdx][13] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[14]") == 0)    lightIntervalSteps[lightsIdx][14] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[15]") == 0)    lightIntervalSteps[lightsIdx][15] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[16]") == 0)    lightIntervalSteps[lightsIdx][16] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[17]") == 0)    lightIntervalSteps[lightsIdx][17] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[18]") == 0)    lightIntervalSteps[lightsIdx][18] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[19]") == 0)    lightIntervalSteps[lightsIdx][19] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[20]") == 0)    lightIntervalSteps[lightsIdx][20]= parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[21]") == 0)    lightIntervalSteps[lightsIdx][21] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[22]") == 0)    lightIntervalSteps[lightsIdx][22] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[23]") == 0)    lightIntervalSteps[lightsIdx][23] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[24]") == 0)    lightIntervalSteps[lightsIdx][24] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[25]") == 0)    lightIntervalSteps[lightsIdx][25] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[26]") == 0)    lightIntervalSteps[lightsIdx][26] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[27]") == 0)    lightIntervalSteps[lightsIdx][27] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[28]") == 0)    lightIntervalSteps[lightsIdx][28] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalSteps[29]") == 0)    lightIntervalSteps[lightsIdx][29] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping.Length") == 0) lightIntervalStepIsLerpingLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[0]") == 0)     intervalStepisLerping[lightsIdx][0] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[1]") == 0)     intervalStepisLerping[lightsIdx][1] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[2]") == 0)     intervalStepisLerping[lightsIdx][2] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[3]") == 0)     intervalStepisLerping[lightsIdx][3] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[4]") == 0)     intervalStepisLerping[lightsIdx][4] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[5]") == 0)     intervalStepisLerping[lightsIdx][5] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[6]") == 0)     intervalStepisLerping[lightsIdx][6] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[7]") == 0)     intervalStepisLerping[lightsIdx][7] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[8]") == 0)     intervalStepisLerping[lightsIdx][8] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[9]") == 0)     intervalStepisLerping[lightsIdx][9] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[10]") == 0)    intervalStepisLerping[lightsIdx][10] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[11]") == 0)    intervalStepisLerping[lightsIdx][11] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[12]") == 0)    intervalStepisLerping[lightsIdx][12] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[13]") == 0)    intervalStepisLerping[lightsIdx][13] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[14]") == 0)    intervalStepisLerping[lightsIdx][14] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[15]") == 0)    intervalStepisLerping[lightsIdx][15] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[16]") == 0)    intervalStepisLerping[lightsIdx][16] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[17]") == 0)    intervalStepisLerping[lightsIdx][17] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[18]") == 0)    intervalStepisLerping[lightsIdx][18] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[19]") == 0)    intervalStepisLerping[lightsIdx][19] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[20]") == 0)    intervalStepisLerping[lightsIdx][20] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[21]") == 0)    intervalStepisLerping[lightsIdx][21] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[22]") == 0)    intervalStepisLerping[lightsIdx][22] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[23]") == 0)    intervalStepisLerping[lightsIdx][23] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[24]") == 0)    intervalStepisLerping[lightsIdx][24] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[25]") == 0)    intervalStepisLerping[lightsIdx][25] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[26]") == 0)    intervalStepisLerping[lightsIdx][26] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[27]") == 0)    intervalStepisLerping[lightsIdx][27] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[28]") == 0)    intervalStepisLerping[lightsIdx][28] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "intervalStepisLerping[29]") == 0)    intervalStepisLerping[lightsIdx][29] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "minIntensity") == 0)    lightMinIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "maxIntensity") == 0)    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
             } else {
                      if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.x") == 0) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
@@ -689,13 +557,20 @@ void LoadLevel(uint8_t curlevel) {
         
         if (isLight) {
             loadedLights++;
+            if (!lightOnRead) {
+                lightOn[lightsIdx] = true;
+            } else {
+                // Dynamic Animated light
+                if (lightMinIntensity[lightsIdx] < 0.01f) lightMinIntensity[lightsIdx] = 0.01f;
+                lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[lightsIdx];
+                lightLerpUp[lightsIdx] = true;
+            }
+            
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-            // TODO: Set lightIsDynamic[lightsIdx] = true when light has animation data values set from file
             if (lightType == 1) {
                 if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",lightsIdx,lineNum+1);
             } else if (lightType == 2) {
-                // TODO: Handle directional lights for cyberspace
-                lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
+                lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 180.0f; // Force to be a directional light
             } else {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
@@ -707,7 +582,7 @@ void LoadLevel(uint8_t curlevel) {
             AddChild1(entities[entIdx].child1, parent, entIdx, &instanceIdx, lineNum);
         }
     }
-
+    
     fclose(file);
     
     // Set Fog
@@ -745,9 +620,6 @@ void LoadLevel(uint8_t curlevel) {
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    numDynamicLights = 0;
-    for (int i=0;i<loadedLights;++i) { if (lightIsDynamic[i]) numDynamicLights++; }
-    DualLog("%u dynamic lights in level %u\n", numDynamicLights, currentLevel);
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
     RenderShadowmaps();
     Input_MouselookApply();

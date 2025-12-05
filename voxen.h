@@ -160,7 +160,23 @@ void LoadModels(void);
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
-extern bool lightIsDynamic[LIGHT_COUNT];
+
+extern float lightBaseIntensity[LIGHT_COUNT];
+extern bool lightOn[LIGHT_COUNT];
+extern bool lightLerpOn[LIGHT_COUNT];
+extern bool lightLerpUp[LIGHT_COUNT];
+extern uint8_t lightCurrentStep[LIGHT_COUNT];
+extern float lightLerpValue[LIGHT_COUNT];
+extern float lightLerpTime[LIGHT_COUNT];
+extern float lightLerpStepTime[LIGHT_COUNT];
+extern float lightLerpStartTime[LIGHT_COUNT];
+extern uint8_t lightIntervalStepsLength[LIGHT_COUNT];
+extern float lightIntervalSteps[LIGHT_COUNT][30];
+extern uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
+extern float intervalStepisLerping[LIGHT_COUNT][30];
+extern float lightMinIntensity[LIGHT_COUNT];
+extern float lightMaxIntensity[LIGHT_COUNT];
+
 extern GLuint shadowMapSSBO;
 void VoxelLists();
 extern GLuint shadowmapsClearShaderProgram;
@@ -193,7 +209,6 @@ extern bool levelCurrentlyLoading;
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
-#define MAX_SQUARE_DIST_INT 268435456 // (64 * 256)^2 = max square dist
 #define MAX_LIGHTS_PER_VOXEL 24 // Cap to prevent overflow
 #define CELL_VISIBLE       1
 #define CELL_OPEN          2
@@ -203,10 +218,6 @@ extern bool levelCurrentlyLoading;
 #define CELL_CLOSEDWEST   32
 #define CELL_SEES_SUN     64
 #define CELL_SEES_SKYBOX 128
-extern uint16_t numberOfFOVConeChecks0; // 5049
-extern uint16_t numberOfFOVConeChecks1; // 5030
-extern uint16_t numberOfFOVConeChecks2; // 2687
-extern uint16_t numberOfFOVConeChecks3; // 2687
 extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
@@ -447,6 +458,7 @@ bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
 void Screenshot();
 bool CursorVisible(void);
+float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum);
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);

@@ -1,23 +1,5 @@
 // voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-// TODO: Figure out how to handle info_ressurection_points that needed to live outside the levels:
-// Level R -27.386 -55.488 26.5941
-// Level 1 40.903 -42.372 -30.78
-// Level 2 30.67407 -25.832 10.21412
-// Level 3 38.26813 -15.498 20.37825
-// Level 4 -19.48 -7.928 22.954
-// Level 5 -24.358 12.5956 31.8497
-// Level 6 -22.3568 33.7845 -30.728
-// Level 7 2.228084 50.95243 7.532025
-// Level 9.1_resdest 2.303 106.77 -38.554 (I don't remember what this is for, cheat spawn from `load 9`??)
-// TODO: Animated lights
-// TODO: Multiview renders for sensaround
-// TODO: Proper physics
-// TODO: Particle system
-// TODO: Raycasts
-// TODO: Voxel GI
-// TODO: Scripting engine for gameplay
-// TODO: Save/Load system
 #define _GNU_SOURCE
 #include <malloc.h>
 #include <sys/stat.h>
@@ -397,6 +379,75 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
 
+void UpdateDynamicLights() {
+    if (gamePaused || menuActive) return;
+    
+    for (int i=0;i<loadedLights;++i) {
+//         DualLog("Light %u is on: %u\n",i,lightOn[i]);
+        if (lightIntervalStepsLength[i] < 1) continue;
+        
+        int litIdx = i * LIGHT_DATA_SIZE;
+        if (lightOn[i]) {
+            if (lightIntervalStepsLength[i] > 0) {
+                float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
+                if (lightLerpUp[i]) {
+                    // Going from lightMinIntensity to lightMaxIntensity
+                    if (lightLerpTime[i] < pauseRelativeTime) {
+                        if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightMaxIntensity[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[i];
+                        lightLerpUp[i] = false;
+                        lightCurrentStep[i]++;
+                        if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
+                        lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
+                        lightLerpTime[i] = pauseRelativeTime + lightLerpStepTime[i];
+                        lightLerpStartTime[i] = pauseRelativeTime;
+                        if (lightLerpTime[i] == 0.0f) lightLerpTime[i] = 0.1f;
+                    } else {
+                        if (lightLerpOn[i]) {
+                            if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
+                                if (intervalStepisLerping[i][lightCurrentStep[i]]) {
+                                    lightLerpValue[i] = (pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                                    lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (lightLerpValue[i]));
+                                    if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightLerpValue[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Going from lightMaxIntensity to lightMinIntensity
+                    if (lightLerpTime[i] < pauseRelativeTime) {
+                        if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightMinIntensity[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
+                        lightLerpUp[i] = true;
+                        lightCurrentStep[i]++;
+                        if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
+                        lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
+                        lightLerpTime[i] = pauseRelativeTime + lightLerpStepTime[i];
+                        lightLerpStartTime[i] = pauseRelativeTime;
+                        if (lightLerpTime[i] == 0.0f) lightLerpTime[i] = 0.1f;
+                    } else {
+                        if (lightLerpOn[i]) {
+                            if (lightCurrentStep[i] == lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
+                            if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
+                                if (intervalStepisLerping[i][lightCurrentStep[i]]) {
+                                    lightLerpValue[i] = (pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                                    lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (1.0f - lightLerpValue[i]));
+                                    if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightLerpValue[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } else { // Light is on but no steps so set to normal intensity setting
+                lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightBaseIntensity[i];
+            }
+        } else { // Light is turned off.
+            if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] > 0.01f) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
+        }
+    }
+
+    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+}
+
 void UpdateVoxelLightLists() {
     memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -537,13 +588,14 @@ void VoxelLists() {
     voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
     voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
     voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  1008105 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     shadowmapIndirectionList = malloc(loadedLights * sizeof(uint32_t));
     lightsID = SetupSSBO(lightsID, 19, loadedLights * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     lightView      = calloc(loadedLights * 6 * 4 * 4, sizeof(float));
     lightViewProj  = calloc(loadedLights * 6 * 4 * 4, sizeof(float));
     lightFrustumPlanes   = calloc(loadedLights * 6 * 6, sizeof(FrustumPlane));
     DebugRAM("prior to UpdateVoxelLightLists");
+    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     UpdateVoxelLightLists();
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
@@ -683,7 +735,6 @@ void RenderShadowmaps(void) {
     uint32_t numToRender = vmin(numShadowsCouldRender, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
-        uint16_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
         RenderShadowmap(lightIdx);
@@ -1325,7 +1376,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
             glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
             
-            // 3. Dynamic Shadowmaps
+            // 3. Light Updates
+            UpdateDynamicLights();
             for (int i = 0; i < loadedLights; ++i) {
                 if (lightDirty[i]) {
                     UpdateVoxelLightLists(); // Takes 12ms of total frametime!!
@@ -1345,8 +1397,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
                 glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
             }
-            glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-
+            
             // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
@@ -1495,7 +1546,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);

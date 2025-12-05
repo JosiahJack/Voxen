@@ -607,6 +607,7 @@ int32_t Physics(void) {
     if (noclip) {
         instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
         instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_USEGRAVITY) | (-false & ENTFLAG_USEGRAVITY);
+        instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_GROUNDED) | (-false & ENTFLAG_GROUNDED);
         instances[PLAYER1].velocity = (Vector3){0.0f,0.0f,0.0f};
     } else {
         instances[PLAYER1].collider = COLLIDER_TYPE_CAPSULE;

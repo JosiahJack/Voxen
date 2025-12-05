@@ -1,10 +1,11 @@
 // console.c - Console Emulator
-#include "voxen.h"
-#include "event.h"
-#include "entity.h"
 #include <ctype.h> // For tolower
 #include <stdlib.h> // For atoi
 #include <stdio.h> // For snprintf
+#include "voxen.h"
+#include "event.h"
+#include "entity.h"
+#include "todo.h"
 
 #define MAX_HISTORY 7
 int32_t currentEntryLength = 0;
@@ -60,26 +61,6 @@ static void RecallHistory(int direction) { // direction 1 up (older), -1 down (n
     }
 }
 
-static void EnterNoclip(void) {
-    // PlayerMovement.a.CheatNoclip = true; // TODO
-    // PlayerMovement.a.grounded = false;
-    // PlayerMovement.a.rbody.useGravity = false;
-    // Utils.DisableCapsuleCollider(PlayerMovement.a.capsuleCollider);
-    // Utils.DisableCapsuleCollider(PlayerMovement.a.leanCapsuleCollider);
-    // Utils.DisableSphereCollider(PlayerMovement.a.cyberCollider);
-}
-
-static void ExitNoclip(void) {
-    // PlayerMovement.a.CheatNoclip = false; // TODO
-    // PlayerMovement.a.grounded = false;
-    // if (PlayerMovement.a.inCyberSpace) {
-    //     Utils.EnableSphereCollider(PlayerMovement.a.cyberCollider);
-    // } else {
-    //     Utils.EnableCapsuleCollider(PlayerMovement.a.capsuleCollider);
-    //     Utils.EnableCapsuleCollider(PlayerMovement.a.leanCapsuleCollider);
-    // }
-}
-
 typedef void (*ConsoleCmdFuncNoArg)(void);
 typedef void (*ConsoleCmdFuncInt)(int);
 typedef void (*ConsoleCmdFuncStr)(const char*);
@@ -109,24 +90,19 @@ static int CommandMatch(const char* input, const char* cmd) {
 
 static void cmd_noclip(void) {
     noclip = !noclip;
-    if (noclip) {
-        EnterNoclip();
-        CenterStatusPrint("noclip: %s", stringTable[1000]); // "ACTIVATED"
-    } else {
-        ExitNoclip();
-        CenterStatusPrint("noclip: %s", stringTable[717]); // "DISABLED"
-    }
+    if (noclip) CenterStatusPrint("noclip: %s", stringTable[1000]); // "ACTIVATED"
+    else CenterStatusPrint("noclip: %s", stringTable[717]); // "DISABLED"
 }
 
 static void cmd_edit(void) {
     editMode = !editMode;
     if (editMode) {
         CenterStatusPrint("edit mode: %s", stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
-        EnterNoclip();
+        noclip = true;
         notarget = true;
     } else {
         CenterStatusPrint("%s", stringTable[999]); // "Edit Mode deactivated, normal play"
-        ExitNoclip();
+        noclip = false;
         notarget = false;
     }
 }
@@ -220,22 +196,15 @@ static void cmd_loadlevel(const char* arg) {
         if (level < 0) { CenterStatusPrint("Invalid level argument"); return; }
         
         CenterStatusPrint("Loading level %u", level);
-        // LevelManager.a.LoadLevel(level); // TODO
+        LoadLevel(level);
     }
 }
 
-static void cmd_loadarsenal(const char* arg) {
-    int level = ParseLevelArg(arg);
-    if (level == -2) return; // g3 message already shown
-    
-    if (level >= 0) {
-        // EnableCheatArsenal(level);
-    }
-}
+static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < numLevels) { EnableCheatArsenal(level); } }
 
 static void cmd_summon(int itemConstIndex) {
-    if (itemConstIndex >= 0 && itemConstIndex < 438) {
-        // SpawnDynamicObject(itemConstIndex, currentLevel, true, -1);
+    if (!ConstIndexInBounds(itemConstIndex)) {
+        SpawnDynamicObject(itemConstIndex, true);
         CenterStatusPrint("Summoned object ID %d", itemConstIndex);
     } else {
         CenterStatusPrint("Invalid object ID: %s", itemConstIndex);
@@ -328,11 +297,6 @@ static void cmd_restart(void)        { CenterStatusPrint("Yeah...better not"); }
 static void cmd_quit(void)           { CenterStatusPrint("Use the Pause Menu by hitting Escape and using the QUIT option via mouse or arrow keys + ENTER"); }
 static void cmd_cd(void)             { CenterStatusPrint("Attempting to access directory... already at root"); }
 
-static void cmd_kill(void) {
-    CenterStatusPrint("%s", stringTable[1011]); // "Player decides to become a cyborg."
-    // TODO: TakeDamage(...)
-}
-
 static void cmd_justinbailey(void)   { CenterStatusPrint("Well, you don't have a suit already so..."); }
 static void cmd_woodstock(void)      { CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!"); }
 static void cmd_quarry(void)         { CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadent, otherwise we are lacking in the stone department."); }
@@ -342,20 +306,6 @@ static void cmd_iamironman(void)     { CenterStatusPrint("That's nice dear."); }
 static void cmd_idkfa(void)          { CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!"); }
 static void cmd_ai(void)             { CenterStatusPrint("Only AI allowed around here is SHODAN"); }
 static void cmd_aireal(void)         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
-
-static void cmd_undo(void) {
-    if (editMode) {
-        // Utils.SafeDestroy(lastSpawnedGO); lastSpawnedGO = NULL;
-        CenterStatusPrint("Last spawned object removed");
-    } else {
-        CenterStatusPrint("Cannot undo when not in Edit Mode");
-    }
-}
-
-static void cmd_shake(void) {
-    // Const.a.Shake(true, -1, -1); // TODO
-    CenterStatusPrint("SHAKE IT!");
-}
 
 static void cmd_staminup(void) {
     fatigueCheat = !fatigueCheat;
@@ -380,6 +330,7 @@ static const ConsoleCommand g_ConsoleCommands[] = {
     { "edit",      {.noArg = cmd_edit}, CMD_NOARG},
     { "edit mode", {.noArg = cmd_edit}, CMD_NOARG},
     { "editor",    {.noArg = cmd_edit}, CMD_NOARG},
+    { "undo",    {.noArg = cmd_undo}, CMD_NOARG},
     { "cull", {.noArg = cmd_cull}, CMD_NOARG},
     { "showfps", {.noArg = cmd_showfps}, CMD_NOARG},
     { "show fps", {.noArg = cmd_showfps}, CMD_NOARG},

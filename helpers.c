@@ -207,3 +207,28 @@ uint8_t random_range_u8(uint8_t a, uint8_t b) {
 }
 
 int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
+
+// Using "relative time" = pauseRelativeTime and "finished" = some
+// script's timer float value, e.g. attackFinished, in the notes below...
+//
+// If the relative time is 123 when we save and finished is 156, then when
+// we load and relative time is 160 and we set finished to 156, it will
+// immediately finish.
+//
+// Need to take finished - relative time = 33 and save that.  Then on load
+// take this differential value and do relative time + differential = 160 +
+// 33 = 193, then the same condition is restored such that the finished 
+// timer still has 33 before it is up.
+//
+// In the scenario where finished is less than relative time, if finished =
+// 103 and relative time is still 123, then when we load and relative time
+// is 160, all is still fine, timer is already up.
+//
+// Still can't hurt to do finished - relative time = -20. Then when we load
+// the value do relative time 160 + -20 = 140.  This is arguably best just
+// in case there is a whackado one-off instance of comparing (time - 
+// finished) somewhere instead of (finished < time) which is my usual Quake
+// derived timer pattern.
+float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) {
+    return parse_float(trimmed_value, initialLine, lineNum) + pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
+}

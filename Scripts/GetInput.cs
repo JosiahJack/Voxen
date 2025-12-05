@@ -30,37 +30,6 @@ public class GetInput : MonoBehaviour {
 		}
 	}
 
-// 	void Update() {
-	//	// Used for testing with a DualShock PlayStation 4 remote aka the DS4 for the PS4.
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton0 )) Debug.Log("JoystickButton0 pressed"); // X (A)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton1 )) Debug.Log("JoystickButton1 pressed"); // Circle (B)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton2 )) Debug.Log("JoystickButton2 pressed"); // Square (X)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton3 )) Debug.Log("JoystickButton3 pressed"); // Triangle (Y)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton4 )) Debug.Log("JoystickButton4 pressed"); // L1 (Left Bumper)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton5 )) Debug.Log("JoystickButton5 pressed"); // R1 (Right Bumper)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton6 )) Debug.Log("JoystickButton6 pressed"); // Share (Select)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton7 )) Debug.Log("JoystickButton7 pressed"); // Options (Start)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton8 )) Debug.Log("JoystickButton8 pressed"); // PS (Xbox)
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton9 )) Debug.Log("JoystickButton9 pressed"); // LJ Press
-	//	if (Input.GetKeyDown(KeyCode.JoystickButton10)) Debug.Log("JoystickButton10 pressed"); // RJ Press
-	//	if (Input.GetAxisRaw("JoyAxis1") > 0) Debug.Log("JoyAxis1 positive"); // LJ Right (Left Thumbstick Right)
-	//	if (Input.GetAxisRaw("JoyAxis1") < 0) Debug.Log("JoyAxis1 negative"); // LJ Left (Left Thumbstick Left)
-	//	if (Input.GetAxisRaw("JoyAxis2") > 0) Debug.Log("JoyAxis2 positive"); // LJ Down (Left Thumbstick Down), Pull toward you
-	//	if (Input.GetAxisRaw("JoyAxis2") < 0) Debug.Log("JoyAxis2 negative"); // LJ Up (Left Thumbstick Up), Push away from you
-	//	if (Input.GetAxisRaw("JoyAxis3") > 0) Debug.Log("JoyAxis3 positive"); // L2 (Left Trigger)
-	//	if (Input.GetAxisRaw("JoyAxis3") < 0) Debug.Log("JoyAxis3 negative"); // L2 fell off haha
-	//	if (Input.GetAxisRaw("JoyAxis4") > 0) Debug.Log("JoyAxis4 positive"); // RJ Right (Right Thumbstick Right)
-	//	if (Input.GetAxisRaw("JoyAxis4") < 0) Debug.Log("JoyAxis4 negative"); // RJ Left (Right Thumbstick Left)
-	//	if (Input.GetAxisRaw("JoyAxis5") > 0) Debug.Log("JoyAxis5 positive"); // RJ Down (Right Thumbstick Down) Pitch Up, Pull towards you
-	//	if (Input.GetAxisRaw("JoyAxis5") < 0) Debug.Log("JoyAxis5 negative"); // RJ Up (Right Thumbstick Up) Pitch Down, Push away from you
-	//	if (Input.GetAxisRaw("JoyAxis6") > 0) Debug.Log("JoyAxis6 positive"); // R2 (Right Trigger)
-	//	if (Input.GetAxisRaw("JoyAxis6") < 0) Debug.Log("JoyAxis6 negative"); // R2 fell off haha
-	//	if (Input.GetAxisRaw("JoyAxis7") > 0) Debug.Log("JoyAxis7 positive"); // D-Pad Right
-	//	if (Input.GetAxisRaw("JoyAxis7") < 0) Debug.Log("JoyAxis7 negative"); // D-Pad Left
-	//	if (Input.GetAxisRaw("JoyAxis8") > 0) Debug.Log("JoyAxis8 positive"); // D-Pad Down
-	//	if (Input.GetAxisRaw("JoyAxis8") < 0) Debug.Log("JoyAxis8 negative"); // D-Pad Up
-// 	}
-
 	// Generics
 	public bool MouseWheelBoundAndRolled(int setCode) {
 		if (setCode == 153) return MouseWheelUp();

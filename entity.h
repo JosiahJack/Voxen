@@ -4,9 +4,9 @@
 #include "voxen.h"
 
 #define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
-#define NULLENT 0
-#define PLAYER1 1
-#define PLAYER2 2
+#define NULLENT 0u
+#define PLAYER1 1u
+#define PLAYER2 2u
 #define START_INDEX_LEVEL_INSTANCES 3
 #define ENTFLAG_ACTIVE        1
 #define ENTFLAG_CARDCHUNK     2
