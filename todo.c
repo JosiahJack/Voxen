@@ -93,7 +93,7 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
         case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
-        case 1:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
+        case 1:  *ofsx = 0.589f; *ofsy = -0.554f; *ofsz = -0.907f; break;
         case 2:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 3:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
         case 4:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;

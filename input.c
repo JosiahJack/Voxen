@@ -170,6 +170,12 @@ void ProcessInput(void) {
         glProgramUniform1i(chunkShaderProgram, 5, debugValue);
     }
     
+    if (keyStates[GLFW_KEY_1].pressed) {
+        settings_Contrast += 0.01f;
+    } else if (keyStates[GLFW_KEY_2].pressed) {
+        settings_Contrast -= 0.01f;
+    }
+    
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     // End Debug Inputs
     

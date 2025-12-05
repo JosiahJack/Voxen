@@ -234,6 +234,7 @@ void main() {
             vec3 normalColor = (getTextureColor(normInstanceIndex,texUVNorm).rgb * 2.0 - 1.0);
             normalColor.g = -normalColor.g;
             adjustedNormal = normalize(TBN3x3 * normalColor);
+            if (dot(adjustedNormal,Normal) < 0.0) adjustedNormal = Normal;
         }
     }
 
@@ -363,21 +364,22 @@ void main() {
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
 
-        // Christmas light filter - warm subtle imperfections
-        float rawNoise = n1 + n2;
-        float n = rawNoise * 0.5 + 0.5;
-        float variation = n * 0.09 + 0.955;
-        float hotCenter = pow(1.0 - smoothstep(0.0, range * 0.5, dist), 2.0);
-        variation += hotCenter * 0.045;
-        vec3 colorVar;
-        colorVar.r = 1.0 + (n - 0.5) * 0.09;
-        colorVar.g = 1.0 + (n - 0.5) * 0.04;
-        colorVar.b = 1.0 + (n - 0.5) * 0.02;
-        colorVar.r += hotCenter * 0.08;
-        colorVar.g += hotCenter * 0.02;
-        colorVar = clamp(colorVar, 0.92, 1.11);
-        vec3 finalLightColor = lightColor * colorVar;
-        lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * finalLightColor * spotFalloff * shadowFactor);
+//         // Christmas light filter - warm subtle imperfections
+//         float rawNoise = n1 + n2;
+//         float n = rawNoise * 0.5 + 0.5;
+//         float variation = n * 0.09 + 0.955;
+//         float hotCenter = pow(1.0 - smoothstep(0.0, range * 0.5, dist), 2.0);
+//         variation += hotCenter * 0.045;
+//         vec3 colorVar;
+//         colorVar.r = 1.0 + (n - 0.5) * 0.09;
+//         colorVar.g = 1.0 + (n - 0.5) * 0.04;
+//         colorVar.b = 1.0 + (n - 0.5) * 0.02;
+//         colorVar.r += hotCenter * 0.08;
+//         colorVar.g += hotCenter * 0.02;
+//         colorVar = clamp(colorVar, 0.92, 1.11);
+//         vec3 finalLightColor = lightColor * colorVar;
+//         lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * finalLightColor * spotFalloff * shadowFactor);
+        lighting += (albedoColor.rgb * intensity * pow(attenuation, 2.2) * lightColor * spotFalloff * shadowFactor);
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);
             float ndh = max(dot(normal, halfDir), 0.0);

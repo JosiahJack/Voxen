@@ -71,6 +71,7 @@ extern QuestBits questData;
 extern uint8_t settings_Shadows;
 extern uint8_t settings_AntiAliasing;
 extern uint8_t settings_Brightness;
+extern float settings_Contrast;
 extern uint8_t settings_VolumeMusic;
 extern uint8_t settings_Language;
 extern uint8_t settings_CullEnabled;

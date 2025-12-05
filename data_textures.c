@@ -46,7 +46,7 @@ void LoadTextures(void) {
     size_t offsets_size          = MAX_VALID_TEXTURE * sizeof(uint32_t);
     size_t sizes_size            = MAX_VALID_TEXTURE * 2 * sizeof(int32_t);
     size_t palette_offsets_size  = MAX_VALID_TEXTURE * sizeof(uint32_t);
-    uint32_t maxUniqueColors = 72428u; uint32_t maxTotalPixels = 23573300u;
+    uint32_t maxUniqueColors = 80000u; uint32_t maxTotalPixels = 24000000u;
     size_t palettes_size         = maxUniqueColors * sizeof(uint32_t);
     size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;

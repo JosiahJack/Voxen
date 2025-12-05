@@ -39,6 +39,7 @@ layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform vec3 staticColor;
 layout(location = 30) uniform float skyRotateSpeed;
+layout(location = 31) uniform float contrast;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels
@@ -440,7 +441,7 @@ void main() {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);
             vec4 specColor = imageLoad(inputSpecular, uv);
-            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.75;
+            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.85;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
             color.rgb += reflectionColor.rgb;
@@ -490,13 +491,25 @@ void main() {
             aaColor = mix(aaColor, blurred, clamp(vhsBlurAmount, 0.0, 1.0));
         }
 
+
+        // Aggressive contrast that works in gamma space (your actual pipeline)
+//         vec3 color = aaColor;
+//         color = (color - 0.5) * contrast + 0.5;
+//         float lift = 0.2;              // 0.02 = deep | 0.09 = brighter
+//         color = max(color - lift, vec3(0.0)) / (1.0 - lift);
+//         color *= 1.82;                  // overall brightness — makes it sing
+//         color = clamp(color, 0.0, 1.0);
+//         aaColor = color;
+
         // Banded Static
         if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed);
 
+        // Brightness Adjustment Setting
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
 
         // Berserk last as it's a brain effect not an eye effect
         if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor);
+
         FragColor = vec4(aaColor, 1.0);
     } else {
         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);

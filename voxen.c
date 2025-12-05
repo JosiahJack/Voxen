@@ -57,6 +57,7 @@ char statusText[TEXT_BUFFER_SIZE];
 uint8_t settings_Shadows = 2u; // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
 uint8_t settings_AntiAliasing = 1u; // Default 1
 uint8_t settings_Brightness = 100u; // Default 100 (for %)
+float settings_Contrast = 0.6f;
 uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
 uint8_t settings_CullEnabled = 1;
@@ -383,7 +384,6 @@ void UpdateDynamicLights() {
     if (gamePaused || menuActive) return;
     
     for (int i=0;i<loadedLights;++i) {
-//         DualLog("Light %u is on: %u\n",i,lightOn[i]);
         if (lightIntervalStepsLength[i] < 1) continue;
         
         int litIdx = i * LIGHT_DATA_SIZE;
@@ -690,6 +690,9 @@ void RenderShadowmaps(void) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        if (range > 7.0f) continue;
+        if (intensity < 1.0f) continue;
+        
         float thresh = 0.02f;
         float luminosity = (intensity / (range * range));
         if (luminosity < thresh) continue;
@@ -943,9 +946,9 @@ void CenterStatusPrint(const char* fmt, ...) {
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
     instances[playerIdx].index = 767;
-    instances[playerIdx].position.x = 10.2f; // Start Actual: Puts player on Medical Level in actual game start position
+    instances[playerIdx].position.x = 10.52f; // Start Actual: Puts player on Medical Level in actual game start position
     instances[playerIdx].position.y = -43.792f + 0.84f; // Added 0.84f for cam offset from center
-    instances[playerIdx].position.z = 20.40001f;
+    instances[playerIdx].position.z = 20.2908f;
     instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
     instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
     instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
@@ -1467,6 +1470,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float coloredStatic = 0.0f; // TODO: Hook into pain/health management and shield impact effect
         glProgramUniform1f(imageBlitShaderProgram, 28, coloredStatic);
         glProgramUniform3f(imageBlitShaderProgram, 29, 1.0f, 0.0f, 0.0f); // TODO: Hook staticColor up to red or blue for pain or shield impact.
+        glProgramUniform1f(imageBlitShaderProgram, 31, settings_Contrast);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
@@ -1547,7 +1551,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx, numCellsVisible);
-        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, settings_Contrast: %f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z, settings_Contrast);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
