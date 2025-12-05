@@ -17,6 +17,10 @@
 // TODO: Voxel GI
 // TODO: Scripting engine for gameplay
 // TODO: Save/Load system
+// TODO: Directional lights for cyberspace
+// TODO: Directional light for sunlight
+// TODO: Directional light shadowmapping just for sunlight
+// TODO: Let user switch monitors from settings, especially in fullscreen.
 #include "voxen.h"
 #include "entity.h"
 #include "vmath.h"
@@ -242,7 +246,7 @@ void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t ent
 }
 
 void EnableCheatArsenal(uint8_t level) {
-    switch(level) { // TODO
+    switch(level) {
         default: break;
     }
 }
@@ -251,13 +255,13 @@ uint16_t SpawnDynamicObject(int val, bool cheat) {
     if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; } // Checked in cmd_summon but used elsewhere so guard here too.
     
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: " , val, cheat);
-//     Vector3 spawnPos = (Vector3){0.0,0.0,0.0}; // TODO
+//     Vector3 spawnPos = (Vector3){0.0,0.0,0.0};
 //     if (cheat) spawnPos = (Vector3){instances[PLAYER1].position.x,instances[PLAYER1].position.y,instances[PLAYER1].position.z};
-    if (ConstIndexIsGeometry(val)/* TODO && !editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
+    if (ConstIndexIsGeometry(val)/* && !editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
     
-    uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity; // TODO
+    uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
     if (cheat && ConstIndexIsHardware(val)) { // Hardware
-//         UseableObjectUse uo = go.GetComponent<UseableObjectUse>(); // TODO
+//         UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
 //         int dex14 = Inventory.a.hardware14fromConstdex(uo.useableItemIndex);
 //         if (Inventory.a.hasHardware[dex14]) uo.customIndex = (Inventory.a.hardwareVersion[dex14] + 1);
     }
@@ -267,10 +271,10 @@ uint16_t SpawnDynamicObject(int val, bool cheat) {
 
 void cmd_kill(void) {
     CenterStatusPrint("%s", stringTable[1011]); // "Player decides to become a cyborg."
-    // TODO: TakeDamage(...)
+    // TakeDamage(...)
 }
 
-void cmd_undo(void) { // TODO
+void cmd_undo(void) {
     if (editMode) {
         // Utils.SafeDestroy(lastSpawnedGO); lastSpawnedGO = NULL;
         CenterStatusPrint("Last spawned object removed");
@@ -280,6 +284,46 @@ void cmd_undo(void) { // TODO
 }
 
 void cmd_shake(void) {
-    // Const.a.Shake(true, -1, -1); // TODO
+    // Const.a.Shake(true, -1, -1);
     CenterStatusPrint("SHAKE IT!");
+}
+
+void ApplyCorpseFriction(uint16_t instanceIdx) {
+    instances[instanceIdx].dynamicFriction = 10.0f;
+    instances[instanceIdx].staticFriction = 10.0f;
+    instances[instanceIdx].bounciness = 0.0f;
+    instances[instanceIdx].frictionCombine = PHYS_COMBINE_MUL;
+    instances[instanceIdx].bounceCombine = PHYS_COMBINE_MAX;
+}
+
+float GetPainStatic() { // TODO: Hook into pain/health management and shield impact effect
+    return 0.0f;
+}
+
+Color GetPainStaticColor() { // TODO: Hook staticColor up to red or blue for pain or shield impact.
+    return (Color){1.0f,0.0f,0.0f,1.0f};
+}
+
+double monitorSwitchTime;
+int currentMonitorIndex = 0;
+bool ignore_next_mouse_delta = false;
+void CycleToNextMonitor(GLFWwindow* window) {
+    if (get_time() < monitorSwitchTime) return;
+    
+    monitorSwitchTime = get_time() + 1.5f; // Dumb hack to prevent toggling every frame from keypress illogic
+    int monitorCount;
+    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
+    if (!monitors || monitorCount < 2) return;
+
+    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
+    GLFWmonitor* next = monitors[currentMonitorIndex];
+
+    int mx, my;
+    glfwGetMonitorPos(next, &mx, &my);
+    const GLFWvidmode* mode = glfwGetVideoMode(next);
+    int xpos = mx + (mode->width - screen_width) / 2;
+    int ypos = my + (mode->height - screen_height) / 2;
+    glfwSetWindowPos(window, xpos, ypos);
+    ignore_next_mouse_delta = true;
+    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
 }

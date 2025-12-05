@@ -14,3 +14,6 @@ uint16_t SpawnDynamicObject(int val, bool cheat);
 void cmd_kill(void);
 void cmd_undo(void);
 void cmd_shake(void);
+float GetPainStatic();
+Color GetPainStaticColor();
+void CycleToNextMonitor(GLFWwindow* window);

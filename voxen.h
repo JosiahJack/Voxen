@@ -251,7 +251,6 @@ bool get_cull_bit(const uint32_t* arr, size_t idx);
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
-// TODO: Ensure that npc corpses get dynamicFriction of 10.0f, staticFriction of 10.0f, bounciness of 0.0f, frictionCombine of 2, bounceCombine of 3
 extern double time_PhysicsStep;
 extern uint8_t boosterActive;
 typedef uint8_t PhysicsLayer;

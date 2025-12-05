@@ -25,6 +25,7 @@
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
+#include "todo.h"
 #include "input.c"
 
 typedef struct {
@@ -34,7 +35,6 @@ typedef struct {
 // ----------------------------------------------------------------------------
 // Window
 GLFWwindow *window;
-double monitorSwitchTime;
 bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
 bool editMode = true;
@@ -984,29 +984,6 @@ void NewGame(void) {
     pauseRelativeTime = 0.0f;
 }
 
-int currentMonitorIndex = 0;
-bool ignore_next_mouse_delta = false;
-void CycleToNextMonitor(GLFWwindow* window) {
-    if (get_time() < monitorSwitchTime) return;
-    
-    monitorSwitchTime = get_time() + 1.5f; // Dumb hack to prevent toggling every frame from keypress illogic
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (!monitors || monitorCount < 2) return;
-
-    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
-    GLFWmonitor* next = monitors[currentMonitorIndex];
-
-    int mx, my;
-    glfwGetMonitorPos(next, &mx, &my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - screen_width) / 2;
-    int ypos = my + (mode->height - screen_height) / 2;
-    glfwSetWindowPos(window, xpos, ypos);
-    ignore_next_mouse_delta = true;
-    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
-}
-
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); exit(1); }
@@ -1023,7 +1000,7 @@ void InitializeEnvironment(void) {
     glfwMakeContextCurrent(window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); exit(1); }
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
-    if (target_monitor) { // TODO: Let user switch monitors from settings, especially in fullscreen.
+    if (target_monitor) {
         const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
         int mx, my;
         glfwGetMonitorPos(target_monitor, &mx, &my);
@@ -1382,19 +1359,9 @@ int32_t main(int32_t argc, char* argv[]) {
             // 3. Light Updates
             UpdateDynamicLights();
             for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) {
-                    UpdateVoxelLightLists(); // Takes 12ms of total frametime!!
-//                     if (settings_Shadows > 0u) RenderShadowmaps();
-//                     else {
-//                         memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
-//                         glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-//                     }
-                    
-                    break;
-                }
+                if (lightDirty[i]) { UpdateVoxelLightLists(); break; }
             }
             
-            // Dynamically update shadowmaps for dynamic objects TODO. takes 16ms!
             if (settings_Shadows > 0u) RenderShadowmaps();
             else {
                 memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
@@ -1467,9 +1434,9 @@ int32_t main(int32_t argc, char* argv[]) {
         glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
         glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
         glProgramUniform1i(imageBlitShaderProgram, 27, 0); // Texture 0 for the rendered geometry color buffer
-        float coloredStatic = 0.0f; // TODO: Hook into pain/health management and shield impact effect
-        glProgramUniform1f(imageBlitShaderProgram, 28, coloredStatic);
-        glProgramUniform3f(imageBlitShaderProgram, 29, 1.0f, 0.0f, 0.0f); // TODO: Hook staticColor up to red or blue for pain or shield impact.
+        glProgramUniform1f(imageBlitShaderProgram, 28, GetPainStatic());
+        Color painStaticColor = GetPainStaticColor();
+        glProgramUniform3f(imageBlitShaderProgram, 29, painStaticColor.r, painStaticColor.g, painStaticColor.b);
         glProgramUniform1f(imageBlitShaderProgram, 31, settings_Contrast);
         glBindVertexArray(quadVAO);
         glDisable(GL_BLEND);
