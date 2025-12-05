@@ -328,7 +328,7 @@ void main() {
             uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
             uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
             vec2 tc = uv * shadowmapSize;
-            float bias = 0.0451 + 0.185 * distOverRangeSqd;   // distance bias (prevents acne on far geometry)
+            float bias = 0.11 * distOverRangeSqd;
             if (shadowsEnabled > 1 && distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;

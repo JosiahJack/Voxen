@@ -1,7 +1,7 @@
 // data_fonts.c - Load Font Atlasses
 // #include "voxen.h" limited includes
-#define _GNU_SOURCE
 // #define FONT_GEN // Turn on when wanting to rebuild Font Atlases
+#include "os.h"
 #include <malloc.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -220,7 +220,7 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
 
 static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint8_t ttf_md5[16], const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
     FILE *f = fopen(path, "wb");
-    if (!f) { DualLogError("Failed to write font cache %s\n", path); exit(1); }
+    if (!f) { DualLogError("Failed to write font cache %s\n", path); OS_Exit(1); }
 
     fwrite(&expected_glyphs, 1, 4, f);
     fwrite(ttf_md5, 1, 16, f);
@@ -286,20 +286,20 @@ void InitFontAtlasses(void) {
     DualLog("Loaded    2 fonts...");
     const char *pri_path = "./Fonts/SystemShockText.ttf";
     const char *sec_path = "./Fonts/StopD.ttf";
-    FILE *f = fopen(pri_path, "rb"); if (!f) { DualLogError("Missing %s\n", pri_path); exit(1); }
+    FILE *f = fopen(pri_path, "rb"); if (!f) { DualLogError("Missing %s\n", pri_path); OS_Exit(1); }
     
     fseek(f, 0, SEEK_END); size_t pri_sz = ftell(f); fseek(f, 0, SEEK_SET);
     primaryFontData = malloc(pri_sz);
     size_t read = fread(primaryFontData, 1, pri_sz, f); fclose(f);
-    if (read != (size_t)pri_sz) { DualLogError("Failed to read full SystemShockText.ttf at: %s\n", pri_path); exit(1); }
-    f = fopen(sec_path, "rb"); if (!f) { DualLogError("Missing %s\n", sec_path); exit(1); }
+    if (read != (size_t)pri_sz) { DualLogError("Failed to read full SystemShockText.ttf at: %s\n", pri_path); OS_Exit(1); }
+    f = fopen(sec_path, "rb"); if (!f) { DualLogError("Missing %s\n", sec_path); OS_Exit(1); }
     
     fseek(f, 0, SEEK_END); size_t sec_sz = ftell(f); fseek(f, 0, SEEK_SET);
     unsigned char *sec_data = malloc(sec_sz);
     read = fread(sec_data, 1, sec_sz, f); fclose(f);
-    if (read != (size_t)sec_sz) { DualLogError("Failed to read full StopD.ttf at: %s\n", sec_path); exit(1); }
-    if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); exit(1); }
-    if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); exit(1); }
+    if (read != (size_t)sec_sz) { DualLogError("Failed to read full StopD.ttf at: %s\n", sec_path); OS_Exit(1); }
+    if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); OS_Exit(1); }
+    if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); OS_Exit(1); }
 
     uint8_t pri_md5[16], sec_md5[16];
     md5(primaryFontData, pri_sz, pri_md5);

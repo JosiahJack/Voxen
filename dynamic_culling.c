@@ -1,3 +1,4 @@
+#include "os.h"
 uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
 extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
@@ -14,15 +15,15 @@ uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCel
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
 
-bool get_cull_bit(const uint32_t* arr, size_t idx) {
-    size_t word = idx / 32;
-    size_t bit = idx % 32;
+bool get_cull_bit(const uint32_t* arr, int idx) {
+    int word = idx / 32;
+    int bit = idx % 32;
     return ((arr[word] & (1U << bit)) != 0);
 }
 
-static inline void set_cull_bit(uint32_t* arr, size_t idx, bool val) {
-    size_t word = idx / 32;
-    size_t bit = idx % 32;
+static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
+    int word = idx / 32;
+    int bit = idx % 32;
     if (val) {
         arr[word] |= (1U << bit);
     } else {
@@ -54,18 +55,18 @@ void DetermineClosedEdges() {
     char filename2[256];
     sprintf(filename2,"./Data/worldcellopen_%d.png",currentLevel);
     fp = fopen(filename2, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename2); exit(1); }
+    if (!fp) { DualLogError("Failed to open %s\n", filename2); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); exit(1); }
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_SET);
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); exit(1); }
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); OS_Exit(1); }
     unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
-	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); exit(1); }
+	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); OS_Exit(1); }
  
     unsigned char openData_r, openData_g, openData_b;
     uint16_t totalOpenCells = 0;
@@ -73,7 +74,7 @@ void DetermineClosedEdges() {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~CELL_OPEN;
-            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
             int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
             openData_r = openPixels[pixelIdx + 0];
             openData_g = openPixels[pixelIdx + 1];
@@ -96,19 +97,19 @@ void DetermineClosedEdges() {
     sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
 
     fp = fopen(filename, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename); exit(1); }
+    if (!fp) { DualLogError("Failed to open %s\n", filename); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); exit(1); }
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_SET);
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); exit(1); }
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); OS_Exit(1); }
 
     unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
-    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); exit(1); }
+    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); OS_Exit(1); }
 
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
     uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
@@ -116,7 +117,7 @@ void DetermineClosedEdges() {
         for (int32_t z=0;z<WORLDZ;z++) {
             int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
-            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
             int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
             closedData_r = edgePixels[pixelIdx + 0];
             closedData_g = edgePixels[pixelIdx + 1];
@@ -150,24 +151,24 @@ void DetermineClosedEdges() {
     char filename3[256];
     sprintf(filename3,"./Data/worldcellskyvis_%d.png",currentLevel);
     fp = fopen(filename3, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename3); exit(1); }
+    if (!fp) { DualLogError("Failed to open %s\n", filename3); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); exit(1); }
+    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_SET);
     read_size = fread(file_buffer, 1, file_size, fp);
     fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); exit(1); }
+    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); OS_Exit(1); }
     unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
-    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); exit(1); }
+    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); OS_Exit(1); }
 
     unsigned char skyData_r, skyData_g, skyData_b;
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx = (z * WORLDX) + x;
-            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to match Unity's bottom-left origin for Texture2D vs stbi_load's top-left
+            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
             int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
             skyData_r = skyPixels[pixelIdx + 0];
             skyData_g = skyPixels[pixelIdx + 1];

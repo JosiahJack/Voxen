@@ -1,15 +1,7 @@
 // voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#define _GNU_SOURCE
-#include <malloc.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <unistd.h>
+#include "os.h" // Operating System calls shim layer.
 #include "event.h"
-#define VOXEN_ENGINE_IMPLEMENTATION
 #include "entity.h"
 #include "voxen.h"
 #include "vmath.h"
@@ -213,7 +205,7 @@ GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     glCompileShader(shader);
     GLint success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) { char infoLog[512]; glGetShaderInfoLog(shader, 512, NULL, infoLog); DualLogError("%s Compilation Failed: %s\n", shaderName, infoLog); exit(1); }
+    if (!success) { char infoLog[512]; glGetShaderInfoLog(shader, 512, NULL, infoLog); DualLogError("%s Compilation Failed: %s\n", shaderName, infoLog); OS_Exit(1); }
     return shader;
 }
 
@@ -223,7 +215,7 @@ GLuint LinkProgram(GLuint *shaders, int32_t count, const char *programName) {
     glLinkProgram(program);
     GLint success;
     glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success) { char infoLog[512]; glGetProgramInfoLog(program, 512, NULL, infoLog); DualLogError("%s Linking Failed: %s\n", programName, infoLog); exit(1); }
+    if (!success) { char infoLog[512]; glGetProgramInfoLog(program, 512, NULL, infoLog); DualLogError("%s Linking Failed: %s\n", programName, infoLog); OS_Exit(1); }
     return program;
 }
 
@@ -253,65 +245,8 @@ void CompileShaders(void) {
     CHECK_GL_ERROR();
 }
 
-static inline void mul_mat4(float *out, const float *a, const float *b) { // out = a * b
-    float result[16];
-    for (int32_t col = 0; col < 4; ++col) {
-        for (int32_t row = 0; row < 4; ++row) {
-            result[col*4 + row] =
-                a[0*4 + row] * b[col*4 + 0] +
-                a[1*4 + row] * b[col*4 + 1] +
-                a[2*4 + row] * b[col*4 + 2] +
-                a[3*4 + row] * b[col*4 + 3];
-        }
-    }
-   
-    for (int32_t i = 0; i < 16; i++) out[i] = result[i]; // copy back
-}
-
-void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
-    float rot[16];
-    quat_to_matrix(quat,rot);
-    mat[0]  = rot[0] * -sclx; mat[1]  = rot[1] * -sclx; mat[2]  = rot[2] * -sclx; mat[3]  = 0.0f;
-    mat[4]  = rot[4] * scly; mat[5]  = rot[5] * scly; mat[6]  = rot[6] * scly; mat[7]  = 0.0f;
-    mat[8]  = rot[8] * sclz; mat[9]  = rot[9] * sclz; mat[10] = rot[10] * sclz; mat[11] = 0.0f;
-    mat[12] = posx;          mat[13] = posy;          mat[14] = posz;          mat[15] = 1.0f;
-}
-
-void UpdateInstanceMatrix(int32_t i) {
-    if (instances[i].modelIndex >= loadedModels) { dirtyInstances[i] = false; return; } // No model
-    if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
-
-    float mat[16]; // 4x4 matrix
-    Quaternion quat = {instances[i].rotation.x, instances[i].rotation.y, instances[i].rotation.z, instances[i].rotation.w};
-    SetUpdatedMatrix(mat, instances[i].position.x, instances[i].position.y, instances[i].position.z, &quat,instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
-    memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
-    dirtyInstances[i] = false;
-}
-
 void UpdateScreenSize(void) {
-    float* m;
-    m = uiOrthoProjection;
-    m[0] = 2.0f / (float)screen_width; m[1] =                           0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                       0.0f; m[5] = -2.0f / ((float)screen_height); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                       0.0f; m[9] =                           0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
-    
-    aspect3D = (float)screen_width / (float)screen_height;
-    float f = vcot(settings_FOV * PI / 360.0f);
-    m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
-    
-    float aspectShad = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
-    f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
-    m = shadowmapsPerspectiveProjection;
-    m[0] = f / aspectShad; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
-    m[4] =           0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
-    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
-    
+    UpdateProjectionMatrices();
     glProgramUniform1ui(imageBlitShaderProgram, 2, screen_width);
     glProgramUniform1ui(imageBlitShaderProgram, 3, screen_height);
     glProgramUniform1f(imageBlitShaderProgram, 23, (float)(SHADOW_MAP_SIZE));
@@ -659,10 +594,30 @@ typedef struct {
     float score; // Priority score (lower distance, higher intensity = higher priority)
 } LightCandidate;
 
-int32_t compareLightCandidates(const void* a, const void* b) {
-    const LightCandidate* ca = (const LightCandidate*)a;
-    const LightCandidate* cb = (const LightCandidate*)b;
-    return (ca->score < cb->score) ? -1 : ((ca->score > cb->score) ? 1 : 0);
+static inline void sift_up(LightCandidate* h, int idx) {
+    while (idx > 0) {
+        int p = (idx - 1) >> 1;
+        if (h[p].score <= h[idx].score) break;
+        LightCandidate t = h[p];
+        h[p] = h[idx];
+        h[idx] = t;
+        idx = p;
+    }
+}
+
+static inline void sift_down(LightCandidate* h, int size, int idx) {
+    for (;;) {
+        int l = (idx << 1) + 1;
+        int r = l + 1;
+        int s = idx;
+        if (l < size && h[l].score < h[s].score) s = l;
+        if (r < size && h[r].score < h[s].score) s = r;
+        if (s == idx) break;
+        LightCandidate t = h[idx];
+        h[idx] = h[s];
+        h[s] = t;
+        idx = s;
+    }
 }
 
 uint32_t numShadowsCouldRender = 0;
@@ -684,16 +639,17 @@ void RenderShadowmaps(void) {
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
-    LightCandidate candidates[loadedLights];
+    LightCandidate candidates[MAX_SHADOWMAPS];
+    uint8_t heap_size = 0;
     numShadowsCouldRender = 0;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        if (range > 7.0f) continue;
-        if (intensity < 1.0f) continue;
-        
-        float thresh = 0.02f;
+//         if (range > 7.0f) continue;
+//         if (intensity < 1.0f) continue;
+
+        float thresh = 0.018f;
         float luminosity = (intensity / (range * range));
         if (luminosity < thresh) continue;
         
@@ -731,10 +687,29 @@ void RenderShadowmaps(void) {
         if (dotResult > 0.5f) score *= 8.0f; // Favor lights in player's view cone
         else if (dotResult > 0.0f) score *= 4.0f; // Favor lights in player's view cone
         
-        candidates[numShadowsCouldRender++] = (LightCandidate){ .index = i, .distanceSquared = distSqrd, .score = score };
+        LightCandidate c = { i, distSqrd, score };
+
+        if (heap_size < MAX_SHADOWMAPS) {
+            candidates[heap_size] = c;
+            sift_up(candidates, heap_size);
+            heap_size++;
+        } else if (c.score < candidates[0].score) {
+            candidates[0] = c;
+            sift_down(candidates, MAX_SHADOWMAPS, 0);
+        }
+        numShadowsCouldRender++;
     }
 
-    qsort(candidates, numShadowsCouldRender, sizeof(LightCandidate), compareLightCandidates);
+    int M = heap_size;
+    for (int a = 1; a < M; a++) {
+        LightCandidate x = candidates[a];
+        int b = a - 1;
+        while (b >= 0 && candidates[b].score > x.score) {
+            candidates[b+1] = candidates[b];
+            b--;
+        }
+        candidates[b+1] = x;
+    }
     uint32_t numToRender = vmin(numShadowsCouldRender, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
@@ -986,7 +961,7 @@ void NewGame(void) {
 
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
-    if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); exit(1); }
+    if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -995,10 +970,10 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 0);
     window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
-    if (!window) { DualLogError("glfwCreateWindow failed\n"); exit(1); }
+    if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
         
     glfwMakeContextCurrent(window);
-    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); exit(1); }
+    if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) {
         const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
@@ -1008,36 +983,16 @@ void InitializeEnvironment(void) {
         int ypos = my + (mode->height - screen_height) / 2;
         glfwSetWindowPos(window, xpos, ypos);
         DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\nUsing GLFW %s, ", glfwGetMonitorName(target_monitor), xpos, ypos,glfwGetVersionString());
-    } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); exit(1); }
+    } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); OS_Exit(1); }
     
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
-    if (!version) { DualLogError("OpenGL support not found!\n"); exit(1);}
+    if (!version) { DualLogError("OpenGL support not found!\n"); OS_Exit(1);}
     
     DualLog("OpenGL Version: %s, ", (const char*)version);
     DualLog("GPU: %s", renderer ? (const char*)renderer : "unknown");
-    char cpu_brand[256] = "Unknown CPU";
-    int logical_cores = 1;
-    FILE* f = fopen("/proc/cpuinfo", "r");
-    if (f) {
-        char line[512];
-        while (fgets(line, sizeof(line), f)) {
-            if (!strncmp(line, "model name", 10)) {
-                char* colon = strchr(line, ':');
-                if (colon) {
-                    strncpy(cpu_brand, colon + 2, sizeof(cpu_brand) - 1);
-                    char* nl = strchr(cpu_brand, '\n');
-                    if (nl) *nl = '\0';
-                }
-                break;
-            }
-        }
-        fclose(f);
-    }
-    logical_cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
-    if (logical_cores <= 0) logical_cores = 1;
-    DualLog("CPU: %s | Logical cores: %d\n", cpu_brand, logical_cores);
+    OS_CPUInfo();
     DebugRAM("GL Buffer and shader setup");
     Input_Init(window);
     glfwSwapInterval(settings_Vsync ? 1 : 0);
@@ -1120,28 +1075,23 @@ void InitializeEnvironment(void) {
     ParseGameData();
     DebugRAM("ParseGameData end");
     glfwSetWindowTitle(window,global_modname);
-    int fp = open("./Textures/UI/menudot1.png", O_RDONLY);
-    if (!fp) { DualLogError("Failed to open ./Textures/UI/menudot1.png\n"); exit(1); }
- 
-    stbi__arena_init();
-    struct stat file_stat;
-    fstat(fp, &file_stat);
-    uint8_t* file_buffer = mmap(NULL, file_stat.st_size, PROT_READ, MAP_PRIVATE, fp, 0);
-    close(fp);
-    if (file_buffer == MAP_FAILED) { DualLogError("Failed to mmap ./Textures/UI/menudot1.png\n"); exit(1); }
-                
+    int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
+    int windowIconFileSize = OS_FileSize(fp);
+    uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
+    OS_Close(fp);
     int w = 1, h = 1;
-    unsigned char* pixels = stbi_load_from_memory(file_buffer, file_stat.st_size, &w, &h);
-    if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); exit(1); }
+    stbi__arena_init();
+    unsigned char* pixels = stbi_load_from_memory(file_buffer, windowIconFileSize, &w, &h);
+    if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
     
     GLFWimage image;
     image.width  = w;
     image.height = h;
     image.pixels = pixels;
     glfwSetWindowIcon(window, 1, &image);
-    madvise(pixels, w * h * 4, MADV_DONTNEED); munmap(file_buffer,file_stat.st_size);
-    madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
-    malloc_trim(0);
+    OS_MemoryAdviseDontNeed(pixels, w * h * 4);
+    file_buffer = OS_DeallocateRAM(file_buffer, windowIconFileSize);
+    stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadTextures(); // Sequential due to GPU transfers
@@ -1157,16 +1107,116 @@ typedef struct {
     float depth;
 } DepthSort;
 
-int32_t compareDepthSort(const void* a, const void* b) {
-    const DepthSort* da = (const DepthSort*)a;
-    const DepthSort* db = (const DepthSort*)b;
-    return da->depth > db->depth ? -1 : (da->depth < db->depth ? 1 : 0);
+static inline void ds_swap(DepthSort* a, DepthSort* b) {
+    DepthSort t = *a; *a = *b; *b = t;
 }
 
-int32_t compareDepthSortInverted(const void* a, const void* b) {
-    const DepthSort* da = (const DepthSort*)a;
-    const DepthSort* db = (const DepthSort*)b;
-    return da->depth > db->depth ? 1 : (da->depth < db->depth ? -1 : 0);
+/* dir = +1.0 => ascending (small -> large)
+   dir = -1.0 => descending (large -> small) */
+static inline int ds_cmp_sign(const DepthSort* a, const DepthSort* b, float dir) {
+    float d = (a->depth - b->depth) * dir;
+    if (d > 0.0f) return 1;
+    if (d < 0.0f) return -1;
+    return 0;
+}
+
+static void ds_insertion(DepthSort* arr, int n, float dir) {
+    int i;
+    for (i = 1; i < n; ++i) {
+        DepthSort v = arr[i];
+        int j = i - 1;
+        while (j >= 0 && ds_cmp_sign(&v, &arr[j], dir) < 0) {
+            arr[j + 1] = arr[j];
+            --j;
+        }
+        arr[j + 1] = v;
+    }
+}
+
+static void ds_heapify_one(DepthSort* arr, int n, int i, float dir) {
+    for (;;) {
+        int l = (i << 1) + 1;
+        int r = l + 1;
+        int best = i;
+        if (l < n && ds_cmp_sign(&arr[l], &arr[best], dir) > 0) best = l;
+        if (r < n && ds_cmp_sign(&arr[r], &arr[best], dir) > 0) best = r;
+        if (best == i) return;
+        ds_swap(&arr[i], &arr[best]);
+        i = best;
+    }
+}
+
+static void ds_heapsort(DepthSort* arr, int n, float dir) {
+    int i;
+    if (n <= 1) return;
+    for (i = (n >> 1) - 1; i >= 0; --i) ds_heapify_one(arr, n, i, dir);
+    for (i = n - 1; i > 0; --i) {
+        ds_swap(&arr[0], &arr[i]);
+        ds_heapify_one(arr, i, 0, dir);
+    }
+}
+
+static void ds_introsort(DepthSort* arr, int n, float dir) {
+    if (n <= 1) return;
+
+    /* maxDepth = floor(log2(n)) * 2 is a common choice; we compute log2(n) */
+    int maxDepth = 0;
+    {
+        int t = n;
+        while (t > 1) { t >>= 1; maxDepth++; }
+        maxDepth = maxDepth * 2;
+    }
+
+    /* manual stack frame */
+    typedef struct { int lo, hi, depth; } Frame;
+    Frame stk[64]; /* 64 is plenty for n ~= 2300 */
+    int sp = 0;
+    stk[sp++] = (Frame){ 0, n - 1, maxDepth };
+
+    while (sp) {
+        Frame f = stk[--sp];
+        int lo = f.lo, hi = f.hi;
+        int depth = f.depth;
+
+        int count = hi - lo + 1;
+        if (count <= 16) {
+            ds_insertion(arr + lo, count, dir);
+            continue;
+        }
+
+        if (depth <= 0) {
+            ds_heapsort(arr + lo, count, dir);
+            continue;
+        }
+
+        /* median-of-three to choose pivot */
+        int mid = lo + ((hi - lo) >> 1);
+        if (ds_cmp_sign(&arr[mid], &arr[lo], dir) < 0) ds_swap(&arr[mid], &arr[lo]);
+        if (ds_cmp_sign(&arr[hi],  &arr[lo], dir) < 0) ds_swap(&arr[hi],  &arr[lo]);
+        if (ds_cmp_sign(&arr[mid], &arr[hi], dir) < 0) ds_swap(&arr[mid], &arr[hi]);
+
+        float pivot = arr[mid].depth;
+
+        int i = lo, j = hi;
+        while (i <= j) {
+            while ((arr[i].depth - pivot) * dir < 0.0f) i++;
+            while ((arr[j].depth - pivot) * dir > 0.0f) j--;
+            if (i <= j) {
+                ds_swap(&arr[i], &arr[j]);
+                i++; j--;
+            }
+        }
+
+        depth--;
+
+        /* push larger partition first to keep stack small (tail recursion elimination) */
+        if (i < hi) {
+            stk[sp++] = (Frame){ i, hi, depth };
+        }
+        if (lo < j) {
+            stk[sp++] = (Frame){ lo, j, depth };
+        }
+    }
 }
 
 #define REND_OPAQUE      1u
@@ -1222,8 +1272,10 @@ void RenderInstances(uint8_t type) {
         
         if (visibleCount == 0) continue;
         
-        if (type == REND_TRANSPARENT) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
-        else                          qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+        float dir = (type == REND_TRANSPARENT) ? -1.0f : +1.0f;
+        ds_introsort(visibleInstances, visibleCount, dir);
+//         if (type == REND_TRANSPARENT) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
+//         else                          qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
         
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
@@ -1311,10 +1363,10 @@ int32_t main(int32_t argc, char* argv[]) {
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
         timeSinceLastPhysicsTick = pauseRelativeTime - last_physics_time;
-//         if (timeSinceLastPhysicsTick > 0.006944444f && !gamePaused && !menuActive) { // 144fps fixed tick rate
+        if (!log_playback && !gamePaused && !menuActive) {
             last_physics_time = pauseRelativeTime;
             EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-//         }
+        }
 
         if (log_playback) { // Enqueue all logged events for the current frame.
             int32_t read_status = ReadActiveLog();
@@ -1358,15 +1410,8 @@ int32_t main(int32_t argc, char* argv[]) {
             
             // 3. Light Updates
             UpdateDynamicLights();
-            for (int i = 0; i < loadedLights; ++i) {
-                if (lightDirty[i]) { UpdateVoxelLightLists(); break; }
-            }
-            
+            for (int i = 0; i < loadedLights; ++i) { if (lightDirty[i]) { UpdateVoxelLightLists(); break; } }
             if (settings_Shadows > 0u) RenderShadowmaps();
-            else {
-                memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
-                glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-            }
             
             // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);

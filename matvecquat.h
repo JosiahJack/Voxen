@@ -1,5 +1,4 @@
-#ifndef VOXEN_MATVECQUAT_H
-#define VOXEN_MATVECQUAT_H
+#pragma once
 typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
@@ -25,4 +24,6 @@ Quaternion axis_angle_quaternion(const Vector3 axis, float angle);
 void normalize_quaternion(Quaternion* q);
 Quaternion mul_quaternion(const Quaternion a, const Quaternion b);
 Vector3 rotate_quaternion(const Quaternion q, const Vector3 v);
-#endif // VOXEN_MATVECQUAT_H
+void mul_mat4(float *out, const float *a, const float *b);
+void UpdateInstanceMatrix(int32_t i);
+void UpdateProjectionMatrices(void);

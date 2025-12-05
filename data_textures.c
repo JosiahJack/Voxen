@@ -1,5 +1,5 @@
 // data_textures.c - Fast single-threaded texture loader (per-texture 8-bit palettized)
-#define _GNU_SOURCE
+#include "os.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "External/stb_image.h"
@@ -41,7 +41,7 @@ void LoadTextures(void) {
     int32_t widths[MAX_VALID_TEXTURE]; memset(widths,0,MAX_VALID_TEXTURE * sizeof(int32_t));
     int32_t heights[MAX_VALID_TEXTURE]; memset(heights,0,MAX_VALID_TEXTURE * sizeof(int32_t));
     FILE *file = fopen("./Data/textures.txt", "r");
-    if (!file) { DualLogError("Cannot open %s: %s\n", "./Data/textures.txt", strerror(errno)); exit(1); }
+    if (!file) { DualLogError("Cannot open %s: %s\n", "./Data/textures.txt", strerror(errno)); OS_Exit(1); }
     
     size_t offsets_size          = MAX_VALID_TEXTURE * sizeof(uint32_t);
     size_t sizes_size            = MAX_VALID_TEXTURE * 2 * sizeof(int32_t);
@@ -51,7 +51,7 @@ void LoadTextures(void) {
     size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
     void* arena = mmap(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
-    if (arena == MAP_FAILED) { DualLogError("Failed to mmap texture arena\n"); exit(1); }
+    if (arena == MAP_FAILED) { DualLogError("Failed to mmap texture arena\n"); OS_Exit(1); }
     uint8_t* cur = (uint8_t*)arena;
     uint32_t* textureOffsets        = (uint32_t*)cur; cur += offsets_size;
     int32_t*  textureSizes          = (int32_t*)cur;  cur += sizes_size;
@@ -63,7 +63,7 @@ void LoadTextures(void) {
     int32_t currentIndex = -1;
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;
-        if (lineNum >= 65535) { DualLogError("textures.txt too large!  Exceeds 65535 lines!\n"); exit(1); }
+        if (lineNum >= 65535) { DualLogError("textures.txt too large!  Exceeds 65535 lines!\n"); OS_Exit(1); }
         
         char *start = line;
         if (strlen(start) < 3) continue; // Must have at least k:v, skip if shorter
@@ -103,22 +103,22 @@ void LoadTextures(void) {
             //     sanitize_utf8_ascii(trimmed_value);
                 if (strncmp(trimmed_key, "index", sizeof(trimmed_key)) == 0) { // Got the index, now load the actual texture.
                     currentIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    if (currentIndex < 0 || currentIndex > MAX_VALID_TEXTURE) { DualLogError("Invalid textures.txt index entry on line %u::%s\n",lineNum,line); exit(1); }
+                    if (currentIndex < 0 || currentIndex > MAX_VALID_TEXTURE) { DualLogError("Invalid textures.txt index entry on line %u::%s\n",lineNum,line); OS_Exit(1); }
                     
                     if (currentIndex > loadedTextures) loadedTextures = currentIndex; // Up to the creator of textures.txt to ensure no holes.
                     
                     int fd = open(filePath, O_RDONLY);
-                    if (fd < 0) { DualLogError("Failed to open %s: %s\n", filePath, strerror(errno)); exit(1); }
+                    if (fd < 0) { DualLogError("Failed to open %s: %s\n", filePath, strerror(errno)); OS_Exit(1); }
 
                     struct stat st;
                     fstat(fd, &st);
                     void* map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
                     close(fd);
-                    if (map == MAP_FAILED) { DualLogError("mmap failed for %s\n", filePath); exit(1); }
+                    if (map == MAP_FAILED) { DualLogError("mmap failed for %s\n", filePath); OS_Exit(1); }
 
                     unsigned char* pixels = stbi_load_from_memory(map, st.st_size, &widths[currentIndex], &heights[currentIndex]);
                     munmap(map, st.st_size);
-                    if (!pixels) { DualLogError("stbi_load failed for %s\n", filePath); exit(1); }
+                    if (!pixels) { DualLogError("stbi_load failed for %s\n", filePath); OS_Exit(1); }
 
                     totalPixels += widths[currentIndex] * heights[currentIndex];
                     int32_t numPixels = widths[currentIndex] * heights[currentIndex];
@@ -139,7 +139,7 @@ void LoadTextures(void) {
                             }
                         }
 
-                        if (pal_size >= 256) { DualLogError("Texture %d exceeded 256 colors\n", currentIndex); exit(1); }
+                        if (pal_size >= 256) { DualLogError("Texture %d exceeded 256 colors\n", currentIndex); OS_Exit(1); }
                         
                         palette[pal_size] = color;
                         indices[p] = pal_size;
@@ -154,10 +154,10 @@ void LoadTextures(void) {
                     textureSizes[currentIndex * 2]      = widths[currentIndex];
                     textureSizes[currentIndex * 2 + 1]  = heights[currentIndex];
                     memcpy(texturePalettes + color_base, palette, pal_size * sizeof(uint32_t));
-                    pixel_base += numPixels; if (pixel_base > maxTotalPixels) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n",pixel_base,maxTotalPixels); exit(1); }
-                    color_base += pal_size;  if (color_base > maxUniqueColors) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n",color_base,maxUniqueColors); exit(1); }
+                    pixel_base += numPixels; if (pixel_base > maxTotalPixels) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n",pixel_base,maxTotalPixels); OS_Exit(1); }
+                    color_base += pal_size;  if (color_base > maxUniqueColors) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n",color_base,maxUniqueColors); OS_Exit(1); }
                     continue;
-                } else if (currentIndex < 0) { DualLogError("index wasn't the first key after %s on line %u\n",filePath,lineNum); exit(1); }
+                } else if (currentIndex < 0) { DualLogError("index wasn't the first key after %s on line %u\n",filePath,lineNum); OS_Exit(1); }
 
                      if (strcmp(trimmed_key, "doublesided") == 0) doubleSidedTexture[currentIndex] = parse_bool(trimmed_value, start, lineNum);
                 else if (strcmp(trimmed_key, "transparent") == 0) transparentTexture[currentIndex] = parse_bool(trimmed_value, start, lineNum);
@@ -169,7 +169,7 @@ void LoadTextures(void) {
 
     fclose(file);
     DebugRAM("After loop for load textures");
-    if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); exit(1); }
+    if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
     
     loadedTextures++; // Increase to be a 1-based count for the SSBO sizes and print reports.
     DualLog("(%u), using stb_image version: 2.28, total palette colors: %u, total pixels: %u...", loadedTextures, totalPaletteColors, totalPixels);

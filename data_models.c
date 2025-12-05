@@ -1,5 +1,5 @@
 // data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
-#define _GNU_SOURCE
+#include "os.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -111,7 +111,7 @@ void cleanup_all_mmaps(void) {
 void LoadModels(void) {
     double start_time = get_time();
     loadedModels = 0;
-    if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); exit(1); }
+    if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < model_parser.count; k++) {
@@ -151,17 +151,17 @@ void LoadModels(void) {
 
         char vmdl_path[512];
         make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
-        if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); exit(1); }
+        if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); OS_Exit(1); }
 
         uint8_t fbx_md5[16];
         int fbx_fp = open(fbx_path, O_RDONLY);
-        if (!fbx_fp) { DualLogError("Failed to open %s\n", fbx_path); exit(1); }
+        if (!fbx_fp) { DualLogError("Failed to open %s\n", fbx_path); OS_Exit(1); }
 
         struct stat fbxstat;
         fstat(fbx_fp, &fbxstat);
         uint8_t* buf = mmap(NULL, fbxstat.st_size, PROT_READ, MAP_PRIVATE, fbx_fp, 0);
         close(fbx_fp);
-        if (buf == MAP_FAILED) { DualLogError("mmap failed for %s\n", fbx_path); exit(1); }
+        if (buf == MAP_FAILED) { DualLogError("mmap failed for %s\n", fbx_path); OS_Exit(1); }
         
         size_t fbxread = read(fbx_fp, buf, fbxstat.st_size);
         if (fbxread == 0) DualLogError("Read failure for %s\n", fbx_path);

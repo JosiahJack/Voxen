@@ -1,5 +1,5 @@
 // data_parser.c - Load game definition files for mod, textures indices and metadata, model indices and metadata, level data, game save data
-#define _GNU_SOURCE
+#include "os.h"
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <stdio.h>
@@ -110,7 +110,7 @@ void ParseGameData() {
     Entity entry;
     InitializeEntity(&entry);
     FILE *gamedatfile = fopen(filename, "r");
-    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); exit(1); }
+    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); OS_Exit(1); }
     
     uint32_t lineNum = 0;
     bool is_eof;

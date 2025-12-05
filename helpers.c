@@ -1,11 +1,49 @@
 // helpers.c - Helper Functions for various things
 #include <sys/stat.h>
+#include <time.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
 #include "entity.h"
 #include "voxen.h"
 #include "event.h"
+
+double get_time(void) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+        DualLogError("clock_gettime failed\n");
+        return 0.0;
+    }
+
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
+}
+
+// Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+void DebugRAM(const char *context) {
+#ifdef DEBUG_RAM_OUTPUT
+    struct mallinfo2 info = mallinfo2();
+    size_t uss_bytes = 0;
+    FILE *fp = fopen("/proc/self/smaps_rollup", "r");
+    if (fp) {
+        char line[256];
+        size_t val;
+        while (fgets(line, sizeof(line), fp)) {
+            if (sscanf(line, "Private_Clean: %zu kB", &val) == 1)      uss_bytes += val * 1024;
+            else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
+        }
+        fclose(fp);
+    } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
+
+    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
+            context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
+            uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
+#endif
+}
+#pragma GCC diagnostic pop
+
+void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
 
 // MD5 (128-bit / 16 bytes) – tiny self-contained implementation
 #define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
@@ -25,7 +63,7 @@ static const uint32_t md5Constants[64] = {
 	0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
 };
 	
-void md5(const uint8_t *data, size_t len, uint8_t out[16]) {
+void md5(const uint8_t *data, int len, uint8_t out[16]) {
 
     uint32_t h[4] = {0x67452301,0xefcdab89,0x98badcfe,0x10325476};
     uint32_t a,b,c,d,f,g;

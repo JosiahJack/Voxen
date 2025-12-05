@@ -1,5 +1,4 @@
-#ifndef VOXEN_VMATH_H
-#define VOXEN_VMATH_H
+#pragma once
 #define vabs(x) ((x) < 0 ? -(x) : (x))
 #define vmin(a,b) ((a) < (b) ? (a) : (b))
 #define vmax(a,b) ((a) > (b) ? (a) : (b))
@@ -37,4 +36,3 @@ static inline float vexp2f(float x) {
 
 static inline float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline float vpow(float a, float b) { return vexp(b * vlog(a)); }
-#endif // VOXEN_VMATH_H

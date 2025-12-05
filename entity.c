@@ -1,3 +1,4 @@
+#include "os.h"
 #include <malloc.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -171,12 +172,12 @@ void InitializeEntity(Entity* entry) {
 
 void LoadEntities(void) {
     double start_time = get_time();
-    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); exit(1); }
+    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
     
     entityCount = entity_parser.count;
     entities = calloc(entityCount,sizeof(Entity));
-    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); exit(1); }
-    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); exit(1); }
+    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); OS_Exit(1); }
+    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
     DualLog("Loading  %d entities...", entityCount);
     for (int32_t i = 0; i < entityCount; i++) {
@@ -218,7 +219,7 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
         for (uint16_t j = 0; j < head; j++) {
             uint16_t i = instanceTypeArray[j];
             if (tempInstances[i].modelIndex == modelIdx) {
-                if (*targetIndex >= nextRegionStart) { DualLogError("Instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, *targetIndex); exit(1); }
+                if (*targetIndex >= nextRegionStart) { DualLogError("Instance overflow at modelIdx %u, index %u, targetIdx %u\n", modelIdx, i, *targetIndex); OS_Exit(1); }
                 
                 instances[*targetIndex] = tempInstances[i];
                 (*targetIndex) += 1;
@@ -272,7 +273,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     for (i = 0; i < loadedModels; i++) { modelTypeOffsetsDoubleSided[i] = currentOffset; currentOffset += modelTypeCountsDoubleSided[i]; }
     startOfTransparentInstances = currentOffset;
     for (i = 0; i < loadedModels; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
-    if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); exit(1); }
+    if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
 
     Entity tempInstances[INSTANCE_COUNT];
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
@@ -303,7 +304,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
         if (ConstIndexIsAmbient(entIdx)) {
             ambientRegistry[loadedAmbients] = i;
             loadedAmbients++;
-            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); exit(1); }
+            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); OS_Exit(1); }
             
             instances[i].volume = entities[entIdx].volume * 0.5f;
         }
@@ -311,7 +312,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
 }
 
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
-    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); exit(1); }
+    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); OS_Exit(1); }
         
     instances[instanceIdx].index = entIdx;
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
@@ -382,14 +383,14 @@ void LoadLevel(uint8_t curlevel) {
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     loadedLights = 0;
     loadedAmbients = 0;
-    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); exit(1); }
+    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); exit(1); }
+    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); OS_Exit(1); }
 
     int32_t lineNum = -1; // Start at 0 on first loop iteration, as it needs to iterate before each blank or commented line skip
     int32_t instanceIdx = PLAYER2;
@@ -412,10 +413,10 @@ void LoadLevel(uint8_t curlevel) {
         if (strcmp(firstKeyCheck, "constIndex") == 0) isLight = false;  // constIndex specified indicating this is a real entity?
         if (isLight) {
             lightsIdx++;
-            if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); exit(1); }
+            if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); OS_Exit(1); }
         } else {
             instanceIdx++;
-            if (instanceIdx >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n",instanceIdx,curlevel); exit(1); }
+            if (instanceIdx >= INSTANCE_COUNT) { DualLogError("Too many instances %u in level%d.txt!\n",instanceIdx,curlevel); OS_Exit(1); }
         }
         
         int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
@@ -435,12 +436,12 @@ void LoadLevel(uint8_t curlevel) {
             if (kvString[0] == '\0' || strchr(kvString, ':') == NULL) continue;
             
             char *colon = strchr(kvString, ':');
-            if (colon[1] == '\0') continue; // Don't care about the name of the Unity gameobject from when this data used to be over there.  Need to skip this in the middle, but this also handles the very end
+            if (colon[1] == '\0') continue; // Don't care about the name.  Need to skip this in the middle, but this also handles the very end
             
             *colon = '\0';           // Split string at the colon
             char *key = kvString;    // Assign key to before colon
             char *value = colon + 1; // Assing value to after colon
-            if (!key || !value) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); exit(1); }
+            if (!key || !value) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); OS_Exit(1); }
 
             char trimmed_key[64];
             char trimmed_value[256];
@@ -458,7 +459,7 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "localRotation.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.w") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intensity") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = parse_float(trimmed_value, initialLine, lineNum) * 0.451f; // Adjustment, globally applied from Citadel's Unity to Custom Game Engine (Voxen) conversion.
+                else if (strcmp(trimmed_key, "intensity") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = parse_float(trimmed_value, initialLine, lineNum) * 0.451f; // ;)
                 else if (strcmp(trimmed_key, "range") == 0)           lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "spotAngle") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "type") == 0) {
@@ -606,7 +607,7 @@ void LoadLevel(uint8_t curlevel) {
         case 13: fogColorR = 0.0f;        fogColorG = 0.0f;         fogColorB = 0.0f;         fogBaseDensityForLevel = 0.005f; break;
     }
 
-    fogBaseDensityForLevel *= 4.0f; // Global multiplier to get it to look similar to Unity's
+    fogBaseDensityForLevel *= 3.8f; // Global modifier to tweak it.
     SetFog();
     malloc_trim(0);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f secs\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);

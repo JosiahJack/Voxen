@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+#include "os.h"
 #include <malloc.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -67,7 +67,7 @@ void LoadTextForLanguage(uint8_t lang) {
 
     fseek(fp, 0, SEEK_END); long file_size = ftell(fp); fseek(fp, 0, SEEK_SET);
     uint8_t* file_data = malloc(file_size);
-    if (fread(file_data, 1, file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s?\n",textFile); exit(1); }
+    if (fread(file_data, 1, file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Exit(1); }
     fclose(fp);
     size_t data_pos = 0;
     int is_utf16le = 0;
@@ -139,7 +139,7 @@ void LoadTextForLanguage(uint8_t lang) {
             utf16le_to_utf8(&file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
         } else {
             DualLogError("Unknown encoding, not UTF-8 nor UTF-16LE for %s\n",textFile);
-            exit(1);
+            OS_Exit(1);
         }
 
         /* ----- trim trailing CR/LF ----- */
@@ -212,14 +212,14 @@ void LoadLogTextForLanguage(uint8_t lang) {
     }
 
     FILE *fp = fopen(textFile, "rb");
-    if (!fp) { DualLog("Failed to open logs text file: %s\n", textFile); exit(1); }
+    if (!fp) { DualLog("Failed to open logs text file: %s\n", textFile); OS_Exit(1); }
 
     fseek(fp, 0, SEEK_END);
     long file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
     uint8_t *file_data = malloc((size_t)file_size);
-    if (fread(file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); exit(1); }
+    if (fread(file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); OS_Exit(1); }
     fclose(fp);
     size_t data_pos = 0;
     int is_utf16le = 0, is_utf8 = 0;
@@ -268,7 +268,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
             if (utf16_len == 0) continue;
             utf8_line[0] = '\0';
             utf16le_to_utf8(&file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
-        } else { DualLogError("Unknown encoding for %s\n", textFile); exit(1); }
+        } else { DualLogError("Unknown encoding for %s\n", textFile); OS_Exit(1); }
 
         size_t len = strlen(utf8_line);
         while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) utf8_line[--len] = '\0';

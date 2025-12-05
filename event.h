@@ -1,7 +1,5 @@
 // event.h - Unified Event System declarations
-#ifndef VOXEN_EVENT_H
-#define VOXEN_EVENT_H
-
+#pragma once
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -55,4 +53,3 @@ void EventSystemInit(int32_t argc, char* command, char* command_input1);
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
 double get_time(void);
 int32_t EventQueueProcess(void);
-#endif // VOXEN_EVENT_H

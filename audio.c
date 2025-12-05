@@ -1,6 +1,7 @@
 // audio.c
+#include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include "os.h"
 #include "./External/miniaudio.h"
 #include "voxen.h"
 #include "vmath.h"
@@ -18,7 +19,7 @@ void InitializeAudio() {
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; // Stereo output, adjust if needed
     result = ma_engine_init(&engine_config, &audio_engine);
-    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result); exit(1); }
+    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result); OS_Exit(1); }
 }
 
 void play_mp3(const char* path, float volume, int32_t fade_in_ms) {

@@ -4,6 +4,7 @@
 #include "entity.h"
 #include "matvecquat.h"
 #include "vmath.h"
+#define FLT_MAX 3.402823e+38
 void ProcessInput(void);
 void UpdatePlayerFacingAngles(void);
 

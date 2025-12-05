@@ -1,5 +1,6 @@
 // event.c - Handle unified event system for engine actions
 #include <stdio.h>
+#include "os.h"
 #include "event.h"
 #include "voxen.h"
 void exit(int status);
@@ -146,10 +147,10 @@ int32_t ReadActiveLog() {
 // Convert the binary .dem file into human readable text
 void JournalDump(const char* dem_file) {
     FILE* fpR = fopen(dem_file, "rb");
-    if (!fpR) { DualLogError("JournalDump failed to open .dem file\n"); exit(1); }
+    if (!fpR) { DualLogError("JournalDump failed to open .dem file\n"); OS_Exit(1); }
 
     FILE* fpW = fopen("./log_dump.txt", "wb");
-    if (!fpW) { DualLogError("JournalDump failed to open .txt\n"); exit(1); }
+    if (!fpW) { DualLogError("JournalDump failed to open .txt\n"); OS_Exit(1); }
 
     Event event;
     while (fread(&event, sizeof(Event), 1, fpR) == 1) {

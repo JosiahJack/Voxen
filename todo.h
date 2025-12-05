@@ -1,4 +1,5 @@
 #pragma once
+#define GEOMETRY_LOD_CARD_MODEL_IDX 178 // Need to specify in gamedata.txt
 extern float correctionX, correctionY, correctionZ;
 extern float correctionNPCX, correctionNPCY, correctionNPCZ;
 extern float correctionDoorsX, correctionDoorsY, correctionDoorsZ;

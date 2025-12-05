@@ -1,10 +1,8 @@
-#ifndef VOXEN_HEADER_H
-#define VOXEN_HEADER_H
+#pragma once
 #define VERSION_STRING "v0.7.4"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
-#include <time.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdarg.h>
@@ -156,7 +154,7 @@ void LoadModels(void);
 #define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
 
-#define MAX_SHADOWMAPS 72u
+#define MAX_SHADOWMAPS 64u
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -227,7 +225,7 @@ extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
 void CullCore(void);
 void Cull();
-bool get_cull_bit(const uint32_t* arr, size_t idx);
+bool get_cull_bit(const uint32_t* arr, int idx);
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 512
@@ -433,12 +431,11 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 // Helper Functions
 extern uint32_t random_range_rng;
 double get_time(void);
-void md5(const uint8_t *data, size_t len, uint8_t out[16]);
+void md5(const uint8_t *data, int len, uint8_t out[16]);
 float clampf(float x, float a, float b);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
 int data_parser_isspace(char c);
-
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum);
 uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum);
 uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum);
@@ -499,72 +496,28 @@ static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
     *flags = (*flags & ~bit) | (-state & bit);
 }
 
-static inline void sanitize_utf8_ascii(char *s) {
-    char *dst = s;
-    while (*s) {
-        if (!memcmp(s, "\xE2\x80\x90", 3) || !memcmp(s, "\xE2\x80\x91", 3) ||
-            !memcmp(s, "\xE2\x80\x92", 3) || !memcmp(s, "\xE2\x80\x93", 3) ||
-            !memcmp(s, "\xE2\x80\x94", 3) || !memcmp(s, "\xE2\x80\x95", 3) ||  // Added: Horizontal bar
-            !memcmp(s, "\xE2\x88\x92", 3)) {
-            dst[0] = '-'; dst++; s += 3; continue;
-        }
-        if (!memcmp(s, "\xC2\xAD", 2)) { dst[0] = '-'; dst++; s += 2; continue; }
-        if (!memcmp(s, "\xE2\x80\x9C", 3) || !memcmp(s, "\xE2\x80\x9D", 3)) { dst[0] = '"'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xE2\x80\x98", 3) || !memcmp(s, "\xE2\x80\x99", 3)) { dst[0] = '\''; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x8B", 3)) { dst[0] = '+'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x8F", 3)) { dst[0] = '/'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x88", 3)) { dst[0] = '('; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x89", 3)) { dst[0] = ')'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x9A", 3)) { dst[0] = ':'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x9B", 3)) { dst[0] = ';'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x8C", 3)) { dst[0] = ','; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x8E", 3)) { dst[0] = '.'; dst++; s += 3; continue; }
-        if (!memcmp(s, "\xEF\xBC\x8D", 3)) { dst[0] = '-'; dst++; s += 3; continue; }
-        dst[0] = *s; dst++; s++;
-    }
-    *dst = '\0';
-}
-
-// // // // //
-#ifdef VOXEN_ENGINE_IMPLEMENTATION // -----------------------------<<<
-// // // // // 
-double get_time(void) {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-        DualLogError("clock_gettime failed\n");
-        return 0.0;
-    }
-
-    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
-}
-
-// Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-void DebugRAM(const char *context) {
-#ifdef DEBUG_RAM_OUTPUT
-    struct mallinfo2 info = mallinfo2();
-    size_t uss_bytes = 0;
-    FILE *fp = fopen("/proc/self/smaps_rollup", "r");
-    if (fp) {
-        char line[256];
-        size_t val;
-        while (fgets(line, sizeof(line), fp)) {
-            if (sscanf(line, "Private_Clean: %zu kB", &val) == 1)      uss_bytes += val * 1024;
-            else if (sscanf(line, "Private_Dirty: %zu kB", &val) == 1) uss_bytes += val * 1024;
-        }
-        fclose(fp);
-    } else DualLogError("Failed to open /proc/self/smaps_rollup\n");
-
-    DualLog("Memory at %s: Heap usage %zu bytes (%zu KB | %.2f MB), USS %zu bytes (%zu KB | %.2f MB)\n",
-            context, info.uordblks, info.uordblks / 1024, info.uordblks / 1024.0 / 1024.0,
-            uss_bytes, uss_bytes / 1024, uss_bytes / 1024.0 / 1024.0);
-#endif
-}
-#pragma GCC diagnostic pop
-
-void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
-// ============================================================================
-#endif // VOXEN_ENGINE_IMPLEMENTATION
-// ----------------------------------------------------------------------------
-#endif // VOXEN_HEADER_H
+// static inline void sanitize_utf8_ascii(char *s) {
+//     char *dst = s;
+//     while (*s) {
+//         if (!memcmp(s, "\xE2\x80\x90", 3) || !memcmp(s, "\xE2\x80\x91", 3) ||
+//             !memcmp(s, "\xE2\x80\x92", 3) || !memcmp(s, "\xE2\x80\x93", 3) ||
+//             !memcmp(s, "\xE2\x80\x94", 3) || !memcmp(s, "\xE2\x80\x95", 3) ||  // Added: Horizontal bar
+//             !memcmp(s, "\xE2\x88\x92", 3)) {
+//             dst[0] = '-'; dst++; s += 3; continue;
+//         }
+//         if (!memcmp(s, "\xC2\xAD", 2)) { dst[0] = '-'; dst++; s += 2; continue; }
+//         if (!memcmp(s, "\xE2\x80\x9C", 3) || !memcmp(s, "\xE2\x80\x9D", 3)) { dst[0] = '"'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xE2\x80\x98", 3) || !memcmp(s, "\xE2\x80\x99", 3)) { dst[0] = '\''; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x8B", 3)) { dst[0] = '+'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x8F", 3)) { dst[0] = '/'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x88", 3)) { dst[0] = '('; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x89", 3)) { dst[0] = ')'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x9A", 3)) { dst[0] = ':'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x9B", 3)) { dst[0] = ';'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x8C", 3)) { dst[0] = ','; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x8E", 3)) { dst[0] = '.'; dst++; s += 3; continue; }
+//         if (!memcmp(s, "\xEF\xBC\x8D", 3)) { dst[0] = '-'; dst++; s += 3; continue; }
+//         dst[0] = *s; dst++; s++;
+//     }
+//     *dst = '\0';
+// }
