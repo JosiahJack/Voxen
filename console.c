@@ -8,12 +8,12 @@
 #include "todo.h"
 
 #define MAX_HISTORY 7
-int32_t currentEntryLength = 0;
+static int32_t currentEntryLength = 0;
 bool consoleActive = false;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
 char history[MAX_HISTORY][TEXT_BUFFER_SIZE] = {0};
-int numHistory = 0;
-int historyPos = 0;
+static int numHistory = 0;
+static int historyPos = 0;
 
 void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;

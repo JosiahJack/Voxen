@@ -49,9 +49,9 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     if (fstat(fd, &st) < 0) { close(fd); return false; }
     if (st.st_size < 16 + 4 + 4) { close(fd); return false; }
     
-    uint8_t *map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
+    uint8_t *map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
     if (map == MAP_FAILED) return false;
-    if (memcmp(map, expected_md5, 16) != 0) { munmap(map, st.st_size); return false; }
+    if (memcmp(map, expected_md5, 16) != 0) { munmap(map, (size_t)st.st_size); return false; }
 
     const uint8_t *p = map + 16;
     uint32_t vcnt = *(uint32_t*)p; p += 4; *out_vcount = vcnt;
@@ -60,13 +60,13 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
     size_t expected   = 16 + 4 + vert_bytes + 4 + idx_bytes;
     if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, st.st_size); return false; }
-    if (p + vert_bytes + idx_bytes > map + st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, st.st_size); return false; }
+    if (p + vert_bytes + idx_bytes > map + (size_t)st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, st.st_size); return false; }
 
     *out_verts  = (float*)p;
     p += vert_bytes;
     *out_idx    = (uint32_t*)p;
     *out_map = map;
-    *out_mapsz = st.st_size;
+    *out_mapsz = (size_t)st.st_size;
     return true;
 }
 

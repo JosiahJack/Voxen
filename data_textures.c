@@ -112,12 +112,12 @@ void LoadTextures(void) {
 
                     struct stat st;
                     fstat(fd, &st);
-                    void* map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+                    void* map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
                     close(fd);
                     if (map == MAP_FAILED) { DualLogError("mmap failed for %s\n", filePath); OS_Exit(1); }
 
-                    unsigned char* pixels = stbi_load_from_memory(map, st.st_size, &widths[currentIndex], &heights[currentIndex]);
-                    munmap(map, st.st_size);
+                    unsigned char* pixels = stbi_load_from_memory(map, (size_t)st.st_size, &widths[currentIndex], &heights[currentIndex]);
+                    munmap(map, (size_t)st.st_size);
                     if (!pixels) { DualLogError("stbi_load failed for %s\n", filePath); OS_Exit(1); }
 
                     totalPixels += widths[currentIndex] * heights[currentIndex];

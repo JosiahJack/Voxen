@@ -3,9 +3,6 @@
 #include "os.h" // Operating System calls shim layer.
 #include "event.h"
 #include "entity.h"
-#include "voxen.h"
-#include "vmath.h"
-#include "matvecquat.h"
 #include "External/stb_image.h"
 #include "Shaders/text_vert.glsl.h" // Shaders are converted into string headers at build time.
 #include "Shaders/text_frag.glsl.h"
@@ -180,16 +177,16 @@ float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
 GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, shadowMapsIndirectionID;
-uint32_t* voxelLightListsRaw = NULL;
-uint32_t* voxelLightListIndices = NULL;
-uint32_t* shadowmapIndirectionList = NULL;
+uint32_t voxelLightListsRaw[VOXEL_COUNT * 4];
+uint32_t voxelLightListIndices[VOXEL_COUNT * 2];
+uint32_t shadowmapIndirectionList[LIGHT_COUNT];
 uint16_t numDynamicLights;
-float lights[LIGHT_COUNT * LIGHT_DATA_SIZE] = {0};
-float lightsRangeSquared[LIGHT_COUNT] = {0.0f};
+float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
+float lightsRangeSquared[LIGHT_COUNT];
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
-float (*lightView)[6][4][4] = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
-float (*lightViewProj)[6][4][4] = NULL; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
-FrustumPlane (*lightFrustumPlanes)[6][6] = NULL; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
+static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
+static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
+FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering Helper Functions
 void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
@@ -383,7 +380,7 @@ void UpdateDynamicLights() {
     glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
-void UpdateVoxelLightLists() {
+void UpdateVoxelLightLists(void) {
     memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
     uint32_t totalLightAssignments = 0;
@@ -514,33 +511,6 @@ void UpdateVoxelLightLists() {
     
     glNamedBufferData(voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
     glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
-}
-
-void VoxelLists() {
-    double start_time = get_time();
-    DualLog("Loading voxels(%u)...", VOXEL_COUNT);
-    DebugRAM("start of VoxelLists");
-    voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
-    voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
-    voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    shadowmapIndirectionList = malloc(loadedLights * sizeof(uint32_t));
-    lightsID = SetupSSBO(lightsID, 19, loadedLights * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    lightView      = calloc(loadedLights * 6 * 4 * 4, sizeof(float));
-    lightViewProj  = calloc(loadedLights * 6 * 4 * 4, sizeof(float));
-    lightFrustumPlanes   = calloc(loadedLights * 6 * 6, sizeof(FrustumPlane));
-    DebugRAM("prior to UpdateVoxelLightLists");
-    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-    UpdateVoxelLightLists();
-    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
-    for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
-    matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-    shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, loadedLights * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    glFlush();
-    glFinish();
-    DebugRAM("end of VoxelLists");
-    DualLog(" took %f secs\n", get_time() - start_time);
 }
 
 void RenderShadowmap(uint16_t lightIdx) {
@@ -1097,6 +1067,13 @@ void InitializeEnvironment(void) {
     LoadTextures(); // Sequential due to GPU transfers
     LoadModels(); // Sequential due to GPU transfers
     LoadEntities(); // Had a note to do this after textures and models, didn't seem necessary but giving it a thread didn't help init times.
+    lightsID = SetupSSBO(lightsID, 19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
+    matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
@@ -1405,9 +1382,8 @@ int32_t main(int32_t argc, char* argv[]) {
             
             // 2. Pass instance data to GPU
             for (uint32_t i = 3; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } } // Skip player indices and start at 3
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, matricesBuffer);
-            glBufferData(GL_SHADER_STORAGE_BUFFER, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-            
+            glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(uint32_t), modelMatrices, GL_DYNAMIC_DRAW);
+
             // 3. Light Updates
             UpdateDynamicLights();
             for (int i = 0; i < loadedLights; ++i) { if (lightDirty[i]) { UpdateVoxelLightLists(); break; } }

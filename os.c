@@ -1,4 +1,5 @@
 // os.c - Operating System calls shim layer.
+#include "os.h"
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -14,21 +15,21 @@ int OS_OpenReadonly(const char* filePath) {
     return fp;
 }
 
-int OS_FileSize(int fileIndex) {
+int OS_FileSize(int fileDescriptor) {
     struct stat fileStatisticsStruct;
-    fstat(fileIndex, &fileStatisticsStruct);
+    fstat(fileDescriptor, &fileStatisticsStruct);
     return fileStatisticsStruct.st_size;
 }
 
-void* OS_AllocateFileBackedRAMReadonly(int size, int fileIndex, char* filePath) {
-    void* ramSpacePointer = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fileIndex, 0);
+void* OS_AllocateFileBackedRAMReadonly(size_t size, int32_t fileDescriptor, char* filePath) {
+    void* ramSpacePointer = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fileDescriptor, 0);
     if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to mmap %s\n", filePath); OS_Exit(1); }
     return ramSpacePointer;
 }
 
-void OS_MemoryAdviseDontNeed(void* ramSpacePointer, int size) { madvise(ramSpacePointer, size, MADV_DONTNEED); }
+void OS_MemoryAdviseDontNeed(void* ramSpacePointer, size_t size) { madvise(ramSpacePointer, size, MADV_DONTNEED); }
 
-void* OS_DeallocateRAM(void* ramSpacePointer, int size) {
+void* OS_DeallocateRAM(void* ramSpacePointer, size_t size) {
     if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
     
     OS_MemoryAdviseDontNeed(ramSpacePointer, size);
@@ -36,7 +37,7 @@ void* OS_DeallocateRAM(void* ramSpacePointer, int size) {
     return NULL;
 }
 
-void OS_Close(int fileIndex) { close(fileIndex); }
+void OS_Close(int fileDescriptor) { close(fileDescriptor); }
 
 void OS_CPUInfo(void) {
     char cpu_brand[256];
@@ -113,8 +114,7 @@ void OS_CPUInfo(void) {
                         have_b = 1;
                     }
                     
-                    if (have_b && b >= a) total += (b - a + 1);
-                    else                  total += 1;
+                    total += (have_b && b >= a) ? (b - a + 1) : 1;
                 } else {
                     total += 1;
                 }

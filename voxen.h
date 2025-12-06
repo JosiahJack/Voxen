@@ -177,7 +177,7 @@ extern float lightMinIntensity[LIGHT_COUNT];
 extern float lightMaxIntensity[LIGHT_COUNT];
 
 extern GLuint shadowMapSSBO;
-void VoxelLists();
+void UpdateVoxelLightLists(void);
 extern GLuint shadowmapsClearShaderProgram;
 void RenderShadowmaps(void);
 void RenderLoadingProgress(int32_t offset, const char* format, ...);
@@ -191,6 +191,7 @@ extern uint8_t currentLevel;
 extern bool gamePaused;
 extern bool menuActive;
 extern bool levelCurrentlyLoading;
+extern GLuint matricesBuffer;
 
 // ----------------------------------------------------------------------------
 // Dynamic Culling

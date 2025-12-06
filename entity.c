@@ -616,7 +616,9 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    VoxelLists();
+    for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
+    glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(uint32_t), modelMatrices, GL_DYNAMIC_DRAW);
+    UpdateVoxelLightLists();
     uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE_SQD * 6u;
     totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
     shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
