@@ -151,7 +151,6 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
 }
 
 void ProcessInput(void) {
-    if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(window);
     if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
     

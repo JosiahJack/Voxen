@@ -24,11 +24,8 @@ bool get_cull_bit(const uint32_t* arr, int idx) {
 static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
     int word = idx / 32;
     int bit = idx % 32;
-    if (val) {
-        arr[word] |= (1U << bit);
-    } else {
-        arr[word] &= ~(1U << bit);
-    }
+    if (val) arr[word] |= (1U << bit);
+    else arr[word] &= ~(1U << bit);
 }
 
 void PutChunksInCells() {
@@ -89,9 +86,7 @@ void DetermineClosedEdges() {
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-//     free(openPixels);
-//     malloc_trim(0);
-    
+
     // ------------------- Closed Edges ------------------    
     char filename[256];
     sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
@@ -144,8 +139,6 @@ void DetermineClosedEdges() {
     }
     
     DualLog("found %d open cells, closed edges N: %d, S: %d, E: %d, W: %d...",totalOpenCells,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
-//     free(edgePixels);
-//     malloc_trim(0);
     
     // ------------------- Sky/Sun Visibility ------------------    
     char filename3[256];
@@ -179,10 +172,8 @@ void DetermineClosedEdges() {
         }
     }
     
-//     free(skyPixels);
     free(file_buffer);
     munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED);
-    malloc_trim(0);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
@@ -672,7 +663,6 @@ void CullInit(void) {
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
-    malloc_trim(0);
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("end of Cull_Init");
 }

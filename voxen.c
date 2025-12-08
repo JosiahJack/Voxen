@@ -535,10 +535,10 @@ void RenderShadowmap(uint16_t lightIdx) {
         nearbyMeshCount++;
     }
 
-    glUniform1ui(3, lightIdx);
+    glProgramUniform1ui(shadowmapsShaderProgram, 3, lightIdx);
     for (uint8_t face = 0; face < 6; face++) {
-        glUniform1i(2, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
-        glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
+        glProgramUniform1i(shadowmapsShaderProgram, 2, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
+        glProgramUniformMatrix4fv(shadowmapsShaderProgram, 1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
             if (instances[i].modelIndex >= loadedModels) continue;
@@ -599,14 +599,12 @@ void RenderShadowmaps(void) {
     glUseProgram(shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     shadowDrawCallsRenderedThisFrame = 0;
     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
     glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
     glUseProgram(shadowmapsShaderProgram);
     glProgramUniform1i(shadowmapsShaderProgram, 4, (int32_t)SHADOW_MAP_SIZE);
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
     glDepthMask(GL_TRUE);
     glBindVertexArray(vao_chunk);
     LightCandidate candidates[MAX_SHADOWMAPS];
@@ -616,9 +614,9 @@ void RenderShadowmaps(void) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//         if (range > 7.0f) continue;
-//         if (intensity < 1.0f) continue;
-
+        if (range > 10.0f) continue;
+        if (intensity < 0.1f) continue;
+        
         float thresh = 0.018f;
         float luminosity = (intensity / (range * range));
         if (luminosity < thresh) continue;
@@ -630,7 +628,7 @@ void RenderShadowmaps(void) {
         float dy = lightPosY - instances[PLAYER1].position.y;
         float dz = lightPosZ - instances[PLAYER1].position.z;
         float distSqrd = dx * dx + dy * dy + dz * dz;
-        if (distSqrd >= FAR_PLANE_SQUARED) continue;
+        if (distSqrd >= 2500.0f) continue; // shadowDistance of 50.0f
         
         int lightCellIdx = cellIndexForLight[i];
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
@@ -658,7 +656,6 @@ void RenderShadowmaps(void) {
         else if (dotResult > 0.0f) score *= 4.0f; // Favor lights in player's view cone
         
         LightCandidate c = { i, distSqrd, score };
-
         if (heap_size < MAX_SHADOWMAPS) {
             candidates[heap_size] = c;
             sift_up(candidates, heap_size);
@@ -670,16 +667,13 @@ void RenderShadowmaps(void) {
         numShadowsCouldRender++;
     }
 
-    int M = heap_size;
-    for (int a = 1; a < M; a++) {
+    for (int a = 1; a < heap_size; a++) {
         LightCandidate x = candidates[a];
         int b = a - 1;
-        while (b >= 0 && candidates[b].score > x.score) {
-            candidates[b+1] = candidates[b];
-            b--;
-        }
+        while (b >= 0 && candidates[b].score > x.score) { candidates[b+1] = candidates[b]; b--; }
         candidates[b+1] = x;
     }
+    
     uint32_t numToRender = vmin(numShadowsCouldRender, MAX_SHADOWMAPS);
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
@@ -692,11 +686,7 @@ void RenderShadowmaps(void) {
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glViewport(0, 0, screen_width, screen_height);
-    glEnable(GL_CULL_FACE);
     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-    glFlush();
-    glFinish();
-    malloc_trim(0);
     DebugRAM("end of RenderShadowmaps");
 }
 
@@ -972,32 +962,23 @@ void InitializeEnvironment(void) {
     float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
     glNamedBufferData(quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
     glCreateVertexArrays(1, &quadVAO);
-    glEnableVertexArrayAttrib(quadVAO, 0);
-    glEnableVertexArrayAttrib(quadVAO, 1);
     glVertexArrayAttribFormat(quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
     glVertexArrayAttribFormat(quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
     glVertexArrayVertexBuffer(quadVAO, 0, quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-    glVertexArrayAttribBinding(quadVAO, 0, 0); // DSA: Bind position attribute to binding index 0
-    glVertexArrayAttribBinding(quadVAO, 1, 0); // DSA: Bind texcoord attribute to binding index 0
-    
-    glGenVertexArrays(1, &vao_chunk);
-    glBindVertexArray(vao_chunk);
-    glVertexAttribFormat(0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexAttribFormat(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
-    glVertexAttribFormat(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    for (uint8_t i = 0; i < 3; i++) { glVertexAttribBinding(i, 0); glEnableVertexAttribArray(i); }
-    glBindVertexArray(0);
+    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(quadVAO, i, 0); glEnableVertexArrayAttrib(quadVAO, i); }
+
+    glCreateVertexArrays(1, &vao_chunk);
+    glVertexArrayAttribFormat(vao_chunk, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
+    glVertexArrayAttribFormat(vao_chunk, 1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
+    glVertexArrayAttribFormat(vao_chunk, 2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
+    for (uint8_t i = 0; i < 3; i++) { glVertexArrayAttribBinding(vao_chunk, i, 0); glEnableVertexArrayAttrib(vao_chunk, i); }
     
     glCreateBuffers(1, &textVBO);
     glCreateVertexArrays(1, &textVAO);    
-    glEnableVertexArrayAttrib(textVAO, 0);
-    glEnableVertexArrayAttrib(textVAO, 1);
     glVertexArrayAttribFormat(textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
     glVertexArrayAttribFormat(textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
     glVertexArrayVertexBuffer(textVAO, 0, textVBO, 0, 5 * sizeof(float));
-    glVertexArrayAttribBinding(textVAO, 0, 0);
-    glVertexArrayAttribBinding(textVAO, 1, 0);
-    DebugRAM("after vao chunk bind");
+    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(textVAO, i, 0); glEnableVertexArrayAttrib(textVAO, i); }
 
     GenerateAndBindTexture(&inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
     GenerateAndBindTexture(&inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
@@ -1251,9 +1232,6 @@ void RenderInstances(uint8_t type) {
         
         float dir = (type == REND_TRANSPARENT) ? -1.0f : +1.0f;
         ds_introsort(visibleInstances, visibleCount, dir);
-//         if (type == REND_TRANSPARENT) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
-//         else                          qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
-        
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
             uint32_t texIndex = instances[i].texIndex;
@@ -1438,6 +1416,7 @@ int32_t main(int32_t argc, char* argv[]) {
             if (currentLevel == 6 || currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
             else if (currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
         }
+        
         glProgramUniform1f(imageBlitShaderProgram, 4, worldMin_x);
         glProgramUniform1f(imageBlitShaderProgram, 5, worldMin_z);
         glProgramUniform1ui(imageBlitShaderProgram, 7, settings_Reflections);
@@ -1563,13 +1542,12 @@ int32_t main(int32_t argc, char* argv[]) {
             lastFrameSecCount = globalFrameNum;
         }
         
-        if (keyStates[GLFW_KEY_F12].pressed) {
-            if (time_now > screenshotTimeout) {
-                Screenshot();
-                screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-            }
+        if (keyStates[GLFW_KEY_F12].pressed && time_now > screenshotTimeout) {
+            Screenshot();
+            screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
         }
         
+        if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
         cpuTime = get_time() - current_time;
         glfwSwapBuffers(window); // Present frame
         CHECK_GL_ERROR();

@@ -8,7 +8,6 @@
 #include "voxen.h"
 #include "entity.h"
 #include "citadel_enumerations.h"
-int malloc_trim(size_t pad); // #include <malloc.h>
 float voxelMinCenterX, voxelMinCenterZ;
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
@@ -71,8 +70,8 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
     while ((c = fgetc(file)) != EOF && c != delimiter && c != '\n' && pos < max_len - 1) { token[pos++] = c; }
     token[pos] = '\0';
     if (pos >= max_len - 1) DualLogError("Token truncated at line %u\n", *lineNum);
-    if (c == EOF) *is_eof = true;
-    if (c == '\n') *is_newline = true;
+    if (c == EOF) *is_eof = 1u;
+    else if (c == '\n') *is_newline = 1u;
     return pos > 0;
 }
 
@@ -118,10 +117,7 @@ void ParseGameData() {
         char token[256];
         bool is_comment, is_newline;
         if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
-            if (is_comment || is_newline) {
-                if (is_newline) lineNum += 1;
-                continue;
-            }
+            if (is_comment || is_newline) { lineNum += is_newline; continue; }
         }
         
         char key[256];

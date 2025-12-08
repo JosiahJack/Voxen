@@ -309,7 +309,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRange * distOverRange * 24.0;
+            float smearness = distOverRange * distOverRange * 24.0 + 12.0;
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -328,7 +328,7 @@ void main() {
             uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
             uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
             vec2 tc = uv * shadowmapSize;
-            float bias = 0.11 * distOverRangeSqd;
+            float bias = 0.02 + 0.17 * distOverRangeSqd;
             if (shadowsEnabled > 1 && distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
@@ -363,43 +363,25 @@ void main() {
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
-
-//         // Christmas light filter - warm subtle imperfections
-//         float rawNoise = n1 + n2;
-//         float n = rawNoise * 0.5 + 0.5;
-//         float variation = n * 0.09 + 0.955;
-//         float hotCenter = pow(1.0 - smoothstep(0.0, range * 0.5, dist), 2.0);
-//         variation += hotCenter * 0.045;
-//         vec3 colorVar;
-//         colorVar.r = 1.0 + (n - 0.5) * 0.09;
-//         colorVar.g = 1.0 + (n - 0.5) * 0.04;
-//         colorVar.b = 1.0 + (n - 0.5) * 0.02;
-//         colorVar.r += hotCenter * 0.08;
-//         colorVar.g += hotCenter * 0.02;
-//         colorVar = clamp(colorVar, 0.92, 1.11);
-//         vec3 finalLightColor = lightColor * colorVar;
-//         lighting += (albedoColor.rgb * intensity * pow(attenuation, 1.6) * finalLightColor * spotFalloff * shadowFactor);
         lighting += (albedoColor.rgb * intensity * pow(attenuation, 2.2) * lightColor * spotFalloff * shadowFactor);
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);
             float ndh = max(dot(normal, halfDir), 0.0);
             float strength = texIndexChecked == 36 || texIndexChecked == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
-            float shininess = 150.0;
-            float spec = pow(ndh, shininess);
+            float shininess = 130.0;
+            float spec = clamp(pow(ndh, shininess),0.0,1.0);
             lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength * 10.0;
         }
     }
 
     if (unlit > 0) lighting = albedoColor.rgb;
-    else lighting += glowColor.rgb;
+    else lighting += glowColor.rgb; // Glow (texture emission)
 
-    // Fog
     float fogFac = clamp(distToPixel * INV_FOG_DIST, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
-    if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac);
-
+    if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac); // Fog
     if (debugView == 1) {
         outAlbedo = albedoColor;
         outAlbedo.a = 1.0;
