@@ -179,30 +179,6 @@ vec3 milkyWay(vec3 dir) {
     return vec3(intensity) * tint * 0.06 + vec3(ditherVal);
 }
 
-vec3 vhsBlur(vec2 uv) { // Subtly soften everything for more realism.  Subtle but really does help.
-    const float r = vhsRadiusMax * vhsBlurAmount;
-    if (r < 0.5) return texture(tex, uv).rgb;
-
-    vec2 px = 1.0 / vec2(screenWidth, screenHeight);
-    vec3 acc = vec3(0.0);
-    float wsum = 0.0;
-
-    // 7-tap horizontal (same weights as original)
-    const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
-    for (int i=0;i<7;i++) {
-        float o = (i-3) * (r/3.0);
-        vec3 s = texture(tex, uv + vec2(o*px.x,0.0)).rgb;
-        acc += s * w[i];
-        wsum += w[i];
-    }
-    acc /= wsum;
-
-    // 3-tap vertical (same as original)
-    acc += texture(tex, uv + vec2(0.0,-px.y)).rgb * 0.25;
-    acc += texture(tex, uv + vec2(0.0, px.y)).rgb * 0.25;
-    return acc * (1.0/1.5); // renormalize
-}
-
 vec3 bandedStatic(vec2 uv) {
     float baseThickness = clamp(staticBandThickness, 0.001, 1.0);
     float screenY = uv.y * float(screenHeight);
@@ -220,27 +196,6 @@ vec3 bandedStatic(vec2 uv) {
     float bandNoiseVal = snoise(vec2(bandIndex * 0.3, uv.x * 5.0 + timeVal * 0.1));
     float intensity = mix(bandNoiseVal, speck, 0.6) * cluster;
     return staticColor * intensity;
-}
-
-uint GetVoxelIndex(vec3 worldPos) {
-    float offsetX = worldPos.x - worldMin_x + (VOXEL_SIZE * 0.5);
-    float offsetZ = worldPos.z - worldMin_z + (VOXEL_SIZE * 0.5);
-    uint cellX = uint(offsetX / WORLDCELL_WIDTH_F);
-    uint cellZ = uint(offsetZ / WORLDCELL_WIDTH_F);
-    float localX = mod(offsetX, WORLDCELL_WIDTH_F);
-    float localZ = mod(offsetZ, WORLDCELL_WIDTH_F);
-    uint voxelX = uint(localX / VOXEL_SIZE);
-    uint voxelZ = uint(localZ / VOXEL_SIZE);
-    uint cellIndex = cellZ * 64 + cellX;
-    uint voxelIndexInCell = voxelZ * 8 + voxelX;
-    return cellIndex * 64 + voxelIndexInCell;
-}
-
-vec4 unpackColor32(uint color) {
-    return vec4(float((color >> 24) & 0xFFu) / 255.0,  // r
-                float((color >> 16) & 0xFFu) / 255.0,  // g
-                float((color >>  8) & 0xFFu) / 255.0,  // b
-                float((color      ) & 0xFFu) / 255.0); // a
 }
 
 vec3 rgb2hsv(vec3 c) {
@@ -486,33 +441,33 @@ void main() {
         }
 
         // VHS Blur
-        if (vhsBlurAmount > 0.0) {
-            vec3 blurred = vhsBlur(texCoordUsed);
-            aaColor = mix(aaColor, blurred, clamp(vhsBlurAmount, 0.0, 1.0));
+        const float r = vhsRadiusMax * vhsBlurAmount;
+        vec2 px = 1.0 / vec2(screenWidth, screenHeight);
+        vec3 acc = vec3(0.0);
+        float wsum = 0.0;
+
+        // 7-tap horizontal (same weights as original)
+        const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
+        for (int i=0;i<7;i++) {
+            float o = (i-3) * (r/3.0);
+            vec3 s = texture(tex, texCoordUsed + vec2(o*px.x,0.0)).rgb;
+            acc += s * w[i];
+            wsum += w[i];
         }
+        acc /= wsum;
 
+        // 3-tap vertical (same as original)
+        acc += texture(tex, texCoordUsed + vec2(0.0,-px.y)).rgb * 0.25;
+        acc += texture(tex, texCoordUsed + vec2(0.0, px.y)).rgb * 0.25;
+        vec3 vhsBlur = acc * (1.0/1.5); // renormalize
+        aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0));
 
-        // Aggressive contrast that works in gamma space (your actual pipeline)
-//         vec3 color = aaColor;
-//         color = (color - 0.5) * contrast + 0.5;
-//         float lift = 0.2;              // 0.02 = deep | 0.09 = brighter
-//         color = max(color - lift, vec3(0.0)) / (1.0 - lift);
-//         color *= 1.82;                  // overall brightness — makes it sing
-//         color = clamp(color, 0.0, 1.0);
-//         aaColor = color;
-
-        // Banded Static
-        if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed);
-
-        // Brightness Adjustment Setting
-        aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0)));
-
-        // Berserk last as it's a brain effect not an eye effect
-        if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor);
-
-        FragColor = vec4(aaColor, 1.0);
+        if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
+        aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting) / 100.0))); // Brightness Adjustment Setting
+        if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
+        FragColor = vec4(aaColor, 1.0); // Output final composited color
     } else {
         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-        FragColor = texture(outputImage, sampleUV);
+        FragColor = texture(outputImage, sampleUV); // SSR debug view
     }
 }

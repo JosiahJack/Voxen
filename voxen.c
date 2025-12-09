@@ -47,7 +47,7 @@ uint8_t settings_VolumeMusic = 20u;
 uint8_t settings_Language = 0; // English default
 uint8_t settings_CullEnabled = 1;
 float settings_FOV = 65.0f;
-#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
+#define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
 uint8_t settings_Reflections = 1u; // Default 1
 float settings_SSRStepSize = 0.55f;
 uint16_t settings_SSRStepCount = 48;
@@ -544,7 +544,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     }
 
     if (nearbyMeshCount > largestNearbyMeshCount) largestNearbyMeshCount = nearbyMeshCount;
-    glProgramUniform1ui(shadowmapsShaderProgram, 3, lightIdx);
+    glProgramUniform1ui(shadowmapsShaderProgram, 3, lightIdx * (uint32_t)LIGHT_DATA_SIZE);
     for (uint8_t face = 0; face < 6; face++) {
         glProgramUniform1i(shadowmapsShaderProgram, 2, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
         glProgramUniformMatrix4fv(shadowmapsShaderProgram, 1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);

@@ -19,8 +19,7 @@ const int LIGHT_DATA_OFFSET_POSZ = 2;
 void main() {
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     int ssbo_index = ssbo_indexBase + texelCoord.y * shadowmapSize + texelCoord.x;
-    uint lightIdx = lightIndex * uint(LIGHT_DATA_SIZE);
-    vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
+    vec3 lightPos = vec3(lights[lightIndex + LIGHT_DATA_OFFSET_POSX], lights[lightIndex + LIGHT_DATA_OFFSET_POSY], lights[lightIndex + LIGHT_DATA_OFFSET_POSZ]);
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
     uint distInt = uint(dist * 100000.0);
