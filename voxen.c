@@ -1,6 +1,7 @@
 // voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #include "os.h" // Operating System calls shim layer.
+#include "voxen.h"
 #include "event.h"
 #include "entity.h"
 #include "External/stb_image.h"
@@ -17,13 +18,8 @@
 #include "todo.h"
 #include "input.c"
 
-typedef struct {
-    float nx, ny, nz, d;
-} FrustumPlane;
+Voxen_GlobalContext voxen_globalContext;
 
-// ----------------------------------------------------------------------------
-// Window
-GLFWwindow *window;
 bool inventoryMode = false;
 uint16_t screen_width = 1366, screen_height = 768;
 bool editMode = true;
@@ -867,7 +863,7 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
     va_end(args);
     RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, buffer);
     glEnable(GL_DEPTH_TEST);
-    glfwSwapBuffers(window);
+    glfwSwapBuffers(voxen_globalContext.window);
 }
 
 void CenterStatusPrint(const char* fmt, ...) {
@@ -929,10 +925,10 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 0);
-    window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
-    if (!window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
+    voxen_globalContext.window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
+    if (!voxen_globalContext.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
         
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(voxen_globalContext.window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     GLFWmonitor* target_monitor = glfwGetPrimaryMonitor();  // Use primary; or monitors[1] for second monitor, etc.
     if (target_monitor) {
@@ -941,11 +937,11 @@ void InitializeEnvironment(void) {
         glfwGetMonitorPos(target_monitor, &mx, &my);
         int xpos = mx + (mode->width - screen_width) / 2;
         int ypos = my + (mode->height - screen_height) / 2;
-        glfwSetWindowPos(window, xpos, ypos);
+        glfwSetWindowPos(voxen_globalContext.window, xpos, ypos);
         DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\nUsing GLFW %s, ", glfwGetMonitorName(target_monitor), xpos, ypos,glfwGetVersionString());
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); OS_Exit(1); }
     
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(voxen_globalContext.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     if (!version) { DualLogError("OpenGL support not found!\n"); OS_Exit(1);}
@@ -954,7 +950,7 @@ void InitializeEnvironment(void) {
     DualLog("GPU: %s", renderer ? (const char*)renderer : "unknown");
     OS_CPUInfo();
     DebugRAM("GL Buffer and shader setup");
-    Input_Init(window);
+    Input_Init(voxen_globalContext.window);
     glfwSwapInterval(settings_Vsync ? 1 : 0);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     CompileShaders();
@@ -1025,7 +1021,7 @@ void InitializeEnvironment(void) {
     DebugRAM("LoadLogTextForLanguage end");
     ParseGameData();
     DebugRAM("ParseGameData end");
-    glfwSetWindowTitle(window,global_modname);
+    glfwSetWindowTitle(voxen_globalContext.window,global_modname);
     int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     int windowIconFileSize = OS_FileSize(fp);
     uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
@@ -1039,7 +1035,7 @@ void InitializeEnvironment(void) {
     image.width  = w;
     image.height = h;
     image.pixels = pixels;
-    glfwSetWindowIcon(window, 1, &image);
+    glfwSetWindowIcon(voxen_globalContext.window, 1, &image);
     OS_MemoryAdviseDontNeed(pixels, w * h * 4);
     file_buffer = OS_DeallocateRAM(file_buffer, windowIconFileSize);
     stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
@@ -1316,7 +1312,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (berserkFinished < (float)pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
         InputClearRisingAndFallingEdges();
         glfwPollEvents();
-        if (glfwWindowShouldClose(window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
+        if (glfwWindowShouldClose(voxen_globalContext.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
         timeSinceLastPhysicsTick = pauseRelativeTime - last_physics_time;
         if (!log_playback && !gamePaused && !menuActive) {
             last_physics_time = pauseRelativeTime;
@@ -1549,7 +1545,7 @@ int32_t main(int32_t argc, char* argv[]) {
         
         if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
         cpuTime = get_time() - current_time;
-        glfwSwapBuffers(window); // Present frame
+        glfwSwapBuffers(voxen_globalContext.window); // Present frame
         CHECK_GL_ERROR();
         globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT

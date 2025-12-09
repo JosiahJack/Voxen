@@ -29,6 +29,14 @@ typedef struct {
 } Trigger;
 
 typedef struct {
+    float nx, ny, nz, d;
+} FrustumPlane;
+
+typedef struct {
+    GLFWwindow* window;
+} Voxen_GlobalContext;
+
+typedef struct {
 	int lev1SecCode;
 	int lev2SecCode;
 	int lev3SecCode;
@@ -298,7 +306,7 @@ typedef struct {
 } KeyState;
 
 extern bool editMode;
-extern GLFWwindow *window;
+extern Voxen_GlobalContext voxen_globalContext;
 extern KeyState keyStates[MAX_KEYS];
 extern KeyState mouseButtons[MAX_MOUSE_BUTTONS];
 extern bool window_has_focus;
