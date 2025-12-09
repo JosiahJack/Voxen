@@ -126,6 +126,6 @@ void UpdateProjectionMatrices(void) {
     m = shadowmapsPerspectiveProjection;
     m[0] = f / aspectShad; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
     m[4] =           0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
-    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(35.0 + NEAR_PLANE) / (35.0 - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0 * NEAR_PLANE / (35.0 - NEAR_PLANE); m[15]=  0.0f;
+    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(35.0f + NEAR_PLANE) / (35.0f - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0f * NEAR_PLANE / (35.0f - NEAR_PLANE); m[15]=  0.0f;
 }

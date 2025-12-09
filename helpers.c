@@ -43,7 +43,7 @@ void DebugRAM(const char *context) {
 }
 #pragma GCC diagnostic pop
 
-void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(float)count / 1000.0f,(float)count / 1000000.0f); }
+void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
 
 // MD5 (128-bit / 16 bytes) – tiny self-contained implementation
 #define ROTL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
@@ -63,7 +63,7 @@ static const uint32_t md5Constants[64] = {
 	0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391
 };
 	
-void md5(const uint8_t *data, int len, uint8_t out[16]) {
+void md5(const uint8_t *data, size_t len, uint8_t out[16]) {
 
     uint32_t h[4] = {0x67452301,0xefcdab89,0x98badcfe,0x10325476};
     uint32_t a,b,c,d,f,g;
@@ -204,8 +204,8 @@ void Screenshot() {
     time_t now = time(NULL);
     struct tm *utc_time = localtime(&now);    
     if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.png", timestamp, VERSION_STRING, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z, get_time());
-    if (!stbi_write_png(filename, screen_width, screen_height, 4, pixels, screen_width * 4)) DualLogError("Failed to save screenshot\n");
+    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, VERSION_STRING, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
+    if (!stbi_write_bmp(filename, screen_width, screen_height, 4, pixels)) DualLogError("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
     free(pixels);
@@ -268,5 +268,5 @@ int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c
 // finished) somewhere instead of (finished < time) which is my usual Quake
 // derived timer pattern.
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) {
-    return parse_float(trimmed_value, initialLine, lineNum) + pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
+    return parse_float(trimmed_value, initialLine, lineNum) + (float)pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
 }

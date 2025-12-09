@@ -15,6 +15,12 @@ int OS_OpenReadonly(const char* filePath) {
     return fp;
 }
 
+int OS_OpenWriteonly(const char* filePath) {
+    int fp = open(filePath, O_WRONLY);
+    if (!fp) { DualLogError("Failed to open %s\n", filePath); OS_Exit(1); }
+    return fp;
+}
+
 int OS_FileSize(int fileDescriptor) {
     struct stat fileStatisticsStruct;
     fstat(fileDescriptor, &fileStatisticsStruct);
@@ -86,7 +92,7 @@ void OS_CPUInfo(void) {
     char online[128];
     int fd2 = open("/sys/devices/system/cpu/online", O_RDONLY);
     if (fd2 >= 0) {
-        int n = read(fd2, online, sizeof(online)-1);
+        int n = read(fd2, online, sizeof(online) - 1);
         close(fd2);
         if (n > 0) {
             online[n] = 0;

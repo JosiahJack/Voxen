@@ -36,12 +36,12 @@ gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
 export CC="gcc"
 CC=gcc
 export LD=mold
-CFLAGS="-flto -pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g0  -std=c11 -Wall -Wextra -Og -D_GNU_SOURCE"
+CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g0  -std=c11 -Wall -Wextra -Wdouble-promotion -Wno-overlength-strings -Og -D_GNU_SOURCE"
 # LDFLAGS="-fuse-ld=mold -Wl,--gc-sections -flto -L./External -l:libz.a -static-libstdc++ -static-libgcc -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -ffast-math -lGL -lfontconfig" # Uncomment for compiling with FONT_GEN set to regenerate font atlases
 LDFLAGS="  -fuse-ld=mold -Wl,--gc-sections -flto -L./External -l:libz.a -static-libstdc++ -static-libgcc -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -ffast-math -lGL"
 SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c hardware.c data_text.c entity.c data_textures.c data_models.c data_fonts.c glad.c os.c todo.c"
 export CC=gcc
-export CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -g0 -std=c11 -Wall -Wextra -Wno-sequence-point -Og -D_GNU_SOURCE"
+export CFLAGS=$CFLAGS
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 cp ./External/assimp/*.o "$TEMP_DIR"/

@@ -11,10 +11,6 @@
 #include "./External/glfw3.h"
 #include "voxen.h"
 #include "vmath.h"
-#define STBTT_ifloor(x)   ((int) vfloor(x))
-#define STBTT_iceil(x)    ((int) vceil(x))
-#define STBTT_sqrt(x)      vsqrtf(x)
-#define STBTT_fabs(x)      vabs(x)
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 #ifdef FONT_GEN
@@ -131,13 +127,13 @@ float TextWidth(const char *utf8, int fontID) {
                 int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
                 
                 int fheight = ttSHORT(primaryFontInfo.data + primaryFontInfo.hhea + 4) - ttSHORT(primaryFontInfo.data + primaryFontInfo.hhea + 6);
-                float kernScaleForPixelHeight = (float) GetScreenRelativeY(genericTextHeightFac) / fheight;
-                width += kern * kernScaleForPixelHeight;
+                float kernScaleForPixelHeight = (float)GetScreenRelativeY(genericTextHeightFac) / (float)fheight;
+                width += (float)kern * kernScaleForPixelHeight;
             } else if (fontID == FONT_STOPD && packedIdx >= 0) {
                 int kern = stbtt_GetGlyphKernAdvance(&secondaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&secondaryFontInfo, cp));
                 int fheight = ttSHORT(secondaryFontInfo.data + secondaryFontInfo.hhea + 4) - ttSHORT(secondaryFontInfo.data + secondaryFontInfo.hhea + 6);
-                float kernScaleForPixelHeight = (float) GetScreenRelativeY(genericTextHeightFacStopD) / fheight;
-                width += kern * kernScaleForPixelHeight;
+                float kernScaleForPixelHeight = (float)GetScreenRelativeY(genericTextHeightFacStopD) / (float)fheight;
+                width += (float)kern * kernScaleForPixelHeight;
             }
         }
 
@@ -232,7 +228,7 @@ static void write_font_cache(const char *path, uint32_t expected_glyphs, const u
 }
 #endif
 
-static bool load_font_cache(const char *path, uint32_t expected_glyphs, const uint8_t expected_md5[16], stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
+static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint8_t expected_md5[16], stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
     int fd = open(path, O_RDONLY);
     if (fd < 0) return false;
 
@@ -246,7 +242,7 @@ static bool load_font_cache(const char *path, uint32_t expected_glyphs, const ui
     if (map == MAP_FAILED) { DualLogError("mmap failed %s\n", path); return false; }
 
     const uint8_t *p = map;
-    uint32_t file_expected = *(uint32_t*)p; p += 4;
+    int32_t file_expected = *(int32_t*)p; p += 4;
     if (file_expected != expected_glyphs) {
         munmap(map, sz);
         DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs);
@@ -288,13 +284,13 @@ void InitFontAtlasses(void) {
     const char *sec_path = "./Fonts/StopD.ttf";
     FILE *f = fopen(pri_path, "rb"); if (!f) { DualLogError("Missing %s\n", pri_path); OS_Exit(1); }
     
-    fseek(f, 0, SEEK_END); size_t pri_sz = ftell(f); fseek(f, 0, SEEK_SET);
+    fseek(f, 0, SEEK_END); size_t pri_sz = (size_t)ftell(f); fseek(f, 0, SEEK_SET);
     primaryFontData = malloc(pri_sz);
     size_t read = fread(primaryFontData, 1, pri_sz, f); fclose(f);
     if (read != (size_t)pri_sz) { DualLogError("Failed to read full SystemShockText.ttf at: %s\n", pri_path); OS_Exit(1); }
     f = fopen(sec_path, "rb"); if (!f) { DualLogError("Missing %s\n", sec_path); OS_Exit(1); }
     
-    fseek(f, 0, SEEK_END); size_t sec_sz = ftell(f); fseek(f, 0, SEEK_SET);
+    fseek(f, 0, SEEK_END); size_t sec_sz = (size_t)ftell(f); fseek(f, 0, SEEK_SET);
     unsigned char *sec_data = malloc(sec_sz);
     read = fread(sec_data, 1, sec_sz, f); fclose(f);
     if (read != (size_t)sec_sz) { DualLogError("Failed to read full StopD.ttf at: %s\n", sec_path); OS_Exit(1); }
@@ -304,7 +300,7 @@ void InitFontAtlasses(void) {
     uint8_t pri_md5[16], sec_md5[16];
     md5(primaryFontData, pri_sz, pri_md5);
     md5(sec_data, sec_sz, sec_md5);
-    uint32_t pri_expected = 0, sec_expected = 0;
+    int32_t pri_expected = 0, sec_expected = 0;
     for (int i = 0; i < numFontRanges; i++) { pri_expected += fontRanges[i].count; sec_expected += fontRangesStopD[i].count; }
     const char *pri_cache = "./Fonts/SystemShockText.vfnt";
     const char *sec_cache = "./Fonts/StopD.vfnt";

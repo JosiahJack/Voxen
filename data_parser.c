@@ -12,7 +12,7 @@ float voxelMinCenterX, voxelMinCenterZ;
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
     if (str == NULL || *str == '\0') { DualLogError("Invalid input blank string, from line[%d]: %s\n", lineNum+1, line); return 0; }
-    while (data_parser_isspace((unsigned char)*str)) str++;
+    while (data_parser_isspace((char)*str)) str++;
     if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
     char* endptr;
     errno = 0;

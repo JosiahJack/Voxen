@@ -15,12 +15,12 @@ static inline float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
 static inline float rad2deg(float radians) { return radians * (180.0f / PI); }
 static inline float vlog2f(float x) {
     union { float f; unsigned int i; } v = { x };
-    int e = ((v.i >> 23) & 255) - 127;
+    int e = (int)((v.i >> 23) & 255) - 127;
     v.i = (v.i & 0x7FFFFF) | 0x3F800000;   // normalize mantissa to [1,2)
     float m = v.f;
     float p = m - 1.0f;
     float log2m = p * (1.3465558f + p * (-0.33942322f + p * 0.028794660f)); // polynomial approximation of log2(m)
-    return e + log2m;
+    return (float)e + log2m;
 }
 
 static inline float vlog(float x) { return vlog2f(x) * 0.69314718f; }

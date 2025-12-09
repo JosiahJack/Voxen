@@ -311,7 +311,7 @@ bool ignore_next_mouse_delta = false;
 void CycleToNextMonitor(GLFWwindow* window) {
     if (get_time() < monitorSwitchTime) return;
     
-    monitorSwitchTime = get_time() + 1.5f; // Dumb hack to prevent toggling every frame from keypress illogic
+    monitorSwitchTime = get_time() + 1.5; // Dumb hack to prevent toggling every frame from keypress illogic
     int monitorCount;
     GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
     if (!monitors || monitorCount < 2) return;

@@ -65,9 +65,9 @@ void LoadTextForLanguage(uint8_t lang) {
 
     FILE* fp = fopen(textFile, "rb"); if (!fp) { DualLog("Failed to open text file: %s\n", textFile); return; }
 
-    fseek(fp, 0, SEEK_END); long file_size = ftell(fp); fseek(fp, 0, SEEK_SET);
+    fseek(fp, 0, SEEK_END); size_t file_size = (size_t)ftell(fp); fseek(fp, 0, SEEK_SET);
     uint8_t* file_data = malloc(file_size);
-    if (fread(file_data, 1, file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Exit(1); }
+    if (fread(file_data, 1, file_size, fp) != file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Exit(1); }
     fclose(fp);
     size_t data_pos = 0;
     int is_utf16le = 0;
@@ -79,7 +79,7 @@ void LoadTextForLanguage(uint8_t lang) {
         data_pos = 3;
         is_utf8 = 1;
     } else {                                   // No BOM → heuristic
-        int null_bytes = 0;
+        size_t null_bytes = 0;
         for (size_t i = 1; i < (size_t)file_size && i < 1024; i += 2) {
             if (file_data[i] == 0) ++null_bytes;
         }
@@ -94,7 +94,6 @@ void LoadTextForLanguage(uint8_t lang) {
     char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
     while (data_pos < (size_t)file_size) {
         ++totalLines; size_t line_start = data_pos;
-
         if (is_utf8) {                         // ----- UTF-8 path -----
             while (data_pos < (size_t)file_size) {
                 uint8_t c = file_data[data_pos];

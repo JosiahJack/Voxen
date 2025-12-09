@@ -22,8 +22,8 @@ void ToggleConsole(void) {
     if (consoleActive) inventoryMode = true;
     else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
         inventoryMode = false;
-        cursorPosition_x = (float)screen_width * 0.5f;
-        cursorPosition_y = (float)screen_height * 0.5f;
+        cursorPosition_x = (int32_t)((float)screen_width * 0.5f);
+        cursorPosition_y = (int32_t)((float)screen_height * 0.5f);
     }
 }
 
@@ -129,7 +129,6 @@ static void cmd_savegeometry(void) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) {
         Entity* ent = &instances[i];
         uint16_t idx = ent->index;
-
         if (!ConstIndexIsGeometry(idx)) continue;
 
         const char* name = "unknown";
@@ -141,16 +140,16 @@ static void cmd_savegeometry(void) {
         }
 
         fprintf(f, "constIndex:%u|%s (%u)|", idx, name, i - START_INDEX_LEVEL_INSTANCES + 1);
-        fprintf(f, "localPosition.x:%08.5f|", ent->position.x);
-        fprintf(f, "localPosition.y:%08.5f|", ent->position.y);
-        fprintf(f, "localPosition.z:%08.5f|", ent->position.z);
-        fprintf(f, "localRotation.x:%08.5f|", ent->rotation.x);
-        fprintf(f, "localRotation.y:%08.5f|", ent->rotation.y);
-        fprintf(f, "localRotation.z:%08.5f|", ent->rotation.z);
-        fprintf(f, "localRotation.w:%08.5f|", ent->rotation.w);
-        fprintf(f, "localScale.x:%08.5f|",    ent->scale.x);
-        fprintf(f, "localScale.y:%08.5f|",    ent->scale.y);
-        fprintf(f, "localScale.z:%08.5f|",     ent->scale.z);
+        fprintf(f, "localPosition.x:%08.5f|", (double)ent->position.x);
+        fprintf(f, "localPosition.y:%08.5f|", (double)ent->position.y);
+        fprintf(f, "localPosition.z:%08.5f|", (double)ent->position.z);
+        fprintf(f, "localRotation.x:%08.5f|", (double)ent->rotation.x);
+        fprintf(f, "localRotation.y:%08.5f|", (double)ent->rotation.y);
+        fprintf(f, "localRotation.z:%08.5f|", (double)ent->rotation.z);
+        fprintf(f, "localRotation.w:%08.5f|", (double)ent->rotation.w);
+        fprintf(f, "localScale.x:%08.5f|",    (double)ent->scale.x);
+        fprintf(f, "localScale.y:%08.5f|",    (double)ent->scale.y);
+        fprintf(f, "localScale.z:%08.5f|",    (double)ent->scale.z);
         fprintf(f, "go.activeSelf:%s|\n", (ent->entflags & ENTFLAG_ACTIVE) ? "True" : "False");
 
         saved++;

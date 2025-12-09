@@ -17,8 +17,6 @@ uint8_t* stbi__arena_base = NULL;
 uint8_t* stbi__arena_cursor = NULL;
 uint8_t* stbi__arena_end = NULL;
 
-#define STBI_ALIGN_PTR(p) (uint8_t*)(((uintptr_t)(p) + 15) & ~15)
-
 void stbi__arena_init(void) {
     if (!stbi__arena_base) {
         stbi__arena_base = mmap(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -30,7 +28,7 @@ void stbi__arena_init(void) {
 void* stbi__arena_alloc(size_t size) {
     if (!stbi__arena_base) { DualLogError("stbi__arena_base was invalid\n"); return NULL; }
 
-    uint8_t* aligned = STBI_ALIGN_PTR(stbi__arena_cursor);
+    uint8_t* aligned = stbi__arena_cursor;
     if (aligned + size > stbi__arena_end) { DualLogError("stbi__arena_alloc failed buffer overflowed with %u vs %u\n",aligned + size,stbi__arena_end); return NULL; } // out of arena → stb_image will fall back or fail
 
     stbi__arena_cursor = aligned + size;
@@ -63,8 +61,9 @@ enum {
 };
 
 inline static uint32_t stbi__get32be(stbi__context *s) {
-   uint32_t z = ((*s->img_buffer++) << 8) + (*s->img_buffer++);
-   return (z << 16) + ((*s->img_buffer++) << 8) + (*s->img_buffer++);
+    const uint8_t *p = s->img_buffer;
+    s->img_buffer += 4;
+    return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
 }
 
 typedef struct {
@@ -143,8 +142,8 @@ static int32_t stbi__zbuild_huffman(stbi__zhuffman *z, const uint8_t* sizelist, 
    return 1;
 }
 
-inline static unsigned int stbi__zreceive(stbi__zbuf *z, int n) {
-   unsigned int k;
+
+inline static uint32_t stbi__zreceive(stbi__zbuf *z, int n) {
    if (z->num_bits < n) {
       #pragma GCC unroll 24
       do {
@@ -152,13 +151,14 @@ inline static unsigned int stbi__zreceive(stbi__zbuf *z, int n) {
          z->num_bits += 8;
       } while (z->num_bits <= 24);
    }
-   k = z->code_buffer & ((1 << n) - 1);
+   
+   uint32_t k = z->code_buffer & ((1u << (uint32_t)n) - 1u);
    z->code_buffer >>= n;
    z->num_bits -= n;
    return k;
 }
 
-inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
+inline static uint32_t stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
    int s;
    if (a->num_bits < 16) {
       #pragma GCC unroll 24
@@ -175,12 +175,12 @@ inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z) {
       return b & 511;
    }
       
-   int k = stbi__bit_reverse(a->code_buffer, 16);
+   int k = stbi__bit_reverse((int32_t)a->code_buffer, 16);
    for (s=10; ;++s) { if (k < z->maxcode[s]) break; }   
    b = (k >> (16-s)) - z->firstcode[s] + z->firstsymbol[s];
    a->code_buffer >>= s;
    a->num_bits -= s;
-   return z->value[b];
+   return (uint32_t)z->value[b];
 }
 
 static const int stbi__zlength_base[31] = { 3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,0,0 };
@@ -192,7 +192,7 @@ static int stbi__parse_huffman_block(stbi__zbuf* a) {
    for(;;) {
       int z = stbi__zhuffman_decode(a, &a->z_length);
       if (z < 256) {         
-         *zout++ = (char) z;
+         *zout++ = (uint8_t)z;
       } else {
          int len,dist;
          if (z == 256) { a->zout = zout; return 1; }
@@ -219,20 +219,20 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
    stbi__zhuffman z_codelength;
    uint8_t lencodes[286+32+137];
    uint8_t codelength_sizes[19];
-   int hlit  = stbi__zreceive(a,5) + 257;
-   int hdist = stbi__zreceive(a,5) + 1;
-   int hclen = stbi__zreceive(a,4) + 4;
-   int ntot  = hlit + hdist;
+   uint32_t hlit  = stbi__zreceive(a,5) + 257;
+   uint32_t hdist = stbi__zreceive(a,5) + 1;
+   uint32_t hclen = stbi__zreceive(a,4) + 4;
+   uint32_t ntot  = hlit + hdist;
    memset(codelength_sizes, 0, sizeof(codelength_sizes));
-   for (int i=0; i < hclen; ++i) {
-      int s = stbi__zreceive(a,3);
+   for (uint32_t i=0; i < hclen; ++i) {
+      uint32_t s = stbi__zreceive(a,3);
       codelength_sizes[length_dezigzag[i]] = (uint8_t)s;
    }
    
    stbi__zbuild_huffman(&z_codelength, codelength_sizes, 19);
-   int n = 0;
+   uint32_t n = 0;
    while (n < ntot) {
-      int c = stbi__zhuffman_decode(a, &z_codelength);      
+      uint32_t c = stbi__zhuffman_decode(a, &z_codelength);      
       if (c < 16) {
          lencodes[n++] = (uint8_t)c;
       } else {
@@ -261,9 +261,10 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    if (a->num_bits & 7) stbi__zreceive(a, a->num_bits & 7);
    int32_t k = 0;
    while (a->num_bits > 0) {
-      header[k++] = (uint8_t)(a->code_buffer & 255);
+      header[k] = (uint8_t)(a->code_buffer & 255);
       a->code_buffer >>= 8;
       a->num_bits -= 8;
+      ++k;
    }
 
    if (k <= 0) header[0] = *a->zbuffer++;

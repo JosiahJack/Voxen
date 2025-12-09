@@ -350,16 +350,14 @@ typedef enum {
 } ma_standard_sample_rate;
 
 
-typedef enum
-{
+typedef enum {
     ma_channel_mix_mode_rectangular = 0,   /* Simple averaging based on the plane(s) the channel is sitting on. */
     ma_channel_mix_mode_simple,            /* Drop excess channels; zeroed out extra channels. */
     ma_channel_mix_mode_custom_weights,    /* Use custom weights specified in ma_channel_converter_config. */
     ma_channel_mix_mode_default = ma_channel_mix_mode_rectangular
 } ma_channel_mix_mode;
 
-typedef enum
-{
+typedef enum {
     ma_standard_channel_map_microsoft,
     ma_standard_channel_map_alsa,
     ma_standard_channel_map_rfc3551,   /* Based off AIFF. */
@@ -368,15 +366,13 @@ typedef enum
     ma_standard_channel_map_default = ma_standard_channel_map_microsoft
 } ma_standard_channel_map;
 
-typedef enum
-{
+typedef enum {
     ma_performance_profile_low_latency = 0,
     ma_performance_profile_conservative
 } ma_performance_profile;
 
 
-typedef struct
-{
+typedef struct {
     void* pUserData;
     void* (* onMalloc)(size_t sz, void* pUserData);
     void* (* onRealloc)(void* p, size_t sz, void* pUserData);

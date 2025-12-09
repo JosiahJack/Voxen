@@ -4,7 +4,7 @@
 #include "entity.h"
 #include "matvecquat.h"
 #include "vmath.h"
-#define FLT_MAX 3.402823e+38
+#define FLT_MAX 3.40282306e+38f
 void ProcessInput(void);
 void UpdatePlayerFacingAngles(void);
 
@@ -183,8 +183,8 @@ static float dist_segment_segment_sq(Vector3 a0, Vector3 a1, Vector3 b0, Vector3
 
 // Check if instance is in 3x3 grid around object
 static inline bool is_instance_in_neighbor_cells(uint32_t instanceCellIdx, uint32_t objectCellIdx) {
-    int32_t dx = (instanceCellIdx % WORLDX) - (objectCellIdx % WORLDX);
-    int32_t dz = (instanceCellIdx / WORLDZ) - (objectCellIdx / WORLDZ);
+    uint32_t dx = (instanceCellIdx % WORLDX) - (objectCellIdx % WORLDX);
+    uint32_t dz = (instanceCellIdx / WORLDZ) - (objectCellIdx / WORLDZ);
     return (dx * dx) <= 1 && (dz * dz) <= 1; // 0 means same cell, 1 means one of the 8 neighbors, accept all.
 }
 
@@ -224,8 +224,8 @@ bool CollideSphereBox(const Entity* sphere, const Entity* box, Manifold* m) {
         float dz = half.z - vabs(local_pos.z);
         float min_pen = vmin(vmin(dx, dy), dz);
         m->penetration = min_pen;
-        if (dx == min_pen)      m->normal = (Vector3){local_pos.x > 0 ? 1.0f : -1.0f, 0, 0};
-        else if (dy == min_pen) m->normal = (Vector3){0, local_pos.y > 0 ? 1.0f : -1.0f, 0};
+        if (dx >= min_pen)      m->normal = (Vector3){local_pos.x > 0 ? 1.0f : -1.0f, 0, 0};
+        else if (dy >= min_pen) m->normal = (Vector3){0, local_pos.y > 0 ? 1.0f : -1.0f, 0};
         else                    m->normal = (Vector3){0, 0, local_pos.z > 0 ? 1.0f : -1.0f};
     }
    
@@ -535,8 +535,8 @@ float GetBasePlayerSpeed(bool running) {
     return retval + bonus;
 }
 
-void IntegratePhysics(float dt) {
-    if (!log_playback) {
+void IntegratePhysics(double dt) {
+    if (!log_playback && !consoleActive) {
         Entity* player = &instances[PLAYER1];
         Vector3 input = {0};
         if (keyStates[GLFW_KEY_F].down)     input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
@@ -570,22 +570,22 @@ void IntegratePhysics(float dt) {
 
         if ((e->entflags & ENTFLAG_USEGRAVITY)) e->accumulatedForce = add_vector3(e->accumulatedForce, scale_vector3((Vector3){0.0f,-9.81f,0.0f}, e->mass));
         Vector3 accel = scale_vector3(e->accumulatedForce, 1.0f / e->mass);
-        e->velocity = add_vector3(e->velocity, scale_vector3(accel, dt));
+        e->velocity = add_vector3(e->velocity, scale_vector3(accel, (float)dt));
         if (e->linearDrag > 0.0001f) {
-            float exp_factor = vexp(-(e->linearDrag) * dt);
+            float exp_factor = vexp(-(e->linearDrag) * (float)dt);
             e->velocity = scale_vector3(e->velocity, exp_factor);
         }
-        e->position = add_vector3(e->position, scale_vector3(e->velocity, dt));
+        e->position = add_vector3(e->position, scale_vector3(e->velocity, (float)dt));
         if (ConstIndexIsNPC(e->index) || i == PLAYER1 || i == PLAYER2) {
             e->angularVelocity = e->accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
         } else if (e->inertia > 0.0f) {
             float invI = 1.0f / e->inertia;
             Vector3 angAccel = scale_vector3(e->accumulatedTorque, invI);
-            e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(angAccel, dt));
-            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * dt));
+            e->angularVelocity = add_vector3(e->angularVelocity, scale_vector3(angAccel, (float)dt));
+            e->angularVelocity = scale_vector3(e->angularVelocity, (1.0f - e->angularDrag * (float)dt));
             float angMag = magnitude_vector3(e->angularVelocity);
             if (angMag > 1e-6f) {
-                float angle = angMag * dt;
+                float angle = angMag * (float)dt;
                 Vector3 axis = normalize_vector3(e->angularVelocity);
                 Quaternion deltaQ = axis_angle_quaternion(axis, angle);
                 e->rotation = mul_quaternion(deltaQ, e->rotation);
@@ -607,12 +607,12 @@ int32_t Physics(void) {
 
     if (noclip) {
         instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
-        instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_USEGRAVITY) | (-false & ENTFLAG_USEGRAVITY);
-        instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_GROUNDED) | (-false & ENTFLAG_GROUNDED);
+        flag_disable(&instances[PLAYER1].entflags, ENTFLAG_USEGRAVITY);
+        flag_disable(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED);
         instances[PLAYER1].velocity = (Vector3){0.0f,0.0f,0.0f};
     } else {
         instances[PLAYER1].collider = COLLIDER_TYPE_CAPSULE;
-        instances[PLAYER1].entflags = (instances[PLAYER1].entflags & ~ENTFLAG_USEGRAVITY) | (-true & ENTFLAG_USEGRAVITY);
+        flag_enable(&instances[PLAYER1].entflags, ENTFLAG_USEGRAVITY);
     }
     
     IntegratePhysics(timeSinceLastPhysicsTick); 

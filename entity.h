@@ -6,14 +6,14 @@
 #define PLAYER1 1u
 #define PLAYER2 2u
 #define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE        1
-#define ENTFLAG_CARDCHUNK     2
-#define ENTFLAG_GROUNDED      4
-#define ENTFLAG_USEGRAVITY    8
-#define ENTFLAG_KINEMATIC    16
-#define ENTFLAG_RIGIDBODY    32
-#define ENTFLAG_DOUBLESIDED  64
-#define ENTFLAG_TRANSPARENT 128
+#define ENTFLAG_ACTIVE        1u
+#define ENTFLAG_CARDCHUNK     2u
+#define ENTFLAG_GROUNDED      4u
+#define ENTFLAG_USEGRAVITY    8u
+#define ENTFLAG_KINEMATIC    16u
+#define ENTFLAG_RIGIDBODY    32u
+#define ENTFLAG_DOUBLESIDED  64u
+#define ENTFLAG_TRANSPARENT 128u
 
 typedef struct {
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources

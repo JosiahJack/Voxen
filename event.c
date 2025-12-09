@@ -160,8 +160,8 @@ void JournalDump(const char* dem_file) {
         fprintf(fpW,"delta time: %f, ", event.deltaTime_ns);
         fprintf(fpW,"payload1i: %d, ", event.payload1i);
         fprintf(fpW,"payload2i: %d, ", event.payload2i);
-        fprintf(fpW,"payload1f: %f, ", event.payload1f);
-        fprintf(fpW,"payload2f: %f\n", event.payload2f); // \n flushes write to file
+        fprintf(fpW,"payload1f: %f, ", (double)event.payload1f);
+        fprintf(fpW,"payload2f: %f\n", (double)event.payload2f); // \n flushes write to file
     }
 
     fclose(fpW);

@@ -75,7 +75,7 @@ uint8_t currentLevel = 0;
 bool gamePaused = false;
 bool menuActive = false;
 bool levelCurrentlyLoading = false;
-float pauseRelativeTime = 0.0f;
+double pauseRelativeTime = 0.0f;
 QuestBits questData;
 bool bottomless = false;
 bool superoverride;
@@ -189,7 +189,7 @@ static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays 
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 // ----------------------------------------------------------------------------
 // OpenGL / Rendering Helper Functions
-void GenerateAndBindTexture(GLuint *id, GLenum internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
+void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
@@ -324,20 +324,20 @@ void UpdateDynamicLights() {
                 float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
                 if (lightLerpUp[i]) {
                     // Going from lightMinIntensity to lightMaxIntensity
-                    if (lightLerpTime[i] < pauseRelativeTime) {
+                    if (lightLerpTime[i] < (float)pauseRelativeTime) {
                         if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightMaxIntensity[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[i];
                         lightLerpUp[i] = false;
                         lightCurrentStep[i]++;
                         if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
                         lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-                        lightLerpTime[i] = pauseRelativeTime + lightLerpStepTime[i];
-                        lightLerpStartTime[i] = pauseRelativeTime;
+                        lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
+                        lightLerpStartTime[i] = (float)pauseRelativeTime;
                         if (lightLerpTime[i] == 0.0f) lightLerpTime[i] = 0.1f;
                     } else {
                         if (lightLerpOn[i]) {
                             if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
                                 if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                                    lightLerpValue[i] = (pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                                    lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                                     lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (lightLerpValue[i]));
                                     if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightLerpValue[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
                                 }
@@ -346,21 +346,21 @@ void UpdateDynamicLights() {
                     }
                 } else {
                     // Going from lightMaxIntensity to lightMinIntensity
-                    if (lightLerpTime[i] < pauseRelativeTime) {
+                    if (lightLerpTime[i] < (float)pauseRelativeTime) {
                         if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightMinIntensity[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
                         lightLerpUp[i] = true;
                         lightCurrentStep[i]++;
                         if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
                         lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-                        lightLerpTime[i] = pauseRelativeTime + lightLerpStepTime[i];
-                        lightLerpStartTime[i] = pauseRelativeTime;
+                        lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
+                        lightLerpStartTime[i] = (float)pauseRelativeTime;
                         if (lightLerpTime[i] == 0.0f) lightLerpTime[i] = 0.1f;
                     } else {
                         if (lightLerpOn[i]) {
                             if (lightCurrentStep[i] == lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
                             if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
                                 if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                                    lightLerpValue[i] = (pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                                    lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                                     lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (1.0f - lightLerpValue[i]));
                                     if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightLerpValue[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
                                 }
@@ -876,7 +876,7 @@ void CenterStatusPrint(const char* fmt, ...) {
     statusTextLengthWithoutNullTerminator = vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
     va_end(args);
     DualLog("%s\n",statusText);
-    statusTextDecayFinished = get_time() + 2.5f; // 2.5 second decay time before text dissappears.
+    statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
@@ -916,7 +916,7 @@ void NewGame(void) {
     InitializePlayer(PLAYER1); InitializePlayer(PLAYER2);
     levelCurrentlyLoading = true;
     LoadLevel(startLevel); // Must be after entities!
-    pauseRelativeTime = 0.0f;
+    pauseRelativeTime = 0.0;
 }
 
 void InitializeEnvironment(void) {
@@ -1309,11 +1309,11 @@ int32_t main(int32_t argc, char* argv[]) {
         current_time = get_time();
         double frame_time = current_time - last_topframe_time;
         last_topframe_time = current_time;
-        if (!gamePaused) pauseRelativeTime += (float)frame_time;
+        if (!gamePaused) pauseRelativeTime += frame_time;
         
         // Handle Berserk Effect for Compositing Shader
-        float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
-        if (berserkFinished < pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
+        float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
+        if (berserkFinished < (float)pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
         InputClearRisingAndFallingEdges();
         glfwPollEvents();
         if (glfwWindowShouldClose(window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
@@ -1427,7 +1427,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
         glProgramUniform3f(imageBlitShaderProgram, 13, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         glProgramUniform1f(imageBlitShaderProgram, 14, settings_FOV);
-        glProgramUniform1f(imageBlitShaderProgram, 15, pauseRelativeTime * 0.1);
+        glProgramUniform1f(imageBlitShaderProgram, 15, (float)pauseRelativeTime * 0.1f);
         glProgramUniform1f(imageBlitShaderProgram, 16, aspect3D);
         glProgramUniform1ui(imageBlitShaderProgram, 20, shieldOnType);
         glProgramUniform1ui(imageBlitShaderProgram, 22, settings_Shadows);
@@ -1516,19 +1516,19 @@ int32_t main(int32_t argc, char* argv[]) {
         // Diagnostics / Debugging
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
-        if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+        if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
         if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx, numCellsVisible);
-        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, settings_Contrast: %f", instances[PLAYER1].velocity.x, instances[PLAYER1].velocity.y, instances[PLAYER1].velocity.z, instances[PLAYER1].accumulatedForce.x, instances[PLAYER1].accumulatedForce.y, instances[PLAYER1].accumulatedForce.z, settings_Contrast);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, settings_Contrast: %f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, (double)settings_Contrast);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
         RenderUIImages();    
         double time_now = get_time();
         drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
         drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        double thisFrameTime = (time_now - last_time) * 1000.0f;
-        double cpuFrameTime = cpuTime * 1000.0f;
+        double thisFrameTime = (time_now - last_time) * 1000.0;
+        double cpuFrameTime = cpuTime * 1000.0;
         uint8_t timingColor = TEXT_WHITE;
         if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_ORANGE;
         if (thisFrameTime > 6.944444) timingColor = TEXT_RED;

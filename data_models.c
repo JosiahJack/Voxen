@@ -37,7 +37,7 @@ static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
     strncpy(out, fbx_path, outsz - 1);
     out[outsz - 1] = '\0';
     char *ext = strrchr(out, '.');
-    if (ext && strcmp(ext, ".fbx") == 0) strncpy(ext, ".vmdl", outsz - (ext - out) - 1);
+    if (ext && strcmp(ext, ".fbx") == 0) strncpy(ext, ".vmdl", outsz - (size_t)(ext - out) - 1);
     else if (strlen(out) + 5 < outsz) strcat(out, ".vmdl");
 }
 
@@ -59,8 +59,8 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     size_t vert_bytes = vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
     size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
     size_t expected   = 16 + 4 + vert_bytes + 4 + idx_bytes;
-    if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, st.st_size); return false; }
-    if (p + vert_bytes + idx_bytes > map + (size_t)st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, st.st_size); return false; }
+    if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, (size_t)st.st_size); return false; }
+    if (p + vert_bytes + idx_bytes > map + (size_t)st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, (size_t)st.st_size); return false; }
 
     *out_verts  = (float*)p;
     p += vert_bytes;
@@ -84,7 +84,7 @@ static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float
     *(uint32_t*)p = triCount; p += 4;
     memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
     memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
-    size_t written = write(fd, buf, total);
+    size_t written = (size_t)write(fd, buf, total);
     if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
     munmap(buf,total);
     close(fd);
@@ -118,7 +118,7 @@ void LoadModels(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
-    loadedModels = maxIndex + 1;
+    loadedModels = (uint16_t)maxIndex + 1U;
     DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
     modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     uint32_t** modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -126,7 +126,7 @@ void LoadModels(void) {
     size_t indexToParser_size = loadedModels * sizeof(int32_t);
     int32_t* indexToParser = mmap(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     for (uint32_t k = 0; k < model_parser.count; k++) {
-        if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = k;
+        if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = (int32_t)k;
     }
     
     struct aiPropertyStore* props = aiCreatePropertyStore();
@@ -159,15 +159,15 @@ void LoadModels(void) {
 
         struct stat fbxstat;
         fstat(fbx_fp, &fbxstat);
-        uint8_t* buf = mmap(NULL, fbxstat.st_size, PROT_READ, MAP_PRIVATE, fbx_fp, 0);
+        uint8_t* buf = mmap(NULL, (size_t)fbxstat.st_size, PROT_READ, MAP_PRIVATE, fbx_fp, 0);
         close(fbx_fp);
         if (buf == MAP_FAILED) { DualLogError("mmap failed for %s\n", fbx_path); OS_Exit(1); }
         
-        size_t fbxread = read(fbx_fp, buf, fbxstat.st_size);
+        size_t fbxread = (size_t)read(fbx_fp, buf, (size_t)fbxstat.st_size);
         if (fbxread == 0) DualLogError("Read failure for %s\n", fbx_path);
                                                      
-        md5(buf, fbxstat.st_size, fbx_md5);
-        munmap(buf, fbxstat.st_size);
+        md5(buf, (size_t)fbxstat.st_size, fbx_md5);
+        munmap(buf, (size_t)fbxstat.st_size);
         float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;
         bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
         if (!cache_hit) {
@@ -281,16 +281,16 @@ void LoadModels(void) {
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
         totalVertices += modelVertexCounts[i];
         size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
-        totalTris += triSize;
+        totalTris += (uint32_t)triSize;
         glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
-        glBufferData(GL_ARRAY_BUFFER, vertSize, NULL, GL_STATIC_DRAW);
-        void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
+        void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, triSize, NULL, GL_STATIC_DRAW);
-        ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
+        ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         glFlush(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier

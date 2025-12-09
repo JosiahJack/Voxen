@@ -47,7 +47,7 @@ extern bool log_playback;
 extern uint32_t globalFrameNum;
 extern double last_time;
 extern double current_time;
-extern float pauseRelativeTime;
+extern double pauseRelativeTime;
 int32_t ReadActiveLog();
 void EventSystemInit(int32_t argc, char* command, char* command_input1);
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);

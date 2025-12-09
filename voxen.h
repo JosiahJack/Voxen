@@ -210,14 +210,14 @@ extern GLuint matricesBuffer;
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
 #define MAX_LIGHTS_PER_VOXEL 24 // Cap to prevent overflow
-#define CELL_VISIBLE       1
-#define CELL_OPEN          2
-#define CELL_CLOSEDNORTH   4
-#define CELL_CLOSEDEAST    8
-#define CELL_CLOSEDSOUTH  16
-#define CELL_CLOSEDWEST   32
-#define CELL_SEES_SUN     64
-#define CELL_SEES_SKYBOX 128
+#define CELL_VISIBLE       1u
+#define CELL_OPEN          2u
+#define CELL_CLOSEDNORTH   4u
+#define CELL_CLOSEDEAST    8u
+#define CELL_CLOSEDSOUTH  16u
+#define CELL_CLOSEDWEST   32u
+#define CELL_SEES_SUN     64u
+#define CELL_SEES_SKYBOX 128u
 extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
@@ -432,7 +432,7 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 // Helper Functions
 extern uint32_t random_range_rng;
 double get_time(void);
-void md5(const uint8_t *data, int len, uint8_t out[16]);
+void md5(const uint8_t *data, size_t len, uint8_t out[16]);
 float clampf(float x, float a, float b);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
