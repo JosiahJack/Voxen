@@ -42,7 +42,7 @@ export CFLAGS=$CFLAGS
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 cp ./External/assimp/*.o "$TEMP_DIR"/
-g++ "$TEMP_DIR"/*.o -o voxen $LDFLAGS #g++ for linker to fix compile issues manually linking in Assimp .o files
+mold -run g++ "$TEMP_DIR"/*.o -o voxen $LDFLAGS #g++ for linker to fix compile issues manually linking in Assimp .o files
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."

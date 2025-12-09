@@ -603,7 +603,6 @@ static inline void sift_down(LightCandidate* h, int size, int idx) {
 uint32_t numShadowsCouldRender = 0;
 
 void RenderShadowmaps(void) {
-    DebugRAM("start of RenderShadowmaps");
     if (settings_Shadows < 1u) return;
 
     largestNearbyMeshCount = 0;
@@ -698,7 +697,6 @@ void RenderShadowmaps(void) {
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glViewport(0, 0, screen_width, screen_height);
     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-    DebugRAM("end of RenderShadowmaps");
 }
 
 // ============================================================================

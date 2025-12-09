@@ -1,6 +1,7 @@
 // helpers.c - Helper Functions for various things
 #include <sys/stat.h>
 #include <time.h>
+#include <malloc.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
