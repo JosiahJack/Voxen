@@ -258,7 +258,7 @@ uint16_t SpawnDynamicObject(int val, bool cheat) {
     if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: " , val, cheat);
 //     Vector3 spawnPos = (Vector3){0.0,0.0,0.0};
 //     if (cheat) spawnPos = (Vector3){instances[PLAYER1].position.x,instances[PLAYER1].position.y,instances[PLAYER1].position.z};
-    if (ConstIndexIsGeometry(val)/* && !editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
+    if (ConstIndexIsGeometry(val)/* && !voxen_Cheats.editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }
     
     uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
     if (cheat && ConstIndexIsHardware(val)) { // Hardware
@@ -271,12 +271,12 @@ uint16_t SpawnDynamicObject(int val, bool cheat) {
 }
 
 void cmd_kill(void) {
-    CenterStatusPrint("%s", stringTable[1011]); // "Player decides to become a cyborg."
+    CenterStatusPrint("%s", voxen_Text.stringTable[1011]); // "Player decides to become a cyborg."
     // TakeDamage(...)
 }
 
 void cmd_undo(void) {
-    if (editMode) {
+    if (voxen_Cheats.editMode) {
         // Utils.SafeDestroy(lastSpawnedGO); lastSpawnedGO = NULL;
         CenterStatusPrint("Last spawned object removed");
     } else {

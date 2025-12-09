@@ -19,11 +19,7 @@ void UpdatePlayerFacingAngles(void);
 #define PLAYER_CROUCH_RATIO 0.6f
 #define PLAYER_PRONE_RATIO 0.2f
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
-bool noclip = true;
-bool god = true;
-bool notarget = false;
-bool fatigueCheat = false;
-bool redbull = false;
+
 float fatigue;
 
 typedef struct {
@@ -503,8 +499,8 @@ void AddExplosionForce(uint16_t idx, float power, Vector3 explosionPos, float ra
 
 __attribute__((pure)) float GetBasePlayerSpeed(bool running) {
     bool isSprinting = keyStates[GLFW_KEY_LEFT_SHIFT].down; // TODO handle keybind
-    if (noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
-    if (noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
+    if (voxen_Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
+    if (voxen_Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
     if (currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
     float retval = PLAYER_MAX_WALK_SPEED;
@@ -536,7 +532,7 @@ __attribute__((pure)) float GetBasePlayerSpeed(bool running) {
 }
 
 void IntegratePhysics(double dt) {
-    if (!log_playback && !consoleActive) {
+    if (!log_playback && !voxen_Cheats.consoleActive) {
         Entity* player = &instances[PLAYER1];
         Vector3 input = {0};
         if (keyStates[GLFW_KEY_F].down)     input = add_vector3(input, (Vector3){cam_forwardx, 0, cam_forwardz});
@@ -558,7 +554,7 @@ void IntegratePhysics(double dt) {
             if (magnitude_vector3(player->velocity) > maxAchievableSpeed) player->velocity = scale_vector3(normalize_vector3(player->velocity),maxAchievableSpeed);
         }
             
-        if (!noclip && keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) { // Jump
+        if (!voxen_Cheats.noclip && keyStates[GLFW_KEY_SPACE].pressed && (instances[PLAYER1].entflags & ENTFLAG_GROUNDED)) { // Jump
             AddForce(PLAYER1, (Vector3){0, 6.8f, 0}, FORCEMODE_IMPULSE);
             flag_set(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED, false);
         }
@@ -599,13 +595,13 @@ void IntegratePhysics(double dt) {
 
 int32_t Physics(void) {
     if (window_has_focus && !log_playback) {
-        if (!gamePaused && !consoleActive) UpdatePlayerFacingAngles();
+        if (!gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
         ProcessInput();
     }
             
     if (gamePaused || menuActive) return 0;
 
-    if (noclip) {
+    if (voxen_Cheats.noclip) {
         instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
         flag_disable(&instances[PLAYER1].entflags, ENTFLAG_USEGRAVITY);
         flag_disable(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED);

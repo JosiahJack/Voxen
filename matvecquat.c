@@ -104,28 +104,3 @@ void UpdateInstanceMatrix(int32_t i) {
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
     dirtyInstances[i] = false;
 }
-
-void UpdateProjectionMatrices(void) {
-    float* m;
-    m = uiOrthoProjection;
-    m[0] = 2.0f / (float)screen_width; m[1] =                           0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                       0.0f; m[5] = -2.0f / ((float)screen_height); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                       0.0f; m[9] =                           0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
-    
-    aspect3D = (float)screen_width / (float)screen_height;
-    float f = vcot(settings_FOV * PI / 360.0f);
-    m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
-    
-    float aspectShad = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
-    f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
-    m = shadowmapsPerspectiveProjection;
-    m[0] = f / aspectShad; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
-    m[4] =           0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
-    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(35.0f + NEAR_PLANE) / (35.0f - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0f * NEAR_PLANE / (35.0f - NEAR_PLANE); m[15]=  0.0f;
-}

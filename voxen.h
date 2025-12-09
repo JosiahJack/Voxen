@@ -35,6 +35,29 @@ typedef struct {
 typedef struct {
     GLFWwindow* window;
 } Voxen_GlobalContext;
+extern Voxen_GlobalContext voxen_globalContext;
+
+typedef struct {
+	GLuint inputImageID;
+	GLuint inputDepthID;
+	GLuint inputWorldPosID;
+	GLuint inputSpecID;
+	GLuint gBufferFBO;
+	GLuint outputImageID;
+	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
+	GLuint vao_chunk; // Vertex Array Object
+	GLuint shadowFBO;
+	GLuint shadowmapsShaderProgram;
+	GLuint shadowmapsClearShaderProgram;
+	GLuint shadowMapSSBO;
+	GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
+	GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
+	GLuint quadVAO, quadVBO;
+	GLuint textShaderProgram;
+	GLuint textVAO, textVBO;
+	GLuint blueNoiseBuffer;
+} Voxen_GL_Comms;
+extern Voxen_GL_Comms voxen_GL_Comms;
 
 typedef struct {
 	int lev1SecCode;
@@ -72,20 +95,18 @@ typedef struct {
 } QuestBits;
 extern QuestBits questData;
 
-// ----------------------------------------------------------------------------
-// Settings
-extern uint8_t settings_Shadows;
-extern uint8_t settings_AntiAliasing;
-extern uint8_t settings_Brightness;
-extern float settings_Contrast;
-extern uint8_t settings_VolumeMusic;
-extern uint8_t settings_Language;
-extern uint8_t settings_CullEnabled;
-extern float settings_FOV;
-extern uint8_t settings_Reflections;
-extern float settings_SSRStepSize;
-extern uint16_t settings_SSRStepCount;
-extern float settings_SSRSampleWeight;
+typedef struct {
+	uint8_t settings_Shadows;
+	uint8_t settings_AntiAliasing;
+	uint8_t settings_Brightness;
+	uint8_t settings_VolumeMusic;
+	uint8_t settings_Language;
+	uint8_t settings_CullEnabled;
+	float settings_FOV;
+	uint8_t settings_Reflections;
+	bool settings_Vsync;
+} Settings;
+extern Settings voxen_Settings;
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32
@@ -127,7 +148,6 @@ extern uint16_t loadedTextures;
 extern uint16_t loadedModels;
 extern uint16_t loadedLights;
 extern uint16_t numDynamicLights;
-extern uint32_t totalShadowmapPixels;
 extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
@@ -159,15 +179,14 @@ void LoadModels(void);
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-#define SHADOW_MAP_SIZE 128u
+#define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
-
 #define MAX_SHADOWMAPS 62u
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
-
 extern float lightBaseIntensity[LIGHT_COUNT];
 extern bool lightOn[LIGHT_COUNT];
 extern bool lightLerpOn[LIGHT_COUNT];
@@ -183,10 +202,7 @@ extern uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 extern float intervalStepisLerping[LIGHT_COUNT][30];
 extern float lightMinIntensity[LIGHT_COUNT];
 extern float lightMaxIntensity[LIGHT_COUNT];
-
-extern GLuint shadowMapSSBO;
 void UpdateVoxelLightLists(void);
-extern GLuint shadowmapsClearShaderProgram;
 void RenderShadowmaps(void);
 void RenderLoadingProgress(int32_t offset, const char* format, ...);
 
@@ -305,8 +321,6 @@ typedef struct {
     bool released;
 } KeyState;
 
-extern bool editMode;
-extern Voxen_GlobalContext voxen_globalContext;
 extern KeyState keyStates[MAX_KEYS];
 extern KeyState mouseButtons[MAX_MOUSE_BUTTONS];
 extern bool window_has_focus;
@@ -347,8 +361,6 @@ extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
 extern Quaternion cam_rotation;
-extern GLuint chunkShaderProgram;
-extern GLuint imageBlitShaderProgram;
 void CacheUniformLocationsForShaders(void);
 GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 void Screenshot(void);
@@ -357,19 +369,24 @@ void ConsoleEmulator(int32_t keycode);
 bool CursorVisible(void);
 // ----------------------------------------------------------------------------
 // Cheats
-extern bool god;
-extern bool noclip;
-extern bool notarget;
-extern bool bottomless;
-extern bool superoverride;
-extern bool fatigueCheat;
-extern bool redbull;
-extern bool consoleActive;
-extern bool noHUD;
-extern bool showLocation;
-extern bool showFPS;
-extern uint8_t dizzyLevel;
-extern float skyRotateSpeed;
+typedef struct {
+	bool god;
+	bool noclip;
+	bool notarget;
+	bool bottomless;
+	bool superoverride;
+	bool fatigueCheat;
+	bool redbull;
+	bool consoleActive;
+	bool noHUD;
+	bool showLocation;
+	bool showFPS;
+	bool editMode;
+	uint8_t dizzyLevel;
+} Voxen_Cheats;
+extern Voxen_Cheats voxen_Cheats;
+
+void SetSkyRotateSpeed(void);
 // ----------------------------------------------------------------------------
 // Text
 #define TEXT_BUFFER_SIZE 1024
@@ -377,19 +394,24 @@ extern float skyRotateSpeed;
 #define MAX_GLYPHS 639
 #define FONT_NORMAL 0
 #define FONT_STOPD 1
+#define TEXT_STRING_COUNT 1100
+#define TEXT_LOCALIZATION_MAX_LENGTH 1207
+#define TEXT_LOGS_COUNT 134
+#define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
+typedef struct {	
+	uint8_t file_data[TEXT_DATA_FILEBUFFER_SIZE]; // Found that only 59430 were needed at one point, padded for safety and typo fixes
+	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
+	uint16_t audioLogImagesRefIndicesLH[TEXT_LOGS_COUNT];
+	uint16_t audioLogImagesRefIndicesRH[TEXT_LOGS_COUNT];
+	uint8_t audioLogType[TEXT_LOGS_COUNT];
+	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
+} Voxen_Text;
+extern Voxen_Text voxen_Text;
 
-extern char** stringTable;
-extern uint16_t* audioLogImagesRefIndicesLH;
-extern uint16_t* audioLogImagesRefIndicesRH;
 extern char** audiologNames;
 extern char** audiologSubjects;
 extern char** audiologSenders;
 extern char** audioLogSpeech2Text;
-extern uint8_t* audioLogType;
-extern uint16_t* audioLogLevelFound;
-
-void LoadTextForLanguage(uint8_t lang);
-void LoadLogTextForLanguage(uint8_t lang);
 extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;
@@ -400,13 +422,15 @@ extern float genericTextHeightFac;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
+
+void LoadTextForLanguage(uint8_t lang);
+void LoadLogTextForLanguage(uint8_t lang);
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
 float TextWidth(const char *utf8, int32_t fontID);
 uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses(void);
 // ----------------------------------------------------------------------------
 // UI
-#define BTN_SHOOT_MODE 10
 #define UI_LAYER_TOP 1.0f
 #define UI_LAYER_5 0.5f
 #define UI_LAYER_4 0.4f
@@ -414,7 +438,6 @@ void InitFontAtlasses(void);
 #define UI_LAYER_2 0.2f
 #define UI_LAYER_1 0.1f
 #define UI_LAYER_0 0.0f
-extern float uiOrthoProjection[16];
 float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------

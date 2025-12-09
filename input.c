@@ -71,7 +71,7 @@ void Input_Init(GLFWwindow* window) {
 
 int32_t Input_KeyDown(int32_t keycode) {
     if (keycode >= 0 && keycode < MAX_KEYS) keyStates[keycode].pressed = keyStates[keycode].down = true;
-    if (consoleActive) { ConsoleEmulator(keycode); return 0; }
+    if (voxen_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
     return 0;
 }
 
@@ -158,28 +158,22 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_R].pressed) {
         debugView++;
         if (debugView > 4) debugView = 0;
-        glProgramUniform1i(chunkShaderProgram, 4, debugView);
-        glProgramUniform1i(imageBlitShaderProgram, 0, debugView);
+        glProgramUniform1i(voxen_GL_Comms.chunkShaderProgram, 4, debugView);
+        glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 0, debugView);
     }
 
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_Y].pressed) {
         debugValue++;
         if (debugValue > 6) debugValue = 0;
-        glProgramUniform1i(imageBlitShaderProgram, 1, debugValue);
-        glProgramUniform1i(chunkShaderProgram, 5, debugValue);
-    }
-    
-    if (keyStates[GLFW_KEY_1].pressed) {
-        settings_Contrast += 0.01f;
-    } else if (keyStates[GLFW_KEY_2].pressed) {
-        settings_Contrast -= 0.01f;
+        glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 1, debugValue);
+        glProgramUniform1i(voxen_GL_Comms.chunkShaderProgram, 5, debugValue);
     }
     
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     // End Debug Inputs
     
     // =========== PAUSE BARRIER ==================
-    if (gamePaused || consoleActive) return;
+    if (gamePaused || voxen_Cheats.consoleActive) return;
     
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;

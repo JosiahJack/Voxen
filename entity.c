@@ -627,14 +627,12 @@ void LoadLevel(uint8_t curlevel) {
     for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(uint32_t), modelMatrices, GL_DYNAMIC_DRAW);
     UpdateVoxelLightLists();
-    uint32_t shadowmapPixelCount = SHADOW_MAP_SIZE_SQD * 6u;
-    totalShadowmapPixels = MAX_SHADOWMAPS * shadowmapPixelCount;
-    shadowMapSSBO = SetupSSBO(shadowMapSSBO, 5, totalShadowmapPixels * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    glUseProgram(shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
+    voxen_GL_Comms.shadowMapSSBO = SetupSSBO(voxen_GL_Comms.shadowMapSSBO, 5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (TOTAL_SHADOWMAP_PIXELS + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)settings_VolumeMusic/100.0f) * 0.4f,100);
+    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.settings_VolumeMusic/100.0f) * 0.4f,100);
     RenderShadowmaps();
     Input_MouselookApply();
     levelCurrentlyLoading = false;

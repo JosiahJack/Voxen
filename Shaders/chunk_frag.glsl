@@ -37,6 +37,7 @@ layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
+layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
 layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x,y pairs for width and height of textures
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
@@ -134,6 +135,7 @@ void main() {
     if (texIndex >= 0) texIndexChecked = int(texIndex);
     ivec2 texSize = textureSizes[texIndexChecked];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
+    ivec2 pixel = ivec2(uv);
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
@@ -191,6 +193,7 @@ void main() {
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = adjustedNormal;
     uint listoffset = 0;
+    float intensityTotal = 0.0;
     if (count > 0) listoffset = voxelLightListIndices[voxelIdx * 2];
     for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
@@ -232,7 +235,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRange * distOverRange * 24.0 + 12.0;
+            float smearness = distOverRange * distOverRange * 24.0 + 14.0;
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -251,7 +254,12 @@ void main() {
             uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
             uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
             vec2 tc = uv * shadowmapSize;
-            float bias = 0.02 + 0.17 * distOverRangeSqd;
+            float NdotL = dot(normal, lightDir);
+            float slopeBias = 0.10 * (1.0 - NdotL);
+            slopeBias = min(slopeBias, 0.18);
+            float constantBias = 0.009 * dist; // Does nothing until ~0.01 but then reintroduces peter panning
+            float bias = (slopeBias + constantBias) * (dist / range);
+            bias = clamp(bias, 0.0, 0.22);
             if (shadowsEnabled > 1 && distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
@@ -286,19 +294,34 @@ void main() {
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
-        lighting += (albedoColor.rgb * intensity * pow(attenuation, 2.2) * lightColor * spotFalloff * shadowFactor);
+        vec3 baseLighting = albedoColor.rgb  * lightColor * intensity;
+        lighting += baseLighting * pow(attenuation, 2.2) * spotFalloff * shadowFactor;
+        lighting += baseLighting * 0.19 * pow(attenuation, 2.2) * (1.0 - shadowFactor); // Poor man's bounce light
+        intensityTotal += intensity * attenuation * 1.5;
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);
             float ndh = max(dot(normal, halfDir), 0.0);
             float strength = texIndexChecked == 36 || texIndexChecked == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
-            float shininess = 130.0;
+            float shininess = 110.0;
             float spec = clamp(pow(ndh, shininess),0.0,1.0);
             lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength * 10.0;
         }
     }
 
+    lighting += albedoColor.rgb * vec3(0.018, 0.020, 0.024);
+
+    float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+    lighting += clamp(pow(rim, 4.0) * 0.5 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel
+
     if (unlit > 0) lighting = albedoColor.rgb;
     else lighting += glowColor.rgb; // Glow (texture emission)
+
+    // Blue Noise Dither for banding
+    ivec2 sp = ivec2(gl_FragCoord.xy);
+    int idx = (sp.x & 63) + (sp.y & 63) * 64;
+    float blue = blueNoiseColors[idx*3 + 0];
+    float dither = (blue - 0.5) / 255.0;
+    lighting.rgb += vec3(dither);
 
     float fogFac = clamp(distToPixel * INV_FOG_DIST, 0.0, 1.0);
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));

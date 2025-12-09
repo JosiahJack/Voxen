@@ -39,7 +39,6 @@ layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 29) uniform vec3 staticColor;
 layout(location = 30) uniform float skyRotateSpeed;
-layout(location = 31) uniform float contrast;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
 const float vhsRadiusMax = 3.0; // in pixels

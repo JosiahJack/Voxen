@@ -9,7 +9,6 @@
 
 #define MAX_HISTORY 7
 static int32_t currentEntryLength = 0;
-bool consoleActive = false;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
 char history[MAX_HISTORY][TEXT_BUFFER_SIZE] = {0};
 static int numHistory = 0;
@@ -17,9 +16,9 @@ static int historyPos = 0;
 
 void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
-    if (!consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
-    consoleActive = !consoleActive; // Tilde
-    if (consoleActive) inventoryMode = true;
+    if (!voxen_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
+    voxen_Cheats.consoleActive = !voxen_Cheats.consoleActive; // Tilde
+    if (voxen_Cheats.consoleActive) inventoryMode = true;
     else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
         inventoryMode = false;
         cursorPosition_x = (int32_t)((float)screen_width * 0.5f);
@@ -89,26 +88,26 @@ __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd
 }
 
 static void cmd_noclip(void) {
-    noclip = !noclip;
-    if (noclip) CenterStatusPrint("noclip: %s", stringTable[1000]); // "ACTIVATED"
-    else CenterStatusPrint("noclip: %s", stringTable[717]); // "DISABLED"
+    voxen_Cheats.noclip = !voxen_Cheats.noclip;
+    if (voxen_Cheats.noclip) CenterStatusPrint("noclip: %s", voxen_Text.stringTable[1000]); // "ACTIVATED"
+    else CenterStatusPrint("noclip: %s", voxen_Text.stringTable[717]); // "DISABLED"
 }
 
 static void cmd_edit(void) {
-    editMode = !editMode;
-    if (editMode) {
-        CenterStatusPrint("edit mode: %s", stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
-        noclip = true;
-        notarget = true;
+    voxen_Cheats.editMode = !voxen_Cheats.editMode;
+    if (voxen_Cheats.editMode) {
+        CenterStatusPrint("edit mode: %s", voxen_Text.stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
+        voxen_Cheats.noclip = true;
+        voxen_Cheats.notarget = true;
     } else {
-        CenterStatusPrint("%s", stringTable[999]); // "Edit Mode deactivated, normal play"
-        noclip = false;
-        notarget = false;
+        CenterStatusPrint("%s", voxen_Text.stringTable[999]); // "Edit Mode deactivated, normal play"
+        voxen_Cheats.noclip = false;
+        voxen_Cheats.notarget = false;
     }
 }
 
 static void cmd_savegeometry(void) {
-    if (!editMode) {
+    if (!voxen_Cheats.editMode) {
         CenterStatusPrint("savegeometry only works in edit mode!");
         return;
     }
@@ -177,7 +176,7 @@ static int ParseLevelArg(const char* arg) {
     if (strstr(clean, "g2") || strstr(clean, "11")) return 11;
     if (strstr(clean, "g4") || strstr(clean, "12")) return 12;
     if (strstr(clean, "g3")) {
-        CenterStatusPrint("%s", stringTable[1001]); // "Gamma grove already jettisoned! Those poor arrogant people."
+        CenterStatusPrint("%s", voxen_Text.stringTable[1001]); // "Gamma grove already jettisoned! Those poor arrogant people."
         return -2; // Special code: do not load
     }
 
@@ -187,7 +186,7 @@ static int ParseLevelArg(const char* arg) {
 }
 
 static void cmd_loadlevel(const char* arg) {
-    if (menuActive) { CenterStatusPrint("%s", stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
+    if (menuActive) { CenterStatusPrint("%s", voxen_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 
     int level = ParseLevelArg(arg);
     if (level >= 0) {
@@ -210,45 +209,43 @@ static void cmd_summon(int itemConstIndex) {
     }
 }
 
-static void cmd_notarget(void) { notarget = !notarget; CenterStatusPrint("notarget: %s", notarget ? stringTable[1000] : stringTable[717]); }
-static void cmd_cull(void) { settings_CullEnabled = !settings_CullEnabled; CenterStatusPrint("Culling: %s", settings_CullEnabled ? stringTable[1000] : stringTable[717]);  }
-static void cmd_showfps(void) { showFPS = !showFPS; }
-static void cmd_showlocation(void) { showLocation = !showLocation; }
+static void cmd_notarget(void) { voxen_Cheats.notarget = !voxen_Cheats.notarget; CenterStatusPrint("notarget: %s", voxen_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
+static void cmd_cull(void) { voxen_Settings.settings_CullEnabled = !voxen_Settings.settings_CullEnabled; CenterStatusPrint("Culling: %s", voxen_Settings.settings_CullEnabled ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]);  }
+static void cmd_showfps(void) { voxen_Cheats.showFPS = !voxen_Cheats.showFPS; }
+static void cmd_showlocation(void) { voxen_Cheats.showLocation = !voxen_Cheats.showLocation; }
 static void cmd_help(void) { CenterStatusPrint("There's no one to save you now Hacker!"); }
 static void cmd_nomoney(void) { CenterStatusPrint("Nice try, there's no money here."); }
-static void cmd_god(void) { god = !god; CenterStatusPrint("god mode: %s", god ? stringTable[1000] : stringTable[717]); }
+static void cmd_god(void) { voxen_Cheats.god = !voxen_Cheats.god; CenterStatusPrint("god mode: %s", voxen_Cheats.god ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
 static void cmd_energy(void) {
-    redbull = !redbull; 
-    if (redbull) CenterStatusPrint("%s", stringTable[1006]); // "I feel the power! 0 energy consumption!"
-    else CenterStatusPrint("%s", stringTable[1005]); // Energy usage normal
+    voxen_Cheats.redbull = !voxen_Cheats.redbull; 
+    if (voxen_Cheats.redbull) CenterStatusPrint("%s", voxen_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
+    else CenterStatusPrint("%s", voxen_Text.stringTable[1005]); // Energy usage normal
 }
 
 static void cmd_dizzy(void) {
-    dizzyLevel++;
-    if (dizzyLevel > 4) dizzyLevel = 0;
-    float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
-    skyRotateSpeed = speeds[dizzyLevel];
-    glProgramUniform1f(imageBlitShaderProgram, 30, skyRotateSpeed);
+    voxen_Cheats.dizzyLevel++;
+    if (voxen_Cheats.dizzyLevel > 4) voxen_Cheats.dizzyLevel = 0;
+    SetSkyRotateSpeed();
 }
 
 static void cmd_bottomless(void) {
-    bottomless = !bottomless;
-    if (bottomless) CenterStatusPrint("bottomlessclip! %s", stringTable[1002]); // "Bring it!"
-    else CenterStatusPrint("%s", stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
+    voxen_Cheats.bottomless = !voxen_Cheats.bottomless;
+    if (voxen_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s", voxen_Text.stringTable[1002]); // "Bring it!"
+    else CenterStatusPrint("%s", voxen_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
 }
 
 static void cmd_nohud(void) {
-    noHUD = !noHUD;
-    if (noHUD) CenterStatusPrint("%s", stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
-    else CenterStatusPrint("HUD %s", stringTable[1000]); // "ACTIVATED"
+    voxen_Cheats.noHUD = !voxen_Cheats.noHUD;
+    if (voxen_Cheats.noHUD) CenterStatusPrint("%s", voxen_Text.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
+    else CenterStatusPrint("HUD %s", voxen_Text.stringTable[1000]); // "ACTIVATED"
 }
 
 static void cmd_iamshodan(void) {
-    superoverride = !superoverride;
-    if (superoverride) {
-        CenterStatusPrint("%s", stringTable[1010]); // "Full security override enabled!"
+    voxen_Cheats.superoverride = !voxen_Cheats.superoverride;
+    if (voxen_Cheats.superoverride) {
+        CenterStatusPrint("%s", voxen_Text.stringTable[1010]); // "Full security override enabled!"
     } else {
-        CenterStatusPrint("%s", stringTable[1009]); // "SHODAN has regained control of security from you"
+        CenterStatusPrint("%s", voxen_Text.stringTable[1009]); // "SHODAN has regained control of security from you"
     }
 }
 
@@ -307,11 +304,11 @@ static void cmd_ai(void)             { CenterStatusPrint("Only AI allowed around
 static void cmd_aireal(void)         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
 
 static void cmd_staminup(void) {
-    fatigueCheat = !fatigueCheat;
-    if (fatigueCheat) {
-        CenterStatusPrint("Stamin-Up! %s", stringTable[1013]);
+    voxen_Cheats.fatigueCheat = !voxen_Cheats.fatigueCheat;
+    if (voxen_Cheats.fatigueCheat) {
+        CenterStatusPrint("Stamin-Up! %s", voxen_Text.stringTable[1013]);
     } else {
-        CenterStatusPrint("%s", stringTable[1012]);
+        CenterStatusPrint("%s", voxen_Text.stringTable[1012]);
     }
 }
 
@@ -430,7 +427,7 @@ void ProcessConsoleCommand(const char* command) {
         }
     }
 
-    if (!commandProcessed) CenterStatusPrint("%s%s", stringTable[1014], command_trimmed); // "Unknown command or function: "
+    if (!commandProcessed) CenterStatusPrint("%s%s", voxen_Text.stringTable[1014], command_trimmed); // "Unknown command or function: "
     consoleEntryText[0] = '\0';
     currentEntryLength = 0;
     historyPos = numHistory; // Position beyond newest for empty

@@ -1066,7 +1066,7 @@ index: 188
 model: 289
 cardchunk: 1
 texture: 528
-spectexture: 1242
+spectexture: 1271
 #chunk_med2_7
 index: 189
 model: 290
@@ -1077,7 +1077,6 @@ spectexture: 1245
 #chunk_med2_8
 index: 190
 model: 291
-spectexture: 1242
 cardchunk: 1
 texture: 531
 spectexture: 1242

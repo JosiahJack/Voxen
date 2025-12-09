@@ -69,7 +69,6 @@ Project must be linked against the following libraries which your system must in
  * -L./External -l:libassimp.6.0.2.a -lz -lstdc++ -static-libstdc++ (Prebuilt, included in ./External/, for model loading from .fbx (for now))
  * libstdc++
  * -lfontconfig
- * -fopenmp
 
 Single command:
 
@@ -233,126 +232,108 @@ Log ouput from standard run:
 
 ```
 Compiling voxen...
-Build completed in 323 ms
+Build completed in 378 ms
 Voxen v0.7.4 by W. Josiah Jack, MIT-0 licensed
-Window positioned (windowed, centered) on monitor: DVI-I-1 (primary) at 2717,141
+Window positioned (windowed, centered) on monitor: DVI-I-1 (primary) at 2717,531
 Using GLFW 3.5.0 Wayland X11 GLX Null EGL OSMesa monotonic, OpenGL Version: 4.3.0 NVIDIA 550.144.03, GPU: NVIDIA GeForce GTX 970/PCIe/SSE2CPU: AMD Ryzen 5 5500 | Logical cores: 12
-Loading game definition from ./Data/gamedata.txt... loaded Game Definition for Citadel:: num levels: 14, start level: 1... took 0.000256 secs
-Loaded    2 fonts...in 0.019 s
-Parallel Inits and window init took 0.141993 secs
-Loading textures(1271) with max index 1270, using stb_image version:  2.28... total pallete colors: 80227, total pixels: 34152900... took 0.136199 secs
-Loading   models( 698) with max index  697 ... total vertices: 57506112, total tris: 7188264, took 0.064184 secs
-Loading  756 entities... took 0.000910 secs
-Loaded 6056 geometry chunks and 893 static lights for Level 1... took 0.021124 secs
-Sorting entity instances... opaque: 5461, double-sided: 42, transparent: 40, invisible: 510... took 0.007388 secs
-Culling...found 1170 open cells, closed edges N: 368, S: 364, E: 337, W: 341... took 0.129602 secs
-Number of lights with shadows: 893
-0 dynamic lights in level 1
-Game Initialized in 0.553212 secs
+Loaded    2 fonts...in 0.010 s
+Loading game definition from ./Data/gamedata.txt... loaded Game Definition for Citadel:: num levels: 14, start level: 1... took 0.000032 secs
+GL buffers, FBO, fonts, audio, localization, and window init took 0.154020 secs
+Loading textures(1272), using stb_image version: 2.28, total palette colors: 72723, total pixels: 23737139... took 0.395442 secs
+Loading   models( 698) with max index  697 ... total vertices: 1796046, total tris: 7184184, took 0.172740 secs
+Loading  768 entities... took 0.000912 secs
+Loaded 6056 geometry chunks and 893 static lights for Level 1... took 0.023691 secs
+Sorting entity instances... opaque: 5477, double-sided: 42, transparent: 40, invisible: 494... took 0.006461 secs
+Culling...found 1170 open cells, closed edges N: 368, S: 364, E: 337, W: 341... took 0.136474 secs
+Game Initialized in 0.926241 secs
 ```
 
 Log output from one run with DEBUG_RAM_OUTPUT declared in voxen.h:
 
 ```
 Compiling voxen...
-Shaders converted to string constants in 12 ms
-Linking completed in 131 ms
-Build completed in 1763 ms
-Memory at prior to event system init: Heap usage 76560 bytes (74 KB | 0.07 MB), USS 1748992 bytes (1708 KB | 1.67 MB)
-Voxen v0.7.2 by W. Josiah Jack, MIT-0 licensed
-Memory at InitializeEnvironment start: Heap usage 82192 bytes (80 KB | 0.08 MB), USS 3018752 bytes (2948 KB | 2.88 MB)
-Memory at window init: Heap usage 6744064 bytes (6586 KB | 6.43 MB), USS 18780160 bytes (18340 KB | 17.91 MB)
-Window positioned (windowed, centered) on monitor: DVI-I-1 (primary) at 2717,141
-OpenGL Version: 4.3.0 NVIDIA 550.144.03
-GPU: NVIDIA GeForce GTX 970/PCIe/SSE2
-Memory at after vao chunk bind: Heap usage 7894848 bytes (7709 KB | 7.53 MB), USS 20209664 bytes (19736 KB | 19.27 MB)
-Memory at after ui image vao chunk bind: Heap usage 7898192 bytes (7713 KB | 7.53 MB), USS 20209664 bytes (19736 KB | 19.27 MB)
-Memory at setup gbuffer end: Heap usage 8197424 bytes (8005 KB | 7.82 MB), USS 20271104 bytes (19796 KB | 19.33 MB)
-Memory at end of font init: Heap usage 12419904 bytes (12128 KB | 11.84 MB), USS 28778496 bytes (28104 KB | 27.45 MB)
-Loading fonts(2)... took 0.033038
-Memory at audio init: Heap usage 13831920 bytes (13507 KB | 13.19 MB), USS 30437376 bytes (29724 KB | 29.03 MB)
-Loading game definition from ./Data/gamedata.txt... loaded Game Definition for Citadel:: num levels: 14, start level: 1
-Window and GL Init took 0.140204 seconds
-Loading texturesMemory at start of LoadTextures: Heap usage 13919808 bytes (13593 KB | 13.27 MB), USS 35745792 bytes (34908 KB | 34.09 MB)
-(1267) with max index 1266, using stb_image version:  2.28... total pallete colors: 79391, totalPixels was: 33438148... 
- took 0.253006 seconds
-Memory at After LoadTextures: Heap usage 14753376 bytes (14407 KB | 14.07 MB), USS 53211136 bytes (51964 KB | 50.75 MB)
-Memory at start of LoadModels: Heap usage 14753376 bytes (14407 KB | 14.07 MB), USS 53211136 bytes (51964 KB | 50.75 MB)
-Loading   models( 672) with max index  671, using    Assimp version: 6.0.2... took 0.613524 seconds
-Memory at After Load Models: Heap usage 160327680 bytes (156570 KB | 152.90 MB), USS 142864384 bytes (139516 KB | 136.25 MB)
-Loading  755 entities... took 0.000354 seconds
-Memory at after loading all entities: Heap usage 160435680 bytes (156675 KB | 153.00 MB), USS 142987264 bytes (139636 KB | 136.36 MB)
-Memory at start of LoadLevel: Heap usage 160436144 bytes (156675 KB | 153.00 MB), USS 142987264 bytes (139636 KB | 136.36 MB)
-Loaded 6054 geometry chunks and 892 static lights for Level 1... took 0.022155 seconds
-Memory at end of LoadLevel: Heap usage 160436144 bytes (156675 KB | 153.00 MB), USS 144412672 bytes (141028 KB | 137.72 MB)
-Sorting instances... took 0.002449 secs
-Total opaque instances: 5427, double-sided: 42, transparent: 40, invisible: 545
-Culling...Memory at start of Cull_Init: Heap usage 160444640 bytes (156684 KB | 153.01 MB), USS 144920576 bytes (141524 KB | 138.21 MB)
-Memory at Start of DetermineClosedEdges: Heap usage 160444640 bytes (156684 KB | 153.01 MB), USS 144920576 bytes (141524 KB | 138.21 MB)
-Found 1170 open cells for level 1, Found closed edges north: 368, south: 364, east: 337, west: 341...Memory at end of dynamic culling DetermineClosedEdges: Heap usage 160444640 bytes (156684 KB | 153.01 MB), USS 144924672 bytes (141528 KB | 138.21 MB)
- took 0.094322 seconds
-Memory at end of Cull_Init: Heap usage 160444640 bytes (156684 KB | 153.01 MB), USS 147034112 bytes (143588 KB | 140.22 MB)
-Generating voxel lighting data... took 0.016658 seconds, total list size: 1008105
-Memory at InitializeEnvironment end: Heap usage 166905776 bytes (162993 KB | 159.17 MB), USS 162381824 bytes (158576 KB | 154.86 MB)
-Memory at prior to game loop: Heap usage 166905776 bytes (162993 KB | 159.17 MB), USS 162381824 bytes (158576 KB | 154.86 MB)
-Rendering shadowmaps...Memory at Start of RenderShadowmaps: Heap usage 166905776 bytes (162993 KB | 159.17 MB), USS 162381824 bytes (158576 KB | 154.86 MB)
- took 0.454595 seconds to render 892 static shadow maps
-Memory at After rendering all shadowmaps: Heap usage 167185136 bytes (163266 KB | 159.44 MB), USS 162447360 bytes (158640 KB | 154.92 MB)
-Game Initialized in 1.626723 secs
-Memory at after 4 frames of running: Heap usage 167258208 bytes (163338 KB | 159.51 MB), USS 162844672 bytes (159028 KB | 155.30 MB)
-Memory at after 100 frames of running: Heap usage 167235360 bytes (163315 KB | 159.49 MB), USS 158351360 bytes (154640 KB | 151.02 MB)
-Memory at after 200 frames of running: Heap usage 167233344 bytes (163313 KB | 159.49 MB), USS 158351360 bytes (154640 KB | 151.02 MB)
+Build completed in 371 ms
+Memory at program start: Heap usage 73856 bytes (72 KB | 0.07 MB), USS 1609728 bytes (1572 KB | 1.54 MB)
+Memory at prior to event system init: Heap usage 79488 bytes (77 KB | 0.08 MB), USS 1613824 bytes (1576 KB | 1.54 MB)
+Voxen v0.7.4 by W. Josiah Jack, MIT-0 licensed
+Window positioned (windowed, centered) on monitor: DVI-I-1 (primary) at 2717,531
+Using GLFW 3.5.0 Wayland X11 GLX Null EGL OSMesa monotonic, OpenGL Version: 4.3.0 NVIDIA 550.144.03, GPU: NVIDIA GeForce GTX 970/PCIe/SSE2CPU: AMD Ryzen 5 5500 | Logical cores: 12
+Memory at GL Buffer and shader setup: Heap usage 7101376 bytes (6934 KB | 6.77 MB), USS 17629184 bytes (17216 KB | 16.81 MB)
+Memory at setup gbuffer end: Heap usage 9112192 bytes (8898 KB | 8.69 MB), USS 19599360 bytes (19140 KB | 18.69 MB)
+Loaded    2 fonts...in 0.010 s
+Memory at after InitFontAtlasses: Heap usage 9119072 bytes (8905 KB | 8.70 MB), USS 37638144 bytes (36756 KB | 35.89 MB)
+Memory at after InitializeAudio: Heap usage 10523504 bytes (10276 KB | 10.04 MB), USS 38813696 bytes (37904 KB | 37.02 MB)
+Memory at LoadTextForLanguage end: Heap usage 10523504 bytes (10276 KB | 10.04 MB), USS 40103936 bytes (39164 KB | 38.25 MB)
+Memory at LoadLogTextForLanguage end: Heap usage 10573328 bytes (10325 KB | 10.08 MB), USS 40157184 bytes (39216 KB | 38.30 MB)
+Loading game definition from ./Data/gamedata.txt... loaded Game Definition for Citadel:: num levels: 14, start level: 1... took 0.000019 secs
+Memory at ParseGameData end: Heap usage 10573808 bytes (10325 KB | 10.08 MB), USS 40161280 bytes (39220 KB | 38.30 MB)
+Memory at after freeing window bar icon: Heap usage 10575408 bytes (10327 KB | 10.09 MB), USS 40198144 bytes (39256 KB | 38.34 MB)
+GL buffers, FBO, fonts, audio, localization, and window init took 0.160541 secs
+Loading texturesMemory at start of LoadTextures: Heap usage 10575408 bytes (10327 KB | 10.09 MB), USS 40198144 bytes (39256 KB | 38.34 MB)
+Memory at After loop for load textures: Heap usage 10575408 bytes (10327 KB | 10.09 MB), USS 72732672 bytes (71028 KB | 69.36 MB)
+(1272), using stb_image version: 2.28, total palette colors: 72723, total pixels: 23737139... took 0.404324 secs
+Memory at After LoadTextures and after munmap of LoadTextures arena and stbi arena: Heap usage 10892496 bytes (10637 KB | 10.39 MB), USS 64118784 bytes (62616 KB | 61.15 MB)
+Loading   models( 698) with max index  697 ...Memory at after main mmap block: Heap usage 11166128 bytes (10904 KB | 10.65 MB), USS 64405504 bytes (62896 KB | 61.42 MB)
+Memory at prior to parallel model load loop: Heap usage 11166560 bytes (10904 KB | 10.65 MB), USS 64409600 bytes (62900 KB | 61.43 MB)
+Memory at after to parallel model load loop: Heap usage 11166560 bytes (10904 KB | 10.65 MB), USS 126656512 bytes (123688 KB | 120.79 MB)
+Memory at after to model to gpu transfer: Heap usage 77180368 bytes (75371 KB | 73.60 MB), USS 115732480 bytes (113020 KB | 110.37 MB)
+ total vertices: 1796046, total tris: 7184184, took 0.178472 secs
+Memory at After Load Models: Heap usage 77201792 bytes (75392 KB | 73.63 MB), USS 51359744 bytes (50156 KB | 48.98 MB)
+Loading  768 entities... took 0.000908 secs
+Memory at after loading all entities: Heap usage 77803936 bytes (75980 KB | 74.20 MB), USS 51965952 bytes (50748 KB | 49.56 MB)
+Memory at start of LoadLevel: Heap usage 80718288 bytes (78826 KB | 76.98 MB), USS 62992384 bytes (61516 KB | 60.07 MB)
+Loaded 6056 geometry chunks and 893 static lights for Level 1... took 0.025371 secs
+Memory at end of LoadLevel instances: Heap usage 80718288 bytes (78826 KB | 76.98 MB), USS 67129344 bytes (65556 KB | 64.02 MB)
+Sorting entity instances... opaque: 5477, double-sided: 42, transparent: 40, invisible: 494... took 0.007188 secs
+Culling...Memory at start of Cull_Init: Heap usage 80727600 bytes (78835 KB | 76.99 MB), USS 71147520 bytes (69480 KB | 67.85 MB)
+found 1170 open cells, closed edges N: 368, S: 364, E: 337, W: 341...Memory at end of dynamic culling DetermineClosedEdges: Heap usage 80727600 bytes (78835 KB | 76.99 MB), USS 71180288 bytes (69512 KB | 67.88 MB)
+ took 0.138372 secs
+Memory at end of Cull_Init: Heap usage 80727600 bytes (78835 KB | 76.99 MB), USS 73293824 bytes (71576 KB | 69.90 MB)
+Memory at InitializeEnvironment end: Heap usage 84538784 bytes (82557 KB | 80.62 MB), USS 94359552 bytes (92148 KB | 89.99 MB)
+Memory at prior to game loop: Heap usage 84538784 bytes (82557 KB | 80.62 MB), USS 94359552 bytes (92148 KB | 89.99 MB)
+Game Initialized in 0.960962 secs
+Memory at after 4 frames of running: Heap usage 84569504 bytes (82587 KB | 80.65 MB), USS 99037184 bytes (96716 KB | 94.45 MB)
+Memory at after 100 frames of running: Heap usage 84596368 bytes (82613 KB | 80.68 MB), USS 99667968 bytes (97332 KB | 95.05 MB)
+Memory at after 200 frames of running: Heap usage 84599296 bytes (82616 KB | 80.68 MB), USS 99667968 bytes (97332 KB | 95.05 MB)
+Memory at after 500 frames of running: Heap usage 84569504 bytes (82587 KB | 80.65 MB), USS 99667968 bytes (97332 KB | 95.05 MB)
+Memory at after 1000 frames of running: Heap usage 84586896 bytes (82604 KB | 80.67 MB), USS 99667968 bytes (97332 KB | 95.05 MB)
 ```
 
 Heap impacts:
 
 ```
 ❯ grep -rIn  "alloc("
-voxen.c:410:    unsigned char* pixels = malloc(screen_width * screen_height * 4 * sizeof(char));
-voxen.c:525:    uint32_t* voxelLightListsRaw = malloc(VOXEL_COUNT * 4 * sizeof(uint32_t));
-voxen.c:526:    uint32_t* voxelLightListIndices = malloc(VOXEL_COUNT * 2 * sizeof(uint32_t));
 dynamic_culling.c:45:    uint8_t* file_buffer = malloc(maxFileSize);
-data_fonts.c:13:    char *p = malloc(len);
-data_fonts.c:151:    unsigned char *data = malloc(size);
-data_fonts.c:220:    primaryFontData = malloc(primarySize);
-data_fonts.c:237:    unsigned char *secondaryFontData = malloc(secondarySize);
-data_fonts.c:254:    unsigned char *atlasBitmap = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
-data_fonts.c:311:    unsigned char *atlasBitmapStopD = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
-data_parser.c:129:        ResourceEntry *new_entries = realloc(parser->entries, entry_count * sizeof(ResourceEntry));  
-data_parser.c:350:    image_data            =   malloc(loadedTextures * sizeof(unsigned char*));
-data_parser.c:351:    textureOffsets        = calloc(loadedTextures, sizeof(uint32_t));
-data_parser.c:352:    textureSizes          = calloc(loadedTextures * 2, sizeof(int));
-data_parser.c:353:    texturePaletteOffsets = calloc(loadedTextures, sizeof(uint32_t));
-data_parser.c:354:    doubleSidedTexture    = calloc(loadedTextures,sizeof(bool));
-data_parser.c:355:    transparentTexture    = calloc(loadedTextures,sizeof(bool));
-data_parser.c:357:    texturePalettes             = malloc(totalPaletteColorsExtraSized * sizeof(uint32_t));
-data_parser.c:358:    int32_t* widths             = malloc(loadedTextures * sizeof(int32_t));
-data_parser.c:359:    int32_t* heights            = malloc(loadedTextures * sizeof(int32_t));
-data_parser.c:360:    int32_t* matchedParserIdxes = malloc(loadedTextures * sizeof(int32_t));
-data_parser.c:382:            uint8_t* file_buffer = malloc(file_size);
-data_parser.c:408:    ColorEntry* color_pool = malloc(loadedTextures * MAX_PALETTE_SIZE * sizeof(ColorEntry));
-data_parser.c:409:    uint32_t* pool_indices = malloc(loadedTextures * sizeof(uint32_t));
-data_parser.c:411:    uint32_t** per_texture_palettes = malloc(loadedTextures * sizeof(uint32_t*));
-data_parser.c:412:    uint32_t* per_texture_palette_sizes = malloc(loadedTextures * sizeof(uint32_t));
-data_parser.c:413:    uint8_t* all_indices = malloc(max_total_pixels * sizeof(uint8_t));
-data_parser.c:414:    uint32_t* index_offsets = malloc(loadedTextures * sizeof(uint32_t));
-data_parser.c:417:        per_texture_palettes[i] = malloc(MAX_PALETTE_SIZE * sizeof(uint32_t));
-data_parser.c:557:    modelVertexCounts   = calloc(loadedModels, sizeof(uint32_t));
-data_parser.c:558:    modelTriangleCounts = calloc(loadedModels, sizeof(uint32_t));
-data_parser.c:559:    modelVertices       = calloc(loadedModels, sizeof(float*));
-data_parser.c:560:    modelTriangles      = calloc(loadedModels, sizeof(uint32_t*));
-data_parser.c:561:    modelBounds         = calloc(loadedModels * BOUNDS_ATTRIBUTES_COUNT, sizeof(float));
-data_parser.c:565:    int32_t* indexToParser = calloc(loadedModels, sizeof(int32_t));
-data_parser.c:617:            modelVertices[i]  = calloc(vertexCount * VERTEX_ATTRIBUTES_COUNT,sizeof(float));
-data_parser.c:618:            modelTriangles[i] = calloc(triCount * 3,sizeof(uint32_t));
-data_parser.c:673:    vbos = calloc(loadedModels, sizeof(GLuint));
-data_parser.c:674:    tbos = calloc(loadedModels, sizeof(GLuint));
-data_parser.c:946:    modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
-data_parser.c:947:    modelTypeCountsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
-data_parser.c:948:    modelTypeCountsTransparent = calloc(loadedModels,sizeof(uint16_t));
-data_parser.c:949:    modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16_t));
-data_parser.c:950:    modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
-data_parser.c:951:    modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
+entity.c:178:    entities = calloc(entityCount,sizeof(Entity));
+entity.c:239:    if (modelTypeCountsOpaque      ) { free(modelTypeCountsOpaque      ); }   modelTypeCountsOpaque = calloc(loadedModels,sizeof(uint16_t)); // Zero out all arrays and counters
+entity.c:240:    if (modelTypeCountsDoubleSided ) { free(modelTypeCountsDoubleSided ); }   modelTypeCountsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
+entity.c:241:    if (modelTypeCountsTransparent ) { free(modelTypeCountsTransparent ); }   modelTypeCountsTransparent = calloc(loadedModels,sizeof(uint16_t));
+entity.c:242:    if (modelTypeOffsetsOpaque     ) { free(modelTypeOffsetsOpaque     ); }   modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16_t));
+entity.c:243:    if (modelTypeOffsetsDoubleSided) { free(modelTypeOffsetsDoubleSided); }   modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
+entity.c:244:    if (modelTypeOffsetsTransparent) { free(modelTypeOffsetsTransparent); }   modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
+data_fonts.c:25:        char *p = malloc(len);
+data_fonts.c:161:    unsigned char *data = malloc(size);
+data_fonts.c:288:    primaryFontData = malloc(pri_sz);
+data_fonts.c:294:    unsigned char *sec_data = malloc(sec_sz);
+data_fonts.c:320:    unsigned char *bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
+data_fonts.c:358:    bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
+data_parser.c:166:        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
+helpers.c:201:    unsigned char* pixels = malloc(screen_width * screen_height * 4 * sizeof(char));
+data_text.c:53:    stringTable = malloc(TEXT_STRING_COUNT * sizeof(char*));
+data_text.c:69:    uint8_t* file_data = malloc(file_size);
+data_text.c:112:                    stringTable[lineNum] = malloc(1 * sizeof(char));
+data_text.c:152:                stringTable[lineNum] = malloc(1 * sizeof(char));
+data_text.c:161:            stringTable[lineNum] = malloc((len+1) * sizeof(char));
+data_text.c:192:    audioLogImagesRefIndicesLH = calloc(TEXT_LOGS_COUNT, sizeof(uint16_t));
+data_text.c:193:    audioLogImagesRefIndicesRH = calloc(TEXT_LOGS_COUNT, sizeof(uint16_t));
+data_text.c:194:    audioLogType               = calloc(TEXT_LOGS_COUNT, sizeof(uint8_t));
+data_text.c:195:    audioLogLevelFound         = calloc(TEXT_LOGS_COUNT, sizeof(uint16_t));
+data_text.c:196:    audiologNames       = calloc(TEXT_LOGS_COUNT, sizeof(char*));
+data_text.c:197:    audiologSenders     = calloc(TEXT_LOGS_COUNT, sizeof(char*));
+data_text.c:198:    audiologSubjects    = calloc(TEXT_LOGS_COUNT, sizeof(char*));
+data_text.c:199:    audioLogSpeech2Text = calloc(TEXT_LOGS_COUNT, sizeof(char*));
+data_text.c:220:    uint8_t *file_data = malloc((size_t)file_size);
+data_text.c:324:                (dst)[readIndexOfLog] = malloc(slen + 1); \
 NOTE: Excluded miniaudio, stb_image ./External alloc calls
 ```
 
@@ -360,410 +341,985 @@ Binary static variable impacts:
 
 ```
 ❯ size ./voxen
-   text    data     bss     dec     hex filename
-2703444   34128 5476360 8213932  7d55ac ./voxen
+   text    data     bss       dec     hex filename
+3124029   57192 21338776 24519997 176253d ./voxen
 ```
 
 Individual static variable impacts:
 
 ```
-❯ 
-0000000000324420 0000000000200000 B precomputedVisibleCellsFromHere
-000000000056a560 000000000009c400 B modelMatrices
-0000000000606960 00000000000927c0 B instances
-000000000029f100 0000000000038000 B fontPackedCharStopD
-00000000002d7100 0000000000038000 B fontPackedChar
-0000000000699360 0000000000023140 B _glfw
-0000000000547ce0 0000000000014500 B lights
-000000000052d5e0 000000000000ee00 B wav_sounds
-000000000030f280 000000000000b400 B entities
-000000000053d0c0 0000000000009c40 B eventJournal
-00000000003197e0 0000000000009c40 B cellIndexForInstance
-0000000000676dc0 0000000000007000 B uiImages
-00000000005285c0 0000000000004000 B uiImageVertexData
-00000000005245c0 0000000000004000 B textVertexData
-000000000067f820 0000000000002710 B instanceIsLODArray
-0000000000682180 0000000000002710 B dirtyInstances
-000000000067de80 0000000000001900 B lightIsDynamic
-0000000000523420 0000000000001000 B gridCellStates
-0000000000661040 0000000000000fa0 B eventQueue
-000000000029be00 0000000000000c58 D _glfwDefaultMappings
-000000000053b3e0 0000000000000770 B mp3_sounds
-000000000029b1e0 0000000000000640 D lightDirty
-000000000053bb60 0000000000000520 B audio_engine
-00000000006769a0 0000000000000400 B uiTextBuffer
-0000000000676540 0000000000000400 B statusText
-000000000029b840 0000000000000400 D consoleEntryText
-000000000029df20 00000000000001c0 B playerMovement
-0000000000524440 000000000000015e B keys
-0000000000682060 0000000000000100 B global_modname
-000000000029bc40 0000000000000090 D textColors
-000000000029b160 0000000000000060 D orientationQuaternion
-0000000000676960 0000000000000040 B uiOrthoProjection
-0000000000681f60 0000000000000040 B shadowmapsPerspectiveProjection
-0000000000681fa0 0000000000000040 B rasterPerspectiveProjection
-0000000000682020 0000000000000034 B questData
-000000000029b040 0000000000000030 D fontRangesStopD
-000000000029b080 0000000000000030 D fontRanges
-00000000002982c0 0000000000000030 D dataDeviceListener
-0000000000297e40 0000000000000028 D wp_fractional_scale_manager_v1_interface
-0000000000297960 0000000000000028 D _glfw_zxdg_toplevel_decoration_v1_interface
-00000000002978a0 0000000000000028 D _glfw_zxdg_decoration_manager_v1_interface
-0000000000297b80 0000000000000028 D _glfw_zwp_relative_pointer_v1_interface
-0000000000297b00 0000000000000028 D _glfw_zwp_relative_pointer_manager_v1_interface
-0000000000297c20 0000000000000028 D _glfw_zwp_pointer_constraints_v1_interface
-0000000000297d00 0000000000000028 D _glfw_zwp_locked_pointer_v1_interface
-0000000000298120 0000000000000028 D _glfw_zwp_idle_inhibitor_v1_interface
-00000000002980c0 0000000000000028 D _glfw_zwp_idle_inhibit_manager_v1_interface
-0000000000297dc0 0000000000000028 D _glfw_zwp_confined_pointer_v1_interface
-0000000000297300 0000000000000028 D _glfw_xdg_wm_base_interface
-0000000000297720 0000000000000028 D _glfw_xdg_toplevel_interface
-0000000000297520 0000000000000028 D _glfw_xdg_surface_interface
-0000000000297440 0000000000000028 D _glfw_xdg_positioner_interface
-0000000000297820 0000000000000028 D _glfw_xdg_popup_interface
-0000000000297f60 0000000000000028 D _glfw_xdg_activation_v1_interface
-0000000000298040 0000000000000028 D _glfw_xdg_activation_token_v1_interface
-0000000000297a80 0000000000000028 D _glfw_wp_viewport_interface
-00000000002979e0 0000000000000028 D _glfw_wp_viewporter_interface
-0000000000297ec0 0000000000000028 D _glfw_wp_fractional_scale_v1_interface
-0000000000296f40 0000000000000028 D _glfw_wl_touch_interface
-0000000000296aa0 0000000000000028 D _glfw_wl_surface_interface
-0000000000297240 0000000000000028 D _glfw_wl_subsurface_interface
-0000000000297160 0000000000000028 D _glfw_wl_subcompositor_interface
-00000000002961c0 0000000000000028 D _glfw_wl_shm_pool_interface
-0000000000296240 0000000000000028 D _glfw_wl_shm_interface
-00000000002968e0 0000000000000028 D _glfw_wl_shell_surface_interface
-0000000000296740 0000000000000028 D _glfw_wl_shell_interface
-0000000000296b80 0000000000000028 D _glfw_wl_seat_interface
-0000000000296040 0000000000000028 D _glfw_wl_registry_interface
-00000000002970e0 0000000000000028 D _glfw_wl_region_interface
-0000000000296d20 0000000000000028 D _glfw_wl_pointer_interface
-0000000000297040 0000000000000028 D _glfw_wl_output_interface
-0000000000296e20 0000000000000028 D _glfw_wl_keyboard_interface
-0000000000295fa0 0000000000000028 D _glfw_wl_display_interface
-0000000000296520 0000000000000028 D _glfw_wl_data_source_interface
-00000000002963e0 0000000000000028 D _glfw_wl_data_offer_interface
-00000000002966e0 0000000000000028 D _glfw_wl_data_device_manager_interface
-0000000000296660 0000000000000028 D _glfw_wl_data_device_interface
-0000000000296120 0000000000000028 D _glfw_wl_compositor_interface
-00000000002960a0 0000000000000028 D _glfw_wl_callback_interface
-00000000002962c0 0000000000000028 D _glfw_wl_buffer_interface
-00000000007b35e0 0000000000000010 B _ZN6Assimp13DefaultLogger13s_pNullLoggerE
-00000000003197a0 0000000000000010 B texture_parser
-0000000000319790 0000000000000010 B model_parser
-0000000000319770 0000000000000010 B lights_parser
-0000000000319780 0000000000000010 B entity_parser
-000000000029bcf0 0000000000000010 D cam_rotation
-000000000029bda8 0000000000000008 D _ZN6Assimp13DefaultLogger9m_pLoggerE
-00000000007b3498 0000000000000008 B window
-000000000052c5c8 0000000000000008 B voxelLightListsRaw
-000000000052c5c0 0000000000000008 B voxelLightListIndices
-000000000029bd70 0000000000000008 D vertexShaderSource
-00000000003196a8 0000000000000008 B vbos
-0000000000319718 0000000000000008 B transparentTexture
-00000000007b3468 0000000000000008 B time_PhysicsStep
-000000000029bd80 0000000000000008 D textVertexShaderSource
-0000000000319730 0000000000000008 B textureSizes
-0000000000319740 0000000000000008 B texturePalettes
-0000000000319748 0000000000000008 B texturePaletteOffsets
-0000000000319750 0000000000000008 B textureOffsets
-000000000029bd78 0000000000000008 D textFragmentShaderSource
-00000000003196a0 0000000000000008 B tbos
-000000000029dc48 0000000000000008 B stdout@GLIBC_2.2.5
-000000000029de00 0000000000000008 B stderr@GLIBC_2.2.5
-000000000029bd40 0000000000000008 D ssr_computeShader
-000000000029bd60 0000000000000008 D shadowmapVertexShaderSource
-000000000029bd38 0000000000000008 D shadowmaps_clear_computeShader
-000000000029bd58 0000000000000008 D shadowmapFragmentShaderSource
-00000000007b3470 0000000000000008 B screenshotTimeout
-000000000029bd50 0000000000000008 D quadVertexShaderSource
-000000000029bd48 0000000000000008 D quadFragmentShaderSource
-00000000005245a0 0000000000000008 B physicsProcessingTime
-00000000003196b8 0000000000000008 B modelVertices
-0000000000319708 0000000000000008 B modelVertexCounts
-00000000003196c8 0000000000000008 B modelTypeOffsetsTransparent
-00000000003196d8 0000000000000008 B modelTypeOffsetsOpaque
-00000000003196d0 0000000000000008 B modelTypeOffsetsDoubleSided
-00000000003196e8 0000000000000008 B modelTypeCountsTransparent
-00000000003196f8 0000000000000008 B modelTypeCountsOpaque
-00000000003196f0 0000000000000008 B modelTypeCountsDoubleSided
-00000000003196b0 0000000000000008 B modelTriangles
-0000000000319700 0000000000000008 B modelTriangleCounts
-0000000000319690 0000000000000008 B modelBounds
-0000000000661fe8 0000000000000008 B manualLogName
-000000000053c090 0000000000000008 B last_time
-0000000000681fe8 0000000000000008 B last_mouse_y
-0000000000681ff0 0000000000000008 B last_mouse_x
-0000000000662000 0000000000000008 B lastJournalWriteTime
-00000000007b3480 0000000000000008 B lastFrameSecCountTime
-0000000000319710 0000000000000008 B image_data
-000000000029ddd0 0000000000000008 B __glewVertexAttribFormat
-000000000029de60 0000000000000008 B __glewVertexAttribBinding
-000000000029de40 0000000000000008 B __glewVertexArrayVertexBuffer
-000000000029dc40 0000000000000008 B __glewVertexArrayAttribFormat
-000000000029de30 0000000000000008 B __glewVertexArrayAttribBinding
-000000000029dea0 0000000000000008 B __glewUseProgram
-000000000029def8 0000000000000008 B __glewUnmapBuffer
-000000000029dd68 0000000000000008 B __glewUniformMatrix4fv
-000000000029dd20 0000000000000008 B __glewUniformMatrix3fv
-000000000029dde8 0000000000000008 B __glewUniform3f
-000000000029dce8 0000000000000008 B __glewUniform1ui
-000000000029dd90 0000000000000008 B __glewUniform1i
-000000000029dd08 0000000000000008 B __glewUniform1f
-000000000029ddf8 0000000000000008 B __glewTextureSubImage2D
-000000000029ddc0 0000000000000008 B __glewTextureStorage2D
-000000000029dc68 0000000000000008 B __glewTextureParameteri
-000000000029dcc8 0000000000000008 B __glewShaderSource
-000000000029dd70 0000000000000008 B __glewProgramUniformMatrix4fv
-000000000029dc70 0000000000000008 B __glewProgramUniform4f
-000000000029de70 0000000000000008 B __glewProgramUniform3f
-000000000029dd00 0000000000000008 B __glewProgramUniform2f
-000000000029de50 0000000000000008 B __glewProgramUniform1ui
-000000000029dd60 0000000000000008 B __glewProgramUniform1i
-000000000029dc60 0000000000000008 B __glewProgramUniform1f
-000000000029dcb8 0000000000000008 B __glewNamedBufferData
-000000000029dcb0 0000000000000008 B __glewMinSampleShading
-000000000029dda0 0000000000000008 B __glewMemoryBarrier
-000000000029dc98 0000000000000008 B __glewMapBufferRange
-000000000029de90 0000000000000008 B __glewLinkProgram
-000000000029dc50 0000000000000008 B __glewGetUniformLocation
-000000000029dc80 0000000000000008 B __glewGetShaderiv
-000000000029dd10 0000000000000008 B __glewGetShaderInfoLog
-000000000029dea8 0000000000000008 B __glewGetProgramiv
-000000000029dce0 0000000000000008 B __glewGetProgramInfoLog
-000000000029de98 0000000000000008 B __glewGenVertexArrays
-000000000029dee0 0000000000000008 B __glewGenFramebuffers
-000000000029dcc0 0000000000000008 B __glewGenBuffers
-000000000029ddc8 0000000000000008 B __glewFramebufferTexture2D
-000000000029df10 0000000000000008 B __glewEnableVertexAttribArray
-000000000029ddf0 0000000000000008 B __glewEnableVertexArrayAttrib
-000000000029def0 0000000000000008 B __glewDrawBuffers
-000000000029dd40 0000000000000008 B __glewDispatchCompute
-000000000029de08 0000000000000008 B __glewDeleteShader
-000000000029de78 0000000000000008 B __glewDeleteBuffers
-000000000029dd88 0000000000000008 B __glewCreateVertexArrays
-000000000029dc88 0000000000000008 B __glewCreateTextures
-000000000029dcd0 0000000000000008 B __glewCreateShader
-000000000029dca0 0000000000000008 B __glewCreateProgram
-000000000029de88 0000000000000008 B __glewCreateBuffers
-000000000029df08 0000000000000008 B __glewCopyBufferSubData
-000000000029dc90 0000000000000008 B __glewCompileShader
-000000000029df00 0000000000000008 B __glewCheckFramebufferStatus
-000000000029de38 0000000000000008 B __glewBufferData
-000000000029de80 0000000000000008 B __glewBindVertexBuffer
-000000000029dcf0 0000000000000008 B __glewBindVertexArray
-000000000029dd78 0000000000000008 B __glewBindTextureUnit
-000000000029ded0 0000000000000008 B __glewBindImageTexture
-000000000029dec8 0000000000000008 B __glewBindFramebuffer
-000000000029dc58 0000000000000008 B __glewBindBufferBase
-000000000029dde0 0000000000000008 B __glewBindBuffer
-000000000029dec0 0000000000000008 B __glewAttachShader
-000000000029de20 0000000000000008 B __glewActiveTexture
-000000000029bd68 0000000000000008 D fragmentShaderTraditional
-000000000029a360 0000000000000008 D fractionalScaleListener
-0000000000319720 0000000000000008 B doubleSidedTexture
-000000000053c088 0000000000000008 B current_time
-000000000053c080 0000000000000008 B cpuTime
-00000000007b3488 0000000000000008 B console_log_file
-0000000000661ff0 0000000000000008 B activeLogFile
-000000000029bd20 0000000000000004 D worstFPS
-000000000067ddf0 0000000000000004 B worldMin_zLoc_imageBlit
-000000000067f7d8 0000000000000004 B worldMin_zLoc_chunk
-00000000003197c0 0000000000000004 B worldMin_z
-000000000067ddf4 0000000000000004 B worldMin_xLoc_imageBlit
-000000000067f7dc 0000000000000004 B worldMin_xLoc_chunk
-00000000003197c4 0000000000000004 B worldMin_x
-000000000052c5d0 0000000000000004 B wav_count
-000000000067f7a0 0000000000000004 B viewProjMatrixLoc_shadowmaps
-000000000067f800 0000000000000004 B viewProjLoc_chunk
-000000000067de5c 0000000000000004 B viewProjectionLoc_ssr
-000000000067ddec 0000000000000004 B viewProjectionLoc_imageBlit
-0000000000681f30 0000000000000004 B verticesRenderedThisFrame
-000000000067f804 0000000000000004 B vao_chunk
-000000000067f7b4 0000000000000004 B unlitLoc_chunk
-0000000000676da0 0000000000000004 B uiImageVBO
-0000000000676da4 0000000000000004 B uiImageVAO
-0000000000681f38 0000000000000004 B uiImageDrawCallsRenderedThisFrame
-0000000000676da8 0000000000000004 B uiImageCount
-000000000031973c 0000000000000004 B totalPixels
-0000000000319738 0000000000000004 B totalPaletteColors
-000000000067de04 0000000000000004 B timeValLoc_imageBlit
-000000000067ddd8 0000000000000004 B textVBO
-000000000067dddc 0000000000000004 B textVAO
-0000000000319764 0000000000000004 B textureSizesID
-000000000031975c 0000000000000004 B texturePalettesID
-0000000000319758 0000000000000004 B texturePaletteOffsetsID
-0000000000319760 0000000000000004 B textureOffsetsID
-000000000067ddcc 0000000000000004 B textTextureLoc_text
-000000000067dde0 0000000000000004 B textShaderProgram
-0000000000681f3c 0000000000000004 B textDrawCallsRenderedThisFrame
-000000000067ddd0 0000000000000004 B textColorLoc_text
-000000000067de40 0000000000000004 B texLoc_quadblit
-000000000067f79c 0000000000000004 B texIndexLoc_shadowmaps
-000000000067f7f8 0000000000000004 B texIndexLoc_chunk
-000000000067ddc8 0000000000000004 B texelSizeLoc_text
-000000000029bd2c 0000000000000004 D stbi_write_tga_with_rle
-000000000029bd30 0000000000000004 D stbi_write_png_compression_level
-000000000029bd28 0000000000000004 D stbi_write_force_png_filter
-000000000029b820 0000000000000004 D statusTextLengthWithoutNullTerminator
-0000000000676524 0000000000000004 B statusTextDecayFinished
-000000000067de1c 0000000000000004 B stationShieldVisibleLoc_imageBlit
-000000000067de68 0000000000000004 B ssrShaderProgram
-000000000067f78c 0000000000000004 B ssbo_indexBaseLoc_shadowmaps
-000000000067de28 0000000000000004 B skyVisibleLoc_imageBlit
-000000000067ddfc 0000000000000004 B shadowsSettingLoc_imageBlit
-000000000067f7bc 0000000000000004 B shadowsEnabledLoc_chunk
-000000000067f7a8 0000000000000004 B shadowmapsShaderProgram
-000000000067f784 0000000000000004 B shadowMapSSBO
-000000000067f788 0000000000000004 B shadowmapSizeLoc_shadowmaps
-000000000067ddf8 0000000000000004 B shadowmapSizeLoc_imageBlit
-000000000067f7c4 0000000000000004 B shadowmapSizeLoc_chunk
-000000000067de50 0000000000000004 B shadowmapsClearShaderProgram
-000000000067f7ac 0000000000000004 B shadowFBO
-0000000000681f34 0000000000000004 B shadowDrawCallsRenderedThisFrame
-000000000067f7b0 0000000000000004 B shadowCubeMap
-000000000067de64 0000000000000004 B screenWidthLoc_ssr
-000000000067de34 0000000000000004 B screenWidthLoc_imageBlit
-000000000067f7e4 0000000000000004 B screenWidthLoc_chunk
-000000000067de60 0000000000000004 B screenHeightLoc_ssr
-000000000067de30 0000000000000004 B screenHeightLoc_imageBlit
-000000000067f7e0 0000000000000004 B screenHeightLoc_chunk
-000000000067de18 0000000000000004 B reflectionsEnabledLoc_imageBlit
-000000000067f7c0 0000000000000004 B reflectionsEnabledLoc_chunk
-000000000029b144 0000000000000004 D random_range_rng
-000000000067de44 0000000000000004 B quadVBO
-000000000067de48 0000000000000004 B quadVAO
-000000000067ddd4 0000000000000004 B projectionLoc_text
-000000000067de24 0000000000000004 B planetaryBodiesVisibleLoc_imageBlit
-0000000000682054 0000000000000004 B pauseRelativeTime
-000000000067de54 0000000000000004 B outputImageLoc_ssr
-000000000067de2c 0000000000000004 B outputImageLoc_imageBlit
-000000000067f80c 0000000000000004 B outputImageID
-000000000030e108 0000000000000004 B numPackedGlyphsStopD
-000000000030e10c 0000000000000004 B numPackedGlyphs
-000000000029b020 0000000000000004 D numFontRanges
-000000000067f794 0000000000000004 B normInstanceIndexLoc_shadowmaps
-000000000067f7e8 0000000000000004 B normInstanceIndexLoc_chunk
-000000000029b0f0 0000000000000004 D move_speed
-000000000029b0e8 0000000000000004 D mouse_sensitivity
-000000000067f7a4 0000000000000004 B modelMatrixLoc_shadowmaps
-0000000000319698 0000000000000004 B modelBoundsID
-0000000000662008 0000000000000004 B maxEventCount_debug
-000000000067f7fc 0000000000000004 B matrixLoc_chunk
-0000000000682160 0000000000000004 B matricesBuffer
-000000000029bd14 0000000000000004 D lodRangeSqrd
-0000000000676520 0000000000000004 B lightsID
-000000000067f790 0000000000000004 B lightPosLoc_shadowmaps
-00000000007b347c 0000000000000004 B lastFrameSecCount
-000000000067f7b8 0000000000000004 B isUILoc_chunk
-000000000067dde4 0000000000000004 B invViewRotLoc_imageBlit
-0000000000682164 0000000000000004 B instancesBuffer
-000000000067f814 0000000000000004 B inputWorldPosID
-000000000067f81c 0000000000000004 B inputImageID
-000000000067f818 0000000000000004 B inputDepthID
-000000000067de4c 0000000000000004 B imageBlitShaderProgram
-000000000067de20 0000000000000004 B groveShieldVisibleLoc_imageBlit
-000000000067f798 0000000000000004 B glowSpecIndexLoc_shadowmaps
-000000000067f7ec 0000000000000004 B glowSpecIndexLoc_chunk
-0000000000661ff8 0000000000000004 B globalFrameNum
-000000000029b0b0 0000000000000004 D genericTextWidthFacStopD
-000000000029b0b8 0000000000000004 D genericTextWidthFac
-000000000029b0b4 0000000000000004 D genericTextHeightFacStopD
-000000000029b0bc 0000000000000004 D genericTextHeightFac
-000000000067f810 0000000000000004 B gBufferFBO
-00000000007b3478 0000000000000004 B framesPerLastSecond
-000000000067de0c 0000000000000004 B fovLoc_imageBlit
-000000000067ddc4 0000000000000004 B fontTypeLoc_text
-000000000030e100 0000000000000004 B fontAtlasTexStopD
-000000000030e104 0000000000000004 B fontAtlasTex
-000000000067f7d0 0000000000000004 B fogColorRLoc_chunk
-000000000029bce0 0000000000000004 D fogColorR
-000000000067f7cc 0000000000000004 B fogColorGLoc_chunk
-000000000029bcdc 0000000000000004 D fogColorG
-000000000067f7c8 0000000000000004 B fogColorBLoc_chunk
-000000000029bcd8 0000000000000004 D fogColorB
-000000000029e0e0 0000000000000004 B fixedNumberAdvanceWidthStopD
-000000000029e0e4 0000000000000004 B fixedNumberAdvanceWidth
-000000000053c098 0000000000000004 B eventQueueEnd
-000000000053c0a0 0000000000000004 B eventJournalIndex
-000000000053c09c 0000000000000004 B eventIndex
-000000000030e264 0000000000000004 B entityCount
-0000000000681f40 0000000000000004 B drawCallsRenderedThisFrame
-000000000067de3c 0000000000000004 B debugViewLoc_quadblit
-000000000067f7f4 0000000000000004 B debugViewLoc_chunk
-0000000000681fe4 0000000000000004 B debugView
-000000000067de38 0000000000000004 B debugValueLoc_quadblit
-000000000067f7f0 0000000000000004 B debugValueLoc_chunk
-0000000000681fe0 0000000000000004 B debugValue
-000000000029bcd0 0000000000000004 D cursorPosition_y
-000000000029bcd4 0000000000000004 D cursorPosition_x
-0000000000676944 0000000000000004 B currentEntryLength
-0000000000319768 0000000000000004 B colorBufferID
-000000000067f808 0000000000000004 B chunkShaderProgram
-000000000029bd04 0000000000000004 D cam_z
-000000000029bd00 0000000000000004 D cam_yaw
-000000000029bd08 0000000000000004 D cam_y
-000000000029bd0c 0000000000000004 D cam_x
-000000000067de08 0000000000000004 B camRotLoc_imageBlit
-0000000000682010 0000000000000004 B cam_roll
-0000000000681ff8 0000000000000004 B cam_rightz
-0000000000681ffc 0000000000000004 B cam_righty
-0000000000682000 0000000000000004 B cam_rightx
-000000000067de58 0000000000000004 B camPosLoc_ssr
-000000000067dde8 0000000000000004 B camPosLoc_imageBlit
-000000000067f7d4 0000000000000004 B camPosLoc_chunk
-0000000000682014 0000000000000004 B cam_pitch
-000000000029bcec 0000000000000004 D cam_fov
-0000000000682004 0000000000000004 B cam_forwardz
-0000000000682008 0000000000000004 B cam_forwardy
-000000000068200c 0000000000000004 B cam_forwardx
-000000000067de10 0000000000000004 B brightnessSettingLoc_imageBlit
-000000000067de00 0000000000000004 B aspectLoc_imageBlit
-000000000029bce8 0000000000000004 D aspect3D
-000000000029bce4 0000000000000004 D aspect2D
-000000000067de14 0000000000000004 B aaEnabledLoc_imageBlit
-0000000000319680 0000000000000002 B transparentInstancesHead
-000000000029b0da 0000000000000002 D startOfTransparentInstances
-000000000029b0dc 0000000000000002 D startOfDoubleSidedInstances
-000000000029bd26 0000000000000002 D screen_width
-000000000029bd24 0000000000000002 D screen_height
-000000000031968a 0000000000000002 B renderableCount
-00000000003197ca 0000000000000002 B playerCellIdx_z
-00000000003197cc 0000000000000002 B playerCellIdx_y
-00000000003197ce 0000000000000002 B playerCellIdx_x
-00000000003197d0 0000000000000002 B playerCellIdx
-000000000030e260 0000000000000002 B physHead
-00000000003196c0 0000000000000002 B opaqueInstancesHead
-00000000003197c8 0000000000000002 B numCellsVisible
-0000000000524420 0000000000000002 B mouse_y
-0000000000524422 0000000000000002 B mouse_x
-0000000000319728 0000000000000002 B loadedTextures
-0000000000319686 0000000000000002 B loadedModels
-0000000000319684 0000000000000002 B loadedLights
-0000000000319688 0000000000000002 B loadedInstances
-00000000003196e0 0000000000000002 B invalidModelIndexCount
-0000000000319682 0000000000000002 B doubleSidedInstancesHead
-000000000052459e 0000000000000001 B window_has_focus
-000000000029bd10 0000000000000001 D startLevel
-000000000067f780 0000000000000001 B shadowMapsRendered
-00000000007b3460 0000000000000001 B settings_Vsync
-000000000029bd18 0000000000000001 D settings_VolumeMusic
-000000000029bd1b 0000000000000001 D settings_Shadows
-000000000029bd1c 0000000000000001 D settings_Reflections
-000000000029bd19 0000000000000001 D settings_Brightness
-000000000029bd1a 0000000000000001 D settings_AntiAliasing
-000000000029bd11 0000000000000001 D numLevels
-000000000029b0ec 0000000000000001 D noclip
-0000000000682058 0000000000000001 B menuActive
-0000000000661fe0 0000000000000001 B log_playback
-000000000029b1c0 0000000000000001 D journalFirstWrite
-00000000007b3490 0000000000000001 B inventoryMode
-000000000068205b 0000000000000001 B global_modIsCitadel
-000000000029dd80 0000000000000001 B glewExperimental
-0000000000682059 0000000000000001 B gamePaused
-000000000067ddc0 0000000000000001 B cursorVisible
-000000000068205a 0000000000000001 B currentLevel
-0000000000676940 0000000000000001 B consoleActive
+❯ nm -S --size-sort -r ./voxen | grep ' [BD] '
+000000000103ef00 0000000000400000 B voxelLightListsRaw
+000000000069f160 00000000003bd080 B tempInstances
+00000000014e0f80 00000000003bd080 B instances
+0000000000e3ef00 0000000000200000 B voxelLightListIndices
+0000000000348b20 0000000000200000 B precomputedVisibleCellsFromHere
+0000000000549b60 0000000000154578 B voxen_Text
+0000000000b1a800 0000000000100000 B lightCounts
+0000000000c1a800 00000000000e1000 B lightFrustumPlanes
+0000000001444b80 000000000009c400 B modelMatrices
+0000000000a9a080 000000000002ee00 B lightIntervalSteps
+0000000000a6ac40 000000000002ee00 B intervalStepisLerping
+000000000189eac0 0000000000023140 B _glfw
+0000000000afb780 000000000001f060 B uiImageVertexData
+0000000000e29100 0000000000014500 B lights
+0000000000adff00 0000000000013880 B visibleInstances
+0000000000ad3e60 0000000000009c40 B eventJournal
+000000000033eee0 0000000000009c40 B cellIndexForInstance
+0000000000af3780 0000000000008000 B textVertexData
+0000000000331920 0000000000007000 B modelBounds
+0000000000a5c1e0 0000000000004e20 B transparentInstances
+0000000000a65e20 0000000000004e20 B opaqueInstances
+0000000000a61000 0000000000004e20 B doubleSidedInstances
+0000000000324d00 00000000000045e4 B fontPackedCharStopD
+0000000000329300 00000000000045e4 B fontPackedChar
+000000000032d900 0000000000004000 B mmap_cleanup
+000000000031eec0 0000000000003b80 B wav_sounds
+000000000143fae0 0000000000002710 B instanceIsLODArray
+0000000001442460 0000000000002710 B dirtyInstances
+0000000000322fa0 0000000000001c00 B history
+0000000000e3d600 0000000000001900 B shadowmapIndirectionList
+0000000000e27800 0000000000001900 B lightsRangeSquared
+0000000000ad2480 0000000000001900 B lightMinIntensity
+0000000000ad0b80 0000000000001900 B lightMaxIntensity
+0000000000acdfc0 0000000000001900 B lightLerpValue
+0000000000acc6c0 0000000000001900 B lightLerpTime
+0000000000acadc0 0000000000001900 B lightLerpStepTime
+0000000000ac94c0 0000000000001900 B lightLerpStartTime
+0000000000339920 0000000000001000 B vbos
+0000000000338920 0000000000001000 B tbos
+000000000033b920 0000000000001000 B modelVertexCounts
+000000000033a920 0000000000001000 B modelTriangleCounts
+0000000000548b20 0000000000001000 B gridCellStates
+0000000000addaa0 0000000000000fa0 B eventQueue
+000000000033c960 0000000000000c80 B cellIndexForLightZ
+000000000033d5e0 0000000000000c80 B cellIndexForLightX
+000000000033e260 0000000000000c80 B cellIndexForLight
+0000000000314a60 0000000000000c58 D _glfwDefaultMappings
+000000000069e0e0 0000000000000800 B transparentTexture
+000000000069e8e0 0000000000000800 B doubleSidedTexture
+000000000143f380 0000000000000700 B uiImages
+0000000000313ba0 0000000000000640 D lightOn
+0000000000acff00 0000000000000640 B lightLerpUp
+0000000000ad0540 0000000000000640 B lightLerpOn
+0000000000ac8e80 0000000000000640 B lightIntervalStepsLength
+0000000000a99a40 0000000000000640 B lightIntervalStepIsLerpingLength
+0000000000314280 0000000000000640 D lightDirty
+0000000000acf8c0 0000000000000640 B lightCurrentStep
+000000000189e4a0 0000000000000600 B keyStates
+0000000000322a40 0000000000000520 B audio_engine
+000000000143ef60 0000000000000400 B uiTextBuffer
+000000000189e000 0000000000000400 B statusText
+00000000003136e0 0000000000000400 D consoleEntryText
+00000000018c26c0 0000000000000118 B _ZSt4wcin
+00000000018c2b40 0000000000000118 B _ZSt3cin
+00000000018c25a0 0000000000000110 B _ZSt5wcout
+00000000018c2360 0000000000000110 B _ZSt5wclog
+00000000018c2480 0000000000000110 B _ZSt5wcerr
+00000000018c2a20 0000000000000110 B _ZSt4cout
+00000000018c27e0 0000000000000110 B _ZSt4clog
+00000000018c2900 0000000000000110 B _ZSt4cerr
+000000000030ede0 0000000000000110 D _ZNSt6locale17_S_twinned_facetsE
+0000000001442340 0000000000000100 B global_modname
+00000000003148e0 0000000000000090 D textColors
+00000000003168c0 0000000000000070 D _ZNSt17__timepunct_cacheIwE12_S_timezonesE
+0000000000316940 0000000000000070 D _ZNSt17__timepunct_cacheIcE12_S_timezonesE
+0000000000314220 0000000000000060 D cubemapOrientationQuaternion
+00000000018c21e0 0000000000000050 B _ZN14__gnu_internal14buf_wcout_syncE
+00000000018c2120 0000000000000050 B _ZN14__gnu_internal14buf_wcerr_syncE
+00000000018c2180 0000000000000050 B _ZN14__gnu_internal13buf_wcin_syncE
+00000000018c2300 0000000000000050 B _ZN14__gnu_internal13buf_cout_syncE
+00000000018c2240 0000000000000050 B _ZN14__gnu_internal13buf_cerr_syncE
+00000000018c22a0 0000000000000050 B _ZN14__gnu_internal12buf_cin_syncE
+000000000030ae40 0000000000000050 D z_errmsg
+000000000143fa80 0000000000000050 B voxen_GL_Comms
+000000000143ef20 0000000000000040 B uiOrthoProjection
+0000000001442220 0000000000000040 B shadowmapsPerspectiveProjection
+0000000001442260 0000000000000040 B rasterPerspectiveProjection
+000000000031ee60 0000000000000040 B ambientRegistry
+00000000014422e0 0000000000000034 B questData
+0000000000313b00 0000000000000030 D fontRangesStopD
+0000000000313b40 0000000000000030 D fontRanges
+000000000030d9c0 0000000000000030 D dataDeviceListener
+000000000030d260 0000000000000028 D wp_fractional_scale_manager_v1_interface
+000000000030cd80 0000000000000028 D _glfw_zxdg_toplevel_decoration_v1_interface
+000000000030ccc0 0000000000000028 D _glfw_zxdg_decoration_manager_v1_interface
+000000000030cfa0 0000000000000028 D _glfw_zwp_relative_pointer_v1_interface
+000000000030cf20 0000000000000028 D _glfw_zwp_relative_pointer_manager_v1_interface
+000000000030d040 0000000000000028 D _glfw_zwp_pointer_constraints_v1_interface
+000000000030d120 0000000000000028 D _glfw_zwp_locked_pointer_v1_interface
+000000000030d540 0000000000000028 D _glfw_zwp_idle_inhibitor_v1_interface
+000000000030d4e0 0000000000000028 D _glfw_zwp_idle_inhibit_manager_v1_interface
+000000000030d1e0 0000000000000028 D _glfw_zwp_confined_pointer_v1_interface
+000000000030c720 0000000000000028 D _glfw_xdg_wm_base_interface
+000000000030cb40 0000000000000028 D _glfw_xdg_toplevel_interface
+000000000030c940 0000000000000028 D _glfw_xdg_surface_interface
+000000000030c860 0000000000000028 D _glfw_xdg_positioner_interface
+000000000030cc40 0000000000000028 D _glfw_xdg_popup_interface
+000000000030d380 0000000000000028 D _glfw_xdg_activation_v1_interface
+000000000030d460 0000000000000028 D _glfw_xdg_activation_token_v1_interface
+000000000030cea0 0000000000000028 D _glfw_wp_viewport_interface
+000000000030ce00 0000000000000028 D _glfw_wp_viewporter_interface
+000000000030d2e0 0000000000000028 D _glfw_wp_fractional_scale_v1_interface
+000000000030c360 0000000000000028 D _glfw_wl_touch_interface
+000000000030bec0 0000000000000028 D _glfw_wl_surface_interface
+000000000030c660 0000000000000028 D _glfw_wl_subsurface_interface
+000000000030c580 0000000000000028 D _glfw_wl_subcompositor_interface
+000000000030b5e0 0000000000000028 D _glfw_wl_shm_pool_interface
+000000000030b660 0000000000000028 D _glfw_wl_shm_interface
+000000000030bd00 0000000000000028 D _glfw_wl_shell_surface_interface
+000000000030bb60 0000000000000028 D _glfw_wl_shell_interface
+000000000030bfa0 0000000000000028 D _glfw_wl_seat_interface
+000000000030b460 0000000000000028 D _glfw_wl_registry_interface
+000000000030c500 0000000000000028 D _glfw_wl_region_interface
+000000000030c140 0000000000000028 D _glfw_wl_pointer_interface
+000000000030c460 0000000000000028 D _glfw_wl_output_interface
+000000000030c240 0000000000000028 D _glfw_wl_keyboard_interface
+000000000030b3c0 0000000000000028 D _glfw_wl_display_interface
+000000000030b940 0000000000000028 D _glfw_wl_data_source_interface
+000000000030b800 0000000000000028 D _glfw_wl_data_offer_interface
+000000000030bb00 0000000000000028 D _glfw_wl_data_device_manager_interface
+000000000030ba80 0000000000000028 D _glfw_wl_data_device_interface
+000000000030b540 0000000000000028 D _glfw_wl_compositor_interface
+000000000030b4c0 0000000000000028 D _glfw_wl_callback_interface
+000000000030b6e0 0000000000000028 D _glfw_wl_buffer_interface
+000000000069f120 0000000000000018 B _ZN10ODDLParser7DDLNode16s_allocatedNodesE
+000000000189e470 0000000000000018 B mouseButtons
+000000000069f140 0000000000000010 B _ZN6Assimp13DefaultLogger13s_pNullLoggerE
+00000000003149b0 0000000000000010 D voxen_Settings
+000000000033c930 0000000000000010 B model_parser
+0000000000ad3e30 0000000000000010 B entity_parser
+0000000000314980 0000000000000010 D cam_rotation
+0000000000314998 000000000000000d D voxen_Cheats
+00000000018c2108 0000000000000008 B _ZNSt7codecvtIwc11__mbstate_tE2idE
+00000000018c42f0 0000000000000008 B _ZNSt7codecvtIDsDu11__mbstate_tE2idE
+00000000018c4300 0000000000000008 B _ZNSt7codecvtIDsc11__mbstate_tE2idE
+00000000018c42e8 0000000000000008 B _ZNSt7codecvtIDiDu11__mbstate_tE2idE
+00000000018c42f8 0000000000000008 B _ZNSt7codecvtIDic11__mbstate_tE2idE
+00000000018c2110 0000000000000008 B _ZNSt7codecvtIcc11__mbstate_tE2idE
+00000000018c2c70 0000000000000008 B _ZNSt6locale9_S_globalE
+00000000018c2c60 0000000000000008 B _ZNSt6locale5facet11_S_c_localeE
+00000000018c2c78 0000000000000008 B _ZNSt6locale10_S_classicE
+00000000018c4520 0000000000000008 B _ZNSt5ctypeIwE2idE
+00000000018c4528 0000000000000008 B _ZNSt5ctypeIcE2idE
+00000000003168a8 0000000000000008 D _ZNSt10__num_base12_S_atoms_outE
+00000000003168b0 0000000000000008 D _ZNSt10__num_base11_S_atoms_inE
+00000000003168b8 0000000000000008 D _ZNSt10money_base8_S_atomsE
+0000000000313b80 0000000000000008 D _ZN6Assimp13DefaultLogger9m_pLoggerE
+00000000003168a0 0000000000000008 D _ZN10__cxxabiv120__unexpected_handlerE
+0000000000316898 0000000000000008 D _ZN10__cxxabiv119__terminate_handlerE
+000000000189e448 0000000000000008 B voxen_globalContext
+0000000000314a08 0000000000000008 D vertexShaderSource
+0000000000adfef0 0000000000000008 B timeSinceLastPhysicsTick
+0000000000314a18 0000000000000008 D textVertexShaderSource
+0000000000314a10 0000000000000008 D textFragmentShaderSource
+000000000069f100 0000000000000008 B stbi__arena_end
+000000000069f108 0000000000000008 B stbi__arena_cursor
+000000000069f110 0000000000000008 B stbi__arena_base
+00000000003149d8 0000000000000008 D ssr_computeShader
+00000000003149f8 0000000000000008 D shadowmapVertexShaderSource
+00000000003149d0 0000000000000008 D shadowmaps_clear_computeShader
+00000000003149f0 0000000000000008 D shadowmapFragmentShaderSource
+000000000189e468 0000000000000008 B scrollDelta
+000000000189e400 0000000000000008 B screenshotTimeout
+00000000003149e8 0000000000000008 D quadVertexShaderSource
+00000000003149e0 0000000000000008 D quadFragmentShaderSource
+0000000001442318 0000000000000008 B pauseRelativeTime
+0000000000adfee0 0000000000000008 B monitorSwitchTime
+000000000033c920 0000000000000008 B modelVertices
+0000000000ad3df0 0000000000000008 B modelTypeOffsetsTransparent
+0000000000ad3e00 0000000000000008 B modelTypeOffsetsOpaque
+0000000000ad3df8 0000000000000008 B modelTypeOffsetsDoubleSided
+0000000000ad3e08 0000000000000008 B modelTypeCountsTransparent
+0000000000ad3e18 0000000000000008 B modelTypeCountsOpaque
+0000000000ad3e10 0000000000000008 B modelTypeCountsDoubleSided
+0000000000adea48 0000000000000008 B manualLogName
+0000000000adfee8 0000000000000008 B last_topframe_time
+000000000189e428 0000000000000008 B last_time
+000000000189e458 0000000000000008 B last_mouse_y
+000000000189e460 0000000000000008 B last_mouse_x
+0000000000adea60 0000000000000008 B lastJournalWriteTime
+000000000189e410 0000000000000008 B lastFrameSecCountTime
+0000000000adeac0 0000000000000008 B glad_glWaitSync
+0000000000adeac8 0000000000000008 B glad_glViewportIndexedfv
+0000000000adead0 0000000000000008 B glad_glViewportIndexedf
+0000000000adead8 0000000000000008 B glad_glViewportArrayv
+0000000000adeae0 0000000000000008 B glad_glViewport
+0000000000adeae8 0000000000000008 B glad_glVertexBindingDivisor
+0000000000adeaf0 0000000000000008 B glad_glVertexAttribPointer
+0000000000adeaf8 0000000000000008 B glad_glVertexAttribP4uiv
+0000000000adeb00 0000000000000008 B glad_glVertexAttribP4ui
+0000000000adeb08 0000000000000008 B glad_glVertexAttribP3uiv
+0000000000adeb10 0000000000000008 B glad_glVertexAttribP3ui
+0000000000adeb18 0000000000000008 B glad_glVertexAttribP2uiv
+0000000000adeb20 0000000000000008 B glad_glVertexAttribP2ui
+0000000000adeb28 0000000000000008 B glad_glVertexAttribP1uiv
+0000000000adeb30 0000000000000008 B glad_glVertexAttribP1ui
+0000000000adeb38 0000000000000008 B glad_glVertexAttribLPointer
+0000000000adeb40 0000000000000008 B glad_glVertexAttribLFormat
+0000000000adeb48 0000000000000008 B glad_glVertexAttribL4dv
+0000000000adeb50 0000000000000008 B glad_glVertexAttribL4d
+0000000000adeb58 0000000000000008 B glad_glVertexAttribL3dv
+0000000000adeb60 0000000000000008 B glad_glVertexAttribL3d
+0000000000adeb68 0000000000000008 B glad_glVertexAttribL2dv
+0000000000adeb70 0000000000000008 B glad_glVertexAttribL2d
+0000000000adeb78 0000000000000008 B glad_glVertexAttribL1dv
+0000000000adeb80 0000000000000008 B glad_glVertexAttribL1d
+0000000000adeb88 0000000000000008 B glad_glVertexAttribIPointer
+0000000000adeb90 0000000000000008 B glad_glVertexAttribIFormat
+0000000000adeb98 0000000000000008 B glad_glVertexAttribI4usv
+0000000000adeba0 0000000000000008 B glad_glVertexAttribI4uiv
+0000000000adeba8 0000000000000008 B glad_glVertexAttribI4ui
+0000000000adebb0 0000000000000008 B glad_glVertexAttribI4ubv
+0000000000adebb8 0000000000000008 B glad_glVertexAttribI4sv
+0000000000adebc0 0000000000000008 B glad_glVertexAttribI4iv
+0000000000adebc8 0000000000000008 B glad_glVertexAttribI4i
+0000000000adebd0 0000000000000008 B glad_glVertexAttribI4bv
+0000000000adebd8 0000000000000008 B glad_glVertexAttribI3uiv
+0000000000adebe0 0000000000000008 B glad_glVertexAttribI3ui
+0000000000adebe8 0000000000000008 B glad_glVertexAttribI3iv
+0000000000adebf0 0000000000000008 B glad_glVertexAttribI3i
+0000000000adebf8 0000000000000008 B glad_glVertexAttribI2uiv
+0000000000adec00 0000000000000008 B glad_glVertexAttribI2ui
+0000000000adec08 0000000000000008 B glad_glVertexAttribI2iv
+0000000000adec10 0000000000000008 B glad_glVertexAttribI2i
+0000000000adec18 0000000000000008 B glad_glVertexAttribI1uiv
+0000000000adec20 0000000000000008 B glad_glVertexAttribI1ui
+0000000000adec28 0000000000000008 B glad_glVertexAttribI1iv
+0000000000adec30 0000000000000008 B glad_glVertexAttribI1i
+0000000000adec38 0000000000000008 B glad_glVertexAttribFormat
+0000000000adec40 0000000000000008 B glad_glVertexAttribDivisor
+0000000000adec48 0000000000000008 B glad_glVertexAttribBinding
+0000000000adec50 0000000000000008 B glad_glVertexAttrib4usv
+0000000000adec58 0000000000000008 B glad_glVertexAttrib4uiv
+0000000000adec60 0000000000000008 B glad_glVertexAttrib4ubv
+0000000000adec68 0000000000000008 B glad_glVertexAttrib4sv
+0000000000adec70 0000000000000008 B glad_glVertexAttrib4s
+0000000000adeca8 0000000000000008 B glad_glVertexAttrib4Nusv
+0000000000adecb0 0000000000000008 B glad_glVertexAttrib4Nuiv
+0000000000adecb8 0000000000000008 B glad_glVertexAttrib4Nubv
+0000000000adecc0 0000000000000008 B glad_glVertexAttrib4Nub
+0000000000adecc8 0000000000000008 B glad_glVertexAttrib4Nsv
+0000000000adecd0 0000000000000008 B glad_glVertexAttrib4Niv
+0000000000adecd8 0000000000000008 B glad_glVertexAttrib4Nbv
+0000000000adec78 0000000000000008 B glad_glVertexAttrib4iv
+0000000000adec80 0000000000000008 B glad_glVertexAttrib4fv
+0000000000adec88 0000000000000008 B glad_glVertexAttrib4f
+0000000000adec90 0000000000000008 B glad_glVertexAttrib4dv
+0000000000adec98 0000000000000008 B glad_glVertexAttrib4d
+0000000000adeca0 0000000000000008 B glad_glVertexAttrib4bv
+0000000000adece0 0000000000000008 B glad_glVertexAttrib3sv
+0000000000adece8 0000000000000008 B glad_glVertexAttrib3s
+0000000000adecf0 0000000000000008 B glad_glVertexAttrib3fv
+0000000000adecf8 0000000000000008 B glad_glVertexAttrib3f
+0000000000aded00 0000000000000008 B glad_glVertexAttrib3dv
+0000000000aded08 0000000000000008 B glad_glVertexAttrib3d
+0000000000aded10 0000000000000008 B glad_glVertexAttrib2sv
+0000000000aded18 0000000000000008 B glad_glVertexAttrib2s
+0000000000aded20 0000000000000008 B glad_glVertexAttrib2fv
+0000000000aded28 0000000000000008 B glad_glVertexAttrib2f
+0000000000aded30 0000000000000008 B glad_glVertexAttrib2dv
+0000000000aded38 0000000000000008 B glad_glVertexAttrib2d
+0000000000aded40 0000000000000008 B glad_glVertexAttrib1sv
+0000000000aded48 0000000000000008 B glad_glVertexAttrib1s
+0000000000aded50 0000000000000008 B glad_glVertexAttrib1fv
+0000000000aded58 0000000000000008 B glad_glVertexAttrib1f
+0000000000aded60 0000000000000008 B glad_glVertexAttrib1dv
+0000000000aded68 0000000000000008 B glad_glVertexAttrib1d
+0000000000aded70 0000000000000008 B glad_glVertexArrayVertexBuffers
+0000000000aded78 0000000000000008 B glad_glVertexArrayVertexBuffer
+0000000000aded80 0000000000000008 B glad_glVertexArrayElementBuffer
+0000000000aded88 0000000000000008 B glad_glVertexArrayBindingDivisor
+0000000000aded90 0000000000000008 B glad_glVertexArrayAttribLFormat
+0000000000aded98 0000000000000008 B glad_glVertexArrayAttribIFormat
+0000000000adeda0 0000000000000008 B glad_glVertexArrayAttribFormat
+0000000000adeda8 0000000000000008 B glad_glVertexArrayAttribBinding
+0000000000adedb0 0000000000000008 B glad_glValidateProgramPipeline
+0000000000adedb8 0000000000000008 B glad_glValidateProgram
+0000000000adedc0 0000000000000008 B glad_glUseProgramStages
+0000000000adedc8 0000000000000008 B glad_glUseProgram
+0000000000adedd0 0000000000000008 B glad_glUnmapNamedBuffer
+0000000000adedd8 0000000000000008 B glad_glUnmapBuffer
+0000000000adede0 0000000000000008 B glad_glUniformSubroutinesuiv
+0000000000adede8 0000000000000008 B glad_glUniformMatrix4x3fv
+0000000000adedf0 0000000000000008 B glad_glUniformMatrix4x3dv
+0000000000adedf8 0000000000000008 B glad_glUniformMatrix4x2fv
+0000000000adee00 0000000000000008 B glad_glUniformMatrix4x2dv
+0000000000adee08 0000000000000008 B glad_glUniformMatrix4fv
+0000000000adee10 0000000000000008 B glad_glUniformMatrix4dv
+0000000000adee18 0000000000000008 B glad_glUniformMatrix3x4fv
+0000000000adee20 0000000000000008 B glad_glUniformMatrix3x4dv
+0000000000adee28 0000000000000008 B glad_glUniformMatrix3x2fv
+0000000000adee30 0000000000000008 B glad_glUniformMatrix3x2dv
+0000000000adee38 0000000000000008 B glad_glUniformMatrix3fv
+0000000000adee40 0000000000000008 B glad_glUniformMatrix3dv
+0000000000adee48 0000000000000008 B glad_glUniformMatrix2x4fv
+0000000000adee50 0000000000000008 B glad_glUniformMatrix2x4dv
+0000000000adee58 0000000000000008 B glad_glUniformMatrix2x3fv
+0000000000adee60 0000000000000008 B glad_glUniformMatrix2x3dv
+0000000000adee68 0000000000000008 B glad_glUniformMatrix2fv
+0000000000adee70 0000000000000008 B glad_glUniformMatrix2dv
+0000000000adee78 0000000000000008 B glad_glUniformBlockBinding
+0000000000adee80 0000000000000008 B glad_glUniform4uiv
+0000000000adee88 0000000000000008 B glad_glUniform4ui
+0000000000adee90 0000000000000008 B glad_glUniform4iv
+0000000000adee98 0000000000000008 B glad_glUniform4i
+0000000000adeea0 0000000000000008 B glad_glUniform4fv
+0000000000adeea8 0000000000000008 B glad_glUniform4f
+0000000000adeeb0 0000000000000008 B glad_glUniform4dv
+0000000000adeeb8 0000000000000008 B glad_glUniform4d
+0000000000adeec0 0000000000000008 B glad_glUniform3uiv
+0000000000adeec8 0000000000000008 B glad_glUniform3ui
+0000000000adeed0 0000000000000008 B glad_glUniform3iv
+0000000000adeed8 0000000000000008 B glad_glUniform3i
+0000000000adeee0 0000000000000008 B glad_glUniform3fv
+0000000000adeee8 0000000000000008 B glad_glUniform3f
+0000000000adeef0 0000000000000008 B glad_glUniform3dv
+0000000000adeef8 0000000000000008 B glad_glUniform3d
+0000000000adef00 0000000000000008 B glad_glUniform2uiv
+0000000000adef08 0000000000000008 B glad_glUniform2ui
+0000000000adef10 0000000000000008 B glad_glUniform2iv
+0000000000adef18 0000000000000008 B glad_glUniform2i
+0000000000adef20 0000000000000008 B glad_glUniform2fv
+0000000000adef28 0000000000000008 B glad_glUniform2f
+0000000000adef30 0000000000000008 B glad_glUniform2dv
+0000000000adef38 0000000000000008 B glad_glUniform2d
+0000000000adef40 0000000000000008 B glad_glUniform1uiv
+0000000000adef48 0000000000000008 B glad_glUniform1ui
+0000000000adef50 0000000000000008 B glad_glUniform1iv
+0000000000adef58 0000000000000008 B glad_glUniform1i
+0000000000adef60 0000000000000008 B glad_glUniform1fv
+0000000000adef68 0000000000000008 B glad_glUniform1f
+0000000000adef70 0000000000000008 B glad_glUniform1dv
+0000000000adef78 0000000000000008 B glad_glUniform1d
+0000000000adef80 0000000000000008 B glad_glTransformFeedbackVaryings
+0000000000adef88 0000000000000008 B glad_glTransformFeedbackBufferRange
+0000000000adef90 0000000000000008 B glad_glTransformFeedbackBufferBase
+0000000000adef98 0000000000000008 B glad_glTextureView
+0000000000adefa0 0000000000000008 B glad_glTextureSubImage3D
+0000000000adefa8 0000000000000008 B glad_glTextureSubImage2D
+0000000000adefb0 0000000000000008 B glad_glTextureSubImage1D
+0000000000adefb8 0000000000000008 B glad_glTextureStorage3DMultisample
+0000000000adefc0 0000000000000008 B glad_glTextureStorage3D
+0000000000adefc8 0000000000000008 B glad_glTextureStorage2DMultisample
+0000000000adefd0 0000000000000008 B glad_glTextureStorage2D
+0000000000adefd8 0000000000000008 B glad_glTextureStorage1D
+0000000000adefe0 0000000000000008 B glad_glTextureParameteriv
+0000000000adf000 0000000000000008 B glad_glTextureParameterIuiv
+0000000000adf008 0000000000000008 B glad_glTextureParameterIiv
+0000000000adefe8 0000000000000008 B glad_glTextureParameteri
+0000000000adeff0 0000000000000008 B glad_glTextureParameterfv
+0000000000adeff8 0000000000000008 B glad_glTextureParameterf
+0000000000adf010 0000000000000008 B glad_glTextureBufferRange
+0000000000adf018 0000000000000008 B glad_glTextureBuffer
+0000000000adf020 0000000000000008 B glad_glTexSubImage3D
+0000000000adf028 0000000000000008 B glad_glTexSubImage2D
+0000000000adf030 0000000000000008 B glad_glTexSubImage1D
+0000000000adf038 0000000000000008 B glad_glTexStorage3DMultisample
+0000000000adf040 0000000000000008 B glad_glTexStorage3D
+0000000000adf048 0000000000000008 B glad_glTexStorage2DMultisample
+0000000000adf050 0000000000000008 B glad_glTexStorage2D
+0000000000adf058 0000000000000008 B glad_glTexStorage1D
+0000000000adf060 0000000000000008 B glad_glTexParameteriv
+0000000000adf080 0000000000000008 B glad_glTexParameterIuiv
+0000000000adf088 0000000000000008 B glad_glTexParameterIiv
+0000000000adf068 0000000000000008 B glad_glTexParameteri
+0000000000adf070 0000000000000008 B glad_glTexParameterfv
+0000000000adf078 0000000000000008 B glad_glTexParameterf
+0000000000adf090 0000000000000008 B glad_glTexImage3DMultisample
+0000000000adf098 0000000000000008 B glad_glTexImage3D
+0000000000adf0a0 0000000000000008 B glad_glTexImage2DMultisample
+0000000000adf0a8 0000000000000008 B glad_glTexImage2D
+0000000000adf0b0 0000000000000008 B glad_glTexImage1D
+0000000000adf0b8 0000000000000008 B glad_glTexBufferRange
+0000000000adf0c0 0000000000000008 B glad_glTexBuffer
+0000000000adf0c8 0000000000000008 B glad_glStencilOpSeparate
+0000000000adf0d0 0000000000000008 B glad_glStencilOp
+0000000000adf0d8 0000000000000008 B glad_glStencilMaskSeparate
+0000000000adf0e0 0000000000000008 B glad_glStencilMask
+0000000000adf0e8 0000000000000008 B glad_glStencilFuncSeparate
+0000000000adf0f0 0000000000000008 B glad_glStencilFunc
+0000000000adf0f8 0000000000000008 B glad_glShaderStorageBlockBinding
+0000000000adf100 0000000000000008 B glad_glShaderSource
+0000000000adf108 0000000000000008 B glad_glShaderBinary
+0000000000adf110 0000000000000008 B glad_glScissorIndexedv
+0000000000adf118 0000000000000008 B glad_glScissorIndexed
+0000000000adf120 0000000000000008 B glad_glScissorArrayv
+0000000000adf128 0000000000000008 B glad_glScissor
+0000000000adf130 0000000000000008 B glad_glSamplerParameteriv
+0000000000adf150 0000000000000008 B glad_glSamplerParameterIuiv
+0000000000adf158 0000000000000008 B glad_glSamplerParameterIiv
+0000000000adf138 0000000000000008 B glad_glSamplerParameteri
+0000000000adf140 0000000000000008 B glad_glSamplerParameterfv
+0000000000adf148 0000000000000008 B glad_glSamplerParameterf
+0000000000adf160 0000000000000008 B glad_glSampleMaski
+0000000000adf168 0000000000000008 B glad_glResumeTransformFeedback
+0000000000adf170 0000000000000008 B glad_glRenderbufferStorageMultisample
+0000000000adf178 0000000000000008 B glad_glRenderbufferStorage
+0000000000adf180 0000000000000008 B glad_glReleaseShaderCompiler
+0000000000adf188 0000000000000008 B glad_glReadPixels
+0000000000adf190 0000000000000008 B glad_glReadBuffer
+0000000000adf198 0000000000000008 B glad_glQueryCounter
+0000000000adf1a0 0000000000000008 B glad_glProvokingVertex
+0000000000adf1a8 0000000000000008 B glad_glProgramUniformMatrix4x3fv
+0000000000adf1b0 0000000000000008 B glad_glProgramUniformMatrix4x3dv
+0000000000adf1b8 0000000000000008 B glad_glProgramUniformMatrix4x2fv
+0000000000adf1c0 0000000000000008 B glad_glProgramUniformMatrix4x2dv
+0000000000adf1c8 0000000000000008 B glad_glProgramUniformMatrix4fv
+0000000000adf1d0 0000000000000008 B glad_glProgramUniformMatrix4dv
+0000000000adf1d8 0000000000000008 B glad_glProgramUniformMatrix3x4fv
+0000000000adf1e0 0000000000000008 B glad_glProgramUniformMatrix3x4dv
+0000000000adf1e8 0000000000000008 B glad_glProgramUniformMatrix3x2fv
+0000000000adf1f0 0000000000000008 B glad_glProgramUniformMatrix3x2dv
+0000000000adf1f8 0000000000000008 B glad_glProgramUniformMatrix3fv
+0000000000adf200 0000000000000008 B glad_glProgramUniformMatrix3dv
+0000000000adf208 0000000000000008 B glad_glProgramUniformMatrix2x4fv
+0000000000adf210 0000000000000008 B glad_glProgramUniformMatrix2x4dv
+0000000000adf218 0000000000000008 B glad_glProgramUniformMatrix2x3fv
+0000000000adf220 0000000000000008 B glad_glProgramUniformMatrix2x3dv
+0000000000adf228 0000000000000008 B glad_glProgramUniformMatrix2fv
+0000000000adf230 0000000000000008 B glad_glProgramUniformMatrix2dv
+0000000000adf238 0000000000000008 B glad_glProgramUniform4uiv
+0000000000adf240 0000000000000008 B glad_glProgramUniform4ui
+0000000000adf248 0000000000000008 B glad_glProgramUniform4iv
+0000000000adf250 0000000000000008 B glad_glProgramUniform4i
+0000000000adf258 0000000000000008 B glad_glProgramUniform4fv
+0000000000adf260 0000000000000008 B glad_glProgramUniform4f
+0000000000adf268 0000000000000008 B glad_glProgramUniform4dv
+0000000000adf270 0000000000000008 B glad_glProgramUniform4d
+0000000000adf278 0000000000000008 B glad_glProgramUniform3uiv
+0000000000adf280 0000000000000008 B glad_glProgramUniform3ui
+0000000000adf288 0000000000000008 B glad_glProgramUniform3iv
+0000000000adf290 0000000000000008 B glad_glProgramUniform3i
+0000000000adf298 0000000000000008 B glad_glProgramUniform3fv
+0000000000adf2a0 0000000000000008 B glad_glProgramUniform3f
+0000000000adf2a8 0000000000000008 B glad_glProgramUniform3dv
+0000000000adf2b0 0000000000000008 B glad_glProgramUniform3d
+0000000000adf2b8 0000000000000008 B glad_glProgramUniform2uiv
+0000000000adf2c0 0000000000000008 B glad_glProgramUniform2ui
+0000000000adf2c8 0000000000000008 B glad_glProgramUniform2iv
+0000000000adf2d0 0000000000000008 B glad_glProgramUniform2i
+0000000000adf2d8 0000000000000008 B glad_glProgramUniform2fv
+0000000000adf2e0 0000000000000008 B glad_glProgramUniform2f
+0000000000adf2e8 0000000000000008 B glad_glProgramUniform2dv
+0000000000adf2f0 0000000000000008 B glad_glProgramUniform2d
+0000000000adf2f8 0000000000000008 B glad_glProgramUniform1uiv
+0000000000adf300 0000000000000008 B glad_glProgramUniform1ui
+0000000000adf308 0000000000000008 B glad_glProgramUniform1iv
+0000000000adf310 0000000000000008 B glad_glProgramUniform1i
+0000000000adf318 0000000000000008 B glad_glProgramUniform1fv
+0000000000adf320 0000000000000008 B glad_glProgramUniform1f
+0000000000adf328 0000000000000008 B glad_glProgramUniform1dv
+0000000000adf330 0000000000000008 B glad_glProgramUniform1d
+0000000000adf338 0000000000000008 B glad_glProgramParameteri
+0000000000adf340 0000000000000008 B glad_glProgramBinary
+0000000000adf348 0000000000000008 B glad_glPrimitiveRestartIndex
+0000000000adf350 0000000000000008 B glad_glPolygonOffset
+0000000000adf358 0000000000000008 B glad_glPolygonMode
+0000000000adf360 0000000000000008 B glad_glPointSize
+0000000000adf368 0000000000000008 B glad_glPointParameteriv
+0000000000adf370 0000000000000008 B glad_glPointParameteri
+0000000000adf378 0000000000000008 B glad_glPointParameterfv
+0000000000adf380 0000000000000008 B glad_glPointParameterf
+0000000000adf388 0000000000000008 B glad_glPixelStorei
+0000000000adf390 0000000000000008 B glad_glPixelStoref
+0000000000adf398 0000000000000008 B glad_glPauseTransformFeedback
+0000000000adf3a0 0000000000000008 B glad_glPatchParameteri
+0000000000adf3a8 0000000000000008 B glad_glPatchParameterfv
+0000000000adf3b0 0000000000000008 B glad_glObjectPtrLabel
+0000000000adf3b8 0000000000000008 B glad_glObjectLabel
+0000000000adf3c0 0000000000000008 B glad_glNamedRenderbufferStorageMultisample
+0000000000adf3c8 0000000000000008 B glad_glNamedRenderbufferStorage
+0000000000adf3d0 0000000000000008 B glad_glNamedFramebufferTextureLayer
+0000000000adf3d8 0000000000000008 B glad_glNamedFramebufferTexture
+0000000000adf3e0 0000000000000008 B glad_glNamedFramebufferRenderbuffer
+0000000000adf3e8 0000000000000008 B glad_glNamedFramebufferReadBuffer
+0000000000adf3f0 0000000000000008 B glad_glNamedFramebufferParameteri
+0000000000adf3f8 0000000000000008 B glad_glNamedFramebufferDrawBuffers
+0000000000adf400 0000000000000008 B glad_glNamedFramebufferDrawBuffer
+0000000000adf408 0000000000000008 B glad_glNamedBufferSubData
+0000000000adf410 0000000000000008 B glad_glNamedBufferStorage
+0000000000adf418 0000000000000008 B glad_glNamedBufferData
+0000000000adf420 0000000000000008 B glad_glMultiDrawElementsIndirect
+0000000000adf428 0000000000000008 B glad_glMultiDrawElementsBaseVertex
+0000000000adf430 0000000000000008 B glad_glMultiDrawElements
+0000000000adf438 0000000000000008 B glad_glMultiDrawArraysIndirect
+0000000000adf440 0000000000000008 B glad_glMultiDrawArrays
+0000000000adf448 0000000000000008 B glad_glMinSampleShading
+0000000000adf450 0000000000000008 B glad_glMemoryBarrier
+0000000000adf458 0000000000000008 B glad_glMapNamedBufferRange
+0000000000adf460 0000000000000008 B glad_glMapNamedBuffer
+0000000000adf468 0000000000000008 B glad_glMapBufferRange
+0000000000adf470 0000000000000008 B glad_glMapBuffer
+0000000000adf478 0000000000000008 B glad_glLogicOp
+0000000000adf480 0000000000000008 B glad_glLinkProgram
+0000000000adf488 0000000000000008 B glad_glLineWidth
+0000000000adf490 0000000000000008 B glad_glIsVertexArray
+0000000000adf498 0000000000000008 B glad_glIsTransformFeedback
+0000000000adf4a0 0000000000000008 B glad_glIsTexture
+0000000000adf4a8 0000000000000008 B glad_glIsSync
+0000000000adf4b0 0000000000000008 B glad_glIsShader
+0000000000adf4b8 0000000000000008 B glad_glIsSampler
+0000000000adf4c0 0000000000000008 B glad_glIsRenderbuffer
+0000000000adf4c8 0000000000000008 B glad_glIsQuery
+0000000000adf4d0 0000000000000008 B glad_glIsProgramPipeline
+0000000000adf4d8 0000000000000008 B glad_glIsProgram
+0000000000adf4e0 0000000000000008 B glad_glIsFramebuffer
+0000000000adf4e8 0000000000000008 B glad_glIsEnabledi
+0000000000adf4f0 0000000000000008 B glad_glIsEnabled
+0000000000adf4f8 0000000000000008 B glad_glIsBuffer
+0000000000adf500 0000000000000008 B glad_glInvalidateTexSubImage
+0000000000adf508 0000000000000008 B glad_glInvalidateTexImage
+0000000000adf510 0000000000000008 B glad_glInvalidateSubFramebuffer
+0000000000adf518 0000000000000008 B glad_glInvalidateNamedFramebufferSubData
+0000000000adf520 0000000000000008 B glad_glInvalidateNamedFramebufferData
+0000000000adf528 0000000000000008 B glad_glInvalidateFramebuffer
+0000000000adf530 0000000000000008 B glad_glInvalidateBufferSubData
+0000000000adf538 0000000000000008 B glad_glInvalidateBufferData
+0000000000adf540 0000000000000008 B glad_glHint
+0000000000adf560 0000000000000008 B glad_glGetVertexAttribPointerv
+0000000000adf568 0000000000000008 B glad_glGetVertexAttribLdv
+0000000000adf548 0000000000000008 B glad_glGetVertexAttribiv
+0000000000adf570 0000000000000008 B glad_glGetVertexAttribIuiv
+0000000000adf578 0000000000000008 B glad_glGetVertexAttribIiv
+0000000000adf550 0000000000000008 B glad_glGetVertexAttribfv
+0000000000adf558 0000000000000008 B glad_glGetVertexAttribdv
+0000000000adf580 0000000000000008 B glad_glGetVertexArrayiv
+0000000000adf588 0000000000000008 B glad_glGetVertexArrayIndexediv
+0000000000adf590 0000000000000008 B glad_glGetVertexArrayIndexed64iv
+0000000000adf598 0000000000000008 B glad_glGetUniformuiv
+0000000000adf5b8 0000000000000008 B glad_glGetUniformSubroutineuiv
+0000000000adf5c0 0000000000000008 B glad_glGetUniformLocation
+0000000000adf5a0 0000000000000008 B glad_glGetUniformiv
+0000000000adf5c8 0000000000000008 B glad_glGetUniformIndices
+0000000000adf5a8 0000000000000008 B glad_glGetUniformfv
+0000000000adf5b0 0000000000000008 B glad_glGetUniformdv
+0000000000adf5d0 0000000000000008 B glad_glGetUniformBlockIndex
+0000000000adf5f0 0000000000000008 B glad_glGetTransformFeedbackVarying
+0000000000adf5d8 0000000000000008 B glad_glGetTransformFeedbackiv
+0000000000adf5e0 0000000000000008 B glad_glGetTransformFeedbacki_v
+0000000000adf5e8 0000000000000008 B glad_glGetTransformFeedbacki64_v
+0000000000adf5f8 0000000000000008 B glad_glGetTextureParameteriv
+0000000000adf608 0000000000000008 B glad_glGetTextureParameterIuiv
+0000000000adf610 0000000000000008 B glad_glGetTextureParameterIiv
+0000000000adf600 0000000000000008 B glad_glGetTextureParameterfv
+0000000000adf618 0000000000000008 B glad_glGetTextureLevelParameteriv
+0000000000adf620 0000000000000008 B glad_glGetTextureLevelParameterfv
+0000000000adf628 0000000000000008 B glad_glGetTextureImage
+0000000000adf630 0000000000000008 B glad_glGetTexParameteriv
+0000000000adf640 0000000000000008 B glad_glGetTexParameterIuiv
+0000000000adf648 0000000000000008 B glad_glGetTexParameterIiv
+0000000000adf638 0000000000000008 B glad_glGetTexParameterfv
+0000000000adf650 0000000000000008 B glad_glGetTexLevelParameteriv
+0000000000adf658 0000000000000008 B glad_glGetTexLevelParameterfv
+0000000000adf660 0000000000000008 B glad_glGetTexImage
+0000000000adf668 0000000000000008 B glad_glGetSynciv
+0000000000adf670 0000000000000008 B glad_glGetSubroutineUniformLocation
+0000000000adf678 0000000000000008 B glad_glGetSubroutineIndex
+0000000000adf680 0000000000000008 B glad_glGetStringi
+0000000000adf688 0000000000000008 B glad_glGetString
+0000000000adf698 0000000000000008 B glad_glGetShaderSource
+0000000000adf6a0 0000000000000008 B glad_glGetShaderPrecisionFormat
+0000000000adf690 0000000000000008 B glad_glGetShaderiv
+0000000000adf6a8 0000000000000008 B glad_glGetShaderInfoLog
+0000000000adf6b0 0000000000000008 B glad_glGetSamplerParameteriv
+0000000000adf6c0 0000000000000008 B glad_glGetSamplerParameterIuiv
+0000000000adf6c8 0000000000000008 B glad_glGetSamplerParameterIiv
+0000000000adf6b8 0000000000000008 B glad_glGetSamplerParameterfv
+0000000000adf6d0 0000000000000008 B glad_glGetRenderbufferParameteriv
+0000000000adf6e0 0000000000000008 B glad_glGetQueryObjectuiv
+0000000000adf6e8 0000000000000008 B glad_glGetQueryObjectui64v
+0000000000adf6f0 0000000000000008 B glad_glGetQueryObjectiv
+0000000000adf6f8 0000000000000008 B glad_glGetQueryObjecti64v
+0000000000adf6d8 0000000000000008 B glad_glGetQueryiv
+0000000000adf700 0000000000000008 B glad_glGetQueryIndexediv
+0000000000adf708 0000000000000008 B glad_glGetQueryBufferObjectuiv
+0000000000adf710 0000000000000008 B glad_glGetQueryBufferObjectui64v
+0000000000adf718 0000000000000008 B glad_glGetQueryBufferObjectiv
+0000000000adf720 0000000000000008 B glad_glGetQueryBufferObjecti64v
+0000000000adf730 0000000000000008 B glad_glGetProgramStageiv
+0000000000adf740 0000000000000008 B glad_glGetProgramResourceName
+0000000000adf748 0000000000000008 B glad_glGetProgramResourceLocationIndex
+0000000000adf750 0000000000000008 B glad_glGetProgramResourceLocation
+0000000000adf738 0000000000000008 B glad_glGetProgramResourceiv
+0000000000adf758 0000000000000008 B glad_glGetProgramResourceIndex
+0000000000adf760 0000000000000008 B glad_glGetProgramPipelineiv
+0000000000adf768 0000000000000008 B glad_glGetProgramPipelineInfoLog
+0000000000adf728 0000000000000008 B glad_glGetProgramiv
+0000000000adf770 0000000000000008 B glad_glGetProgramInterfaceiv
+0000000000adf778 0000000000000008 B glad_glGetProgramInfoLog
+0000000000adf780 0000000000000008 B glad_glGetProgramBinary
+0000000000adf788 0000000000000008 B glad_glGetPointerv
+0000000000adf790 0000000000000008 B glad_glGetObjectPtrLabel
+0000000000adf798 0000000000000008 B glad_glGetObjectLabel
+0000000000adf7a0 0000000000000008 B glad_glGetNamedRenderbufferParameteriv
+0000000000adf7a8 0000000000000008 B glad_glGetNamedFramebufferParameteriv
+0000000000adf7b0 0000000000000008 B glad_glGetNamedFramebufferAttachmentParameteriv
+0000000000adf7b8 0000000000000008 B glad_glGetNamedBufferSubData
+0000000000adf7c0 0000000000000008 B glad_glGetNamedBufferPointerv
+0000000000adf7c8 0000000000000008 B glad_glGetNamedBufferParameteriv
+0000000000adf7d0 0000000000000008 B glad_glGetNamedBufferParameteri64v
+0000000000adf7d8 0000000000000008 B glad_glGetMultisamplefv
+0000000000adf7e0 0000000000000008 B glad_glGetInternalformativ
+0000000000adf7e8 0000000000000008 B glad_glGetInternalformati64v
+0000000000adf7f0 0000000000000008 B glad_glGetIntegerv
+0000000000adf7f8 0000000000000008 B glad_glGetIntegeri_v
+0000000000adf800 0000000000000008 B glad_glGetInteger64v
+0000000000adf808 0000000000000008 B glad_glGetInteger64i_v
+0000000000adf810 0000000000000008 B glad_glGetFramebufferParameteriv
+0000000000adf818 0000000000000008 B glad_glGetFramebufferAttachmentParameteriv
+0000000000adf820 0000000000000008 B glad_glGetFragDataLocation
+0000000000adf828 0000000000000008 B glad_glGetFragDataIndex
+0000000000adf830 0000000000000008 B glad_glGetFloatv
+0000000000adf838 0000000000000008 B glad_glGetFloati_v
+0000000000adf840 0000000000000008 B glad_glGetError
+0000000000adf848 0000000000000008 B glad_glGetDoublev
+0000000000adf850 0000000000000008 B glad_glGetDoublei_v
+0000000000adf858 0000000000000008 B glad_glGetBufferSubData
+0000000000adf860 0000000000000008 B glad_glGetBufferPointerv
+0000000000adf868 0000000000000008 B glad_glGetBufferParameteriv
+0000000000adf870 0000000000000008 B glad_glGetBufferParameteri64v
+0000000000adf878 0000000000000008 B glad_glGetBooleanv
+0000000000adf880 0000000000000008 B glad_glGetBooleani_v
+0000000000adf888 0000000000000008 B glad_glGetAttribLocation
+0000000000adf890 0000000000000008 B glad_glGetAttachedShaders
+0000000000adf898 0000000000000008 B glad_glGetActiveUniformsiv
+0000000000adf8a0 0000000000000008 B glad_glGetActiveUniformName
+0000000000adf8b0 0000000000000008 B glad_glGetActiveUniformBlockName
+0000000000adf8a8 0000000000000008 B glad_glGetActiveUniformBlockiv
+0000000000adf8b8 0000000000000008 B glad_glGetActiveUniform
+0000000000adf8c8 0000000000000008 B glad_glGetActiveSubroutineUniformName
+0000000000adf8c0 0000000000000008 B glad_glGetActiveSubroutineUniformiv
+0000000000adf8d0 0000000000000008 B glad_glGetActiveSubroutineName
+0000000000adf8d8 0000000000000008 B glad_glGetActiveAttrib
+0000000000adf8e0 0000000000000008 B glad_glGetActiveAtomicCounterBufferiv
+0000000000adf8f8 0000000000000008 B glad_glGenVertexArrays
+0000000000adf900 0000000000000008 B glad_glGenTransformFeedbacks
+0000000000adf908 0000000000000008 B glad_glGenTextures
+0000000000adf910 0000000000000008 B glad_glGenSamplers
+0000000000adf918 0000000000000008 B glad_glGenRenderbuffers
+0000000000adf920 0000000000000008 B glad_glGenQueries
+0000000000adf928 0000000000000008 B glad_glGenProgramPipelines
+0000000000adf930 0000000000000008 B glad_glGenFramebuffers
+0000000000adf8e8 0000000000000008 B glad_glGenerateTextureMipmap
+0000000000adf8f0 0000000000000008 B glad_glGenerateMipmap
+0000000000adf938 0000000000000008 B glad_glGenBuffers
+0000000000adf940 0000000000000008 B glad_glFrontFace
+0000000000adf948 0000000000000008 B glad_glFramebufferTextureLayer
+0000000000adf950 0000000000000008 B glad_glFramebufferTexture3D
+0000000000adf958 0000000000000008 B glad_glFramebufferTexture2D
+0000000000adf960 0000000000000008 B glad_glFramebufferTexture1D
+0000000000adf968 0000000000000008 B glad_glFramebufferTexture
+0000000000adf970 0000000000000008 B glad_glFramebufferRenderbuffer
+0000000000adf978 0000000000000008 B glad_glFramebufferParameteri
+0000000000adf980 0000000000000008 B glad_glFlushMappedNamedBufferRange
+0000000000adf988 0000000000000008 B glad_glFlushMappedBufferRange
+0000000000adf990 0000000000000008 B glad_glFlush
+0000000000adf998 0000000000000008 B glad_glFinish
+0000000000adf9a0 0000000000000008 B glad_glFenceSync
+0000000000adf9a8 0000000000000008 B glad_glEndTransformFeedback
+0000000000adf9b0 0000000000000008 B glad_glEndQueryIndexed
+0000000000adf9b8 0000000000000008 B glad_glEndQuery
+0000000000adf9c0 0000000000000008 B glad_glEndConditionalRender
+0000000000adf9d0 0000000000000008 B glad_glEnableVertexAttribArray
+0000000000adf9d8 0000000000000008 B glad_glEnableVertexArrayAttrib
+0000000000adf9c8 0000000000000008 B glad_glEnablei
+0000000000adf9e0 0000000000000008 B glad_glEnable
+0000000000adf9e8 0000000000000008 B glad_glDrawTransformFeedbackStreamInstanced
+0000000000adf9f0 0000000000000008 B glad_glDrawTransformFeedbackStream
+0000000000adf9f8 0000000000000008 B glad_glDrawTransformFeedbackInstanced
+0000000000adfa00 0000000000000008 B glad_glDrawTransformFeedback
+0000000000adfa08 0000000000000008 B glad_glDrawRangeElementsBaseVertex
+0000000000adfa10 0000000000000008 B glad_glDrawRangeElements
+0000000000adfa18 0000000000000008 B glad_glDrawElementsInstancedBaseVertexBaseInstance
+0000000000adfa20 0000000000000008 B glad_glDrawElementsInstancedBaseVertex
+0000000000adfa28 0000000000000008 B glad_glDrawElementsInstancedBaseInstance
+0000000000adfa30 0000000000000008 B glad_glDrawElementsInstanced
+0000000000adfa38 0000000000000008 B glad_glDrawElementsIndirect
+0000000000adfa40 0000000000000008 B glad_glDrawElementsBaseVertex
+0000000000adfa48 0000000000000008 B glad_glDrawElements
+0000000000adfa50 0000000000000008 B glad_glDrawBuffers
+0000000000adfa58 0000000000000008 B glad_glDrawBuffer
+0000000000adfa60 0000000000000008 B glad_glDrawArraysInstancedBaseInstance
+0000000000adfa68 0000000000000008 B glad_glDrawArraysInstanced
+0000000000adfa70 0000000000000008 B glad_glDrawArraysIndirect
+0000000000adfa78 0000000000000008 B glad_glDrawArrays
+0000000000adfa80 0000000000000008 B glad_glDispatchComputeIndirect
+0000000000adfa88 0000000000000008 B glad_glDispatchCompute
+0000000000adfa98 0000000000000008 B glad_glDisableVertexAttribArray
+0000000000adfaa0 0000000000000008 B glad_glDisableVertexArrayAttrib
+0000000000adfa90 0000000000000008 B glad_glDisablei
+0000000000adfaa8 0000000000000008 B glad_glDisable
+0000000000adfab0 0000000000000008 B glad_glDetachShader
+0000000000adfac0 0000000000000008 B glad_glDepthRangeIndexed
+0000000000adfab8 0000000000000008 B glad_glDepthRangef
+0000000000adfac8 0000000000000008 B glad_glDepthRangeArrayv
+0000000000adfad0 0000000000000008 B glad_glDepthRange
+0000000000adfad8 0000000000000008 B glad_glDepthMask
+0000000000adfae0 0000000000000008 B glad_glDepthFunc
+0000000000adfae8 0000000000000008 B glad_glDeleteVertexArrays
+0000000000adfaf0 0000000000000008 B glad_glDeleteTransformFeedbacks
+0000000000adfaf8 0000000000000008 B glad_glDeleteTextures
+0000000000adfb00 0000000000000008 B glad_glDeleteSync
+0000000000adfb08 0000000000000008 B glad_glDeleteShader
+0000000000adfb10 0000000000000008 B glad_glDeleteSamplers
+0000000000adfb18 0000000000000008 B glad_glDeleteRenderbuffers
+0000000000adfb20 0000000000000008 B glad_glDeleteQueries
+0000000000adfb28 0000000000000008 B glad_glDeleteProgramPipelines
+0000000000adfb30 0000000000000008 B glad_glDeleteProgram
+0000000000adfb38 0000000000000008 B glad_glDeleteFramebuffers
+0000000000adfb40 0000000000000008 B glad_glDeleteBuffers
+0000000000adfb48 0000000000000008 B glad_glCullFace
+0000000000adfb50 0000000000000008 B glad_glCreateVertexArrays
+0000000000adfb58 0000000000000008 B glad_glCreateTransformFeedbacks
+0000000000adfb60 0000000000000008 B glad_glCreateTextures
+0000000000adfb68 0000000000000008 B glad_glCreateShaderProgramv
+0000000000adfb70 0000000000000008 B glad_glCreateShader
+0000000000adfb78 0000000000000008 B glad_glCreateSamplers
+0000000000adfb80 0000000000000008 B glad_glCreateRenderbuffers
+0000000000adfb88 0000000000000008 B glad_glCreateQueries
+0000000000adfb90 0000000000000008 B glad_glCreateProgramPipelines
+0000000000adfb98 0000000000000008 B glad_glCreateProgram
+0000000000adfba0 0000000000000008 B glad_glCreateFramebuffers
+0000000000adfba8 0000000000000008 B glad_glCreateBuffers
+0000000000adfbb0 0000000000000008 B glad_glCopyTextureSubImage3D
+0000000000adfbb8 0000000000000008 B glad_glCopyTextureSubImage2D
+0000000000adfbc0 0000000000000008 B glad_glCopyTextureSubImage1D
+0000000000adfbc8 0000000000000008 B glad_glCopyTexSubImage3D
+0000000000adfbd0 0000000000000008 B glad_glCopyTexSubImage2D
+0000000000adfbd8 0000000000000008 B glad_glCopyTexSubImage1D
+0000000000adfbe0 0000000000000008 B glad_glCopyTexImage2D
+0000000000adfbe8 0000000000000008 B glad_glCopyTexImage1D
+0000000000adfbf0 0000000000000008 B glad_glCopyNamedBufferSubData
+0000000000adfbf8 0000000000000008 B glad_glCopyImageSubData
+0000000000adfc00 0000000000000008 B glad_glCopyBufferSubData
+0000000000adfc08 0000000000000008 B glad_glCompileShader
+0000000000adfc10 0000000000000008 B glad_glColorMaski
+0000000000adfc18 0000000000000008 B glad_glColorMask
+0000000000adfc20 0000000000000008 B glad_glClientWaitSync
+0000000000adfc28 0000000000000008 B glad_glClearNamedFramebufferuiv
+0000000000adfc30 0000000000000008 B glad_glClearNamedFramebufferiv
+0000000000adfc38 0000000000000008 B glad_glClearNamedFramebufferfv
+0000000000adfc40 0000000000000008 B glad_glClearNamedFramebufferfi
+0000000000adfc48 0000000000000008 B glad_glClearNamedBufferSubData
+0000000000adfc50 0000000000000008 B glad_glClearNamedBufferData
+0000000000adfc58 0000000000000008 B glad_glClearDepthf
+0000000000adfc60 0000000000000008 B glad_glClearDepth
+0000000000adfc68 0000000000000008 B glad_glClearColor
+0000000000adfc70 0000000000000008 B glad_glClearBufferuiv
+0000000000adfc90 0000000000000008 B glad_glClearBufferSubData
+0000000000adfc78 0000000000000008 B glad_glClearBufferiv
+0000000000adfc80 0000000000000008 B glad_glClearBufferfv
+0000000000adfc88 0000000000000008 B glad_glClearBufferfi
+0000000000adfc98 0000000000000008 B glad_glClearBufferData
+0000000000adfca0 0000000000000008 B glad_glClear
+0000000000adfca8 0000000000000008 B glad_glClampColor
+0000000000adfcb0 0000000000000008 B glad_glCheckNamedFramebufferStatus
+0000000000adfcb8 0000000000000008 B glad_glCheckFramebufferStatus
+0000000000adfcc0 0000000000000008 B glad_glBufferSubData
+0000000000adfcc8 0000000000000008 B glad_glBufferStorage
+0000000000adfcd0 0000000000000008 B glad_glBufferData
+0000000000adfcd8 0000000000000008 B glad_glBlitNamedFramebuffer
+0000000000adfce0 0000000000000008 B glad_glBlitFramebuffer
+0000000000adfcf0 0000000000000008 B glad_glBlendFuncSeparatei
+0000000000adfcf8 0000000000000008 B glad_glBlendFuncSeparate
+0000000000adfce8 0000000000000008 B glad_glBlendFunci
+0000000000adfd00 0000000000000008 B glad_glBlendFunc
+0000000000adfd10 0000000000000008 B glad_glBlendEquationSeparatei
+0000000000adfd18 0000000000000008 B glad_glBlendEquationSeparate
+0000000000adfd08 0000000000000008 B glad_glBlendEquationi
+0000000000adfd20 0000000000000008 B glad_glBlendEquation
+0000000000adfd28 0000000000000008 B glad_glBlendColor
+0000000000adfd30 0000000000000008 B glad_glBindVertexBuffer
+0000000000adfd38 0000000000000008 B glad_glBindVertexArray
+0000000000adfd40 0000000000000008 B glad_glBindTransformFeedback
+0000000000adfd48 0000000000000008 B glad_glBindTextureUnit
+0000000000adfd50 0000000000000008 B glad_glBindTexture
+0000000000adfd58 0000000000000008 B glad_glBindSampler
+0000000000adfd60 0000000000000008 B glad_glBindRenderbuffer
+0000000000adfd68 0000000000000008 B glad_glBindProgramPipeline
+0000000000adfd70 0000000000000008 B glad_glBindImageTexture
+0000000000adfd78 0000000000000008 B glad_glBindFramebuffer
+0000000000adfd80 0000000000000008 B glad_glBindFragDataLocationIndexed
+0000000000adfd88 0000000000000008 B glad_glBindFragDataLocation
+0000000000adfd90 0000000000000008 B glad_glBindBufferRange
+0000000000adfd98 0000000000000008 B glad_glBindBufferBase
+0000000000adfda0 0000000000000008 B glad_glBindBuffer
+0000000000adfda8 0000000000000008 B glad_glBindAttribLocation
+0000000000adfdb0 0000000000000008 B glad_glBeginTransformFeedback
+0000000000adfdb8 0000000000000008 B glad_glBeginQueryIndexed
+0000000000adfdc0 0000000000000008 B glad_glBeginQuery
+0000000000adfdc8 0000000000000008 B glad_glBeginConditionalRender
+0000000000adfdd0 0000000000000008 B glad_glAttachShader
+0000000000adfdd8 0000000000000008 B glad_glActiveTexture
+0000000000adfde0 0000000000000008 B glad_glActiveShaderProgram
+000000000189e438 0000000000000008 B game_start_time
+0000000000314a00 0000000000000008 D fragmentShaderTraditional
+000000000030da60 0000000000000008 D fractionalScaleListener
+0000000000ad3e48 0000000000000008 B entities
+000000000189e420 0000000000000008 B current_time
+000000000189e418 0000000000000008 B cpuTime
+0000000000adea50 0000000000000008 B console_log_file
+0000000000549b38 0000000000000008 B audiologSubjects
+0000000000549b28 0000000000000008 B audioLogSpeech2Text
+0000000000549b30 0000000000000008 B audiologSenders
+0000000000549b40 0000000000000008 B audiologNames
+0000000000adea58 0000000000000008 B activeLogFile
+00000000018c4630 0000000000000004 B _ZNSt8ios_base4Init11_S_refcountE
+00000000018c2c68 0000000000000004 B _ZNSt6locale7_S_onceE
+00000000018c2c5c 0000000000000004 B _ZNSt6locale5facet7_S_onceE
+00000000018c2c58 0000000000000004 B _ZNSt6locale2id11_S_refcountE
+00000000003149c0 0000000000000004 D worstFPS
+000000000033c940 0000000000000004 B worldMin_z
+000000000033c944 0000000000000004 B worldMin_x
+000000000031eea4 0000000000000004 B wav_count
+0000000000549b20 0000000000000004 B voxelMinCenterZ
+0000000000549b24 0000000000000004 B voxelMinCenterX
+000000000143ef04 0000000000000004 B voxelLightListsRawID
+000000000143ef08 0000000000000004 B voxelLightListIndicesID
+00000000014421f0 0000000000000004 B verticesRenderedThisFrame
+00000000014421f8 0000000000000004 B uiImageDrawCallsRenderedThisFrame
+000000000143f360 0000000000000004 B uiImageCount
+000000000069f0e8 0000000000000004 B totalPixels
+000000000069f0e4 0000000000000004 B totalPaletteColors
+000000000069f0f8 0000000000000004 B textureSizesID
+000000000069f0f0 0000000000000004 B texturePalettesID
+000000000069f0ec 0000000000000004 B texturePaletteOffsetsID
+000000000069f0f4 0000000000000004 B textureOffsetsID
+00000000014421fc 0000000000000004 B textDrawCallsRenderedThisFrame
+00000000003148c0 0000000000000004 D statusTextLengthWithoutNullTerminator
+000000000143ef10 0000000000000004 B statusTextDecayFinished
+000000000143ef00 0000000000000004 B shadowMapsIndirectionID
+00000000014421f4 0000000000000004 B shadowDrawCallsRenderedThisFrame
+0000000000314200 0000000000000004 D random_range_rng
+0000000000b1a7e0 0000000000000004 B numShadowsCouldRender
+000000000032d8ec 0000000000000004 B numPackedGlyphsStopD
+000000000032d8f0 0000000000000004 B numPackedGlyphs
+0000000000313ae0 0000000000000004 D numFontRanges
+00000000003149c8 0000000000000004 D mouse_sensitivity
+000000000032d8f4 0000000000000004 B mmap_cleanup_count
+0000000001442440 0000000000000004 B matricesBuffer
+000000000143ef0c 0000000000000004 B lightsID
+000000000189e40c 0000000000000004 B lastFrameSecCount
+000000000189e430 0000000000000004 B globalFrameNum
+0000000000adfe04 0000000000000004 B GLAD_GL_VERSION_4_3
+0000000000adfe08 0000000000000004 B GLAD_GL_VERSION_4_2
+0000000000adfe0c 0000000000000004 B GLAD_GL_VERSION_4_1
+0000000000adfe10 0000000000000004 B GLAD_GL_VERSION_4_0
+0000000000adfe14 0000000000000004 B GLAD_GL_VERSION_3_3
+0000000000adfe18 0000000000000004 B GLAD_GL_VERSION_3_2
+0000000000adfe1c 0000000000000004 B GLAD_GL_VERSION_3_1
+0000000000adfe20 0000000000000004 B GLAD_GL_VERSION_3_0
+0000000000adfe24 0000000000000004 B GLAD_GL_VERSION_2_1
+0000000000adfe28 0000000000000004 B GLAD_GL_VERSION_2_0
+0000000000adfe2c 0000000000000004 B GLAD_GL_VERSION_1_5
+0000000000adfe30 0000000000000004 B GLAD_GL_VERSION_1_4
+0000000000adfe34 0000000000000004 B GLAD_GL_VERSION_1_3
+0000000000adfe38 0000000000000004 B GLAD_GL_VERSION_1_2
+0000000000adfe3c 0000000000000004 B GLAD_GL_VERSION_1_1
+0000000000adfe40 0000000000000004 B GLAD_GL_VERSION_1_0
+0000000000adfde8 0000000000000004 B GLAD_GL_ARB_texture_view
+0000000000adfdec 0000000000000004 B GLAD_GL_ARB_texture_storage
+0000000000adfdf0 0000000000000004 B GLAD_GL_ARB_shader_storage_buffer_object
+0000000000adfdf4 0000000000000004 B GLAD_GL_ARB_map_buffer_range
+0000000000adfdf8 0000000000000004 B GLAD_GL_ARB_direct_state_access
+0000000000adfdfc 0000000000000004 B GLAD_GL_ARB_copy_buffer
+0000000000adfe00 0000000000000004 B GLAD_GL_ARB_buffer_storage
+0000000000313b70 0000000000000004 D genericTextWidthFacStopD
+0000000000313b74 0000000000000004 D genericTextHeightFacStopD
+0000000000313b78 0000000000000004 D genericTextHeightFac
+000000000189e408 0000000000000004 B framesPerLastSecond
+000000000032d8e4 0000000000000004 B fontAtlasTexStopD
+000000000032d8e8 0000000000000004 B fontAtlasTex
+000000000143fadc 0000000000000004 B fogColorR
+000000000143fad8 0000000000000004 B fogColorG
+000000000143fad4 0000000000000004 B fogColorB
+000000000143fad0 0000000000000004 B fogBaseDensityForLevel
+0000000000324ba4 0000000000000004 B fixedNumberAdvanceWidthStopD
+0000000000324ba8 0000000000000004 B fixedNumberAdvanceWidth
+0000000000adfec0 0000000000000004 B fatigue
+0000000000ad3e54 0000000000000004 B eventQueueEnd
+0000000000ad3e5c 0000000000000004 B eventJournalIndex
+0000000000ad3e58 0000000000000004 B eventIndex
+0000000000ad3e40 0000000000000004 B entityCount
+0000000001442200 0000000000000004 B drawCallsRenderedThisFrame
+00000000014422a4 0000000000000004 B debugView
+00000000014422a0 0000000000000004 B debugValue
+0000000000314970 0000000000000004 D cursorPosition_y
+0000000000314974 0000000000000004 D cursorPosition_x
+0000000000adfed8 0000000000000004 B currentMonitorIndex
+0000000000ad3dd8 0000000000000004 B correctionZ
+0000000000ad3ddc 0000000000000004 B correctionY
+0000000000ad3de0 0000000000000004 B correctionX
+0000000000ad3d90 0000000000000004 B correctionStaticSaveableZ
+0000000000ad3d94 0000000000000004 B correctionStaticSaveableY
+0000000000ad3d98 0000000000000004 B correctionStaticSaveableX
+0000000000ad3d9c 0000000000000004 B correctionStaticImmutableZ
+0000000000ad3da0 0000000000000004 B correctionStaticImmutableY
+0000000000ad3da4 0000000000000004 B correctionStaticImmutableX
+0000000000ad3dcc 0000000000000004 B correctionNPCZ
+0000000000ad3dd0 0000000000000004 B correctionNPCY
+0000000000ad3dd4 0000000000000004 B correctionNPCX
+0000000000ad3d84 0000000000000004 B correctionLightZ
+0000000000ad3d88 0000000000000004 B correctionLightY
+0000000000ad3d8c 0000000000000004 B correctionLightX
+0000000000ad3da8 0000000000000004 B correctionLightsSaveableZ
+0000000000ad3dac 0000000000000004 B correctionLightsSaveableY
+0000000000ad3db0 0000000000000004 B correctionLightsSaveableX
+0000000000ad3db4 0000000000000004 B correctionDynamicsZ
+0000000000ad3db8 0000000000000004 B correctionDynamicsY
+0000000000ad3dbc 0000000000000004 B correctionDynamicsX
+0000000000ad3dc0 0000000000000004 B correctionDoorsZ
+0000000000ad3dc4 0000000000000004 B correctionDoorsY
+0000000000ad3dc8 0000000000000004 B correctionDoorsX
+000000000069f0fc 0000000000000004 B colorBufferID
+0000000000314990 0000000000000004 D cam_yaw
+00000000014422c8 0000000000000004 B cam_roll
+00000000014422b0 0000000000000004 B cam_rightz
+00000000014422b4 0000000000000004 B cam_righty
+00000000014422b8 0000000000000004 B cam_rightx
+00000000014422cc 0000000000000004 B cam_pitch
+00000000014422bc 0000000000000004 B cam_forwardz
+00000000014422c0 0000000000000004 B cam_forwardy
+00000000014422c4 0000000000000004 B cam_forwardx
+00000000014422a8 0000000000000004 B berserkSeedTime
+00000000014422ac 0000000000000004 B berserkFinished
+0000000000314978 0000000000000004 D aspect3D
+0000000000ad3de4 0000000000000002 B transparentInstancesHead
+00000000003141e0 0000000000000002 D startOfTransparentInstances
+00000000003141e2 0000000000000002 D startOfDoubleSidedInstances
+00000000003149c6 0000000000000002 D screen_width
+00000000003149c4 0000000000000002 D screen_height
+0000000000ad3dea 0000000000000002 B renderableCount
+000000000033c94a 0000000000000002 B playerCellIdx_z
+000000000033c94c 0000000000000002 B playerCellIdx_y
+000000000033c94e 0000000000000002 B playerCellIdx_x
+000000000033c950 0000000000000002 B playerCellIdx
+0000000000ad3dec 0000000000000002 B opaqueInstancesHead
+000000000033c948 0000000000000002 B numCellsVisible
+000000000069f0e0 0000000000000002 B loadedTextures
+0000000000331900 0000000000000002 B loadedModels
+0000000000ad3d80 0000000000000002 B loadedLights
+0000000000ad3de8 0000000000000002 B loadedInstances
+000000000031eea0 0000000000000002 B loadedAmbients
+0000000000b1a7e4 0000000000000002 B largestNearbyMeshCount
+0000000000ad3e20 0000000000000002 B invalidModelIndexCount
+0000000000ad3de6 0000000000000002 B doubleSidedInstancesHead
+00000000003169b8 0000000000000001 D _ZNSt8ios_base4Init20_S_synced_with_stdioE
+000000000189e450 0000000000000001 B window_has_focus
+0000000000adea41 0000000000000001 B usingManualLog
+0000000000314994 0000000000000001 D startLevel
+0000000000314995 0000000000000001 D numLevels
+0000000001442321 0000000000000001 B menuActive
+0000000000adea40 0000000000000001 B log_playback
+0000000001442320 0000000000000001 B levelCurrentlyLoading
+00000000003141e4 0000000000000001 D journalFirstWrite
+000000000189e440 0000000000000001 B inventoryMode
+0000000000adfed4 0000000000000001 B ignore_next_mouse_delta
+0000000001442324 0000000000000001 B global_modIsCitadel
+0000000001442322 0000000000000001 B gamePaused
+0000000001442323 0000000000000001 B currentLevel
+0000000000adfe44 0000000000000001 B boosterActive
 ```
 
 cloc --by-file --exclude-dir=temp_build,.git,Audio,Data,Fonts,Models,Screenshots,Scripts,Shaders,Textures,Tools,External ./
