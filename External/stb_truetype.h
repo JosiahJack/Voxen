@@ -932,10 +932,8 @@ static void stbtt__csctx_v(stbtt__csctx *c, stbtt_uint8 type, stbtt_int32 x, stb
    c->num_vertices++;
 }
 
-static void stbtt__csctx_close_shape(stbtt__csctx *ctx)
-{
-   if (ctx->first_x != ctx->x || ctx->first_y != ctx->y)
-      stbtt__csctx_v(ctx, STBTT_vline, (int)ctx->first_x, (int)ctx->first_y, 0, 0, 0, 0);
+static void stbtt__csctx_close_shape(stbtt__csctx *ctx) {
+   if (ctx->first_x != ctx->x || ctx->first_y != ctx->y) stbtt__csctx_v(ctx, STBTT_vline, (int)ctx->first_x, (int)ctx->first_y, 0, 0, 0, 0);
 }
 
 static void stbtt__csctx_rmove_to(stbtt__csctx *ctx, float dx, float dy)

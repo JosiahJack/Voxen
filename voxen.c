@@ -254,6 +254,7 @@ void UpdateScreenSize(void) {
     glProgramUniform1f(ssrShaderProgram, 3, settings_SSRSampleWeight);
     glProgramUniform1ui(ssrShaderProgram, 4, settings_SSRStepCount);
     glProgramUniform1f(imageBlitShaderProgram, 30, skyRotateSpeed);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
 }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
@@ -318,39 +319,35 @@ void UpdateDynamicLights(void) {
         if (lightOn[i]) {
             if (lightIntervalStepsLength[i] > 0) {
                 float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
-                if (lightLerpUp[i]) {
-                    // Going from lightMinIntensity to lightMaxIntensity
+                if (lightLerpUp[i]) { // Going from lightMinIntensity to lightMaxIntensity
                     if (lightLerpTime[i] < (float)pauseRelativeTime) {
-                        if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightMaxIntensity[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[i];
+                        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[i];
                         lightLerpUp[i] = false;
                         lightCurrentStep[i]++;
                         if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
                         lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
                         lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
                         lightLerpStartTime[i] = (float)pauseRelativeTime;
-                        if (lightLerpTime[i] == 0.0f) lightLerpTime[i] = 0.1f;
                     } else {
                         if (lightLerpOn[i]) {
                             if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
                                 if (intervalStepisLerping[i][lightCurrentStep[i]]) {
                                     lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                                     lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (lightLerpValue[i]));
-                                    if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightLerpValue[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+                                    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
                                 }
                             }
                         }
                     }
-                } else {
-                    // Going from lightMaxIntensity to lightMinIntensity
+                } else { // Going from lightMaxIntensity to lightMinIntensity
                     if (lightLerpTime[i] < (float)pauseRelativeTime) {
-                        if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightMinIntensity[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
+                        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
                         lightLerpUp[i] = true;
                         lightCurrentStep[i]++;
                         if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
                         lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
                         lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
                         lightLerpStartTime[i] = (float)pauseRelativeTime;
-                        if (lightLerpTime[i] == 0.0f) lightLerpTime[i] = 0.1f;
                     } else {
                         if (lightLerpOn[i]) {
                             if (lightCurrentStep[i] == lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
@@ -358,7 +355,7 @@ void UpdateDynamicLights(void) {
                                 if (intervalStepisLerping[i][lightCurrentStep[i]]) {
                                     lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                                     lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (1.0f - lightLerpValue[i]));
-                                    if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] != lightLerpValue[i]) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+                                    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
                                 }
                             }
                         }
@@ -369,7 +366,7 @@ void UpdateDynamicLights(void) {
                 lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightBaseIntensity[i];
             }
         } else { // Light is turned off.
-            if (lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] > 0.01f) lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
+            lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
         }
     }
 
@@ -517,17 +514,29 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+    float halfRadSqrd = lightRadius * lightRadius * 0.5f;
     float effectiveRadius = vmin(lightRadius, 15.36f);
     uint16_t nearMeshes[256]; // Found that this is typically around 172
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
         if (instances[j].modelIndex >= loadedModels) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-        
-        float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-        float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
-        float radSum = (effectiveRadius + radius);
-        if (distToLightSqrd > radSum * radSum) continue;
+
+        uint16_t instCellIdx = (uint16_t)cellIndexForInstance[j];
+        if (settings_CullEnabled) {
+            if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+            
+            float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+            float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
+            float radSum = (effectiveRadius + radius);
+            if (distToLightSqrd > radSum * radSum) continue;
+            
+            float distSqrd = squareDistance3D(      instances[j].position.x,       instances[j].position.y,       instances[j].position.z,
+                                              instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+            if (distSqrd >= FAR_PLANE_SQUARED) continue;
+            
+            instanceIsLODArray[j] = (distToLightSqrd >= halfRadSqrd);
+        }
         
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
@@ -768,9 +777,6 @@ void RenderUIImages(void) {
 
         start = end;
     }
-
-    glBindVertexArray(0);
-    glUseProgram(0);
 }
 
 __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
@@ -837,6 +843,7 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
             else xpos = q.x0 + fixedNumberAdvanceWidth;
         }
     }
+    
     if (vertexCount > 0) {
         glNamedBufferData(textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
@@ -844,8 +851,6 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
         textDrawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertexCount * 6;
     }
-    
-    glBindVertexArray(0);
 }
 
 void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only adds 0.01secs to game startup time.
@@ -860,7 +865,6 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
     drawCallsRenderedThisFrame++;
     verticesRenderedThisFrame += 4;
     glBindTextureUnit(0, 0);
-    glUseProgram(0);
     char buffer[256];
     va_list args;
     va_start(args, format);
@@ -1201,7 +1205,6 @@ void RenderInstances(uint8_t type) {
                                startOfNextType = startOfTransparentInstances; break;
         case REND_TRANSPARENT: glEnable(GL_BLEND);
                                glEnable(GL_CULL_FACE);
-                               glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                                glDepthMask(GL_FALSE);
                                countsArray  =  modelTypeCountsTransparent;
                                offsetsArray = modelTypeOffsetsTransparent;
@@ -1388,7 +1391,6 @@ int32_t main(int32_t argc, char* argv[]) {
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers
-            glBindVertexArray(0);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             // 5. SSR (Screen Space Reflections)
@@ -1448,7 +1450,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += 4;
-        glBindTextureUnit(0, 0);
 
         // HUD
         // UI Common GL traits
@@ -1462,9 +1463,7 @@ int32_t main(int32_t argc, char* argv[]) {
         // 7. UI
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-//         glDepthMask(GL_FALSE); // Fixes alpha rendering of text, but makes the z sort not work for some reason.
-        glDepthMask(GL_TRUE); // Fixes z sorting unless it has alpha
+        glDepthMask(GL_TRUE); // GL_TRUE Fixes z sorting unless it has alpha, GL_FALSE Fixes alpha rendering of text, but makes the z sort not work for some reason.
         glDisable(GL_CULL_FACE);
         
         //    Cursor
