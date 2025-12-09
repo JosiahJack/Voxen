@@ -235,7 +235,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
     }
 
     int lineNum = 0, totalLines = 0;
-    char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
+    char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH]; // 1207
     while (data_pos < (size_t)file_size) {
         ++totalLines;
         size_t line_start = data_pos;

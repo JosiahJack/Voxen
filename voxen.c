@@ -373,6 +373,7 @@ void UpdateDynamicLights(void) {
     glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
+uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
 void UpdateVoxelLightLists(void) {
     memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -428,7 +429,7 @@ void UpdateVoxelLightLists(void) {
     }
 
     // Assign light indices to voxelLightListsRaw
-    uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
+    memset(lightCounts,0,VOXEL_COUNT * sizeof(uint32_t)); // Track current count for each voxel
     for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -1185,8 +1186,7 @@ static void ds_introsort(DepthSort* arr, int n, float dir) {
 #define REND_OPAQUE      1u
 #define REND_DOUBLESIDED 2u
 #define REND_TRANSPARENT 3u
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wvla"
+DepthSort visibleInstances[INSTANCE_COUNT];
 void RenderInstances(uint8_t type) {
     uint16_t* countsArray = NULL;
     uint16_t* offsetsArray = NULL;
@@ -1211,13 +1211,16 @@ void RenderInstances(uint8_t type) {
                                startOfNextType = loadedInstances - invalidModelIndexCount; break;
     }
     
+    if (!countsArray || !offsetsArray) return;
+    if (startOfNextType > loadedInstances) return;
+    
+    memset(visibleInstances,0,INSTANCE_COUNT * sizeof(DepthSort));
     for (uint16_t modelIdx = 0; modelIdx < loadedModels; modelIdx++) {
         if (countsArray[modelIdx] == 0) continue;
 
         uint16_t start = offsetsArray[modelIdx];
         if (start < 3) DualLogError("offsets for rendering wrong!\n");
         uint16_t count = countsArray[modelIdx];
-        DepthSort visibleInstances[start + count];
         uint16_t visibleCount = 0;
         for (uint16_t i = start; i < start + count && i < startOfNextType; i++) { // Filter visible instances
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
@@ -1256,7 +1259,6 @@ void RenderInstances(uint8_t type) {
         }
     }
 }
-#pragma GCC diagnostic pop
 
 void SetFog(void) {
     fogColorRUsed = fogColorR * fogBaseDensityForLevel;

@@ -228,6 +228,11 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
     }
 }
 
+uint16_t opaqueInstances[INSTANCE_COUNT] = {0};
+uint16_t doubleSidedInstances[INSTANCE_COUNT] = {0};
+uint16_t transparentInstances[INSTANCE_COUNT] = {0};
+Entity tempInstances[INSTANCE_COUNT] = {0};
+    
 void SortInstances(void) { // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
     double start_time = get_time();
     DualLog("Sorting entity instances... ");
@@ -237,9 +242,9 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     if (modelTypeOffsetsOpaque     ) { free(modelTypeOffsetsOpaque     ); }   modelTypeOffsetsOpaque = calloc(loadedModels,sizeof(uint16_t));
     if (modelTypeOffsetsDoubleSided) { free(modelTypeOffsetsDoubleSided); }   modelTypeOffsetsDoubleSided = calloc(loadedModels,sizeof(uint16_t));
     if (modelTypeOffsetsTransparent) { free(modelTypeOffsetsTransparent); }   modelTypeOffsetsTransparent = calloc(loadedModels,sizeof(uint16_t));
-    uint16_t opaqueInstances[INSTANCE_COUNT] = {0};
-    uint16_t doubleSidedInstances[INSTANCE_COUNT] = {0};
-    uint16_t transparentInstances[INSTANCE_COUNT] = {0};
+    memset(opaqueInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
+    memset(doubleSidedInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
+    memset(transparentInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
     opaqueInstancesHead = doubleSidedInstancesHead = transparentInstancesHead = invalidModelIndexCount = 0;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
         if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != MATERIAL_IDX_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
@@ -275,7 +280,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     for (i = 0; i < loadedModels; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
     if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
 
-    Entity tempInstances[INSTANCE_COUNT];
+    memset(tempInstances,0,INSTANCE_COUNT * sizeof(Entity));
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
     uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
     CopyInstanceRegion(opaqueInstancesHead,           opaqueInstances, tempInstances, &targetIdx, startOfDoubleSidedInstances); // Copy opaque instances
