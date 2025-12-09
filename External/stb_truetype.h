@@ -553,7 +553,7 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
    return 1;
 }
 
-STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint) {
+__attribute__((pure)) STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint) {
    stbtt_uint8 *data = info->data;
    stbtt_uint32 index_map = info->index_map;
    stbtt_uint16 format = ttUSHORT(data + index_map + 0);
@@ -1304,7 +1304,7 @@ STBTT_DEF void stbtt_GetGlyphHMetrics(const stbtt_fontinfo *info, int glyph_inde
    }
 }
 
-STBTT_DEF int  stbtt_GetKerningTableLength(const stbtt_fontinfo *info) {
+__attribute__((pure)) STBTT_DEF int stbtt_GetKerningTableLength(const stbtt_fontinfo *info) {
    stbtt_uint8 *data = info->data + info->kern;
    if (!info->kern) return 0; // we only look at the first table. it must be 'horizontal' and format 0.
    if (ttUSHORT(data+2) < 1) return 0; // number of tables, need at least 1
@@ -1330,7 +1330,7 @@ STBTT_DEF int stbtt_GetKerningTable(const stbtt_fontinfo *info, stbtt_kerningent
    return length;
 }
 
-static int stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2) {
+__attribute__((pure)) static int stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2) {
    stbtt_uint8 *data = info->data + info->kern;
    stbtt_uint32 needle, straw;
    int l, r, m;
@@ -1359,8 +1359,7 @@ static int stbtt__GetGlyphKernInfoAdvance(const stbtt_fontinfo *info, int glyph1
    return 0;
 }
 
-static stbtt_int32 stbtt__GetCoverageIndex(stbtt_uint8 *coverageTable, int glyph)
-{
+__attribute__((pure)) static stbtt_int32 stbtt__GetCoverageIndex(stbtt_uint8 *coverageTable, int glyph) {
    stbtt_uint16 coverageFormat = ttUSHORT(coverageTable);
    switch (coverageFormat) {
       case 1: {
@@ -1417,11 +1416,9 @@ static stbtt_int32 stbtt__GetCoverageIndex(stbtt_uint8 *coverageTable, int glyph
    return -1;
 }
 
-static stbtt_int32  stbtt__GetGlyphClass(stbtt_uint8 *classDefTable, int glyph)
-{
+__attribute__((pure)) static stbtt_int32 stbtt__GetGlyphClass(stbtt_uint8 *classDefTable, int glyph) {
    stbtt_uint16 classDefFormat = ttUSHORT(classDefTable);
-   switch (classDefFormat)
-   {
+   switch (classDefFormat) {
       case 1: {
          stbtt_uint16 startGlyphID = ttUSHORT(classDefTable + 2);
          stbtt_uint16 glyphCount = ttUSHORT(classDefTable + 4);
@@ -1463,7 +1460,7 @@ static stbtt_int32  stbtt__GetGlyphClass(stbtt_uint8 *classDefTable, int glyph)
    return 0;
 }
 
-static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2) {
+__attribute__((pure)) static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2) {
    stbtt_uint16 lookupListOffset;
    stbtt_uint8 *lookupList;
    stbtt_uint16 lookupCount;
@@ -1568,7 +1565,7 @@ static stbtt_int32 stbtt__GetGlyphGPOSInfoAdvance(const stbtt_fontinfo *info, in
    return 0;
 }
 
-extern int stbtt_GetGlyphKernAdvance(const stbtt_fontinfo *info, int g1, int g2) {
+__attribute__((pure)) extern int stbtt_GetGlyphKernAdvance(const stbtt_fontinfo *info, int g1, int g2) {
    int xAdvance = 0;
    if (info->gpos) xAdvance += stbtt__GetGlyphGPOSInfoAdvance(info, g1, g2);
    else if (info->kern) xAdvance += stbtt__GetGlyphKernInfoAdvance(info, g1, g2);
@@ -1583,12 +1580,12 @@ extern void stbtt_GetFontBoundingBox(const stbtt_fontinfo *info, int *x0, int *y
    *y1 = ttSHORT(info->data + info->head + 42);
 }
 
-extern float stbtt_ScaleForPixelHeight(const stbtt_fontinfo *info, float height) {
+__attribute__((pure)) extern float stbtt_ScaleForPixelHeight(const stbtt_fontinfo *info, float height) {
    int fheight = ttSHORT(info->data + info->hhea + 4) - ttSHORT(info->data + info->hhea + 6);
    return (float) height / fheight;
 }
 
-extern float stbtt_ScaleForMappingEmToPixels(const stbtt_fontinfo *info, float pixels) {
+__attribute__((pure)) extern float stbtt_ScaleForMappingEmToPixels(const stbtt_fontinfo *info, float pixels) {
    int unitsPerEm = ttUSHORT(info->data + info->head + 18);
    return pixels / unitsPerEm;
 }
@@ -2661,7 +2658,7 @@ STBTT_DEF void stbtt_GetPackedQuad(const stbtt_packedchar *chardata, int pw, int
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
-STBTT_DEF int stbtt_GetFontOffsetForIndex(const unsigned char *data, int index) {
+__attribute__((pure)) STBTT_DEF int stbtt_GetFontOffsetForIndex(const unsigned char *data, int index) {
    return stbtt_GetFontOffsetForIndex_internal((unsigned char *) data, index);
 }
 

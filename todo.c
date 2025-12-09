@@ -297,11 +297,11 @@ void ApplyCorpseFriction(uint16_t instanceIdx) {
     instances[instanceIdx].bounceCombine = PHYS_COMBINE_MAX;
 }
 
-float GetPainStatic() { // TODO: Hook into pain/health management and shield impact effect
+float GetPainStatic(void) { // TODO: Hook into pain/health management and shield impact effect
     return 0.0f;
 }
 
-Color GetPainStaticColor() { // TODO: Hook staticColor up to red or blue for pain or shield impact.
+Color GetPainStaticColor(void) { // TODO: Hook staticColor up to red or blue for pain or shield impact.
     return (Color){1.0f,0.0f,0.0f,1.0f};
 }
 

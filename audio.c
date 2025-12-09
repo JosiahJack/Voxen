@@ -14,7 +14,7 @@ ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
 // Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 
-void InitializeAudio() {
+void InitializeAudio(void) {
     ma_result result;
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.channels = 2; // Stereo output, adjust if needed

@@ -76,7 +76,7 @@ typedef struct {
     enum { CMD_NOARG, CMD_INT, CMD_STR } type;
 } ConsoleCommand;
 
-static int CommandMatch(const char* input, const char* cmd) {
+__attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
     while (*cmd && *input) {
         char c1 = tolower((unsigned char)*input++);
         char c2 = tolower((unsigned char)*cmd++);

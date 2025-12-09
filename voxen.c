@@ -276,7 +276,7 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float
     m[15] = 1.0f;
 }
 
-bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
+__attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
     for (int i = 0; i < 6; i++) {
         float dist = planes[i].nx * cx + planes[i].ny * cy + planes[i].nz * cz + planes[i].d;
         if (dist < -radius) return false;
@@ -308,7 +308,7 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
 
-void UpdateDynamicLights() {
+void UpdateDynamicLights(void) {
     if (gamePaused || menuActive) return;
     
     for (int i=0;i<loadedLights;++i) {
@@ -509,6 +509,8 @@ void UpdateVoxelLightLists(void) {
     glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
 }
 
+uint16_t largestNearbyMeshCount = 0;
+
 void RenderShadowmap(uint16_t lightIdx) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -516,7 +518,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
     float effectiveRadius = vmin(lightRadius, 15.36f);
-    uint16_t nearMeshes[loadedInstances];
+    uint16_t nearMeshes[256]; // Found that this is typically around 172
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
         if (instances[j].modelIndex >= loadedModels) continue;
@@ -529,8 +531,10 @@ void RenderShadowmap(uint16_t lightIdx) {
         
         nearMeshes[nearbyMeshCount] = j;
         nearbyMeshCount++;
+        if (nearbyMeshCount >= 256) { DualLogWarn("Shadowmapping needs larger nearMeshes count than 256!  Skipping some renderables for light %u!\n", lightIdx); break; }
     }
 
+    if (nearbyMeshCount > largestNearbyMeshCount) largestNearbyMeshCount = nearbyMeshCount;
     glProgramUniform1ui(shadowmapsShaderProgram, 3, lightIdx);
     for (uint8_t face = 0; face < 6; face++) {
         glProgramUniform1i(shadowmapsShaderProgram, 2, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
@@ -592,6 +596,7 @@ void RenderShadowmaps(void) {
     DebugRAM("start of RenderShadowmaps");
     if (settings_Shadows < 1u) return;
 
+    largestNearbyMeshCount = 0;
     glUseProgram(shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (totalShadowmapPixels + 31) / 32;
     glDispatchCompute(groupX_shadClear,1, 1);
@@ -688,8 +693,8 @@ void RenderShadowmaps(void) {
 
 // ============================================================================
 // UI Rendering and Text
-float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
-float GetScreenRelativeY(float percentage) { return (float)screen_height * percentage; }
+__attribute__((pure)) float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
+__attribute__((pure)) float GetScreenRelativeY(float percentage) { return (float)screen_height * percentage; }
 
 uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
     if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return 0; }
@@ -706,7 +711,7 @@ uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32
 }
 
 float uiImageVertexData[31768];
-void RenderUIImages() {
+void RenderUIImages(void) {
     if (uiImageCount == 0) return;
 
     glUseProgram(chunkShaderProgram);
@@ -768,7 +773,7 @@ void RenderUIImages() {
     glUseProgram(0);
 }
 
-bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
+__attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
     return (   cursorPosition_x >= startX && cursorPosition_x <= endX     // 0 == left
             && cursorPosition_y >= endY   && cursorPosition_y <= startY); // 0 == top
 }
@@ -1176,6 +1181,8 @@ static void ds_introsort(DepthSort* arr, int n, float dir) {
 #define REND_OPAQUE      1u
 #define REND_DOUBLESIDED 2u
 #define REND_TRANSPARENT 3u
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wvla"
 void RenderInstances(uint8_t type) {
     uint16_t* countsArray = NULL;
     uint16_t* offsetsArray = NULL;
@@ -1206,7 +1213,7 @@ void RenderInstances(uint8_t type) {
 
         uint16_t start = offsetsArray[modelIdx];
         if (start < 3) DualLogError("offsets for rendering wrong!\n");
-        uint16_t count =  countsArray[modelIdx];
+        uint16_t count = countsArray[modelIdx];
         DepthSort visibleInstances[start + count];
         uint16_t visibleCount = 0;
         for (uint16_t i = start; i < start + count && i < startOfNextType; i++) { // Filter visible instances
@@ -1246,8 +1253,9 @@ void RenderInstances(uint8_t type) {
         }
     }
 }
+#pragma GCC diagnostic pop
 
-void SetFog() {
+void SetFog(void) {
     fogColorRUsed = fogColorR * fogBaseDensityForLevel;
     fogColorGUsed = fogColorG * fogBaseDensityForLevel;
     fogColorBUsed = fogColorB * fogBaseDensityForLevel;
@@ -1514,7 +1522,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!noHUD && showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
         if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx, numCellsVisible);
-        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, settings_Contrast: %f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, (double)settings_Contrast);
+        if (!noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, settings_Contrast: %f, largestNearbyMeshCount: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, (double)settings_Contrast, largestNearbyMeshCount);
         if (consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 

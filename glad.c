@@ -1400,7 +1400,8 @@ static int glad_gl_get_extensions( const char **out_exts, char ***out_exts_i) {
     *out_exts = (const char *)glad_glGetString(GL_EXTENSIONS);
     return 1;
 }
-static int glad_gl_has_extension(const char *exts, char **exts_i, const char *ext) {
+
+__attribute__((pure)) static int glad_gl_has_extension(const char *exts, char **exts_i, const char *ext) {
     if(exts_i) {
         unsigned int index;
         for(index = 0; exts_i[index]; index++) {

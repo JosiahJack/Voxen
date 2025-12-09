@@ -33,7 +33,7 @@ void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogM
 void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
 void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
 
-void OpenConsoleLogFile() {
+void OpenConsoleLogFile(void) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
 }

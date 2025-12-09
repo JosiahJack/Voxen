@@ -93,7 +93,7 @@ extern uint16_t loadedAmbients;
 extern uint16_t ambientRegistry[MAX_AMBIENT_NOISES];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
-void InitializeAudio();
+void InitializeAudio(void);
 void UpdateAmbientSounds(void);
 // ----------------------------------------------------------------------------
 // Textures
@@ -233,7 +233,7 @@ extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
 void CullCore(void);
-void Cull();
+void Cull(void);
 bool get_cull_bit(const uint32_t* arr, int idx);
 // ----------------------------------------------------------------------------
 // Physics
@@ -314,7 +314,7 @@ extern double last_mouse_x, last_mouse_y;
 extern bool ignore_next_mouse_delta;
 void CycleToNextMonitor(GLFWwindow* window);
 void Input_Init(GLFWwindow* window);
-void Input_MouselookApply();
+void Input_MouselookApply(void);
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
@@ -336,7 +336,7 @@ extern uint16_t screen_height;
 extern int32_t debugView;
 extern int32_t debugValue;
 extern float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;
-void SetFog();
+void SetFog(void);
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern bool lightDirty[LIGHT_COUNT];
@@ -403,7 +403,7 @@ extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
 float TextWidth(const char *utf8, int32_t fontID);
 uint32_t DecodeUTF8(const char **p);
-void InitFontAtlasses();
+void InitFontAtlasses(void);
 // ----------------------------------------------------------------------------
 // UI
 #define BTN_SHOOT_MODE 10
@@ -425,8 +425,8 @@ float GetScreenRelativeY(float percentage);
 
 // ----------------------------------------------------------------------------
 // Logging / Debug Prints
-void OpenConsoleLogFile();
-void Screenshot();
+void OpenConsoleLogFile(void);
+void Screenshot(void);
 void CenterStatusPrint(const char* fmt, ...);
 void JournalDump(const char* dem_file);
 void DualLog(const char* fmt, ...);
@@ -462,7 +462,6 @@ bool ConstIndexIsStaticObjectSaveable(int constdex);
 bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
-void Screenshot();
 bool CursorVisible(void);
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum);
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {

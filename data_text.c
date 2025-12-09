@@ -218,7 +218,8 @@ void LoadLogTextForLanguage(uint8_t lang) {
     fseek(fp, 0, SEEK_SET);
 
     uint8_t *file_data = malloc((size_t)file_size);
-    if (fread(file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); OS_Exit(1); }
+    if (fread(file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); OS_Exit(1); return; } // Suppress -fanalyzer warning about double free by including unnecessary `return;` here.
+    
     fclose(fp);
     size_t data_pos = 0;
     int is_utf16le = 0, is_utf8 = 0;

@@ -80,13 +80,13 @@ int32_t Input_KeyUp(int32_t keycode) {
     return 0;
 }
 
-void InputClearRisingAndFallingEdges() { // Clear keypress rising and falling edge triggers
+void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
     for (int32_t i=0;i<MAX_KEYS;++i)          keyStates[i].pressed = keyStates[i].released = false;       // Can't memset as we want to preserve down state
     for (int32_t i=0;i<MAX_MOUSE_BUTTONS;i++) mouseButtons[i].pressed = mouseButtons[i].released = false; // Can't memset as we want to preserve down state
     scrollDelta = 0;
 }
 
-void UpdatePlayerFacingAngles() {
+void UpdatePlayerFacingAngles(void) {
     float rotation[16]; // Extract forward and right vectors from quaternion
     quat_to_matrix(&cam_rotation, rotation);
     cam_forwardx = rotation[8];  // Forward X
@@ -121,7 +121,7 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     else { q->x = 0.0f; q->y = 0.0f; q->z = 0.0f; q->w = 1.0f; }
 }
 
-void Input_MouselookApply() {
+void Input_MouselookApply(void) {
     if (currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }

@@ -501,7 +501,7 @@ void AddExplosionForce(uint16_t idx, float power, Vector3 explosionPos, float ra
     else           e->accumulatedForce = add_vector3(e->accumulatedForce, explosionForce);
 }
 
-float GetBasePlayerSpeed(bool running) {
+__attribute__((pure)) float GetBasePlayerSpeed(bool running) {
     bool isSprinting = keyStates[GLFW_KEY_LEFT_SHIFT].down; // TODO handle keybind
     if (noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;

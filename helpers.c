@@ -191,7 +191,7 @@ bool ConstIndexIsAmbient(int constdex) {
     return (constdex >= 621 && constdex <= 655);
 }
 
-void Screenshot() {
+void Screenshot(void) {
     struct stat st = {0};
     if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
         if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
@@ -222,11 +222,11 @@ GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* da
     return new_id;
 }
 
-bool CursorVisible(void) {
+__attribute__((pure)) bool CursorVisible(void) {
     return (inventoryMode || menuActive || gamePaused);
 }
 
-float clampf(float x, float a, float b) {
+__attribute__((pure)) float clampf(float x, float a, float b) {
     return x < a ? a : (x > b ? b : x);
 }
 

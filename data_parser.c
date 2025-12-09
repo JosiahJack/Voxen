@@ -102,7 +102,7 @@ bool process_gamedata_key_value(Entity *entry, const char *key, const char *valu
 }
 
 // Load Game/Mod Definition
-void ParseGameData() {
+void ParseGameData(void) {
     double start_time = get_time();
     const char* filename = "./Data/gamedata.txt";
     DualLog("Loading game definition from %s...",filename);    
@@ -283,11 +283,11 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     return true;
 }
 
-bool isDoubleSided(uint32_t texIndexToCheck) {
+__attribute__((pure)) bool isDoubleSided(uint32_t texIndexToCheck) {
     if (texIndexToCheck > loadedTextures) return false;
     return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
 }
-bool isTransparent(uint32_t texIndexToCheck) {
+__attribute__((pure)) bool isTransparent(uint32_t texIndexToCheck) {
     if (texIndexToCheck > loadedTextures) return false;
     return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
 }

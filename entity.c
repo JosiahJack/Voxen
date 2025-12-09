@@ -373,6 +373,10 @@ void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instan
     instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child1_scale.z;
 }
 
+#define LINE_LEN_MAX 81920
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     if (!levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
@@ -395,13 +399,12 @@ void LoadLevel(uint8_t curlevel) {
     int32_t lineNum = -1; // Start at 0 on first loop iteration, as it needs to iterate before each blank or commented line skip
     int32_t instanceIdx = PLAYER2;
     int32_t lightsIdx = -1;
-    size_t lineLengthMax = 81920; 
-    char lineSpace[lineLengthMax];
+    char lineSpace[LINE_LEN_MAX];
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
-    char initialLine[lineLengthMax];
+    char initialLine[LINE_LEN_MAX];
     SetUnityHierarchyOffsets(curlevel);
-    while (fgets(lineSpace, lineLengthMax, file)) {
+    while (fgets(lineSpace, LINE_LEN_MAX, file)) {
         size_t len = strlen(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
         lineSpace[--len] = '\0';
@@ -631,3 +634,4 @@ void LoadLevel(uint8_t curlevel) {
     Input_MouselookApply();
     levelCurrentlyLoading = false;
 }
+#pragma GCC diagnostic pop

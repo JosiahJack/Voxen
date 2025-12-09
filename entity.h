@@ -63,7 +63,7 @@ typedef struct {
     uint32_t capacity;
 } DataParser;
 
-void ParseGameData();
+void ParseGameData(void);
 bool parse_data_file(DataParser *parser, const char *filename);
 extern Entity* entities; // Global array of entity definitions
 extern Entity instances[INSTANCE_COUNT];

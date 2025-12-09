@@ -15,7 +15,7 @@ uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCel
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
 
-bool get_cull_bit(const uint32_t* arr, int idx) {
+__attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
     int word = idx / 32;
     int bit = idx % 32;
     return ((arr[word] & (1U << bit)) != 0);
@@ -28,7 +28,7 @@ static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
     else arr[word] &= ~(1U << bit);
 }
 
-void PutChunksInCells() {
+void PutChunksInCells(void) {
     uint16_t x,z;
     uint16_t cellIdx;
     for (uint16_t c=3; c < INSTANCE_COUNT; ++c) { // Start after player instances and NULLENT
@@ -40,7 +40,7 @@ void PutChunksInCells() {
     }
 }
 
-void DetermineClosedEdges() {
+void DetermineClosedEdges(void) {
     size_t maxFileSize = 500000; // 0.5MB
     uint8_t* file_buffer = malloc(maxFileSize);
     stbi__arena_init();
@@ -177,7 +177,7 @@ void DetermineClosedEdges() {
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
-bool UpdatedPlayerCell() {
+bool UpdatedPlayerCell(void) {
     uint16_t lastX = playerCellIdx_x;
     uint16_t lastZ = playerCellIdx_z;
     PosToCellCoords(instances[PLAYER1].position.x,instances[PLAYER1].position.z,&playerCellIdx_x,&playerCellIdx_z);
@@ -694,7 +694,7 @@ void CullCore(void) {
 //     ToggleNPCPVS();
 }
 
-void Cull() {
+void Cull(void) {
     if (menuActive || gamePaused || currentLevel >= LEVEL_CYBERSPACE) return;
 
     // Now handle player position updating PVS. Always do UpdatedPlayerCell
