@@ -576,6 +576,7 @@ void LoadLevel(uint8_t curlevel) {
                 lights[litIdx + LIGHT_DATA_OFFSET_POSX] += correctionLightX;
                 lights[litIdx + LIGHT_DATA_OFFSET_POSY] += correctionLightY;
                 lights[litIdx + LIGHT_DATA_OFFSET_POSZ] += correctionLightZ;
+                if (!lightOn[lightsIdx]) DualLog("Animatable light was off at %f %f %f\n",(double)lights[litIdx + LIGHT_DATA_OFFSET_POSX], (double)lights[litIdx + LIGHT_DATA_OFFSET_POSY], (double)lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
             }
             
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];

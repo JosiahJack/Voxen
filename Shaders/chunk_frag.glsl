@@ -233,6 +233,7 @@ void main() {
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
+        float depthDiff = distOverRange;
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
             float smearness = distOverRange * distOverRange * 24.0 + 14.0;
             vec3 a = abs(toLight);
@@ -293,9 +294,9 @@ void main() {
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
-        vec3 baseLighting = albedoColor.rgb  * lightColor * intensity;
-        lighting += baseLighting * pow(attenuation, 2.2) * spotFalloff * shadowFactor;
-        lighting += baseLighting * 0.19 * pow(attenuation, 2.2) * (1.0 - shadowFactor); // Poor man's bounce light
+        vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 2.2);
+        lighting += baseLighting * spotFalloff * shadowFactor;
+        lighting += baseLighting * (0.19 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
         intensityTotal += intensity * attenuation * 1.5;
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);

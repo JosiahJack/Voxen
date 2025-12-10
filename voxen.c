@@ -39,7 +39,7 @@ char statusText[TEXT_BUFFER_SIZE];
 // ----------------------------------------------------------------------------
 // Settings
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
-Settings voxen_Settings = {
+VoxenSettings voxen_Settings = {
     .ScreenWidth = 1366u,
     .ScreenHeight = 768u,
     .Shadows = 2u, // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
@@ -390,7 +390,8 @@ void UpdateDynamicLights(void) {
                 lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightBaseIntensity[i];
             }
         } else { // Light is turned off.
-            lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = 0.0f;
+            DualLog("Seting light to off\n");
+            lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
         }
     }
 

@@ -4109,6 +4109,7 @@ texture: 184
 index: 499
 model: 82
 texture: 196
+glowtexture: 197
 #doorE
 index: 500
 #doorF

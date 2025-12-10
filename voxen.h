@@ -107,8 +107,8 @@ typedef struct {
 	float FOV;
 	uint8_t Reflections;
 	bool Vsync;
-} Settings;
-extern Settings voxen_Settings;
+} VoxenSettings;
+extern VoxenSettings voxen_Settings;
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32
