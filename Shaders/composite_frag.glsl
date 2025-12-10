@@ -245,7 +245,7 @@ void main() {
     vec4 color = texture(tex, texCoordUsed).rgba;
     bool isSky = false;
     if (skyVisible > 0) {
-        isSky = (color.a > 0.1 && color.a < 0.8); // Sky hack alpha
+        isSky = ((color.a > 0.0 && color.a < 0.21) || color.a < 0.001); // Sky hack alpha (alpha of 0 for when noclipping)
         float mappedLat = 0.0;
         if (isSky) {
             vec2 ndc = texCoordUsed * 2.0 - 1.0;
