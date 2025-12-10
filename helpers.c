@@ -198,15 +198,15 @@ void Screenshot(void) {
         if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
     }
     
-    unsigned char* pixels = malloc(screen_width * screen_height * 4 * sizeof(char));
-    glReadPixels(0, 0, screen_width, screen_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    unsigned char* pixels = malloc(voxen_Settings.ScreenWidth * voxen_Settings.ScreenHeight * 4 * sizeof(char));
+    glReadPixels(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     char timestamp[32];
     char filename[96];
     time_t now = time(NULL);
     struct tm *utc_time = localtime(&now);    
     if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
     snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, VERSION_STRING, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
-    if (!stbi_write_bmp(filename, screen_width, screen_height, 4, pixels)) DualLogError("Failed to save screenshot\n");
+    if (!stbi_write_bmp(filename, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
     free(pixels);

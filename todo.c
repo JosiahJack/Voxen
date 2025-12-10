@@ -322,8 +322,8 @@ void CycleToNextMonitor(GLFWwindow* window) {
     int mx, my;
     glfwGetMonitorPos(next, &mx, &my);
     const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - screen_width) / 2;
-    int ypos = my + (mode->height - screen_height) / 2;
+    int xpos = mx + (mode->width - voxen_Settings.ScreenWidth) / 2;
+    int ypos = my + (mode->height - voxen_Settings.ScreenHeight) / 2;
     glfwSetWindowPos(window, xpos, ypos);
     ignore_next_mouse_delta = true;
     DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);

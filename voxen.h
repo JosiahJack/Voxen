@@ -96,15 +96,17 @@ typedef struct {
 extern QuestBits questData;
 
 typedef struct {
-	uint8_t settings_Shadows;
-	uint8_t settings_AntiAliasing;
-	uint8_t settings_Brightness;
-	uint8_t settings_VolumeMusic;
-	uint8_t settings_Language;
-	uint8_t settings_CullEnabled;
-	float settings_FOV;
-	uint8_t settings_Reflections;
-	bool settings_Vsync;
+	uint16_t ScreenWidth;
+	uint16_t ScreenHeight;
+	uint8_t Shadows;
+	uint8_t AntiAliasing;
+	uint8_t Brightness;
+	uint8_t VolumeMusic;
+	uint8_t Language;
+	uint8_t CullEnabled;
+	float FOV;
+	uint8_t Reflections;
+	bool Vsync;
 } Settings;
 extern Settings voxen_Settings;
 // ----------------------------------------------------------------------------
@@ -345,8 +347,6 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
 extern float testLight_x, testLight_y, testLight_z;
-extern uint16_t screen_width;
-extern uint16_t screen_height;
 extern int32_t debugView;
 extern int32_t debugValue;
 extern float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;

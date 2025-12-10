@@ -21,8 +21,8 @@ void ToggleConsole(void) {
     if (voxen_Cheats.consoleActive) inventoryMode = true;
     else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
         inventoryMode = false;
-        cursorPosition_x = (int32_t)((float)screen_width * 0.5f);
-        cursorPosition_y = (int32_t)((float)screen_height * 0.5f);
+        cursorPosition_x = (int32_t)((float)voxen_Settings.ScreenWidth * 0.5f);
+        cursorPosition_y = (int32_t)((float)voxen_Settings.ScreenHeight * 0.5f);
     }
 }
 
@@ -210,7 +210,7 @@ static void cmd_summon(int itemConstIndex) {
 }
 
 static void cmd_notarget(void) { voxen_Cheats.notarget = !voxen_Cheats.notarget; CenterStatusPrint("notarget: %s", voxen_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
-static void cmd_cull(void) { voxen_Settings.settings_CullEnabled = !voxen_Settings.settings_CullEnabled; CenterStatusPrint("Culling: %s", voxen_Settings.settings_CullEnabled ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]);  }
+static void cmd_cull(void) { voxen_Settings.CullEnabled = !voxen_Settings.CullEnabled; CenterStatusPrint("Culling: %s", voxen_Settings.CullEnabled ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]);  }
 static void cmd_showfps(void) { voxen_Cheats.showFPS = !voxen_Cheats.showFPS; }
 static void cmd_showlocation(void) { voxen_Cheats.showLocation = !voxen_Cheats.showLocation; }
 static void cmd_help(void) { CenterStatusPrint("There's no one to save you now Hacker!"); }

@@ -340,7 +340,8 @@ index: 160
 index: 161
 #Textures/dexmissile_glow.png
 index: 162
-
+#Textures/med1_8d_normal.png
+index: 163
 #Textures/dexmissile.png
 index: 164
 #Textures/d_logo10.png
@@ -1075,7 +1076,8 @@ index: 506
 index: 507
 #Textures/med2_1d_glow.png
 index: 508
-
+#Textures/med1_6_normal.png
+index: 509
 #Textures/med2_1d.png
 index: 510
 #Textures/med2_1_glow.png

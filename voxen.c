@@ -22,7 +22,6 @@
 Voxen_GlobalContext voxen_globalContext;
 
 bool inventoryMode = false;
-uint16_t screen_width = 1366, screen_height = 768;
 // ----------------------------------------------------------------------------
 // Diagnostics
 double game_start_time = 0.00;
@@ -41,15 +40,17 @@ char statusText[TEXT_BUFFER_SIZE];
 // Settings
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
 Settings voxen_Settings = {
-    .settings_Shadows = 2u, // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
-    .settings_AntiAliasing = 1u, // Default 1
-    .settings_Brightness = 100u, // Default 100 (for %)
-    .settings_VolumeMusic = 20u,
-    .settings_Language = 0, // English default
-    .settings_CullEnabled = 1,
-    .settings_FOV = 65.0f,
-    .settings_Reflections = 1u, // Default 1
-    .settings_Vsync = false
+    .ScreenWidth = 1366u,
+    .ScreenHeight = 768u,
+    .Shadows = 2u, // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
+    .AntiAliasing = 1u, // Default 1
+    .Brightness = 70u, // Default 100 (for %)
+    .VolumeMusic = 20u,
+    .Language = 0, // English default
+    .CullEnabled = 1,
+    .FOV = 65.0f,
+    .Reflections = 1u, // Default 1
+    .Vsync = false
 };
 
 // Cheats
@@ -241,15 +242,15 @@ void SetSkyRotateSpeed(void) {
 
 void UpdateScreenSize(void) {
     UpdateProjectionMatrices();
-    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 2, screen_width);
-    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 3, screen_height);
+    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 2, voxen_Settings.ScreenWidth);
+    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 3, voxen_Settings.ScreenHeight);
     glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 23, (float)(SHADOW_MAP_SIZE));
     glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 26, SSR_RES);
-    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 6, screen_width);
-    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 7, screen_height);
+    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 6, voxen_Settings.ScreenWidth);
+    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 7, voxen_Settings.ScreenHeight);
     glProgramUniform1f(voxen_GL_Comms.chunkShaderProgram, 16, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 0, screen_width / SSR_RES);
-    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 1, screen_height / SSR_RES);       
+    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 0, voxen_Settings.ScreenWidth / SSR_RES);
+    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 1, voxen_Settings.ScreenHeight / SSR_RES);       
     glProgramUniform1i(voxen_GL_Comms.ssrShaderProgram, 2, SSR_RES);
     SetSkyRotateSpeed();
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
@@ -278,13 +279,13 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float
 void UpdateProjectionMatrices(void) {
     float* m;
     m = uiOrthoProjection;
-    m[0] = 2.0f / (float)screen_width; m[1] =                           0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                       0.0f; m[5] = -2.0f / ((float)screen_height); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                       0.0f; m[9] =                           0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                      -1.0f; m[13]=                           1.0f; m[14]=  0.0f; m[15]= 1.0f;
+    m[0] = 2.0f / (float)voxen_Settings.ScreenWidth; m[1] =                                         0.0f; m[2] =  0.0f; m[3] = 0.0f;
+    m[4] =                                     0.0f; m[5] = -2.0f / ((float)voxen_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
+    m[8] =                                     0.0f; m[9] =                                         0.0f; m[10]= -1.0f; m[11]= 0.0f;
+    m[12]=                                    -1.0f; m[13]=                                         1.0f; m[14]=  0.0f; m[15]= 1.0f;
     
-    aspect3D = (float)screen_width / (float)screen_height;
-    float f = vcot(voxen_Settings.settings_FOV * PI / 360.0f);
+    aspect3D = (float)voxen_Settings.ScreenWidth / (float)voxen_Settings.ScreenHeight;
+    float f = vcot(voxen_Settings.FOV * PI / 360.0f);
     m = rasterPerspectiveProjection;
     m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
     m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
@@ -294,10 +295,10 @@ void UpdateProjectionMatrices(void) {
     float aspectShad = (float)SHADOW_MAP_SIZE / (float)SHADOW_MAP_SIZE;
     f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
     m = shadowmapsPerspectiveProjection;
-    m[0] = f / aspectShad; m[1] = 0.0f; m[2] =                                            0.0f; m[3] =  0.0f;
-    m[4] =           0.0f; m[5] =    f; m[6] =                                            0.0f; m[7] =  0.0f;
-    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(35.0f + NEAR_PLANE) / (35.0f - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * 35.0f * NEAR_PLANE / (35.0f - NEAR_PLANE); m[15]=  0.0f;
+    m[0] = f / aspectShad; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
+    m[4] =           0.0f; m[5] =    f; m[6] =                                                                  0.0f; m[7] =  0.0f;
+    m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
 }
 
 __attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
@@ -547,7 +548,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
 
         uint16_t instCellIdx = (uint16_t)cellIndexForInstance[j];
-        if (voxen_Settings.settings_CullEnabled) {
+        if (voxen_Settings.CullEnabled) {
             if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
             
             float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
@@ -660,7 +661,7 @@ void RenderShadowmaps(void) {
         float dz = lightPosZ - instances[PLAYER1].position.z;
         float distSqrd = dx * dx + dy * dy + dz * dz;
         if (distSqrd >= 2500.0f) continue; // shadowDistance of 50.0f
-        
+
         int lightCellIdx = cellIndexForLight[i];
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
@@ -716,14 +717,14 @@ void RenderShadowmaps(void) {
 
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
-    glViewport(0, 0, screen_width, screen_height);
+    glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
     glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
 }
 
 // ============================================================================
 // UI Rendering and Text
-__attribute__((pure)) float GetScreenRelativeX(float percentage) { return (float)screen_width * percentage; }
-__attribute__((pure)) float GetScreenRelativeY(float percentage) { return (float)screen_height * percentage; }
+__attribute__((pure)) float GetScreenRelativeX(float percentage) { return (float)voxen_Settings.ScreenWidth * percentage; }
+__attribute__((pure)) float GetScreenRelativeY(float percentage) { return (float)voxen_Settings.ScreenHeight * percentage; }
 
 uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
     if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return 0; }
@@ -890,7 +891,7 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    RenderFormattedText(screen_width / 2 - offset, screen_height / 2 - 5, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, buffer);
+    RenderFormattedText(voxen_Settings.ScreenWidth / 2 - offset, voxen_Settings.ScreenHeight / 2 - 5, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, buffer);
     glEnable(GL_DEPTH_TEST);
     glfwSwapBuffers(voxen_globalContext.window);
 }
@@ -954,7 +955,7 @@ void InitializeEnvironment(void) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 0);
-    voxen_globalContext.window = glfwCreateWindow(screen_width, screen_height, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
+    voxen_globalContext.window = glfwCreateWindow(voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, "Voxen, the OpenGL Voxel Lit Engine", NULL, NULL);
     if (!voxen_globalContext.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
         
     glfwMakeContextCurrent(voxen_globalContext.window);
@@ -964,8 +965,8 @@ void InitializeEnvironment(void) {
         const GLFWvidmode* mode = glfwGetVideoMode(target_monitor);
         int mx, my;
         glfwGetMonitorPos(target_monitor, &mx, &my);
-        int xpos = mx + (mode->width - screen_width) / 2;
-        int ypos = my + (mode->height - screen_height) / 2;
+        int xpos = mx + (mode->width - voxen_Settings.ScreenWidth) / 2;
+        int ypos = my + (mode->height - voxen_Settings.ScreenHeight) / 2;
         glfwSetWindowPos(voxen_globalContext.window, xpos, ypos);
         DualLog("Window positioned (windowed, centered) on monitor: %s (primary) at %d,%d\nUsing GLFW %s, ", glfwGetMonitorName(target_monitor), xpos, ypos,glfwGetVersionString());
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); OS_Exit(1); }
@@ -980,7 +981,7 @@ void InitializeEnvironment(void) {
     OS_CPUInfo();
     DebugRAM("GL Buffer and shader setup");
     Input_Init(voxen_globalContext.window);
-    glfwSwapInterval(voxen_Settings.settings_Vsync ? 1 : 0);
+    glfwSwapInterval(voxen_Settings.Vsync ? 1 : 0);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     CompileShaders();
     glCreateBuffers(1, &voxen_GL_Comms.quadVBO);
@@ -1005,13 +1006,13 @@ void InitializeEnvironment(void) {
     glVertexArrayVertexBuffer(voxen_GL_Comms.textVAO, 0, voxen_GL_Comms.textVBO, 0, 5 * sizeof(float));
     for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(voxen_GL_Comms.textVAO, i, 0); glEnableVertexArrayAttrib(voxen_GL_Comms.textVAO, i); }
 
-    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA32F, screen_width, screen_height,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, screen_width, screen_height, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, screen_width, screen_height,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
+    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA32F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
     glGenTextures(1, &voxen_GL_Comms.outputImageID);
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  screen_width / SSR_RES,  screen_height / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  voxen_Settings.ScreenWidth / SSR_RES,  voxen_Settings.ScreenHeight / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -1048,10 +1049,10 @@ void InitializeEnvironment(void) {
     malloc_trim(0);
     DebugRAM("after InitializeAudio");
     
-    LoadTextForLanguage(voxen_Settings.settings_Language);
+    LoadTextForLanguage(voxen_Settings.Language);
     DebugRAM("LoadTextForLanguage end");
     
-    LoadLogTextForLanguage(voxen_Settings.settings_Language);
+    LoadLogTextForLanguage(voxen_Settings.Language);
     DebugRAM("LoadLogTextForLanguage end");
     
     ParseGameData();
@@ -1087,7 +1088,7 @@ void InitializeEnvironment(void) {
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
     matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-//     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)voxen_Settings.settings_VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
+//     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -1252,7 +1253,7 @@ void RenderInstances(uint8_t type) {
             uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
             float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
                                               instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-            if (voxen_Settings.settings_CullEnabled) {
+            if (voxen_Settings.CullEnabled) {
                 if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
             }
@@ -1397,7 +1398,7 @@ int32_t main(int32_t argc, char* argv[]) {
             // 3. Light Updates
             UpdateDynamicLights();
             for (int i = 0; i < loadedLights; ++i) { if (lightDirty[i]) { UpdateVoxelLightLists(); break; } }
-            if (voxen_Settings.settings_Shadows > 0u) RenderShadowmaps();
+            if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
             
             // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
@@ -1408,8 +1409,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glProgramUniform1f(voxen_GL_Comms.chunkShaderProgram, 8, worldMin_x);
             glProgramUniform1f(voxen_GL_Comms.chunkShaderProgram, 9, worldMin_z);
             glProgramUniform3f(voxen_GL_Comms.chunkShaderProgram, 10, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-            glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 14, voxen_Settings.settings_Reflections);
-            glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 15, voxen_Settings.settings_Shadows);
+            glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 14, voxen_Settings.Reflections);
+            glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 15, voxen_Settings.Shadows);
             glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 17, 0u); // unlit false
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
@@ -1419,12 +1420,12 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             // 5. SSR (Screen Space Reflections)
-            if ((debugView == 0 || debugView == 4) && voxen_Settings.settings_Reflections > 0) {
+            if ((debugView == 0 || debugView == 4) && voxen_Settings.Reflections > 0) {
                 glUseProgram(voxen_GL_Comms.ssrShaderProgram);
                 glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
                 glUniform3f(3, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-                GLuint groupX_ssr = ((screen_width / SSR_RES) + 31) / 32;
-                GLuint groupY_ssr = ((screen_height / SSR_RES) + 31) / 32;
+                GLuint groupX_ssr = ((voxen_Settings.ScreenWidth  / SSR_RES) + 31) / 32;
+                GLuint groupY_ssr = ((voxen_Settings.ScreenHeight / SSR_RES) + 31) / 32;
                 glDispatchCompute(groupX_ssr, groupY_ssr, 1);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
             }
@@ -1450,18 +1451,18 @@ int32_t main(int32_t argc, char* argv[]) {
         
         glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 4, worldMin_x);
         glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 5, worldMin_z);
-        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 7, voxen_Settings.settings_Reflections);
-        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 8, voxen_Settings.settings_AntiAliasing);
+        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 7, voxen_Settings.Reflections);
+        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 8, voxen_Settings.AntiAliasing);
         glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 9, berserkTimeRemainingNormalized);
         glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 10, berserkSeedTime);
-        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 11, voxen_Settings.settings_Brightness);
+        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 11, voxen_Settings.Brightness);
         glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
         glProgramUniform3f(voxen_GL_Comms.imageBlitShaderProgram, 13, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-        glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 14, voxen_Settings.settings_FOV);
+        glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 14, voxen_Settings.FOV);
         glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 15, (float)pauseRelativeTime * 0.1f);
         glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 16, aspect3D);
         glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 20, shieldOnType);
-        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 22, voxen_Settings.settings_Shadows);
+        glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 22, voxen_Settings.Shadows);
         glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
         glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
         glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 27, 0); // Texture 0 for the rendered geometry color buffer
@@ -1480,8 +1481,8 @@ int32_t main(int32_t argc, char* argv[]) {
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
 
         // UI Common References
-        float screenCenterX = (float)screen_width / 2;
-        float screenCenterY = (float)screen_height / 2;
+        float screenCenterX = (float)voxen_Settings.ScreenWidth / 2;
+        float screenCenterY = (float)voxen_Settings.ScreenHeight / 2;
         float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
         
         // 7. UI
@@ -1493,7 +1494,7 @@ int32_t main(int32_t argc, char* argv[]) {
         //    Cursor
         uint16_t cursorTexture = 1260;
         if (gamePaused || menuActive) cursorTexture = 1261;
-        float cursorSize = (float)screen_width * CURSOR_SCREEN_PERCENTAGE;
+        float cursorSize = (float)voxen_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE;
         float cursorHalfSize = cursorSize * 0.5f;
         if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
         else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
@@ -1506,8 +1507,8 @@ int32_t main(int32_t argc, char* argv[]) {
             if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
                 if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
                     inventoryMode = false;
-                    cursorPosition_x = screen_width / 2;
-                    cursorPosition_y = screen_height / 2;
+                    cursorPosition_x = voxen_Settings.ScreenWidth / 2;
+                    cursorPosition_y = voxen_Settings.ScreenHeight / 2;
                 }
             }
         }
@@ -1547,7 +1548,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, largestNearbyMeshCount: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, largestNearbyMeshCount);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (screen_width / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
         RenderUIImages();    

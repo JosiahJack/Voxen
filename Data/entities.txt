@@ -911,6 +911,7 @@ index: 161
 model: 259
 cardchunk: 1
 texture: 496
+normtexture: 509
 spectexture: 1256
 #chunk_med1_7
 index: 162
@@ -961,12 +962,14 @@ index: 169
 model: 268
 cardchunk: 1
 texture: 503
+normtexture: 502
 spectexture: 1242
 #chunk_med1_8d
 index: 170
 model: 267
 cardchunk: 1
 texture: 501
+normtexture: 163
 spectexture: 1242
 #chunk_med1_9
 index: 171

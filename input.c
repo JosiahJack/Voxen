@@ -129,11 +129,11 @@ void Input_MouselookApply(void) {
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     if (CursorVisible()) {
         int32_t newX = cursorPosition_x + xrel;
-        if (newX > screen_width) newX = screen_width;
+        if (newX > voxen_Settings.ScreenWidth) newX = voxen_Settings.ScreenWidth;
         if (newX < 0) newX = 0;
         cursorPosition_x = newX;
         int32_t newY = cursorPosition_y + yrel;
-        if (newY > screen_height) newY = screen_height;
+        if (newY > voxen_Settings.ScreenHeight) newY = voxen_Settings.ScreenHeight;
         if (newY < 0) newY = 0;
         cursorPosition_y = newY;
     }
@@ -178,7 +178,7 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;
         inventoryMode = !inventoryMode;
-        cursorPosition_x = screen_width / 2;
-        cursorPosition_y = screen_height / 2;
+        cursorPosition_x = voxen_Settings.ScreenWidth / 2;
+        cursorPosition_y = voxen_Settings.ScreenHeight / 2;
     }
 }
