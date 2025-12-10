@@ -39,7 +39,8 @@ index: 1
 model: 178
 cardchunk: 1
 texture: 1230
-spectexture: 1242
+normtexture: 160
+spectexture: 1230
 collider: 1
 collider_centerx: 0.0
 collider_centery: 1.44

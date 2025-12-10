@@ -379,7 +379,7 @@ void main() {
                 skyColor += sunColor * (sunMask * 3.0 + corona * 1.5);
             }
 
-            FragColor = vec4((color.rgb * color.a) + skyColor, 1.0); // Add window alpha weighted color tint
+            FragColor = vec4((color.rgb * max(0.1,color.a)) + skyColor, 1.0); // Add window alpha weighted color tint
         }
     }
 
@@ -395,6 +395,7 @@ void main() {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);
             vec4 specColor = imageLoad(inputSpecular, uv);
+            if (color.a < 0.99 && color.a > 0.1) specColor *= 2.0;
             reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.85;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 

@@ -142,15 +142,14 @@ void main() {
     vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
-    if (texIndexChecked == 1230) albedoColor.a = 0.20;
     vec3 adjustedNormal = Normal;
-    if (normInstanceIndex != 0 && debugValue < 1 && distToPixel < 10.24) {
+    if (normInstanceIndex != 0 && debugValue < 1) {
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
         vec2 duv2 = dFdy(TexCoord);
         float uvArea = abs(duv1.x * duv2.y - duv1.y * duv2.x);
-        if (uvArea > 0.0000001) {
+        if (uvArea > 0.000000001) {
             vec3 t = normalize(dp1 * duv2.y - dp2 * duv1.y);
             vec3 b = normalize(dp1 * duv2.x - dp2 * duv1.x);
             mat3 TBN3x3 = mat3(t, b, adjustedNormal);
