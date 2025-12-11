@@ -28,6 +28,7 @@ DataParser model_parser;
 float** modelVertices = NULL; // Persistent for physics convex hulls and raycasts
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
+uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
 GLuint vbos[MODEL_IDX_MAX] = {0}; // 4kb
 GLuint tbos[MODEL_IDX_MAX] = {0}; // 4kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
@@ -112,6 +113,7 @@ void cleanup_all_mmaps(void) {
 void LoadModels(void) {
     double start_time = get_time();
     loadedModels = 0;
+    uint16_t animatedModelCount = 0u;
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
     int32_t maxIndex = -1;
@@ -148,6 +150,8 @@ void LoadModels(void) {
     
     for (uint32_t i = 0; i < loadedModels; ++i) {
         int32_t parserIdx = indexToParser[i];
+        modelAnimationType[i] = model_parser.entries[parserIdx].animated;
+        if (modelAnimationType[i] > 0u) animatedModelCount++;
         const char *fbx_path = model_parser.entries[parserIdx].path;
         if (!fbx_path || !fbx_path[0]) continue;
 
@@ -307,7 +311,7 @@ void LoadModels(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
-    DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
+    DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
     for (int i = 0; i < loadedModels; ++i) {
         if (modelVertexCounts[i] == 0) continue;
         

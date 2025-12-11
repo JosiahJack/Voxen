@@ -58,6 +58,7 @@ float intervalStepisLerping[LIGHT_COUNT][30] = {0};
                 "    index: %u\n"
                 "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
                 "    modelIndex: %u\n"
+                "    animated:   %u\n"
                 "    texIndex:   %u\n"
                 "    glowIndex:  %u\n"
                 "    specIndex:  %u\n"
@@ -95,6 +96,7 @@ float intervalStepisLerping[LIGHT_COUNT][30] = {0};
                     (ent.entflags & ENTFLAG_KINEMATIC) > 0,
                     (ent.entflags & ENTFLAG_RIGIDBODY) > 0,
                 ent.modelIndex,
+                ent.animated,
                 ent.texIndex,
                 ent.glowIndex,
                 ent.specIndex,
@@ -134,6 +136,7 @@ void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
+    entry->animated = 0u;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
     entry->lodIndex  = MODEL_IDX_MAX;
     entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
@@ -305,6 +308,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         
     instances[instanceIdx].index = entIdx;
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
+    instances[instanceIdx].animated = modelAnimationType[instances[instanceIdx].modelIndex];
     if (instances[instanceIdx].modelIndex < loadedModels) renderableCount++;
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
     instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
@@ -352,7 +356,6 @@ void AddChild(uint16_t child, uint16_t childIndex, uint16_t parent, uint16_t ent
     if (child == UINT16_MAX) return;
     
     (*instanceIdx)++; // Increment head of the list an extra time for the child entity
-    DualLog("Adding a child with entity index %u and with entity prefab child index %u\n", child, childIndex);
     AddInstance(child, *instanceIdx, lineNum);
     instances[*instanceIdx].index = child;
     instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child_offset[childIndex].x;

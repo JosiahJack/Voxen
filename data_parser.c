@@ -230,6 +230,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 } else {
                          if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "animated") == 0)          entry.animated = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "spectexture") == 0)       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
@@ -259,9 +260,8 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(trimmed_key, "volume") == 0)            entry.volume = parse_float(trimmed_value, start, lineNum);
                     
                     else if (strcmp(trimmed_key, "##child") == 0) {
-                        DualLog("Found a child!\n");
                         ++currentChild;
-                        if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children! Minivan is full!!\n"); OS_Exit(1); }
+                        if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children %u! Minivan is full!!\n", currentChild); OS_Exit(1); }
                         
                         entry.child[currentChild] = parse_numberu16(trimmed_value, start, lineNum);
                     } else if (strcmp(trimmed_key, "child_offsetx") == 0)    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);

@@ -174,38 +174,55 @@ index: 76
 index: 77
 #Models/door10.fbx
 index: 78
+animated: 1
 #Models/door1.fbx
 index: 79
+animated: 1
 #Models/door2.fbx
 index: 80
+animated: 1
 #Models/door3.fbx
 index: 81
+animated: 1
 #Models/door4.fbx
 index: 82
+animated: 1
 #Models/door5.fbx
 index: 83
+animated: 1
 #Models/door6.fbx
 index: 84
+animated: 1
 #Models/door7.fbx
 index: 85
+animated: 1
 #Models/door8.fbx
 index: 86
+animated: 1
 #Models/door9.fbx
 index: 87
+animated: 1
 #Models/door_elevator1.fbx
 index: 88
+animated: 1
 #Models/door_elevator2.fbx
 index: 89
+animated: 1
 #Models/door_elevator3.fbx
 index: 90
+animated: 1
 #Models/door_elevator4.fbx
 index: 91
+animated: 1
 #Models/door_wall1.fbx
 index: 92
+animated: 1
 #Models/door_wall2.fbx
 index: 93
+animated: 1
 #Models/door_wall3.fbx
 index: 94
+animated: 1
 #Models/eng1_1d.fbx
 index: 95
 #Models/eng1_1.fbx
@@ -262,6 +279,7 @@ index: 120
 index: 121
 #Models/eng_wallpump.fbx
 index: 122
+animated: 1
 #Models/exec1_1d.fbx
 index: 123
 #Models/exec1_1.fbx
@@ -332,6 +350,7 @@ index: 155
 index: 156
 #Models/flight_fanwall.fbx
 index: 157
+animated: 1
 #Models/flightpods_exterior.fbx
 index: 158
 #Models/foliage_fernblueflower.fbx
@@ -618,6 +637,7 @@ index: 298
 index: 299
 #Models/npc_bot_cortex_reaver.fbx
 index: 300
+animated: 2
 #Models/npc_bot_cortex_reaver_gibs.fbx
 index: 301
 #Models/npc_cyberdog.fbx
@@ -630,67 +650,89 @@ index: 304
 index: 305
 #Models/npc_cyborgassassin.fbx
 index: 306
+animated: 2
 #Models/npc_cyborgassassin_throwingstar.fbx
 index: 307
 #Models/npc_cyborgassassin_weapon.fbx
 index: 308
-#Models/npc_cyborg_diego_die.fbx
-index: 309
+
 #Models/npc_cyborg_diego.fbx
 index: 310
+animated: 2
 #Models/npc_cyborg_diegoteleportfx.fbx
 index: 311
 #Models/npc_cyborg_drone.fbx
 index: 312
+animated: 2
 #Models/npc_cyborg_elite.fbx
 index: 313
+animated: 2
 #Models/npc_cyborg_enforcer.fbx
 index: 314
+animated: 2
 #Models/npc_cyborgwarrior.fbx
 index: 315
+animated: 2
 #Models/npc_execbot.fbx
 index: 316
+animated: 2
 #Models/npc_execbot_gibs.fbx
 index: 317
 #Models/npc_flierbot.fbx
 index: 318
+animated: 1
 #Models/npc_flierbot_gibs.fbx
 index: 319
 #Models/npc_gortiger.fbx
 index: 320
+animated: 2
 #Models/npc_hopper_die.fbx
 index: 321
+animated: 3
 #Models/npc_hopper.fbx
 index: 322
+animated: 2
 #Models/npc_humanoidmutant.fbx
 index: 323
+animated: 2
 #Models/npc_invisomut.fbx
 index: 324
+animated: 2
 #Models/npc_maintenancebot.fbx
 index: 325
+animated: 1
 #Models/npc_maintenancebot_gibs.fbx
 index: 326
-
+//#Models/npc_zerogmut.glb
+//index: 327
+//animated: 3
 #Models/npc_mutant_avian.fbx
 index: 328
+animated: 2
 #Models/npc_mutant_cyborg.fbx
 index: 329
+animated: 2
 #Models/npc_plantmutant.fbx
 index: 330
+animated: 2
 #Models/npc_repairbot.fbx
 index: 331
+animated: 2
 #Models/npc_repairbot_gibs.fbx
 index: 332
 #Models/npc_sec1bot.fbx
 index: 333
+animated: 2
 #Models/npc_sec1bot_gibs.fbx
 index: 334
 #Models/npc_sec2bot.fbx
 index: 335
+animated: 2
 #Models/npc_sec2botgibs.fbx
 index: 336
 #Models/npc_servbot.fbx
 index: 337
+animated: 2
 #Models/npc_servbot_gibs.fbx
 index: 338
 
@@ -724,10 +766,13 @@ index: 496
 index: 497
 #Models/puzzlepanel1.fbx
 index: 498
+animated: 1
 #Models/puzzlepanel2.fbx
 index: 499
+animated: 1
 #Models/puzzlepanel3.fbx
 index: 500
+animated: 1
 #Models/rad1_1.fbx
 index: 501
 #Models/reac1_1.fbx
@@ -918,6 +963,7 @@ index: 593
 index: 595
 #Models/sparkingwire.fbx
 index: 596
+animated: 2
 #Models/stor1_1.fbx
 index: 597
 #Models/stor1_3.fbx
@@ -950,10 +996,12 @@ index: 610
 index: 611
 #Models/switch4.fbx
 index: 612
+animated: 1
 #Models/switch5_broken.fbx
 index: 613
 #Models/switch5.fbx
 index: 614
+animated: 1
 #Models/switch6.fbx
 index: 615
 #Models/switch8.fbx
@@ -989,12 +1037,14 @@ index: 631
 index: 632
 #Models/v_pipe.fbx
 index: 633
+animated: 1
 #Models/v_pistol.fbx
 index: 634
 #Models/v_plasma.fbx
 index: 635
 #Models/v_rapier.fbx
 index: 636
+animated: 1
 #Models/warecasing.fbx
 index: 637
 #Models/w_blaster.fbx
@@ -1038,8 +1088,10 @@ index: 656
 index: 657
 #Models/xdoor1.fbx
 index: 658
+animated: 1
 #Models/xdoor2.fbx
 index: 659
+animated: 1
 #Models/xray_machine.fbx
 index: 660
 #Models/bridg1_1.fbx

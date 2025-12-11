@@ -21,6 +21,7 @@ typedef struct {
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     uint32_t entflags;
     uint16_t modelIndex;
+    uint8_t animated;
     uint16_t texIndex;
     uint16_t glowIndex;
     uint16_t specIndex;

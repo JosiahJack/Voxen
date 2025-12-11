@@ -153,6 +153,7 @@ extern uint16_t numDynamicLights;
 extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
+extern uint8_t modelAnimationType[MODEL_IDX_MAX];
 void LoadModels(void);
 
 // Lights
