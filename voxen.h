@@ -190,7 +190,6 @@ void LoadModels(void);
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern float lightsRangeSquared[LIGHT_COUNT];
-extern float lightBaseIntensity[LIGHT_COUNT];
 extern bool lightOn[LIGHT_COUNT];
 extern bool lightLerpOn[LIGHT_COUNT];
 extern bool lightLerpUp[LIGHT_COUNT];

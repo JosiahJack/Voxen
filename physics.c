@@ -28,7 +28,7 @@ typedef struct {
     Vector3 contactPoint; // Max 4 for box resting on ground
 } Manifold;
 
-Vector3 GetWorldCenter(const Entity* e) {
+__attribute__((pure)) Vector3 GetWorldCenter(const Entity* e) {
     Vector3 scaledCenter = {e->colliderCenter.x * e->scale.x, e->colliderCenter.y * e->scale.y, e->colliderCenter.z * e->scale.z};
     Vector3 rotatedCenter = rotate_quaternion(e->rotation, scaledCenter);
     return add_vector3(e->position, rotatedCenter);

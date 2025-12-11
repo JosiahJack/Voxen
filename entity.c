@@ -36,7 +36,6 @@ float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticIm
 float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
 float correctionLightX, correctionLightY, correctionLightZ;
 uint16_t loadedLights = 0;
-float lightBaseIntensity[LIGHT_COUNT] = {0};
 float lightMinIntensity[LIGHT_COUNT] = {0};
 float lightMaxIntensity[LIGHT_COUNT] = {0};
 bool lightOn[LIGHT_COUNT] = {1};

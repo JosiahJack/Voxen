@@ -235,45 +235,9 @@ void CompileShaders(void) {
 }
 
 void SetSkyRotateSpeed(void) {
-    float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
+    static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
     float skyRotateSpeed = speeds[voxen_Cheats.dizzyLevel];
     glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 30, skyRotateSpeed);
-}
-
-void UpdateScreenSize(void) {
-    UpdateProjectionMatrices();
-    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 2, voxen_Settings.ScreenWidth);
-    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 3, voxen_Settings.ScreenHeight);
-    glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 23, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 26, SSR_RES);
-    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 6, voxen_Settings.ScreenWidth);
-    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 7, voxen_Settings.ScreenHeight);
-    glProgramUniform1f(voxen_GL_Comms.chunkShaderProgram, 16, (float)(SHADOW_MAP_SIZE));
-    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 0, voxen_Settings.ScreenWidth / SSR_RES);
-    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 1, voxen_Settings.ScreenHeight / SSR_RES);       
-    glProgramUniform1i(voxen_GL_Comms.ssrShaderProgram, 2, SSR_RES);
-    SetSkyRotateSpeed();
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
-}
-
-// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
-    float rotation[16];
-    quat_to_matrix(camRotation, rotation);
-
-    // Extract basis vectors (camera space axes)
-    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
-    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
-    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
-
-    // View matrix: inverse rotation (transpose) and inverse translation
-    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
-    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
-    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
-    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
-    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
-    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
-    m[15] = 1.0f;
 }
 
 void UpdateProjectionMatrices(void) {
@@ -299,6 +263,38 @@ void UpdateProjectionMatrices(void) {
     m[4] =           0.0f; m[5] =    f; m[6] =                                                                  0.0f; m[7] =  0.0f;
     m[8] =           0.0f; m[9] = 0.0f; m[10]=      -(LIGHT_RANGE_MAX + NEAR_PLANE) / (LIGHT_RANGE_MAX - NEAR_PLANE); m[11]= -1.0f;
     m[12]=           0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
+}
+
+void UpdateScreenSize(void) {
+    UpdateProjectionMatrices();
+    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 2, voxen_Settings.ScreenWidth);
+    glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 3, voxen_Settings.ScreenHeight);
+    glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 23, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 26, SSR_RES);
+    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 6, voxen_Settings.ScreenWidth);
+    glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 7, voxen_Settings.ScreenHeight);
+    glProgramUniform1f(voxen_GL_Comms.chunkShaderProgram, 16, (float)(SHADOW_MAP_SIZE));
+    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 0, voxen_Settings.ScreenWidth / SSR_RES);
+    glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 1, voxen_Settings.ScreenHeight / SSR_RES);       
+    glProgramUniform1i(voxen_GL_Comms.ssrShaderProgram, 2, SSR_RES);
+    SetSkyRotateSpeed();
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
+}
+
+// Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
+void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
+    float rotation[16];
+    quat_to_matrix(camRotation, rotation);
+    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
+    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
+    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
+    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
+    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
+    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
+    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
+    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
+    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
+    m[15] = 1.0f;
 }
 
 __attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
@@ -340,58 +336,26 @@ void UpdateDynamicLights(void) {
         if (lightIntervalStepsLength[i] < 1) continue;
         
         int litIdx = i * LIGHT_DATA_SIZE;
-        if (lightOn[i]) {
-            if (lightIntervalStepsLength[i] > 0) {
-                float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
-                if (lightLerpUp[i]) { // Going from lightMinIntensity to lightMaxIntensity
-                    if (lightLerpTime[i] < (float)pauseRelativeTime) {
-                        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMaxIntensity[i];
-                        lightLerpUp[i] = false;
-                        lightCurrentStep[i]++;
-                        if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
-                        lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-                        lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
-                        lightLerpStartTime[i] = (float)pauseRelativeTime;
-                    } else {
-                        if (lightLerpOn[i]) {
-                            if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
-                                if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                                    lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
-                                    lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (lightLerpValue[i]));
-                                    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
-                                }
-                            }
-                        }
-                    }
-                } else { // Going from lightMaxIntensity to lightMinIntensity
-                    if (lightLerpTime[i] < (float)pauseRelativeTime) {
-                        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
-                        lightLerpUp[i] = true;
-                        lightCurrentStep[i]++;
-                        if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
-                        lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-                        lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
-                        lightLerpStartTime[i] = (float)pauseRelativeTime;
-                    } else {
-                        if (lightLerpOn[i]) {
-                            if (lightCurrentStep[i] == lightIntervalStepsLength[i]) lightCurrentStep[i] = 0;
-                            if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
-                                if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                                    lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
-                                    lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * (1.0f - lightLerpValue[i]));
-                                    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
-                                }
-                            }
-                        }
-                    }
-                }
+        if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
 
-            } else { // Light is on but no steps so set to normal intensity setting
-                lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightBaseIntensity[i];
+        float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
+        if (lightLerpTime[i] < (float)pauseRelativeTime) {
+            lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
+            lightLerpUp[i] = !lightLerpUp[i];
+            lightCurrentStep[i]++;
+            if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0; // Wrap and start over continuous looping
+            lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
+            lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
+            lightLerpStartTime[i] = (float)pauseRelativeTime;
+        } else if (lightLerpOn[i]) {
+            if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
+                if (intervalStepisLerping[i][lightCurrentStep[i]]) {
+                    lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                    float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
+                    lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * lerpVal);
+                    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+                }
             }
-        } else { // Light is turned off.
-            DualLog("Seting light to off\n");
-            lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i];
         }
     }
 

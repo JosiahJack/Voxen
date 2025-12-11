@@ -87,14 +87,21 @@ void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and fallin
 }
 
 void UpdatePlayerFacingAngles(void) {
-    float rotation[16]; // Extract forward and right vectors from quaternion
-    quat_to_matrix(&cam_rotation, rotation);
-    cam_forwardx = rotation[8];  // Forward X
-    cam_forwardy = rotation[9];  // Forward Y
-    cam_forwardz = rotation[10]; // Forward Z
-    cam_rightx = rotation[0];  // Right X
-    cam_righty = rotation[1];  // Right Y
-    cam_rightz = rotation[2];  // Right Z
+    float x2 = cam_rotation.x * cam_rotation.x;
+    float y2 = cam_rotation.y * cam_rotation.y;
+    float z2 = cam_rotation.z * cam_rotation.z;
+    float xy = cam_rotation.x * cam_rotation.y;
+    float xz = cam_rotation.x * cam_rotation.z;
+    float yz = cam_rotation.y * cam_rotation.z;
+    float wx = cam_rotation.w * cam_rotation.x;
+    float wy = cam_rotation.w * cam_rotation.y;
+    float wz = cam_rotation.w * cam_rotation.z;
+    cam_forwardx = 2.0f * (xz + wy);  // Forward X
+    cam_forwardy = 2.0f * (yz - wx);  // Forward Y
+    cam_forwardz = 1.0f - 2.0f * (x2 + y2); // Forward Z
+    cam_rightx = 1.0f - 2.0f * (y2 + z2);  // Right X
+    cam_righty = 2.0f * (xy + wz);  // Right Y
+    cam_rightz = 2.0f * (xz - wy);  // Right Z
     normalize_vector(&cam_forwardx, &cam_forwardy, &cam_forwardz); // Normalize forward
     normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
 }
