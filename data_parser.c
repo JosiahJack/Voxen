@@ -175,6 +175,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     InitializeEntity(&entry);
     int32_t entries_stored = 0;
     lineNum = 0;
+    int32_t currentChild = -1;
     while (fgets(line, sizeof(line), file)) {
         lineNum++;
         char *start = line;
@@ -186,7 +187,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
         if (*start == '\0') continue; // Skip empty line
         if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
 
-        if (*start == '#') {
+        if (*start == '#' && *(start + 1) != '#') {
             // Store previous entry if valid
             if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
                 parser->entries[entry.index] = entry;
@@ -257,15 +258,15 @@ bool parse_data_file(DataParser *parser, const char *filename) {
 
                     else if (strcmp(trimmed_key, "volume") == 0)            entry.volume = parse_float(trimmed_value, start, lineNum);
                     
-                    else if (strcmp(trimmed_key, "child0") == 0)            entry.child0 = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child0_offsetx") == 0)    entry.child0_offset.x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child0_offsety") == 0)    entry.child0_offset.y = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child0_offsetz") == 0)    entry.child0_offset.z = parse_float(trimmed_value, start, lineNum);
-                    
-                    else if (strcmp(trimmed_key, "child1") == 0)            entry.child1 = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child1_offsetx") == 0)    entry.child1_offset.x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child1_offsety") == 0)    entry.child1_offset.y = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child1_offsetz") == 0)    entry.child1_offset.z = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "##child") == 0) {
+                        DualLog("Found a child!\n");
+                        ++currentChild;
+                        if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children! Minivan is full!!\n"); OS_Exit(1); }
+                        
+                        entry.child[currentChild] = parse_numberu16(trimmed_value, start, lineNum);
+                    } else if (strcmp(trimmed_key, "child_offsetx") == 0)    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child_offsety") == 0)    entry.child_offset[currentChild].y = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child_offsetz") == 0)    entry.child_offset[currentChild].z = parse_float(trimmed_value, start, lineNum);
                 }
             } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
         } else {

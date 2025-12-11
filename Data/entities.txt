@@ -4717,7 +4717,7 @@ index: 718
 index: 719
 #ef_mist
 index: 720
-child0: 648
+##child: 648
 #ef_particle_bloodspurtsmall
 index: 721
 #ef_particle_bloodspurtsmallgreen
@@ -4744,9 +4744,9 @@ index: 731
 index: 732
 #ef_spraydrips
 index: 733
-child0: 649
-child1: 653
-child1_offsety: -1.26
+##child: 649
+##child: 653
+child_offsety: -1.26
 #ef_steam
 index: 734
 #env_sparksmall

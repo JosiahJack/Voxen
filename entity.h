@@ -3,6 +3,7 @@
 
 #define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
+#define MAX_CHILD_COUNT 8
 #define NULLENT 0u
 #define PLAYER1 1u
 #define PLAYER2 2u
@@ -47,14 +48,10 @@ typedef struct {
     PhysCombineType frictionCombine;
     PhysCombineType bounceCombine;
     float volume;
-    uint16_t   child0;
-    Vector3    child0_offset;
-    Quaternion child0_rotation;
-    Vector3    child0_scale;
-    uint16_t   child1;
-    Vector3    child1_offset;
-    Quaternion child1_rotation;
-    Vector3    child1_scale;
+    uint16_t   child[MAX_CHILD_COUNT];
+    Vector3    child_offset[MAX_CHILD_COUNT];
+    Quaternion child_rotation[MAX_CHILD_COUNT];
+    Vector3    child_scale[MAX_CHILD_COUNT];
     char path[MAX_PATH];
 } Entity;
 

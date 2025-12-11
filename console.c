@@ -130,14 +130,6 @@ static void cmd_savegeometry(void) {
         uint16_t idx = ent->index;
         if (!ConstIndexIsGeometry(idx)) continue;
 
-//         const char* name = "unknown";
-//         if (idx < entityCount && entities[idx].path[0]) {
-//             const char* slash = strrchr(entities[idx].path, '/');
-//             name = slash ? slash + 1 : entities[idx].path;
-//             const char* dot = strstr(name, ".fbx");
-//             if (dot) name = dot - 4; // strip .fbx
-//         }
-
         fprintf(f, "constIndex:%u|geometry instance (%u)|", idx, i - START_INDEX_LEVEL_INSTANCES + 1);
         fprintf(f, "localPosition.x:%08.5f|", (double)ent->position.x);
         fprintf(f, "localPosition.y:%08.5f|", (double)ent->position.y);
@@ -150,7 +142,6 @@ static void cmd_savegeometry(void) {
         fprintf(f, "localScale.y:%08.5f|",    (double)ent->scale.y);
         fprintf(f, "localScale.z:%08.5f|",    (double)ent->scale.z);
         fprintf(f, "go.activeSelf:%s|\n", (ent->entflags & ENTFLAG_ACTIVE) ? "True" : "False");
-
         saved++;
     }
 

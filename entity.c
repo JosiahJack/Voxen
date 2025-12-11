@@ -85,14 +85,6 @@ float intervalStepisLerping[LIGHT_COUNT][30] = {0};
                 "    frictionCombine: %u\n"
                 "    bounceCombine: %u\n"
                 "    volume: %f\n"
-                "    child0: %u\n"
-                "    child0_offset.x: %f, .y: %f, .z: %f\n"
-                "    child0_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-                "    child0_scale.x: %f, .y: %f, .z: %f\n"
-                "    child1: %u\n"
-                "    child1_offset.x: %f, .y: %f, .z: %f\n"
-                "    child1_rotation.x: %f, .y: %f, .z: %f, .w: %f\n"
-                "    child1_scale.x: %f, .y: %f, .z: %f\n"
                 ,
                 ent.index,
                 ent.entflags,
@@ -129,15 +121,7 @@ float intervalStepisLerping[LIGHT_COUNT][30] = {0};
                 ent.bounciness,
                 ent.frictionCombine,
                 ent.bounceCombine,
-                ent.volume,
-                ent.child0,
-                ent.child0_offset.x, ent.child0_offset.y, ent.child0_offset.z,
-                ent.child0_rotation.x, ent.child0_rotation.y, ent.child0_rotation.z, ent.child0_rotation.w,
-                ent.child0_scale.x, ent.child0_scale.y, ent.child0_scale.z,
-                ent.child1,
-                ent.child1_offset.x, ent.child1_offset.y, ent.child1_offset.z,
-                ent.child1_rotation.x, ent.child1_rotation.y, ent.child1_rotation.z, ent.child1_rotation.w,
-                ent.child1_scale.x, ent.child1_scale.y, ent.child1_scale.z);
+                ent.volume);
     }
 
     void DualLogEntityInstance(uint16_t idx) {
@@ -161,12 +145,12 @@ void InitializeEntity(Entity* entry) {
     entry->dynamicFriction = entry->staticFriction = 0.6f;
     entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
-    entry->child0 = UINT16_MAX;
-    entry->child0_rotation.x = entry->child0_rotation.y = entry->child0_rotation.z = 0.0f; entry->child0_rotation.w = 1.0f;
-    entry->child0_scale.x = entry->child0_scale.y = entry->child0_scale.z = 1.0f;
-    entry->child1 = UINT16_MAX;
-    entry->child1_rotation.x = entry->child1_rotation.y = entry->child1_rotation.z = 0.0f; entry->child1_rotation.w = 1.0f;
-    entry->child1_scale.x = entry->child1_scale.y = entry->child1_scale.z = 1.0f;
+    for (int i=0;i<MAX_CHILD_COUNT;++i) {
+        entry->child[i] = UINT16_MAX;
+        entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
+        entry->child_rotation[i].x = entry->child_rotation[i].y = entry->child_rotation[i].z = 0.0f; entry->child_rotation[i].w = 1.0f;
+        entry->child_scale[i].x = entry->child_scale[i].y = entry->child_scale[i].z = 1.0f;
+    }
     entry->path[0] = '\0';    
 }
 
@@ -345,37 +329,38 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+    for (int i=0;i<MAX_CHILD_COUNT;++i) {
+        instances[instanceIdx].child[i] = entities[entIdx].child[i];
+        instances[instanceIdx].child_offset[i].x = entities[entIdx].child_offset[i].x;
+        instances[instanceIdx].child_offset[i].y = entities[entIdx].child_offset[i].y;
+        instances[instanceIdx].child_offset[i].z = entities[entIdx].child_offset[i].z;
+        instances[instanceIdx].child_rotation[i].x = entities[entIdx].child_rotation[i].x;
+        instances[instanceIdx].child_rotation[i].y = entities[entIdx].child_rotation[i].y;
+        instances[instanceIdx].child_rotation[i].z = entities[entIdx].child_rotation[i].z;
+        instances[instanceIdx].child_rotation[i].w = entities[entIdx].child_rotation[i].w;
+        instances[instanceIdx].child_scale[i].x = entities[entIdx].child_scale[i].x;
+        instances[instanceIdx].child_scale[i].y = entities[entIdx].child_scale[i].y;
+        instances[instanceIdx].child_scale[i].z = entities[entIdx].child_scale[i].z;
+    }
+    
     ApplyUnityHierarchyCorrectionAtLevelLoad(instanceIdx, entIdx);
     dirtyInstances[instanceIdx] = true;
     loadedInstances++;
 }
 
-void AddChild0(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
+void AddChild(uint16_t child, uint16_t childIndex, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
     if (child == UINT16_MAX) return;
     
     (*instanceIdx)++; // Increment head of the list an extra time for the child entity
+    DualLog("Adding a child with entity index %u and with entity prefab child index %u\n", child, childIndex);
     AddInstance(child, *instanceIdx, lineNum);
     instances[*instanceIdx].index = child;
-    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child0_offset.x;
-    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child0_offset.y;
-    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child0_offset.z;
-    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child0_scale.x;
-    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child0_scale.y;
-    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child0_scale.z;
-}
-
-void AddChild1(uint16_t child, uint16_t parent, uint16_t entIdx, int32_t* instanceIdx, uint32_t lineNum) {
-    if (child == UINT16_MAX) return;
-
-    (*instanceIdx)++; // Increment head of the list an extra time for the child entity
-    AddInstance(child, *instanceIdx, lineNum);
-    instances[*instanceIdx].index = child;
-    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child1_offset.x;
-    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child1_offset.y;
-    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child1_offset.z;
-    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child1_scale.x;
-    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child1_scale.y;
-    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child1_scale.z;
+    instances[*instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child_offset[childIndex].x;
+    instances[*instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child_offset[childIndex].y;
+    instances[*instanceIdx].position.z = instances[parent].position.z + entities[entIdx].child_offset[childIndex].z;
+    instances[*instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child_scale[childIndex].x;
+    instances[*instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child_scale[childIndex].y;
+    instances[*instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child_scale[childIndex].z;
 }
 
 #define LINE_LEN_MAX 81920
@@ -590,8 +575,9 @@ void LoadLevel(uint8_t curlevel) {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
             AddInstance(entIdx, parent, lineNum);
-            AddChild0(entities[entIdx].child0, parent, entIdx, &instanceIdx, lineNum);
-            AddChild1(entities[entIdx].child1, parent, entIdx, &instanceIdx, lineNum);
+            for (int i=0;i<MAX_CHILD_COUNT;++i) {
+                if (instances[parent].child[i] < entityCount) AddChild(entities[entIdx].child[i], i, parent, entIdx, &instanceIdx, lineNum);
+            }
         }
     }
     
