@@ -2,6 +2,7 @@
 #include "voxen.h"
 
 #define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 #define NULLENT 0u
 #define PLAYER1 1u
 #define PLAYER2 2u
@@ -65,7 +66,7 @@ typedef struct {
 
 void ParseGameData(void);
 bool parse_data_file(DataParser *parser, const char *filename);
-extern Entity* entities; // Global array of entity definitions
+extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 extern Entity instances[INSTANCE_COUNT];
 extern uint16_t loadedInstances;
 extern float modelMatrices[INSTANCE_COUNT * 16];

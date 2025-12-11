@@ -245,7 +245,7 @@ void main() {
     vec4 color = texture(tex, texCoordUsed).rgba;
     bool isSky = false;
     if (skyVisible > 0) {
-        isSky = ((color.a > 0.0 && color.a < 0.21) || color.a < 0.001); // Sky hack alpha (alpha of 0 for when noclipping)
+        isSky = ((color.a > 0.0 && color.a < 0.21) || color.a < 0.001); // Sky hack alpha (alpha of 0 for when noclipping) (the extra color.a < 0.001 check for noclip has no discernible quality impact, leaving)
         float mappedLat = 0.0;
         if (isSky) {
             vec2 ndc = texCoordUsed * 2.0 - 1.0;
@@ -465,6 +465,7 @@ void main() {
         if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting * 1.25) / 100.0))); // Brightness Adjustment Setting
         if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
+
         FragColor = vec4(aaColor, 1.0); // Output final composited color
     } else {
         vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);

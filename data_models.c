@@ -108,6 +108,7 @@ void cleanup_all_mmaps(void) {
     for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
 }
 
+// uint8_t modelFBX_FileBuffer[15360000]; // 14983372 found in practice
 void LoadModels(void) {
     double start_time = get_time();
     loadedModels = 0;
@@ -144,6 +145,7 @@ void LoadModels(void) {
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
     DebugRAM("prior to parallel model load loop");
+    
     for (uint32_t i = 0; i < loadedModels; ++i) {
         int32_t parserIdx = indexToParser[i];
         const char *fbx_path = model_parser.entries[parserIdx].path;
@@ -162,7 +164,7 @@ void LoadModels(void) {
         uint8_t* buf = mmap(NULL, (size_t)fbxstat.st_size, PROT_READ, MAP_PRIVATE, fbx_fp, 0);
         close(fbx_fp);
         if (buf == MAP_FAILED) { DualLogError("mmap failed for %s\n", fbx_path); OS_Exit(1); }
-        
+
         size_t fbxread = (size_t)read(fbx_fp, buf, (size_t)fbxstat.st_size);
         if (fbxread == 0) DualLogError("Read failure for %s\n", fbx_path);
                                                      
@@ -172,7 +174,7 @@ void LoadModels(void) {
         bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
         if (!cache_hit) {
             DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
-            const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_GenNormals*/ 0x20 | 0x800/*aiProcess_ImproveCacheLocality*/, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
+            const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_Triangulate*/ 0x8 | /*aiProcess_GenNormals*/ 0x20 | 0x800/*aiProcess_ImproveCacheLocality*/, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
             if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); continue; }
 
             uint32_t vertexCount = 0, triCount = 0;

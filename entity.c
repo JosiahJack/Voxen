@@ -9,8 +9,8 @@
 #include "todo.h"
 
 //#define DEBUG_ENTITIES
-#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-Entity* entities = NULL; // Global array of entity definitions
+Entity entities[MAX_ENTITIES]; // Global array of entity definitions
+char entityNames[MAX_ENTITIES][34];
 int32_t entityCount = 0;            // Number of entities loaded
 DataParser entity_parser;
 uint16_t invalidModelIndexCount;
@@ -175,11 +175,11 @@ void LoadEntities(void) {
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
     
     entityCount = entity_parser.count;
-    entities = calloc(entityCount,sizeof(Entity));
+    DualLog("Loading  %d entities...", entityCount);
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); OS_Exit(1); }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
 
-    DualLog("Loading  %d entities...", entityCount);
+    memset(entities,0,MAX_ENTITIES * sizeof(Entity));
     for (int32_t i = 0; i < entityCount; i++) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
@@ -576,7 +576,6 @@ void LoadLevel(uint8_t curlevel) {
                 lights[litIdx + LIGHT_DATA_OFFSET_POSX] += correctionLightX;
                 lights[litIdx + LIGHT_DATA_OFFSET_POSY] += correctionLightY;
                 lights[litIdx + LIGHT_DATA_OFFSET_POSZ] += correctionLightZ;
-                if (!lightOn[lightsIdx]) DualLog("Animatable light was off at %f %f %f\n",(double)lights[litIdx + LIGHT_DATA_OFFSET_POSX], (double)lights[litIdx + LIGHT_DATA_OFFSET_POSY], (double)lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
             }
             
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];

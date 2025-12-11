@@ -42,7 +42,7 @@ char statusText[TEXT_BUFFER_SIZE];
 VoxenSettings voxen_Settings = {
     .ScreenWidth = 1366u,
     .ScreenHeight = 768u,
-    .Shadows = 2u, // Default 2 (1 is hard shadows, 2 enables Pseudo-Stochastic PCF sampling softening
+    .Shadows = 1u,
     .AntiAliasing = 1u, // Default 1
     .Brightness = 70u, // Default 100 (for %)
     .VolumeMusic = 20u,
@@ -1477,22 +1477,17 @@ int32_t main(int32_t argc, char* argv[]) {
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += 4;
 
-        // HUD
-        // UI Common GL traits
+        // 7. UI
         uint32_t drawCallsNormal = drawCallsRenderedThisFrame;
-
-        // UI Common References
         float screenCenterX = (float)voxen_Settings.ScreenWidth / 2;
         float screenCenterY = (float)voxen_Settings.ScreenHeight / 2;
         float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
-        
-        // 7. UI
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
         glDepthMask(GL_TRUE); // GL_TRUE Fixes z sorting unless it has alpha, GL_FALSE Fixes alpha rendering of text, but makes the z sort not work for some reason.
         glDisable(GL_CULL_FACE);
         
-        //    Cursor
+        // Cursor
         uint16_t cursorTexture = 1260;
         if (gamePaused || menuActive) cursorTexture = 1261;
         float cursorSize = (float)voxen_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE;
@@ -1552,17 +1547,20 @@ int32_t main(int32_t argc, char* argv[]) {
         if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
-        RenderUIImages();    
+        RenderUIImages();
         double time_now = get_time();
-        drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add one more for this text render ;)
-        double thisFrameTime = (time_now - last_time) * 1000.0;
-        double cpuFrameTime = cpuTime * 1000.0;
-        uint8_t timingColor = TEXT_WHITE;
-        if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_ORANGE;
-        if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        if (voxen_Cheats.showFPS) RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
-        if (voxen_Cheats.showFPS) RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, voxen_Cheats.editMode);
+        if (voxen_Cheats.showFPS) {
+            double thisFrameTime = (time_now - last_time) * 1000.0;
+            double cpuFrameTime = cpuTime * 1000.0;
+            uint8_t timingColor = TEXT_WHITE;
+            if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
+            if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
+            drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add two more for this text render ;)
+            drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++;
+            RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
+            RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, voxen_Cheats.editMode);
+        }
+
         last_time = time_now;
         if ((time_now - lastFrameSecCountTime) >= 1.00) {
             lastFrameSecCountTime = time_now;

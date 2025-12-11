@@ -143,7 +143,7 @@ void main() {
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
-    if (normInstanceIndex != 0 && debugValue < 1) {
+    if (normInstanceIndex != 0 && debugValue < 1) { //  && distToPixel < 10.24 only has 0.073ms savings, leaving off for better quality of visuals
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -233,7 +233,6 @@ void main() {
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
-        float depthDiff = distOverRange;
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
             float smearness = distOverRange * distOverRange * 24.0 + 14.0;
             vec3 a = abs(toLight);
@@ -257,10 +256,10 @@ void main() {
             float NdotL = dot(normal, lightDir);
             float slopeBias = 0.10 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
-            float constantBias = 0.009 * dist; // Does nothing until ~0.01 but then reintroduces peter panning
-            float bias = (slopeBias + constantBias) * (dist / range);
+            float constantBias = 0.009 * dist;
+            float bias = (slopeBias + constantBias) * (dist / range); // The NdotL performance impact is negligible.
             bias = clamp(bias, 0.0, 0.22);
-            if (shadowsEnabled > 1 && distToPixel < 24.0) {
+            if (distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
                 float invSamples = 1.0 / float(PCF_SAMPLES);
@@ -302,21 +301,19 @@ void main() {
             vec3 halfDir = normalize(lightDir + viewDir);
             float ndh = max(dot(normal, halfDir), 0.0);
             float strength = texIndexChecked == 36 || texIndexChecked == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
-            float shininess = 110.0;
+            float shininess = 100.0;
             float spec = clamp(pow(ndh, shininess),0.0,1.0);
             lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength * 10.0;
         }
     }
 
-    lighting += albedoColor.rgb * vec3(0.018, 0.020, 0.024);
-
     float rim = 1.0 - max(dot(normal, viewDir), 0.0);
-    lighting += clamp(pow(rim, 4.0) * 0.5 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel
+    lighting += clamp(pow(rim, 4.0) * 0.5 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel (tested and performance impact is essentially zero)
 
     if (unlit > 0) lighting = albedoColor.rgb;
     else lighting += glowColor.rgb; // Glow (texture emission)
 
-    // Blue Noise Dither for banding
+    // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
     ivec2 sp = ivec2(gl_FragCoord.xy);
     int idx = (sp.x & 63) + (sp.y & 63) * 64;
     float blue = blueNoiseColors[idx*3 + 0];

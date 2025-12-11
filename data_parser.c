@@ -227,7 +227,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     strncpy(entry.path, trimmed_key, sizeof(entry.path) - 1);
                     entry.path[sizeof(entry.path) - 1] = '\0';
                 } else {
-                            if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
+                         if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
