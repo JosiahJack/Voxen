@@ -1136,7 +1136,8 @@ index: 536
 index: 537
 #Textures/MessyStreakTrail.png
 index: 538
-
+#Textures/med2_5_spec.png
+index: 539
 #Textures/npc_autobombdark.png
 index: 540
 #Textures/npc_autobomb_glow.png

@@ -620,7 +620,7 @@ int32_t Physics(void) {
 
         for (int32_t q = START_INDEX_LEVEL_INSTANCES; q < loadedInstances; ++q) {
             Entity* eb = &instances[q];
-            if (!is_instance_in_neighbor_cells(cellIndexForInstance[p], cellIndexForInstance[q])) continue;
+//             if (!is_instance_in_neighbor_cells(cellIndexForInstance[p], cellIndexForInstance[q])) continue;
 
             Vector3 minb, maxb;
             if (!GetAABB(eb, &minb, &maxb)) continue;

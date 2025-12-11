@@ -162,11 +162,8 @@ int statusTextLengthWithoutNullTerminator = 6;
 float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
-GLuint lightsID, voxelLightListIndicesID, voxelLightListsRawID, shadowMapsIndirectionID;
-uint32_t voxelLightListsRaw[VOXEL_COUNT * 4];
-uint32_t voxelLightListIndices[VOXEL_COUNT * 2];
+GLuint lightsID, shadowMapsIndirectionID;
 uint32_t shadowmapIndirectionList[LIGHT_COUNT];
-uint16_t numDynamicLights;
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 float lightsRangeSquared[LIGHT_COUNT];
 bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
@@ -362,7 +359,11 @@ void UpdateDynamicLights(void) {
     glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
+#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
+GLuint voxelLightListIndicesID, voxelLightListsRawID;
 uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
+uint32_t voxelLightListsRaw[VOXEL_COUNT * 4];
+uint32_t voxelLightListIndices[VOXEL_COUNT * 2];
 void UpdateVoxelLightLists(void) {
     memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
     memset(voxelLightListIndices, 0, VOXEL_COUNT * 2 * sizeof(uint32_t));
@@ -427,14 +428,14 @@ void UpdateVoxelLightLists(void) {
         float distSq = squareDistance2D(instances[PLAYER1].position.x, instances[PLAYER1].position.z, litX, litZ);
         if(distSq > FAR_PLANE_SQUARED) continue;
         
-        int lightCellIdx = cellIndexForLight[lightIdx];
+        uint16_t lightcellX = (uint16_t)clamp((int32_t)vfloor((litX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t lightcellZ = (uint16_t)clamp((int32_t)vfloor((litZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        int lightCellIdx = (lightcellZ * WORLDX) + lightcellX;
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if(!inPVS) {
-            int x = cellIndexForLightX[lightIdx];
-            int z = cellIndexForLightZ[lightIdx];
             int r = vfloor(range * 0.390625f); // 6 max
-            for(int ix=x-r; ix<=x+r && !inPVS; ix++){
-                for(int iz=z-r; iz<=z+r; iz++){
+            for(int ix=lightcellX-r; ix<=lightcellX+r && !inPVS; ix++){
+                for(int iz=lightcellZ-r; iz<=lightcellZ+r; iz++){
                     if(!XZPairInBounds(ix,iz)) continue;
                     int subIdx = iz*WORLDX + ix;
                     if((gridCellStates[subIdx] & CELL_VISIBLE) &&
@@ -497,7 +498,6 @@ void UpdateVoxelLightLists(void) {
 }
 
 uint16_t largestNearbyMeshCount = 0;
-
 void RenderShadowmap(uint16_t lightIdx) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
@@ -512,7 +512,7 @@ void RenderShadowmap(uint16_t lightIdx) {
         if (instances[j].modelIndex >= loadedModels) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
 
-        uint16_t instCellIdx = (uint16_t)cellIndexForInstance[j];
+        uint16_t instCellIdx = PosGetCellCoords(instances[j].position.x, instances[j].position.z);
         if (voxen_Settings.CullEnabled) {
             if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
             
@@ -627,14 +627,15 @@ void RenderShadowmaps(void) {
         float distSqrd = dx * dx + dy * dy + dz * dz;
         if (distSqrd >= 2500.0f) continue; // shadowDistance of 50.0f
 
-        int lightCellIdx = cellIndexForLight[i];
+        // PosGetCellCoords unwrapped for cellX and cellZ reuse down below
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPosX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPosZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        int lightCellIdx = (cellZ * WORLDX) + cellX;
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
-            int x = cellIndexForLightX[i];
-            int z = cellIndexForLightZ[i];
             int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F)); // 1 / 2.56f
-            for (int ix = x - r; ix <= x + r && !inPVS; ix++) {
-                for (int iz = z - r; iz <= z + r; iz++) {
+            for (int ix = cellX - r; ix <= cellX + r && !inPVS; ix++) {
+                for (int iz = cellZ - r; iz <= cellZ + r; iz++) {
                     if (!XZPairInBounds(ix, iz)) continue;
                     int subIdx = iz * WORLDX + ix;
                     if ((gridCellStates[subIdx] & CELL_VISIBLE) &&
@@ -1063,114 +1064,49 @@ typedef struct {
     float depth;
 } DepthSort;
 
-static inline void ds_swap(DepthSort* a, DepthSort* b) {
-    DepthSort t = *a; *a = *b; *b = t;
-}
+static void sort_transparents(DepthSort* arr, int n) {
+    if (n < 2) return;
 
-/* dir = +1.0 => ascending (small -> large)
-   dir = -1.0 => descending (large -> small) */
-static inline int ds_cmp_sign(const DepthSort* a, const DepthSort* b, float dir) {
-    float d = (a->depth - b->depth) * dir;
-    if (d > 0.0f) return 1;
-    if (d < 0.0f) return -1;
-    return 0;
-}
-
-static void ds_insertion(DepthSort* arr, int n, float dir) {
-    int i;
-    for (i = 1; i < n; ++i) {
-        DepthSort v = arr[i];
-        int j = i - 1;
-        while (j >= 0 && ds_cmp_sign(&v, &arr[j], dir) < 0) {
-            arr[j + 1] = arr[j];
-            --j;
-        }
-        arr[j + 1] = v;
-    }
-}
-
-static void ds_heapify_one(DepthSort* arr, int n, int i, float dir) {
-    for (;;) {
-        int l = (i << 1) + 1;
-        int r = l + 1;
-        int best = i;
-        if (l < n && ds_cmp_sign(&arr[l], &arr[best], dir) > 0) best = l;
-        if (r < n && ds_cmp_sign(&arr[r], &arr[best], dir) > 0) best = r;
-        if (best == i) return;
-        ds_swap(&arr[i], &arr[best]);
-        i = best;
-    }
-}
-
-static void ds_heapsort(DepthSort* arr, int n, float dir) {
-    int i;
-    if (n <= 1) return;
-    for (i = (n >> 1) - 1; i >= 0; --i) ds_heapify_one(arr, n, i, dir);
-    for (i = n - 1; i > 0; --i) {
-        ds_swap(&arr[0], &arr[i]);
-        ds_heapify_one(arr, i, 0, dir);
-    }
-}
-
-static void ds_introsort(DepthSort* arr, int n, float dir) {
-    if (n <= 1) return;
-
-    /* maxDepth = floor(log2(n)) * 2 is a common choice; we compute log2(n) */
-    int maxDepth = 0;
-    {
-        int t = n;
-        while (t > 1) { t >>= 1; maxDepth++; }
-        maxDepth = maxDepth * 2;
-    }
-
-    /* manual stack frame */
-    typedef struct { int lo, hi, depth; } Frame;
-    Frame stk[64]; /* 64 is plenty for n ~= 2300 */
-    int sp = 0;
-    stk[sp++] = (Frame){ 0, n - 1, maxDepth };
-
-    while (sp) {
-        Frame f = stk[--sp];
-        int lo = f.lo, hi = f.hi;
-        int depth = f.depth;
-
-        int count = hi - lo + 1;
-        if (count <= 16) {
-            ds_insertion(arr + lo, count, dir);
-            continue;
-        }
-
-        if (depth <= 0) {
-            ds_heapsort(arr + lo, count, dir);
-            continue;
-        }
-
-        /* median-of-three to choose pivot */
-        int mid = lo + ((hi - lo) >> 1);
-        if (ds_cmp_sign(&arr[mid], &arr[lo], dir) < 0) ds_swap(&arr[mid], &arr[lo]);
-        if (ds_cmp_sign(&arr[hi],  &arr[lo], dir) < 0) ds_swap(&arr[hi],  &arr[lo]);
-        if (ds_cmp_sign(&arr[mid], &arr[hi], dir) < 0) ds_swap(&arr[mid], &arr[hi]);
-
-        float pivot = arr[mid].depth;
-
-        int i = lo, j = hi;
-        while (i <= j) {
-            while ((arr[i].depth - pivot) * dir < 0.0f) i++;
-            while ((arr[j].depth - pivot) * dir > 0.0f) j--;
-            if (i <= j) {
-                ds_swap(&arr[i], &arr[j]);
-                i++; j--;
+    const int THRESH = 16;
+    int lo[64], hi[64];
+    int sp = 1;
+    lo[0] = 0; hi[0] = n - 1;
+    while (sp > 0) {
+        int l = lo[--sp];
+        int h = hi[sp];
+        if (h - l < THRESH) {
+            for (int i = l + 1; i <= h; ++i) {
+                DepthSort v = arr[i];
+                int j = i - 1;
+                while (j >= l && arr[j].depth < v.depth) {  // descending depth
+                    arr[j + 1] = arr[j];
+                    --j;
+                }
+                arr[j + 1] = v;
             }
+            continue;
         }
 
-        depth--;
-
-        /* push larger partition first to keep stack small (tail recursion elimination) */
-        if (i < hi) {
-            stk[sp++] = (Frame){ i, hi, depth };
+        int m = l + (h - l) / 2;
+        if (arr[m].depth > arr[l].depth) { DepthSort t = arr[m]; arr[m] = arr[l]; arr[l] = t; }
+        if (arr[h].depth > arr[l].depth) { DepthSort t = arr[h]; arr[h] = arr[l]; arr[l] = t; }
+        if (arr[m].depth > arr[h].depth) { DepthSort t = arr[m]; arr[m] = arr[h]; arr[h] = t; }
+        float pivot = arr[h].depth;
+        int i = l - 1;
+        int j = h;
+        for (;;) {
+            while (arr[++i].depth > pivot);
+            while (arr[--j].depth < pivot);
+            if (i >= j) break;
+            DepthSort t = arr[i]; arr[i] = arr[j]; arr[j] = t;
         }
-        if (lo < j) {
-            stk[sp++] = (Frame){ lo, j, depth };
+
+        if (j - l > h - i) {
+            if (i < h) { lo[sp] = i; hi[sp] = h; ++sp; }
+            if (l < j) { lo[sp] = l; hi[sp] = j; ++sp; }
+        } else {
+            if (l < j) { lo[sp] = l; hi[sp] = j; ++sp; }
+            if (i < h) { lo[sp] = i; hi[sp] = h; ++sp; }
         }
     }
 }
@@ -1188,16 +1124,15 @@ void RenderInstances(uint8_t type) {
                                offsetsArray = modelTypeOffsetsOpaque;
                                startOfNextType = startOfDoubleSidedInstances;
                                glDisable(GL_BLEND);
-                               glDepthMask(GL_TRUE);
                                glEnable(GL_DEPTH_TEST);
                                glEnable(GL_CULL_FACE); break;
         case REND_DOUBLESIDED: glDisable(GL_CULL_FACE);
                                countsArray  =  modelTypeCountsDoubleSided;
                                offsetsArray = modelTypeOffsetsDoubleSided;
+                               glEnable(GL_BLEND);
                                startOfNextType = startOfTransparentInstances; break;
         case REND_TRANSPARENT: glEnable(GL_BLEND);
                                glEnable(GL_CULL_FACE);
-                               glDepthMask(GL_FALSE);
                                countsArray  =  modelTypeCountsTransparent;
                                offsetsArray = modelTypeOffsetsTransparent;
                                startOfNextType = loadedInstances - invalidModelIndexCount; break;
@@ -1215,11 +1150,11 @@ void RenderInstances(uint8_t type) {
         uint16_t count = countsArray[modelIdx];
         uint16_t visibleCount = 0;
         for (uint16_t i = start; i < start + count && i < startOfNextType; i++) { // Filter visible instances
-            uint16_t instCellIdx = (uint16_t)cellIndexForInstance[i];
+            uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
             float distSqrd = squareDistance3D(      instances[i].position.x,       instances[i].position.y,       instances[i].position.z,
                                               instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
             if (voxen_Settings.CullEnabled) {
-                if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
+                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
             }
             
@@ -1231,8 +1166,7 @@ void RenderInstances(uint8_t type) {
         
         if (visibleCount == 0) continue;
         
-        float dir = (type == REND_TRANSPARENT) ? -1.0f : +1.0f;
-        ds_introsort(visibleInstances, visibleCount, dir);
+        if (type == REND_TRANSPARENT) sort_transparents(visibleInstances, visibleCount); // With layout(early_fragment_tests) in; in the chunk_frag.glsl we only need to sort transparents
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
             uint32_t texIndex = instances[i].texIndex;
@@ -1298,7 +1232,7 @@ int32_t main(int32_t argc, char* argv[]) {
     DualLog("Voxen " VERSION_STRING " by W. Josiah Jack, MIT-0 licensed\n");
     EventSystemInit(argc,argv[1],argv[2]);
     InitializeEnvironment();
-    playerCellIdx_x = 0u; playerCellIdx_y = 0u; playerCellIdx_z = 0u; // Force a cull
+    playerCellIdx = 0u; // Force a cull
     double last_physics_time = get_time();
     last_topframe_time = last_physics_time - 0.05;
     DebugRAM("prior to game loop");
@@ -1362,7 +1296,8 @@ int32_t main(int32_t argc, char* argv[]) {
 
             // 3. Light Updates
             UpdateDynamicLights();
-            for (int i = 0; i < loadedLights; ++i) { if (lightDirty[i]) { UpdateVoxelLightLists(); break; } }
+//             UpdateVoxelLightLists();
+            for (int i = 0; i < loadedLights; ++i) { if (lightDirty[i]) { UpdateVoxelLightLists(); memset(lightDirty, 0, loadedLights * sizeof(bool)); break; } }
             if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
             
             // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
@@ -1379,6 +1314,7 @@ int32_t main(int32_t argc, char* argv[]) {
             glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 17, 0u); // unlit false
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
             memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
+            glDepthMask(GL_TRUE);
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers

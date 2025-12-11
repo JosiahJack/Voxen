@@ -129,9 +129,7 @@ void UpdateAmbientSounds(void) {
         const float dist_sq = squareDistance3D(player->x, player->y, player->z, ent->position.x, ent->position.y, ent->position.z);
         const float distance = vsqrtf(dist_sq);
         bool in_range = (dist_sq < max_range_sq);
-        uint16_t ix, iy;
-        PosToCellCoords(ent->position.x, ent->position.z, &ix, &iy);
-        int subIdx = (iy * WORLDX) + ix;
+        int32_t subIdx = PosGetCellCoords(ent->position.x, ent->position.z);
         int cellIdx = (playerCellIdx * ARRSIZE);
         int flat_idx = cellIdx + subIdx;
         if (!get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) in_range = false;

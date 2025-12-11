@@ -69,10 +69,6 @@ extern Entity instances[INSTANCE_COUNT];
 extern uint16_t loadedInstances;
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
-extern uint32_t cellIndexForInstance[INSTANCE_COUNT];
-extern uint16_t cellIndexForLight[LIGHT_COUNT];
-extern uint16_t cellIndexForLightX[LIGHT_COUNT];
-extern uint16_t cellIndexForLightZ[LIGHT_COUNT];
 extern int32_t entityCount;            // Number of entities loaded
 extern uint16_t invalidModelIndexCount;
 extern uint16_t* modelTypeCountsOpaque;

@@ -1064,7 +1064,7 @@ model: 288
 cardchunk: 1
 texture: 527
 glowtexture: 526
-spectexture: 1242
+spectexture: 539
 #chunk_med2_6
 index: 188
 model: 289
@@ -4270,12 +4270,23 @@ texture: 164
 glowtexture: 162
 #prop_foliage_fernpoison
 index: 560
+model: 160
+texture: 331
 #prop_foliage_bush
 index: 561
+model: 495
+texture: 643
+glowtexture: 642
 #prop_foliage_fern
 index: 562
+model: 160
+texture: 333
+glowtexture: 330
 #prop_foliage_fernblueflower
 index: 563
+model: 159
+texture: 333
+glowtexture: 330
 #prop_foliage_pinetreem
 index: 564
 #prop_foliage_poisonbush1

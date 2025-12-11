@@ -149,7 +149,6 @@ extern GLuint tbos[MODEL_IDX_MAX];
 extern uint16_t loadedTextures;
 extern uint16_t loadedModels;
 extern uint16_t loadedLights;
-extern uint16_t numDynamicLights;
 extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
@@ -224,6 +223,8 @@ extern GLuint matricesBuffer;
 #define WORLDX 64
 #define WORLDZ WORLDX
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
+#define WORLDX_0BASED (WORLDX - 1)
+#define WORLDZ_0BASED (WORLDZ - 1)
 #define TOTAL_WORLD_CELLS (WORLDX * WORLDY * WORLDZ)
 #define ARRSIZE (WORLDX * WORLDZ)
 #define WORLDCELL_WIDTH_F 2.56f
@@ -231,7 +232,6 @@ extern GLuint matricesBuffer;
 #define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
 #define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
-#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
 #define CELL_SIZE 2.56f // Each cell is 2.56x2.56
@@ -244,7 +244,7 @@ extern GLuint matricesBuffer;
 #define CELL_CLOSEDWEST   32u
 #define CELL_SEES_SUN     64u
 #define CELL_SEES_SKYBOX 128u
-extern uint16_t playerCellIdx, playerCellIdx_x, playerCellIdx_y, playerCellIdx_z;
+extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint8_t gridCellStates[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
@@ -498,17 +498,10 @@ static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
     return val;
 }
 
-static inline void PosToCellCoords(float pos_x, float pos_z, uint16_t* x, uint16_t* z) {
-    int32_t max = WORLDX - 1; // 63
-    int32_t xval = (int32_t)((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F);
-    if (xval > max) xval = max;
-    if (xval < 0) xval = 0;
-    *x = (uint16_t)xval;
-    
-    int32_t zval = (int32_t)((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F);
-    if (zval > max) zval = max;
-    if (zval < 0) zval = 0;
-    *z = (uint16_t)zval;
+static inline int32_t PosGetCellCoords(float pos_x, float pos_z) {
+	uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+	return (cellZ * WORLDX) + cellX;
 }
 
 static inline bool XZPairInBounds(int32_t x, int32_t z) {

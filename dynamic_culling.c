@@ -6,12 +6,7 @@ extern uint8_t*  stbi__arena_base;
 
 uint8_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
-uint32_t cellIndexForInstance[INSTANCE_COUNT];
-uint16_t cellIndexForLight[LIGHT_COUNT];
-uint16_t cellIndexForLightX[LIGHT_COUNT];
-uint16_t cellIndexForLightZ[LIGHT_COUNT];
 uint16_t playerCellIdx = 0u;
-uint16_t playerCellIdx_x = 0u; uint16_t playerCellIdx_y = 0u; uint16_t playerCellIdx_z = 0u;
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
 
@@ -26,18 +21,6 @@ static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
     int bit = idx % 32;
     if (val) arr[word] |= (1U << bit);
     else arr[word] &= ~(1U << bit);
-}
-
-void PutChunksInCells(void) {
-    uint16_t x,z;
-    uint16_t cellIdx;
-    for (uint16_t c=3; c < INSTANCE_COUNT; ++c) { // Start after player instances and NULLENT
-        
-        PosToCellCoords(instances[c].position.x, instances[c].position.z, &x, &z);
-        cellIdx = (z * WORLDX) + x;
-        if (!(gridCellStates[cellIdx] & CELL_OPEN)) cellIdx = 0;
-        cellIndexForInstance[c] = (uint32_t)cellIdx;
-    }
 }
 
 void DetermineClosedEdges(void) {
@@ -178,12 +161,9 @@ void DetermineClosedEdges(void) {
 }
 
 bool UpdatedPlayerCell(void) {
-    uint16_t lastX = playerCellIdx_x;
-    uint16_t lastZ = playerCellIdx_z;
-    PosToCellCoords(instances[PLAYER1].position.x,instances[PLAYER1].position.z,&playerCellIdx_x,&playerCellIdx_z);
-    playerCellIdx = (playerCellIdx_z * WORLDX) + playerCellIdx_x;
-    if (playerCellIdx_x == lastX && playerCellIdx_z == lastZ) return false;
-    return true;
+    uint16_t lastCell = playerCellIdx;
+    playerCellIdx = PosGetCellCoords(instances[PLAYER1].position.x, instances[PLAYER1].position.z);
+    return (playerCellIdx != lastCell);
 }
 
 int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
@@ -605,7 +585,6 @@ void CullInit(void) {
     voxelMinCenterX = worldMin_x + VOXEL_HALF;
     voxelMinCenterZ = worldMin_z + VOXEL_HALF;
     DetermineClosedEdges();
-    PutChunksInCells();
   
     // For each cell, get the visibility as though player were there and put into gridCellStates
     // Then store the visibility of gridCellStates into the table of all visible cells for that cell
@@ -614,8 +593,6 @@ void CullInit(void) {
     int32_t numPrecomputedVisibleCells = 0;
     for (int32_t z=0;z<WORLDZ;z++) {
         for (int32_t x=0;x<WORLDX;x++) {
-            playerCellIdx_x = x;
-            playerCellIdx_z = z;
             DetermineVisibleCells(x,z);
             int32_t cellIdx = (z * WORLDX) + x;
             for (int32_t z2=0;z2<WORLDZ;z2++) {
@@ -650,15 +627,6 @@ void CullInit(void) {
                 gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
             }
         }
-    }
-    
-    for (int i=0;i<loadedLights;++i) {
-        uint16_t x,z;
-        int lightIdx = (i * LIGHT_DATA_SIZE);
-        PosToCellCoords(lights[lightIdx + LIGHT_DATA_OFFSET_POSX],lights[lightIdx + LIGHT_DATA_OFFSET_POSZ], &x, &z);
-        cellIndexForLight[i] = (z * WORLDX) + x;
-        cellIndexForLightX[i] = x;
-        cellIndexForLightZ[i] = z;
     }
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.

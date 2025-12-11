@@ -276,17 +276,6 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
         if (tempInstances[i].modelIndex > loadedModels) { instances[targetIdx] = tempInstances[i]; targetIdx++; }
     }
 
-    // Update cellIndexForInstance
-    for (i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) { // Skip player index and start at 3?
-        float x = instances[i].position.x;
-        float z = instances[i].position.z;
-        int32_t cellX = (int32_t)vfloor((x - worldMin_x) / WORLDCELL_WIDTH_F);
-        int32_t cellZ = (int32_t)vfloor((z - worldMin_z) / WORLDCELL_WIDTH_F);
-        cellX = clamp(cellX, 0, 63);
-        cellZ = clamp(cellZ, 0, 63);
-        cellIndexForInstance[i] = cellZ * 64 + cellX;
-    }
-    
     DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
     DualLog(" took %f secs\n", get_time() - start_time);
     loadedAmbients = 0;
