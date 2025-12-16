@@ -624,10 +624,6 @@ void LoadLevel(uint8_t curlevel) {
     UpdateVoxelLightLists();
     DebugRAM("after first UpdateVoxelLightLists for load level");
     voxen_GL_Comms.shadowMapSSBO = SetupSSBO(voxen_GL_Comms.shadowMapSSBO, 5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (TOTAL_SHADOWMAP_PIXELS + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
     RenderShadowmaps();
     Input_MouselookApply();
