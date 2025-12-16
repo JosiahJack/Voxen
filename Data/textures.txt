@@ -1110,7 +1110,6 @@ index: 522
 index: 523
 #Textures/med2_4_specular.png
 index: 524
-transparent: 1
 #Textures/med2_5_glow.png
 index: 526
 #Textures/med2_5.png

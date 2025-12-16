@@ -613,9 +613,9 @@ void LoadLevel(uint8_t curlevel) {
     malloc_trim(0);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f secs\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
-    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     LoadModels();
     LoadTextures();
+    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
