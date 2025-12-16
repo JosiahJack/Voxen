@@ -25,7 +25,7 @@ int close (int filedes); // #include <unistd.h>
 ssize_t read(int fd, void *buf, size_t count);
 
 DataParser model_parser;
-float** modelVertices = NULL; // Persistent for physics convex hulls and raycasts
+float** modelVertices = NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
@@ -121,8 +121,10 @@ void LoadModels(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
+    uint16_t actualLoadedModels = 0u;
+    for (int32_t i=0;i<MODEL_IDX_MAX;++i) actualLoadedModels += modelIndexUsedForCurrentLevel[i] ? 1u : 0u;
     loadedModels = (uint16_t)maxIndex + 1U;
-    DualLog("Loading   models( %d) with max index  %d ...", model_parser.count, maxIndex);
+    DualLog("Loading   models( %d/%d) with max index  %d ...", actualLoadedModels, model_parser.count, maxIndex);
     modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     uint32_t** modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
@@ -150,10 +152,12 @@ void LoadModels(void) {
     
     for (uint32_t i = 0; i < loadedModels; ++i) {
         int32_t parserIdx = indexToParser[i];
+        if (!modelIndexUsedForCurrentLevel[parserIdx]) continue;
+        
         modelAnimationType[i] = model_parser.entries[parserIdx].animated;
         if (modelAnimationType[i] > 0u) animatedModelCount++;
         const char *fbx_path = model_parser.entries[parserIdx].path;
-        if (!fbx_path || !fbx_path[0]) continue;
+        if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); OS_Exit(1); }
 
         char vmdl_path[512];
         make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));

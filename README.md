@@ -1359,3 +1359,27 @@ File                                           blank        comment           co
 ----------------------------------------------------------------------------------
 SUM:                                             818            644           6948
 ----------------------------------------------------------------------------------
+
+
+Main Rig.  Settings:
+#define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
+VoxenSettings voxen_Settings = {
+    .ScreenWidth = 1366u,
+    .ScreenHeight = 768u,
+    .Shadows = 1u,
+    .AntiAliasing = 1u, // Default 1
+    .Brightness = 70u, // Default 100 (for %)
+    .VolumeMusic = 20u,
+    .Language = 0, // English default
+    .CullEnabled = 1,
+    .FOV = 65.0f,
+    .Reflections = 1u, // Default 1
+    .Vsync = false
+};
+
+FPS:  168
+ms:  5.95
+RAM:  133mb
+VRAM: 220mb
+Build 379ms
+Init 0.932168secs

@@ -112,7 +112,7 @@ bool GetAABB(const Entity* e, Vector3* aabb_min, Vector3* aabb_max) {
         return true;
     } else if (e->collider == COLLIDER_TYPE_CONVEXMESH) {
         uint16_t modelIdx = e->colliderMeshIndex;
-        if (modelIdx >= loadedModels) { /*DualLogError("Invalid mesh for GetAABB: %u on entity with index: %u\n",modelIdx,e->index);*/ return false; }
+        if (modelIdx >= MODEL_IDX_MAX) { /*DualLogError("Invalid mesh for GetAABB: %u on entity with index: %u\n",modelIdx,e->index);*/ return false; }
 
         uint32_t base = modelIdx * BOUNDS_ATTRIBUTES_COUNT;
         Vector3 local_min = {
@@ -314,7 +314,7 @@ static bool CollideCapsuleBox(const Entity* cap, const Entity* box, Manifold* m)
 
 bool CollideConvexBox(const Entity* convex, const Entity* box, Manifold* m) {
     uint16_t modelIdx = convex->colliderMeshIndex;
-    if (modelIdx >= loadedModels) return false;
+    if (modelIdx >= MODEL_IDX_MAX) return false;
 
     Vector3 boxHalf = scale_vector3(box->colliderSize, 0.5f);
     uint32_t vcount = modelVertexCounts[modelIdx];
