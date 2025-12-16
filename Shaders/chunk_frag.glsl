@@ -272,6 +272,8 @@ void main() {
                     uint uty = uint(ty);
                     uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
                     uint distInt = shadowMaps[ssbo_index];
+                    if (distInt == 0xFFFFFFFFu) continue;
+
                     float d = (float(distInt) / 100000.0);
                     float depthDiff = (dist) - d - bias;
                     float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
@@ -286,6 +288,8 @@ void main() {
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
                 uint distInt = shadowMaps[ssbo_index];
+                if (distInt == 0xFFFFFFFFu) continue;
+
                 float d = (float(distInt) / 100000.0);
                 float depthDiff = (dist) - d - bias;
                 shadowFactor = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
