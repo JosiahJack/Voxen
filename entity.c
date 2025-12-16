@@ -24,6 +24,7 @@ bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
 uint16_t opaqueInstancesHead = 0;
 uint16_t renderableCount = 0;
 uint16_t loadedInstances = 0;
+bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
 uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
 uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
 uint16_t doubleSidedInstancesHead = 0;
@@ -137,7 +138,7 @@ void InitializeEntity(Entity* entry) {
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
     entry->animated = 0u;
-    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MATERIAL_IDX_MAX;
+    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;
     entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
     entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
@@ -148,6 +149,7 @@ void InitializeEntity(Entity* entry) {
     entry->dynamicFriction = entry->staticFriction = 0.6f;
     entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
+    entry->persistent = false;
     for (int i=0;i<MAX_CHILD_COUNT;++i) {
         entry->child[i] = UINT16_MAX;
         entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
@@ -234,7 +236,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     memset(transparentInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
     opaqueInstancesHead = doubleSidedInstancesHead = transparentInstancesHead = invalidModelIndexCount = 0;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
-        if (instances[i].texIndex >= loadedTextures && instances[i].texIndex != MATERIAL_IDX_MAX) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
+        if (instances[i].texIndex >= MAX_VALID_TEXTURE && instances[i].texIndex != MAX_VALID_TEXTURE) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
         if (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
         if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
 
@@ -297,15 +299,28 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         
     instances[instanceIdx].index = entIdx;
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
+    if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) {
+        modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;    
+        renderableCount++;
+    }
+    
     instances[instanceIdx].animated = modelAnimationType[instances[instanceIdx].modelIndex];
-    if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) renderableCount++;
+    
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
+    if (instances[instanceIdx].texIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].texIndex] = true;
+    
     instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
-    if (instances[instanceIdx].glowIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].glowIndex = 0;
+    if (instances[instanceIdx].glowIndex >= MAX_VALID_TEXTURE) instances[instanceIdx].glowIndex = 0;
+    if (instances[instanceIdx].glowIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].glowIndex] = true;
+    
     instances[instanceIdx].specIndex = entities[entIdx].specIndex;
-    if (instances[instanceIdx].specIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].specIndex = 0;
+    if (instances[instanceIdx].specIndex >= MAX_VALID_TEXTURE) instances[instanceIdx].specIndex = 0;
+    if (instances[instanceIdx].specIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].specIndex] = true;
+
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
-    if (instances[instanceIdx].normIndex >= MATERIAL_IDX_MAX) instances[instanceIdx].normIndex = 0;
+    if (instances[instanceIdx].normIndex >= MAX_VALID_TEXTURE) instances[instanceIdx].normIndex = 0;
+    if (instances[instanceIdx].normIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].normIndex] = true;
+
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK); // Decided `instances[instanceIdx].entflags = entities[entIdx].entflags;` was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
@@ -356,6 +371,7 @@ void LoadLevel(uint8_t curlevel) {
     loadedLights = 0;
     loadedAmbients = 0;
     memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
+    memset(textureIndexUsedForCurrentLevel,0,MAX_VALID_TEXTURE * sizeof(bool));
     if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
@@ -554,8 +570,6 @@ void LoadLevel(uint8_t curlevel) {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
             AddInstance(entIdx, parent, lineNum);
-            uint16_t parentModelIndex = instances[parent].modelIndex;
-            if (parentModelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[parentModelIndex] = true;
             for (int i=0;i<MAX_CHILD_COUNT;++i) {
                 if (instances[parent].child[i] < entityCount) {
                     if (entities[entIdx].child[i] != UINT16_MAX) { // Add child
@@ -568,8 +582,6 @@ void LoadLevel(uint8_t curlevel) {
                         instances[instanceIdx].scale.x = instances[parent].scale.x * entities[entIdx].child_scale[i].x;
                         instances[instanceIdx].scale.y = instances[parent].scale.y * entities[entIdx].child_scale[i].y;
                         instances[instanceIdx].scale.z = instances[parent].scale.z * entities[entIdx].child_scale[i].z;
-                        uint16_t childModelIndex = instances[instanceIdx].modelIndex;
-                        if (childModelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[childModelIndex] = true;
                     }
                 }
             }
@@ -603,6 +615,7 @@ void LoadLevel(uint8_t curlevel) {
     DebugRAM("end of LoadLevel instances");
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     LoadModels();
+    LoadTextures();
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");

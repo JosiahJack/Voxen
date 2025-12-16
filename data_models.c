@@ -32,7 +32,7 @@ uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
 GLuint vbos[MODEL_IDX_MAX] = {0}; // 4kb
 GLuint tbos[MODEL_IDX_MAX] = {0}; // 4kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
-uint16_t loadedModels = 0;
+uint16_t loadedModelsMaxIndex = 0;
 
 static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
     strncpy(out, fbx_path, outsz - 1);
@@ -112,7 +112,7 @@ void cleanup_all_mmaps(void) {
 // uint8_t modelFBX_FileBuffer[15360000]; // 14983372 found in practice
 void LoadModels(void) {
     double start_time = get_time();
-    loadedModels = 0;
+    loadedModelsMaxIndex = 0;
     uint16_t animatedModelCount = 0u;
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
@@ -123,12 +123,12 @@ void LoadModels(void) {
 
     uint16_t actualLoadedModels = 0u;
     for (int32_t i=0;i<MODEL_IDX_MAX;++i) actualLoadedModels += modelIndexUsedForCurrentLevel[i] ? 1u : 0u;
-    loadedModels = (uint16_t)maxIndex + 1U;
+    loadedModelsMaxIndex = (uint16_t)maxIndex + 1U;
     DualLog("Loading   models( %d/%d) with max index  %d ...", actualLoadedModels, model_parser.count, maxIndex);
-    modelVertices       = mmap(NULL, loadedModels * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    uint32_t** modelTriangles      = mmap(NULL, loadedModels * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    modelVertices       = mmap(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    uint32_t** modelTriangles      = mmap(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
-    size_t indexToParser_size = loadedModels * sizeof(int32_t);
+    size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
     int32_t* indexToParser = mmap(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     for (uint32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = (int32_t)k;
@@ -149,8 +149,7 @@ void LoadModels(void) {
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
     DebugRAM("prior to parallel model load loop");
-    
-    for (uint32_t i = 0; i < loadedModels; ++i) {
+    for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (!modelIndexUsedForCurrentLevel[parserIdx]) continue;
         
@@ -282,10 +281,10 @@ void LoadModels(void) {
     DebugRAM("after to parallel model load loop");
     madvise(indexToParser, indexToParser_size, MADV_DONTNEED); munmap(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
-    glGenBuffers(loadedModels, vbos);
-    glGenBuffers(loadedModels, tbos);
+    glGenBuffers(loadedModelsMaxIndex, vbos);
+    glGenBuffers(loadedModelsMaxIndex, tbos);
     uint32_t totalVertices = 0, totalTris = 0;
-    for (int i = 0; i < loadedModels; ++i) {
+    for (int i = 0; i < loadedModelsMaxIndex; ++i) {
         if (modelVertexCounts[i] == 0) continue;
 
         size_t vertSize = modelVertexCounts[i] * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
@@ -311,12 +310,12 @@ void LoadModels(void) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     GLuint modelBoundsID = 0;
-    modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModels * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModelsMaxIndex * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
     DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
-    for (int i = 0; i < loadedModels; ++i) {
+    for (int i = 0; i < loadedModelsMaxIndex; ++i) {
         if (modelVertexCounts[i] == 0) continue;
         
         madvise(modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t), MADV_DONTNEED);

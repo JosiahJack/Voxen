@@ -510,7 +510,7 @@ void RenderShadowmap(uint16_t lightIdx) {
     uint16_t nearMeshes[256]; // Found that this is typically around 172
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
-        if (instances[j].modelIndex >= MODEL_IDX_MAX) continue;
+        if (instances[j].modelIndex >= loadedModelsMaxIndex) continue;
         if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
 
         uint16_t instCellIdx = PosGetCellCoords(instances[j].position.x, instances[j].position.z);
@@ -541,13 +541,13 @@ void RenderShadowmap(uint16_t lightIdx) {
         glProgramUniformMatrix4fv(voxen_GL_Comms.shadowmapsShaderProgram, 1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
-            if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
+            if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
             if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
             
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.56f; // Could use 1.42f for diagonal length of unit square, but this is fine.
             if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
 
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_IDX_MAX ? instances[i].lodIndex : instances[i].modelIndex;
+            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
             glUniform1ui(0, i);
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
@@ -1046,7 +1046,6 @@ void InitializeEnvironment(void) {
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadEntities();
-    LoadTextures();
     lightsID = SetupSSBO(lightsID, 19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
@@ -1142,7 +1141,7 @@ void RenderInstances(uint8_t type) {
     if (startOfNextType > loadedInstances) return;
     
     memset(visibleInstances,0,INSTANCE_COUNT * sizeof(DepthSort));
-    for (uint16_t modelIdx = 0; modelIdx < MODEL_IDX_MAX; modelIdx++) {
+    for (uint16_t modelIdx = 0; modelIdx < loadedModelsMaxIndex; modelIdx++) {
         if (countsArray[modelIdx] == 0) continue;
 
         uint16_t start = offsetsArray[modelIdx];
@@ -1175,7 +1174,7 @@ void RenderInstances(uint8_t type) {
             glUniform1ui(18, texIndex);
             glUniform1ui(19, (uint32_t)instances[i].glowIndex);
             glUniform1ui(20, (uint32_t)instances[i].specIndex);
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < MODEL_IDX_MAX ? instances[i].lodIndex : instances[i].modelIndex;
+            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
             uint32_t vertCount = modelTriangleCounts[modelType] * 3;
             glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);

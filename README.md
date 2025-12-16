@@ -1383,3 +1383,12 @@ RAM:  133mb
 VRAM: 220mb
 Build 379ms
 Init 0.932168secs
+
+
+After converting to only use models and textures needed for current level
+FPS: 165
+ms: 6.09
+RAM: 135mb
+VRAM: 155mb // Nice!
+Build 364ms
+Init 0.553304secs // Aww yeaaaaah

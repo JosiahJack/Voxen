@@ -4,6 +4,7 @@
 #include "matvecquat.h"
 #include "vmath.h"
 #include "entity.h"
+extern uint16_t loadedModelsMaxIndex;
 extern float aspect3D;
 extern float rasterPerspectiveProjection[16];
 extern float shadowmapsPerspectiveProjection[16];
@@ -49,7 +50,7 @@ void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion
 }
 
 void UpdateInstanceMatrix(int32_t i) {
-    if (instances[i].modelIndex >= MODEL_IDX_MAX) { dirtyInstances[i] = false; return; } // No model
+    if (instances[i].modelIndex >= loadedModelsMaxIndex) { dirtyInstances[i] = false; return; } // No model
     if (modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; return; } // Empty model
 
     float mat[16]; // 4x4 matrix

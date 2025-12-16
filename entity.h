@@ -79,6 +79,7 @@ extern uint16_t modelTypeOffsetsOpaque[MODEL_IDX_MAX];
 extern uint16_t modelTypeOffsetsDoubleSided[MODEL_IDX_MAX];
 extern uint16_t modelTypeOffsetsTransparent[MODEL_IDX_MAX];
 extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
+extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
 extern uint16_t opaqueInstancesHead;
 extern uint16_t renderableCount;
 extern uint16_t loadedInstances;

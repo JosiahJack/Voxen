@@ -286,11 +286,11 @@ bool parse_data_file(DataParser *parser, const char *filename) {
 }
 
 __attribute__((pure)) bool isDoubleSided(uint32_t texIndexToCheck) {
-    if (texIndexToCheck > loadedTextures) return false;
+    if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
     return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
 }
 __attribute__((pure)) bool isTransparent(uint32_t texIndexToCheck) {
-    if (texIndexToCheck > loadedTextures) return false;
+    if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
     return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
 }
 

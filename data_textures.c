@@ -22,7 +22,7 @@ GLuint texturePalettesID = 0;
 GLuint texturePaletteOffsetsID = 0;
 uint32_t totalPixels = 0u;
 uint32_t totalPaletteColors = 0u;
-uint16_t loadedTextures = 0u;
+uint16_t loadedTexturesMaxIndex = 0u;
 bool doubleSidedTexture[MAX_VALID_TEXTURE] = {0};
 bool transparentTexture[MAX_VALID_TEXTURE] = {0};
 
@@ -35,7 +35,7 @@ void LoadTextures(void) {
     double start_time = get_time();
     DebugRAM("start of LoadTextures");
     stbi__arena_init();
-    loadedTextures = 0u;
+    loadedTexturesMaxIndex = 0u;
     if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     
     int32_t maxIndex = -1;
@@ -43,17 +43,27 @@ void LoadTextures(void) {
         if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) maxIndex = texture_parser.entries[k].index;
     }
 
-    loadedTextures = maxIndex + 1;
-    if (loadedTextures == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
-    DualLog("Loading textures(%u), using stb_image version: 2.28, ", loadedTextures);
+    loadedTexturesMaxIndex = maxIndex + 1;
+    uint16_t actualLoadedTextures = 0u;
+    int32_t matchedParserIdxes[MAX_VALID_TEXTURE];
+    for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) matchedParserIdxes[i] = -1;
+    for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
+        if (texture_parser.entries[k].index < loadedTexturesMaxIndex) {
+            matchedParserIdxes[texture_parser.entries[k].index] = k;
+            if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true;
+        }
+    }
+    for (int32_t i=0;i<MAX_VALID_TEXTURE;++i) actualLoadedTextures += textureIndexUsedForCurrentLevel[i] ? 1u : 0u;
+    if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
+    DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", actualLoadedTextures, loadedTexturesMaxIndex);
     
     totalPixels = 0U;
     totalPaletteColors = 0U;
     int32_t widths[MAX_VALID_TEXTURE]; memset(widths,0,MAX_VALID_TEXTURE * sizeof(int32_t));
     int32_t heights[MAX_VALID_TEXTURE]; memset(heights,0,MAX_VALID_TEXTURE * sizeof(int32_t));    
-    size_t offsets_size          = loadedTextures * sizeof(uint32_t);
-    size_t sizes_size            = loadedTextures * 2 * sizeof(int32_t);
-    size_t palette_offsets_size  = loadedTextures * sizeof(uint32_t);
+    size_t offsets_size          = loadedTexturesMaxIndex * sizeof(uint32_t);
+    size_t sizes_size            = loadedTexturesMaxIndex * 2 * sizeof(int32_t);
+    size_t palette_offsets_size  = loadedTexturesMaxIndex * sizeof(uint32_t);
     uint32_t maxUniqueColors = 74000u; uint32_t maxTotalPixels = 24000000u;
     size_t palettes_size         = maxUniqueColors * sizeof(uint32_t);
     size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
@@ -67,16 +77,11 @@ void LoadTextures(void) {
     uint32_t* texturePalettes       = (uint32_t*)cur; cur += palettes_size;
     uint8_t*  all_indices           = (uint8_t*)cur;
     uint32_t pixel_base = 0u, color_base = 0u;
-    int32_t matchedParserIdxes[MAX_VALID_TEXTURE];
-    for (uint16_t i = 0; i < loadedTextures; ++i) matchedParserIdxes[i] = -1;
-    for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
-        if (texture_parser.entries[k].index < loadedTextures) matchedParserIdxes[texture_parser.entries[k].index] = k;
-    }
-    
-    for (uint16_t i = 0; i < loadedTextures; ++i) {
-        if (matchedParserIdxes[i] < 0) continue;
-    
+    for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
         int32_t currentIndex = matchedParserIdxes[i];
+        if (currentIndex < 0) continue;
+        if (!textureIndexUsedForCurrentLevel[currentIndex]) continue;
+        
         doubleSidedTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_DOUBLESIDED) > 0 ? 1 : 0;
         transparentTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_TRANSPARENT) > 0 ? 1 : 0;
         int fd = open(texture_parser.entries[currentIndex].path, O_RDONLY);
@@ -145,11 +150,11 @@ void LoadTextures(void) {
     CHECK_GL_ERROR();
     texturePalettesID       = SetupSSBO(texturePalettesID,       16, totalPaletteColors * sizeof(uint32_t), texturePalettes,       GL_STATIC_DRAW);
     CHECK_GL_ERROR();
-    textureOffsetsID        = SetupSSBO(textureOffsetsID,        14, loadedTextures * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
+    textureOffsetsID        = SetupSSBO(textureOffsetsID,        14, loadedTexturesMaxIndex * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
     CHECK_GL_ERROR();
-    textureSizesID          = SetupSSBO(textureSizesID,          15, loadedTextures * 2 * sizeof(int32_t), textureSizes,      GL_STATIC_DRAW);
+    textureSizesID          = SetupSSBO(textureSizesID,          15, loadedTexturesMaxIndex * 2 * sizeof(int32_t), textureSizes,      GL_STATIC_DRAW);
     CHECK_GL_ERROR();
-    texturePaletteOffsetsID = SetupSSBO(texturePaletteOffsetsID, 17, loadedTextures * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
+    texturePaletteOffsetsID = SetupSSBO(texturePaletteOffsetsID, 17, loadedTexturesMaxIndex * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
     CHECK_GL_ERROR();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     CHECK_GL_ERROR();

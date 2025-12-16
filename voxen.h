@@ -123,7 +123,6 @@ void UpdateAmbientSounds(void);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MATERIAL_IDX_MAX 2048 // Max value the bit packing bits allow
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
 bool isDoubleSided(uint32_t texIndexToCheck);
@@ -146,8 +145,8 @@ extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT];
 extern float** modelVertices;
 extern GLuint vbos[MODEL_IDX_MAX];
 extern GLuint tbos[MODEL_IDX_MAX];
-extern uint16_t loadedTextures;
-extern uint16_t loadedModels;
+extern uint16_t loadedTexturesMaxIndex;
+extern uint16_t loadedModelsMaxIndex;
 extern uint16_t loadedLights;
 extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
