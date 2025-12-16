@@ -18,8 +18,10 @@
 // ls *.png | sort | awk '{print "#Textures/"$0"\nindex: "NR-1}'
 //
 // Unneeded fields do not need to be specified.
+// Index 0 is reserved for black, alpha 1.0 (fully opaque)!
 #Textures/black.png
 index: 0
+persistent: 1
 #Textures/access_card02.png
 index: 1
 #Textures/access_card03.png
@@ -1778,270 +1780,395 @@ index: 895
 index: 896
 #Textures/UI/ammopane_orange.png
 index: 897
+persistent: 1
 #Textures/UI/ammopane.png
 index: 898
+persistent: 1
 #Textures/UI/ammopane_red.png
 index: 899
+persistent: 1
 
 #Textures/UI/buttonborder_orange.png
 index: 908
+persistent: 1
 
 #Textures/UI/checkbox.png
 index: 910
+persistent: 1
 #Textures/UI/checkmark.png
 index: 912
+persistent: 1
 #Textures/UI/circle_blue.png
 index: 914
+persistent: 1
 #Textures/UI/circle_green.png
 index: 915
+persistent: 1
 #Textures/UI/circle_purple.png
 index: 916
+persistent: 1
 #Textures/UI/circle_red.png
 index: 917
+persistent: 1
 #Textures/UI/clipindicator.png
 index: 918
+persistent: 1
 #Textures/UI/config_dropdown.png
 index: 919
+persistent: 1
 #Textures/UI/config_tabhilite.png
 index: 920
+persistent: 1
 #Textures/UI/config_tab.png
 index: 921
+persistent: 1
 #Textures/UI/datapanel.png
 index: 922
+persistent: 1
 #Textures/UI/elnum0.png
 index: 923
+persistent: 1
 #Textures/UI/elnum1.png
 index: 924
+persistent: 1
 #Textures/UI/elnum2.png
 index: 925
+persistent: 1
 #Textures/UI/elnum3.png
 index: 926
+persistent: 1
 #Textures/UI/elnum4.png
 index: 927
+persistent: 1
 #Textures/UI/elnum5.png
 index: 928
+persistent: 1
 #Textures/UI/elnum6.png
 index: 929
+persistent: 1
 #Textures/UI/elnum7.png
 index: 930
+persistent: 1
 #Textures/UI/elnum8.png
 index: 931
+persistent: 1
 #Textures/UI/elnum9.png
 index: 932
+persistent: 1
 #Textures/UI/elnumb.png
 index: 933
+persistent: 1
 #Textures/UI/elnumg.png
 index: 934
-#Textures/UI/elnum_null.png
-index: 935
+persistent: 1
+
 #Textures/UI/elnumr.png
 index: 936
+persistent: 1
 #Textures/UI/elnums.png
 index: 937
+persistent: 1
 #Textures/UI/energyindicatororange.png
 index: 938
+persistent: 1
 #Textures/UI/energyindicator.png
 index: 939
+persistent: 1
 #Textures/UI/energyindicatorred_1.png
 index: 940
+persistent: 1
 #Textures/UI/energyindicatorred_2.png
 index: 941
+persistent: 1
 #Textures/UI/energyindicatorred_3.png
 index: 942
+persistent: 1
 #Textures/UI/energyindicatorred_4.png
 index: 943
+persistent: 1
 #Textures/UI/energy_surge.png
 index: 944
+persistent: 1
 #Textures/UI/ener_overheatborder.png
 index: 945
+persistent: 1
 #Textures/UI/ener_overheattickblue.png
 index: 946
+persistent: 1
 #Textures/UI/ener_overheattickgreen.png
 index: 947
+persistent: 1
 #Textures/UI/ener_overheattickorange.png
 index: 948
+persistent: 1
 #Textures/UI/ener_overheattickred.png
 index: 949
+persistent: 1
 #Textures/UI/ener_overloadoff.png
 index: 950
+persistent: 1
 #Textures/UI/ener_overloadon.png
 index: 951
+persistent: 1
 #Textures/UI/ener_settingborder.png
 index: 952
+persistent: 1
 #Textures/UI/ener_settinghandle.png
 index: 953
+persistent: 1
 #Textures/UI/healthindicatorcyber.png
 index: 954
+persistent: 1
 #Textures/UI/healthindicatororange.png
 index: 955
+persistent: 1
 #Textures/UI/healthindicator.png
 index: 956
+persistent: 1
 #Textures/UI/healthindicatorred_1.png
 index: 957
+persistent: 1
 #Textures/UI/healthindicatorred_2.png
 index: 958
+persistent: 1
 #Textures/UI/healthindicatorred_3.png
 index: 959
+persistent: 1
 #Textures/UI/healthindicatorred_4.png
 index: 960
+persistent: 1
 #Textures/UI/healthindicatorred_5.png
 index: 961
+persistent: 1
 #Textures/UI/health_tickgreen.png
 index: 962
+persistent: 1
 #Textures/UI/health_tickorange.png
 index: 963
+persistent: 1
 #Textures/UI/health_tickred.png
 index: 964
+persistent: 1
 
 #Textures/UI/hud_hwico_biostats_off.png
 index: 989
+persistent: 1
 #Textures/UI/hud_hwico_biostats_v1.png
 index: 991
+persistent: 1
 #Textures/UI/hud_hwico_biostats_v2.png
 index: 992
+persistent: 1
 #Textures/UI/hud_hwico_booster_off.png
 index: 993
+persistent: 1
 #Textures/UI/hud_hwico_booster_onv1.png
 index: 994
+persistent: 1
 #Textures/UI/hud_hwico_booster_onv2.png
 index: 995
+persistent: 1
 #Textures/UI/hud_hwico_ereader_off.png
 index: 996
+persistent: 1
 #Textures/UI/hud_hwico_ereader_v1.png
 index: 997
+persistent: 1
 #Textures/UI/hud_hwico_infrared_off.png
 index: 998
+persistent: 1
 #Textures/UI/hud_hwico_infrared_v1.png
 index: 999
+persistent: 1
 #Textures/UI/hud_hwico_jumpjets_off.png
 index: 1000
+persistent: 1
 #Textures/UI/hud_hwico_jumpjets_onv1.png
 index: 1001
+persistent: 1
 #Textures/UI/hud_hwico_jumpjets_onv2.png
 index: 1002
+persistent: 1
 #Textures/UI/hud_hwico_jumpjets_onv3.png
 index: 1003
+persistent: 1
 #Textures/UI/hud_hwico_lantern_off.png
 index: 1004
+persistent: 1
 #Textures/UI/hud_hwico_lantern_v1.png
 index: 1006
+persistent: 1
 #Textures/UI/hud_hwico_lantern_v2.png
 index: 1007
+persistent: 1
 #Textures/UI/hud_hwico_lantern_v3.png
 index: 1008
+persistent: 1
 #Textures/UI/hud_hwico_sensaround_off.png
 index: 1009
+persistent: 1
 #Textures/UI/hud_hwico_sensaround_v1.png
 index: 1011
+persistent: 1
 #Textures/UI/hud_hwico_sensaround_v2.png
 index: 1012
+persistent: 1
 #Textures/UI/hud_hwico_sensaround_v3.png
 index: 1013
+persistent: 1
 #Textures/UI/hud_hwico_shield_off.png
 index: 1014
+persistent: 1
 #Textures/UI/hud_hwico_shield_on_v1.png
 index: 1015
+persistent: 1
 #Textures/UI/hud_hwico_shield_on_v2.png
 index: 1016
+persistent: 1
 #Textures/UI/hud_hwico_shield_on_v3.png
 index: 1017
+persistent: 1
 #Textures/UI/hud_hwico_shield_on_v4.png
 index: 1018
+persistent: 1
 #Textures/UI/hud_shootmode.png
 index: 1020
+persistent: 1
 #Textures/UI/hudtab1.png
 index: 1021
+persistent: 1
 #Textures/UI/hudtab2.png
 index: 1022
+persistent: 1
 #Textures/UI/hudtab_highlight.png
 index: 1023
+persistent: 1
 #Textures/UI/hudtab_on.png
 index: 1024
+persistent: 1
 #Textures/UI/infopanel.png
 index: 1025
+persistent: 1
 #Textures/UI/menu_background_new.png
 index: 1026
+persistent: 1
 #Textures/UI/menu_button_paddark.png
 index: 1028
+persistent: 1
 #Textures/UI/menu_button_padlit.png
 index: 1029
+persistent: 1
 #Textures/UI/menu_config.png
 index: 1030
+persistent: 1
 
 #Textures/UI/menu_load.png
 index: 1037
+persistent: 1
 #Textures/UI/nav_e.png
 index: 1038
+persistent: 1
 #Textures/UI/nav_I.png
 index: 1039
+persistent: 1
 #Textures/UI/nav_ne.png
 index: 1040
+persistent: 1
 #Textures/UI/nav_n.png
 index: 1041
+persistent: 1
 #Textures/UI/nav_nw.png
 index: 1042
+persistent: 1
 #Textures/UI/nav_se.png
 index: 1043
+persistent: 1
 #Textures/UI/nav_s.png
 index: 1044
+persistent: 1
 #Textures/UI/nav_sw.png
 index: 1045
+persistent: 1
 #Textures/UI/nav_tick.png
 index: 1046
+persistent: 1
 #Textures/UI/nav_w.png
 index: 1047
+persistent: 1
 #Textures/UI/newgame_background_inset.png
 index: 1048
+persistent: 1
 #Textures/UI/newgame_background.png
 index: 1049
+persistent: 1
 #Textures/UI/noammo.png
 index: 1050
+persistent: 1
 #Textures/UI/nodamage.png
 index: 1051
-#Textures/UI/nullsprite.png
-index: 1052
+persistent: 1
+
 #Textures/UI/num_0.png
 index: 1053
+persistent: 1
 #Textures/UI/num_1.png
 index: 1054
+persistent: 1
 #Textures/UI/num_2.png
 index: 1055
+persistent: 1
 #Textures/UI/num_3.png
 index: 1056
+persistent: 1
 #Textures/UI/num_4.png
 index: 1057
+persistent: 1
 #Textures/UI/num_5.png
 index: 1058
+persistent: 1
 #Textures/UI/num_6.png
 index: 1059
+persistent: 1
 #Textures/UI/num_7.png
 index: 1060
+persistent: 1
 #Textures/UI/num_8.png
 index: 1061
+persistent: 1
 #Textures/UI/num_9.png
 index: 1062
+persistent: 1
 #Textures/UI/num_colon.png
 index: 1063
+persistent: 1
 #Textures/UI/num_slash.png
 index: 1064
+persistent: 1
 #Textures/UI/searchfx.png
 index: 1074
+persistent: 1
 #Textures/UI/selection_box.png
 index: 1075
+persistent: 1
 #Textures/UI/shieldwave.png
 index: 1076
-#Textures/UI/sightDimming.png
-index: 1077
+persistent: 1
+
 #Textures/UI/sliderhandle.png
 index: 1078
+persistent: 1
 #Textures/UI/slider.png
 index: 1079
+persistent: 1
 #Textures/UI/pause_bg_outline.png
 index: 1080
+persistent: 1
 #Textures/UI/vaporizebutton_outline_dark.png
 index: 1086
+persistent: 1
 #Textures/UI/vaporizebutton_outline.png
 index: 1087
+persistent: 1
 #Textures/sequences/ammo_magcart_00.png
 index: 1088
 #Textures/sequences/ammo_magcart_01.png
@@ -2382,18 +2509,25 @@ index: 1258
 index: 1259
 #Textures/UI/cursors/cursor.png
 index: 1260
+persistent: 1
 #Textures/UI/cursors/cursor_normal.png
 index: 1261
+persistent: 1
 #Textures/UI/cursors/cursor_LH.png
 index: 1262
+persistent: 1
 #Textures/UI/cursors/cursor_RH.png
 index: 1263
+persistent: 1
 #Textures/UI/cursors/cursor_DN.png
 index: 1264
+persistent: 1
 #Textures/UI/cursors/cursor_vmail.png
 index: 1265
+persistent: 1
 #Textures/UI/cursors/cursor_cyberspace.png
 index: 1266
+persistent: 1
 #Textures/med1_9_spec.png
 index: 1267
 #Textures/med1_7_spec.png
