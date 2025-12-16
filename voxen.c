@@ -44,7 +44,7 @@ VoxenSettings voxen_Settings = {
     .ScreenWidth = 1366u,
     .ScreenHeight = 768u,
     .Shadows = 1u,
-    .AntiAliasing = 1u, // Default 1
+    .AntiAliasing = 1u, // Default 1 (incredibly cheap)
     .Brightness = 70u, // Default 100 (for %)
     .VolumeMusic = 20u,
     .Language = 0, // English default
@@ -1160,7 +1160,7 @@ void RenderInstances(uint8_t type) {
             visibleInstances[visibleCount].index = i;
             visibleInstances[visibleCount].depth = distSqrd;
             visibleCount++;
-            instanceIsLODArray[i] = (distSqrd >= 1253.16f); // 35.4f * 35.4f
+            instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
         }
         
         if (visibleCount == 0) continue;

@@ -622,6 +622,7 @@ void LoadLevel(uint8_t curlevel) {
     for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(uint32_t), modelMatrices, GL_DYNAMIC_DRAW);
     UpdateVoxelLightLists();
+    DebugRAM("after first UpdateVoxelLightLists for load level");
     voxen_GL_Comms.shadowMapSSBO = SetupSSBO(voxen_GL_Comms.shadowMapSSBO, 5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
     GLuint groupX_shadClear = (TOTAL_SHADOWMAP_PIXELS + 31) / 32;

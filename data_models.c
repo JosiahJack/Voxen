@@ -148,7 +148,7 @@ void LoadModels(void) {
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
-    DebugRAM("prior to parallel model load loop");
+    DebugRAM("prior to model load loop");
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         if (!modelIndexUsedForCurrentLevel[parserIdx]) continue;
@@ -278,7 +278,7 @@ void LoadModels(void) {
         }
     }
 
-    DebugRAM("after to parallel model load loop");
+    DebugRAM("after model load loop");
     madvise(indexToParser, indexToParser_size, MADV_DONTNEED); munmap(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
     glGenBuffers(loadedModelsMaxIndex, vbos);

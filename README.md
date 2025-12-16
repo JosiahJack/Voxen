@@ -1392,3 +1392,9 @@ RAM: 135mb
 VRAM: 155mb // Nice!
 Build 364ms
 Init 0.553304secs // Aww yeaaaaah
+
+12/15 performance canvas:
+Shaodowmapping: 2.64ms of total frametime
+Reflections: 1.7ms of total frametime (only is 0.77ms if SSR_RES is 4 instead of the current 2, 1:1 ratio with resolution)
+All else: 1.75ms (Antialiasing only like 0.03ms)
+TOTAL: 6.09ms
