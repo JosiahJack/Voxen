@@ -163,7 +163,6 @@ int statusTextLengthWithoutNullTerminator = 6;
 float statusTextDecayFinished = 0.0f;
 // ----------------------------------------------------------------------------
 // Lights
-GLuint lightsID, shadowMapsIndirectionID;
 uint32_t shadowmapIndirectionList[LIGHT_COUNT];
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 float lightsRangeSquared[LIGHT_COUNT];
@@ -223,7 +222,6 @@ void CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");
     voxen_GL_Comms.imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
-    CHECK_GL_ERROR();
     
     glGenBuffers(1, &voxen_GL_Comms.blueNoiseBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.blueNoiseBuffer);
@@ -267,11 +265,9 @@ void UpdateScreenSize(void) {
     UpdateProjectionMatrices();
     glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 2, voxen_Settings.ScreenWidth);
     glProgramUniform1ui(voxen_GL_Comms.imageBlitShaderProgram, 3, voxen_Settings.ScreenHeight);
-    glProgramUniform1f(voxen_GL_Comms.imageBlitShaderProgram, 23, (float)(SHADOW_MAP_SIZE));
     glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 26, SSR_RES);
     glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 6, voxen_Settings.ScreenWidth);
     glProgramUniform1ui(voxen_GL_Comms.chunkShaderProgram, 7, voxen_Settings.ScreenHeight);
-    glProgramUniform1f(voxen_GL_Comms.chunkShaderProgram, 16, (float)(SHADOW_MAP_SIZE));
     glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 0, voxen_Settings.ScreenWidth / SSR_RES);
     glProgramUniform1ui(voxen_GL_Comms.ssrShaderProgram, 1, voxen_Settings.ScreenHeight / SSR_RES);       
     glProgramUniform1i(voxen_GL_Comms.ssrShaderProgram, 2, SSR_RES);
@@ -357,11 +353,10 @@ void UpdateDynamicLights(void) {
         }
     }
 
-    glNamedBufferData(lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
 }
 
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-GLuint voxelLightListIndicesID, voxelLightListsRawID;
 uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
 uint32_t voxelLightListsRaw[VOXEL_COUNT * 4];
 uint32_t voxelLightListIndices[VOXEL_COUNT * 2];
@@ -494,12 +489,12 @@ void UpdateVoxelLightLists(void) {
         }
     }
     
-    glNamedBufferData(voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
-    glNamedBufferData(voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
 }
 
 uint16_t largestNearbyMeshCount = 0;
-void RenderShadowmap(uint16_t lightIdx) {
+void RenderShadowmap(uint16_t lightIdx, uint32_t shadowSize) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -536,8 +531,10 @@ void RenderShadowmap(uint16_t lightIdx) {
 
     if (nearbyMeshCount > largestNearbyMeshCount) largestNearbyMeshCount = nearbyMeshCount;
     glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 3, lightIdx * (uint32_t)LIGHT_DATA_SIZE);
+    glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 5, shadowmapIndirectionList[lightIdx]);
     for (uint8_t face = 0; face < 6; face++) {
-        glProgramUniform1i(voxen_GL_Comms.shadowmapsShaderProgram, 2, (shadowmapIndirectionList[lightIdx] * (6 * SHADOW_MAP_SIZE_SQD)) + (face * SHADOW_MAP_SIZE_SQD));
+        glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 2, face);
+        glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 4, shadowSize);
         glProgramUniformMatrix4fv(voxen_GL_Comms.shadowmapsShaderProgram, 1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = nearMeshes[j];
@@ -549,8 +546,9 @@ void RenderShadowmap(uint16_t lightIdx) {
 
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
             glUniform1ui(0, i);
-            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+            glUniform1ui(6, instances[i].texIndex);
+            glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
             glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
@@ -591,17 +589,9 @@ static inline void sift_down(LightCandidate* h, int size, int idx) {
 }
 
 uint32_t numShadowsCouldRender = 0;
-
+uint32_t shadowmapSizes[MAX_SHADOWMAPS];
 void RenderShadowmaps(void) {
     largestNearbyMeshCount = 0;
-    glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (TOTAL_SHADOWMAP_PIXELS + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
-    shadowDrawCallsRenderedThisFrame = 0;
-    memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t));
-    glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-    glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
-    glProgramUniform1i(voxen_GL_Comms.shadowmapsShaderProgram, 4, (int32_t)SHADOW_MAP_SIZE);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glBindVertexArray(voxen_GL_Comms.vao_chunk);
@@ -612,12 +602,12 @@ void RenderShadowmaps(void) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        if (range > 10.0f) continue;
-        if (intensity < 0.1f) continue;
+//         if (range > 10.0f) continue;
+//         if (intensity < 0.1f) continue;
         
-        float thresh = 0.018f;
-        float luminosity = (intensity / (range * range));
-        if (luminosity < thresh) continue;
+//         float thresh = 0.018f;
+//         float luminosity = (intensity / (range * range));
+//         if (luminosity < thresh) continue;
         
         float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -663,6 +653,7 @@ void RenderShadowmaps(void) {
             candidates[0] = c;
             sift_down(candidates, MAX_SHADOWMAPS, 0);
         }
+        
         numShadowsCouldRender++;
     }
 
@@ -674,18 +665,34 @@ void RenderShadowmaps(void) {
     }
     
     uint32_t numToRender = vmin(numShadowsCouldRender, MAX_SHADOWMAPS);
+    glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
+    GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
+    glDispatchCompute(groupX_shadClear,1, 1);
+    shadowDrawCallsRenderedThisFrame = 0;
+    memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+    glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
-        RenderShadowmap(lightIdx);
+        uint32_t shadSize = (float)SHADOW_MAP_SIZE;
+        if (candidates[c].score > 2500.0f) shadSize = SHADOW_MAP_SIZE;
+        else if (candidates[c].score > 1250.0f) shadSize = (uint32_t)((float)SHADOW_MAP_SIZE * 0.5f);
+        else if (candidates[c].score > 500.0f) shadSize = (uint32_t)((float)SHADOW_MAP_SIZE * 0.25f);
+        else if (candidates[c].score > 250.0f) shadSize = (uint32_t)((float)SHADOW_MAP_SIZE * 0.125f);
+        
+        shadSize = SHADOW_MAP_SIZE;
+        glViewport(0, 0, shadSize, shadSize);
+        shadowmapSizes[c] = shadSize;
+        RenderShadowmap(lightIdx, shadSize);
         shadowDrawCallsRenderedThisFrame++;
     }
 
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
-    glNamedBufferData(shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.shadowMapsSizesID, MAX_SHADOWMAPS * sizeof(uint32_t), shadowmapSizes, GL_DYNAMIC_DRAW);
 }
 
 // ============================================================================
@@ -939,6 +946,7 @@ void InitializeEnvironment(void) {
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); OS_Exit(1); }
     
     glfwSetInputMode(voxen_globalContext.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    ENABLE_GL_DEBUG();
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     if (!version) { DualLogError("OpenGL support not found!\n"); OS_Exit(1);}
@@ -1046,13 +1054,14 @@ void InitializeEnvironment(void) {
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadEntities();
-    lightsID = SetupSSBO(lightsID, 19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    voxelLightListIndicesID = SetupSSBO(voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    voxelLightListsRawID = SetupSSBO(voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.lightsID = SetupSSBO(voxen_GL_Comms.lightsID, 19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.voxelLightListIndicesID = SetupSSBO(voxen_GL_Comms.voxelLightListIndicesID, 26, VOXEL_COUNT * 2 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.voxelLightListsRawID = SetupSSBO(voxen_GL_Comms.voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
     matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-    shadowMapsIndirectionID = SetupSSBO(shadowMapsIndirectionID, 8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    voxen_GL_Comms.shadowMapsIndirectionID = SetupSSBO(voxen_GL_Comms.shadowMapsIndirectionID, 8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    voxen_GL_Comms.shadowMapsSizesID = SetupSSBO(voxen_GL_Comms.shadowMapsSizesID, 9, MAX_SHADOWMAPS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
@@ -1168,16 +1177,15 @@ void RenderInstances(uint8_t type) {
         if (type == REND_TRANSPARENT) sort_transparents(visibleInstances, visibleCount); // With layout(early_fragment_tests) in; in the chunk_frag.glsl we only need to sort transparents
         for (uint16_t j = 0; j < visibleCount; j++) {
             uint16_t i = visibleInstances[j].index;
-            uint32_t texIndex = instances[i].texIndex;
             glUniform1ui(0, i);
             glUniform1ui(1, (uint32_t)instances[i].normIndex);
-            glUniform1ui(18, texIndex);
+            glUniform1ui(18, instances[i].texIndex);
             glUniform1ui(19, (uint32_t)instances[i].glowIndex);
             glUniform1ui(20, (uint32_t)instances[i].specIndex);
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
             uint32_t vertCount = modelTriangleCounts[modelType] * 3;
-            glBindVertexBuffer(0, vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[modelType]);
+            glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
             glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
             drawCallsRenderedThisFrame++;
             verticesRenderedThisFrame += vertCount;

@@ -31,7 +31,7 @@ layout(location = 19) uniform uint groveShieldVisible;
 layout(location = 20) uniform uint stationShieldVisible;
 layout(location = 21) uniform uint empEffectActive;
 layout(location = 22) uniform uint  shadowsEnabled;
-layout(location = 23) uniform float shadowmapSize;
+
 layout(location = 24) uniform mat4 viewProjection;
 layout(location = 25) uniform mat3 invViewRot;
 layout(location = 26) uniform int SSR_RES;

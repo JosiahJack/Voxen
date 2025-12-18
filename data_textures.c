@@ -15,11 +15,6 @@ int close(int filedes); // #include <unistd.h>
 int open(const char *, int, ...); // #include <fcntl.h>
 
 DataParser texture_parser;
-GLuint colorBufferID = 0;
-GLuint textureSizesID = 0;
-GLuint textureOffsetsID = 0;
-GLuint texturePalettesID = 0;
-GLuint texturePaletteOffsetsID = 0;
 uint32_t totalPixels = 0u;
 uint32_t totalPaletteColors = 0u;
 uint16_t loadedTexturesMaxIndex = 0u;
@@ -138,30 +133,18 @@ void LoadTextures(void) {
     DebugRAM("After loop for load textures");
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
-    CHECK_GL_ERROR();
-    colorBufferID = SetupSSBO(colorBufferID, 12, packed_size, NULL, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, colorBufferID);
-    CHECK_GL_ERROR();
+    voxen_GL_Comms.colorBufferID = SetupSSBO(voxen_GL_Comms.colorBufferID, 12, packed_size, NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.colorBufferID);
     void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
-    CHECK_GL_ERROR();
     memcpy(dst, all_indices,packed_size);
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-    CHECK_GL_ERROR();
-    texturePalettesID       = SetupSSBO(texturePalettesID,       16, totalPaletteColors * sizeof(uint32_t), texturePalettes,       GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    textureOffsetsID        = SetupSSBO(textureOffsetsID,        14, loadedTexturesMaxIndex * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    textureSizesID          = SetupSSBO(textureSizesID,          15, loadedTexturesMaxIndex * 2 * sizeof(int32_t), textureSizes,      GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
-    texturePaletteOffsetsID = SetupSSBO(texturePaletteOffsetsID, 17, loadedTexturesMaxIndex * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
-    CHECK_GL_ERROR();
+    voxen_GL_Comms.texturePalettesID       = SetupSSBO(voxen_GL_Comms.texturePalettesID,       16, totalPaletteColors * sizeof(uint32_t), texturePalettes,           GL_STATIC_DRAW);
+    voxen_GL_Comms.textureOffsetsID        = SetupSSBO(voxen_GL_Comms.textureOffsetsID,        14, loadedTexturesMaxIndex * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
+    voxen_GL_Comms.textureSizesID          = SetupSSBO(voxen_GL_Comms.textureSizesID,          15, loadedTexturesMaxIndex * 2 * sizeof(int32_t), textureSizes,       GL_STATIC_DRAW);
+    voxen_GL_Comms.texturePaletteOffsetsID = SetupSSBO(voxen_GL_Comms.texturePaletteOffsetsID, 17, loadedTexturesMaxIndex * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    CHECK_GL_ERROR();
     glFlush();
-    CHECK_GL_ERROR();
     glFinish();
-    CHECK_GL_ERROR();
     madvise(arena, arena_size, MADV_DONTNEED); munmap(arena, arena_size); arena = NULL;
     madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     double end_time = get_time();

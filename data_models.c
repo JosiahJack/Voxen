@@ -29,8 +29,6 @@ float** modelVertices = NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
-GLuint vbos[MODEL_IDX_MAX] = {0}; // 4kb
-GLuint tbos[MODEL_IDX_MAX] = {0}; // 4kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
 uint16_t loadedModelsMaxIndex = 0;
 
@@ -281,8 +279,8 @@ void LoadModels(void) {
     DebugRAM("after model load loop");
     madvise(indexToParser, indexToParser_size, MADV_DONTNEED); munmap(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
-    glGenBuffers(loadedModelsMaxIndex, vbos);
-    glGenBuffers(loadedModelsMaxIndex, tbos);
+    glGenBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
+    glGenBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
     uint32_t totalVertices = 0, totalTris = 0;
     for (int i = 0; i < loadedModelsMaxIndex; ++i) {
         if (modelVertexCounts[i] == 0) continue;
@@ -291,13 +289,13 @@ void LoadModels(void) {
         totalVertices += modelVertexCounts[i];
         size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         totalTris += (uint32_t)triSize;
-        glBindBuffer(GL_ARRAY_BUFFER, vbos[i]);
+        glBindBuffer(GL_ARRAY_BUFFER, voxen_GL_Comms.vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, tbos[i]);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
@@ -309,8 +307,7 @@ void LoadModels(void) {
     DebugRAM("after to model to gpu transfer");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    GLuint modelBoundsID = 0;
-    modelBoundsID = SetupSSBO(modelBoundsID, 7, loadedModelsMaxIndex * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
+    voxen_GL_Comms.modelBoundsID = SetupSSBO(voxen_GL_Comms.modelBoundsID, 7, loadedModelsMaxIndex * BOUNDS_ATTRIBUTES_COUNT * sizeof(float), modelBounds, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();

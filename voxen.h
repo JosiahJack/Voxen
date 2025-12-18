@@ -15,6 +15,10 @@
 // Generic Constants
 #define MAX_PATH 128
 
+void DualLog(const char* fmt, ...);
+void DualLogWarn(const char* fmt, ...);
+void DualLogError(const char* fmt, ...);
+
 // Global Types
 typedef struct { float r,g,b,a; } Color;
 
@@ -36,28 +40,6 @@ typedef struct {
     GLFWwindow* window;
 } Voxen_GlobalContext;
 extern Voxen_GlobalContext voxen_globalContext;
-
-typedef struct {
-	GLuint inputImageID;
-	GLuint inputDepthID;
-	GLuint inputWorldPosID;
-	GLuint inputSpecID;
-	GLuint gBufferFBO;
-	GLuint outputImageID;
-	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
-	GLuint vao_chunk; // Vertex Array Object
-	GLuint shadowFBO;
-	GLuint shadowmapsShaderProgram;
-	GLuint shadowmapsClearShaderProgram;
-	GLuint shadowMapSSBO;
-	GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
-	GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
-	GLuint quadVAO, quadVBO;
-	GLuint textShaderProgram;
-	GLuint textVAO, textVBO;
-	GLuint blueNoiseBuffer;
-} Voxen_GL_Comms;
-extern Voxen_GL_Comms voxen_GL_Comms;
 
 typedef struct {
 	int lev1SecCode;
@@ -143,8 +125,6 @@ void LoadTextures(void);
 #define BOUNDS_DATA_OFFSET_RADIUS 6
 extern float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT];
 extern float** modelVertices;
-extern GLuint vbos[MODEL_IDX_MAX];
-extern GLuint tbos[MODEL_IDX_MAX];
 extern uint16_t loadedTexturesMaxIndex;
 extern uint16_t loadedModelsMaxIndex;
 extern uint16_t loadedLights;
@@ -182,7 +162,7 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define SHADOW_MAP_SIZE 256u
 #define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
-#define MAX_SHADOWMAPS 56u
+#define MAX_SHADOWMAPS 96u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 #define SHADOWMAP_FOV 90.0f
 
@@ -337,7 +317,41 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 // Rendering
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
+
+void glDebugMessageCallback(GLDEBUGPROC callback, const void* userParam);
+void glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled);
 #define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
+
+#define UNUSED(x) (void)(x)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* user) {
+    UNUSED(source);
+    UNUSED(severity);
+    UNUSED(length);
+    UNUSED(user);
+    if (id != 131186 // Suppress GL_STATIC_DRAW vs GL_DYNAMIC_DRAW warnings for model vbos/tbos due to orphaned copying this warning is spurious; dynamic adds RAM (not VRAM) and hurts performance by 40fps!.
+        && id != 131218) { // Suppress single chunk_frag shader recompile at first frame UI render
+        if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR) {
+            DualLogError("GL ERROR [%u]: %s\n", id, message);
+            __builtin_trap();
+        } else {
+            DualLogWarn("GL WARN [%u]: %s\n", id, message);
+        }
+    }
+}
+#pragma GCC diagnostic pop
+
+
+#define ENABLE_GL_DEBUG() \
+    do { \
+        glEnable(GL_DEBUG_OUTPUT); \
+        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); \
+        glDebugMessageCallback(GLDebugCallback, NULL); \
+        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE); \
+    } while (0)
+
 #else
 #define CHECK_GL_ERROR() do {} while(0)
 #endif
@@ -451,9 +465,6 @@ void OpenConsoleLogFile(void);
 void Screenshot(void);
 void CenterStatusPrint(const char* fmt, ...);
 void JournalDump(const char* dem_file);
-void DualLog(const char* fmt, ...);
-void DualLogWarn(const char* fmt, ...);
-void DualLogError(const char* fmt, ...);
 void DebugRAM(const char *context);
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
 void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
@@ -544,3 +555,40 @@ static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
 //     }
 //     *dst = '\0';
 // }
+
+typedef struct {
+	GLuint inputImageID;
+	GLuint inputDepthID;
+	GLuint inputWorldPosID;
+	GLuint inputSpecID;
+	GLuint gBufferFBO;
+	GLuint outputImageID;
+	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
+	GLuint vao_chunk; // Vertex Array Object
+	GLuint shadowFBO;
+	GLuint shadowmapsShaderProgram;
+	GLuint shadowmapsClearShaderProgram;
+	GLuint shadowMapSSBO;
+	GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
+	GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
+	GLuint quadVAO;
+	GLuint quadVBO;
+	GLuint textShaderProgram;
+	GLuint textVAO;
+	GLuint textVBO;
+	GLuint blueNoiseBuffer;
+	GLuint modelBoundsID;
+	GLuint colorBufferID;
+	GLuint texturePalettesID;
+	GLuint textureOffsetsID;
+	GLuint textureSizesID;
+	GLuint texturePaletteOffsetsID;
+	GLuint lightsID;
+	GLuint shadowMapsIndirectionID;
+	GLuint shadowMapsSizesID;
+	GLuint voxelLightListIndicesID;
+	GLuint voxelLightListsRawID;
+	GLuint vbos[MODEL_IDX_MAX];
+	GLuint tbos[MODEL_IDX_MAX];
+} Voxen_GL_Comms;
+extern Voxen_GL_Comms voxen_GL_Comms; // Added last to make use of all defines for sizes.

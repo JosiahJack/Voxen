@@ -3807,24 +3807,37 @@ model: 34
 glowtexture: 65
 #se_corpse_blueshirt
 index: 465
+texture: 126
+spectexture: 127
 model: 51
 #se_corpse_brownshirt
 index: 466
+texture: 128
+spectexture: 129
 model: 52
 #se_corpse_eaten
 index: 467
+texture: 130
+spectexture: 131
 model: 53
 #se_corpse_labcoat
 index: 468
+texture: 132
+spectexture: 133
 model: 55
 #se_corpse_security
 index: 469
+texture: 136
+spectexture: 137
 model: 56
 #se_corpse_tan
 index: 470
+texture: 138
 model: 57
 #se_corpse_torso
 index: 471
+texture: 126
+spectexture: 127
 model: 58
 #se_crate1
 index: 472
@@ -4191,8 +4204,12 @@ collider_sizez: 2.56
 colliderMeshIndex: 65535
 #prop_console01
 index: 525
+texture: 100
+model: 49
 #prop_console02
 index: 526
+texture: 100
+model: 50
 #prop_grate1_1
 index: 527
 #prop_grate1_2
@@ -4203,6 +4220,8 @@ index: 529
 index: 530
 #se_thermos
 index: 531
+texture: 863
+model: 623
 #prop_beaker_holder
 index: 532
 #prop_bed

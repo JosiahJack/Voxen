@@ -25,7 +25,7 @@ layout(location = 12) uniform float fogColorG;
 layout(location = 13) uniform float fogColorB;
 layout(location = 14) uniform uint reflectionsEnabled;
 layout(location = 15) uniform uint shadowsEnabled;
-layout(location = 16) uniform float shadowmapSize;
+
 layout(location = 17) uniform uint unlit;
 layout(location = 18) uniform uint texIndex;
 layout(location = 19) uniform uint glowIndex;
@@ -36,6 +36,8 @@ layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
+layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
+layout(std430, binding = 10) buffer ShadowMapOffsets { uint shadowMapOffsets[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -250,9 +252,9 @@ void main() {
             }
 
             uv = uv * 0.5 + 0.5;
-            uint shadSizeSquared = uint(shadowmapSize) * uint(shadowmapSize);
+            uint shadSizeSquared = shadowMapSizes[shadowIndex] * shadowMapSizes[shadowIndex];
             uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
-            vec2 tc = uv * shadowmapSize;
+            vec2 tc = uv * float(shadowMapSizes[shadowIndex]);
             float NdotL = dot(normal, lightDir);
             float slopeBias = 0.10 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
@@ -266,11 +268,11 @@ void main() {
                 for (int si = 0; si < PCF_SAMPLES; ++si) {
                     vec2 off = poissonDisk[si] * smearness;
                     vec2 t = tc + off;
-                    float tx = clamp(t.x, 0.0, shadowmapSize - 1.0); // Minus 1 prevents tiny gaps
-                    float ty = clamp(t.y, 0.0, shadowmapSize - 1.0);
+                    float tx = clamp(t.x, 0.0, float(shadowMapSizes[shadowIndex] - 1)); // Minus 1 prevents tiny gaps
+                    float ty = clamp(t.y, 0.0, float(shadowMapSizes[shadowIndex] - 1));
                     uint utx = uint(tx);
                     uint uty = uint(ty);
-                    uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
+                    uint ssbo_index = faceOff + uty * shadowMapSizes[shadowIndex] + utx;
                     uint distInt = shadowMaps[ssbo_index];
                     if (distInt == 0xFFFFFFFFu) continue;
 
@@ -282,11 +284,11 @@ void main() {
 
                 shadowFactor = sum;
             } else {
-                float tx = clamp(tc.x, 0.0, shadowmapSize - 1.0); // Minus 1 prevents tiny gaps
-                float ty = clamp(tc.y, 0.0, shadowmapSize - 1.0);
+                float tx = clamp(tc.x, 0.0, float(shadowMapSizes[shadowIndex] - 1)); // Minus 1 prevents tiny gaps
+                float ty = clamp(tc.y, 0.0, float(shadowMapSizes[shadowIndex] - 1));
                 uint utx = uint(tx);
                 uint uty = uint(ty);
-                uint ssbo_index = faceOff + uty * uint(shadowmapSize) + utx;
+                uint ssbo_index = faceOff + uty * shadowMapSizes[shadowIndex] + utx;
                 uint distInt = shadowMaps[ssbo_index];
                 if (distInt == 0xFFFFFFFFu) continue;
 
