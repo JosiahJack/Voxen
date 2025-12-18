@@ -576,7 +576,7 @@ static inline void sift_down(LightCandidate* h, int size, int idx) {
 }
 
 void RenderShadowmaps(void) {
-    if (debugValue == 2) return;
+    if (debugValue == 2 || voxen_Settings.Shadows < 1) return;
     
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -644,9 +644,14 @@ void RenderShadowmaps(void) {
     }
     
     uint32_t numToRender = vmin(shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
-    glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
-    GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
-    glDispatchCompute(groupX_shadClear,1, 1);
+//     glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
+//     GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
+//     glDispatchCompute(groupX_shadClear,1, 1);
+    
+    GLuint clearValue = 0xFFFFFFFFu;
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
+    glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     shadowDrawCallsRenderedThisFrame = 0;
     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
