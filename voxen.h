@@ -161,8 +161,8 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define SHADOW_MAP_SIZE 192u
-#define MAX_SHADOWMAPS 64u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 4U)) // Found that in practice only needed ~45%, oversized a little here for safety.
+#define MAX_SHADOWMAPS 80u
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 3U)) // Found that in practice only needed ~45%, oversized a little here for safety.
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -571,6 +571,7 @@ typedef struct {
 	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
 	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
 	uint32_t maximumShadowmapSSBOUsage;
+	bool useComputeClear;
 } Shadow_System;
 extern Shadow_System shadow_System;
 

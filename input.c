@@ -182,6 +182,25 @@ void ProcessInput(void) {
     // =========== PAUSE BARRIER ==================
     if (gamePaused || voxen_Cheats.consoleActive) return;
     
+    uint16_t testlightIdx = (817 * LIGHT_DATA_SIZE);
+    if (keyStates[GLFW_KEY_1].down) {
+        lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] += 0.01f; lightDirty[817] = true;
+    } else if (keyStates[GLFW_KEY_2].down) {
+        lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] -= 0.01f; lightDirty[817] = true;
+    }
+    
+    if (keyStates[GLFW_KEY_3].down) {
+        lights[testlightIdx + LIGHT_DATA_OFFSET_POSY] += 0.01f; lightDirty[817] = true;
+    } else if (keyStates[GLFW_KEY_4].down) {
+        lights[testlightIdx + LIGHT_DATA_OFFSET_POSY] -= 0.01f; lightDirty[817] = true;
+    }
+    
+    if (keyStates[GLFW_KEY_5].down) {
+        lights[testlightIdx + LIGHT_DATA_OFFSET_POSZ] += 0.01f; lightDirty[817] = true;
+    } else if (keyStates[GLFW_KEY_6].down) {
+        lights[testlightIdx + LIGHT_DATA_OFFSET_POSZ] -= 0.01f; lightDirty[817] = true;
+    }
+        
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;
         inventoryMode = !inventoryMode;

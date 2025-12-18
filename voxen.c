@@ -461,19 +461,6 @@ void UpdateVoxelLightLists(void) {
             }
         }
     }
-
-    for (int i=0;i<loadedLights;++i) {
-        uint32_t litIdx = i * LIGHT_DATA_SIZE;
-        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        #pragma GCC unroll 6
-        for (int j=0;j<6;++j) {
-            mat4_lookat_from((float*)lightView[i][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
-            mul_mat4((float*)lightViewProj[i][j], shadowmapsPerspectiveProjection, (float*)lightView[i][j]);
-            ExtractFrustumPlanes((float*)lightViewProj[i][j], lightFrustumPlanes[i][j]);
-        }
-    }
     
     glNamedBufferData(voxen_GL_Comms.voxelLightListIndicesID, VOXEL_COUNT * 2 * sizeof(uint32_t), voxelLightListIndices, GL_DYNAMIC_DRAW);
     glNamedBufferData(voxen_GL_Comms.voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
@@ -644,27 +631,40 @@ void RenderShadowmaps(void) {
     }
     
     uint32_t numToRender = vmin(shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
-//     glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
-//     GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
-//     glDispatchCompute(groupX_shadClear,1, 1);
+    if (shadow_System.useComputeClear) {
+        glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
+        GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
+        glDispatchCompute(groupX_shadClear,1, 1);
+    } else {
+        GLuint clearValue = 0xFFFFFFFFu;
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
+        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+    }
     
-    GLuint clearValue = 0xFFFFFFFFu;
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
-    glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     shadowDrawCallsRenderedThisFrame = 0;
     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
     uint32_t shadowmapOffsetHead = 0U;
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
+        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        #pragma GCC unroll 6
+        for (int j=0;j<6;++j) {
+            mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
+            mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
+            ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
+        }
+        
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
         float scale = 1.0f / (1.0f + 0.001f * candidates[c].score);
         scale = vmax(scale, 0.0625f);
         if (c > (MAX_SHADOWMAPS / 2U)) scale = vmin(scale,0.125f);
         uint32_t shadSize = (uint32_t)(SHADOW_MAP_SIZE * scale + 0.5f);
-//         DualLog("shadSize used for shadowmap %u: %u\n",c,shadSize);
         glViewport(0, 0, shadSize, shadSize);
         shadow_System.shadowmapSizes[c] = shadSize;
         RenderShadowmap(lightIdx, shadSize, shadowmapOffsetHead);
@@ -955,6 +955,9 @@ void InitializeEnvironment(void) {
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &maxWorkGroupCount[1]);
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &maxWorkGroupCount[2]);
     DualLog("Maximum compute shader work groups: %u, %u, %u\n",maxWorkGroupCount[0], maxWorkGroupCount[1], maxWorkGroupCount[2]);
+    if (maxWorkGroupCount[0] <= 65536) shadow_System.useComputeClear = false; // Some systems limit the workgroup size to uint16_t (e.g. Mesa on Intel HD4400), so fallback to slower big hammer but reliable glClearBufferData instead for shadowmaps clear
+    else shadow_System.useComputeClear = true;
+    
     Input_Init(voxen_globalContext.window);
     glfwSwapInterval(voxen_Settings.Vsync ? 1 : 0);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
@@ -1251,6 +1254,8 @@ int32_t main(int32_t argc, char* argv[]) {
         last_topframe_time = current_time;
         if (!gamePaused) pauseRelativeTime += frame_time;
         
+        memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));
+        
         // Handle Berserk Effect for Compositing Shader
         float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
         if (berserkFinished < (float)pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
@@ -1281,7 +1286,6 @@ int32_t main(int32_t argc, char* argv[]) {
         shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
         uiImageCount = 0;
-        memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));
         
         // 0. View Matrix, and Projection Matrix
         float view[16]; // Also known as view matrix
