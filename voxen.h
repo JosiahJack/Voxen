@@ -161,9 +161,8 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 #define SHADOW_MAP_SIZE 256u
-#define SHADOW_MAP_SIZE_SQD (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE)
-#define MAX_SHADOWMAPS 96u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
+#define MAX_SHADOWMAPS 64u
+#define TOTAL_SHADOWMAP_PIXELS 7328580 // (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -586,6 +585,7 @@ typedef struct {
 	GLuint lightsID;
 	GLuint shadowMapsIndirectionID;
 	GLuint shadowMapsSizesID;
+	GLuint shadowMapsOffsetsID;
 	GLuint voxelLightListIndicesID;
 	GLuint voxelLightListsRawID;
 	GLuint vbos[MODEL_IDX_MAX];

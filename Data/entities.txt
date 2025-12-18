@@ -1061,14 +1061,12 @@ spectexture: 1242
 #chunk_med2_5
 index: 187
 model: 288
-cardchunk: 1
 texture: 527
 glowtexture: 526
 spectexture: 539
 #chunk_med2_6
 index: 188
 model: 289
-cardchunk: 1
 texture: 528
 spectexture: 1271
 #chunk_med2_7

@@ -13,6 +13,7 @@ layout(location = 3) uniform uint lightIndex;
 layout(location = 4) uniform uint shadowmapSize;
 layout(location = 5) uniform uint shadowmapIndirection;
 layout(location = 6) uniform uint texIndex;
+layout(location = 7) uniform uint offsetIntoSSBO;
 
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -26,7 +27,7 @@ const int LIGHT_DATA_OFFSET_POSY = 1;
 const int LIGHT_DATA_OFFSET_POSZ = 2;
 const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
 
-vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
+uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
     uint slotIndex = pixelOffset / 4u;
     uint packedIdx = colors[slotIndex];
@@ -34,7 +35,7 @@ vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint paletteIndex = (packedIdx >> (8u * localOffset)) & 0xFFu;
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
-    return vec4(color & 0xFFu, (color>>8)&0xFFu, (color>>16)&0xFFu, color>>24) * BYTE_TO_FLOAT;
+    return color>>24;
 }
 
 void main() {
@@ -46,11 +47,10 @@ void main() {
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
-    vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
-    if (albedoColor.a < 0.99) discard; // Alpha cutout threshold
+    if (getTextureAlpha(texIndexChecked,texUV) < 252u) return; // Alpha cutout threshold
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
-    uint ssbo_indexBase = (shadowmapIndirection * (6 * shadowmapSize * shadowmapSize)) + (face * shadowmapSize * shadowmapSize);
+    uint ssbo_indexBase = offsetIntoSSBO + (face * shadowmapSize * shadowmapSize);
     uint ssbo_index = ssbo_indexBase + texelCoord.y * shadowmapSize + texelCoord.x;
     vec3 lightPos = vec3(lights[lightIndex + LIGHT_DATA_OFFSET_POSX], lights[lightIndex + LIGHT_DATA_OFFSET_POSY], lights[lightIndex + LIGHT_DATA_OFFSET_POSZ]);
     vec3 toLight = lightPos - FragPos;

@@ -81,14 +81,26 @@ uint GetVoxelIndex(vec3 worldPos) {
 }
 
 const float INV_FOG_DIST = 1.0 / 71.68;
-const int PCF_SAMPLES = 6;
+
+const int PCF_SAMPLES = 16;
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2(-0.0326212f, -0.0405810f),
-    vec2(-0.0840144f, -0.0073580f),
-    vec2(-0.0695914f,  0.0457137f),
-    vec2(-0.0203345f,  0.0620716f),
-    vec2( 0.0962340f, -0.0194983f),
-    vec2( 0.0473434f, -0.0480026f));
+    vec2(-0.0713, -0.0936),
+    vec2( 0.0248, -0.0983),
+    vec2( 0.0946, -0.0657),
+    vec2( 0.1337, -0.0042),
+    vec2( 0.1065,  0.0591),
+    vec2( 0.0389,  0.1048),
+    vec2(-0.0378,  0.1035),
+    vec2(-0.1032,  0.0739),
+    vec2(-0.1316,  0.0114),
+    vec2(-0.1024, -0.0518),
+    vec2(-0.0471, -0.0693),
+    vec2( 0.0087, -0.0445),
+    vec2( 0.0624, -0.0321),
+    vec2( 0.0892,  0.0247),
+    vec2( 0.0517,  0.0684),
+    vec2(-0.0216,  0.0712)
+);
 
 vec3 quat_rotate(vec4 q, vec3 v) {
     float x2 = q.x + q.x;
@@ -252,15 +264,21 @@ void main() {
             }
 
             uv = uv * 0.5 + 0.5;
-            uint shadSizeSquared = shadowMapSizes[shadowIndex] * shadowMapSizes[shadowIndex];
-            uint faceOff = shadowIndex * 6u * shadSizeSquared + face * shadSizeSquared;
-            vec2 tc = uv * float(shadowMapSizes[shadowIndex]);
+            uint shadSize = shadowMapSizes[shadowIndex];
+            float shadSizef = float(shadSize);
+            uint faceOff = shadowMapOffsets[shadowIndex] + (face * shadSize * shadSize);
+            vec2 tc = uv * shadSizef;
             float NdotL = dot(normal, lightDir);
             float slopeBias = 0.10 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
             float constantBias = 0.009 * dist;
             float bias = (slopeBias + constantBias) * (dist / range); // The NdotL performance impact is negligible.
             bias = clamp(bias, 0.0, 0.22);
+            bias += shadSize < 256 ? 0.04 : 0.0;
+            bias += shadSize < 128 ? 0.08 : 0.0;
+            bias += shadSize < 64 ? 0.16 : 0.0;
+            bias += shadSize < 32 ? 0.24 : 0.0;
+            float shadSizeLessOne = float(shadSize - 1);
             if (distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
                 float sum = 0.0;
@@ -268,11 +286,11 @@ void main() {
                 for (int si = 0; si < PCF_SAMPLES; ++si) {
                     vec2 off = poissonDisk[si] * smearness;
                     vec2 t = tc + off;
-                    float tx = clamp(t.x, 0.0, float(shadowMapSizes[shadowIndex] - 1)); // Minus 1 prevents tiny gaps
-                    float ty = clamp(t.y, 0.0, float(shadowMapSizes[shadowIndex] - 1));
+                    float tx = clamp(t.x, 0.0, shadSizeLessOne); // Minus 1 prevents tiny gaps
+                    float ty = clamp(t.y, 0.0, shadSizeLessOne);
                     uint utx = uint(tx);
                     uint uty = uint(ty);
-                    uint ssbo_index = faceOff + uty * shadowMapSizes[shadowIndex] + utx;
+                    uint ssbo_index = faceOff + uty * shadSize + utx;
                     uint distInt = shadowMaps[ssbo_index];
                     if (distInt == 0xFFFFFFFFu) continue;
 
@@ -284,11 +302,11 @@ void main() {
 
                 shadowFactor = sum;
             } else {
-                float tx = clamp(tc.x, 0.0, float(shadowMapSizes[shadowIndex] - 1)); // Minus 1 prevents tiny gaps
-                float ty = clamp(tc.y, 0.0, float(shadowMapSizes[shadowIndex] - 1));
+                float tx = clamp(tc.x, 0.0, shadSizeLessOne); // Minus 1 prevents tiny gaps
+                float ty = clamp(tc.y, 0.0, shadSizeLessOne);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
-                uint ssbo_index = faceOff + uty * shadowMapSizes[shadowIndex] + utx;
+                uint ssbo_index = faceOff + uty * shadSize + utx;
                 uint distInt = shadowMaps[ssbo_index];
                 if (distInt == 0xFFFFFFFFu) continue;
 

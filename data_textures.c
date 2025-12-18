@@ -110,9 +110,9 @@ void LoadTextures(void) {
                     goto Label_found;
                 }
             }
-
-            if (pal_size >= 256) { DualLogError("Texture %d exceeded 256 colors\n", currentIndex); OS_Exit(1); }
             
+            if (pal_size >= 256) { DualLogError("Texture %d exceeded 256 colors\n", currentIndex); OS_Exit(1); }
+                        
             palette[pal_size] = color;
             indices[p] = pal_size;
             remap[color & 255] = pal_size + 1;

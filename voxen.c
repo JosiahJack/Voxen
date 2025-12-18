@@ -39,7 +39,7 @@ double time_PhysicsStep = 0.0;
 char statusText[TEXT_BUFFER_SIZE];
 // ----------------------------------------------------------------------------
 // Settings
-#define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
+#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
 VoxenSettings voxen_Settings = {
     .ScreenWidth = 1366u,
     .ScreenHeight = 768u,
@@ -494,7 +494,7 @@ void UpdateVoxelLightLists(void) {
 }
 
 uint16_t largestNearbyMeshCount = 0;
-void RenderShadowmap(uint16_t lightIdx, uint32_t shadowSize) {
+void RenderShadowmap(uint16_t lightIdx, uint32_t shadSize, uint32_t offset) {
     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
     float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
@@ -503,6 +503,7 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadowSize) {
     float halfRadSqrd = lightRadius * lightRadius * 0.5f;
     float effectiveRadius = vmin(lightRadius, 15.36f);
     uint16_t nearMeshes[256]; // Found that this is typically around 172
+    float nearMeshRadii[256];
     uint16_t nearbyMeshCount = 0;
     for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
         if (instances[j].modelIndex >= loadedModelsMaxIndex) continue;
@@ -512,9 +513,9 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadowSize) {
         if (voxen_Settings.CullEnabled) {
             if (instCellIdx < ARRSIZE && !(gridCellStates[instCellIdx] & CELL_VISIBLE)) continue;
             
-            float radius = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+            nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
             float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, lightPosX, lightPosY, lightPosZ);
-            float radSum = (effectiveRadius + radius);
+            float radSum = (effectiveRadius + nearMeshRadii[nearbyMeshCount]);
             if (distToLightSqrd > radSum * radSum) continue;
             
             float distSqrd = squareDistance3D(      instances[j].position.x,       instances[j].position.y,       instances[j].position.z,
@@ -531,18 +532,15 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadowSize) {
 
     if (nearbyMeshCount > largestNearbyMeshCount) largestNearbyMeshCount = nearbyMeshCount;
     glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 3, lightIdx * (uint32_t)LIGHT_DATA_SIZE);
+    glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 4, shadSize);
     glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 5, shadowmapIndirectionList[lightIdx]);
     for (uint8_t face = 0; face < 6; face++) {
         glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 2, face);
-        glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 4, shadowSize);
+        glProgramUniform1ui(voxen_GL_Comms.shadowmapsShaderProgram, 7, offset);
         glProgramUniformMatrix4fv(voxen_GL_Comms.shadowmapsShaderProgram, 1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
-            int i = nearMeshes[j];
-            if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
-            if (modelVertexCounts[instances[i].modelIndex] < 1) continue; // Empty model
-            
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.56f; // Could use 1.42f for diagonal length of unit square, but this is fine.
-            if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, radius)) continue;
+            int i = nearMeshes[j];            
+            if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, nearMeshRadii[j] * 2.56f)) continue;
 
             int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
             glUniform1ui(0, i);
@@ -590,6 +588,8 @@ static inline void sift_down(LightCandidate* h, int size, int idx) {
 
 uint32_t numShadowsCouldRender = 0;
 uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+uint32_t maximumShadowmapSSBOUsage = 0U;
 void RenderShadowmaps(void) {
     largestNearbyMeshCount = 0;
     glEnable(GL_DEPTH_TEST);
@@ -601,11 +601,8 @@ void RenderShadowmaps(void) {
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-//         if (range > 10.0f) continue;
-//         if (intensity < 0.1f) continue;
-        
-//         float thresh = 0.018f;
+        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];        
+//         float thresh = 0.010f;
 //         float luminosity = (intensity / (range * range));
 //         if (luminosity < thresh) continue;
         
@@ -641,8 +638,8 @@ void RenderShadowmaps(void) {
         
         float score = distSqrd / vmax(intensity, 0.01f);
         float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        if (dotResult > 0.5f) score *= 8.0f; // Favor lights in player's view cone
-        else if (dotResult > 0.0f) score *= 4.0f; // Favor lights in player's view cone
+        if (dotResult > 0.5f) score *= 0.125f; // Favor lights in player's view cone
+        else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
         
         LightCandidate c = { i, distSqrd, score };
         if (heap_size < MAX_SHADOWMAPS) {
@@ -671,28 +668,32 @@ void RenderShadowmaps(void) {
     shadowDrawCallsRenderedThisFrame = 0;
     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
+    uint32_t shadowmapOffsetHead = 0U;
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
-        uint32_t shadSize = (float)SHADOW_MAP_SIZE;
-        if (candidates[c].score > 2500.0f) shadSize = SHADOW_MAP_SIZE;
-        else if (candidates[c].score > 1250.0f) shadSize = (uint32_t)((float)SHADOW_MAP_SIZE * 0.5f);
-        else if (candidates[c].score > 500.0f) shadSize = (uint32_t)((float)SHADOW_MAP_SIZE * 0.25f);
-        else if (candidates[c].score > 250.0f) shadSize = (uint32_t)((float)SHADOW_MAP_SIZE * 0.125f);
-        
-        shadSize = SHADOW_MAP_SIZE;
+        float scale = 1.0f / (1.0f + 0.001f * candidates[c].score * candidates[c].score);
+        scale = vmax(scale, 0.0625f);
+        uint32_t shadSize = (uint32_t)(SHADOW_MAP_SIZE * scale + 0.5f);
+//         DualLog("shadSize used for shadowmap %u: %u\n",c,shadSize);
         glViewport(0, 0, shadSize, shadSize);
         shadowmapSizes[c] = shadSize;
-        RenderShadowmap(lightIdx, shadSize);
+        RenderShadowmap(lightIdx, shadSize, shadowmapOffsetHead);
+        shadowmapOffsets[c] = shadowmapOffsetHead;
+        shadowmapOffsetHead += (shadSize * shadSize) * 6;
+        if (shadowmapOffsetHead > TOTAL_SHADOWMAP_PIXELS) { DualLogWarn("Early exit on shadowmap loop due to undersized SSBO\n"); break; }
+        
         shadowDrawCallsRenderedThisFrame++;
     }
 
+    if (shadowmapOffsetHead > maximumShadowmapSSBOUsage) maximumShadowmapSSBOUsage = shadowmapOffsetHead;
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
     glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     glNamedBufferData(voxen_GL_Comms.shadowMapsSizesID, MAX_SHADOWMAPS * sizeof(uint32_t), shadowmapSizes, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.shadowMapsOffsetsID, MAX_SHADOWMAPS * sizeof(uint32_t), shadowmapOffsets, GL_DYNAMIC_DRAW);
 }
 
 // ============================================================================
@@ -1062,6 +1063,7 @@ void InitializeEnvironment(void) {
     matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     voxen_GL_Comms.shadowMapsIndirectionID = SetupSSBO(voxen_GL_Comms.shadowMapsIndirectionID, 8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.shadowMapsSizesID = SetupSSBO(voxen_GL_Comms.shadowMapsSizesID, 9, MAX_SHADOWMAPS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    voxen_GL_Comms.shadowMapsOffsetsID = SetupSSBO(voxen_GL_Comms.shadowMapsOffsetsID, 10, MAX_SHADOWMAPS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
@@ -1449,7 +1451,7 @@ int32_t main(int32_t argc, char* argv[]) {
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, numShadowsCouldRender, playerCellIdx, numCellsVisible);
-        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, largestNearbyMeshCount: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, largestNearbyMeshCount);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, largestNearbyMeshCount: %u, maximumShadowmapSSBOUsage: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, largestNearbyMeshCount, maximumShadowmapSSBOUsage);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
