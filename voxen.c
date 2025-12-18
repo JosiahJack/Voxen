@@ -944,6 +944,17 @@ void InitializeEnvironment(void) {
     DualLog("GPU: %s", renderer ? (const char*)renderer : "unknown");
     OS_CPUInfo();
     DebugRAM("GL Buffer and shader setup");
+    GLint64 maxSSBO_Size = 0;
+    glGetInteger64v(GL_MAX_SHADER_STORAGE_BLOCK_SIZE, &maxSSBO_Size);
+    DualLog("Maximum SSBO size supported: %lld bytes(%.2f MB)\n", (long long)maxSSBO_Size, (double)maxSSBO_Size/ (1024.0 * 1024.0));
+    GLint maxBindings;
+    glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxBindings);
+    DualLog("Maximum SSBO binding count: %u\n", maxBindings);
+    GLint maxWorkGroupCount[3];
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxWorkGroupCount[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &maxWorkGroupCount[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &maxWorkGroupCount[2]);
+    DualLog("Maximum compute shader work groups: %u, %u, %u\n",maxWorkGroupCount[0], maxWorkGroupCount[1], maxWorkGroupCount[2]);
     Input_Init(voxen_globalContext.window);
     glfwSwapInterval(voxen_Settings.Vsync ? 1 : 0);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
