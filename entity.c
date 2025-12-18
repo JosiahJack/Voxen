@@ -548,6 +548,7 @@ void LoadLevel(uint8_t curlevel) {
             loadedLights++;
             if (!lightOnRead) {
                 lightOn[lightsIdx] = true;
+                lightMaxIntensity[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
             } else {
                 // Dynamic Animated light
                 if (lightMinIntensity[lightsIdx] < 0.01f) lightMinIntensity[lightsIdx] = 0.01f;

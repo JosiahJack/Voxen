@@ -14,6 +14,7 @@ layout(location = 4) uniform uint shadowmapSize;
 layout(location = 5) uniform uint shadowmapIndirection;
 layout(location = 6) uniform uint texIndex;
 layout(location = 7) uniform uint offsetIntoSSBO;
+layout(location = 8) uniform uint isTransparent;
 
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -39,15 +40,17 @@ uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
 }
 
 void main() {
-    int texIndexChecked = 0;
-    if (texIndex >= 0) texIndexChecked = int(texIndex);
-    ivec2 texSize = textureSizes[texIndexChecked];
-    vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
-    ivec2 pixel = ivec2(uv);
-    ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
-    texUV.x = texUV.x % texSize.x;
-    texUV.y = texUV.y % texSize.y;
-    if (getTextureAlpha(texIndexChecked,texUV) < 252u) return; // Alpha cutout threshold
+    if (isTransparent > 0) {
+        int texIndexChecked = 0;
+        if (texIndex >= 0) texIndexChecked = int(texIndex);
+        ivec2 texSize = textureSizes[texIndexChecked];
+        vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
+        ivec2 pixel = ivec2(uv);
+        ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
+        texUV.x = texUV.x % texSize.x;
+        texUV.y = texUV.y % texSize.y;
+        if (getTextureAlpha(texIndexChecked,texUV) < 252u) return; // Alpha cutout threshold for {fence style textures
+    }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     uint ssbo_indexBase = offsetIntoSSBO + (face * shadowmapSize * shadowmapSize);

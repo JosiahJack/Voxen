@@ -160,9 +160,9 @@ void LoadModels(void);
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
-#define SHADOW_MAP_SIZE 256u
+#define SHADOW_MAP_SIZE 192u
 #define MAX_SHADOWMAPS 64u
-#define TOTAL_SHADOWMAP_PIXELS 7328580 // (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 4U)) // Found that in practice only needed ~45%, oversized a little here for safety.
 #define SHADOWMAP_FOV 90.0f
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -410,6 +410,16 @@ void SetSkyRotateSpeed(void);
 #define TEXT_LOCALIZATION_MAX_LENGTH 1207
 #define TEXT_LOGS_COUNT 134
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
+#define TEXT_WHITE 0
+#define TEXT_YELLOW 1
+#define TEXT_DARK_YELLOW 2
+#define TEXT_GREEN 3
+#define TEXT_RED 4
+#define TEXT_ORANGE 5
+#define TEXT_STOPD_RED 6
+#define TEXT_STOPD_RED_HIGHLIGHT 7
+#define TEXT_STOPD_RED_PAUSETITLE 8
+#define TEXT_COLOR_COUNT 9
 typedef struct {	
 	uint8_t file_data[TEXT_DATA_FILEBUFFER_SIZE]; // Found that only 59430 were needed at one point, padded for safety and typo fixes
 	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
@@ -443,6 +453,7 @@ uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses(void);
 // ----------------------------------------------------------------------------
 // UI
+#define MAX_UI_IMAGES 64
 #define UI_LAYER_TOP 1.0f
 #define UI_LAYER_5 0.5f
 #define UI_LAYER_4 0.4f
@@ -554,6 +565,14 @@ static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
 //     }
 //     *dst = '\0';
 // }
+
+typedef struct {
+	uint32_t numShadowsCouldRender;
+	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+	uint32_t maximumShadowmapSSBOUsage;
+} Shadow_System;
+extern Shadow_System shadow_System;
 
 typedef struct {
 	GLuint inputImageID;

@@ -3839,6 +3839,7 @@ spectexture: 127
 model: 58
 #se_crate1
 index: 472
+texture: 145
 model: 60
 mass: 0.75
 linearDrag: 0.0
@@ -3852,6 +3853,7 @@ frictionCombine: 0
 bounceCombine: 0
 #se_crate2
 index: 473
+texture: 143
 model: 60
 mass: 0.75
 linearDrag: 0.0
@@ -3865,6 +3867,7 @@ frictionCombine: 0
 bounceCombine: 0
 #se_crate3
 index: 474
+texture: 144
 model: 60
 mass: 0.75
 linearDrag: 0.0
@@ -3878,6 +3881,7 @@ frictionCombine: 0
 bounceCombine: 0
 #se_crate4
 index: 475
+texture: 146
 model: 60
 mass: 2.25
 linearDrag: 0.0

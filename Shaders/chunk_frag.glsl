@@ -82,7 +82,7 @@ uint GetVoxelIndex(vec3 worldPos) {
 
 const float INV_FOG_DIST = 1.0 / 71.68;
 
-const int PCF_SAMPLES = 16;
+const int PCF_SAMPLES = 12;
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
     vec2(-0.0713, -0.0936),
     vec2( 0.0248, -0.0983),
@@ -95,12 +95,7 @@ const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
     vec2(-0.1316,  0.0114),
     vec2(-0.1024, -0.0518),
     vec2(-0.0471, -0.0693),
-    vec2( 0.0087, -0.0445),
-    vec2( 0.0624, -0.0321),
-    vec2( 0.0892,  0.0247),
-    vec2( 0.0517,  0.0684),
-    vec2(-0.0216,  0.0712)
-);
+    vec2( 0.0087, -0.0445));
 
 vec3 quat_rotate(vec4 q, vec3 v) {
     float x2 = q.x + q.x;
@@ -213,16 +208,20 @@ void main() {
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
         vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        if (intensity < 0.05) continue;
+        if (intensity < 0.1) continue;
 
         float range = lights[lightIdx + LIGHT_DATA_OFFSET_RANGE];
         vec3 toLight = lightPos - worldPos;
-        float distSqr = dot(toLight, toLight);
         float dist = length(toLight);
         if (dist > range) continue;
 
         vec3 lightDir = normalize(toLight);
         float lambertian = clamp(max(dot(normal, lightDir), 0.0),0.0,1.0);
+        float distOverRange = dist / range;
+        float distOverRangeSqd = distOverRange * distOverRange;
+        float attenuation = (1.0 - distOverRangeSqd) * lambertian;
+        if (attenuation < 0.05) continue;
+
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;
         if (spotAng > 0.0) { // Extremely rare, only ~15 spot lights in entire game out of several thousand lights.
@@ -242,9 +241,6 @@ void main() {
             if (spotFalloff <= 0.0) continue;
         }
 
-        float distOverRange = dist / range;
-        float distOverRangeSqd = distOverRange * distOverRange;
-        float attenuation = (1.0 - distOverRangeSqd) * lambertian;
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
@@ -274,10 +270,10 @@ void main() {
             float constantBias = 0.009 * dist;
             float bias = (slopeBias + constantBias) * (dist / range); // The NdotL performance impact is negligible.
             bias = clamp(bias, 0.0, 0.22);
-            bias += shadSize < 256 ? 0.04 : 0.0;
-            bias += shadSize < 128 ? 0.08 : 0.0;
-            bias += shadSize < 64 ? 0.16 : 0.0;
-            bias += shadSize < 32 ? 0.24 : 0.0;
+            bias += shadSize < 256 ? 0.01 : 0.0;
+            bias += shadSize < 128 ? 0.04 : 0.0;
+            bias += shadSize < 64 ? 0.12 : 0.0;
+            bias += shadSize < 32 ? 0.16 : 0.0;
             float shadSizeLessOne = float(shadSize - 1);
             if (distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
