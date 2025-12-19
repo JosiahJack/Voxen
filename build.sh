@@ -44,6 +44,7 @@ gen_header() {
 
 # Shaders and their C variable names
 gen_header ./Shaders/ssr.compute                ssr_computeShader
+gen_header ./Shaders/voxels.compute             voxelUpdate_computeShader
 gen_header ./Shaders/shadowmaps_clear.compute   shadowmaps_clear_computeShader
 gen_header ./Shaders/chunk_vert.glsl            vertexShaderSource
 gen_header ./Shaders/chunk_frag.glsl            fragmentShaderTraditional

@@ -14,6 +14,7 @@
 #include "Shaders/composite_vert.glsl.h"
 #include "Shaders/composite_frag.glsl.h"
 #include "Shaders/ssr.compute.h"
+#include "Shaders/voxels.compute.h"
 #include "Shaders/shadowmaps_clear.compute.h"
 #include "Shaders/bluenoise64.cginc"
 #include "todo.h"
@@ -202,18 +203,15 @@ void CompileShaders(void) {
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader");
     voxen_GL_Comms.ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
     
+    computeShader = CompileShader(GL_COMPUTE_SHADER, voxelUpdate_computeShader, "Voxel Update Compute Shader");
+    voxen_GL_Comms.voxelUpdateShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Update Shader Program");
+        
     computeShader = CompileShader(GL_COMPUTE_SHADER, shadowmaps_clear_computeShader, "Shadowmaps Clear Compute Shader");
     voxen_GL_Comms.shadowmapsClearShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Shadowmaps Clear Shader Program");
 
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");
     voxen_GL_Comms.imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
-    
-    glGenBuffers(1, &voxen_GL_Comms.blueNoiseBuffer);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.blueNoiseBuffer);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, voxen_GL_Comms.blueNoiseBuffer); // Use binding point 13
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 void SetSkyRotateSpeed(void) {
@@ -347,35 +345,19 @@ void UpdateDynamicLights(void) {
 }
 
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-uint32_t voxelLightLists[VOXEL_COUNT * 24];
+uint32_t voxelLightLists[VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL];
 uint32_t voxelLightListCounts[VOXEL_COUNT];
 void UpdateVoxelLightLists(void) {
-    memset(voxelLightLists, 0xFFFFFFFFu, VOXEL_COUNT * 24 * sizeof(uint32_t));
-    memset(voxelLightListCounts, 0, VOXEL_COUNT * sizeof(uint32_t));
-    for (uint32_t voxelZ = 0; voxelZ < 512; ++voxelZ) {
-        for (uint32_t voxelX = 0; voxelX < 512; ++voxelX) {
-            float posX = voxelMinCenterX + (voxelX * VOXEL_SIZE);
-            float posZ = voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
-            int32_t cellIdx = PosGetCellCoords(posX, posZ);
-            if (!(gridCellStates[cellIdx] & CELL_OPEN)) continue;
-            if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) continue;
-
-            uint32_t voxelIndex = voxelZ * 512 + voxelX;
-            for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-                uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-                float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-                float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-                float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-                if (distSqrd < lightsRangeSquared[lightIdx]) {
-                    voxelLightLists[(voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex]] = lightIdx;
-                    ++voxelLightListCounts[voxelIndex];
-                }
-            }
-        }
-    }
-    
-    glNamedBufferData(voxen_GL_Comms.voxelLightListCountsID, VOXEL_COUNT * sizeof(uint32_t), voxelLightListCounts, GL_DYNAMIC_DRAW);
-    glNamedBufferData(voxen_GL_Comms.voxelLightListsID, VOXEL_COUNT * 24 * sizeof(uint32_t), voxelLightLists, GL_DYNAMIC_DRAW);
+    glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
+    glUniform1f(0, voxelMinCenterX);
+    glUniform1f(1, voxelMinCenterZ);
+    glUniform1ui(2, loadedLights);
+    glUniform1f(3, worldMin_x);
+    glUniform1f(4, worldMin_z);
+    GLuint groupX_voxels = (512 + 31) / 32;
+    GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
+    glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
 #define SHADOW_NEARMESH_MAX 350 // 312 was too low for light 867 on medical
@@ -976,11 +958,13 @@ void InitializeEnvironment(void) {
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadEntities();
     voxen_GL_Comms.lightsID = SetupSSBO(voxen_GL_Comms.lightsID, 19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.cellVisibleDataID = SetupSSBO(voxen_GL_Comms.cellVisibleDataID, 4, ARRSIZE * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     voxen_GL_Comms.voxelLightListCountsID = SetupSSBO(voxen_GL_Comms.voxelLightListCountsID, 6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    voxen_GL_Comms.voxelLightListsID = SetupSSBO(voxen_GL_Comms.voxelLightListsID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.voxelLightListsID = SetupSSBO(voxen_GL_Comms.voxelLightListsID, 27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
     matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.blueNoiseBuffer = SetupSSBO(voxen_GL_Comms.blueNoiseBuffer, 13, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
     voxen_GL_Comms.shadowMapsIndirectionID = SetupSSBO(voxen_GL_Comms.shadowMapsIndirectionID, 8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.shadowMapsSizesID = SetupSSBO(voxen_GL_Comms.shadowMapsSizesID, 9, MAX_SHADOWMAPS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.shadowMapsOffsetsID = SetupSSBO(voxen_GL_Comms.shadowMapsOffsetsID, 10, MAX_SHADOWMAPS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
@@ -1227,7 +1211,6 @@ int32_t main(int32_t argc, char* argv[]) {
 
             // 3. Light Updates
             UpdateDynamicLights();
-//             UpdateVoxelLightLists();
             for (int i = 0; i < loadedLights; ++i) { if (lightDirty[i]) { UpdateVoxelLightLists(); memset(lightDirty, 0, loadedLights * sizeof(bool)); break; } }
             if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
             

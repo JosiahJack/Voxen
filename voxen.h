@@ -222,7 +222,7 @@ extern GLuint matricesBuffer;
 #define CELL_SEES_SKYBOX 128u
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
-extern uint8_t gridCellStates[ARRSIZE];
+extern uint32_t gridCellStates[ARRSIZE];
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
@@ -605,6 +605,8 @@ typedef struct {
 	GLuint shadowMapsIndirectionID;
 	GLuint shadowMapsSizesID;
 	GLuint shadowMapsOffsetsID;
+	GLuint cellVisibleDataID;
+	GLuint voxelUpdateShaderProgram;
 	GLuint voxelLightListCountsID;
 	GLuint voxelLightListsID;
 	GLuint vbos[MODEL_IDX_MAX];
