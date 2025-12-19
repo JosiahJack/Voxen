@@ -46,7 +46,6 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
-layout(std430, binding = 26) buffer VoxelLightListOffsets { uint voxelLightListOffsets[]; };
 layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
@@ -69,17 +68,11 @@ const float VOXEL_SIZE = 0.32;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
 
 uint GetVoxelIndex(vec3 worldPos) {
-    float offsetX = worldPos.x - worldMin_x + (VOXEL_SIZE * 0.5);
-    float offsetZ = worldPos.z - worldMin_z + (VOXEL_SIZE * 0.5);
-    uint cellX = uint(offsetX / WORLDCELL_WIDTH_F);
-    uint cellZ = uint(offsetZ / WORLDCELL_WIDTH_F);
-    float localX = mod(offsetX, WORLDCELL_WIDTH_F);
-    float localZ = mod(offsetZ, WORLDCELL_WIDTH_F);
-    uint voxelX = uint(localX / VOXEL_SIZE);
-    uint voxelZ = uint(localZ / VOXEL_SIZE);
-    uint cellIndex = cellZ * 64 + cellX;
-    uint voxelIndexInCell = voxelZ * 8 + voxelX;
-    return cellIndex * 64 + voxelIndexInCell;
+    float offsetX = worldPos.x - worldMin_x;
+    float offsetZ = worldPos.z - worldMin_z;
+    uint voxelX = uint(offsetX / VOXEL_SIZE);
+    uint voxelZ = uint(offsetZ / VOXEL_SIZE);
+    return (voxelZ * 512) + voxelX;
 }
 
 const float INV_FOG_DIST = 1.0 / 71.68;
@@ -210,9 +203,10 @@ void main() {
     vec3 normal = adjustedNormal;
     uint listoffset = 0;
     float intensityTotal = 0.0;
-    if (count > 0) listoffset = voxelLightListOffsets[voxelIdx];
     for (uint i = 0u; i < count; i++) {
-        uint lightIdxInPVS = uniqueLightLists[listoffset + i];
+        uint lightIdxInPVS = uniqueLightLists[(voxelIdx * 24) + i];
+        if (lightIdxInPVS >= 1600) continue;
+
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
         vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];

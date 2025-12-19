@@ -207,8 +207,6 @@ extern GLuint matricesBuffer;
 #define ARRSIZE (WORLDX * WORLDZ)
 #define WORLDCELL_WIDTH_F 2.56f
 #define CELLXHALF (WORLDCELL_WIDTH_F * 0.5f)
-#define LIGHT_RANGE_VOXEL_MANHATTAN_DIST (floorf(LIGHT_RANGE_MAX / VOXEL_WIDTH_F))
-#define INVALID_LIGHT_INDEX (LIGHT_COUNT + 1)
 #define PRECOMPUTED_VISIBILITY_SIZE 524288 // 4096 * 4096 / 32
 #define VOXEL_SIZE 0.32f
 #define VOXEL_HALF (VOXEL_SIZE * 0.5f)
@@ -607,9 +605,8 @@ typedef struct {
 	GLuint shadowMapsIndirectionID;
 	GLuint shadowMapsSizesID;
 	GLuint shadowMapsOffsetsID;
-	GLuint voxelLightListOffsetsID;
 	GLuint voxelLightListCountsID;
-	GLuint voxelLightListsRawID;
+	GLuint voxelLightListsID;
 	GLuint vbos[MODEL_IDX_MAX];
 	GLuint tbos[MODEL_IDX_MAX];
 } Voxen_GL_Comms;

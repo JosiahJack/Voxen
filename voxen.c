@@ -347,128 +347,35 @@ void UpdateDynamicLights(void) {
 }
 
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-uint32_t lightCounts[VOXEL_COUNT] = {0}; // Track current count for each voxel
-uint32_t voxelLightListsRaw[VOXEL_COUNT * 4];
-uint32_t voxelLightListOffsets[VOXEL_COUNT];
+uint32_t voxelLightLists[VOXEL_COUNT * 24];
 uint32_t voxelLightListCounts[VOXEL_COUNT];
 void UpdateVoxelLightLists(void) {
-    memset(voxelLightListsRaw, 0, VOXEL_COUNT * 4 * sizeof(uint32_t));
-    memset(voxelLightListOffsets, 0, VOXEL_COUNT * sizeof(uint32_t));
+    memset(voxelLightLists, 0xFFFFFFFFu, VOXEL_COUNT * 24 * sizeof(uint32_t));
     memset(voxelLightListCounts, 0, VOXEL_COUNT * sizeof(uint32_t));
-    uint32_t totalLightAssignments = 0;
-    float cellWidthRecip = 1.0f / WORLDCELL_WIDTH_F;
-    for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE]; // Can't early out here for range to player as it breaks shadows!
-        int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip);
-        int32_t maxCellX = (int32_t)vceil((litX + range - worldMin_x) * cellWidthRecip);
-        int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip);
-        int32_t maxCellZ = (int32_t)vceil((litZ + range - worldMin_z) * cellWidthRecip);
-        minCellX = minCellX > 0 ? minCellX : 0;
-        maxCellX = maxCellX > (WORLDX - 1) ? (WORLDX - 1) : maxCellX;
-        minCellZ = minCellZ > 0 ? minCellZ : 0;
-        maxCellZ = maxCellZ > (WORLDZ - 1) ? (WORLDZ - 1) : maxCellZ;
-        for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
-            for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-                uint32_t cellIndex = cellZ * WORLDX + cellX;
-                
-                #pragma GCC unroll 8
-                for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
-                    #pragma GCC unroll 8
-                    for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                        uint32_t voxelIndex = cellIndex * WORLDX + voxelZ * 8 + voxelX;
-                        float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
-                        float posZ = voxelMinCenterZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
-                        float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-                        if (distSqrd < lightsRangeSquared[lightIdx] && voxelLightListCounts[voxelIndex] < MAX_LIGHTS_PER_VOXEL) {
-                            voxelLightListCounts[voxelIndex]++; // Increment light count
-                            totalLightAssignments++;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    for (uint32_t voxelZ = 0; voxelZ < 512; ++voxelZ) {
+        for (uint32_t voxelX = 0; voxelX < 512; ++voxelX) {
+            float posX = voxelMinCenterX + (voxelX * VOXEL_SIZE);
+            float posZ = voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
+            int32_t cellIdx = PosGetCellCoords(posX, posZ);
+            if (!(gridCellStates[cellIdx] & CELL_OPEN)) continue;
+            if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) continue;
 
-    if (totalLightAssignments > VOXEL_COUNT * 4) { DualLogError("\nTotal light assignments (%u) exceed voxelLightListsRaw capacity (%u)\n", totalLightAssignments, VOXEL_COUNT * 4); return; }
-
-    // Assign offsets and populate voxelLightListsRaw
-    uint32_t head = 0;
-    for (uint32_t idx = 0; idx < VOXEL_COUNT; ++idx) {
-        if (voxelLightListCounts[idx] > 0) {
-            voxelLightListOffsets[idx] = head; // Set offset
-            head += voxelLightListCounts[idx]; // Advance head
-        } else {
-            voxelLightListOffsets[idx] = head; // Empty list points to current head
-        }
-    }
-
-    // Assign light indices to voxelLightListsRaw
-    memset(lightCounts,0,VOXEL_COUNT * sizeof(uint32_t)); // Track current count for each voxel
-    for (uint32_t lightIdx = 0; lightIdx < LIGHT_COUNT; ++lightIdx) {
-        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        float distSq = squareDistance2D(instances[PLAYER1].position.x, instances[PLAYER1].position.z, litX, litZ);
-        if(distSq > FAR_PLANE_SQUARED) continue;
-        
-        uint16_t lightcellX = (uint16_t)clamp((int32_t)vfloor((litX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        uint16_t lightcellZ = (uint16_t)clamp((int32_t)vfloor((litZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        int lightCellIdx = (lightcellZ * WORLDX) + lightcellX;
-        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if(!inPVS) {
-            int r = vfloor(range * 0.390625f); // 6 max
-            for(int ix=lightcellX-r; ix<=lightcellX+r && !inPVS; ix++){
-                for(int iz=lightcellZ-r; iz<=lightcellZ+r; iz++){
-                    if(!XZPairInBounds(ix,iz)) continue;
-                    int subIdx = iz*WORLDX + ix;
-                    if((gridCellStates[subIdx] & CELL_VISIBLE) &&
-                        get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx*ARRSIZE + subIdx)) {
-                        inPVS = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if(!inPVS) continue; // Only include lights that the voxel can actually see
-        
-        int32_t minCellX = (int32_t)((litX - range - worldMin_x) * cellWidthRecip); // cast to int truncates, no floorf
-        int32_t maxCellX = (int32_t)vceil((litX + range - worldMin_x) * cellWidthRecip);
-        int32_t minCellZ = (int32_t)((litZ - range - worldMin_z) * cellWidthRecip); // cast to int truncates, no floorf
-        int32_t maxCellZ = (int32_t)vceil((litZ + range - worldMin_z) * cellWidthRecip);
-        minCellX = minCellX > 0 ? minCellX : 0;
-        maxCellX = maxCellX > (WORLDX - 1) ? (WORLDX - 1) : maxCellX;
-        minCellZ = minCellZ > 0 ? minCellZ : 0;
-        maxCellZ = maxCellZ > (WORLDZ - 1) ? (WORLDZ - 1) : maxCellZ;
-        for (int32_t cellZ = minCellZ; cellZ <= maxCellZ; ++cellZ) {
-            for (int32_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
-                uint32_t cellIndex = cellZ * WORLDX + cellX;
-
-                #pragma GCC unroll 8
-                for (uint32_t voxelZ = 0; voxelZ < 8; ++voxelZ) {
-                    #pragma GCC unroll 8
-                    for (uint32_t voxelX = 0; voxelX < 8; ++voxelX) {
-                        uint32_t voxelIndex = cellIndex * WORLDX + voxelZ * 8 + voxelX;
-                        float posX = voxelMinCenterX + (cellX * WORLDCELL_WIDTH_F) + (voxelX * VOXEL_SIZE);
-                        float posZ = voxelMinCenterZ + (cellZ * WORLDCELL_WIDTH_F) + (voxelZ * VOXEL_SIZE);
-                        float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-                        if (distSqrd < lightsRangeSquared[lightIdx] && lightCounts[voxelIndex] < MAX_LIGHTS_PER_VOXEL) {
-                            uint32_t offset = voxelLightListOffsets[voxelIndex];
-                            voxelLightListsRaw[offset + lightCounts[voxelIndex]] = lightIdx;
-                            lightCounts[voxelIndex]++;
-                        }
-                    }
+            uint32_t voxelIndex = voxelZ * 512 + voxelX;
+            for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
+                uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+                float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+                float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+                float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
+                if (distSqrd < lightsRangeSquared[lightIdx]) {
+                    voxelLightLists[(voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex]] = lightIdx;
+                    ++voxelLightListCounts[voxelIndex];
                 }
             }
         }
     }
     
-    glNamedBufferData(voxen_GL_Comms.voxelLightListOffsetsID, VOXEL_COUNT * sizeof(uint32_t), voxelLightListOffsets, GL_DYNAMIC_DRAW);
     glNamedBufferData(voxen_GL_Comms.voxelLightListCountsID, VOXEL_COUNT * sizeof(uint32_t), voxelLightListCounts, GL_DYNAMIC_DRAW);
-    glNamedBufferData(voxen_GL_Comms.voxelLightListsRawID, head * sizeof(uint32_t), voxelLightListsRaw, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.voxelLightListsID, VOXEL_COUNT * 24 * sizeof(uint32_t), voxelLightLists, GL_DYNAMIC_DRAW);
 }
 
 #define SHADOW_NEARMESH_MAX 350 // 312 was too low for light 867 on medical
@@ -1069,9 +976,8 @@ void InitializeEnvironment(void) {
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadEntities();
     voxen_GL_Comms.lightsID = SetupSSBO(voxen_GL_Comms.lightsID, 19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    voxen_GL_Comms.voxelLightListOffsetsID = SetupSSBO(voxen_GL_Comms.voxelLightListOffsetsID, 26, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     voxen_GL_Comms.voxelLightListCountsID = SetupSSBO(voxen_GL_Comms.voxelLightListCountsID, 6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
-    voxen_GL_Comms.voxelLightListsRawID = SetupSSBO(voxen_GL_Comms.voxelLightListsRawID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
+    voxen_GL_Comms.voxelLightListsID = SetupSSBO(voxen_GL_Comms.voxelLightListsID, 27,  VOXEL_COUNT * 4 * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
     matricesBuffer = SetupSSBO(matricesBuffer, 11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
