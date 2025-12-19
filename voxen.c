@@ -21,25 +21,36 @@
 #include "input.c"
 #include "data_models.c"
 
-Voxen_GlobalContext voxen_globalContext;
+Voxen_GlobalContext voxen_globalContext = {
+    .window = NULL,
+    .inventoryMode = false,
+    .last_time = 0.0,
+    .last_topframe_time = 0.0,
+    .current_time = 0.0,
+    .timeSinceLastPhysicsTick = 0.0,
+    .screenshotTimeout = 1.0,
+    .pauseRelativeTime = 0.0,
+    .levelCurrentlyLoading = false,
+    .global_modname = {'\0'},
+    .global_modIsCitadel = false,
+    .startLevel = 3,
+    .numLevels = 2,
+    .currentLevel = 0,
+    .gamePaused = false,
+    .menuActive = false
+};
 
-bool inventoryMode = false;
-// ----------------------------------------------------------------------------
-// Diagnostics
-double game_start_time = 0.00;
-uint32_t globalFrameNum = 0;
-double last_time = 0.0;
-double current_time = 0.0;
-double cpuTime = 0.0;
-double lastFrameSecCountTime = 0.00;
-uint32_t lastFrameSecCount = 0;
-uint32_t framesPerLastSecond = 0;
-uint32_t worstFPS = UINT32_MAX;
-double screenshotTimeout = 0.0;
-double time_PhysicsStep = 0.0;
 char statusText[TEXT_BUFFER_SIZE];
-// ----------------------------------------------------------------------------
-// Settings
+
+VoxenDiagnostics voxen_Diagnostics = {
+    .globalFrameNum = 0,
+    .cpuTime = 0.0,
+    .lastFrameSecCountTime = 0.0,
+    .lastFrameSecCount = 0,
+    .framesPerLastSecond = 0,
+    .worstFPS = UINT32_MAX
+};
+
 #define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
 VoxenSettings voxen_Settings = {
     .ScreenWidth = 1366u,
@@ -71,27 +82,13 @@ Voxen_Cheats voxen_Cheats = {
     .dizzyLevel = 0u,
     .editMode = true
 };
-// ----------------------------------------------------------------------------
-// Instances
+
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 GLuint instancesBuffer;
 GLuint matricesBuffer;
-// ----------------------------------------------------------------------------
-// Game/Mod Definition
-char global_modname[256];
-bool global_modIsCitadel = false;
-uint8_t numLevels = 2;
-uint8_t startLevel = 3;
-uint8_t currentLevel = 0;
-bool gamePaused = false;
-bool menuActive = false;
-bool levelCurrentlyLoading = false;
-double pauseRelativeTime = 0.0f;
 QuestBits questData;
-// ----------------------------------------------------------------------------
-// Camera variables
 float cam_yaw = 90.0f;
 float cam_pitch = 0.0f;
 float cam_roll = 0.0f;
@@ -100,8 +97,6 @@ float cam_forwardx = 0.0f, cam_forwardy = 0.0f, cam_forwardz = 0.0f;
 float cam_rightx = 0.0f, cam_righty = 0.0f, cam_rightz = 0.0f;
 float berserkFinished = 0.0f;
 float berserkSeedTime = 0.0f;
-// ----------------------------------------------------------------------------
-// OpenGL / Rendering
 int32_t debugView = 0;
 int32_t debugValue = 0;
 float aspect3D = 1.0f;
@@ -116,12 +111,9 @@ bool instanceIsLODArray[INSTANCE_COUNT];
 float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 Voxen_GL_Comms voxen_GL_Comms;
 Shadow_System shadow_System;
-// ----------------------------------------------------------------------------
-// UI Cursor
 bool cursorVisible = false;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
-// ----------------------------------------------------------------------------
-// UI
+
 typedef struct {
     float x, y, z;        // Top-left corner in screen space (pixels)
     float width, height; // Size in screen space (pixels)
@@ -153,7 +145,7 @@ float statusTextDecayFinished = 0.0f;
 uint32_t shadowmapIndirectionList[LIGHT_COUNT];
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 float lightsRangeSquared[LIGHT_COUNT];
-bool lightDirty[LIGHT_COUNT] = { [0 ... LIGHT_COUNT-1] = true };
+bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
@@ -312,7 +304,7 @@ Quaternion cubemapOrientationQuaternion[6] = {
 };
 
 void UpdateDynamicLights(void) {
-    if (gamePaused || menuActive) return;
+    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
     
     for (int i=0;i<loadedLights;++i) {
         if (lightIntervalStepsLength[i] < 1) continue;
@@ -321,18 +313,18 @@ void UpdateDynamicLights(void) {
         if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
 
         float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
-        if (lightLerpTime[i] < (float)pauseRelativeTime) {
+        if (lightLerpTime[i] < (float)voxen_globalContext.pauseRelativeTime) {
             lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
             lightLerpUp[i] = !lightLerpUp[i];
             lightCurrentStep[i]++;
             if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0; // Wrap and start over continuous looping
             lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-            lightLerpTime[i] = (float)pauseRelativeTime + lightLerpStepTime[i];
-            lightLerpStartTime[i] = (float)pauseRelativeTime;
+            lightLerpTime[i] = (float)voxen_globalContext.pauseRelativeTime + lightLerpStepTime[i];
+            lightLerpStartTime[i] = (float)voxen_globalContext.pauseRelativeTime;
         } else if (lightLerpOn[i]) {
             if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
                 if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                    lightLerpValue[i] = ((float)pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                    lightLerpValue[i] = ((float)voxen_globalContext.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                     float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
                     lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * lerpVal);
                     lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
@@ -422,7 +414,7 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadSize, uint32_t offset) {
             verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
         }
     }
-} // fps worst 319 with glUniform calls
+}
 
 typedef struct {
     uint16_t index; // Original index in lights array
@@ -800,9 +792,9 @@ void NewGame(void) {
     questData.lev6SecCode = random_range_u8(0u,9u);
     memset(instances,0,3 * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     InitializePlayer(PLAYER1); InitializePlayer(PLAYER2);
-    levelCurrentlyLoading = true;
-    LoadLevel(startLevel); // Must be after entities!
-    pauseRelativeTime = 0.0;
+    voxen_globalContext.levelCurrentlyLoading = true;
+    LoadLevel(voxen_globalContext.startLevel); // Must be after entities!
+    voxen_globalContext.pauseRelativeTime = 0.0;
 }
 
 void InitializeEnvironment(void) {
@@ -936,7 +928,7 @@ void InitializeEnvironment(void) {
     ParseGameData();
     DebugRAM("ParseGameData end");
     
-    glfwSetWindowTitle(voxen_globalContext.window,global_modname);
+    glfwSetWindowTitle(voxen_globalContext.window, voxen_globalContext.global_modname);
     int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     int windowIconFileSize = OS_FileSize(fp);
     uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
@@ -1106,11 +1098,8 @@ void SetFog(void) {
     glUniform1f(13, fogColorB * fogBaseDensityForLevel);
 }
 
-double timeSinceLastPhysicsTick = 0.0;
-double last_topframe_time = 0.0;
-
 int32_t main(int32_t argc, char* argv[]) {
-    game_start_time = get_time();
+    double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
     OpenConsoleLogFile();
     DebugRAM("program start");
@@ -1141,33 +1130,33 @@ int32_t main(int32_t argc, char* argv[]) {
 
     if (argc == 3 && strcmp(argv[1], "dump") == 0) { DualLog("Converting log to plaintext: %s ...", argv[2]); JournalDump(argv[2]); DualLog("DONE!\n"); return 0; }
 
-    globalFrameNum = 0;
+    voxen_Diagnostics.globalFrameNum = 0;
     DebugRAM("prior to event system init");
     DualLog("Voxen " VERSION_STRING " by W. Josiah Jack, MIT-0 licensed\n");
     EventSystemInit(argc,argv[1],argv[2]);
     InitializeEnvironment();
     playerCellIdx = 0u; // Force a cull
     double last_physics_time = get_time();
-    last_topframe_time = last_physics_time - 0.05;
+    voxen_globalContext.last_topframe_time = last_physics_time - 0.05;
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) {
-        current_time = get_time();
-        double frame_time = current_time - last_topframe_time;
-        last_topframe_time = current_time;
-        if (!gamePaused) pauseRelativeTime += frame_time;
+        voxen_globalContext.current_time = get_time();
+        double frame_time = voxen_globalContext.current_time - voxen_globalContext.last_topframe_time;
+        voxen_globalContext.last_topframe_time = voxen_globalContext.current_time;
+        if (!voxen_globalContext.gamePaused) voxen_globalContext.pauseRelativeTime += frame_time;
         
         memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));
         
         // Handle Berserk Effect for Compositing Shader
-        float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
-        if (berserkFinished < (float)pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
+        float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)voxen_globalContext.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
+        if (berserkFinished < (float)voxen_globalContext.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
         InputClearRisingAndFallingEdges();
         glfwPollEvents();
         if (glfwWindowShouldClose(voxen_globalContext.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-        timeSinceLastPhysicsTick = pauseRelativeTime - last_physics_time;
-        if (!log_playback && !gamePaused && !menuActive) {
-            last_physics_time = pauseRelativeTime;
+        voxen_globalContext.timeSinceLastPhysicsTick = voxen_globalContext.pauseRelativeTime - last_physics_time;
+        if (!log_playback && !voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) {
+            last_physics_time = voxen_globalContext.pauseRelativeTime;
             EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
         }
 
@@ -1199,7 +1188,7 @@ int32_t main(int32_t argc, char* argv[]) {
         invViewRot[0] = view[0]; invViewRot[3] = view[1]; invViewRot[6] = view[2];
         invViewRot[1] = view[4]; invViewRot[4] = view[5]; invViewRot[7] = view[6];
         invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
-        if (!gamePaused && !menuActive) { // !PAUSED BLOCK -------------------------------------------------
+        if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
             UpdateAmbientSounds();
             
             // 1. Culling
@@ -1255,13 +1244,13 @@ int32_t main(int32_t argc, char* argv[]) {
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
         glUniform1i(6, 4); // outputImage texture sampler2D
-        glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || currentLevel == 13);
-        glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && currentLevel != 13);
-        glUniform1ui(19, ((currentLevel >= 10 && currentLevel < 13) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+        glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
+        glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && voxen_globalContext.currentLevel != LEVEL_CYBERSPACE);
+        glUniform1ui(19, ((voxen_globalContext.currentLevel >= 10 && voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
         uint32_t shieldOnType = 0u; // No shield green tint.
         if (questData.ShieldActivated) {
-            if (currentLevel == 6 || currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-            else if (currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+            if (voxen_globalContext.currentLevel == 6 || voxen_globalContext.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+            else if (voxen_globalContext.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
         }
         
         glUniform1f(4, worldMin_x);
@@ -1274,7 +1263,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
         glUniform3f(13, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
         glUniform1f(14, voxen_Settings.FOV);
-        glUniform1f(15, (float)pauseRelativeTime * 0.1f);
+        glUniform1f(15, (float)voxen_globalContext.pauseRelativeTime * 0.1f);
         glUniform1f(16, aspect3D);
         glUniform1ui(20, shieldOnType);
         glUniform1ui(22, voxen_Settings.Shadows);
@@ -1303,7 +1292,7 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // Cursor
         uint16_t cursorTexture = 1260;
-        if (gamePaused || menuActive) cursorTexture = 1261;
+        if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) cursorTexture = 1261;
         float cursorSize = (float)voxen_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE;
         float cursorHalfSize = cursorSize * 0.5f;
         if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
@@ -1312,18 +1301,18 @@ int32_t main(int32_t argc, char* argv[]) {
         float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
         float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
         float shootModePos_y = 0.0f;
-        if (!gamePaused && !voxen_Cheats.noHUD) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
-        if (inventoryMode) {
+        if (!voxen_globalContext.gamePaused && !voxen_Cheats.noHUD) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+        if (voxen_globalContext.inventoryMode) {
             if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
                 if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
-                    inventoryMode = false;
+                    voxen_globalContext.inventoryMode = false;
                     cursorPosition_x = voxen_Settings.ScreenWidth / 2;
                     cursorPosition_y = voxen_Settings.ScreenHeight / 2;
                 }
             }
         }
         
-        if (gamePaused) {
+        if (voxen_globalContext.gamePaused) {
             RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), UI_LAYER_5, TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
             char* pauseButton_ResumeText = "RESUME";
             float pauseButton_ResumeWidth = (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
@@ -1355,50 +1344,50 @@ int32_t main(int32_t argc, char* argv[]) {
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
         if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
-        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", timeSinceLastPhysicsTick, shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, maximumShadowmapSSBOUsage: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, shadow_System.maximumShadowmapSSBOUsage);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > (float)current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (statusTextDecayFinished > (float)voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
         RenderUIImages();
         double time_now = get_time();
         if (voxen_Cheats.showFPS) {
-            double thisFrameTime = (time_now - last_time) * 1000.0;
-            double cpuFrameTime = cpuTime * 1000.0;
+            double thisFrameTime = (time_now - voxen_globalContext.last_time) * 1000.0;
+            double cpuFrameTime = voxen_Diagnostics.cpuTime * 1000.0;
             uint8_t timingColor = TEXT_WHITE;
             if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
             if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
             drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add two more for this text render ;)
             drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++;
             RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
-            RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u",framesPerLastSecond,worstFPS,drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, voxen_Cheats.editMode);
+            RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", voxen_Diagnostics.framesPerLastSecond, voxen_Diagnostics.worstFPS, drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, voxen_Cheats.editMode);
         }
 
-        last_time = time_now;
-        if ((time_now - lastFrameSecCountTime) >= 1.00) {
-            lastFrameSecCountTime = time_now;
-            framesPerLastSecond = globalFrameNum - lastFrameSecCount;
-            if (framesPerLastSecond < worstFPS && globalFrameNum > 2000) worstFPS = framesPerLastSecond; // After startup, keep track of worst framerate seen.
-            lastFrameSecCount = globalFrameNum;
+        voxen_globalContext.last_time = time_now;
+        if ((time_now - voxen_Diagnostics.lastFrameSecCountTime) >= 1.00) {
+            voxen_Diagnostics.lastFrameSecCountTime = time_now;
+            voxen_Diagnostics.framesPerLastSecond = voxen_Diagnostics.globalFrameNum - voxen_Diagnostics.lastFrameSecCount;
+            if (voxen_Diagnostics.framesPerLastSecond < voxen_Diagnostics.worstFPS && voxen_Diagnostics.globalFrameNum > 2000) voxen_Diagnostics.worstFPS = voxen_Diagnostics.framesPerLastSecond; // After startup, keep track of worst framerate seen.
+            voxen_Diagnostics.lastFrameSecCount = voxen_Diagnostics.globalFrameNum;
         }
         
-        if (keyStates[GLFW_KEY_F12].pressed && time_now > screenshotTimeout) {
+        if (keyStates[GLFW_KEY_F12].pressed && time_now > voxen_globalContext.screenshotTimeout) {
             Screenshot();
-            screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
+            voxen_globalContext.screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
         }
         
-        if (keyStates[GLFW_KEY_ESCAPE].pressed) gamePaused = !gamePaused;
-        cpuTime = get_time() - current_time;
+        if (keyStates[GLFW_KEY_ESCAPE].pressed) voxen_globalContext.gamePaused = !voxen_globalContext.gamePaused;
+        voxen_Diagnostics.cpuTime = get_time() - voxen_globalContext.current_time;
         glfwSwapBuffers(voxen_globalContext.window); // Present frame
         CHECK_GL_ERROR();
-        globalFrameNum++;
+        voxen_Diagnostics.globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT
-            if (globalFrameNum == 4) { DebugRAM("after 4 frames of running"); malloc_trim(0); }
-            else if (globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
-            else if (globalFrameNum == 200) DebugRAM("after 200 frames of running");
-            else if (globalFrameNum == 500) DebugRAM("after 500 frames of running");
-            else if (globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
+            if (voxen_Diagnostics.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); malloc_trim(0); }
+            else if (voxen_Diagnostics.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
+            else if (voxen_Diagnostics.globalFrameNum == 200) DebugRAM("after 200 frames of running");
+            else if (voxen_Diagnostics.globalFrameNum == 500) DebugRAM("after 500 frames of running");
+            else if (voxen_Diagnostics.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
         #endif
     }
     

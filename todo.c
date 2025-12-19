@@ -28,7 +28,7 @@
 #include "todo.h"
 
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; } // TODO: Resave levels with the offsets applied.
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; } // TODO: Resave levels with the offsets applied.
     
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.MedicalLevel
         case 0:  *ofsx = 3.6f; *ofsy = -4.10195f; *ofsz = 1.0f; break;
@@ -50,7 +50,7 @@ void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, floa
 }
 
 void GetLevel_Dynamic_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DynamicObjectsSaveableInstantiated
         case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
@@ -72,7 +72,7 @@ void GetLevel_Dynamic_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofs
 }
 
 void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticSaveable
         case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
@@ -94,7 +94,7 @@ void GetLevel_LightsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofs
 }
 
 void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.LightsStaticImmutable
         case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
@@ -116,7 +116,7 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 }
 
 void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.DoorsStaticSaveable
         case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
@@ -138,7 +138,7 @@ void GetLevel_DoorsStaticSaveable_ContainerOffsets(int32_t curlevel, float* ofsx
 }
 
 void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsSaveable
         case 0:  *ofsx = -1.2417f; *ofsy = -0.26194f; *ofsz = -1.0883f; break;
@@ -160,7 +160,7 @@ void GetLevel_StaticObjectsSaveable_ContainerOffsets(int32_t curlevel, float* of
 }
 
 void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.StaticObjectsImmutable
         case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
@@ -182,7 +182,7 @@ void GetLevel_StaticObjectsImmutable_ContainerOffsets(int32_t curlevel, float* o
 }
 
 void GetLevel_NPCsSaveableInstantiated_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
-    if (!global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
+    if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; }
 
     switch(curlevel) { // Match the parent transforms #.NAMELevel, e.g. 1.NPCsSaveableInstantiated
         case 0:  *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f; break;
@@ -216,7 +216,7 @@ void SetUnityHierarchyOffsets(uint8_t curlevel) {
 
 // Apply the Unity hierarchy nonsense, TODO: Save out level#.txt from the engine just once and then delete all this.
 void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t entIdx) {
-        if (levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
+        if (voxen_globalContext.levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
         instances[instanceIdx].position.x += correctionX;   
         instances[instanceIdx].position.y += correctionY;
         instances[instanceIdx].position.z += correctionZ;

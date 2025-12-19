@@ -44,10 +44,6 @@ extern bool journalFirstWrite;
 extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
 extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were already executed and walked away from the counter.
 extern bool log_playback;
-extern uint32_t globalFrameNum;
-extern double last_time;
-extern double current_time;
-extern double pauseRelativeTime;
 int32_t ReadActiveLog(void);
 void EventSystemInit(int32_t argc, char* command, char* command_input1);
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);

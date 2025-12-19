@@ -501,7 +501,7 @@ __attribute__((pure)) float GetBasePlayerSpeed(bool running) {
     bool isSprinting = keyStates[GLFW_KEY_LEFT_SHIFT].down; // TODO handle keybind
     if (voxen_Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (voxen_Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
-    if (currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
     float retval = PLAYER_MAX_WALK_SPEED;
     float bonus = 0.0f;
@@ -595,11 +595,11 @@ void IntegratePhysics(double dt) {
 
 int32_t Physics(void) {
     if (window_has_focus && !log_playback) {
-        if (!gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
+        if (!voxen_globalContext.gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
         ProcessInput();
     }
             
-    if (gamePaused || menuActive) return 0;
+    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return 0;
 
     if (voxen_Cheats.noclip) {
         instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
@@ -611,7 +611,7 @@ int32_t Physics(void) {
         flag_enable(&instances[PLAYER1].entflags, ENTFLAG_USEGRAVITY);
     }
     
-    IntegratePhysics(timeSinceLastPhysicsTick); 
+    IntegratePhysics(voxen_globalContext.timeSinceLastPhysicsTick); 
     return 0;
     for (int32_t p = PLAYER1; p < loadedInstances; ++p) {
         Entity* ea = &instances[p];

@@ -33,7 +33,7 @@ void DetermineClosedEdges(void) {
     
     // ------------------- Open Cells ------------------
     char filename2[256];
-    sprintf(filename2,"./Data/worldcellopen_%d.png",currentLevel);
+    sprintf(filename2,"./Data/worldcellopen_%d.png", voxen_globalContext.currentLevel);
     fp = fopen(filename2, "rb");
     if (!fp) { DualLogError("Failed to open %s\n", filename2); OS_Exit(1); }
     
@@ -72,7 +72,7 @@ void DetermineClosedEdges(void) {
 
     // ------------------- Closed Edges ------------------    
     char filename[256];
-    sprintf(filename,"./Data/worldedgesclosed_%d.png",currentLevel);
+    sprintf(filename,"./Data/worldedgesclosed_%d.png", voxen_globalContext.currentLevel);
 
     fp = fopen(filename, "rb");
     if (!fp) { DualLogError("Failed to open %s\n", filename); OS_Exit(1); }
@@ -125,7 +125,7 @@ void DetermineClosedEdges(void) {
     
     // ------------------- Sky/Sun Visibility ------------------    
     char filename3[256];
-    sprintf(filename3,"./Data/worldcellskyvis_%d.png",currentLevel);
+    sprintf(filename3,"./Data/worldcellskyvis_%d.png", voxen_globalContext.currentLevel);
     fp = fopen(filename3, "rb");
     if (!fp) { DualLogError("Failed to open %s\n", filename3); OS_Exit(1); }
     
@@ -535,7 +535,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx_xz = (z * WORLDX) + x;
-            if (currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
+            if (voxen_globalContext.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
                 if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
                     || (x >= 32 && startX >= 32)
                     || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
@@ -563,7 +563,7 @@ void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling...");
     DebugRAM("start of Cull_Init");    
-    switch(currentLevel) {
+    switch(voxen_globalContext.currentLevel) {
         case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
         case 1: worldMin_x = -76.80f + ( 0.00000f +   25.5600f); worldMin_z = -56.32f + (0.0f + -5.2f); break;
         case 2: worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); worldMin_z = -46.08f + (0.0f + -7.7f); break;
@@ -605,7 +605,7 @@ void CullInit(void) {
                 }
             }
             
-            if (currentLevel == 10) {
+            if (voxen_globalContext.currentLevel == 10) {
                 if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
@@ -636,7 +636,7 @@ void CullInit(void) {
 }
 
 void CullCore(void) {    
-    if (currentLevel >= (numLevels - 1)) return;
+    if (voxen_globalContext.currentLevel >= (voxen_globalContext.numLevels - 1)) return;
 
     lightDirty[0] = true; // Force dynamic lights to update.
     numCellsVisible = 0;
@@ -657,16 +657,14 @@ void CullCore(void) {
         }
     }
     
-    
     glNamedBufferData(voxen_GL_Comms.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
-
 //     CameraViewUnculling(playerCellX,playerCellY);
 //     UpdateNPCPVS();
 //     ToggleNPCPVS();
 }
 
 void Cull(void) {
-    if (menuActive || gamePaused || currentLevel >= LEVEL_CYBERSPACE) return;
+    if (voxen_globalContext.menuActive || voxen_globalContext.gamePaused || voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
 
     // Now handle player position updating PVS. Always do UpdatedPlayerCell
     // to set playerCellX and playerCellY.

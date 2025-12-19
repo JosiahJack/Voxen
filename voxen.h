@@ -21,8 +21,6 @@ void DualLogError(const char* fmt, ...);
 
 // Global Types
 typedef struct { float r,g,b,a; } Color;
-
-extern double timeSinceLastPhysicsTick;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 
@@ -38,6 +36,21 @@ typedef struct {
 
 typedef struct {
     GLFWwindow* window;
+	bool inventoryMode;
+	double last_time;
+	double last_topframe_time;
+	double current_time;
+	double timeSinceLastPhysicsTick;
+	double screenshotTimeout;
+	double pauseRelativeTime;
+	bool levelCurrentlyLoading;
+	char global_modname[256];
+	bool global_modIsCitadel;
+	uint8_t startLevel;
+	uint8_t numLevels; // Can be set by gamedata.txt
+	uint8_t currentLevel;
+	bool gamePaused;
+	bool menuActive;
 } Voxen_GlobalContext;
 extern Voxen_GlobalContext voxen_globalContext;
 
@@ -91,6 +104,16 @@ typedef struct {
 	bool Vsync;
 } VoxenSettings;
 extern VoxenSettings voxen_Settings;
+
+typedef struct {
+	uint32_t globalFrameNum;
+	double cpuTime;
+	double lastFrameSecCountTime;
+	uint32_t lastFrameSecCount;
+	uint32_t framesPerLastSecond;
+	uint32_t worstFPS;
+} VoxenDiagnostics;
+extern VoxenDiagnostics voxen_Diagnostics;
 // ----------------------------------------------------------------------------
 // Audio
 #define MAX_AMBIENT_NOISES 32
@@ -187,13 +210,6 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...);
 
 // Levels / Game Management
 #define LEVEL_CYBERSPACE 13
-extern char global_modname[256];
-extern uint8_t startLevel;
-extern uint8_t numLevels; // Can be set by gamedata.txt
-extern uint8_t currentLevel;
-extern bool gamePaused;
-extern bool menuActive;
-extern bool levelCurrentlyLoading;
 extern GLuint matricesBuffer;
 
 // ----------------------------------------------------------------------------
@@ -252,7 +268,6 @@ bool get_cull_bit(const uint32_t* arr, int idx);
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
-extern double time_PhysicsStep;
 extern uint8_t boosterActive;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;
@@ -364,8 +379,6 @@ void SetFog(void);
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
 extern bool lightDirty[LIGHT_COUNT];
-extern bool global_modIsCitadel;
-extern bool inventoryMode;
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;

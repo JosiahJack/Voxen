@@ -362,17 +362,17 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
-    if (!levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    levelCurrentlyLoading = true;
+    if (!voxen_globalContext.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    voxen_globalContext.levelCurrentlyLoading = true;
     DebugRAM("start of LoadLevel");
-    currentLevel = curlevel;
+    voxen_globalContext.currentLevel = curlevel;
     renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     loadedLights = 0;
     loadedAmbients = 0;
     memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
     memset(textureIndexUsedForCurrentLevel,0,MAX_VALID_TEXTURE * sizeof(bool));
-    if (curlevel >= numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n",curlevel,numLevels - 1); OS_Exit(1); }
+    if (curlevel >= voxen_globalContext.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, voxen_globalContext.numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
@@ -628,7 +628,7 @@ void LoadLevel(uint8_t curlevel) {
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
     RenderShadowmaps();
     Input_MouselookApply();
-    levelCurrentlyLoading = false;
+    voxen_globalContext.levelCurrentlyLoading = false;
 //     PRINT_GL_IDS();
 }
 #pragma GCC diagnostic pop

@@ -16,11 +16,11 @@ static int historyPos = 0;
 
 void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
-    if (!voxen_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = inventoryMode;
+    if (!voxen_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = voxen_globalContext.inventoryMode;
     voxen_Cheats.consoleActive = !voxen_Cheats.consoleActive; // Tilde
-    if (voxen_Cheats.consoleActive) inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && inventoryMode) {
-        inventoryMode = false;
+    if (voxen_Cheats.consoleActive) voxen_globalContext.inventoryMode = true;
+    else if (!inventoryModeWasActivePriorToConsole && voxen_globalContext.inventoryMode) {
+        voxen_globalContext.inventoryMode = false;
         cursorPosition_x = (int32_t)((float)voxen_Settings.ScreenWidth * 0.5f);
         cursorPosition_y = (int32_t)((float)voxen_Settings.ScreenHeight * 0.5f);
     }
@@ -107,22 +107,14 @@ static void cmd_edit(void) {
 }
 
 static void cmd_savegeometry(void) {
-    if (!voxen_Cheats.editMode) {
-        CenterStatusPrint("savegeometry only works in edit mode!");
-        return;
-    }
+    if (!voxen_Cheats.editMode) { CenterStatusPrint("savegeometry only works in edit mode!"); return; }
 
     char filename[64];
-    snprintf(filename, sizeof(filename), "./Data/level%u.txt", currentLevel);
-
+    snprintf(filename, sizeof(filename), "./Data/level%u.txt", voxen_globalContext.currentLevel);
     FILE* f = fopen(filename, "w");
-    if (!f) {
-        CenterStatusPrint("Failed to open %s for writing!", filename);
-        return;
-    }
+    if (!f) { CenterStatusPrint("Failed to open %s for writing!", filename); return; }
 
     DualLog("Saving current level geometry to %s...", filename);
-
     // We'll save only geometry chunks for now (constIndex 0–306 except 112, and 760)
     int saved = 0;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) {
@@ -172,12 +164,12 @@ static int ParseLevelArg(const char* arg) {
     }
 
     int level = atoi(clean);
-    if (level >= 0 && level < numLevels) return level;
+    if (level >= 0 && level < voxen_globalContext.numLevels) return level;
     return -1; // Invalid
 }
 
 static void cmd_loadlevel(const char* arg) {
-    if (menuActive) { CenterStatusPrint("%s", voxen_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
+    if (voxen_globalContext.menuActive) { CenterStatusPrint("%s", voxen_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 
     int level = ParseLevelArg(arg);
     if (level >= 0) {
@@ -189,7 +181,7 @@ static void cmd_loadlevel(const char* arg) {
     }
 }
 
-static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < numLevels) { EnableCheatArsenal(level); } }
+static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < voxen_globalContext.numLevels) { EnableCheatArsenal(level); } }
 
 static void cmd_summon(int itemConstIndex) {
     if (!ConstIndexInBounds(itemConstIndex)) {

@@ -35,7 +35,7 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
         last_mouse_y = ypos;
         if (ignore_next_mouse_delta) { ignore_next_mouse_delta = false; return; }
         
-        if (globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
+        if (voxen_Diagnostics.globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
@@ -129,7 +129,7 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
 }
 
 void Input_MouselookApply(void) {
-    if (currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
+    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
     else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
 }
 
@@ -145,7 +145,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
         cursorPosition_y = newY;
     }
     
-    if (gamePaused || inventoryMode) return 0;
+    if (voxen_globalContext.gamePaused || voxen_globalContext.inventoryMode) return 0;
     
     cam_yaw += (float)xrel * mouse_sensitivity;
     if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
@@ -180,7 +180,7 @@ void ProcessInput(void) {
     // End Debug Inputs
     
     // =========== PAUSE BARRIER ==================
-    if (gamePaused || voxen_Cheats.consoleActive) return;
+    if (voxen_globalContext.gamePaused || voxen_Cheats.consoleActive) return;
     
     uint16_t testlightIdx = (817 * LIGHT_DATA_SIZE);
     if (keyStates[GLFW_KEY_1].down) {
@@ -203,7 +203,7 @@ void ProcessInput(void) {
         
     if (keyStates[GLFW_KEY_TAB].pressed) {
         ignore_next_mouse_delta = true;
-        inventoryMode = !inventoryMode;
+        voxen_globalContext.inventoryMode = !voxen_globalContext.inventoryMode;
         cursorPosition_x = voxen_Settings.ScreenWidth / 2;
         cursorPosition_y = voxen_Settings.ScreenHeight / 2;
     }

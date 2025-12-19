@@ -213,7 +213,7 @@ void Screenshot(void) {
 }
 
 GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
-    if (!levelCurrentlyLoading && globalFrameNum > 1) DualLogError("Trying to delete and generate a new SSBO %u outside of a level load!\n", bindingIndex);
+    if (!voxen_globalContext.levelCurrentlyLoading && voxen_Diagnostics.globalFrameNum > 1) DualLogError("Trying to delete and generate a new SSBO %u outside of a level load!\n", bindingIndex);
     if (id != 0) glDeleteBuffers(1, &id); // Clear last level's SSBO.
     GLuint new_id = 0;
     glGenBuffers(1, &new_id);
@@ -224,7 +224,7 @@ GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* da
 }
 
 __attribute__((pure)) bool CursorVisible(void) {
-    return (inventoryMode || menuActive || gamePaused);
+    return (voxen_globalContext.inventoryMode || voxen_globalContext.menuActive || voxen_globalContext.gamePaused);
 }
 
 __attribute__((pure)) float clampf(float x, float a, float b) {
@@ -269,5 +269,5 @@ int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c
 // finished) somewhere instead of (finished < time) which is my usual Quake
 // derived timer pattern.
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) {
-    return parse_float(trimmed_value, initialLine, lineNum) + (float)pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
+    return parse_float(trimmed_value, initialLine, lineNum) + (float)voxen_globalContext.pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
 }

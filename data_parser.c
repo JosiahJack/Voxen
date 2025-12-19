@@ -94,9 +94,9 @@ bool process_gamedata_key_value(Entity *entry, const char *key, const char *valu
 //     sanitize_utf8_ascii(trimmed_key);
 //     sanitize_utf8_ascii(trimmed_value);
     
-         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(global_modname, trimmed_value, sizeof(global_modname) - 1); global_modname[sizeof(global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
-    else if (strcmp(trimmed_key, "levelcount") == 0)      numLevels = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "startlevel") == 0)      startLevel = parse_numberu8(trimmed_value, line, lineNum);
+         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(voxen_globalContext.global_modname, trimmed_value, sizeof(voxen_globalContext.global_modname) - 1); voxen_globalContext.global_modname[sizeof(voxen_globalContext.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
+    else if (strcmp(trimmed_key, "levelcount") == 0)      voxen_globalContext.numLevels = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "startlevel") == 0)      voxen_globalContext.startLevel = parse_numberu8(trimmed_value, line, lineNum);
     else return false;
     return true;
 }
@@ -130,8 +130,8 @@ void ParseGameData(void) {
     }
     
     fclose(gamedatfile);
-    if (strcmp(global_modname, "Citadel") == 0) global_modIsCitadel = true;;
-    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",global_modname,numLevels,startLevel,get_time() - start_time);
+    if (strcmp(voxen_globalContext.global_modname, "Citadel") == 0) voxen_globalContext.global_modIsCitadel = true;;
+    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",voxen_globalContext.global_modname, voxen_globalContext.numLevels, voxen_globalContext.startLevel, get_time() - start_time);
 }
 
 bool parse_data_file(DataParser *parser, const char *filename) {
