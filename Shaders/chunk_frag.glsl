@@ -34,6 +34,7 @@ layout(location = 20) uniform uint specIndex;
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
+layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
@@ -45,7 +46,8 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
-layout(std430, binding = 26) buffer VoxelLightListIndices { uint voxelLightListIndices[]; };
+layout(std430, binding = 26) buffer VoxelLightListOffsets { uint voxelLightListOffsets[]; };
+layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
 const int LIGHT_DATA_SIZE = 13;
@@ -135,6 +137,12 @@ uint packColor(vec4 color) {
     return (c.r << 24) | (c.g << 16) | (c.b << 8) | c.a;
 }
 
+vec2 EncodeOctahedral(vec3 n) {
+    n = normalize(n);
+    vec2 p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z));
+    return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
+}
+
 void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
@@ -184,25 +192,25 @@ void main() {
 
     vec4 specColor = vec4(0.0,0.0,0.0,0.0);
     if (reflectionsEnabled > 0) {
-        vec4 normalPack = vec4((adjustedNormal.x + 1.0) * 0.5,(adjustedNormal.y + 1.0) * 0.5,(adjustedNormal.z + 1.0) * 0.5,0.0);
         ivec2 texSizeSpec = textureSizes[specIndex];
         ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
         texUVSpec.x = texUVSpec.x % texSizeSpec.x;
         texUVSpec.y = texUVSpec.y % texSizeSpec.y;
         specColor = getTextureColor(specIndex,texUVSpec);
-        vec4 worldPosPack = vec4(FragPos.xyz, uintBitsToFloat(packColor(normalPack)));
+        outSpecular = specColor;
+        vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
         outWorldPos = worldPosPack;
-        outSpecular = specColor; 
+        outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
     }
 
     uint voxelIdx = GetVoxelIndex(worldPos);
-    uint count = voxelLightListIndices[voxelIdx * 2 + 1];
+    uint count = voxelLightListCounts[voxelIdx];
     if (unlit > 0) count = 0;
     vec3 lighting = vec3(0.0, 0.0, 0.0);
     vec3 normal = adjustedNormal;
     uint listoffset = 0;
     float intensityTotal = 0.0;
-    if (count > 0) listoffset = voxelLightListIndices[voxelIdx * 2];
+    if (count > 0) listoffset = voxelLightListOffsets[voxelIdx];
     for (uint i = 0u; i < count; i++) {
         uint lightIdxInPVS = uniqueLightLists[listoffset + i];
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);

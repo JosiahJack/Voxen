@@ -165,15 +165,15 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_R].pressed) {
         debugView++;
         if (debugView > 4) debugView = 0;
-        glProgramUniform1i(voxen_GL_Comms.chunkShaderProgram, 4, debugView);
-        glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 0, debugView);
+        glUseProgram(voxen_GL_Comms.chunkShaderProgram); glUniform1i(4, debugView);
+        glUseProgram(voxen_GL_Comms.imageBlitShaderProgram); glUniform1i(0, debugView);
     }
 
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_Y].pressed) {
         debugValue++;
         if (debugValue > 6) debugValue = 0;
-        glProgramUniform1i(voxen_GL_Comms.imageBlitShaderProgram, 1, debugValue);
-        glProgramUniform1i(voxen_GL_Comms.chunkShaderProgram, 5, debugValue);
+        glUseProgram(voxen_GL_Comms.imageBlitShaderProgram); glUniform1i(1, debugValue);
+        glUseProgram(voxen_GL_Comms.chunkShaderProgram); glUniform1i(5, debugValue);
     }
     
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);

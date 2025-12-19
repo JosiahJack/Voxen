@@ -334,7 +334,7 @@ static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLen
         && id != 131218) { // Suppress single chunk_frag shader recompile at first frame UI render
         if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR) {
             DualLogError("GL ERROR [%u]: %s\n", id, message);
-            __builtin_trap();
+//             __builtin_trap();
         } else {
             DualLogWarn("GL WARN [%u]: %s\n", id, message);
         }
@@ -580,6 +580,7 @@ typedef struct {
 	GLuint inputDepthID;
 	GLuint inputWorldPosID;
 	GLuint inputSpecID;
+	GLuint inputNormalID;
 	GLuint gBufferFBO;
 	GLuint outputImageID;
 	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
@@ -606,7 +607,8 @@ typedef struct {
 	GLuint shadowMapsIndirectionID;
 	GLuint shadowMapsSizesID;
 	GLuint shadowMapsOffsetsID;
-	GLuint voxelLightListIndicesID;
+	GLuint voxelLightListOffsetsID;
+	GLuint voxelLightListCountsID;
 	GLuint voxelLightListsRawID;
 	GLuint vbos[MODEL_IDX_MAX];
 	GLuint tbos[MODEL_IDX_MAX];

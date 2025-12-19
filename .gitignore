@@ -2,3 +2,4 @@
 *.dem
 log_dump.txt
 voxen.log
+*.diff
