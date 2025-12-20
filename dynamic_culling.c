@@ -9,6 +9,7 @@ uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint16_t playerCellIdx = 0u;
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
+bool instanceIsLODArray[INSTANCE_COUNT];
 
 __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
     int word = idx / 32;
@@ -658,6 +659,16 @@ void CullCore(void) {
     }
     
     glNamedBufferData(voxen_GL_Comms.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
+    
+    float pos_x, pos_z;
+    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((instances[PLAYER1].position.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((instances[PLAYER1].position.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+    CellCoordsToPos(cellX,cellZ, &pos_x,&pos_z);
+    for (int i=0;i<loadedInstances;++i) {
+        float distSqrd = squareDistance2D(instances[i].position.x, instances[i].position.z, pos_x, pos_z);
+        instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
+    }
+    
 //     CameraViewUnculling(playerCellX,playerCellY);
 //     UpdateNPCPVS();
 //     ToggleNPCPVS();

@@ -4228,10 +4228,16 @@ model: 623
 index: 532
 #prop_bed
 index: 533
+texture: 537
+model: 16
 #prop_bed_hospital
 index: 534
 #prop_bed_neurosurgery
 index: 535
+texture: 18
+normtexture: 29
+spectexture: 1238
+model: 17
 #prop_bonepile1
 index: 536
 #prop_bridgewall1

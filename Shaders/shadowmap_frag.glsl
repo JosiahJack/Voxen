@@ -41,15 +41,13 @@ uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
 
 void main() {
     if (isTransparent > 0) {
-        int texIndexChecked = 0;
-        if (texIndex >= 0) texIndexChecked = int(texIndex);
-        ivec2 texSize = textureSizes[texIndexChecked];
+        ivec2 texSize = textureSizes[texIndex];
         vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
         ivec2 pixel = ivec2(uv);
         ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
         texUV.x = texUV.x % texSize.x;
         texUV.y = texUV.y % texSize.y;
-        if (getTextureAlpha(texIndexChecked,texUV) < 252u) return; // Alpha cutout threshold for {fence style textures
+        if (getTextureAlpha(texIndex,texUV) < 252u) return; // Alpha cutout threshold for {fence style textures
     }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);

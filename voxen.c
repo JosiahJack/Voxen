@@ -37,7 +37,8 @@ Voxen_GlobalContext voxen_globalContext = {
     .numLevels = 2,
     .currentLevel = 0,
     .gamePaused = false,
-    .menuActive = false
+    .menuActive = false,
+    .statusTextDecayFinished = 0.0
 };
 
 char statusText[TEXT_BUFFER_SIZE];
@@ -51,7 +52,7 @@ VoxenDiagnostics voxen_Diagnostics = {
     .worstFPS = UINT32_MAX
 };
 
-#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
+#define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
 VoxenSettings voxen_Settings = {
     .ScreenWidth = 1366u,
     .ScreenHeight = 768u,
@@ -107,7 +108,6 @@ uint32_t textDrawCallsRenderedThisFrame = 0;
 uint32_t uiImageDrawCallsRenderedThisFrame = 0;
 uint32_t shadowDrawCallsRenderedThisFrame = 0;
 uint32_t verticesRenderedThisFrame = 0;
-bool instanceIsLODArray[INSTANCE_COUNT];
 float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 Voxen_GL_Comms voxen_GL_Comms;
 Shadow_System shadow_System;
@@ -137,10 +137,6 @@ Color textColors[TEXT_COLOR_COUNT] = {
     { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}  // 8 StopD Red Pause Title
 };
 
-//      Center Status Print
-int statusTextLengthWithoutNullTerminator = 6;
-float statusTextDecayFinished = 0.0f;
-// ----------------------------------------------------------------------------
 // Lights
 uint32_t shadowmapIndirectionList[LIGHT_COUNT];
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
@@ -361,9 +357,7 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadSize, uint32_t offset) {
     float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
     float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
     float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-    float halfRadSqrd = lightRadius * lightRadius * 0.5f;
     float effectiveRadius = vmin(lightRadius, 15.36f);
-
     memset(shadows_nearMeshes, 0, SHADOW_NEARMESH_MAX * sizeof(uint16_t));
     memset(shadows_nearMeshRadii, 0, SHADOW_NEARMESH_MAX * sizeof(uint16_t));
     uint16_t nearbyMeshCount = 0;
@@ -383,8 +377,6 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadSize, uint32_t offset) {
             float distSqrd = squareDistance3D(      instances[j].position.x,       instances[j].position.y,       instances[j].position.z,
                                               instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            
-            instanceIsLODArray[j] = (distToLightSqrd >= halfRadSqrd);
         }
         
         shadows_nearMeshes[nearbyMeshCount] = j;
@@ -395,9 +387,9 @@ void RenderShadowmap(uint16_t lightIdx, uint32_t shadSize, uint32_t offset) {
     glUniform1ui(3, lightIdx * (uint32_t)LIGHT_DATA_SIZE);
     glUniform1ui(4, shadSize);
     glUniform1ui(5, shadowmapIndirectionList[lightIdx]);
+    glUniform1ui(7, offset);
     for (uint8_t face = 0; face < 6; face++) {
         glUniform1ui(2, face);
-        glUniform1ui(7, offset);
         glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
         for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
             int i = shadows_nearMeshes[j];            
@@ -456,29 +448,29 @@ void RenderShadowmaps(void) {
     glBindVertexArray(voxen_GL_Comms.vao_chunk);
     LightCandidate candidates[MAX_SHADOWMAPS];
     uint8_t heap_size = 0;
+    float bestScores[MAX_SHADOWMAPS];
     shadow_System.numShadowsCouldRender = 0;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         float intensity = lightMaxIntensity[litIdx];
-        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];        
+        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float dx = lightPosX - instances[PLAYER1].position.x;
         float dy = lightPosY - instances[PLAYER1].position.y;
         float dz = lightPosZ - instances[PLAYER1].position.z;
-        float distSqrd = dx * dx + dy * dy + dz * dz;
+        float distSqrd = dx*dx + dy*dy + dz*dz;
         if (distSqrd >= 2500.0f) continue; // shadowDistance of 50.0f
 
-        // PosGetCellCoords unwrapped for cellX and cellZ reuse down below
         uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPosX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPosZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         int lightCellIdx = (cellZ * WORLDX) + cellX;
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
-            int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F)); // 1 / 2.56f
-            for (int ix = cellX - r; ix <= cellX + r && !inPVS; ix++) {
-                for (int iz = cellZ - r; iz <= cellZ + r; iz++) {
+            int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F));
+            for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
+                for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
                     if (!XZPairInBounds(ix, iz)) continue;
                     int subIdx = iz * WORLDX + ix;
                     if ((gridCellStates[subIdx] & CELL_VISIBLE) &&
@@ -490,44 +482,43 @@ void RenderShadowmaps(void) {
             }
         }
         if (!inPVS) continue;
-        
+
         float score = distSqrd / vmax(intensity, 0.01f);
         float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
         if (dotResult > 0.5f || distSqrd < 26.2144f) score *= 0.125f; // Favor lights in player's view cone or within 5.12 (2 world cells)
         else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
-        
-        LightCandidate c = { i, distSqrd, score };
+
         if (heap_size < MAX_SHADOWMAPS) {
-            candidates[heap_size] = c;
-            sift_up(candidates, heap_size);
+            candidates[heap_size] = (LightCandidate){ i, distSqrd, score };
+            bestScores[heap_size] = score;
             heap_size++;
-        } else if (c.score < candidates[0].score) {
-            candidates[0] = c;
-            sift_down(candidates, MAX_SHADOWMAPS, 0);
+        } else if (score < bestScores[0]) {  // Only compare against current worst
+            // Find worst (highest score) and replace it
+            int worstIdx = 0;
+            for (uint32_t j = 1; j < heap_size; ++j) {
+                if (bestScores[j] > bestScores[worstIdx]) worstIdx = j;
+            }
+            candidates[worstIdx] = (LightCandidate){ i, distSqrd, score };
+            bestScores[worstIdx] = score;
         }
-        
+
         shadow_System.numShadowsCouldRender++;
     }
 
-    for (int a = 1; a < heap_size; a++) {
-        LightCandidate x = candidates[a];
-        int b = a - 1;
-        while (b >= 0 && candidates[b].score > x.score) { candidates[b+1] = candidates[b]; b--; }
-        candidates[b+1] = x;
-    }
-    
     uint32_t numToRender = vmin(shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
+
+    // Clear shadowmaps
     if (shadow_System.useComputeClear) {
         glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
         GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
-        glDispatchCompute(groupX_shadClear,1, 1);
+        glDispatchCompute(groupX_shadClear,1,1);
     } else {
         GLuint clearValue = 0xFFFFFFFFu;
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
-        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!
+        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!  Only used for fallback on some systems (e.g. HD4400) that can't use compute shader.
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
-    
+
     shadowDrawCallsRenderedThisFrame = 0;
     memset(shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
@@ -538,13 +529,14 @@ void RenderShadowmaps(void) {
         float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
         float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+
         #pragma GCC unroll 6
         for (int j=0;j<6;++j) {
             mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
             mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
             ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
         }
-        
+
         uint32_t slot = shadowDrawCallsRenderedThisFrame;
         shadowmapIndirectionList[lightIdx] = slot;
         float scale = 1.0f / (1.0f + 0.001f * candidates[c].score);
@@ -557,7 +549,7 @@ void RenderShadowmaps(void) {
         shadow_System.shadowmapOffsets[c] = shadowmapOffsetHead;
         shadowmapOffsetHead += (shadSize * shadSize) * 6;
         if (shadowmapOffsetHead > TOTAL_SHADOWMAP_PIXELS) { DualLogWarn("Early exit on shadowmap loop due to undersized SSBO\n"); break; }
-        
+
         shadowDrawCallsRenderedThisFrame++;
     }
 
@@ -751,10 +743,10 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
 void CenterStatusPrint(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    statusTextLengthWithoutNullTerminator = vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
+    (void)vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
     va_end(args);
     DualLog("%s\n",statusText);
-    statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
+    voxen_globalContext.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 // ============================================================================
 void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
@@ -1067,7 +1059,6 @@ void RenderInstances(uint8_t type) {
             visibleInstances[visibleCount].index = i;
             visibleInstances[visibleCount].depth = distSqrd;
             visibleCount++;
-            instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
         }
         
         if (visibleCount == 0) continue;
@@ -1196,7 +1187,7 @@ int32_t main(int32_t argc, char* argv[]) {
             
             // 2. Pass instance data to GPU
             for (uint32_t i = 3; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } } // Skip player indices and start at 3
-            glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(uint32_t), modelMatrices, GL_DYNAMIC_DRAW);
+            glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 
             // 3. Light Updates
             UpdateDynamicLights();
@@ -1216,7 +1207,6 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1ui(15, voxen_Settings.Shadows);
             glUniform1ui(17, 0u); // unlit false
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
-            memset(instanceIsLODArray,true,INSTANCE_COUNT * sizeof(bool)); // All using lower detail LOD mesh.
             glDepthMask(GL_TRUE);
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
@@ -1243,20 +1233,9 @@ int32_t main(int32_t argc, char* argv[]) {
         glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.inputImageID);
         glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
-        glUniform1i(6, 4); // outputImage texture sampler2D
-        glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
-        glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && voxen_globalContext.currentLevel != LEVEL_CYBERSPACE);
-        glUniform1ui(19, ((voxen_globalContext.currentLevel >= 10 && voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
-        uint32_t shieldOnType = 0u; // No shield green tint.
-        if (questData.ShieldActivated) {
-            if (voxen_globalContext.currentLevel == 6 || voxen_globalContext.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-            else if (voxen_globalContext.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
-        }
-        
-        glUniform1f(4, worldMin_x);
-        glUniform1f(5, worldMin_z);
-        glUniform1ui(7, voxen_Settings.Reflections);
-        glUniform1ui(8, voxen_Settings.AntiAliasing);
+        glUniform1i(4, 4); // outputImage texture sampler2D
+        glUniform1ui(5, voxen_Settings.Reflections);
+        glUniform1ui(6, voxen_Settings.AntiAliasing);
         glUniform1f(9, berserkTimeRemainingNormalized);
         glUniform1f(10, berserkSeedTime);
         glUniform1ui(11, voxen_Settings.Brightness);
@@ -1265,14 +1244,22 @@ int32_t main(int32_t argc, char* argv[]) {
         glUniform1f(14, voxen_Settings.FOV);
         glUniform1f(15, (float)voxen_globalContext.pauseRelativeTime * 0.1f);
         glUniform1f(16, aspect3D);
+                glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
+        glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && voxen_globalContext.currentLevel != LEVEL_CYBERSPACE);
+        glUniform1ui(19, ((voxen_globalContext.currentLevel >= 10 && voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+        uint32_t shieldOnType = 0u; // No shield green tint.
+        if (questData.ShieldActivated) {
+            if (voxen_globalContext.currentLevel == 6 || voxen_globalContext.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+            else if (voxen_globalContext.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+        }
         glUniform1ui(20, shieldOnType);
         glUniform1ui(22, voxen_Settings.Shadows);
+        Color painStaticColor = GetPainStaticColor();
+        glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
         glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
         glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
         glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
         glUniform1f(28, GetPainStatic());
-        Color painStaticColor = GetPainStaticColor();
-        glUniform3f(29, painStaticColor.r, painStaticColor.g, painStaticColor.b);
         glBindVertexArray(voxen_GL_Comms.quadVAO);
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
@@ -1347,12 +1334,12 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, maximumShadowmapSSBOUsage: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, shadow_System.maximumShadowmapSSBOUsage);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (statusTextDecayFinished > (float)voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
         glDepthMask(GL_TRUE);
-        RenderUIImages();
+        if (!voxen_Cheats.noHUD) RenderUIImages();
         double time_now = get_time();
-        if (voxen_Cheats.showFPS) {
+        if (voxen_Cheats.showFPS && !voxen_Cheats.noHUD) {
             double thisFrameTime = (time_now - voxen_globalContext.last_time) * 1000.0;
             double cpuFrameTime = voxen_Diagnostics.cpuTime * 1000.0;
             uint8_t timingColor = TEXT_WHITE;

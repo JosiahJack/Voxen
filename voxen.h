@@ -43,6 +43,7 @@ typedef struct {
 	double timeSinceLastPhysicsTick;
 	double screenshotTimeout;
 	double pauseRelativeTime;
+	double statusTextDecayFinished;
 	bool levelCurrentlyLoading;
 	char global_modname[256];
 	bool global_modIsCitadel;

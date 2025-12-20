@@ -56,7 +56,8 @@ index: 15
 index: 16
 #Textures/ammo_rail.png
 index: 17
-
+#Textures/bed_neurosurgery.png
+index: 18
 #Textures/ammo_rubber.png
 index: 19
 #Textures/ammo_slaglarge.png
@@ -77,7 +78,8 @@ index: 26
 index: 27
 #Textures/arm.png
 index: 28
-
+#Textures/bed_neurosurgery_norm.png
+index: 29
 #Textures/barrel_chemical.png
 index: 30
 #Textures/barrel_explosive.png

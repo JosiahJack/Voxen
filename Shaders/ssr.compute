@@ -53,14 +53,13 @@ void main() {
     vec2 screenSize = vec2(screenWidth, screenHeight);
     ivec2 screenSizeLess1 = ivec2(screenWidth - 1, screenHeight - 1);
     ivec2 zeroIVec2 = ivec2(0, 0);
-    float confidence = 0.0;
     for (int i = 0; i < 48; ++i) { // stepCount
         marchPos += rayStep;
         traveled += 0.55; // stepSize
         vec4 clipPos = viewProjection * vec4(marchPos, 1.0);
         vec2 ndc = clipPos.xy / clipPos.w;
         hitUV = ndc * 0.5 + 0.5;
-        if (hitUV.x <= 0.05 || hitUV.x >= 0.95 || hitUV.y <= 0.05 || hitUV.y >= 0.95) break;
+        if (hitUV.x <= 0.01 || hitUV.x >= 0.99 || hitUV.y <= 0.01 || hitUV.y >= 0.99) break;
 
         ivec2 samplePixel = ivec2(hitUV * screenSize);
         samplePixel = clamp(samplePixel, zeroIVec2, screenSizeLess1);
@@ -79,16 +78,11 @@ void main() {
             vec4 sampleColor = imageLoad(inputImage, hitPixel * SSR_RES);
             reflectionColor += sampleColor.rgb * weight;
             totalWeight += weight;
-            confidence += weight;
             if (totalWeight > 0.8) break;
         }
     }
 
-    if (totalWeight < 0.0001) { imageStore(outputImage, ivec2(pixel), vec4(0.0,0.0,0.0,1.0)); return; } // Avoid division by near-zero
-
     reflectionColor /= totalWeight; // Normalize by total weight
-    vec3 combined = mix(vec3(0.0,0.0,0.0), reflectionColor, vec3(1.0) * 0.451); // Just so happens to work well with, yes, another magical 451
-    vec3 prev = imageLoad(outputImage, ivec2(pixel)).rgb;
-    vec3 result = mix(prev, combined, confidence > 0.1 ? 0.9 : 0.1);
+    vec3 result = reflectionColor * 0.451 * (specColor.rgb + vec3(0.1,0.1,0.1));
     imageStore(outputImage, ivec2(pixel), vec4(result, 1.0));
 }

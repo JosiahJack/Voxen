@@ -2,17 +2,14 @@
 #version 430 core
 in vec2 TexCoord;
 out vec4 FragColor;
-layout(rgba32f, binding = 1) readonly uniform image2D inputWorldPos;
-layout(rgba8,   binding = 2) readonly uniform image2D inputSpecular;
+layout(rgba16f, binding = 1) readonly uniform image2D inputWorldPos;
 layout(location =  0) uniform int debugView;
 layout(location =  1) uniform int debugValue;
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
-layout(location =  4) uniform float worldMin_x;
-layout(location =  5) uniform float worldMin_z;
-layout(location =  6) uniform sampler2D outputImage;
-layout(location =  7) uniform uint reflectionsEnabled;
-layout(location =  8) uniform uint aaEnabled;
+layout(location =  4) uniform sampler2D outputImage;
+layout(location =  5) uniform uint reflectionsEnabled;
+layout(location =  6) uniform uint aaEnabled;
 layout(location =  9) uniform float berserkTimeRemaining;
 layout(location = 10) uniform float berserkSeedTimestamp;
 layout(location = 11) uniform uint brightnessSetting;
@@ -27,13 +24,12 @@ layout(location = 19) uniform uint groveShieldVisible;
 layout(location = 20) uniform uint stationShieldVisible;
 layout(location = 21) uniform uint empEffectActive;
 layout(location = 22) uniform uint shadowsEnabled;
-
+layout(location = 23) uniform vec3 staticColor;
 layout(location = 24) uniform mat4 viewProjection;
 layout(location = 25) uniform mat3 invViewRot;
 layout(location = 26) uniform int SSR_RES;
 layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
-layout(location = 29) uniform vec3 staticColor;
 layout(location = 30) uniform float skyRotateSpeed;
 
 const float vhsBlurAmount = 0.5; // Cannot be overstated just how magical and impactful this setting is.  DO NOT EVER TURN OFF EVER!!  I recant my former statement about avoiding blur at all costs in all scenarios.
@@ -381,7 +377,6 @@ void main() {
 
     ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     vec4 fog = vec4(0.0,0.0,0.0,0.0);
-    vec4 specColor = vec4(0.0,0.0,0.0,0.0);
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
     if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
 
@@ -390,9 +385,7 @@ void main() {
         if (reflectionsEnabled > 0) {
             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
             vec4 reflectionColor = vec4(0.0);
-            vec4 specColor = imageLoad(inputSpecular, uv);
-            if (color.a < 0.99 && color.a > 0.1) specColor *= 2.0;
-            reflectionColor.rgb += texture(outputImage, sampleUV).rgb * specColor.rgb * 1.85;
+            reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
             color.rgb += reflectionColor.rgb;

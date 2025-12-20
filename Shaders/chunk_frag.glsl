@@ -141,15 +141,12 @@ void main() {
     vec3 viewDir = (camPos - worldPos);
     float distToPixel = length(viewDir);
     viewDir = normalize(viewDir);
-    int texIndexChecked = 0;
-    if (texIndex >= 0) texIndexChecked = int(texIndex);
-    ivec2 texSize = textureSizes[texIndexChecked];
+    ivec2 texSize = textureSizes[texIndex];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
-    ivec2 pixel = ivec2(uv);
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
-    vec4 albedoColor = getTextureColor(texIndexChecked,texUV);
+    vec4 albedoColor = getTextureColor(texIndex,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
@@ -272,10 +269,7 @@ void main() {
             float constantBias = 0.009 * dist;
             float bias = (slopeBias + constantBias) * (dist / range); // The NdotL performance impact is negligible.
             bias = clamp(bias, 0.0, 0.22);
-            bias += shadSize < 256 ? 0.01 : 0.0;
-            bias += shadSize < 128 ? 0.04 : 0.0;
-            bias += shadSize < 64 ? 0.12 : 0.0;
-            bias += shadSize < 32 ? 0.16 : 0.0;
+            bias += 0.44 * pow(clamp((192.0 - shadSize) / 192.0, 0.0, 1.0), 0.65);
             float shadSizeLessOne = float(shadSize - 1);
             if (distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
@@ -317,12 +311,12 @@ void main() {
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 2.2);
         lighting += baseLighting * spotFalloff * shadowFactor;
-        lighting += baseLighting * (0.19 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
+        lighting += baseLighting * (0.451 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
         intensityTotal += intensity * attenuation * 1.5;
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);
             float ndh = max(dot(normal, halfDir), 0.0);
-            float strength = texIndexChecked == 36 || texIndexChecked == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
+            float strength = texIndex == 36 || texIndex == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
             float shininess = 100.0;
             float spec = clamp(pow(ndh, shininess),0.0,1.0);
             lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength * 10.0;

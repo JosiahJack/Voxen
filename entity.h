@@ -67,6 +67,7 @@ void ParseGameData(void);
 bool parse_data_file(DataParser *parser, const char *filename);
 extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 extern Entity instances[INSTANCE_COUNT];
+extern bool instanceIsLODArray[INSTANCE_COUNT];
 extern uint16_t loadedInstances;
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
