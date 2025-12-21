@@ -18,7 +18,7 @@ jobs:
       - name: Run build.sh bash script
         run: |
           sudo apt-get update
-          sudo apt-get install libsdl2-dev libsdl2-ttf-dev libglew-dev libgl1-mesa-dev libassimp-dev libenet-dev uthash-dev
+          sudo apt-get install mold libgl1-mesa-dev libassimp-dev
           chmod +x ./build.sh
           ./build.sh ci
       - name: Upload voxen binary
