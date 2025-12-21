@@ -227,10 +227,6 @@ __attribute__((pure)) bool CursorVisible(void) {
     return (voxen_globalContext.inventoryMode || voxen_globalContext.menuActive || voxen_globalContext.gamePaused);
 }
 
-__attribute__((pure)) float clampf(float x, float a, float b) {
-    return x < a ? a : (x > b ? b : x);
-}
-
 uint32_t random_range_rng = 0x12345678u; // Global seed
 uint32_t xs32(uint32_t *s) {
     uint32_t x=*s; x^=x<<13; x^=x>>17; x^=x<<5;

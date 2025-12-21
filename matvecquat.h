@@ -4,15 +4,15 @@
 typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
-static inline Vector3 add_vector3(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
-static inline Vector3 sub_vector3(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
+static inline Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
+static inline Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3){a.x - b.x, a.y - b.y, a.z - b.z}; }
 static inline Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
 static inline float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
 static inline float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
 static inline float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
 static inline Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
 static inline Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
-static inline float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = sub_vector3(a, b); return dot_vector3(d, d); }
+static inline float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
 static inline Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 static inline Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
 static inline float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
@@ -34,11 +34,10 @@ static inline Quaternion mul_quaternion(Quaternion a, Quaternion b) {
     };
 }
 
-static inline Vector3 rotate_quaternion(Quaternion q, Vector3 v) {
-    Vector3 qv = {q.x, q.y, q.z};
-    Vector3 uv = cross_vector3(qv, v);
-    Vector3 uuv = cross_vector3(qv, uv);
-    return add_vector3(v, add_vector3(scale_vector3(uv, 2.0f * q.w), scale_vector3(uuv, 2.0f)));
+static inline Vector3 rotate_quaternion(Quaternion rotation, Vector3 axis) {
+    Vector3 qv = {rotation.x, rotation.y, rotation.z}; // Take only the xyz, not w
+    Vector3 uv = cross_vector3(qv, axis);
+    return Vector3_A_plus_B(axis,Vector3_A_plus_B(scale_vector3(uv, 2.0f * rotation.w), scale_vector3(cross_vector3(qv, uv), 2.0f)));
 }
 
 static inline void mul_mat4(float *out, const float *a, const float *b) { // out = a * b

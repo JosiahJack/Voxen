@@ -251,9 +251,6 @@ bool get_cull_bit(const uint32_t* arr, int idx);
 #define MAX_DYNAMIC_ENTITIES 512
 #define TERMINAL_VELOCITY 10.0f
 #define PHYS_FLOAT_TO_INT_SCALEF 100.0f
-#define PLAYER_RADIUS 0.48f
-#define PLAYER_HEIGHT 2.00f
-#define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 #define PHYS_COMBINE_AVG 0 // All the same for both frictionCombine and bounceCombine
 #define PHYS_COMBINE_MIN 1
 #define PHYS_COMBINE_MUL 2
@@ -496,7 +493,6 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 extern uint32_t random_range_rng;
 double get_time(void);
 void md5(const uint8_t *data, size_t len, uint8_t out[16]);
-float clampf(float x, float a, float b);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
 int data_parser_isspace(char c);

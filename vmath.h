@@ -6,6 +6,7 @@
 #define TAU 6.2831853f
 static inline float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
 static inline float vceil(float x) { int i = (int)x; return (float)(i < x ? i + 1 : i); }
+static inline float vclamp(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
 static inline float vsqrtf(float x) { union { float f; unsigned int i; } u = { x }; u.i = 0x1fbd1df5 + (u.i >> 1); return 0.5f * (u.f + x / u.f); }
 static inline float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 static inline float vcosf(float x) { return vsinf(x + 1.57079632f); }
