@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-clear
+if [ $# -eq 0 ] || [ "$1" != "ci" ]; then
+    clear
+fi
+
 TEMP_DIR=temp_build
 export TMPDIR=/dev/shm
 mkdir -p $TEMP_DIR
