@@ -1,12 +1,14 @@
 // helpers.c - Helper Functions for various things
 #include <sys/stat.h>
 #include <time.h>
-#include <malloc.h>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
 #include "entity.h"
 #include "voxen.h"
+#ifdef DEBUG_RAM_OUTPUT
+#include <malloc.h>
+#endif
 #include "event.h"
 
 double get_time(void) {

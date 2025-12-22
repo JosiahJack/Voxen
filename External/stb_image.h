@@ -5,7 +5,6 @@ void DualLog(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
 extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t *x, int32_t *y);
 #include <stddef.h>
-#include <malloc.h>
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);

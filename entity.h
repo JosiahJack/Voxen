@@ -1,9 +1,9 @@
 #pragma once
 #include "voxen.h"
 
-#define INSTANCE_COUNT 10000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 7000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define MAX_CHILD_COUNT 8
+#define MAX_CHILD_COUNT 4
 #define NULLENT 0u
 #define PLAYER1 1u
 #define PLAYER2 2u
@@ -54,7 +54,7 @@ typedef struct {
     Quaternion child_rotation[MAX_CHILD_COUNT];
     Vector3    child_scale[MAX_CHILD_COUNT];
     bool persistent;
-    char path[MAX_PATH];
+    char path[128];
 } Entity;
 
 typedef struct {
@@ -81,7 +81,6 @@ extern uint16_t modelTypeOffsetsDoubleSided[MODEL_IDX_MAX];
 extern uint16_t modelTypeOffsetsTransparent[MODEL_IDX_MAX];
 extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
 extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
-extern uint16_t opaqueInstancesHead;
 extern uint16_t renderableCount;
 extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;

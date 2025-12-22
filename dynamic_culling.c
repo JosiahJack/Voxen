@@ -10,6 +10,8 @@ uint16_t playerCellIdx = 0u;
 uint16_t numCellsVisible = 0u;
 float worldMin_x = 0.0f; float worldMin_z = 0.0f;
 bool instanceIsLODArray[INSTANCE_COUNT];
+#define MAX_CULL_FILESIZE 500000
+uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
 
 __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
     int word = idx / 32;
@@ -25,8 +27,6 @@ static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
 }
 
 void DetermineClosedEdges(void) {
-    size_t maxFileSize = 500000; // 0.5MB
-    uint8_t* file_buffer = malloc(maxFileSize);
     stbi__arena_init();
     FILE* fp;
     size_t file_size, read_size;
@@ -40,13 +40,13 @@ void DetermineClosedEdges(void) {
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); OS_Exit(1); }
+    if (file_size > MAX_CULL_FILESIZE) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_SET);
-    read_size = fread(file_buffer, 1, file_size, fp);
+    read_size = fread(cullingFileBuffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); OS_Exit(1); }
-    unsigned char* openPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
+    unsigned char* openPixels = stbi_load_from_memory(cullingFileBuffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
 	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); OS_Exit(1); }
  
     unsigned char openData_r, openData_g, openData_b;
@@ -80,14 +80,14 @@ void DetermineClosedEdges(void) {
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); OS_Exit(1); }
+    if (file_size > MAX_CULL_FILESIZE) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_SET);
-    read_size = fread(file_buffer, 1, file_size, fp);
+    read_size = fread(cullingFileBuffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); OS_Exit(1); }
 
-    unsigned char* edgePixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
+    unsigned char* edgePixels = stbi_load_from_memory(cullingFileBuffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
     if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); OS_Exit(1); }
 
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
@@ -132,13 +132,13 @@ void DetermineClosedEdges(void) {
     
     fseek(fp, 0, SEEK_END);
     file_size = ftell(fp);
-    if (file_size > maxFileSize) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); OS_Exit(1); }
+    if (file_size > MAX_CULL_FILESIZE) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); OS_Exit(1); }
     
     fseek(fp, 0, SEEK_SET);
-    read_size = fread(file_buffer, 1, file_size, fp);
+    read_size = fread(cullingFileBuffer, 1, file_size, fp);
     fclose(fp);
     if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); OS_Exit(1); }
-    unsigned char* skyPixels = stbi_load_from_memory(file_buffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
+    unsigned char* skyPixels = stbi_load_from_memory(cullingFileBuffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
     if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); OS_Exit(1); }
 
     unsigned char skyData_r, skyData_g, skyData_b;
@@ -156,7 +156,6 @@ void DetermineClosedEdges(void) {
         }
     }
     
-    free(file_buffer);
     munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }

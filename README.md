@@ -340,10 +340,11 @@ NOTE: Excluded miniaudio, stb_image ./External alloc calls
 Binary static variable impacts:
 
 ```
-❯ size ./voxen
+❯ size voxen
    text    data     bss       dec     hex filename
-3124029   57192 21338776 24519997 176253d ./voxen
+3183917   55952 56755608 59995477 3937555 voxen
 ```
+
 
 Individual static variable impacts:
 

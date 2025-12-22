@@ -1,6 +1,6 @@
 #pragma once
 #define VERSION_STRING "v0.7.4"
-// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <stdbool.h>
@@ -11,9 +11,6 @@
 #include "External/stb_truetype.h"
 #include "citadel_enumerations.h"
 #include "matvecquat.h"
-
-// Generic Constants
-#define MAX_PATH 128
 
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);

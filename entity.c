@@ -216,11 +216,6 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
         }
     }
 }
-
-uint16_t opaqueInstances[INSTANCE_COUNT] = {0};
-uint16_t doubleSidedInstances[INSTANCE_COUNT] = {0};
-uint16_t transparentInstances[INSTANCE_COUNT] = {0};
-Entity tempInstances[INSTANCE_COUNT] = {0};
     
 void SortInstances(void) { // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
     double start_time = get_time();
@@ -231,9 +226,9 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     memset(modelTypeOffsetsOpaque, 0, MODEL_IDX_MAX * sizeof(uint16_t));
     memset(modelTypeOffsetsDoubleSided, 0, MODEL_IDX_MAX * sizeof(uint16_t));
     memset(modelTypeOffsetsTransparent, 0, MODEL_IDX_MAX * sizeof(uint16_t));
-    memset(opaqueInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
-    memset(doubleSidedInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
-    memset(transparentInstances,0,INSTANCE_COUNT * sizeof(uint16_t));
+    uint16_t* opaqueInstances      = calloc(INSTANCE_COUNT,sizeof(uint16_t));
+    uint16_t* doubleSidedInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
+    uint16_t* transparentInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     opaqueInstancesHead = doubleSidedInstancesHead = transparentInstancesHead = invalidModelIndexCount = 0;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
         if (instances[i].texIndex >= MAX_VALID_TEXTURE && instances[i].texIndex != MAX_VALID_TEXTURE) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
@@ -269,7 +264,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     for (i = 0; i < MODEL_IDX_MAX; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
     if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
 
-    memset(tempInstances,0,INSTANCE_COUNT * sizeof(Entity));
+    Entity* tempInstances = calloc(INSTANCE_COUNT,sizeof(Entity));
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
     uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
     CopyInstanceRegion(opaqueInstancesHead,           opaqueInstances, tempInstances, &targetIdx, startOfDoubleSidedInstances); // Copy opaque instances
@@ -279,6 +274,8 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
         if (tempInstances[i].modelIndex > MODEL_IDX_MAX) { instances[targetIdx] = tempInstances[i]; targetIdx++; }
     }
 
+    free(transparentInstances); free(doubleSidedInstances); free(opaqueInstances); free(tempInstances);
+    malloc_trim(0);
     DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
     DualLog(" took %f secs\n", get_time() - start_time);
     loadedAmbients = 0;
@@ -609,7 +606,6 @@ void LoadLevel(uint8_t curlevel) {
 
     fogBaseDensityForLevel *= 3.8f; // Global modifier to tweak it.
     SetFog();
-    malloc_trim(0);
     DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f secs\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     LoadModels();

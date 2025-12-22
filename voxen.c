@@ -219,8 +219,6 @@ void UpdateDynamicLights(void) {
 }
 
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-uint32_t voxelLightLists[VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL];
-uint32_t voxelLightListCounts[VOXEL_COUNT];
 void UpdateVoxelLightLists(void) {
     glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
     GLuint groupX_voxels = (512 + 31) / 32;
@@ -719,7 +717,6 @@ void InitializeEnvironment(void) {
     
     Input_MouselookApply(); // Input
     InitializeAudio(); // Audio
-    malloc_trim(0);
     DebugRAM("after InitializeAudio");
     
     LoadTextForLanguage(voxen_Settings.Language);
