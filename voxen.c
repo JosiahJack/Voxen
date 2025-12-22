@@ -774,6 +774,7 @@ void InitializeEnvironment(void) {
     glfwSwapInterval(voxen_Settings.Vsync ? 1 : 0);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     CompileShaders();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
     glCreateBuffers(1, &voxen_GL_Comms.quadVBO);
     float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
     glNamedBufferData(voxen_GL_Comms.quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
@@ -836,6 +837,7 @@ void InitializeEnvironment(void) {
     UpdateScreenSize();
     InitFontAtlasses();
     DebugRAM("after InitFontAtlasses");
+    RenderLoadingProgress(80,"Loading...");
     
     Input_MouselookApply(); // Input
     InitializeAudio(); // Audio
@@ -1174,7 +1176,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glUniform1f(14, voxen_Settings.FOV);
         glUniform1f(15, (float)voxen_globalContext.pauseRelativeTime * 0.1f);
         glUniform1f(16, aspect3D);
-                glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
+        glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
         glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && voxen_globalContext.currentLevel != LEVEL_CYBERSPACE);
         glUniform1ui(19, ((voxen_globalContext.currentLevel >= 10 && voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
         uint32_t shieldOnType = 0u; // No shield green tint.
