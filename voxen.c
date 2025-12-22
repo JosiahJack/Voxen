@@ -113,16 +113,6 @@ Voxen_GL_Comms voxen_GL_Comms;
 Shadow_System shadow_System;
 bool cursorVisible = false;
 int32_t cursorPosition_x = 680, cursorPosition_y = 384;
-
-typedef struct {
-    float x, y, z;        // Top-left corner in screen space (pixels)
-    float width, height; // Size in screen space (pixels)
-    uint32_t texIndex; // Index into textureOffsets for palettized texture
-    bool visible;      // Whether to render this image
-} UIImage;
-
-UIImage uiImages[MAX_UI_IMAGES];
-uint32_t uiImageCount = 0;
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
 Color textColors[TEXT_COLOR_COUNT] = {
@@ -567,80 +557,26 @@ void RenderShadowmaps(void) {
 __attribute__((pure)) float GetScreenRelativeX(float percentage) { return (float)voxen_Settings.ScreenWidth * percentage; }
 __attribute__((pure)) float GetScreenRelativeY(float percentage) { return (float)voxen_Settings.ScreenHeight * percentage; }
 
-uint32_t AddUIImage(float x, float y, float z, float width, float height, uint32_t texIndex) {
-    if (uiImageCount >= MAX_UI_IMAGES) { DualLogError("Max UI images reached!\n"); return 0; }
-    
-    uiImages[uiImageCount].x = x;
-    uiImages[uiImageCount].y = y;
-    uiImages[uiImageCount].z = z;
-    uiImages[uiImageCount].width = width;
-    uiImages[uiImageCount].height = height;
-    uiImages[uiImageCount].texIndex = texIndex;
-    uiImages[uiImageCount].visible = true;
-    uiImageCount++;
-    return uiImageCount - 1; // Return index of this just now created image for use on making buttons.
-}
-
-float uiImageVertexData[31768];
-void RenderUIImages(void) {
-    if (uiImageCount == 0) return;
-
+void RenderUIImage(float x, float y, float width, float height, uint32_t texIndex) {
     glUseProgram(voxen_GL_Comms.chunkShaderProgram);
     glBindVertexArray(voxen_GL_Comms.textVAO);
-    glUniform1ui(3, 1u); // isUI true
+    glUniform1ui(1, 0);
+    glUniform1ui(3, 1u);  // isUI true
     glUniform1ui(17, 1u); // unlit is true
+    glUniform1ui(19, 0);
+    glUniform1ui(20, 0);
     glUniformMatrix4fv(2, 1, GL_FALSE, uiOrthoProjection);
-    for (uint32_t i = 0; i < uiImageCount; i++) { // Sort images by texIndex to minimize state changes.  Simple bubble sort for small N
-        for (uint32_t j = i + 1; j < uiImageCount; j++) {
-            if (uiImages[j].texIndex < uiImages[i].texIndex) {
-                UIImage temp = uiImages[i];
-                uiImages[i] = uiImages[j];
-                uiImages[j] = temp;
-            }
-        }
-    }
-
-    uint32_t start = 0;
     glBindBuffer(GL_ARRAY_BUFFER, voxen_GL_Comms.textVBO);
-    while (start < uiImageCount) {
-        uint32_t currentTex = uiImages[start].texIndex;
-        uint32_t end = start;
-        while (end < uiImageCount && uiImages[end].texIndex == currentTex && uiImages[end].visible) end++; // Find range with same texIndex
-        size_t vertexCount = 0;
-        for (uint32_t i = start; i < end; i++) {  // Build vertex buffer for this batch
-            if (!uiImages[i].visible) continue;
-
-            float x0 = uiImages[i].x;
-            float y0 = uiImages[i].y;
-            float z0 = uiImages[i].z;
-            float x1 = x0 + uiImages[i].width;
-            float y1 = y0 + uiImages[i].height;
-            float vertices[30] = { x0, y1, z0, 0.0f, 0.0f,
-                                   x1, y0, z0, 1.0f, 1.0f,
-                                   x1, y1, z0, 1.0f, 0.0f,
-                                   x0, y1, z0, 0.0f, 0.0f,
-                                   x0, y0, z0, 0.0f, 1.0f,
-                                   x1, y0, z0, 1.0f, 1.0f };
-
-            memcpy(uiImageVertexData + vertexCount * 30, vertices, sizeof(vertices));
-            vertexCount++;
-        }
-
-        if (vertexCount > 0) {
-            glUniform1ui(1, 0);
-            glUniform1ui(18, currentTex);
-            glUniform1ui(19, 0);
-            glUniform1ui(20, 0);
-            glBufferData(GL_ARRAY_BUFFER, vertexCount * 30 * sizeof(float), uiImageVertexData, GL_DYNAMIC_DRAW);
-            glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
-            drawCallsRenderedThisFrame++;
-            uiImageDrawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += vertexCount * 6;
-        }
-
-        start = end;
-    }
-    
+    float x1 = x + width;
+    float y1 = y + height;
+    float z = 0.0f;
+    float vertices[30] = { x, y1, z, 0.0f, 0.0f, x1,  y, z, 1.0f, 1.0f, x1, y1, z, 1.0f, 0.0f, x, y1, z, 0.0f, 0.0f, x,  y, z, 0.0f, 1.0f, x1,  y, z, 1.0f, 1.0f };
+    glUniform1ui(18, texIndex);
+    glBufferData(GL_ARRAY_BUFFER, 30 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    drawCallsRenderedThisFrame++;
+    uiImageDrawCallsRenderedThisFrame++;
+    verticesRenderedThisFrame += 6;    
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -650,7 +586,7 @@ __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float st
 }
 
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t fontID, const char* format, ...) {
+void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char* format, ...) {
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(voxen_GL_Comms.textShaderProgram);
@@ -694,13 +630,8 @@ void RenderFormattedText(float x, float y, float z, uint32_t color, uint8_t font
         float t0 = q.t0 - paddingUV;
         float s1 = q.s1 + paddingUV;
         float t1 = q.t1 + paddingUV;
-        float textVertices[30] = { vx0, vy0, z, s0, t0, // Triangle 1
-                                   vx1, vy1, z, s1, t1,
-                                   vx1, vy0, z, s1, t0,
-                                   vx0, vy0, z, s0, t0, // Triangle 2
-                                   vx0, vy1, z, s0, t1,
-                                   vx1, vy1, z, s1, t1 };
-
+        float z = 0.0f;
+        float textVertices[30] = { vx0, vy0, z, s0, t0, vx1, vy1, z, s1, t1, vx1, vy0, z, s1, t0, vx0, vy0, z, s0, t0, vx0, vy1, z, s0, t1, vx1, vy1, z, s1, t1 };
         memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
         vertexCount++;
         if (codepoint >= '0' && codepoint <= '9') {
@@ -735,7 +666,7 @@ void RenderLoadingProgress(int32_t offset, const char* format, ...) { // Only ad
     va_start(args, format);
     vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
-    RenderFormattedText(voxen_Settings.ScreenWidth / 2 - offset, voxen_Settings.ScreenHeight / 2 - 5, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, buffer);
+    RenderFormattedText(voxen_Settings.ScreenWidth / 2 - offset, voxen_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL, buffer);
     glEnable(GL_DEPTH_TEST);
     glfwSwapBuffers(voxen_globalContext.window);
 }
@@ -1168,7 +1099,6 @@ int32_t main(int32_t argc, char* argv[]) {
         uiImageDrawCallsRenderedThisFrame = 0;
         shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
-        uiImageCount = 0;
         
         // 0. View Matrix, and Projection Matrix
         float view[16]; // Also known as view matrix
@@ -1274,33 +1204,19 @@ int32_t main(int32_t argc, char* argv[]) {
         float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
         glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
-        glDepthMask(GL_TRUE); // GL_TRUE Fixes z sorting unless it has alpha, GL_FALSE Fixes alpha rendering of text, but makes the z sort not work for some reason.
+        glDepthMask(GL_TRUE);
         glDisable(GL_CULL_FACE);
-        
-        // Cursor
-        uint16_t cursorTexture = 1260;
-        if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) cursorTexture = 1261;
-        float cursorSize = (float)voxen_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE;
-        float cursorHalfSize = cursorSize * 0.5f;
-        if (CursorVisible()) AddUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
-        else AddUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, UI_LAYER_TOP, cursorSize, cursorSize, cursorTexture);
-        
-        float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
-        float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
-        float shootModePos_y = 0.0f;
-        if (!voxen_globalContext.gamePaused && !voxen_Cheats.noHUD) AddUIImage(shootModePos_x, shootModePos_y, UI_LAYER_0, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
-        if (voxen_globalContext.inventoryMode) {
-            if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
-                if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
-                    voxen_globalContext.inventoryMode = false;
-                    cursorPosition_x = voxen_Settings.ScreenWidth / 2;
-                    cursorPosition_y = voxen_Settings.ScreenHeight / 2;
-                }
-            }
-        }
-        
+        glDepthMask(GL_TRUE);
         if (voxen_globalContext.gamePaused) {
-            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), UI_LAYER_5, TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
+            float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
+            float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);
+            float pauseBGY = screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
+            RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background
+            RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background
+            float quitGame_Height = GetScreenRelativeY(0.05f);
+            RenderUIImage(pauseBGX, screenCenterY + GetScreenRelativeY(0.40f) - (quitGame_Height * 0.5f), pauseBGWidth, quitGame_Height, 950); // Pause Quit Game background
+            
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
             char* pauseButton_ResumeText = "RESUME";
             float pauseButton_ResumeWidth = (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
             float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
@@ -1311,33 +1227,24 @@ int32_t main(int32_t argc, char* argv[]) {
                                                                 pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.5f), pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.5f));
             
             if (pauseButton_CursorIsAbove) pauseButton_ResumeColor = TEXT_STOPD_RED_HIGHLIGHT;
-            RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, UI_LAYER_5, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
+            RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
             
-            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.00f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "LOAD");
-            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.08f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "SAVE");
-            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.5f), screenCenterY + GetScreenRelativeY(0.16f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "OPTIONS");
-            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 6.0f), screenCenterY + GetScreenRelativeY(0.24f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "QUIT TO MENU");
-            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 4.5f), screenCenterY + GetScreenRelativeY(0.40f), UI_LAYER_5, TEXT_STOPD_RED, FONT_STOPD, "QUIT GAME");
-            float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
-            float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);
-            float pauseBGY = screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
-            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_0, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background
-            AddUIImage(pauseBGX, pauseBGY, UI_LAYER_1, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background
-            float quitGame_Height = GetScreenRelativeY(0.05f);
-            AddUIImage(pauseBGX, screenCenterY + GetScreenRelativeY(0.40f) - (quitGame_Height * 0.5f), UI_LAYER_0, pauseBGWidth, quitGame_Height, 950); // Pause Quit Game background
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.00f), TEXT_STOPD_RED, FONT_STOPD, "LOAD");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.08f), TEXT_STOPD_RED, FONT_STOPD, "SAVE");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.5f), screenCenterY + GetScreenRelativeY(0.16f), TEXT_STOPD_RED, FONT_STOPD, "OPTIONS");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 6.0f), screenCenterY + GetScreenRelativeY(0.24f), TEXT_STOPD_RED, FONT_STOPD, "QUIT TO MENU");
+            RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 4.5f), screenCenterY + GetScreenRelativeY(0.40f), TEXT_STOPD_RED, FONT_STOPD, "QUIT GAME");
         }
         
         // Diagnostics / Debugging
         float debugTextStartY = GetScreenRelativeY(0.075f);
         float leftPad = GetScreenRelativeX(0.0125f);
-        if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
-        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
-        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, maximumShadowmapSSBOUsage: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, shadow_System.maximumShadowmapSSBOUsage);
-        if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-        if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), UI_LAYER_1, TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+        if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, maximumShadowmapSSBOUsage: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, shadow_System.maximumShadowmapSSBOUsage);
+        if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
+        if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
-        glDepthMask(GL_TRUE);
-        if (!voxen_Cheats.noHUD) RenderUIImages();
         double time_now = get_time();
         if (voxen_Cheats.showFPS && !voxen_Cheats.noHUD) {
             double thisFrameTime = (time_now - voxen_globalContext.last_time) * 1000.0;
@@ -1347,9 +1254,31 @@ int32_t main(int32_t argc, char* argv[]) {
             if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
             drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; // Add two more for this text render ;)
             drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++;
-            RenderFormattedText(leftPad, debugTextStartY - lineSpacing, UI_LAYER_5, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
-            RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, UI_LAYER_5, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", voxen_Diagnostics.framesPerLastSecond, voxen_Diagnostics.worstFPS, drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, voxen_Cheats.editMode);
+            RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
+            RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", voxen_Diagnostics.framesPerLastSecond, voxen_Diagnostics.worstFPS, drawCallsRenderedThisFrame, drawCallsNormal, uiImageDrawCallsRenderedThisFrame, textDrawCallsRenderedThisFrame, shadowDrawCallsRenderedThisFrame, verticesRenderedThisFrame, voxen_Cheats.editMode);
         }
+        
+        float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
+        float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
+        float shootModePos_y = 0.0f;
+        if (!voxen_globalContext.gamePaused && !voxen_Cheats.noHUD) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+        if (voxen_globalContext.inventoryMode) {
+            if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
+                if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
+                    voxen_globalContext.inventoryMode = false;
+                    cursorPosition_x = voxen_Settings.ScreenWidth / 2;
+                    cursorPosition_y = voxen_Settings.ScreenHeight / 2;
+                }
+            }
+        }
+        
+        // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
+        bool menuOrInventoryCursorStyle = (voxen_globalContext.gamePaused || voxen_globalContext.menuActive);
+        uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
+        float cursorSize = (float)voxen_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE * (menuOrInventoryCursorStyle ? 3.0f : 1.0f);
+        float cursorHalfSize = cursorSize * 0.5f;
+        if (CursorVisible()) RenderUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
+        else RenderUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
 
         voxen_globalContext.last_time = time_now;
         if ((time_now - voxen_Diagnostics.lastFrameSecCountTime) >= 1.00) {

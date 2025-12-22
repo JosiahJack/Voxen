@@ -409,7 +409,7 @@ extern Voxen_Cheats voxen_Cheats;
 
 void SetSkyRotateSpeed(void);
 // ----------------------------------------------------------------------------
-// Text
+// UI
 #define TEXT_BUFFER_SIZE 1024
 #define FONT_ATLAS_SIZE 3072
 #define MAX_GLYPHS 639
@@ -438,7 +438,6 @@ typedef struct {
 	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
 } Voxen_Text;
 extern Voxen_Text voxen_Text;
-
 extern char** audiologNames;
 extern char** audiologSubjects;
 extern char** audiologSenders;
@@ -453,23 +452,12 @@ extern float genericTextHeightFac;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
-
 void LoadTextForLanguage(uint8_t lang);
 void LoadLogTextForLanguage(uint8_t lang);
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
 float TextWidth(const char *utf8, int32_t fontID);
 uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses(void);
-// ----------------------------------------------------------------------------
-// UI
-#define MAX_UI_IMAGES 64
-#define UI_LAYER_TOP 1.0f
-#define UI_LAYER_5 0.5f
-#define UI_LAYER_4 0.4f
-#define UI_LAYER_3 0.3f
-#define UI_LAYER_2 0.2f
-#define UI_LAYER_1 0.1f
-#define UI_LAYER_0 0.0f
 float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------
