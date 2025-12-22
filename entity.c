@@ -620,11 +620,16 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
     glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
+    glUniform1f(0, voxelMinCenterX);
+    glUniform1f(1, voxelMinCenterZ);
+    glUniform1ui(2, loadedLights);
+    glUniform1f(3, worldMin_x);
+    glUniform1f(4, worldMin_z);
     UpdateVoxelLightLists();
     DebugRAM("after first UpdateVoxelLightLists for load level");
     voxen_GL_Comms.shadowMapSSBO = SetupSSBO(voxen_GL_Comms.shadowMapSSBO, 5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
-    RenderShadowmaps();
     Input_MouselookApply();
     voxen_globalContext.levelCurrentlyLoading = false;
 //     PRINT_GL_IDS();

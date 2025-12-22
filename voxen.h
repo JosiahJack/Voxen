@@ -102,7 +102,7 @@ typedef struct {
 	uint8_t CullEnabled;
 	float FOV;
 	uint8_t Reflections;
-	bool Vsync;
+	int32_t Vsync;
 } VoxenSettings;
 extern VoxenSettings voxen_Settings;
 
@@ -117,7 +117,7 @@ typedef struct {
 extern VoxenDiagnostics voxen_Diagnostics;
 // ----------------------------------------------------------------------------
 // Audio
-#define MAX_AMBIENT_NOISES 32
+#define MAX_AMBIENT_NOISES 128
 extern uint16_t loadedAmbients;
 extern uint16_t ambientRegistry[MAX_AMBIENT_NOISES];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
@@ -368,6 +368,14 @@ static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLen
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
+Quaternion cubemapOrientationQuaternion[6] = {
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+};
 extern float testLight_x, testLight_y, testLight_z;
 extern int32_t debugView;
 extern int32_t debugValue;
@@ -428,6 +436,17 @@ void SetSkyRotateSpeed(void);
 #define TEXT_STOPD_RED_HIGHLIGHT 7
 #define TEXT_STOPD_RED_PAUSETITLE 8
 #define TEXT_COLOR_COUNT 9
+Color textColors[TEXT_COLOR_COUNT] = {
+    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White
+    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow
+    { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
+    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green
+    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red
+    {         1.0f, 0.498039216f,          0.0f, 1.0f}, // 5 Orange
+    { 0.674509804f, 0.058823529f,  0.070588235f, 1.0f}, // 6 StopD Red
+    { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight
+    { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}  // 8 StopD Red Pause Title
+};
 typedef struct {	
 	uint8_t file_data[TEXT_DATA_FILEBUFFER_SIZE]; // Found that only 59430 were needed at one point, padded for safety and typo fixes
 	char stringTable[TEXT_STRING_COUNT][TEXT_LOCALIZATION_MAX_LENGTH]; // Hefty table for localization support.
@@ -534,15 +553,6 @@ static inline void flag_disable(uint32_t *flags, uint32_t bit) {
 static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
     *flags = (*flags & ~bit) | (-state & bit);
 }
-
-typedef struct {
-	uint32_t numShadowsCouldRender;
-	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
-	uint32_t maximumShadowmapSSBOUsage;
-	bool useComputeClear;
-} Shadow_System;
-extern Shadow_System shadow_System;
 
 typedef struct {
 	GLuint inputImageID;

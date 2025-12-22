@@ -1322,43 +1322,45 @@ Individual static variable impacts:
 0000000000adfe44 0000000000000001 B boosterActive
 ```
 
-cloc --by-file --exclude-dir=temp_build,.git,Audio,Data,Fonts,Models,Screenshots,Scripts,Shaders,Textures,Tools,External ./
+❯ cloc --by-file --exclude-dir=temp_build,.git,Audio,Data,Fonts,Models,Screenshots,Scripts,Shaders,Textures,Tools,External --not-match-f='\.md$|\.csv$|\.diff$|\.sh$|\.yml$' ./
       31 text files.
       31 unique files.                              
        5 files ignored.
 
-github.com/AlDanial/cloc v 1.90  T=0.02 s (1086.0 files/s, 439666.1 lines/s)
-----------------------------------------------------------------------------------
-File                                           blank        comment           code
-----------------------------------------------------------------------------------
-./voxen.c                                        172            151           1476
-./entity.c                                        73             12            714
-./dynamic_culling.c                               89             30            588
-./physics.c                                       69            116            542
-./voxen.h                                         40             57            461
-./data_fonts.c                                    49              8            380
-./console.c                                       20             80            372
-./data_models.c                                   37              3            306
-./data_text.c                                     32              3            303
-./citadel_enumerations.h                          28             28            297
-./data_parser.c                                   37             11            263
-./data_textures.c                                 22              5            214
-./event.c                                         36             16            187
-./helpers.c                                       25              5            179
-./input.c                                         29              5            167
-./audio.c                                         26              7            140
-./entity.h                                        13              6             95
-./build.sh                                         5              3             53
-./event.h                                          6              4             48
-./matvecquat.c                                     4              3             41
-./vmath.h                                          2              0             38
-./.github/workflows/main.yml                       0              0             28
-./matvecquat.h                                     0              0             24
-./test_voxen_restart_x_times.sh                    2              0             17
-./patches.c                                        2             91             15
-----------------------------------------------------------------------------------
-SUM:                                             818            644           6948
-----------------------------------------------------------------------------------
+github.com/AlDanial/cloc v 1.90  T=0.02 s (1373.1 files/s, 393260.5 lines/s)
+--------------------------------------------------------------------------------------
+File                                    blank        comment           code
+--------------------------------------------------------------------------------------
+./voxen.c                                 123             25           1165
+./entity.c                                 45              7            580
+./dynamic_culling.c                        89             29            565
+./voxen.h                                  38             47            501
+./console.c                                45              4            423
+./data_fonts.c                             49              8            376
+./citadel_enumerations.h                   28             28            297
+./data_models.c                            37              2            284
+./data_text.c                              23              1            271
+./todo.c                                   33             33            264
+./data_parser.c                            34              7            252
+./helpers.c                                30             27            212
+./event.c                                  36             16            195
+./input.c                                  28              7            175
+./physics.c                                37            182            171
+./audio.c                                  26              7            139
+./data_textures.c                          15              1            137
+./os.c                                     19              1            114
+./entity.h                                  4              0             91
+./matvecquat.c                              6              2             53
+./matvecquat.h                              4              1             51
+./event.h                                   5              4             42
+./vmath.h                                   2              0             37
+./todo.h                                    0              0             20
+./patches.c                                 2             91             15
+./os.h                                      0              0             11
+./hardware.c                                1              1              2
+--------------------------------------------------------------------------------------
+SUM:                                      759            531           6443
+--------------------------------------------------------------------------------------
 
 
 Main Rig.  Settings:
