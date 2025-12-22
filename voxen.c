@@ -13,18 +13,9 @@
 Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
 Voxen_Cheats               voxen_Cheats = { .god = true, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
-VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 70u, .VolumeMusic = 20u, .CullEnabled = 1, .FOV = 65.0f, .Reflections = 1u };
+VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 100u, .VolumeMusic = 20u, .CullEnabled = 1, .FOV = 65.0f, .Reflections = 1u };
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
 Voxen_GL_Comms           voxen_GL_Comms;
-
-typedef struct {
-	uint32_t numShadowsCouldRender;
-	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
-	uint32_t maximumShadowmapSSBOUsage;
-	bool useComputeClear;
-} VoxenShadowSystem;
-VoxenShadowSystem voxen_Shadow_System;
 
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -128,7 +119,7 @@ void UpdateProjectionMatrices(void) {
     m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
     
-    f = 1.0f / vtan(SHADOWMAP_FOV * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
+    f = 1.0f / vtan(90.0f * PI / 360.0f); // vcot introduces skewness causing false "Peter-Panning" from bubble distortion of the shadowmap depths.  Just stick with recip tangent.
     m = shadowmapsPerspectiveProjection;
     m[0] = f / 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
     m[4] =     0.0f; m[5] =    f; m[6] =                                                                  0.0f; m[7] =  0.0f;
@@ -239,6 +230,22 @@ void UpdateVoxelLightLists(void) {
 }
 
 #define SHADOW_NEARMESH_MAX 350 // 312 was too low for light 867 on medical
+#define MAX_SHADOWMAPS 256u
+#define SHADOW_MAP_SIZE 192u
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 3U)) // Found that in practice only needed ~45%, oversized a little here for safety.
+typedef struct {
+	uint32_t numShadowsCouldRender;
+	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+	uint32_t maximumShadowmapSSBOUsage;
+	bool useComputeClear;
+} VoxenShadowSystem;
+VoxenShadowSystem voxen_Shadow_System;
+
+void InitShadows() {
+    voxen_GL_Comms.shadowMapSSBO = SetupSSBO(voxen_GL_Comms.shadowMapSSBO, 5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_DYNAMIC_DRAW);    
+}
+
 uint16_t shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 void RenderShadowmap(uint16_t lightIdx, uint32_t shadSize, uint32_t offset, float px, float py, float pz) {
@@ -308,7 +315,7 @@ void RenderShadowmaps(void) {
     glDepthMask(GL_TRUE);
     glBindVertexArray(voxen_GL_Comms.vao_chunk);
     LightCandidate candidates[MAX_SHADOWMAPS];
-    uint8_t heap_size = 0;
+    uint16_t heap_size = 0;
     float bestScores[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
     float px = instances[PLAYER1].position.x, py = instances[PLAYER1].position.y, pz = instances[PLAYER1].position.z;

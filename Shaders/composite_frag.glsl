@@ -452,7 +452,7 @@ void main() {
         aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0));
 
         if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
-        aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting * 1.25) / 100.0))); // Brightness Adjustment Setting
+//         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting * 1.25) / 100.0))); // Brightness Adjustment Setting
         if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
 
         FragColor = vec4(aaColor, 1.0); // Output final composited color

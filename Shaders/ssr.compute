@@ -16,13 +16,6 @@ layout(location = 2) uniform int SSR_RES;
 layout(location = 3) uniform vec3 camPos;
 layout(location = 4) uniform mat4 viewProjection;
 
-vec4 unpackColor32(uint color) {
-    return vec4(float((color >> 24) & 0xFFu) / 255.0,  // r
-                float((color >> 16) & 0xFFu) / 255.0,  // g
-                float((color >>  8) & 0xFFu) / 255.0,  // b
-                float((color      ) & 0xFFu) / 255.0); // a
-}
-
 vec3 DecodeOctahedral(vec2 enc) {
     enc = enc * 2.0 - 1.0;
     vec3 n = vec3(enc, 1.0 - abs(enc.x) - abs(enc.y));

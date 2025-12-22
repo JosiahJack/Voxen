@@ -75,11 +75,9 @@ uint GetVoxelIndex(vec3 worldPos) {
     return (voxelZ * 512) + voxelX;
 }
 
-const float INV_FOG_DIST = 1.0 / 71.68;
-
 const int PCF_SAMPLES = 12;
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
-    vec2(-0.0713, -0.0936),
+    vec2(0.0),
     vec2( 0.0248, -0.0983),
     vec2( 0.0946, -0.0657),
     vec2( 0.1337, -0.0042),
@@ -125,11 +123,6 @@ vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     return vec4(color & 0xFFu, (color>>8)&0xFFu, (color>>16)&0xFFu, color>>24) * BYTE_TO_FLOAT;
 }
 
-uint packColor(vec4 color) {
-    uvec4 c = uvec4(clamp(color * 255.0, 0.0, 255.0));
-    return (c.r << 24) | (c.g << 16) | (c.b << 8) | c.a;
-}
-
 vec2 EncodeOctahedral(vec3 n) {
     n = normalize(n);
     vec2 p = n.xy / (abs(n.x) + abs(n.y) + abs(n.z));
@@ -171,7 +164,7 @@ void main() {
         }
     }
 
-    vec4 glowColor = vec4(0.0,0.0,0.0,0.0);
+    vec4 glowColor = vec4(0.0);
     if (glowIndex != 0) {
         ivec2 texSizeGlow = textureSizes[glowIndex];
         ivec2 texUVGlow = ivec2(int(floor(uv.x * float(texSizeGlow.x))), int(floor(uv.y * float(texSizeGlow.y))));
@@ -180,7 +173,7 @@ void main() {
         glowColor = getTextureColor(glowIndex,texUVGlow);
     }
 
-    vec4 specColor = vec4(0.0,0.0,0.0,0.0);
+    vec4 specColor = vec4(0.0);
     if (reflectionsEnabled > 0) {
         ivec2 texSizeSpec = textureSizes[specIndex];
         ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
@@ -196,8 +189,7 @@ void main() {
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count = voxelLightListCounts[voxelIdx];
     if (unlit > 0) count = 0;
-    vec3 lighting = vec3(0.0, 0.0, 0.0);
-    vec3 normal = adjustedNormal;
+    vec3 lighting = vec3(0.0);
     uint listoffset = 0;
     float intensityTotal = 0.0;
     for (uint i = 0u; i < count; i++) {
@@ -215,7 +207,7 @@ void main() {
         if (dist > range) continue;
 
         vec3 lightDir = normalize(toLight);
-        float lambertian = clamp(max(dot(normal, lightDir), 0.0),0.0,1.0);
+        float lambertian = clamp(max(dot(adjustedNormal, lightDir), 0.0),0.0,1.0);
         float distOverRange = dist / range;
         float distOverRangeSqd = distOverRange * distOverRange;
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
@@ -243,7 +235,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRange * distOverRange * 24.0 + 14.0;
+            float smearness = distOverRange * distOverRange * 24.0 + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -263,13 +255,12 @@ void main() {
             float shadSizef = float(shadSize);
             uint faceOff = shadowMapOffsets[shadowIndex] + (face * shadSize * shadSize);
             vec2 tc = uv * shadSizef;
-            float NdotL = dot(normal, lightDir);
-            float slopeBias = 0.10 * (1.0 - NdotL);
+            float NdotL = dot(adjustedNormal, lightDir);
+            float slopeBias = 0.451 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
-            float constantBias = 0.009 * dist;
-            float bias = (slopeBias + constantBias) * (dist / range); // The NdotL performance impact is negligible.
+            float bias = slopeBias * (dist / range);
             bias = clamp(bias, 0.0, 0.22);
-            bias += 0.44 * pow(clamp((192.0 - shadSize) / 192.0, 0.0, 1.0), 0.65);
+            bias += 0.02 * pow(clamp((192.0 - shadSize) / 192.0, 0.0, 1.0), 0.65);
             float shadSizeLessOne = float(shadSize - 1);
             if (distToPixel < 24.0) {
                 // Pseudo-Stochastic PCF sampling
@@ -309,13 +300,13 @@ void main() {
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
-        vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 2.2);
+        vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 1.75);
         lighting += baseLighting * spotFalloff * shadowFactor;
-        lighting += baseLighting * (0.451 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
+//         lighting += baseLighting * (0.451 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
         intensityTotal += intensity * attenuation * 1.5;
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);
-            float ndh = max(dot(normal, halfDir), 0.0);
+            float ndh = max(dot(adjustedNormal, halfDir), 0.0);
             float strength = texIndex == 36 || texIndex == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
             float shininess = 100.0;
             float spec = clamp(pow(ndh, shininess),0.0,1.0);
@@ -323,9 +314,8 @@ void main() {
         }
     }
 
-    float rim = 1.0 - max(dot(normal, viewDir), 0.0);
-    lighting += clamp(pow(rim, 4.0) * 0.5 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel (tested and performance impact is essentially zero)
-
+    float rim = 1.0 - max(dot(adjustedNormal, viewDir), 0.0);
+    lighting += clamp(pow(rim, 4.0) * 0.25 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel (tested and performance impact is essentially zero)
     if (unlit > 0) lighting = albedoColor.rgb;
     else lighting += glowColor.rgb; // Glow (texture emission)
 
@@ -336,7 +326,7 @@ void main() {
     float dither = (blue - 0.5) / 255.0;
     lighting.rgb += vec3(dither);
 
-    float fogFac = clamp(distToPixel * INV_FOG_DIST, 0.0, 1.0);
+    float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0); // This is inverse of fog dist so * (1 / 71.68 far plane)
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
     vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
