@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run build.sh bash script
         run: |
-          sudo apt-get install -y --no-install-recommends mold libgl1-mesa-dev
+          sudo apt-get install -y --no-install-recommends mold libgl1-mesa-dev libassimp-dev
           chmod +x ./build.sh
           ./build.sh ci
       - name: Upload voxen binary

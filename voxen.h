@@ -345,7 +345,6 @@ static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLen
         && id != 131218) { // Suppress single chunk_frag shader recompile at first frame UI render
         if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR) {
             DualLogError("GL ERROR [%u]: %s\n", id, message);
-//             __builtin_trap();
         } else {
             DualLogWarn("GL WARN [%u]: %s\n", id, message);
         }
@@ -535,32 +534,6 @@ static inline void flag_disable(uint32_t *flags, uint32_t bit) {
 static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
     *flags = (*flags & ~bit) | (-state & bit);
 }
-
-// static inline void sanitize_utf8_ascii(char *s) {
-//     char *dst = s;
-//     while (*s) {
-//         if (!memcmp(s, "\xE2\x80\x90", 3) || !memcmp(s, "\xE2\x80\x91", 3) ||
-//             !memcmp(s, "\xE2\x80\x92", 3) || !memcmp(s, "\xE2\x80\x93", 3) ||
-//             !memcmp(s, "\xE2\x80\x94", 3) || !memcmp(s, "\xE2\x80\x95", 3) ||  // Added: Horizontal bar
-//             !memcmp(s, "\xE2\x88\x92", 3)) {
-//             dst[0] = '-'; dst++; s += 3; continue;
-//         }
-//         if (!memcmp(s, "\xC2\xAD", 2)) { dst[0] = '-'; dst++; s += 2; continue; }
-//         if (!memcmp(s, "\xE2\x80\x9C", 3) || !memcmp(s, "\xE2\x80\x9D", 3)) { dst[0] = '"'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xE2\x80\x98", 3) || !memcmp(s, "\xE2\x80\x99", 3)) { dst[0] = '\''; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x8B", 3)) { dst[0] = '+'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x8F", 3)) { dst[0] = '/'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x88", 3)) { dst[0] = '('; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x89", 3)) { dst[0] = ')'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x9A", 3)) { dst[0] = ':'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x9B", 3)) { dst[0] = ';'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x8C", 3)) { dst[0] = ','; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x8E", 3)) { dst[0] = '.'; dst++; s += 3; continue; }
-//         if (!memcmp(s, "\xEF\xBC\x8D", 3)) { dst[0] = '-'; dst++; s += 3; continue; }
-//         dst[0] = *s; dst++; s++;
-//     }
-//     *dst = '\0';
-// }
 
 typedef struct {
 	uint32_t numShadowsCouldRender;

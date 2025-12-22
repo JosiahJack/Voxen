@@ -91,8 +91,6 @@ bool process_gamedata_key_value(Entity *entry, const char *key, const char *valu
     char *val_end = trimmed_value + strlen(trimmed_value) - 1;
     while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
     while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
-//     sanitize_utf8_ascii(trimmed_key);
-//     sanitize_utf8_ascii(trimmed_value);
     
          if (strcmp(trimmed_key, "modname") == 0)         { strncpy(voxen_globalContext.global_modname, trimmed_value, sizeof(voxen_globalContext.global_modname) - 1); voxen_globalContext.global_modname[sizeof(voxen_globalContext.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
     else if (strcmp(trimmed_key, "levelcount") == 0)      voxen_globalContext.numLevels = parse_numberu8(trimmed_value, line, lineNum);
@@ -222,8 +220,6 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 char *val_end = trimmed_value + strlen(trimmed_value) - 1;
                 while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
                 while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
-            //     sanitize_utf8_ascii(trimmed_key);
-            //     sanitize_utf8_ascii(trimmed_value);
                 if (strncmp(trimmed_key, "chunk_", 6) == 0) {
                     strncpy(entry.path, trimmed_key, sizeof(entry.path) - 1);
                     entry.path[sizeof(entry.path) - 1] = '\0';
