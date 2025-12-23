@@ -177,6 +177,7 @@ static void cmd_loadlevel(const char* arg) {
         if (level < 0) { CenterStatusPrint("Invalid level argument"); return; }
         
         CenterStatusPrint("Loading level %u", level);
+        queuedLevelToLoad = level;
         LoadLevel(level);
     }
 }

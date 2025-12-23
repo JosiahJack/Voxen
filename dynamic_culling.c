@@ -156,7 +156,7 @@ void DetermineClosedEdges(void) {
         }
     }
     
-    munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED);
+    munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
@@ -562,6 +562,8 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
 void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling...");
+    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) return;
+    
     DebugRAM("start of Cull_Init");    
     switch(voxen_globalContext.currentLevel) {
         case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
@@ -636,9 +638,8 @@ void CullInit(void) {
 }
 
 void CullCore(void) {    
-    if (voxen_globalContext.currentLevel >= (voxen_globalContext.numLevels - 1)) return;
+    if (voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
 
-    lightDirty[0] = true; // Force dynamic lights to update.
     numCellsVisible = 0;
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
     for (int32_t z=0;z<WORLDZ;++z) {

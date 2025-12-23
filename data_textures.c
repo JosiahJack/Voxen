@@ -15,11 +15,11 @@ int close(int filedes); // #include <unistd.h>
 int open(const char *, int, ...); // #include <fcntl.h>
 
 DataParser texture_parser;
-uint32_t totalPixels = 0u;
-uint32_t totalPaletteColors = 0u;
-uint16_t loadedTexturesMaxIndex = 0u;
-bool doubleSidedTexture[MAX_VALID_TEXTURE] = {0};
-bool transparentTexture[MAX_VALID_TEXTURE] = {0};
+uint32_t totalPixels;
+uint32_t totalPaletteColors;
+uint16_t loadedTexturesMaxIndex;
+bool doubleSidedTexture[MAX_VALID_TEXTURE];
+bool transparentTexture[MAX_VALID_TEXTURE];
 
 typedef union {
     uint32_t u32;
@@ -29,10 +29,15 @@ typedef union {
 void LoadTextures(void) {
     double start_time = get_time();
     DebugRAM("start of LoadTextures");
-    stbi__arena_init();
-    loadedTexturesMaxIndex = 0u;
+    if (loadedTexturesMaxIndex > 0) {
+        memset(doubleSidedTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
+        memset(transparentTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
+    }
+
+    loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
     if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     
+    stbi__arena_init();
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < texture_parser.count; k++) {
         if (texture_parser.entries[k].index > maxIndex && texture_parser.entries[k].index != UINT16_MAX) maxIndex = texture_parser.entries[k].index;
@@ -45,7 +50,7 @@ void LoadTextures(void) {
     for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
         if (texture_parser.entries[k].index < loadedTexturesMaxIndex) {
             matchedParserIdxes[texture_parser.entries[k].index] = k;
-            if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true;
+            if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true; // textureIndexUsedForCurrentLevel pre-cleared by LoadLevel parent calling function of LoadTextures
         }
     }
     for (int32_t i=0;i<MAX_VALID_TEXTURE;++i) actualLoadedTextures += textureIndexUsedForCurrentLevel[i] ? 1u : 0u;
@@ -59,9 +64,8 @@ void LoadTextures(void) {
     size_t offsets_size          = loadedTexturesMaxIndex * sizeof(uint32_t);
     size_t sizes_size            = loadedTexturesMaxIndex * 2 * sizeof(int32_t);
     size_t palette_offsets_size  = loadedTexturesMaxIndex * sizeof(uint32_t);
-    uint32_t maxUniqueColors = 74000u; uint32_t maxTotalPixels = 24000000u;
-    size_t palettes_size         = maxUniqueColors * sizeof(uint32_t);
-    size_t indices_size          = maxTotalPixels * sizeof(uint8_t);
+    size_t palettes_size         = MAX_UNIQUE_COLORS * sizeof(uint32_t);
+    size_t indices_size          = MAX_TOTAL_PIXELS * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
     void* arena = mmap(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     if (arena == MAP_FAILED) { DualLogError("Failed to mmap texture arena\n"); OS_Exit(1); }
@@ -126,27 +130,30 @@ void LoadTextures(void) {
         textureSizes[currentIndex * 2]      = widths[currentIndex];
         textureSizes[currentIndex * 2 + 1]  = heights[currentIndex];
         memcpy(texturePalettes + color_base, palette, pal_size * sizeof(uint32_t));
-        pixel_base += numPixels; if (pixel_base > maxTotalPixels) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n",pixel_base,maxTotalPixels); OS_Exit(1); }
-        color_base += pal_size;  if (color_base > maxUniqueColors) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n",color_base,maxUniqueColors); OS_Exit(1); }
+        pixel_base += numPixels; if (pixel_base > MAX_TOTAL_PIXELS) { DualLogError("Overflowed unique pixels buffer with %u, max size allowed: %u\n", pixel_base, MAX_TOTAL_PIXELS); OS_Exit(1); }
+        color_base += pal_size;  if (color_base > MAX_UNIQUE_COLORS) { DualLogError("Overflowed palette buffer with %u, max size allowed: %u\n", color_base, MAX_UNIQUE_COLORS); OS_Exit(1); }
     }
 
     DebugRAM("After loop for load textures");
     DualLog("total palette colors: %u, total pixels: %u...", totalPaletteColors, totalPixels);
     int32_t packed_size = ((int32_t)totalPixels + 3) / 4 * sizeof(uint32_t);
-    voxen_GL_Comms.colorBufferID = SetupSSBO(voxen_GL_Comms.colorBufferID, 12, packed_size, NULL, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.colorBufferID);
     void* dst = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, packed_size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_RANGE_BIT);
     memcpy(dst, all_indices,packed_size);
     glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-    voxen_GL_Comms.texturePalettesID       = SetupSSBO(voxen_GL_Comms.texturePalettesID,       16, totalPaletteColors * sizeof(uint32_t), texturePalettes,           GL_STATIC_DRAW);
-    voxen_GL_Comms.textureOffsetsID        = SetupSSBO(voxen_GL_Comms.textureOffsetsID,        14, loadedTexturesMaxIndex * sizeof(uint32_t), textureOffsets,        GL_STATIC_DRAW);
-    voxen_GL_Comms.textureSizesID          = SetupSSBO(voxen_GL_Comms.textureSizesID,          15, loadedTexturesMaxIndex * 2 * sizeof(int32_t), textureSizes,       GL_STATIC_DRAW);
-    voxen_GL_Comms.texturePaletteOffsetsID = SetupSSBO(voxen_GL_Comms.texturePaletteOffsetsID, 17, loadedTexturesMaxIndex * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.texturePalettesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, totalPaletteColors * sizeof(uint32_t), texturePalettes, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.textureOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedTexturesMaxIndex * sizeof(uint32_t), textureOffsets, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.textureSizesID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedTexturesMaxIndex * 2 * sizeof(int32_t), textureSizes, GL_STATIC_DRAW);
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.texturePaletteOffsetsID);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, loadedTexturesMaxIndex * sizeof(uint32_t), texturePaletteOffsets, GL_STATIC_DRAW);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
-    madvise(arena, arena_size, MADV_DONTNEED); munmap(arena, arena_size); arena = NULL;
-    madvise(stbi__arena_base, STBI_ARENA_SIZE, MADV_DONTNEED); munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
+    munmap(arena, arena_size); arena = NULL;
+    munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     double end_time = get_time();
     DualLog(" took %.6f secs\n", end_time - start_time);
     DebugRAM("After LoadTextures and after munmap of LoadTextures arena and stbi arena");

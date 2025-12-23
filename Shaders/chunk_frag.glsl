@@ -260,49 +260,33 @@ void main() {
             slopeBias = min(slopeBias, 0.18);
             float bias = slopeBias * (dist / range);
             bias = clamp(bias, 0.0, 0.22);
-            bias += 0.02 * pow(clamp((192.0 - shadSize) / 192.0, 0.0, 1.0), 0.65);
+            bias += 0.02 * pow(clamp((256.0 - shadSize) / 256.0, 0.0, 1.0), 0.65);
             float shadSizeLessOne = float(shadSize - 1);
-            if (distToPixel < 24.0) {
-                // Pseudo-Stochastic PCF sampling
-                float sum = 0.0;
-                float invSamples = 1.0 / float(PCF_SAMPLES);
-                for (int si = 0; si < PCF_SAMPLES; ++si) {
-                    vec2 off = poissonDisk[si] * smearness;
-                    vec2 t = tc + off;
-                    float tx = clamp(t.x, 0.0, shadSizeLessOne); // Minus 1 prevents tiny gaps
-                    float ty = clamp(t.y, 0.0, shadSizeLessOne);
-                    uint utx = uint(tx);
-                    uint uty = uint(ty);
-                    uint ssbo_index = faceOff + uty * shadSize + utx;
-                    uint distInt = shadowMaps[ssbo_index];
-                    if (distInt == 0xFFFFFFFFu) continue;
-
-                    float d = (float(distInt) / 100000.0);
-                    float depthDiff = (dist) - d - bias;
-                    float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
-                    sum += shadowContrib * invSamples;
-                }
-
-                shadowFactor = sum;
-            } else {
-                float tx = clamp(tc.x, 0.0, shadSizeLessOne); // Minus 1 prevents tiny gaps
-                float ty = clamp(tc.y, 0.0, shadSizeLessOne);
+            // Pseudo-Stochastic PCF sampling
+            float sum = 0.0;
+            float invSamples = 1.0 / float(PCF_SAMPLES);
+            for (int si = 0; si < PCF_SAMPLES; ++si) {
+                vec2 off = poissonDisk[si] * smearness;
+                vec2 t = tc + off;
+                float tx = clamp(t.x, 0.0, shadSizeLessOne); // Minus 1 prevents tiny gaps
+                float ty = clamp(t.y, 0.0, shadSizeLessOne);
                 uint utx = uint(tx);
                 uint uty = uint(ty);
                 uint ssbo_index = faceOff + uty * shadSize + utx;
                 uint distInt = shadowMaps[ssbo_index];
-                if (distInt == 0xFFFFFFFFu) continue;
-
                 float d = (float(distInt) / 100000.0);
                 float depthDiff = (dist) - d - bias;
-                shadowFactor = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
+                float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
+                sum += shadowContrib * invSamples;
             }
+
+            shadowFactor = sum;
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 1.75);
         lighting += baseLighting * spotFalloff * shadowFactor;
-//         lighting += baseLighting * (0.451 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
+//         lighting += baseLighting * (0.15 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
         intensityTotal += intensity * attenuation * 1.5;
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);

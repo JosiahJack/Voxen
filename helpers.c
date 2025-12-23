@@ -214,17 +214,6 @@ void Screenshot(void) {
     free(pixels);
 }
 
-GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
-    if (!voxen_globalContext.levelCurrentlyLoading && voxen_Diagnostics.globalFrameNum > 1) DualLogError("Trying to delete and generate a new SSBO %u outside of a level load!\n", bindingIndex);
-    if (id != 0) glDeleteBuffers(1, &id); // Clear last level's SSBO.
-    GLuint new_id = 0;
-    glGenBuffers(1, &new_id);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, new_id);
-    glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, new_id);
-    return new_id;
-}
-
 __attribute__((pure)) bool CursorVisible(void) {
     return (voxen_globalContext.inventoryMode || voxen_globalContext.menuActive || voxen_globalContext.gamePaused);
 }

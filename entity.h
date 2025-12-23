@@ -1,7 +1,7 @@
 #pragma once
 #include "voxen.h"
 
-#define INSTANCE_COUNT 7000 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
+#define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 #define MAX_CHILD_COUNT 4
 #define NULLENT 0u
@@ -68,10 +68,8 @@ bool parse_data_file(DataParser *parser, const char *filename);
 extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 extern Entity instances[INSTANCE_COUNT];
 extern bool instanceIsLODArray[INSTANCE_COUNT];
-extern uint16_t loadedInstances;
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
-extern int32_t entityCount;            // Number of entities loaded
 extern uint16_t invalidModelIndexCount;
 extern uint16_t modelTypeCountsOpaque[MODEL_IDX_MAX];
 extern uint16_t modelTypeCountsDoubleSided[MODEL_IDX_MAX];
@@ -81,12 +79,9 @@ extern uint16_t modelTypeOffsetsDoubleSided[MODEL_IDX_MAX];
 extern uint16_t modelTypeOffsetsTransparent[MODEL_IDX_MAX];
 extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
 extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
-extern uint16_t renderableCount;
 extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
-extern uint16_t doubleSidedInstancesHead;
-extern uint16_t transparentInstancesHead;
 void InitializeEntity(Entity* entry);
 void DualLogEntityInstance(uint16_t idx);
 void DualLogEntity(Entity ent);

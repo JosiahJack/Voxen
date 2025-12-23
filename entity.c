@@ -9,50 +9,6 @@
 #include "todo.h"
 
 //#define DEBUG_ENTITIES
-Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-char entityNames[MAX_ENTITIES][34];
-int32_t entityCount = 0;            // Number of entities loaded
-DataParser entity_parser;
-uint16_t invalidModelIndexCount;
-uint16_t modelTypeCountsOpaque[MODEL_IDX_MAX];
-uint16_t modelTypeCountsDoubleSided[MODEL_IDX_MAX];
-uint16_t modelTypeCountsTransparent[MODEL_IDX_MAX];
-uint16_t modelTypeOffsetsOpaque[MODEL_IDX_MAX];
-uint16_t modelTypeOffsetsDoubleSided[MODEL_IDX_MAX];
-uint16_t modelTypeOffsetsTransparent[MODEL_IDX_MAX];
-bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
-uint16_t opaqueInstancesHead = 0;
-uint16_t renderableCount = 0;
-uint16_t loadedInstances = 0;
-bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
-uint16_t startOfDoubleSidedInstances = INSTANCE_COUNT - 1;
-uint16_t startOfTransparentInstances = INSTANCE_COUNT - 1;
-uint16_t doubleSidedInstancesHead = 0;
-uint16_t transparentInstancesHead = 0;
-float correctionX, correctionY, correctionZ;
-float correctionNPCX, correctionNPCY, correctionNPCZ;
-float correctionDoorsX, correctionDoorsY, correctionDoorsZ;
-float correctionDynamicsX, correctionDynamicsY, correctionDynamicsZ;
-float correctionLightsSaveableX, correctionLightsSaveableY, correctionLightsSaveableZ;
-float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticImmutableZ;
-float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
-float correctionLightX, correctionLightY, correctionLightZ;
-uint16_t loadedLights = 0;
-float lightMinIntensity[LIGHT_COUNT] = {0};
-float lightMaxIntensity[LIGHT_COUNT] = {0};
-bool lightOn[LIGHT_COUNT] = {1};
-bool lightLerpOn[LIGHT_COUNT] = {0};
-bool lightLerpUp[LIGHT_COUNT] = {0};
-uint8_t lightCurrentStep[LIGHT_COUNT] = {0};
-float lightLerpValue[LIGHT_COUNT] = {0};
-float lightLerpTime[LIGHT_COUNT] = {0};
-float lightLerpStepTime[LIGHT_COUNT] = {0};
-float lightLerpStartTime[LIGHT_COUNT] = {0};
-uint8_t lightIntervalStepsLength[LIGHT_COUNT] = {0};
-float lightIntervalSteps[LIGHT_COUNT][30] = {0};
-uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT] = {0};
-float intervalStepisLerping[LIGHT_COUNT][30] = {0};
-
 #ifdef DEBUG_ENTITIES
     void DualLogEntity(Entity ent) {
         DualLog("Entity::\n"
@@ -159,8 +115,12 @@ void InitializeEntity(Entity* entry) {
     entry->path[0] = '\0';    
 }
 
+Entity entities[MAX_ENTITIES]; // Global array of entity definitions
+int32_t entityCount; // Number of entities loaded
+DataParser entity_parser;
 void LoadEntities(void) {
     double start_time = get_time();
+    entityCount = 0;
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
     
     entityCount = entity_parser.count;
@@ -216,7 +176,16 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
         }
     }
 }
-    
+
+uint16_t modelTypeCountsOpaque[MODEL_IDX_MAX];
+uint16_t modelTypeCountsDoubleSided[MODEL_IDX_MAX];
+uint16_t modelTypeCountsTransparent[MODEL_IDX_MAX];
+uint16_t modelTypeOffsetsOpaque[MODEL_IDX_MAX];
+uint16_t modelTypeOffsetsDoubleSided[MODEL_IDX_MAX];
+uint16_t modelTypeOffsetsTransparent[MODEL_IDX_MAX];
+uint16_t invalidModelIndexCount;
+uint16_t startOfDoubleSidedInstances, startOfTransparentInstances;
+uint16_t loadedInstances;
 void SortInstances(void) { // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
     double start_time = get_time();
     DualLog("Sorting entity instances... ");
@@ -229,7 +198,9 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     uint16_t* opaqueInstances      = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     uint16_t* doubleSidedInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     uint16_t* transparentInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
-    opaqueInstancesHead = doubleSidedInstancesHead = transparentInstancesHead = invalidModelIndexCount = 0;
+    uint16_t opaqueInstancesHead = 0, doubleSidedInstancesHead = 0, transparentInstancesHead = 0;
+    invalidModelIndexCount = 0;
+    startOfDoubleSidedInstances = startOfTransparentInstances = INSTANCE_COUNT - 1;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
         if (instances[i].texIndex >= MAX_VALID_TEXTURE && instances[i].texIndex != MAX_VALID_TEXTURE) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
         if (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
@@ -291,16 +262,14 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     }
 }
 
+bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
+bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); OS_Exit(1); }
         
     instances[instanceIdx].index = entIdx;
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
-    if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) {
-        modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;    
-        renderableCount++;
-    }
-    
+    if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;    
     instances[instanceIdx].animated = modelAnimationType[instances[instanceIdx].modelIndex];
     
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
@@ -353,22 +322,52 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     loadedInstances++;
 }
 
+uint16_t loadedLights;
+float lightMinIntensity[LIGHT_COUNT];
+float lightMaxIntensity[LIGHT_COUNT];
+bool lightOn[LIGHT_COUNT];
+bool lightLerpOn[LIGHT_COUNT];
+bool lightLerpUp[LIGHT_COUNT];
+uint8_t lightCurrentStep[LIGHT_COUNT];
+float lightLerpValue[LIGHT_COUNT];
+float lightLerpTime[LIGHT_COUNT];
+float lightLerpStepTime[LIGHT_COUNT];
+float lightLerpStartTime[LIGHT_COUNT];
+uint8_t lightIntervalStepsLength[LIGHT_COUNT];
+float lightIntervalSteps[LIGHT_COUNT][30];
+uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
+float intervalStepisLerping[LIGHT_COUNT][30];
 #define LINE_LEN_MAX 81920
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
+    queuedLevelToLoad = 255u; // Reset any loading state that got us here.
+    if (curlevel == LEVEL_CYBERSPACE) RenderLoadingProgress(100,"Loading cyberspace...");
+    else RenderLoadingProgress(100,"Loading level...");
+
     if (!voxen_globalContext.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     voxen_globalContext.levelCurrentlyLoading = true;
     DebugRAM("start of LoadLevel");
     voxen_globalContext.currentLevel = curlevel;
-    renderableCount = 0;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    loadedLights = 0;
-    loadedAmbients = 0;
+    loadedLights = loadedAmbients = 0;
     memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
     memset(textureIndexUsedForCurrentLevel,0,MAX_VALID_TEXTURE * sizeof(bool));
+    memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
+    memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
+    memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
+    memset(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
+    memset(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
+    memset(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
+    memset(lightLerpValue,0,LIGHT_COUNT * sizeof(float));
+    memset(lightLerpTime,0,LIGHT_COUNT * sizeof(float));
+    memset(lightLerpStepTime,0,LIGHT_COUNT * sizeof(float));
+    memset(lightLerpStartTime,0,LIGHT_COUNT * sizeof(float));
+    memset(lightIntervalStepsLength,0,LIGHT_COUNT * sizeof(uint8_t));
+    memset(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
+    memset(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
+    memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
     if (curlevel >= voxen_globalContext.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, voxen_globalContext.numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
@@ -553,7 +552,8 @@ void LoadLevel(uint8_t curlevel) {
                 lights[litIdx + LIGHT_DATA_OFFSET_POSY] += correctionLightY;
                 lights[litIdx + LIGHT_DATA_OFFSET_POSZ] += correctionLightZ;
             }
-            
+
+            if (lightMaxIntensity[lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { lightsIdx--; loadedLights--; }
             lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             if (lightType == 1) {
                 if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",lightsIdx,lineNum+1);
@@ -615,19 +615,19 @@ void LoadLevel(uint8_t curlevel) {
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
-    glNamedBufferData(matricesBuffer, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
     glUniform1f(0, voxelMinCenterX);
     glUniform1f(1, voxelMinCenterZ);
     glUniform1ui(2, loadedLights);
     glUniform1f(3, worldMin_x);
     glUniform1f(4, worldMin_z);
+    memset(lightDirty,1,LIGHT_COUNT * sizeof(bool)); // Mark all true to ensure frustums and matrices are updated for all.
     UpdateVoxelLightLists();
-    InitShadows();
-    DebugRAM("after first UpdateVoxelLightLists for load level");
+    DebugRAM("after UpdateVoxelLightLists for load level");
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
     Input_MouselookApply();
     voxen_globalContext.levelCurrentlyLoading = false;
-//     PRINT_GL_IDS();
+    DualLog("LoadLevel completed!\n");
 }
 #pragma GCC diagnostic pop

@@ -27,6 +27,15 @@
 #include "vmath.h"
 #include "todo.h"
 
+float correctionX, correctionY, correctionZ;
+float correctionNPCX, correctionNPCY, correctionNPCZ;
+float correctionDoorsX, correctionDoorsY, correctionDoorsZ;
+float correctionDynamicsX, correctionDynamicsY, correctionDynamicsZ;
+float correctionLightsSaveableX, correctionLightsSaveableY, correctionLightsSaveableZ;
+float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticImmutableZ;
+float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
+float correctionLightX, correctionLightY, correctionLightZ;
+
 void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz) {
     if (!voxen_globalContext.global_modIsCitadel) { *ofsx = 0.0f; *ofsy = 0.0f; *ofsz = 0.0f;  return; } // TODO: Resave levels with the offsets applied.
     

@@ -33,12 +33,9 @@ void* OS_AllocateFileBackedRAMReadonly(size_t size, int32_t fileDescriptor, char
     return ramSpacePointer;
 }
 
-void OS_MemoryAdviseDontNeed(void* ramSpacePointer, size_t size) { madvise(ramSpacePointer, size, MADV_DONTNEED); }
-
 void* OS_DeallocateRAM(void* ramSpacePointer, size_t size) {
     if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
     
-    OS_MemoryAdviseDontNeed(ramSpacePointer, size);
     munmap(ramSpacePointer, size);
     return NULL;
 }

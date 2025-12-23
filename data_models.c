@@ -110,7 +110,16 @@ void cleanup_all_mmaps(void) {
 // uint8_t modelFBX_FileBuffer[15360000]; // 14983372 found in practice
 void LoadModels(void) {
     double start_time = get_time();
-    loadedModelsMaxIndex = 0;
+    if (loadedModelsMaxIndex > 0) {
+        glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
+        glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
+        memset(modelVertexCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
+        memset(modelTriangleCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
+        memset(modelAnimationType, 0, MODEL_IDX_MAX * sizeof(uint8_t));
+        memset(modelBounds, 0, MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
+        loadedModelsMaxIndex = 0;
+    }
+    
     uint16_t animatedModelCount = 0u;
     if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
@@ -277,7 +286,7 @@ void LoadModels(void) {
     }
 
     DebugRAM("after model load loop");
-    madvise(indexToParser, indexToParser_size, MADV_DONTNEED); munmap(indexToParser,indexToParser_size);
+    munmap(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
     glGenBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
     glGenBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
@@ -310,12 +319,6 @@ void LoadModels(void) {
     glFlush();
     glFinish();
     DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
-    for (int i = 0; i < loadedModelsMaxIndex; ++i) {
-        if (modelVertexCounts[i] == 0) continue;
-        
-        madvise(modelTriangles[i], modelTriangleCounts[i] * 3 * sizeof(uint32_t), MADV_DONTNEED);
-    }
-    
     cleanup_all_mmaps();
     DebugRAM("After Load Models");
 }

@@ -268,7 +268,6 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     glTextureStorage2D(*out_tex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(*out_tex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, p);
     glFinish();
-    madvise(map, sz, MADV_DONTNEED);
     munmap(map, sz);
     glTextureParameteri(*out_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(*out_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

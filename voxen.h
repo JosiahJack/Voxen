@@ -1,6 +1,6 @@
 #pragma once
 #define VERSION_STRING "v0.7.4"
-#define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+// #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 
 // Generic Lib Includes
 #include <stdbool.h>
@@ -126,6 +126,8 @@ void UpdateAmbientSounds(void);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
+#define MAX_TOTAL_PIXELS 24000000u
+#define MAX_UNIQUE_COLORS 74000u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
 bool isDoubleSided(uint32_t texIndexToCheck);
@@ -199,15 +201,9 @@ extern float intervalStepisLerping[LIGHT_COUNT][30];
 extern float lightMinIntensity[LIGHT_COUNT];
 extern float lightMaxIntensity[LIGHT_COUNT];
 void UpdateVoxelLightLists(void);
-void InitShadows(void);
-void RenderLoadingProgress(int32_t offset, const char* format, ...);
+void RenderLoadingProgress(int32_t offset, const char* text);
 
-// Levels / Game Management
 #define LEVEL_CYBERSPACE 13
-extern GLuint matricesBuffer;
-
-// ----------------------------------------------------------------------------
-// Dynamic Culling
 #define WORLDX 64
 #define WORLDZ WORLDX
 #define WORLDY 18 // Level 8 is only 17.5 cells tall!!  Could be 16 if I make the ceiling same height in last room as in original.
@@ -230,6 +226,7 @@ extern GLuint matricesBuffer;
 #define CELL_CLOSEDWEST   32u
 #define CELL_SEES_SUN     64u
 #define CELL_SEES_SKYBOX 128u
+extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint32_t gridCellStates[ARRSIZE];
@@ -382,8 +379,6 @@ extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;
 extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
 extern Quaternion cam_rotation;
-void CacheUniformLocationsForShaders(void);
-GLuint SetupSSBO(GLuint id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 void Screenshot(void);
 void ToggleConsole(void);
 void ConsoleEmulator(int32_t keycode);
@@ -570,6 +565,7 @@ typedef struct {
 	GLuint textVBO;
 	GLuint blueNoiseBuffer;
 	GLuint modelBoundsID;
+	GLuint matricesBufferID;
 	GLuint colorBufferID;
 	GLuint texturePalettesID;
 	GLuint textureOffsetsID;
