@@ -264,7 +264,7 @@ void EnableCheatArsenal(uint8_t level) {
 uint16_t SpawnDynamicObject(int val, bool cheat) {
     if (!ConstIndexInBounds(val)) { DualLogError("Const index out of bounds: %u", val); return NULLENT; } // Checked in cmd_summon but used elsewhere so guard here too.
     
-    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: " , val, cheat);
+    if (cheat) DualLog("Cheat spawn constIndex %u, level: %u, from cheat: %u, name: ", val, voxen_globalContext.currentLevel, cheat);
 //     Vector3 spawnPos = (Vector3){0.0,0.0,0.0};
 //     if (cheat) spawnPos = (Vector3){instances[PLAYER1].position.x,instances[PLAYER1].position.y,instances[PLAYER1].position.z};
     if (ConstIndexIsGeometry(val)/* && !voxen_Cheats.editMode*/) { CenterStatusPrint("Indices 0 through 306 (level geometry chunks) not possible when not on edit mode!"); return NULLENT; }

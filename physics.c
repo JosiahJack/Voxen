@@ -156,8 +156,8 @@ int32_t Physics(void) {
         float sprintMul = keyStates[GLFW_KEY_LEFT_SHIFT].down ? 1.75f : 1.0f;
         const float moveForce = 1800.0f;
 
-        float floatWishSpeed = magnitude_vector3(input);
-        if (floatWishSpeed > 0.1f) {
+        float wishSpeed = magnitude_vector3(input);
+        if (wishSpeed > 0.1f) {
             input = normalize_vector3(input);
             Vector3 force = scale_vector3(input, moveForce * sprintMul);
             player->velocity = Vector3_A_plus_B(player->velocity, force);

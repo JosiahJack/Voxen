@@ -35,7 +35,7 @@ uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
 
 bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
     uint32_t parseval = parse_numberu32(str, line, lineNum);
-    if (parseval > 1) DualLogWarn("Loaded %u\n      in place where expected a boolean from line[%u]: %s\n",lineNum+1,line);
+    if (parseval > 1) DualLogWarn("Loaded %u\n      in place where expected a boolean from line[%u]: %s\n",parseval, lineNum+1, line);
     return parseval > 0 ? true : false;
 }
 

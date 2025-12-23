@@ -415,7 +415,7 @@ void LoadLevel(uint8_t curlevel) {
             *colon = '\0';           // Split string at the colon
             char *key = kvString;    // Assign key to before colon
             char *value = colon + 1; // Assing value to after colon
-            if (!key || !value) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); OS_Exit(1); }
+            if (!key) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); OS_Exit(1); }
 
             char trimmed_key[64];
             char trimmed_value[256];
