@@ -13,7 +13,7 @@
 Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
 Voxen_Cheats               voxen_Cheats = { .god = true, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
-VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 100u, .VolumeMusic = 20u, .CullEnabled = 1, .FOV = 65.0f, .Reflections = 1u };
+VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 0u, .AntiAliasing = 1u, .Brightness = 100u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 0u };
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
 Voxen_GL_Comms           voxen_GL_Comms;
 
@@ -108,6 +108,13 @@ void SetSkyRotateSpeed(void) {
     float skyRotateSpeed = speeds[voxen_Cheats.dizzyLevel];
     glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
     glUniform1f(30, skyRotateSpeed);
+}
+
+void SetFog(void) {
+    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUniform1f(11, fogColorR * fogBaseDensityForLevel);
+    glUniform1f(12, fogColorG * fogBaseDensityForLevel);
+    glUniform1f(13, fogColorB * fogBaseDensityForLevel);
 }
 
 void UpdateProjectionMatrices(void) {
@@ -229,7 +236,7 @@ void UpdateVoxelLightLists(void) {
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
 #define MAX_SHADOWMAPS 64u
-#define SHADOW_MAP_SIZE 256u
+#define SHADOW_MAP_SIZE 192u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 3U)) // Found that in practice only needed ~45%, oversized a little here for safety.
 typedef struct {
 	uint32_t numShadowsCouldRender;
@@ -366,18 +373,16 @@ void RenderShadowmaps(void) {
             if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
 
             uint16_t instCellIdx = PosGetCellCoords(instances[j].position.x, instances[j].position.z);
-            if (voxen_Settings.CullEnabled) {
-                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue;
-                
-                shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-                float obj_x = instances[j].position.x, obj_y = instances[j].position.y, obj_z = instances[j].position.z;
-                float distToLightSqrd = squareDistance3D(obj_x, obj_y, obj_z, litX, litY, litZ);
-                float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
-                if (distToLightSqrd > radSum * radSum) continue;
-                
-                float distSqrd = squareDistance3D(obj_x, obj_y, obj_z, px, py, pz);
-                if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            } else shadows_nearMeshRadii[nearbyMeshCount] = 1000.0f;
+            if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue;
+            
+            shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+            float obj_x = instances[j].position.x, obj_y = instances[j].position.y, obj_z = instances[j].position.z;
+            float distToLightSqrd = squareDistance3D(obj_x, obj_y, obj_z, litX, litY, litZ);
+            float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
+            if (distToLightSqrd > radSum * radSum) continue;
+            
+            float distSqrd = squareDistance3D(obj_x, obj_y, obj_z, px, py, pz);
+            if (distSqrd >= FAR_PLANE_SQUARED) continue;
             
             shadows_nearMeshes[nearbyMeshCount] = j;
             nearbyMeshCount++;
@@ -828,13 +833,11 @@ void RenderInstances(uint8_t type) {
             float dy = obj_y - py;
             float dz = obj_z - pz;
             float distSqrd = dx*dx + dy*dy + dz*dz;
-            if (voxen_Settings.CullEnabled) {
-                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-                if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            }
+            if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+            if (distSqrd >= FAR_PLANE_SQUARED) continue;
             
             float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
             if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
             
             visibleInstances[visibleCount].index = i;
@@ -861,13 +864,6 @@ void RenderInstances(uint8_t type) {
             verticesRenderedThisFrame += vertCount;
         }
     }
-}
-
-void SetFog(void) {
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform1f(11, fogColorR * fogBaseDensityForLevel);
-    glUniform1f(12, fogColorG * fogBaseDensityForLevel);
-    glUniform1f(13, fogColorB * fogBaseDensityForLevel);
 }
 
 int32_t main(int32_t argc, char* argv[]) {

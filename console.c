@@ -194,7 +194,6 @@ static void cmd_summon(int itemConstIndex) {
 }
 
 static void cmd_notarget(void) { voxen_Cheats.notarget = !voxen_Cheats.notarget; CenterStatusPrint("notarget: %s", voxen_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
-static void cmd_cull(void) { voxen_Settings.CullEnabled = !voxen_Settings.CullEnabled; CenterStatusPrint("Culling: %s", voxen_Settings.CullEnabled ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]);  }
 static void cmd_showfps(void) { voxen_Cheats.showFPS = !voxen_Cheats.showFPS; }
 static void cmd_showlocation(void) { voxen_Cheats.showLocation = !voxen_Cheats.showLocation; }
 static void cmd_help(void) { CenterStatusPrint("There's no one to save you now Hacker!"); }
@@ -311,7 +310,6 @@ static const ConsoleCommand g_ConsoleCommands[] = {
     { "edit mode", {.noArg = cmd_edit}, CMD_NOARG},
     { "editor",    {.noArg = cmd_edit}, CMD_NOARG},
     { "undo",    {.noArg = cmd_undo}, CMD_NOARG},
-    { "cull", {.noArg = cmd_cull}, CMD_NOARG},
     { "showfps", {.noArg = cmd_showfps}, CMD_NOARG},
     { "show fps", {.noArg = cmd_showfps}, CMD_NOARG},
     { "showlocation", {.noArg = cmd_showlocation}, CMD_NOARG},

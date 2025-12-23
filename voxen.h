@@ -96,7 +96,6 @@ typedef struct {
 	uint8_t Brightness;
 	uint8_t VolumeMusic;
 	uint8_t Language;
-	uint8_t CullEnabled;
 	float FOV;
 	uint8_t Reflections;
 	int32_t Vsync;

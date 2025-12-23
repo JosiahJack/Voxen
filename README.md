@@ -1371,33 +1371,26 @@ VoxenSettings voxen_Settings = {
     .ScreenHeight = 768u,
     .Shadows = 1u,
     .AntiAliasing = 1u, // Default 1
-    .Brightness = 70u, // Default 100 (for %)
+    .Brightness = 100u, // Default 100 (for %)
     .VolumeMusic = 20u,
     .Language = 0, // English default
-    .CullEnabled = 1,
     .FOV = 65.0f,
     .Reflections = 1u, // Default 1
     .Vsync = false
 };
 
-FPS:  168
-ms:  5.95
-RAM:  133mb
-VRAM: 220mb
-Build 379ms
-Init 0.932168secs
+FPS: 270
+ms: 3.71
+RAM: 112mb
+VRAM: 140mb
+Build 347ms
+Init 0.608443secs
 
+Performance canvas:
+Shaodowmapping: 1.265ms of total frametime
+Reflections: 0.98ms of total frametime
+All else: 1.465ms (Antialiasing only like 0.03ms)
+TOTAL: 3.71ms
 
-After converting to only use models and textures needed for current level
-FPS: 165
-ms: 6.09
-RAM: 135mb
-VRAM: 155mb // Nice!
-Build 364ms
-Init 0.553304secs // Aww yeaaaaah
-
-12/15 performance canvas:
-Shaodowmapping: 2.64ms of total frametime
-Reflections: 1.7ms of total frametime (only is 0.77ms if SSR_RES is 4 instead of the current 2, 1:1 ratio with resolution)
-All else: 1.75ms (Antialiasing only like 0.03ms)
-TOTAL: 6.09ms
+CPU: 0.99ms
+GPU: 3.71ms
