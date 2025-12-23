@@ -249,17 +249,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     malloc_trim(0);
     DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
     DualLog(" took %f secs\n", get_time() - start_time);
-    loadedAmbients = 0;
-    for (i = opaqueInstancesHead + doubleSidedInstancesHead + transparentInstancesHead; i<loadedInstances;++i) {
-        uint16_t entIdx = instances[i].index;
-        if (ConstIndexIsAmbient(entIdx)) {
-            ambientRegistry[loadedAmbients] = i;
-            loadedAmbients++;
-            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); OS_Exit(1); }
-            
-            instances[i].volume = entities[entIdx].volume * 0.5f;
-        }
-    }
+    ResetLevelAudio();
 }
 
 bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
@@ -351,7 +341,7 @@ void LoadLevel(uint8_t curlevel) {
     DebugRAM("start of LoadLevel");
     voxen_globalContext.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
-    loadedLights = loadedAmbients = 0;
+    loadedLights = 0;
     memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
     memset(textureIndexUsedForCurrentLevel,0,MAX_VALID_TEXTURE * sizeof(bool));
     memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
@@ -554,7 +544,6 @@ void LoadLevel(uint8_t curlevel) {
             }
 
             if (lightMaxIntensity[lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { lightsIdx--; loadedLights--; }
-            lightsRangeSquared[lightsIdx] = lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             if (lightType == 1) {
                 if (lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] < 5.0f) DualLogWarn("Spotlight %d on line %d loaded with spotAngle less than 5deg\n",lightsIdx,lineNum+1);
             } else if (lightType == 2) {

@@ -2,7 +2,6 @@
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
-#include "event.h"
 #include "entity.h"
 #include "External/stb_image.h"
 #include "Shaders/shaders.h"
@@ -13,10 +12,9 @@
 Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
 Voxen_Cheats               voxen_Cheats = { .god = true, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
-VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 0u, .AntiAliasing = 1u, .Brightness = 100u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 0u };
-#define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
+VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 100u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 1u };
+#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
 Voxen_GL_Comms           voxen_GL_Comms;
-
 uint8_t queuedLevelToLoad = 3;
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -33,13 +31,11 @@ int32_t cursorPosition_x = 680, cursorPosition_y = 384; // Separate internal cur
 char uiTextBuffer[TEXT_BUFFER_SIZE];
 float uiOrthoProjection[16];
 float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-float lightsRangeSquared[LIGHT_COUNT];
 bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
-// ----------------------------------------------------------------------------
-// OpenGL / Rendering Helper Functions
+
 void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
@@ -112,7 +108,7 @@ void SetSkyRotateSpeed(void) {
 
 void SetFog(void) {
     glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform1f(11, fogColorR * fogBaseDensityForLevel);
+    glUniform1f(11, fogColorR * fogBaseDensityForLevel); // TODO: Add gunsmoke accumulation
     glUniform1f(12, fogColorG * fogBaseDensityForLevel);
     glUniform1f(13, fogColorB * fogBaseDensityForLevel);
 }
@@ -437,6 +433,11 @@ __attribute__((pure)) float GetScreenRelativeX(float percentage) { return (float
 __attribute__((pure)) float GetScreenRelativeY(float percentage) { return (float)voxen_Settings.ScreenHeight * percentage; }
 
 void RenderUIImage(float x, float y, float width, float height, uint32_t texIndex) {
+    glEnable(GL_BLEND);
+    glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
+    glDepthMask(GL_TRUE);
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
     glUseProgram(voxen_GL_Comms.chunkShaderProgram);
     glBindVertexArray(voxen_GL_Comms.textVAO);
     glUniform1ui(1, 0);
@@ -569,7 +570,6 @@ void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are 
 
 void NewGame(void) {
     RenderLoadingProgress(100,"Loading new game...");
-    memset(&ambientRegistry, 0, sizeof(uint16_t));
     memset(&questData, 0, sizeof(QuestBits));
     questData.lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
     questData.lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
@@ -611,7 +611,6 @@ void InitializeEnvironment(void) {
     } else { DualLogError("GLFW Unable to obtain target monitor [primary]!\n"); OS_Exit(1); }
     
     glfwSetInputMode(voxen_globalContext.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    ENABLE_GL_DEBUG();
     const GLubyte* version = glGetString(GL_VERSION);
     const GLubyte* renderer = glGetString(GL_RENDERER);
     if (!version) { DualLogError("OpenGL support not found!\n"); OS_Exit(1);}
@@ -1026,8 +1025,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.inputImageID);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
         glUniform1i(4, 4); // outputImage texture sampler2D
         glUniform1ui(5, voxen_Settings.Reflections);
         glUniform1ui(6, voxen_Settings.AntiAliasing);
@@ -1056,7 +1053,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
         glUniform1f(28, GetPainStatic());
         glBindVertexArray(voxen_GL_Comms.quadVAO);
-        glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         drawCallsRenderedThisFrame++;
@@ -1067,11 +1063,6 @@ int32_t main(int32_t argc, char* argv[]) {
         float screenCenterX = (float)voxen_Settings.ScreenWidth / 2;
         float screenCenterY = (float)voxen_Settings.ScreenHeight / 2;
         float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
-        glEnable(GL_BLEND);
-        glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
-        glDepthMask(GL_TRUE);
-        glDisable(GL_CULL_FACE);
-        glDepthMask(GL_TRUE);
         if (voxen_globalContext.gamePaused) {
             float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
             float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);

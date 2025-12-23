@@ -382,10 +382,32 @@ void main() {
 
     ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
     if (debugView != 4) { // Light index debugView
+//         if (reflectionsEnabled > 0) {
+//             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+//             vec4 reflectionColor = vec4(0.0);
+//             reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
+//             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
+// 
+//             color.rgb += reflectionColor.rgb;
+//         }
+
         if (reflectionsEnabled > 0) {
-            vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+            vec2 lowResSize = vec2(screenWidth / SSR_RES, screenHeight / SSR_RES);
+            vec2 pixelLow = floor(vec2(pixel)) + 0.5;  // Center of the current low-res pixel
+            vec2 sampleUVBase = pixelLow / lowResSize;
             vec4 reflectionColor = vec4(0.0);
-            reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
+            float weightSum = 0.0;
+            for (int x = -1; x <= 1; ++x) {
+                for (int y = -1; y <= 1; ++y) {
+                    vec2 offset = vec2(float(x), float(y));
+                    vec2 sampleUV = (pixelLow + offset) / lowResSize;
+                    vec3 samp = texture(outputImage, sampleUV).rgb;
+                    reflectionColor.rgb += samp;
+                    weightSum += 1.0;
+                }
+            }
+
+            reflectionColor.rgb /= weightSum;
             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
             color.rgb += reflectionColor.rgb;

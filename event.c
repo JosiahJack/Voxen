@@ -1,7 +1,6 @@
 // event.c - Handle unified event system for engine actions
 #include <stdio.h>
 #include "os.h"
-#include "event.h"
 #include "voxen.h"
 void exit(int status);
 

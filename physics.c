@@ -1,6 +1,5 @@
 // physics.c - Physics System
 #include "voxen.h"
-#include "event.h"
 #include "entity.h"
 #include "matvecquat.h"
 #include "vmath.h"

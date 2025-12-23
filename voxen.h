@@ -113,12 +113,10 @@ typedef struct {
 extern VoxenDiagnostics voxen_Diagnostics;
 // ----------------------------------------------------------------------------
 // Audio
-#define MAX_AMBIENT_NOISES 128
-extern uint16_t loadedAmbients;
-extern uint16_t ambientRegistry[MAX_AMBIENT_NOISES];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume);
 void InitializeAudio(void);
+void ResetLevelAudio(void);
 void UpdateAmbientSounds(void);
 // ----------------------------------------------------------------------------
 // Textures
@@ -184,7 +182,6 @@ void LoadModels(void);
 #define LIGHT_RANGE_MAX_SQUARED (LIGHT_RANGE_MAX * LIGHT_RANGE_MAX)
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
-extern float lightsRangeSquared[LIGHT_COUNT];
 extern bool lightOn[LIGHT_COUNT];
 extern bool lightLerpOn[LIGHT_COUNT];
 extern bool lightLerpUp[LIGHT_COUNT];
@@ -316,42 +313,11 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
 // Rendering
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
-
-void glDebugMessageCallback(GLDEBUGPROC callback, const void* userParam);
-void glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled);
-#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
-
-#define UNUSED(x) (void)(x)
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
-static void APIENTRY GLDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* user) {
-    UNUSED(source);
-    UNUSED(severity);
-    UNUSED(length);
-    UNUSED(user);
-    if (id != 131186 // Suppress GL_STATIC_DRAW vs GL_DYNAMIC_DRAW warnings for model vbos/tbos due to orphaned copying this warning is spurious; dynamic adds RAM (not VRAM) and hurts performance by 40fps!.
-        && id != 131218) { // Suppress single chunk_frag shader recompile at first frame UI render
-        if (type == GL_DEBUG_TYPE_ERROR || type == GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR) {
-            DualLogError("GL ERROR [%u]: %s\n", id, message);
-        } else {
-            DualLogWarn("GL WARN [%u]: %s\n", id, message);
-        }
-    }
-}
-#pragma GCC diagnostic pop
-
-
-#define ENABLE_GL_DEBUG() \
-    do { \
-        glEnable(GL_DEBUG_OUTPUT); \
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS); \
-        glDebugMessageCallback(GLDebugCallback, NULL); \
-        glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, NULL, GL_FALSE); \
-    } while (0)
-
+	void glDebugMessageCallback(GLDEBUGPROC callback, const void* userParam);
+	void glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled);
+	#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #else
-#define CHECK_GL_ERROR() do {} while(0)
+	#define CHECK_GL_ERROR() do {} while(0)
 #endif
     
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
@@ -365,10 +331,9 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
-extern float testLight_x, testLight_y, testLight_z;
 extern int32_t debugView;
 extern int32_t debugValue;
-extern float fogColorR, fogColorG, fogColorB, fogColorRUsed, fogColorGUsed, fogColorBUsed, fogBaseDensityForLevel;
+extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 void SetFog(void);
 extern uint32_t drawCallsRenderedThisFrame;
 extern uint32_t verticesRenderedThisFrame;
@@ -465,6 +430,54 @@ uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses(void);
 float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
+// ----------------------------------------------------------------------------
+// Event System
+#define EV_NULL 0u
+#define EV_INIT 1u
+#define EV_KEYDOWN 10u
+#define EV_KEYUP 11u
+#define EV_MOUSEMOVE 12u
+#define EV_MOUSEDOWN 13u
+#define EV_MOUSEUP 14u
+#define EV_MOUSEWARP 15u
+#define EV_PLAYAUDIO_CLIP 40u
+#define EV_PLAYAUDIO_STREAM 41u
+#define EV_PHYSICS_TICK 50u
+#define EV_PARTICLE_TICK 60u
+#define EV_PAUSE 254u
+#define EV_QUIT 255u
+#define EV_INT_FIELD_UNUSED 0
+#define EV_FLOAT_FIELD_UNUSED 0.0f
+
+// Event Journal Buffer
+#define EVENT_JOURNAL_BUFFER_SIZE 1000
+
+// Event Queue
+#define MAX_EVENTS_PER_FRAME 100
+
+// Event System variables
+typedef struct {
+    double timestamp;
+    double deltaTime_ns;
+    uint32_t frameNum; // Can't unionize the payloads as some need both.
+    int32_t payload1i; // First one used for payloads less than or equal to 4 bytes
+    int32_t payload2i; // Second one used for more values or for long ints by using bitpacking
+    float payload1f;   // First one used for float payloads
+    float payload2f;   // Second one used for a 2nd value or for double via bitpacking
+    uint8_t type;
+} Event;
+
+extern Event eventQueue[MAX_EVENTS_PER_FRAME];
+extern int32_t eventJournalIndex;
+extern bool journalFirstWrite;
+extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
+extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were already executed and walked away from the counter.
+extern bool log_playback;
+int32_t ReadActiveLog(void);
+void EventSystemInit(int32_t argc, char* command, char* command_input1);
+int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
+double get_time(void);
+int32_t EventQueueProcess(void);
 // ----------------------------------------------------------------------------
 // GAME LOGIC
 

@@ -9,7 +9,6 @@
 #ifdef DEBUG_RAM_OUTPUT
 #include <malloc.h>
 #endif
-#include "event.h"
 
 double get_time(void) {
     struct timespec ts;

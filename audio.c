@@ -8,6 +8,7 @@
 #include "entity.h"
 
 #define MAX_CHANNELS 16
+#define MAX_AMBIENT_NOISES 128
 ma_engine audio_engine;
 ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
@@ -167,6 +168,21 @@ void UpdateAmbientSounds(void) {
             ma_sound_set_volume(&slot->sound, final_vol);
         } else {
             if (ma_sound_is_playing(&slot->sound)) ma_sound_stop(&slot->sound);
+        }
+    }
+}
+
+void ResetLevelAudio(void) {
+    loadedAmbients = 0;
+    memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<loadedInstances;++i) {
+        uint16_t entIdx = instances[i].index;
+        if (ConstIndexIsAmbient(entIdx)) {
+            ambientRegistry[loadedAmbients] = i;
+            loadedAmbients++;
+            if (loadedAmbients >= MAX_AMBIENT_NOISES) { DualLogError("%u exceeded max number of ambient noises %u!\n",loadedAmbients,MAX_AMBIENT_NOISES); OS_Exit(1); }
+            
+            instances[i].volume = entities[entIdx].volume * 0.5f;
         }
     }
 }
