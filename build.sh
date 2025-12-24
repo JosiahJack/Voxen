@@ -49,6 +49,8 @@ gen_header() {
 gen_header ./Shaders/ssr.compute                ssr_computeShader
 gen_header ./Shaders/voxels.compute             voxelUpdate_computeShader
 gen_header ./Shaders/shadowmaps_clear.compute   shadowmaps_clear_computeShader
+gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertexShaderSource
+gen_header ./Shaders/debugunlit_frag.glsl       debugUnlitFragmentShaderSource
 gen_header ./Shaders/chunk_vert.glsl            vertexShaderSource
 gen_header ./Shaders/chunk_frag.glsl            fragmentShaderTraditional
 gen_header ./Shaders/text_vert.glsl             textVertexShaderSource
@@ -61,6 +63,8 @@ cat > Shaders/shaders.h <<'EOF'
 #pragma once
 #include "text_vert.glsl.h"
 #include "text_frag.glsl.h"
+#include "debugunlit_vert.glsl.h"
+#include "debugunlit_frag.glsl.h"
 #include "chunk_vert.glsl.h"
 #include "chunk_frag.glsl.h"
 #include "shadowmap_vert.glsl.h"
@@ -90,7 +94,11 @@ if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
     exit 1
 fi
-rm -f "$TEMP_DIR"/*.o ./Shaders/*.h
+
+if [ $# -eq 0 ] || [ "$1" != "ci" ]; then
+    rm -f "$TEMP_DIR"/*.o ./Shaders/*.h
+fi
+
 build_end=$(now_ms)
 total_build_time=$((build_end - shader_start))
 echo "Build completed in ${total_build_time} ms"

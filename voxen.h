@@ -109,6 +109,8 @@ typedef struct {
 	uint32_t lastFrameSecCount;
 	uint32_t framesPerLastSecond;
 	uint32_t worstFPS;
+	float debugLine_startX, debugLine_startY, debugLine_startZ;
+    float debugLine_endX, debugLine_endY, debugLine_endZ;
 } VoxenDiagnostics;
 extern VoxenDiagnostics voxen_Diagnostics;
 // ----------------------------------------------------------------------------
@@ -563,6 +565,7 @@ typedef struct {
 	GLuint gBufferFBO;
 	GLuint outputImageID;
 	GLuint chunkShaderProgram; // Generic lit and unlit raster shader forward+
+	GLuint debugUnlitShaderProgram;
 	GLuint vao_chunk; // Vertex Array Object
 	GLuint shadowFBO;
 	GLuint shadowmapsShaderProgram;

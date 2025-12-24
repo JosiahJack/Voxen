@@ -68,6 +68,10 @@ void CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader");
     voxen_GL_Comms.chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");
+    
+    vertShader = CompileShader(GL_VERTEX_SHADER, debugUnlitVertexShaderSource, "Debug Unlit Vertex Shader");
+    fragShader = CompileShader(GL_FRAGMENT_SHADER, debugUnlitFragmentShaderSource, "Debug Unlit Fragment Shader");
+    voxen_GL_Comms.debugUnlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Debug Unlit Shader Program");
 
     vertShader = CompileShader(GL_VERTEX_SHADER, shadowmapVertexShaderSource, "Shadowmaps Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, shadowmapFragmentShaderSource, "Shadowmaps Fragment Shader");
@@ -584,6 +588,11 @@ void NewGame(void) {
     voxen_globalContext.pauseRelativeTime = 0.0;
 }
 
+GLuint debugLinesVAO = 0;
+GLuint debugLinesVBO = 0;
+#define MAX_DEBUG_LINE_VERTS 4096                // 2048 lines max per frame
+float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
+
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
@@ -647,6 +656,14 @@ void InitializeEnvironment(void) {
     glVertexArrayAttribFormat(voxen_GL_Comms.textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
     glVertexArrayVertexBuffer(voxen_GL_Comms.textVAO, 0, voxen_GL_Comms.textVBO, 0, 5 * sizeof(float));
     for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(voxen_GL_Comms.textVAO, i, 0); glEnableVertexArrayAttrib(voxen_GL_Comms.textVAO, i); }
+    
+    glCreateVertexArrays(1, &debugLinesVAO);
+    glCreateBuffers(1, &debugLinesVBO);
+    glNamedBufferStorage(debugLinesVBO, MAX_DEBUG_LINE_VERTS * 3 * sizeof(float), NULL, GL_DYNAMIC_STORAGE_BIT);  // persistent, client-writable
+    glVertexArrayAttribFormat(debugLinesVAO, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glEnableVertexArrayAttrib(debugLinesVAO, 0);
+    glVertexArrayAttribBinding(debugLinesVAO, 0, 0);
+    glVertexArrayVertexBuffer(debugLinesVAO, 0, debugLinesVBO, 0, 3 * sizeof(float));
 
     GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
     GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
@@ -733,6 +750,32 @@ void InitializeEnvironment(void) {
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
+}
+
+int debugLineVertCount = 0;
+void DrawDebugLines(float* viewProj) {
+    if (debugLineVertCount < 1) return;
+    
+    glNamedBufferSubData(debugLinesVBO, 0, debugLineVertCount * sizeof(float), debugLineBuffer);
+    glUseProgram(voxen_GL_Comms.debugUnlitShaderProgram);
+    glUniformMatrix4fv(0, 1, GL_FALSE, viewProj);
+    glLineWidth(10.0f);         // Max safe value (many drivers cap at 10; 8 is fine)
+    glDisable(GL_DEPTH_TEST);   // ← Add this temporarily so lines draw over everything (great for debug)
+    glBindVertexArray(debugLinesVAO);
+    glDrawArrays(GL_LINES, 0, debugLineVertCount / 3);
+    glEnable(GL_DEPTH_TEST);    // Restore depth test
+    drawCallsRenderedThisFrame++;
+    verticesRenderedThisFrame += debugLineVertCount / 3;
+    debugLineVertCount = 0;
+}
+
+void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
+    if (debugLineVertCount + 6 > MAX_DEBUG_LINE_VERTS * 3) return;
+
+    int i = debugLineVertCount;
+    debugLineBuffer[i++] = x1; debugLineBuffer[i++] = y1; debugLineBuffer[i++] = z1;
+    debugLineBuffer[i++] = x2; debugLineBuffer[i++] = y2; debugLineBuffer[i++] = z2;
+    debugLineVertCount = i;
 }
 
 typedef struct {
@@ -955,6 +998,18 @@ int32_t main(int32_t argc, char* argv[]) {
         invViewRot[1] = view[4]; invViewRot[4] = view[5]; invViewRot[7] = view[6];
         invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
         if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
+            if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) {
+                DualLog("Mouse rmb released\n");
+                
+                voxen_Diagnostics.debugLine_startX = instances[PLAYER1].position.x;
+                voxen_Diagnostics.debugLine_startY = instances[PLAYER1].position.y;
+                voxen_Diagnostics.debugLine_startZ = instances[PLAYER1].position.z;
+                voxen_Diagnostics.debugLine_endX = 0.0f;
+                voxen_Diagnostics.debugLine_endY = 0.0f;
+                voxen_Diagnostics.debugLine_endZ = 0.0f;           
+            }
+            
+            AddDebugLine(voxen_Diagnostics.debugLine_startX, voxen_Diagnostics.debugLine_startY, voxen_Diagnostics.debugLine_startZ, voxen_Diagnostics.debugLine_endX, voxen_Diagnostics.debugLine_endY, voxen_Diagnostics.debugLine_endZ);
             UpdateAmbientSounds();
             
             // 1. Culling
@@ -1005,6 +1060,7 @@ int32_t main(int32_t argc, char* argv[]) {
             RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers
+            DrawDebugLines(viewProj);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
             // 5. SSR (Screen Space Reflections)
@@ -1098,6 +1154,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f, maximumShadowmapSSBOUsage: %u", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z, voxen_Shadow_System.maximumShadowmapSSBOUsage);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_startX, (double)voxen_Diagnostics.debugLine_startY, (double)voxen_Diagnostics.debugLine_startZ, (double)voxen_Diagnostics.debugLine_endX, (double)voxen_Diagnostics.debugLine_endY, (double)voxen_Diagnostics.debugLine_endZ);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
