@@ -93,6 +93,7 @@ void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
+    entry->layer = PhysicsLayer_Default;
     entry->animated = 0u;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;

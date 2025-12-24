@@ -40,6 +40,26 @@ void normalize_quaternion(Quaternion* q) {
     else { q->w = 1.0f; q->x = q->y = q->z = 0.0f; }
 }
 
+Vector3 quat_rotate(Quaternion q, Vector3 v) {
+    float x2 = q.x + q.x;
+    float y2 = q.y + q.y;
+    float z2 = q.z + q.z;
+    float xx2 = q.x * x2;
+    float yy2 = q.y * y2;
+    float zz2 = q.z * z2;
+    float xy2 = q.x * y2;
+    float xz2 = q.x * z2;
+    float yz2 = q.y * z2;
+    float wx2 = q.w * x2;
+    float wy2 = q.w * y2;
+    float wz2 = q.w * z2;
+    return (Vector3){
+        v.x * (1.0f - yy2 - zz2) + v.y * (xy2 - wz2) + v.z * (xz2 + wy2),
+        v.x * (xy2 + wz2) + v.y * (1.0f - xx2 - zz2) + v.z * (yz2 - wx2),
+        v.x * (xz2 - wy2) + v.y * (yz2 + wx2) + v.z * (1.0f - xx2 - yy2)
+    };
+}
+
 void SetUpdatedMatrix(float *mat, float posx, float posy, float posz, Quaternion* quat, float sclx, float scly, float sclz) {
     float rot[16];
     quat_to_matrix(quat,rot);

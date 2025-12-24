@@ -23,6 +23,7 @@ void quat_to_matrix(Quaternion* q, float* m);
 Quaternion conjugate_quaternion(const Quaternion q);
 Quaternion axis_angle_quaternion(const Vector3 axis, float angle);
 void normalize_quaternion(Quaternion* q);
+Vector3 quat_rotate(Quaternion q, Vector3 v);
 void UpdateInstanceMatrix(int32_t i);
 
 static inline Quaternion mul_quaternion(Quaternion a, Quaternion b) {

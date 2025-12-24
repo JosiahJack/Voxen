@@ -261,12 +261,12 @@ typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;
 static const uint8_t PhysicsLayer_TransparentFX    = 1;
 static const uint8_t PhysicsLayer_IgnoreRaycast    = 2;
-//static const uint8_t PhysicsLayer_               = 3; // Layers direct copy from Unity version of Citadel, [sic] and sick
+static const uint8_t PhysicsLayer_Water            = 3;
 static const uint8_t PhysicsLayer_BlocksRaycast    = 4;
 static const uint8_t PhysicsLayer_UI               = 5;
 //static const uint8_t PhysicsLayer_               = 6;
 //static const uint8_t PhysicsLayer_               = 7;
-//static const uint8_t PhysicsLayer_               = 8;
+static const uint8_t PhysicsLayer_GunViewModel     = 8;
 static const uint8_t PhysicsLayer_Geometry         = 9;
 static const uint8_t PhysicsLayer_NPC              = 10;
 static const uint8_t PhysicsLayer_PlayerBullets    = 11;
@@ -281,13 +281,44 @@ static const uint8_t PhysicsLayer_InterDebris      = 19;
 static const uint8_t PhysicsLayer_Player2          = 20;
 //static const uint8_t PhysicsLayer_               = 21;
 //static const uint8_t PhysicsLayer_               = 22;
-//static const uint8_t PhysicsLayer_               = 23;
+static const uint8_t PhysicsLayer_NPCTrigger       = 23;
 static const uint8_t PhysicsLayer_NPCBullet        = 24;
 static const uint8_t PhysicsLayer_NPCClip          = 25;
 static const uint8_t PhysicsLayer_Clip             = 26;
-//static const uint8_t PhysicsLayer_               = 27;
-//static const uint8_t PhysicsLayer_               = 28;
+static const uint8_t PhysicsLayer_Automap          = 27;
+static const uint8_t PhysicsLayer_Culling          = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
+//static const uint8_t PhysicsLayer_               = 30;
+static const uint8_t PhysicsLayer_NULL             = 31;
+#define LAYER_MASK_NPC_SIGHT ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_Door) | (1u << PhysicsLayer_InterDebris) \
+	                          | (1u << PhysicsLayer_PhysObjects) | (1u << PhysicsLayer_Player))
+
+#define LAYER_MASK_NPC_ATTACK ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_NPC) | (1u << PhysicsLayer_Door) \
+							   | (1u << PhysicsLayer_InterDebris) | (1u << PhysicsLayer_PhysObjects) | (1u << PhysicsLayer_Player))
+
+#define LAYER_MASK_NPC_COLLISION ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_TransparentFX) | (1u << PhysicsLayer_IgnoreRaycast) | (1u << PhysicsLayer_Geometry) \
+							      | (1u << PhysicsLayer_NPC) | (1u << PhysicsLayer_Door) | (1u << PhysicsLayer_InterDebris) | (1u << PhysicsLayer_Player) \
+							      | (1u << PhysicsLayer_Clip) | (1u << PhysicsLayer_NPCClip) | (1u << PhysicsLayer_PhysObjects))
+#define LAYER_MASK_PLAYER_FROB ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_Water) | (1u << PhysicsLayer_Door) \
+								| (1u << PhysicsLayer_InterDebris) | (1u << PhysicsLayer_PhysObjects) | (1u << PhysicsLayer_CorpseSearchable))
+
+#define LAYER_MASK_PLAYER_TARGET_ID_FROB ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_Door) | (1u << PhysicsLayer_NPC) | (1u << PhysicsLayer_CorpseSearchable))
+#define LAYER_MASK_PLAYER_ATTACK ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_NPC) | (1u << PhysicsLayer_PlayerBullets) \
+								  | (1u << PhysicsLayer_Door) | (1u << PhysicsLayer_InterDebris) | (1u << PhysicsLayer_PhysObjects) | (1u << PhysicsLayer_CorpseSearchable))
+
+#define LAYER_MASK_EXPLOSION ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_NPC) | (1u << PhysicsLayer_PlayerBullets) | (1u << PhysicsLayer_Door) \
+							  | (1u << PhysicsLayer_InterDebris) | (1u << PhysicsLayer_PhysObjects) | (1u << PhysicsLayer_Player) | (1u << PhysicsLayer_Player2) | (1u << PhysicsLayer_CorpseSearchable))
+
+#define LAYER_MASK_PLAYER_FEET ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry))
+
+typedef struct {
+	Vector3 point;
+	Vector3 normal;
+	float distance;
+	uint16_t hitInstanceIndex;
+	bool hit;
+} RaycastHit;
+
 int32_t Physics(void);
 void UpdateInstanceMatrix(int32_t i);
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
@@ -525,6 +556,7 @@ bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
 bool CursorVisible(void);
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum);
+const char* GetPrefabNameFromIndex(int constIndex);
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);

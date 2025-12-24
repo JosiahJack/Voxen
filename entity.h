@@ -33,6 +33,7 @@ typedef struct {
     Vector3 velocity;
     Vector3 angularVelocity;
     BodyState bodyState;
+    uint32_t layer;
     ColliderType collider;
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)

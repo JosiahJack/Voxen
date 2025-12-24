@@ -908,6 +908,130 @@ void RenderInstances(uint8_t type) {
     }
 }
 
+RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
+    RaycastHit result = {
+        .hit = false,
+        .distance = maxDist,
+        .point = {0.0f, 0.0f, 0.0f},
+        .normal = {0.0f, 0.0f, 0.0f},
+        .hitInstanceIndex = INSTANCE_COUNT
+    };
+
+    float playerX = instances[PLAYER1].position.x;
+    float playerY = instances[PLAYER1].position.y;
+    float playerZ = instances[PLAYER1].position.z;
+
+    for (uint16_t instIdx = START_INDEX_LEVEL_INSTANCES; instIdx < loadedInstances; ++instIdx) {
+        Entity* e = &instances[instIdx];
+
+        if (e->collider == COLLIDER_TYPE_NONE) continue;
+        if (((1u << e->layer) & layerMask) == 0) continue;
+
+        // Cell visibility cull
+        uint16_t cellIdx = PosGetCellCoords(e->position.x, e->position.z);
+        if (cellIdx < ARRSIZE &&
+            !(gridCellStates[cellIdx] & CELL_VISIBLE) &&
+            (gridCellStates[cellIdx] & CELL_OPEN)) {
+            continue;
+        }
+
+        // Bounding sphere cull
+        float dx = e->position.x - playerX;
+        float dy = e->position.y - playerY;
+        float dz = e->position.z - playerZ;
+        float distSq = dx*dx + dy*dy + dz*dz;
+        float radius = modelBounds[(e->modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (distSq > (maxDist + radius) * (maxDist + radius)) continue;
+
+        // *** CORRECT LOCAL TRANSFORM ***
+        // Vector from box center to ray origin
+        Vector3 centerToOrigin = {
+            origin.x - e->position.x,
+            origin.y - e->position.y,
+            origin.z - e->position.z
+        };
+
+        Quaternion invRot = conjugate_quaternion(e->rotation);
+        Vector3 localOrigin = quat_rotate(invRot, centerToOrigin);
+        Vector3 localDir    = quat_rotate(invRot, dir);
+
+        Vector3 half = {
+            e->colliderSize.x * e->scale.x,
+            e->colliderSize.y * e->scale.y,
+            e->colliderSize.z * e->scale.z
+        };
+
+        float tNear = -INFINITY;
+        float tFar  = INFINITY;
+        bool noHit = false;
+
+        for (int axis = 0; axis < 3; ++axis) {
+            float o = (axis == 0 ? localOrigin.x : (axis == 1 ? localOrigin.y : localOrigin.z));
+            float d = (axis == 0 ? localDir.x    : (axis == 1 ? localDir.y    : localDir.z));
+            float h = (axis == 0 ? half.x         : (axis == 1 ? half.y         : half.z));
+
+            if (fabsf(d) < 1e-6f) {
+                if (o < -h || o > h) {
+                    noHit = true;
+                    break;
+                }
+            } else {
+                float t1 = (-h - o) / d;
+                float t2 = ( h - o) / d;
+                if (t1 > t2) {
+                    float tmp = t1; t1 = t2; t2 = tmp;
+                }
+                tNear = fmaxf(tNear, t1);
+                tFar  = fminf(tFar,  t2);
+            }
+        }
+
+        if (noHit || tNear > tFar || tFar <= 0.0f) continue;
+
+        float t = (tNear > 0.0f) ? tNear : tFar;
+        if (t > maxDist || t < 0.0f) continue;
+
+        if (t < result.distance) {
+            result.hit = true;
+            result.distance = t;
+            result.hitInstanceIndex = instIdx;
+
+            // World-space hit point — direct and accurate
+            result.point.x = origin.x + dir.x * t;
+            result.point.y = origin.y + dir.y * t;
+            result.point.z = origin.z + dir.z * t;
+
+            // Compute local hit point for normal
+            Vector3 localHit = {
+                localOrigin.x + localDir.x * t,
+                localOrigin.y + localDir.y * t,
+                localOrigin.z + localDir.z * t
+            };
+
+            // Normal from closest face
+            Vector3 localNormal = {0.0f, 0.0f, 0.0f};
+            float bestDist = INFINITY;
+            for (int axis = 0; axis < 3; ++axis) {
+                float p = (axis == 0 ? localHit.x : (axis == 1 ? localHit.y : localHit.z));
+                float h = (axis == 0 ? half.x : (axis == 1 ? half.y : half.z));
+                float dist = fabsf(fabsf(p) - h);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    localNormal = (Vector3){0.0f, 0.0f, 0.0f};
+                    if (axis == 0) localNormal.x = (p >= 0.0f) ? 1.0f : -1.0f;
+                    if (axis == 1) localNormal.y = (p >= 0.0f) ? 1.0f : -1.0f;
+                    if (axis == 2) localNormal.z = (p >= 0.0f) ? 1.0f : -1.0f;
+                }
+            }
+
+            result.normal = quat_rotate(e->rotation, localNormal);
+            normalize_vector(&result.normal.x, &result.normal.y, &result.normal.z);
+        }
+    }
+
+    return result;
+}
+
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -990,7 +1114,10 @@ int32_t main(int32_t argc, char* argv[]) {
         
         // 0. View Matrix, and Projection Matrix
         float view[16]; // Also known as view matrix
-        mat4_lookat_from(view,&cam_rotation, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
+        float px = instances[PLAYER1].position.x;
+        float py = instances[PLAYER1].position.y;
+        float pz = instances[PLAYER1].position.z;
+        mat4_lookat_from(view,&cam_rotation, px, py, pz);
         float viewProj[16]; // view-projection matrix
         mul_mat4(viewProj, rasterPerspectiveProjection, view);
         float invViewRot[9];
@@ -1000,13 +1127,38 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
             if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) {
                 DualLog("Mouse rmb released\n");
-                
-                voxen_Diagnostics.debugLine_startX = instances[PLAYER1].position.x;
-                voxen_Diagnostics.debugLine_startY = instances[PLAYER1].position.y;
-                voxen_Diagnostics.debugLine_startZ = instances[PLAYER1].position.z;
-                voxen_Diagnostics.debugLine_endX = instances[PLAYER1].position.x + (cam_forwardx * FROB_DISTANCE);
-                voxen_Diagnostics.debugLine_endY = instances[PLAYER1].position.y + (cam_forwardy * FROB_DISTANCE);
-                voxen_Diagnostics.debugLine_endZ = instances[PLAYER1].position.z + (cam_forwardz * FROB_DISTANCE);
+
+                float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
+                float offsetY = cursorPosition_y - (voxen_Settings.ScreenHeight * 0.5f);
+                float ndcX = offsetX / (voxen_Settings.ScreenWidth * 0.5f);
+                float ndcY = -offsetY / (voxen_Settings.ScreenHeight * 0.5f);  // flip Y
+                float tanFov = tanf(voxen_Settings.FOV * 0.5f * PI / 180.0f);
+                float viewX = ndcX * tanFov * aspect3D;
+                float viewY = ndcY * tanFov;
+                float viewZ = -1.0f;
+                float len = sqrtf(viewX*viewX + viewY*viewY + viewZ*viewZ);
+                viewX /= len; viewY /= len; viewZ /= len;
+                float upX = cam_righty * (-cam_forwardz) - cam_rightz * (-cam_forwardy);
+                float upY = cam_rightz * (-cam_forwardx) - cam_rightx * (-cam_forwardz);
+                float upZ = cam_rightx * (-cam_forwardy) - cam_righty * (-cam_forwardx);
+                float upLen = sqrtf(upX*upX + upY*upY + upZ*upZ);
+                if (upLen > 0.001f) { upX /= upLen; upY /= upLen; upZ /= upLen; }
+                float dirX = viewX * cam_rightx + viewY * upX + viewZ * (-cam_forwardx);
+                float dirY = viewX * cam_righty + viewY * upY + viewZ * (-cam_forwardy);
+                float dirZ = viewX * cam_rightz + viewY * upZ + viewZ * (-cam_forwardz);
+                voxen_Diagnostics.debugLine_startX = px;
+                voxen_Diagnostics.debugLine_startY = py;
+                voxen_Diagnostics.debugLine_startZ = pz;
+                voxen_Diagnostics.debugLine_endX   = px + dirX * FROB_DISTANCE;
+                voxen_Diagnostics.debugLine_endY   = py + dirY * FROB_DISTANCE;
+                voxen_Diagnostics.debugLine_endZ   = pz + dirZ * FROB_DISTANCE;
+                RaycastHit tempHit = Raycast((Vector3){ px, py, pz }, (Vector3){ dirX, dirY, dirZ }, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
+                if (tempHit.hit) {
+                    voxen_Diagnostics.debugLine_endX   = tempHit.point.x;
+                    voxen_Diagnostics.debugLine_endY   = tempHit.point.y;
+                    voxen_Diagnostics.debugLine_endZ   = tempHit.point.z;
+                    DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
+                }
                 voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
             }
             
