@@ -111,6 +111,7 @@ typedef struct {
 	uint32_t worstFPS;
 	float debugLine_startX, debugLine_startY, debugLine_startZ;
     float debugLine_endX, debugLine_endY, debugLine_endZ;
+	double debugLineFinished;
 } VoxenDiagnostics;
 extern VoxenDiagnostics voxen_Diagnostics;
 // ----------------------------------------------------------------------------
@@ -254,6 +255,7 @@ bool get_cull_bit(const uint32_t* arr, int idx);
 #define COLLIDER_CAPSULE_DIRECTION_X_F 0.0f // X-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
+#define FROB_DISTANCE 4.9f
 extern uint8_t boosterActive;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;

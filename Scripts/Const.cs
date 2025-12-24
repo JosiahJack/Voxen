@@ -35,7 +35,7 @@ using UnityEngine.Networking;
 // TextLocalization 1300
 
 public class Const : MonoBehaviour {
-	public float shadowThreshold = 0.03f;
+	public float shadowThreshold = 0.042f; // checked in inspector to be 0.042f too
 	//Item constants
 	public QuestBits questData;
 	public Texture2D[] useableItemsFrobIcons;
@@ -68,10 +68,53 @@ public class Const : MonoBehaviour {
 	public float[] penetrationForWeapon2;
 	public float[] offenseForWeapon;
 	public float[] offenseForWeapon2;
+	
+	// Not in damage_tables.txt!::
 	public int[] magazinePitchCountForWeapon;
+	/* GenericPropertyJSON:{"name":"magazinePitchCountForWeapon","type":-1,"arraySize":16,"arrayType":"int","children":[{"name":"Array","type":-1,"arraySize":16,"arrayType":"int","children":[{"name":"size","type":12,"val":16},{"name":"data","type":0,"val":10},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":15},{"name":"data","type":0,"val":60},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":12},{"name":"data","type":0,"val":25},{"name":"data","type":0,"val":20},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":12},{"name":"data","type":0,"val":20},{"name":"data","type":0,"val":50},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0}]}]}*/
+
 	public int[] magazinePitchCountForWeapon2;
+	/*GenericPropertyJSON:{"name":"magazinePitchCountForWeapon2","type":-1,"arraySize":16,"arrayType":"int","children":[{"name":"Array","type":-1,"arraySize":16,"arrayType":"int","children":[{"name":"size","type":12,"val":16},{"name":"data","type":0,"val":8},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":15},{"name":"data","type":0,"val":60},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":12},{"name":"data","type":0,"val":10},{"name":"data","type":0,"val":20},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":100},{"name":"data","type":0,"val":0},{"name":"data","type":0,"val":0}]}]}*/
+	
 	public float[] recoilForWeapon;
+	/*GenericPropertyJSON:{"name":"recoilForWeapon","type":-1,"arraySize":16,"arrayType":"float","children":[
+	 * {"name":"Array","type":-1,"arraySize":16,"arrayType":"float","children":[
+	 * {"name":"size","type":12,"val":16},
+	 * {"name":"data","type":2,"val":1.3},
+	 * {"name":"data","type":2,"val":0},
+	 * {"name":"data","type":2,"val":0.1},
+	 * {"name":"data","type":2,"val":0.2},
+	 * {"name":"data","type":2,"val":0},
+	 * {"name":"data","type":2,"val":0},
+	 * {"name":"data","type":2,"val":0},
+	 * {"name":"data","type":2,"val":1.2},
+	 * {"name":"data","type":2,"val":0.8},
+	 * {"name":"data","type":2,"val":0.5},
+	 * {"name":"data","type":2,"val":1.5},
+	 * {"name":"data","type":2,"val":1},
+	 *{"name":"data","type":2,"val":0.9},
+	 * {"name":"data","type":2,"val":0.7},
+	 * {"name":"data","type":2,"val":0},
+	 * {"name":"data","type":2,"val":0.1}]}]}*/
+	
 	public AttackType[] attackTypeForWeapon;
+	/* Magnetic // index 0
+	 Melee Energy
+	 Magnetic
+	 Magnetic
+	 MeleeEnergy // index 4
+	 Melee
+	 Melee
+	 Melee
+	 Magnetic
+	 EnergyBeam // index 8
+	 Magnetic
+	 Projectile
+	 Magnetic
+	 Magnetic
+	 Magnetic
+	 MeleeEnergy
+	 Projectile // index 15*/
 
 	//NPC constants
 	[HideInInspector] public string[] nameForNPC;
@@ -213,10 +256,10 @@ public class Const : MonoBehaviour {
 	public StatusBarTextDecay statusBar;
    
 	//Config constants
-	public int difficultyCombat;
-	public int difficultyMission;
-	public int difficultyPuzzle;
-	public int difficultyCyber;
+	public int difficultyCombat = 2;
+	public int difficultyMission = 2;
+	public int difficultyPuzzle = 2;
+	public int difficultyCyber = 2;
 	[HideInInspector] public string playerName;
 	public AudioSource mainmenuMusic;
 	[HideInInspector] public int GraphicsResWidth;
@@ -239,11 +282,61 @@ public class Const : MonoBehaviour {
 	public int[] InputCodeSettings;	  // The integer index values
 	public string[] InputCodes;		  // The readable mapping names used as
 									  //   labels on the configuration page
+/*GenericPropertyJSON:{"name":"InputCodes","type":-1,"arraySize":44,"arrayType":"string","children":[{"name":"Array","type":-1,"arraySize":44,"arrayType":"string","children":
+ *[{"name":"size","type":12,"val":44},
+ * {"name":"data","type":3,"val":"Forward"},
+ * {"name":"data","type":3,"val":"Strafe Left"},
+ * {"name":"data","type":3,"val":"Backpedal"},
+ * {"name":"data","type":3,"val":"Strafe Right"},
+ * {"name":"data","type":3,"val":"Jump"},
+ * {"name":"data","type":3,"val":"Crouch"},
+ * {"name":"data","type":3,"val":"Prone"},
+ * {"name":"data","type":3,"val":"Lean Left"},
+ * {"name":"data","type":3,"val":"Lean Right"},
+ * {"name":"data","type":3,"val":"Sprint"},
+ * {"name":"data","type":3,"val":"Toggle Sprint"},
+ * {"name":"data","type":3,"val":"Turn Left"},
+ * {"name":"data","type":3,"val":"Turn Right"},
+ * {"name":"data","type":3,"val":"Look Up"},
+ * {"name":"data","type":3,"val":"Look Down"},
+ * {"name":"data","type":3,"val":"Recent Log"},
+ * {"name":"data","type":3,"val":"Biomonitor"},
+ * {"name":"data","type":3,"val":"Sensaround"},
+ * {"name":"data","type":3,"val":"Lantern"},
+ * {"name":"data","type":3,"val":"Shield"},
+ * {"name":"data","type":3,"val":"Infrared"},
+ * {"name":"data","type":3,"val":"E-reader"},
+ * {"name":"data","type":3,"val":"Booster"},
+ * {"name":"data","type":3,"val":"Jumpjets"},
+ * {"name":"data","type":3,"val":"Attack"},
+ * {"name":"data","type":3,"val":"Use"},
+ * {"name":"data","type":3,"val":"Menu/Back"},
+ * {"name":"data","type":3,"val":"Toggle Mode"},
+ * {"name":"data","type":3,"val":"Reload"},
+ * {"name":"data","type":3,"val":"Weapon +"},
+ * {"name":"data","type":3,"val":"Weapon -"},
+ * {"name":"data","type":3,"val":"Grenade"},
+ * {"name":"data","type":3,"val":"Grenade +"},
+ * {"name":"data","type":3,"val":"Grenade -"},
+ * {"name":"data","type":3,"val":"Ammo Type"},
+ * {"name":"data","type":3,"val":"Unused"},
+ * {"name":"data","type":3,"val":"Patch Use"},
+ * {"name":"data","type":3,"val":"Patch +"},
+ * {"name":"data","type":3,"val":"Patch -"},
+ * {"name":"data","type":3,"val":"Full Map"},
+ * {"name":"data","type":3,"val":"Swim Up"},
+ * {"name":"data","type":3,"val":"Swim Down"},
+ * {"name":"data","type":3,"val":"Swap Ammo Type"},
+ * {"name":"data","type":3,"val":"ToggleConsole"}]}]}(*/
+									  
+									  
 	public string[] InputValues;	  // The list of all valid keys: letters,
 									  //   numbers, etc.
+/*GenericPropertyJSON:{"name":"InputValues","type":-1,"arraySize":159,"arrayType":"string","children":[{"name":"Array","type":-1,"arraySize":159,"arrayType":"string","children":[{"name":"size","type":12,"val":159},{"name":"data","type":3,"val":"a"},{"name":"data","type":3,"val":"b"},{"name":"data","type":3,"val":"c"},{"name":"data","type":3,"val":"d"},{"name":"data","type":3,"val":"e"},{"name":"data","type":3,"val":"f"},{"name":"data","type":3,"val":"g"},{"name":"data","type":3,"val":"h"},{"name":"data","type":3,"val":"i"},{"name":"data","type":3,"val":"j"},{"name":"data","type":3,"val":"k"},{"name":"data","type":3,"val":"l"},{"name":"data","type":3,"val":"m"},{"name":"data","type":3,"val":"n"},{"name":"data","type":3,"val":"o"},{"name":"data","type":3,"val":"p"},{"name":"data","type":3,"val":"q"},{"name":"data","type":3,"val":"r"},{"name":"data","type":3,"val":"s"},{"name":"data","type":3,"val":"t"},{"name":"data","type":3,"val":"u"},{"name":"data","type":3,"val":"v"},{"name":"data","type":3,"val":"w"},{"name":"data","type":3,"val":"x"},{"name":"data","type":3,"val":"y"},{"name":"data","type":3,"val":"z"},{"name":"data","type":3,"val":"1"},{"name":"data","type":3,"val":"2"},{"name":"data","type":3,"val":"3"},{"name":"data","type":3,"val":"4"},{"name":"data","type":3,"val":"5"},{"name":"data","type":3,"val":"6"},{"name":"data","type":3,"val":"7"},{"name":"data","type":3,"val":"8"},{"name":"data","type":3,"val":"9"},{"name":"data","type":3,"val":"0"},{"name":"data","type":3,"val":"up"},{"name":"data","type":3,"val":"down"},{"name":"data","type":3,"val":"left"},{"name":"data","type":3,"val":"right"},{"name":"data","type":3,"val":"[1]"},{"name":"data","type":3,"val":"[2]"},{"name":"data","type":3,"val":"[3]"},{"name":"data","type":3,"val":"[+]"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"right shift"},{"name":"data","type":3,"val":"left shift"},{"name":"data","type":3,"val":"right ctrl"},{"name":"data","type":3,"val":"left ctrl"},{"name":"data","type":3,"val":"right alt"},{"name":"data","type":3,"val":"left alt"},{"name":"data","type":3,"val":"right cmd"},{"name":"data","type":3,"val":"left cmd"},{"name":"data","type":3,"val":"mouse 0"},{"name":"data","type":3,"val":"mouse 1"},{"name":"data","type":3,"val":"mouse 2"},{"name":"data","type":3,"val":"mouse 3"},{"name":"data","type":3,"val":"mouse 4"},{"name":"data","type":3,"val":"mouse 5"},{"name":"data","type":3,"val":"mouse 6"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"joystick button 0"},{"name":"data","type":3,"val":"joystick button 1"},{"name":"data","type":3,"val":"joystick button 2"},{"name":"data","type":3,"val":"joystick button 3"},{"name":"data","type":3,"val":"joystick button 4"},{"name":"data","type":3,"val":"joystick button 5"},{"name":"data","type":3,"val":"joystick button 6"},{"name":"data","type":3,"val":"joystick button 7"},{"name":"data","type":3,"val":"joystick button 8"},{"name":"data","type":3,"val":"joystick button 9"},{"name":"data","type":3,"val":"joystick button 10"},{"name":"data","type":3,"val":"joystick button 11"},{"name":"data","type":3,"val":"joystick button 12"},{"name":"data","type":3,"val":"joystick button 13"},{"name":"data","type":3,"val":"joystick button 14"},{"name":"data","type":3,"val":"joystick button 15"},{"name":"data","type":3,"val":"joystick button 16"},{"name":"data","type":3,"val":"joystick button 17"},{"name":"data","type":3,"val":"backspace"},{"name":"data","type":3,"val":"tab"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"escape"},{"name":"data","type":3,"val":"space"},{"name":"data","type":3,"val":"delete"},{"name":"data","type":3,"val":"enter"},{"name":"data","type":3,"val":"insert"},{"name":"data","type":3,"val":"home"},{"name":"data","type":3,"val":"end"},{"name":"data","type":3,"val":"page up"},{"name":"data","type":3,"val":"page down"},{"name":"data","type":3,"val":"f1"},{"name":"data","type":3,"val":"f2"},{"name":"data","type":3,"val":"f3"},{"name":"data","type":3,"val":"f4"},{"name":"data","type":3,"val":"f5"},{"name":"data","type":3,"val":"f6"},{"name":"data","type":3,"val":"f7"},{"name":"data","type":3,"val":"f8"},{"name":"data","type":3,"val":"f9"},{"name":"data","type":3,"val":"f10"},{"name":"data","type":3,"val":"f11"},{"name":"data","type":3,"val":"f12"},{"name":"data","type":3,"val":"`"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"!"},{"name":"data","type":3,"val":"@"},{"name":"data","type":3,"val":"#"},{"name":"data","type":3,"val":"$"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"^"},{"name":"data","type":3,"val":"&"},{"name":"data","type":3,"val":"*"},{"name":"data","type":3,"val":"("},{"name":"data","type":3,"val":")"},{"name":"data","type":3,"val":"_"},{"name":"data","type":3,"val":"+"},{"name":"data","type":3,"val":"-"},{"name":"data","type":3,"val":"="},{"name":"data","type":3,"val":"["},{"name":"data","type":3,"val":"]"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"\\"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"/"},{"name":"data","type":3,"val":"?"},{"name":"data","type":3,"val":"."},{"name":"data","type":3,"val":">"},{"name":"data","type":3,"val":","},{"name":"data","type":3,"val":"<"},{"name":"data","type":3,"val":";"},{"name":"data","type":3,"val":":"},{"name":"data","type":3,"val":"'"},{"name":"data","type":3,"val":"\""},{"name":"data","type":3,"val":"capslock"},{"name":"data","type":3,"val":"[0]"},{"name":"data","type":3,"val":"[4]"},{"name":"data","type":3,"val":"[5]"},{"name":"data","type":3,"val":"[6]"},{"name":"data","type":3,"val":"[7]"},{"name":"data","type":3,"val":"[8]"},{"name":"data","type":3,"val":"[9]"},{"name":"data","type":3,"val":"[*]"},{"name":"data","type":3,"val":"[-]"},{"name":"data","type":3,"val":"[.]"},{"name":"data","type":3,"val":"menu"},{"name":"data","type":3,"val":"pause"},{"name":"data","type":3,"val":"numlock"},{"name":"data","type":3,"val":"mwheel up"},{"name":"data","type":3,"val":"mwheel dn"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"return"},{"name":"data","type":3,"val":"joystick button 18"},{"name":"data","type":3,"val":"joystick button 19"}]}]}*/
 	public string[] InputConfigNames; // The readable keys used as text
 									  //   representations on the configuration
 									  //   page for set values.
+/*GenericPropertyJSON:{"name":"InputConfigNames","type":-1,"arraySize":159,"arrayType":"string","children":[{"name":"Array","type":-1,"arraySize":159,"arrayType":"string","children":[{"name":"size","type":12,"val":159},{"name":"data","type":3,"val":"A"},{"name":"data","type":3,"val":"B"},{"name":"data","type":3,"val":"C"},{"name":"data","type":3,"val":"D"},{"name":"data","type":3,"val":"E"},{"name":"data","type":3,"val":"F"},{"name":"data","type":3,"val":"G"},{"name":"data","type":3,"val":"H"},{"name":"data","type":3,"val":"I"},{"name":"data","type":3,"val":"J"},{"name":"data","type":3,"val":"K"},{"name":"data","type":3,"val":"L"},{"name":"data","type":3,"val":"M"},{"name":"data","type":3,"val":"N"},{"name":"data","type":3,"val":"O"},{"name":"data","type":3,"val":"P"},{"name":"data","type":3,"val":"Q"},{"name":"data","type":3,"val":"R"},{"name":"data","type":3,"val":"S"},{"name":"data","type":3,"val":"T"},{"name":"data","type":3,"val":"U"},{"name":"data","type":3,"val":"V"},{"name":"data","type":3,"val":"W"},{"name":"data","type":3,"val":"X"},{"name":"data","type":3,"val":"Y"},{"name":"data","type":3,"val":"Z"},{"name":"data","type":3,"val":"1"},{"name":"data","type":3,"val":"2"},{"name":"data","type":3,"val":"3"},{"name":"data","type":3,"val":"4"},{"name":"data","type":3,"val":"5"},{"name":"data","type":3,"val":"6"},{"name":"data","type":3,"val":"7"},{"name":"data","type":3,"val":"8"},{"name":"data","type":3,"val":"9"},{"name":"data","type":3,"val":"0"},{"name":"data","type":3,"val":"UP ARROW"},{"name":"data","type":3,"val":"DN ARROW"},{"name":"data","type":3,"val":"LF ARROW"},{"name":"data","type":3,"val":"RT ARROW"},{"name":"data","type":3,"val":"NUM 1"},{"name":"data","type":3,"val":"NUM 2"},{"name":"data","type":3,"val":"NUM 3"},{"name":"data","type":3,"val":"NUM +"},{"name":"data","type":3,"val":"ENTER"},{"name":"data","type":3,"val":"RIGHT SHIFT"},{"name":"data","type":3,"val":"LEFT SHIFT"},{"name":"data","type":3,"val":"RIGHT CTRL"},{"name":"data","type":3,"val":"LEFT CTRL"},{"name":"data","type":3,"val":"RIGHT ALT"},{"name":"data","type":3,"val":"LEFT ALT"},{"name":"data","type":3,"val":"RIGHT CMD"},{"name":"data","type":3,"val":"LEFT CMD"},{"name":"data","type":3,"val":"LMB"},{"name":"data","type":3,"val":"RMB"},{"name":"data","type":3,"val":"MMB"},{"name":"data","type":3,"val":"MB 3"},{"name":"data","type":3,"val":"MB 4"},{"name":"data","type":3,"val":"MB 5"},{"name":"data","type":3,"val":"MB 6"},{"name":"data","type":3,"val":"MB 7"},{"name":"data","type":3,"val":"MB 8"},{"name":"data","type":3,"val":"MB 9"},{"name":"data","type":3,"val":"MB 10"},{"name":"data","type":3,"val":"MB 11"},{"name":"data","type":3,"val":"JOY 0"},{"name":"data","type":3,"val":"JOY 1"},{"name":"data","type":3,"val":"JOY 2"},{"name":"data","type":3,"val":"JOY 3"},{"name":"data","type":3,"val":"JOY 4"},{"name":"data","type":3,"val":"JOY 5"},{"name":"data","type":3,"val":"JOY 6"},{"name":"data","type":3,"val":"JOY 7"},{"name":"data","type":3,"val":"JOY 8"},{"name":"data","type":3,"val":"JOY 9"},{"name":"data","type":3,"val":"JOY 10"},{"name":"data","type":3,"val":"JOY 11"},{"name":"data","type":3,"val":"JOY 12"},{"name":"data","type":3,"val":"JOY 13"},{"name":"data","type":3,"val":"JOY 14"},{"name":"data","type":3,"val":"JOY 15"},{"name":"data","type":3,"val":"JOY 16"},{"name":"data","type":3,"val":"JOY 17"},{"name":"data","type":3,"val":"BACKSPACE"},{"name":"data","type":3,"val":"TAB"},{"name":"data","type":3,"val":"NUM ENTER"},{"name":"data","type":3,"val":"ESCAPE"},{"name":"data","type":3,"val":"SPACE"},{"name":"data","type":3,"val":"DELETE"},{"name":"data","type":3,"val":"ENTER"},{"name":"data","type":3,"val":"INSERT"},{"name":"data","type":3,"val":"HOME"},{"name":"data","type":3,"val":"END"},{"name":"data","type":3,"val":"PAGE UP"},{"name":"data","type":3,"val":"PAGE DN"},{"name":"data","type":3,"val":"F1"},{"name":"data","type":3,"val":"F2"},{"name":"data","type":3,"val":"F3"},{"name":"data","type":3,"val":"F4"},{"name":"data","type":3,"val":"F5"},{"name":"data","type":3,"val":"F6"},{"name":"data","type":3,"val":"F7"},{"name":"data","type":3,"val":"F8"},{"name":"data","type":3,"val":"F9"},{"name":"data","type":3,"val":"F10"},{"name":"data","type":3,"val":"F11"},{"name":"data","type":3,"val":"F12"},{"name":"data","type":3,"val":"GRAVE"},{"name":"data","type":3,"val":"TILDE"},{"name":"data","type":3,"val":"!"},{"name":"data","type":3,"val":"@"},{"name":"data","type":3,"val":"#"},{"name":"data","type":3,"val":"$"},{"name":"data","type":3,"val":"%"},{"name":"data","type":3,"val":"^"},{"name":"data","type":3,"val":"&"},{"name":"data","type":3,"val":"*"},{"name":"data","type":3,"val":"("},{"name":"data","type":3,"val":")"},{"name":"data","type":3,"val":"_"},{"name":"data","type":3,"val":"+"},{"name":"data","type":3,"val":"-"},{"name":"data","type":3,"val":"="},{"name":"data","type":3,"val":"["},{"name":"data","type":3,"val":"]"},{"name":"data","type":3,"val":"{"},{"name":"data","type":3,"val":"}"},{"name":"data","type":3,"val":"\\"},{"name":"data","type":3,"val":"|"},{"name":"data","type":3,"val":"/"},{"name":"data","type":3,"val":"?"},{"name":"data","type":3,"val":"."},{"name":"data","type":3,"val":">"},{"name":"data","type":3,"val":","},{"name":"data","type":3,"val":"<"},{"name":"data","type":3,"val":";"},{"name":"data","type":3,"val":":"},{"name":"data","type":3,"val":"'"},{"name":"data","type":3,"val":"\""},{"name":"data","type":3,"val":"CAPSLOCK"},{"name":"data","type":3,"val":"NUM 0"},{"name":"data","type":3,"val":"NUM 4"},{"name":"data","type":3,"val":"NUM 5"},{"name":"data","type":3,"val":"NUM 6"},{"name":"data","type":3,"val":"NUM 7"},{"name":"data","type":3,"val":"NUM 8"},{"name":"data","type":3,"val":"NUM 9"},{"name":"data","type":3,"val":"NUM *"},{"name":"data","type":3,"val":"NUM -"},{"name":"data","type":3,"val":"NUM ."},{"name":"data","type":3,"val":"MENU"},{"name":"data","type":3,"val":"PAUSE"},{"name":"data","type":3,"val":"NUMLOCK"},{"name":"data","type":3,"val":"MWHEEL +"},{"name":"data","type":3,"val":"MWHEEL -"},{"name":"data","type":3,"val":"PRINT"},{"name":"data","type":3,"val":"BREAK"},{"name":"data","type":3,"val":"JOY 18"},{"name":"data","type":3,"val":"JOY 19"}]}]}*/
 
     public Font mainFont1; // Used to force Point filter mode.
 	public Font mainFont2; // Used to force Point filter mode.
@@ -254,15 +347,118 @@ public class Const : MonoBehaviour {
 	[HideInInspector] public bool loading = false;
 	public HashSet<TextLocalization> TextLocalizationRegister;
 	public float[] reloadTime;
+/*GenericPropertyJSON:{"name":"reloadTime","type":-1,"arraySize":16,"arrayType":"float","children":[
+ *{"name":"Array","type":-1,"arraySize":16,"arrayType":"float","children":[
+ * {"name":"size","type":12,"val":16},
+ * {"name":"data","type":2,"val":1},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":1},
+ * {"name":"data","type":2,"val":1.2},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":1.3},
+ * {"name":"data","type":2,"val":1.5},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":1},
+ * {"name":"data","type":2,"val":1.5},
+ * {"name":"data","type":2,"val":2},
+ * {"name":"data","type":2,"val":0.8},
+ * {"name":"data","type":2,"val":0.8}]}]}*/
 
 	public Material[] screenCodes;
 	public Sprite[] logImages;
+/* blank1
+ Baerga
+ blocked_by_sec1
+ blocked_by_sec2
+ blocked_by_sec3
+ Brocail-1_rightpain
+ cybdiego
+ D'Arcy
+ diagnostic
+ Diego
+ Engle
+ Ghiran
+ Grossman
+ hessman
+ Honig
+ Kell
+ Lansing-1_rightpane
+ Lansing
+ laserbad
+ logocrate
+ logogears
+ logomed
+ logosci
+ logotriop
+ logotriopwings
+ MacLeod
+ Parovski-2_rightpane
+ Parovski
+ Schuler
+ SHODAN-cyborg_rightpane
+ SHODAN-grayscale
+ SHODAN
+ stackhouse
+ Stannek
+ Stevens-1_rightpane
+ Travers
+ Wong
+ severed_head*/
 
 	public GameObject eventSystem;
 	private GameObject[] prefabs; // Everything
-	public GameObject prefabFallback;
+	public GameObject prefabFallback; // item_paper_wad
 	public Texture2D[] textures;
 	public Texture[] sequenceTextures;
+/*scr_exp 01 - 06
+ bridg1_1 001 - 004
+ broken_clock 01 - 02
+ broken_clock01_glow 01 - 02
+ g_energmine 00 - 06
+ g_energmine_glow 00 - 07 (yes different count, supported!)
+ scr_cita2 0 - 3
+ scr_cita3 0 - 3
+ scr_cita 0 - 7
+ engscreen1_04 // index 45
+ scr_static2 0 - 6, then scr_static2_a
+ scr_static 0 - 5
+ screen1 0 - 3
+ screen2 0 - 4
+ screen3 0 - 3
+ screen4 0 - 5
+ screen5 0 - 3
+ triop1 0 - 3
+ triop2 0 - 9
+ triop3 0 - 7
+ triop4_8 // index 105
+ triop3_0 // index 106
+ dna 0 - 7
+ edcolor 0 - 3
+ edgray 0 - 3
+ ammo_magcart 00 - 10
+ ammo_magcart_glow 00 - 10
+ medicalbed 00 - 9
+ rad1_1 00 - 04
+ screencode 0 - 9
+ shodanstatic 00 - 36
+ telepad 00 - 03
+ telepad_00_glow
+ black // index 212
+ black
+ black
+ black
+ black
+ black // index 217
+ medscreen13 00 - 11
+ medscreen24 00 - 07
+ medscreen16 00 - 07
+ zerog 00 - 52
+ door_x1 01 - 03 // ends at index 301
+ */
+
 	public Text loadPercentText;
 	public Material[] genericMaterials;
 	public GameObject[] ReverbRegister;

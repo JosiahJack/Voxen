@@ -759,11 +759,11 @@ void DrawDebugLines(float* viewProj) {
     glNamedBufferSubData(debugLinesVBO, 0, debugLineVertCount * sizeof(float), debugLineBuffer);
     glUseProgram(voxen_GL_Comms.debugUnlitShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, viewProj);
-    glLineWidth(10.0f);         // Max safe value (many drivers cap at 10; 8 is fine)
-    glDisable(GL_DEPTH_TEST);   // ← Add this temporarily so lines draw over everything (great for debug)
+    glLineWidth(10.0f);
+    glDisable(GL_DEPTH_TEST);
     glBindVertexArray(debugLinesVAO);
     glDrawArrays(GL_LINES, 0, debugLineVertCount / 3);
-    glEnable(GL_DEPTH_TEST);    // Restore depth test
+    glEnable(GL_DEPTH_TEST);
     drawCallsRenderedThisFrame++;
     verticesRenderedThisFrame += debugLineVertCount / 3;
     debugLineVertCount = 0;
@@ -1004,12 +1004,13 @@ int32_t main(int32_t argc, char* argv[]) {
                 voxen_Diagnostics.debugLine_startX = instances[PLAYER1].position.x;
                 voxen_Diagnostics.debugLine_startY = instances[PLAYER1].position.y;
                 voxen_Diagnostics.debugLine_startZ = instances[PLAYER1].position.z;
-                voxen_Diagnostics.debugLine_endX = 0.0f;
-                voxen_Diagnostics.debugLine_endY = 0.0f;
-                voxen_Diagnostics.debugLine_endZ = 0.0f;           
+                voxen_Diagnostics.debugLine_endX = instances[PLAYER1].position.x + (cam_forwardx * FROB_DISTANCE);
+                voxen_Diagnostics.debugLine_endY = instances[PLAYER1].position.y + (cam_forwardy * FROB_DISTANCE);
+                voxen_Diagnostics.debugLine_endZ = instances[PLAYER1].position.z + (cam_forwardz * FROB_DISTANCE);
+                voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
             }
             
-            AddDebugLine(voxen_Diagnostics.debugLine_startX, voxen_Diagnostics.debugLine_startY, voxen_Diagnostics.debugLine_startZ, voxen_Diagnostics.debugLine_endX, voxen_Diagnostics.debugLine_endY, voxen_Diagnostics.debugLine_endZ);
+            if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_startX, voxen_Diagnostics.debugLine_startY, voxen_Diagnostics.debugLine_startZ, voxen_Diagnostics.debugLine_endX, voxen_Diagnostics.debugLine_endY, voxen_Diagnostics.debugLine_endZ);
             UpdateAmbientSounds();
             
             // 1. Culling
