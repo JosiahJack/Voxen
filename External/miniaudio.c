@@ -21,7 +21,7 @@
 #define MA_NO_DEFAULT_DEVICES      // removes the giant default-device-name tables
 #define MA_NO_LOOPING              // removes all looping logic in data sources
 #define MA_NO_PULSEAUDIO_CONTEXT
-#include "../vmath.h"
+#include "../voxen.h"
 #include "miniaudio.h"
 // Minor modification made to miniaudio.h, otherwise unchanged vs https://github.com/mackron/miniaudio version 0.11.22 (350784a...)
 // In file included from audio.c:3:

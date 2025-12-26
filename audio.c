@@ -4,7 +4,6 @@
 #include "os.h"
 #include "./External/miniaudio.h"
 #include "voxen.h"
-#include "vmath.h"
 #include "entity.h"
 
 #define MAX_CHANNELS 16

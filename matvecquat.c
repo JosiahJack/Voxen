@@ -1,8 +1,7 @@
 // matvecquat.c - Matrices, Vectors, Quaternions
 #include <stdint.h>
 #include <stdbool.h>
-#include "matvecquat.h"
-#include "vmath.h"
+#include "voxen.h"
 #include "entity.h"
 extern uint16_t loadedModelsMaxIndex;
 extern float aspect3D;

@@ -318,11 +318,14 @@ void main() {
             uint face;
             vec2 uv;
             if (a.x >= a.y && a.x >= a.z) {
-                face = -toLight.x > 0.0 ? 0u : 1u; uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
+                face = -toLight.x > 0.0 ? 0u : 1u;
+                uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
             } else if (a.y >= a.x && a.y >= a.z) {
-                face = -toLight.y > 0.0 ? 2u : 3u; uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
+                face = -toLight.y > 0.0 ? 2u : 3u;
+                uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
             } else {
-                face = -toLight.z > 0.0 ? 4u : 5u; uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
+                face = -toLight.z > 0.0 ? 4u : 5u;
+                uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
             }
 
             uv = uv * 0.5 + 0.5;
@@ -337,17 +340,14 @@ void main() {
             bias = clamp(bias, 0.0, 0.22);
             bias += 0.02 * pow(clamp((256.0 - float(shadSize)) / 256.0, 0.0, 1.0), 0.65);
             float shadSizeLessOne = float(shadSize - 1);
+
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
             float invSamples = 1.0 / float(PCF_SAMPLES);
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
-                float tx = clamp(t.x, 0.0, shadSizeLessOne); // Minus 1 prevents tiny gaps
-                float ty = clamp(t.y, 0.0, shadSizeLessOne);
-                uint utx = uint(tx);
-                uint uty = uint(ty);
-                uint ssbo_index = faceOff + uty * shadSize + utx;
+                uint ssbo_index = faceOff + uint(t.y) * shadSize + uint(t.x);
                 uint distInt = shadowMaps[ssbo_index];
                 float d = (float(distInt) / 100000.0);
                 float depthDiff = (dist) - d - bias;
@@ -360,9 +360,8 @@ void main() {
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);
         vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 1.75);
-        lighting += baseLighting * spotFalloff * shadowFactor;
-//         lighting += baseLighting * (0.15 + 0.8 * distOverRange * shadowFactor) * (1.0 - shadowFactor); // Poor man's bounce light
-        intensityTotal += intensity * attenuation * 1.5;
+        lighting = fma(baseLighting,vec3(spotFalloff * shadowFactor),lighting);
+        intensityTotal = fma(intensity,attenuation * 1.5,intensityTotal);
         if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
             vec3 halfDir = normalize(lightDir + viewDir);
             float ndh = max(dot(adjustedNormal, halfDir), 0.0);
@@ -375,14 +374,13 @@ void main() {
 
     float rim = 1.0 - max(dot(adjustedNormal, viewDir), 0.0);
     lighting += clamp(pow(rim, 4.0) * 0.25 * clamp(intensityTotal,0.0,1.0) * specColor.rgb,0.0,1.0); // Specular "rim" fresnel (tested and performance impact is essentially zero)
-    if (unlit > 0) lighting = albedoColor.rgb;
-    else lighting += glowColor.rgb; // Glow (texture emission)
+    lighting = (unlit > 0) ? albedoColor.rgb : lighting + glowColor.rgb;
 
     // Blue Noise Dither for banding (0.03ms performance cost, leaving in for quality)
     ivec2 sp = ivec2(gl_FragCoord.xy);
     int idx = (sp.x & 63) + (sp.y & 63) * 64;
     float blue = blueNoiseColors[idx*3 + 0];
-    float dither = (blue - 0.5) / 255.0;
+    float dither = (blue - 0.5) * 0.003921569; // 1.0 / 255.0;
     lighting.rgb += vec3(dither);
 
     float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0); // This is inverse of fog dist so * (1 / 71.68 far plane)

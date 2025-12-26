@@ -24,7 +24,6 @@
 // TODO: Let user switch monitors from settings, especially in fullscreen.
 #include "voxen.h"
 #include "entity.h"
-#include "vmath.h"
 #include "todo.h"
 
 float correctionX, correctionY, correctionZ;

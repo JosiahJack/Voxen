@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include "voxen.h"
 #include "entity.h"
-#include "vmath.h"
 #define C_STRUCT struct // #include <assimp/defs.h>
 #define ASSIMP_API
 struct aiFileIO; // #include <assimp/cimport.h>
@@ -20,9 +19,6 @@ ASSIMP_API void aiReleasePropertyStore(C_STRUCT aiPropertyStore *p); // #include
 ASSIMP_API const char *aiGetErrorString(void); // #include <assimp/cimport.h>
 ASSIMP_API void aiReleaseImport(const C_STRUCT aiScene *pScene); // #include <assimp/cimport.h>
 #include "./External/assimp/include/scene.h" // Only 514 lines and make use of most all of it so leaving unhoovered, unlike assimp/cimport.h.
-ssize_t write(int fd, const void *buf, size_t nbytes); // #include <unistd.h>
-int close (int filedes); // #include <unistd.h>
-ssize_t read(int fd, void *buf, size_t count);
 
 DataParser model_parser;
 float** modelVertices = NULL;

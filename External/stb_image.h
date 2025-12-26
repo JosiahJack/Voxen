@@ -1,5 +1,4 @@
 // stb_image.h - PNG Load System
-#include "../vmath.h"
 #include <stdint.h>
 void DualLog(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);

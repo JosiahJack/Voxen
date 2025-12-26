@@ -10,7 +10,6 @@
 #include "./External/glad/gl.h"
 #include "./External/glfw3.h"
 #include "voxen.h"
-#include "vmath.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 #ifdef FONT_GEN

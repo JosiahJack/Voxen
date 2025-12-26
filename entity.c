@@ -5,7 +5,6 @@
 #include <errno.h>
 #include "entity.h"
 #include "voxen.h"
-#include "vmath.h"
 #include "todo.h"
 
 //#define DEBUG_ENTITIES

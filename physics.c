@@ -1,8 +1,6 @@
 // physics.c - Physics System
 #include "voxen.h"
 #include "entity.h"
-#include "matvecquat.h"
-#include "vmath.h"
 #define FLT_MAX 3.40282306e+38f
 void ProcessInput(void);
 void UpdatePlayerFacingAngles(void);

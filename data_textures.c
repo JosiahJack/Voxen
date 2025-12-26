@@ -1,5 +1,6 @@
 // data_textures.c - Load textures from raw .png files on disk
 #include "os.h"
+#include "voxen.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "External/stb_image.h"
@@ -9,10 +10,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <string.h>
-#include "voxen.h"
 #include "entity.h"
-int close(int filedes); // #include <unistd.h>
-int open(const char *, int, ...); // #include <fcntl.h>
+#include <unistd.h>
 
 DataParser texture_parser;
 uint32_t totalPixels;
