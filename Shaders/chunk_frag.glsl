@@ -35,7 +35,11 @@ layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
 layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
+// layout(std430, binding = 4) buffer CullingData { uint gridCellStates[]; };
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
+// layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };
+// layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };
+// layout(std430, binding = 8) readonly buffer ModelVertexCounts { uint modelVertexCounts[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
 layout(std430, binding = 10) buffer ShadowMapOffsets { uint shadowMapOffsets[]; };
@@ -46,6 +50,7 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
+// layout(std430, binding = 20) readonly buffer MasterVertexBuffer { float vertexData[]; };
 layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
@@ -66,6 +71,76 @@ const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
+
+// uint PosGetCellCoords(vec3 pos) {
+// 	uint cellX = uint(uint(floor((pos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F)));
+// 	uint cellZ = uint(uint(floor((pos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F)));
+//     if (cellX > WORLDX_0BASED) cellX = WORLDX_0BASED;
+//     if (cellX < 0) cellX = 0;
+//     if (cellZ > WORLDX_0BASED) cellZ = WORLDX_0BASED;
+//     if (cellZ < 0) cellZ = 0;
+// 	return (cellZ * WORLDX) + cellX;
+// }
+
+//     if ((gridCellStates[cellIdx] & CELL_VISIBLE) == 0u && ((gridCellStates[cellIdx] & CELL_OPEN) >= 1u)) return;
+
+// --- Ray-Triangle Intersection (Möller-Trumbore) ---
+// bool RayTriangle(vec3 origin, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t) {
+//     vec3 edge1 = v1 - v0;
+//     vec3 edge2 = v2 - v0;
+//     vec3 h = cross(dir, edge2);
+//     float a = dot(edge1, h);
+//     if (abs(a) < 1e-6) return false;
+// 
+//     float f = 1.0 / a;
+//     vec3 s = origin - v0;
+//     float u = f * dot(s, h);
+//     if (u < 0.0 || u > 1.0) return false;
+// 
+//     vec3 q = cross(s, edge1);
+//     float v = f * dot(dir, q);
+//     if (v < 0.0 || u + v > 1.0) return false;
+// 
+//     t = f * dot(edge2, q);
+//     return t > 0.001;
+// }
+// 
+// // --- Trace Ray for Shadow ---
+// float TraceRay(vec3 origin, vec3 dir, float maxDist) {
+//     for (int i = 0; i < instancesInPVSCount; i++) {
+//         uint instanceIdx = instancesIndices[i];
+//         Instance inst = instances[instanceIdx];
+//         if (inst.texIndex == 881) continue; // Fullbright light
+// 
+//         mat4 invModel = inverse(instanceMatrices[instanceIdx]);
+//         vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;
+//         float instanceRadius = bounds[instanceIdx * BOUNDS_ATTRIBUTES_COUNT + 6]; // first 6 are the mins,maxs xyz
+//         if (length(localOrigin - origin) > (maxDist + instanceRadius)) continue;
+// 
+//         vec3 localDir = ((invModel * vec4(dir, 0.0)).xyz);
+//         uint modelIndex = inst.modelIndex;
+//         uint vertCount = modelVertexCounts[modelIndex];
+//         if (vertCount > 1000) continue;
+// 
+//         uint triCount = vertCount / 3;
+//         mat4 matrix = instanceMatrices[instanceIdx];
+//         uint j = 0;
+//         uint vertexIdx;
+//         vec3 v0, v1, v2;
+//         for (uint tri = 0; tri < triCount; tri++) {
+//             vertexIdx = (vertexOffsets[modelIndex] * VERTEX_ATTRIBUTES_COUNT) + (tri * VERTEX_ATTRIBUTES_COUNT);
+//             j = 0;
+//             v0 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);
+//             j++;
+//             v1 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);
+//             j++;
+//             v2 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);
+//             float t; // Output result
+//             if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && (t < maxDist)) return 0.0;
+//         }
+//     }
+//     return 1.0;
+// }
 
 uint GetVoxelIndex(vec3 worldPos) {
     float offsetX = worldPos.x - worldMin_x;
