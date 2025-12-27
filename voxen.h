@@ -407,8 +407,6 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
-extern int32_t debugView;
-extern int32_t debugValue;
 extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 void SetFog(void);
 extern uint32_t drawCallsRenderedThisFrame;
@@ -653,6 +651,8 @@ typedef struct {
 	GLuint textShaderProgram;
 	GLuint textVAO;
 	GLuint textVBO;
+	GLuint debugLinesVAO;
+	GLuint debugLinesVBO;
 	GLuint blueNoiseBuffer;
 	GLuint modelBoundsID;
 	GLuint matricesBufferID;

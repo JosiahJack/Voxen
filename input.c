@@ -161,21 +161,6 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(voxen_globalContext.window);
     if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
     
-    // Debug inputs
-    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_R].pressed) {
-        debugView++;
-        if (debugView > 4) debugView = 0;
-        glUseProgram(voxen_GL_Comms.chunkShaderProgram); glUniform1i(4, debugView);
-        glUseProgram(voxen_GL_Comms.imageBlitShaderProgram); glUniform1i(0, debugView);
-    }
-
-    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_Y].pressed) {
-        debugValue++;
-        if (debugValue > 6) debugValue = 0;
-        glUseProgram(voxen_GL_Comms.imageBlitShaderProgram); glUniform1i(1, debugValue);
-        glUseProgram(voxen_GL_Comms.chunkShaderProgram); glUniform1i(5, debugValue);
-    }
-    
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     // End Debug Inputs
     

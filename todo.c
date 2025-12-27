@@ -314,7 +314,7 @@ Color GetPainStaticColor(void) { // TODO: Hook staticColor up to red or blue for
 }
 
 double monitorSwitchTime;
-int currentMonitorIndex = 0;
+int currentMonitorIndex = 1; // Start on primary after first cycle, puts it a 0.
 bool ignore_next_mouse_delta = false;
 void CycleToNextMonitor(GLFWwindow* window) {
     if (get_time() < monitorSwitchTime) return;

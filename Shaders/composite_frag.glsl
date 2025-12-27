@@ -3,8 +3,7 @@
 in vec2 TexCoord;
 out vec4 FragColor;
 layout(rgba16f, binding = 1) readonly uniform image2D inputWorldPos;
-layout(location =  0) uniform int debugView;
-layout(location =  1) uniform int debugValue;
+
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
 layout(location =  4) uniform sampler2D outputImage;
@@ -378,108 +377,101 @@ void main() {
     ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     vec4 fog = vec4(0.0,0.0,0.0,0.0);
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
-    if (debugValue > 0) { FragColor = vec4(color.rgb, 1.0); return; }
-
     ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
-    if (debugView != 4) { // Light index debugView
-//         if (reflectionsEnabled > 0) {
-//             vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-//             vec4 reflectionColor = vec4(0.0);
-//             reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
-//             if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
-// 
-//             color.rgb += reflectionColor.rgb;
-//         }
+    if (reflectionsEnabled > 0) {
+        vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
+        vec4 reflectionColor = vec4(0.0);
+        reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
+        if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
 
-        if (reflectionsEnabled > 0) {
-            vec2 lowResSize = vec2(screenWidth / SSR_RES, screenHeight / SSR_RES);
-            vec2 pixelLow = floor(vec2(pixel)) + 0.5;  // Center of the current low-res pixel
-            vec2 sampleUVBase = pixelLow / lowResSize;
-            vec4 reflectionColor = vec4(0.0);
-            float weightSum = 0.0;
-            for (int x = -1; x <= 1; ++x) {
-                for (int y = -1; y <= 1; ++y) {
-                    vec2 offset = vec2(float(x), float(y));
-                    vec2 sampleUV = (pixelLow + offset) / lowResSize;
-                    vec3 samp = texture(outputImage, sampleUV).rgb;
-                    reflectionColor.rgb += samp;
-                    weightSum += 1.0;
-                }
-            }
-
-            reflectionColor.rgb /= weightSum;
-            if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
-
-            color.rgb += reflectionColor.rgb;
-        }
-
-        vec3 aaColor = color.rgb; // Default to chromatic aberration result
-        if (aaEnabled > 0) {
-            // SMAA-Inspired Edge-Directed Antialiasing
-            // Compute luminance for edge detection
-            vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
-            vec3 centerColor = texture(tex, texCoordUsed).rgb;
-            float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114)); // Luminance (Rec. 601)
-            vec3 dx = texture(tex, texCoordUsed + vec2(pixelSize.x, 0.0)).rgb - texture(tex, texCoordUsed - vec2(pixelSize.x, 0.0)).rgb;
-            vec3 dy = texture(tex, texCoordUsed + vec2(0.0, pixelSize.y)).rgb - texture(tex, texCoordUsed - vec2(0.0, pixelSize.y)).rgb;
-            float lumaDx = dot(abs(dx), vec3(0.299, 0.587, 0.114));
-            float lumaDy = dot(abs(dy), vec3(0.299, 0.587, 0.114));
-            float gradientMag = lumaDx + lumaDy; // Luminance-based gradient magnitude
-            if (gradientMag > aaThreshold) {
-                // Determine edge direction
-                vec2 edgeDir = vec2(lumaDx, lumaDy);
-                edgeDir = normalize(edgeDir + 1e-6); // Avoid division by zero
-                vec2 orthoDir = vec2(-edgeDir.y, edgeDir.x); // Perpendicular to edge
-
-                // Sample along the edge (up to ±5 pixels)
-                vec3 sampleColor = vec3(0.0);
-                float aaWeightSum = 0.0;
-                const int sampleCount = 10; // Samples per side (total 11 samples: -5 to +5)
-                for (int i = -sampleCount; i <= sampleCount; i++) {
-                    float t = float(i) / float(sampleCount); // Normalized position [-1, 1]
-                    float dist = t * 2.0; // Distance along edge
-                    float weight = exp(-abs(t) * 2.0); // Gaussian weight (sigma = 0.5)
-                    vec2 sampleUV = texCoordUsed + orthoDir * dist * pixelSize;
-                    sampleColor += texture(tex, sampleUV).rgb * weight;
-                    aaWeightSum += weight;
-                }
-                sampleColor /= aaWeightSum;
-
-                // Dynamic blending based on edge contrast
-                float blendFactor = clamp(gradientMag * 0.5, 2.0, 4.0); // Adjust blend based on edge strength
-                aaColor = mix(color.rgb, sampleColor, blendFactor);
-            }
-        }
-
-        // VHS Blur
-        const float r = vhsRadiusMax * vhsBlurAmount;
-        vec2 px = 1.0 / vec2(screenWidth, screenHeight);
-        vec3 acc = vec3(0.0);
-        float wsum = 0.0;
-
-        // 7-tap horizontal (same weights as original)
-        const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
-        for (int i=0;i<7;i++) {
-            float o = (i-3) * (r/3.0);
-            vec3 s = texture(tex, texCoordUsed + vec2(o*px.x,0.0)).rgb;
-            acc += s * w[i];
-            wsum += w[i];
-        }
-        acc /= wsum;
-
-        // 3-tap vertical (same as original)
-        acc += texture(tex, texCoordUsed + vec2(0.0,-px.y)).rgb * 0.25;
-        acc += texture(tex, texCoordUsed + vec2(0.0, px.y)).rgb * 0.25;
-        vec3 vhsBlur = acc * (1.0/1.5); // renormalize
-        aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0));
-
-        if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
-//         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting * 1.25) / 100.0))); // Brightness Adjustment Setting
-        if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
-
-        FragColor = vec4(aaColor, 1.0); // Output final composited color
-    } else {
-        vec2 sampleUV = (vec2(pixel) + 0.5) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-        FragColor = texture(outputImage, sampleUV); // SSR debug view
+        color.rgb += reflectionColor.rgb;
     }
+
+    if (reflectionsEnabled > 0) {
+        vec2 lowResSize = vec2(screenWidth / SSR_RES, screenHeight / SSR_RES);
+        vec2 pixelLow = floor(vec2(pixel)) + 0.5;  // Center of the current low-res pixel
+        vec2 sampleUVBase = pixelLow / lowResSize;
+        vec4 reflectionColor = vec4(0.0);
+        float weightSum = 0.0;
+        for (int x = -1; x <= 1; ++x) {
+            for (int y = -1; y <= 1; ++y) {
+                vec2 offset = vec2(float(x), float(y));
+                vec2 sampleUV = (pixelLow + offset) / lowResSize;
+                vec3 samp = texture(outputImage, sampleUV).rgb;
+                reflectionColor.rgb += samp;
+                weightSum += 1.0;
+            }
+        }
+
+        reflectionColor.rgb /= weightSum;
+        if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
+
+        color.rgb += reflectionColor.rgb;
+    }
+
+    vec3 aaColor = color.rgb; // Default to chromatic aberration result
+    if (aaEnabled > 0) {
+        // SMAA-Inspired Edge-Directed Antialiasing
+        // Compute luminance for edge detection
+        vec2 pixelSize = vec2(1.0 / float(screenWidth), 1.0 / float(screenHeight));
+        vec3 centerColor = texture(tex, texCoordUsed).rgb;
+        float lumaCenter = dot(centerColor, vec3(0.299, 0.587, 0.114)); // Luminance (Rec. 601)
+        vec3 dx = texture(tex, texCoordUsed + vec2(pixelSize.x, 0.0)).rgb - texture(tex, texCoordUsed - vec2(pixelSize.x, 0.0)).rgb;
+        vec3 dy = texture(tex, texCoordUsed + vec2(0.0, pixelSize.y)).rgb - texture(tex, texCoordUsed - vec2(0.0, pixelSize.y)).rgb;
+        float lumaDx = dot(abs(dx), vec3(0.299, 0.587, 0.114));
+        float lumaDy = dot(abs(dy), vec3(0.299, 0.587, 0.114));
+        float gradientMag = lumaDx + lumaDy; // Luminance-based gradient magnitude
+        if (gradientMag > aaThreshold) {
+            // Determine edge direction
+            vec2 edgeDir = vec2(lumaDx, lumaDy);
+            edgeDir = normalize(edgeDir + 1e-6); // Avoid division by zero
+            vec2 orthoDir = vec2(-edgeDir.y, edgeDir.x); // Perpendicular to edge
+
+            // Sample along the edge (up to ±5 pixels)
+            vec3 sampleColor = vec3(0.0);
+            float aaWeightSum = 0.0;
+            const int sampleCount = 10; // Samples per side (total 11 samples: -5 to +5)
+            for (int i = -sampleCount; i <= sampleCount; i++) {
+                float t = float(i) / float(sampleCount); // Normalized position [-1, 1]
+                float dist = t * 2.0; // Distance along edge
+                float weight = exp(-abs(t) * 2.0); // Gaussian weight (sigma = 0.5)
+                vec2 sampleUV = texCoordUsed + orthoDir * dist * pixelSize;
+                sampleColor += texture(tex, sampleUV).rgb * weight;
+                aaWeightSum += weight;
+            }
+            sampleColor /= aaWeightSum;
+
+            // Dynamic blending based on edge contrast
+            float blendFactor = clamp(gradientMag * 0.5, 2.0, 4.0); // Adjust blend based on edge strength
+            aaColor = mix(color.rgb, sampleColor, blendFactor);
+        }
+    }
+
+    // VHS Blur
+    const float r = vhsRadiusMax * vhsBlurAmount;
+    vec2 px = 1.0 / vec2(screenWidth, screenHeight);
+    vec3 acc = vec3(0.0);
+    float wsum = 0.0;
+
+    // 7-tap horizontal (same weights as original)
+    const float w[7] = float[](0.05,0.12,0.20,0.26,0.20,0.12,0.05);
+    for (int i=0;i<7;i++) {
+        float o = (i-3) * (r/3.0);
+        vec3 s = texture(tex, texCoordUsed + vec2(o*px.x,0.0)).rgb;
+        acc += s * w[i];
+        wsum += w[i];
+    }
+    acc /= wsum;
+
+    // 3-tap vertical (same as original)
+    acc += texture(tex, texCoordUsed + vec2(0.0,-px.y)).rgb * 0.25;
+    acc += texture(tex, texCoordUsed + vec2(0.0, px.y)).rgb * 0.25;
+    vec3 vhsBlur = acc * (1.0/1.5); // renormalize
+    aaColor = mix(aaColor, vhsBlur, clamp(vhsBlurAmount, 0.0, 1.0));
+
+    if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
+//         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting * 1.25) / 100.0))); // Brightness Adjustment Setting
+    if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
+
+    FragColor = vec4(aaColor, 1.0); // Output final composited color
 }

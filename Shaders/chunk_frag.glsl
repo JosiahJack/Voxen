@@ -13,19 +13,14 @@ layout(location =  0) uniform uint instanceIndex; // start vert shader uniforms
 layout(location =  1) uniform uint normInstanceIndex;
 layout(location =  2) uniform mat4 viewProjection;
 layout(location =  3) uniform uint isUI; // end vert shader uniforms
-layout(location =  4) uniform int debugView;
-layout(location =  5) uniform int debugValue;
+layout(location =  4) uniform vec3 fogColor;
 layout(location =  6) uniform uint screenWidth;
 layout(location =  7) uniform uint screenHeight;
 layout(location =  8) uniform float worldMin_x;
 layout(location =  9) uniform float worldMin_z;
 layout(location = 10) uniform vec3 camPos;
-layout(location = 11) uniform float fogColorR;
-layout(location = 12) uniform float fogColorG;
-layout(location = 13) uniform float fogColorB;
 layout(location = 14) uniform uint reflectionsEnabled;
 layout(location = 15) uniform uint shadowsEnabled;
-
 layout(location = 17) uniform uint unlit;
 layout(location = 18) uniform uint texIndex;
 layout(location = 19) uniform uint glowIndex;
@@ -35,11 +30,7 @@ layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
 layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
 layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
-// layout(std430, binding = 4) buffer CullingData { uint gridCellStates[]; };
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
-// layout(std430, binding = 6) readonly buffer ModelVertexOffsets { uint vertexOffsets[]; };
-// layout(std430, binding = 7) buffer BoundsBuffer { float bounds[]; };
-// layout(std430, binding = 8) readonly buffer ModelVertexCounts { uint modelVertexCounts[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
 layout(std430, binding = 10) buffer ShadowMapOffsets { uint shadowMapOffsets[]; };
@@ -50,7 +41,6 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
-// layout(std430, binding = 20) readonly buffer MasterVertexBuffer { float vertexData[]; };
 layout(std430, binding = 6) buffer VoxelLightListCounts { uint voxelLightListCounts[]; };
 layout(std430, binding = 27) buffer UniqueLightLists { uint uniqueLightLists[]; };
 
@@ -71,76 +61,6 @@ const int LIGHT_DATA_OFFSET_B = 12;
 const float WORLDCELL_WIDTH_F = 2.56;
 const float VOXEL_SIZE = 0.32;
 const vec3 baseDir = vec3(0.0, 0.0, 1.0);
-
-// uint PosGetCellCoords(vec3 pos) {
-// 	uint cellX = uint(uint(floor((pos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F)));
-// 	uint cellZ = uint(uint(floor((pos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F)));
-//     if (cellX > WORLDX_0BASED) cellX = WORLDX_0BASED;
-//     if (cellX < 0) cellX = 0;
-//     if (cellZ > WORLDX_0BASED) cellZ = WORLDX_0BASED;
-//     if (cellZ < 0) cellZ = 0;
-// 	return (cellZ * WORLDX) + cellX;
-// }
-
-//     if ((gridCellStates[cellIdx] & CELL_VISIBLE) == 0u && ((gridCellStates[cellIdx] & CELL_OPEN) >= 1u)) return;
-
-// --- Ray-Triangle Intersection (Möller-Trumbore) ---
-// bool RayTriangle(vec3 origin, vec3 dir, vec3 v0, vec3 v1, vec3 v2, out float t) {
-//     vec3 edge1 = v1 - v0;
-//     vec3 edge2 = v2 - v0;
-//     vec3 h = cross(dir, edge2);
-//     float a = dot(edge1, h);
-//     if (abs(a) < 1e-6) return false;
-// 
-//     float f = 1.0 / a;
-//     vec3 s = origin - v0;
-//     float u = f * dot(s, h);
-//     if (u < 0.0 || u > 1.0) return false;
-// 
-//     vec3 q = cross(s, edge1);
-//     float v = f * dot(dir, q);
-//     if (v < 0.0 || u + v > 1.0) return false;
-// 
-//     t = f * dot(edge2, q);
-//     return t > 0.001;
-// }
-// 
-// // --- Trace Ray for Shadow ---
-// float TraceRay(vec3 origin, vec3 dir, float maxDist) {
-//     for (int i = 0; i < instancesInPVSCount; i++) {
-//         uint instanceIdx = instancesIndices[i];
-//         Instance inst = instances[instanceIdx];
-//         if (inst.texIndex == 881) continue; // Fullbright light
-// 
-//         mat4 invModel = inverse(instanceMatrices[instanceIdx]);
-//         vec3 localOrigin = (invModel * vec4(origin, 1.0)).xyz;
-//         float instanceRadius = bounds[instanceIdx * BOUNDS_ATTRIBUTES_COUNT + 6]; // first 6 are the mins,maxs xyz
-//         if (length(localOrigin - origin) > (maxDist + instanceRadius)) continue;
-// 
-//         vec3 localDir = ((invModel * vec4(dir, 0.0)).xyz);
-//         uint modelIndex = inst.modelIndex;
-//         uint vertCount = modelVertexCounts[modelIndex];
-//         if (vertCount > 1000) continue;
-// 
-//         uint triCount = vertCount / 3;
-//         mat4 matrix = instanceMatrices[instanceIdx];
-//         uint j = 0;
-//         uint vertexIdx;
-//         vec3 v0, v1, v2;
-//         for (uint tri = 0; tri < triCount; tri++) {
-//             vertexIdx = (vertexOffsets[modelIndex] * VERTEX_ATTRIBUTES_COUNT) + (tri * VERTEX_ATTRIBUTES_COUNT);
-//             j = 0;
-//             v0 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);
-//             j++;
-//             v1 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);
-//             j++;
-//             v2 = vec3(vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 0], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 1], vertexData[vertexIdx + j * VERTEX_ATTRIBUTES_COUNT + 2]);
-//             float t; // Output result
-//             if (RayTriangle(localOrigin, localDir, v0, v1, v2, t) && (t < maxDist)) return 0.0;
-//         }
-//     }
-//     return 1.0;
-// }
 
 uint GetVoxelIndex(vec3 worldPos) {
     float offsetX = worldPos.x - worldMin_x;
@@ -218,7 +138,7 @@ void main() {
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
     vec3 adjustedNormal = Normal;
-    if (normInstanceIndex != 0 && debugValue < 1) { //  && distToPixel < 10.24 only has 0.073ms savings, leaving off for better quality of visuals
+    if (normInstanceIndex != 0) { //  && distToPixel < 10.24 only has 0.073ms savings, leaving off for better quality of visuals
         vec3 dp1 = dFdx(FragPos);
         vec3 dp2 = dFdy(FragPos);
         vec2 duv1 = dFdx(TexCoord);
@@ -282,7 +202,8 @@ void main() {
         if (dist > range) continue;
 
         vec3 lightDir = normalize(toLight);
-        float lambertian = clamp(max(dot(adjustedNormal, lightDir), 0.0),0.0,1.0);
+        float NdotL = dot(adjustedNormal, lightDir);
+        float lambertian = clamp(max(NdotL, 0.0),0.0,1.0);
         float distOverRange = dist / range;
         float distOverRangeSqd = distOverRange * distOverRange;
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
@@ -309,7 +230,7 @@ void main() {
 
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
-        if (debugValue != 2 && shadowsEnabled > 0 && shadowIndex < 1600) {
+        if (shadowsEnabled > 0 && shadowIndex < 1600) {
             float smearness = distOverRange * distOverRange * 24.0 + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
@@ -333,7 +254,6 @@ void main() {
             float shadSizef = float(shadSize);
             uint faceOff = shadowMapOffsets[shadowIndex] + (face * shadSize * shadSize);
             vec2 tc = uv * shadSizef;
-            float NdotL = dot(adjustedNormal, lightDir);
             float slopeBias = 0.451 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
             float bias = slopeBias * (dist / range);
@@ -349,7 +269,7 @@ void main() {
                 vec2 t = tc + off;
                 uint ssbo_index = faceOff + uint(t.y) * shadSize + uint(t.x);
                 uint distInt = shadowMaps[ssbo_index];
-                float d = (float(distInt) / 100000.0);
+                float d = (float(distInt) * 0.00001);
                 float depthDiff = (dist) - d - bias;
                 float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
                 sum += shadowContrib * invSamples;
@@ -362,14 +282,11 @@ void main() {
         vec3 baseLighting = albedoColor.rgb  * lightColor * intensity * pow(attenuation, 1.75);
         lighting = fma(baseLighting,vec3(spotFalloff * shadowFactor),lighting);
         intensityTotal = fma(intensity,attenuation * 1.5,intensityTotal);
-        if (specColor.r > 0.0 || specColor.g > 0.0 || specColor.b > 0.0) {
-            vec3 halfDir = normalize(lightDir + viewDir);
-            float ndh = max(dot(adjustedNormal, halfDir), 0.0);
-            float strength = texIndex == 36 || texIndex == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 0.451;
-            float shininess = 100.0;
-            float spec = clamp(pow(ndh, shininess),0.0,1.0);
-            lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength * 10.0;
-        }
+        vec3 halfDir = normalize(lightDir + viewDir);
+        float ndh = max(dot(adjustedNormal, halfDir), 0.0);
+        float strength = texIndex == 36 || texIndex == 887 ? 1.0 : max(specColor.r, max(specColor.g, specColor.b)) * 4.51;
+        float spec = clamp(pow(ndh, 100.0),0.0,1.0);
+        lighting += specColor.rgb * intensity * attenuation * spotFalloff * spec * shadowFactor * strength;
     }
 
     float rim = 1.0 - max(dot(adjustedNormal, viewDir), 0.0);
@@ -383,25 +300,11 @@ void main() {
     float dither = (blue - 0.5) * 0.003921569; // 1.0 / 255.0;
     lighting.rgb += vec3(dither);
 
+    // Fog
     float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0); // This is inverse of fog dist so * (1 / 71.68 far plane)
     float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
-    vec3 fogColor = vec3(fogColorR, fogColorG, fogColorB);
     fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
-    if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac); // Fog
-    if (debugView == 1) {
-        outAlbedo = albedoColor;
-        outAlbedo.a = 1.0;
-    } else if (debugView == 2) {
-        outAlbedo.r = (adjustedNormal.x + 1.0) * 0.5f;
-        outAlbedo.g = (adjustedNormal.y + 1.0) * 0.5f;
-        outAlbedo.b = (adjustedNormal.z + 1.0) * 0.5f;
-        outAlbedo.a = 1.0;
-    } else if (debugView == 3) {
-        float ndcDepth = (2.0 * gl_FragCoord.z - 1.0); // Depth debug
-        float clipDepth = ndcDepth / gl_FragCoord.w;
-        float linearDepth = (clipDepth - 0.02) / (71.68 - 0.02);
-        outAlbedo = vec4(vec3(linearDepth), 1.0);
-    } else {
-        outAlbedo = vec4(lighting.rgb, albedoColor.a);
-    }
+    if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac);
+
+    outAlbedo = vec4(lighting.rgb, albedoColor.a);
 }
