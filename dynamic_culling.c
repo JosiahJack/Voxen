@@ -669,6 +669,7 @@ void CullCore(void) {
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
     }
     
+    lightDirty[0] = true;
 //     CameraViewUnculling(playerCellX,playerCellY);
 //     UpdateNPCPVS();
 //     ToggleNPCPVS();

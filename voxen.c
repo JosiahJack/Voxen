@@ -227,7 +227,7 @@ void UpdateVoxelLightLists(void) {
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
 #define MAX_SHADOWMAPS 56u
 #define SHADOW_MAP_SIZE 192u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 3U)) // Found that in practice only needed ~45%, oversized a little here for safety.
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U)) // Found that in practice only needed ~45%, oversized a little here for safety.
 typedef struct {
 	uint32_t numShadowsCouldRender;
 	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
@@ -264,9 +264,8 @@ typedef struct {
     float score; // Priority score (lower distance, higher intensity = higher priority)
 } LightCandidate;
 
-void RenderShadowmaps(void) {
-    if (voxen_Settings.Shadows < 1) return;
-    
+void RenderShadowmaps(void) {    
+    shadowDrawCallsRenderedThisFrame = 0;
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glBindVertexArray(voxen_GL_Comms.vao_chunk);
@@ -317,13 +316,7 @@ void RenderShadowmaps(void) {
         }
         if (!inPVS) continue;
 
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        if (dotResult < 0.0f && distSqrd > (range * range)) continue;
-        
-        float score = distSqrd / vmax(intensity, 0.01f);
-        if (dotResult > 0.5f || distSqrd < 26.2144f) score *= 0.125f; // Favor lights in player's view cone or within 5.12 (2 world cells)
-        else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
-
+        float score = distSqrd / vmax(intensity, 0.01f); // Don't skip lights behind player nor score them differently now that we are only updating when cell changes, not view and not every frame or if light moves
         if (heap_size < MAX_SHADOWMAPS) {
             candidates[heap_size] = (LightCandidate){ i, distSqrd, score };
             bestScores[heap_size] = score;
@@ -371,7 +364,7 @@ void RenderShadowmaps(void) {
         float scale = 1.0f / (1.0f + 0.001f * candidates[c].score);
         scale = vmax(scale, 0.0625f);
         if (c > shadowmapCountHalf) scale = vmin(scale,0.125f);
-        uint32_t shadSize = (uint32_t)(SHADOW_MAP_SIZE * scale + 0.5f);
+        uint32_t shadSize = SHADOW_MAP_SIZE;//(uint32_t)(SHADOW_MAP_SIZE * scale + 0.5f);
         glViewport(0, 0, shadSize, shadSize);
         voxen_Shadow_System.shadowmapSizes[c] = shadSize;
         uint16_t nearbyMeshCount = 0;
@@ -751,9 +744,6 @@ void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
     debugLineVertCount = i;
 }
 
-#define REND_OPAQUE      1u
-#define REND_DOUBLESIDED 2u
-#define REND_TRANSPARENT 3u
 DepthSort visibleInstances[INSTANCE_COUNT];
 void RenderInstances(void) {
     glEnable(GL_CULL_FACE); // Opaques
@@ -1057,7 +1047,6 @@ int32_t main(int32_t argc, char* argv[]) {
         drawCallsRenderedThisFrame = 0; // Reset per frame
         textDrawCallsRenderedThisFrame = 0;
         uiImageDrawCallsRenderedThisFrame = 0;
-        shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
         
         // 0. View Matrix, and Projection Matrix
@@ -1122,6 +1111,7 @@ int32_t main(int32_t argc, char* argv[]) {
             // 3. Light Updates
             UpdateDynamicLights(); // Just lerps/flickers in intensity
             bool voxelsNeedUpdated = false;
+            bool shadowsNeedUpdated = false;
             for (int lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
                 if (lightDirty[lightIdx]) { // Marked all as true at level load.
                     voxelsNeedUpdated = true;
@@ -1135,11 +1125,13 @@ int32_t main(int32_t argc, char* argv[]) {
                         mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
                         ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
                     }
+                    
+                    shadowsNeedUpdated = true;
                 }
             }
             
             if (voxelsNeedUpdated) UpdateVoxelLightLists();
-            if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
+            if (voxen_Settings.Shadows > 0u && shadowsNeedUpdated) RenderShadowmaps();
             memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));         // Clear dirty after shadowmaps for minimal shadowmap updating.
             memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
             
