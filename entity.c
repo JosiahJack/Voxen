@@ -391,6 +391,7 @@ void LoadLevel(uint8_t curlevel) {
         int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
         uint8_t lightType = 0u; // Point
         bool lightOnRead = false;
+        bool overridePos = false;
         while(line[0] != '\0') {
             // Guaranteed no leading whitespaces,k comments, or blank lines, so don't bother
             char* pipe = strchr(line,'|');
@@ -509,6 +510,7 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "maxIntensity") == 0)    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
             } else {
                      if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "overridePosition") == 0) overridePos  = parse_bool(trimmed_value, initialLine, lineNum) + correctionZ;
                 else if (strcmp(trimmed_key, "localPosition.x") == 0) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.y") == 0) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.z") == 0) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
@@ -549,7 +551,18 @@ void LoadLevel(uint8_t curlevel) {
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
+            float posBeforeX, posBeforeY, posBeforeZ;
+            if (overridePos) {
+                posBeforeX = instances[parent].position.x;
+                posBeforeY = instances[parent].position.y;
+                posBeforeZ = instances[parent].position.z;
+            }
             AddInstance(entIdx, parent, lineNum);
+            if (overridePos) {
+                    instances[parent].position.x = posBeforeX;
+                    instances[parent].position.y = posBeforeY;
+                    instances[parent].position.z = posBeforeZ;
+            }
             for (int i=0;i<MAX_CHILD_COUNT;++i) {
                 if (instances[parent].child[i] < entityCount) {
                     if (entities[entIdx].child[i] != UINT16_MAX) { // Add child
