@@ -784,7 +784,7 @@ void RenderInstances(void) {
     uint32_t currentNormIndex = 0;
     uint32_t currentGlowIndex = 0;
     uint32_t currentSpecIndex = 0;
-    
+    uint16_t currentModelType = 0;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
         uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
         float dx = instances[i].position.x - px;
@@ -806,27 +806,16 @@ void RenderInstances(void) {
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
-        float dx = instances[i].position.x - px;
-        float dy = instances[i].position.y - py;
-        float dz = instances[i].position.z - pz;
-        float distSqrd = dx*dx + dy*dy + dz*dz;
-        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-        if (distSqrd >= FAR_PLANE_SQUARED) continue;
-        
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-
         glUniform1ui(0, i);
         if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        uint32_t vertCount = modelTriangleCounts[modelType] * 3;
-        glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
+        if (currentModelType != modelType) currentModelType = modelType;
+        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertCount;
@@ -852,9 +841,10 @@ void RenderInstances(void) {
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        uint32_t vertCount = modelTriangleCounts[modelType] * 3;
-        glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
+        if (currentModelType != modelType) currentModelType = modelType;
+        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertCount;
@@ -885,27 +875,16 @@ void RenderInstances(void) {
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
-        float dx = instances[i].position.x - px;
-        float dy = instances[i].position.y - py;
-        float dz = instances[i].position.z - pz;
-        float distSqrd = dx*dx + dy*dy + dz*dz;
-        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-        if (distSqrd >= FAR_PLANE_SQUARED) continue;
-        
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-        
         glUniform1ui(0, i);
         if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        uint32_t vertCount = modelTriangleCounts[modelType] * 3;
-        glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
+        if (currentModelType != modelType) currentModelType = modelType;
+        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertCount;
