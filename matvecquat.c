@@ -76,5 +76,4 @@ void UpdateInstanceMatrix(int32_t i) {
     Quaternion quat = {instances[i].rotation.x, instances[i].rotation.y, instances[i].rotation.z, instances[i].rotation.w};
     SetUpdatedMatrix(mat, instances[i].position.x, instances[i].position.y, instances[i].position.z, &quat,instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
     memcpy(&modelMatrices[i * 16], mat, 16 * sizeof(float));
-    dirtyInstances[i] = false;
 }

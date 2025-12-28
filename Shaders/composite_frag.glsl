@@ -7,7 +7,6 @@ out vec4 FragColor;
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
 layout(location =  4) uniform sampler2D outputImage;
-layout(location =  5) uniform uint reflectionsEnabled;
 layout(location =  6) uniform uint aaEnabled;
 layout(location =  9) uniform float berserkTimeRemaining;
 layout(location = 10) uniform float berserkSeedTimestamp;

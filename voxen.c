@@ -225,7 +225,7 @@ void UpdateVoxelLightLists(void) {
 }
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
-#define MAX_SHADOWMAPS 64u
+#define MAX_SHADOWMAPS 56u
 #define SHADOW_MAP_SIZE 192u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 3U)) // Found that in practice only needed ~45%, oversized a little here for safety.
 typedef struct {
@@ -238,7 +238,24 @@ typedef struct {
 } VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
 
-uint16_t shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
+typedef struct {
+    uint16_t index;
+    float depth;
+} DepthSort;
+
+__attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) {
+    const DepthSort* da = (const DepthSort*)a;
+    const DepthSort* db = (const DepthSort*)b;
+    return da->depth > db->depth ? -1 : (da->depth < db->depth ? 1 : 0);
+}
+
+__attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void* b) {
+    const DepthSort* da = (const DepthSort*)a;
+    const DepthSort* db = (const DepthSort*)b;
+    return da->depth > db->depth ? 1 : (da->depth < db->depth ? -1 : 0);
+}
+
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 
 typedef struct {
@@ -270,7 +287,7 @@ void RenderShadowmaps(void) {
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (range < 0.32f) continue;
         
-        float thresh = 0.01f;
+        float thresh = 0.0125f;
         float luminosity = (intensity / (range * range));
         if (luminosity < thresh) continue;
 
@@ -343,9 +360,6 @@ void RenderShadowmaps(void) {
     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
     uint32_t shadowmapOffsetHead = 0U;
     uint16_t shadowmapCountHalf = (MAX_SHADOWMAPS / 2U);
-    uint16_t currentModelType = 0;
-    uint16_t currentTexIndex = 0;
-    bool currentIsTransparent = 0;
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
@@ -361,7 +375,8 @@ void RenderShadowmaps(void) {
         glViewport(0, 0, shadSize, shadSize);
         voxen_Shadow_System.shadowmapSizes[c] = shadSize;
         uint16_t nearbyMeshCount = 0;
-        for (uint16_t j = 3; j < loadedInstances; j++) { // Skip player indices and start at 3
+        uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
+        for (uint16_t j = 3; j < endOfModels; j++) { // Skip player indices and start at 3
             if (instances[j].modelIndex >= loadedModelsMaxIndex) continue;
             if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
 
@@ -377,23 +392,28 @@ void RenderShadowmaps(void) {
             float distSqrd = squareDistance3D(obj_x, obj_y, obj_z, px, py, pz);
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
             
-            shadows_nearMeshes[nearbyMeshCount] = j;
+            shadows_nearMeshes[nearbyMeshCount].index = j;
+            shadows_nearMeshes[nearbyMeshCount].depth = distSqrd; 
             nearbyMeshCount++;
             if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
         }
 
         if (nearbyMeshCount < 1) continue;
         
+        qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
         glUniform1ui(3, lightIdx * (uint32_t)LIGHT_DATA_SIZE);
         glUniform1ui(4, shadSize);
         voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
         glUniform1ui(5, voxen_Shadow_System.shadowmapIndirectionList[lightIdx]);
         glUniform1ui(7, shadowmapOffsetHead);
+        uint16_t currentModelType = 0;
+        uint16_t currentTexIndex = 0;
+        bool currentIsTransparent = 0;
         for (uint8_t face = 0; face < 6; face++) {
             glUniform1ui(2, face);
             glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
             for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
-                int i = shadows_nearMeshes[j];            
+                int i = shadows_nearMeshes[j].index;            
                 if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 2.56f)) continue;
 
                 int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
@@ -729,23 +749,6 @@ void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
     debugLineBuffer[i++] = x1; debugLineBuffer[i++] = y1; debugLineBuffer[i++] = z1;
     debugLineBuffer[i++] = x2; debugLineBuffer[i++] = y2; debugLineBuffer[i++] = z2;
     debugLineVertCount = i;
-}
-
-typedef struct {
-    uint16_t index;
-    float depth;
-} DepthSort;
-
-__attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) {
-    const DepthSort* da = (const DepthSort*)a;
-    const DepthSort* db = (const DepthSort*)b;
-    return da->depth > db->depth ? -1 : (da->depth < db->depth ? 1 : 0);
-}
-
-__attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void* b) {
-    const DepthSort* da = (const DepthSort*)a;
-    const DepthSort* db = (const DepthSort*)b;
-    return da->depth > db->depth ? 1 : (da->depth < db->depth ? -1 : 0);
 }
 
 #define REND_OPAQUE      1u
@@ -1113,7 +1116,7 @@ int32_t main(int32_t argc, char* argv[]) {
             Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
             
             // 2. Pass instance data to GPU
-            for (uint32_t i = 3; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } } // Skip player indices and start at 3
+            for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } }
             glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 
             // 3. Light Updates
@@ -1132,13 +1135,13 @@ int32_t main(int32_t argc, char* argv[]) {
                         mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
                         ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
                     }
-                    
-                    lightDirty[lightIdx] = false;
                 }
             }
             
             if (voxelsNeedUpdated) UpdateVoxelLightLists();
             if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
+            memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));         // Clear dirty after shadowmaps for minimal shadowmap updating.
+            memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
             
             // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
             glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);

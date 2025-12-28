@@ -598,7 +598,7 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    for (uint16_t i = 3; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i); // Skip player indices and start at 3
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
     glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
     glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
     glUniform1f(0, voxelMinCenterX);
