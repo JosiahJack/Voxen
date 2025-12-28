@@ -780,6 +780,11 @@ void RenderInstances(void) {
     glEnable(GL_CULL_FACE);
     float px = instances[PLAYER1].position.x, py = instances[PLAYER1].position.y, pz = instances[PLAYER1].position.z;
     uint16_t visibleCount = 0;
+    uint32_t currentTexIndex = 0;
+    uint32_t currentNormIndex = 0;
+    uint32_t currentGlowIndex = 0;
+    uint32_t currentSpecIndex = 0;
+    
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
         uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
         float dx = instances[i].position.x - px;
@@ -814,10 +819,10 @@ void RenderInstances(void) {
         if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
 
         glUniform1ui(0, i);
-        glUniform1ui(1, (uint32_t)instances[i].normIndex);
-        glUniform1ui(18, instances[i].texIndex);
-        glUniform1ui(19, (uint32_t)instances[i].glowIndex);
-        glUniform1ui(20, (uint32_t)instances[i].specIndex);
+        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
         uint32_t vertCount = modelTriangleCounts[modelType] * 3;
         glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -842,10 +847,10 @@ void RenderInstances(void) {
         if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
         
         glUniform1ui(0, i);
-        glUniform1ui(1, (uint32_t)instances[i].normIndex);
-        glUniform1ui(18, instances[i].texIndex);
-        glUniform1ui(19, (uint32_t)instances[i].glowIndex);
-        glUniform1ui(20, (uint32_t)instances[i].specIndex);
+        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
         uint32_t vertCount = modelTriangleCounts[modelType] * 3;
         glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -893,10 +898,10 @@ void RenderInstances(void) {
         if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
         
         glUniform1ui(0, i);
-        glUniform1ui(1, (uint32_t)instances[i].normIndex);
-        glUniform1ui(18, instances[i].texIndex);
-        glUniform1ui(19, (uint32_t)instances[i].glowIndex);
-        glUniform1ui(20, (uint32_t)instances[i].specIndex);
+        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
         uint32_t vertCount = modelTriangleCounts[modelType] * 3;
         glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
