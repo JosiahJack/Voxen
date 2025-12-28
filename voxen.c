@@ -550,20 +550,13 @@ void CenterStatusPrint(const char* fmt, ...) {
 
 void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
     instances[playerIdx].index = 767;
-    instances[playerIdx].position.x = 10.52f; // Start Actual: Puts player on Medical Level in actual game start position
-    instances[playerIdx].position.y = -43.792f + 0.84f; // Added 0.84f for cam offset from center
-    instances[playerIdx].position.z = 20.2908f;
-    instances[playerIdx].velocity.x = instances[playerIdx].velocity.y = instances[playerIdx].velocity.z = 0.0f;
-    instances[playerIdx].scale.x = instances[playerIdx].scale.y = instances[playerIdx].scale.z = 1.0f;
-    instances[playerIdx].rotation.x = instances[playerIdx].rotation.y = instances[playerIdx].rotation.z = 0.0f; instances[playerIdx].rotation.w = 1.0f;
-    flag_enable(&instances[playerIdx].entflags, ENTFLAG_ACTIVE);
-    flag_enable(&instances[playerIdx].entflags, ENTFLAG_USEGRAVITY);
-    flag_enable(&instances[playerIdx].entflags, ENTFLAG_RIGIDBODY);
+    instances[playerIdx].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
+    instances[playerIdx].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
+    instances[playerIdx].rotation.w = 1.0f;
+    instances[playerIdx].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
     instances[playerIdx].collider = COLLIDER_TYPE_CAPSULE;
     instances[playerIdx].colliderCenter.y = 0.84f;
-    instances[playerIdx].colliderSize.x = 0.48f; // Radius
-    instances[playerIdx].colliderSize.y = 2.0f;  // Overall height including end radii (Unity convention, blech)
-    instances[playerIdx].colliderSize.z = COLLIDER_CAPSULE_DIRECTION_Y_F; // Direction, 1.0 == Y-Axis
+    instances[playerIdx].colliderSize = (Vector3) { .x = 0.48f, .y = 2.0f, .z = COLLIDER_CAPSULE_DIRECTION_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     instances[playerIdx].mass = 1.0f;
     instances[playerIdx].linearDrag = 8.0f;
     instances[playerIdx].dynamicFriction = 0.6f;
@@ -580,9 +573,8 @@ void NewGame(void) {
     questData.lev4SecCode = random_range_u8(0u,9u);
     questData.lev5SecCode = random_range_u8(0u,9u);
     questData.lev6SecCode = random_range_u8(0u,9u);
-    memset(instances,0,3 * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     InitializePlayer(PLAYER1); InitializePlayer(PLAYER2);
-    voxen_globalContext.levelCurrentlyLoading = true;
     LoadLevel(voxen_globalContext.startLevel); // Must be after entities!
     voxen_globalContext.pauseRelativeTime = 0.0;
 }
@@ -755,7 +747,7 @@ void DrawDebugLines(float* viewProj) {
 void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
     if (debugLineVertCount + 6 > MAX_DEBUG_LINE_VERTS * 3) return;
 
-    int i = debugLineVertCount;
+    int32_t i = debugLineVertCount;
     debugLineBuffer[i++] = x1; debugLineBuffer[i++] = y1; debugLineBuffer[i++] = z1;
     debugLineBuffer[i++] = x2; debugLineBuffer[i++] = y2; debugLineBuffer[i++] = z2;
     debugLineVertCount = i;
@@ -766,128 +758,152 @@ typedef struct {
     float depth;
 } DepthSort;
 
-static void sort_transparents(DepthSort* arr, int n) {
-    if (n < 2) return;
+__attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) {
+    const DepthSort* da = (const DepthSort*)a;
+    const DepthSort* db = (const DepthSort*)b;
+    return da->depth > db->depth ? -1 : (da->depth < db->depth ? 1 : 0);
+}
 
-    const int THRESH = 16;
-    int lo[64], hi[64];
-    int sp = 1;
-    lo[0] = 0; hi[0] = n - 1;
-    while (sp > 0) {
-        int l = lo[--sp];
-        int h = hi[sp];
-        if (h - l < THRESH) {
-            for (int i = l + 1; i <= h; ++i) {
-                DepthSort v = arr[i];
-                int j = i - 1;
-                while (j >= l && arr[j].depth < v.depth) {  // descending depth
-                    arr[j + 1] = arr[j];
-                    --j;
-                }
-                arr[j + 1] = v;
-            }
-            continue;
-        }
-
-        int m = l + (h - l) / 2;
-        if (arr[m].depth > arr[l].depth) { DepthSort t = arr[m]; arr[m] = arr[l]; arr[l] = t; }
-        if (arr[h].depth > arr[l].depth) { DepthSort t = arr[h]; arr[h] = arr[l]; arr[l] = t; }
-        if (arr[m].depth > arr[h].depth) { DepthSort t = arr[m]; arr[m] = arr[h]; arr[h] = t; }
-        float pivot = arr[h].depth;
-        int i = l - 1;
-        int j = h;
-        for (;;) {
-            while (arr[++i].depth > pivot);
-            while (arr[--j].depth < pivot);
-            if (i >= j) break;
-            DepthSort t = arr[i]; arr[i] = arr[j]; arr[j] = t;
-        }
-
-        if (j - l > h - i) {
-            if (i < h) { lo[sp] = i; hi[sp] = h; ++sp; }
-            if (l < j) { lo[sp] = l; hi[sp] = j; ++sp; }
-        } else {
-            if (l < j) { lo[sp] = l; hi[sp] = j; ++sp; }
-            if (i < h) { lo[sp] = i; hi[sp] = h; ++sp; }
-        }
-    }
+__attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void* b) {
+    const DepthSort* da = (const DepthSort*)a;
+    const DepthSort* db = (const DepthSort*)b;
+    return da->depth > db->depth ? 1 : (da->depth < db->depth ? -1 : 0);
 }
 
 #define REND_OPAQUE      1u
 #define REND_DOUBLESIDED 2u
 #define REND_TRANSPARENT 3u
 DepthSort visibleInstances[INSTANCE_COUNT];
-void RenderInstances(uint8_t type) {
-    uint16_t* countsArray = NULL;
-    uint16_t* offsetsArray = NULL;
-    uint16_t startOfNextType = 0;
-    switch(type) {
-        case REND_OPAQUE:      countsArray  =  modelTypeCountsOpaque; // Cull face enabled after transparents rendered.  Might have 1 frame junk but that's fine to minimize gl calls.
-                               offsetsArray = modelTypeOffsetsOpaque;
-                               startOfNextType = startOfDoubleSidedInstances;
-                               glDisable(GL_BLEND);
-                               glEnable(GL_DEPTH_TEST);
-                               glEnable(GL_CULL_FACE); break;
-        case REND_DOUBLESIDED: glDisable(GL_CULL_FACE);
-                               countsArray  =  modelTypeCountsDoubleSided;
-                               offsetsArray = modelTypeOffsetsDoubleSided;
-                               glEnable(GL_BLEND);
-                               startOfNextType = startOfTransparentInstances; break;
-        case REND_TRANSPARENT: glEnable(GL_BLEND);
-                               glEnable(GL_CULL_FACE);
-                               countsArray  =  modelTypeCountsTransparent;
-                               offsetsArray = modelTypeOffsetsTransparent;
-                               startOfNextType = loadedInstances - invalidModelIndexCount; break;
+void RenderInstances(void) {
+    glEnable(GL_CULL_FACE); // Opaques
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    float px = instances[PLAYER1].position.x, py = instances[PLAYER1].position.y, pz = instances[PLAYER1].position.z;
+    uint16_t visibleCount = 0;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
+        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        float dx = instances[i].position.x - px;
+        float dy = instances[i].position.y - py;
+        float dz = instances[i].position.z - pz;
+        float distSqrd = dx*dx + dy*dy + dz*dz;
+        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
+        
+        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        
+        visibleInstances[visibleCount].index = i;
+        visibleInstances[visibleCount].depth = distSqrd;
+        visibleCount++;
     }
     
-    if (!countsArray || !offsetsArray) return;
-    if (startOfNextType > loadedInstances) return;
-
-    float px = instances[PLAYER1].position.x, py = instances[PLAYER1].position.y, pz = instances[PLAYER1].position.z;    
-    for (uint16_t modelIdx = 0; modelIdx < loadedModelsMaxIndex; modelIdx++) {
-        if (countsArray[modelIdx] == 0) continue;
-
-        uint16_t start = offsetsArray[modelIdx];
-        if (start < 3) DualLogError("offsets for rendering wrong!\n");
-        uint16_t count = countsArray[modelIdx];
-        uint16_t visibleCount = 0;
-        for (uint16_t i = start; i < start + count && i < startOfNextType; i++) { // Filter visible instances
-            uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
-            float obj_x = instances[i].position.x, obj_y = instances[i].position.y, obj_z = instances[i].position.z;
-            float dx = obj_x - px;
-            float dy = obj_y - py;
-            float dz = obj_z - pz;
-            float distSqrd = dx*dx + dy*dy + dz*dz;
-            if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-            if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            
-            float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-            if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-            
-            visibleInstances[visibleCount].index = i;
-            visibleInstances[visibleCount].depth = distSqrd;
-            visibleCount++;
-        }
+    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+    for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+        uint16_t i = visibleInstances[visibleIndex].index;
+        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        float dx = instances[i].position.x - px;
+        float dy = instances[i].position.y - py;
+        float dz = instances[i].position.z - pz;
+        float distSqrd = dx*dx + dy*dy + dz*dz;
+        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
         
-        if (visibleCount == 0) continue;
+        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+
+        glUniform1ui(0, i);
+        glUniform1ui(1, (uint32_t)instances[i].normIndex);
+        glUniform1ui(18, instances[i].texIndex);
+        glUniform1ui(19, (uint32_t)instances[i].glowIndex);
+        glUniform1ui(20, (uint32_t)instances[i].specIndex);
+        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        uint32_t vertCount = modelTriangleCounts[modelType] * 3;
+        glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
+        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+        drawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += vertCount;
+    }
+    
+    glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
+    for (uint16_t i = startOfDoubleSidedInstances; i < startOfTransparentInstances; ++i) {
+        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        float dx = instances[i].position.x - px;
+        float dy = instances[i].position.y - py;
+        float dz = instances[i].position.z - pz;
+        float distSqrd = dx*dx + dy*dy + dz*dz;
+        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
         
-        if (type == REND_TRANSPARENT) sort_transparents(visibleInstances, visibleCount); // With layout(early_fragment_tests) in; in the chunk_frag.glsl we only need to sort transparents
-        for (uint16_t j = 0; j < visibleCount; j++) {
-            uint16_t i = visibleInstances[j].index;
-            glUniform1ui(0, i);
-            glUniform1ui(1, (uint32_t)instances[i].normIndex);
-            glUniform1ui(18, instances[i].texIndex);
-            glUniform1ui(19, (uint32_t)instances[i].glowIndex);
-            glUniform1ui(20, (uint32_t)instances[i].specIndex);
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-            uint32_t vertCount = modelTriangleCounts[modelType] * 3;
-            glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
-            glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-            drawCallsRenderedThisFrame++;
-            verticesRenderedThisFrame += vertCount;
-        }
+        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        
+        glUniform1ui(0, i);
+        glUniform1ui(1, (uint32_t)instances[i].normIndex);
+        glUniform1ui(18, instances[i].texIndex);
+        glUniform1ui(19, (uint32_t)instances[i].glowIndex);
+        glUniform1ui(20, (uint32_t)instances[i].specIndex);
+        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        uint32_t vertCount = modelTriangleCounts[modelType] * 3;
+        glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
+        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+        drawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += vertCount;
+    }
+    
+    glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
+    uint16_t startOfNextType = loadedInstances - invalidModelIndexCount;
+    visibleCount = 0;
+    for (uint16_t i = startOfTransparentInstances; i < startOfNextType; ++i) {
+        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        float dx = instances[i].position.x - px;
+        float dy = instances[i].position.y - py;
+        float dz = instances[i].position.z - pz;
+        float distSqrd = dx*dx + dy*dy + dz*dz;
+        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
+        
+        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        
+        visibleInstances[visibleCount].index = i;
+        visibleInstances[visibleCount].depth = distSqrd;
+        visibleCount++;
+    }
+
+    
+    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
+    for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+        uint16_t i = visibleInstances[visibleIndex].index;
+        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        float dx = instances[i].position.x - px;
+        float dy = instances[i].position.y - py;
+        float dz = instances[i].position.z - pz;
+        float distSqrd = dx*dx + dy*dy + dz*dz;
+        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
+        
+        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        
+        glUniform1ui(0, i);
+        glUniform1ui(1, (uint32_t)instances[i].normIndex);
+        glUniform1ui(18, instances[i].texIndex);
+        glUniform1ui(19, (uint32_t)instances[i].glowIndex);
+        glUniform1ui(20, (uint32_t)instances[i].specIndex);
+        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        uint32_t vertCount = modelTriangleCounts[modelType] * 3;
+        glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
+        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+        drawCallsRenderedThisFrame++;
+        verticesRenderedThisFrame += vertCount;
     }
 }
 
@@ -903,14 +919,11 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
     float playerX = instances[PLAYER1].position.x;
     float playerY = instances[PLAYER1].position.y;
     float playerZ = instances[PLAYER1].position.z;
-
     for (uint16_t instIdx = START_INDEX_LEVEL_INSTANCES; instIdx < loadedInstances; ++instIdx) {
         Entity* e = &instances[instIdx];
-
         if (e->collider == COLLIDER_TYPE_NONE) continue;
         if (((1u << e->layer) & layerMask) == 0) continue;
 
-        // Cell visibility cull
         uint16_t cellIdx = PosGetCellCoords(e->position.x, e->position.z);
         if (cellIdx < ARRSIZE &&
             !(gridCellStates[cellIdx] & CELL_VISIBLE) &&
@@ -918,7 +931,6 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
             continue;
         }
 
-        // Bounding sphere cull
         float dx = e->position.x - playerX;
         float dy = e->position.y - playerY;
         float dz = e->position.z - playerZ;
@@ -926,8 +938,6 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
         float radius = modelBounds[(e->modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
         if (distSq > (maxDist + radius) * (maxDist + radius)) continue;
 
-        // *** CORRECT LOCAL TRANSFORM ***
-        // Vector from box center to ray origin
         Vector3 centerToOrigin = {
             origin.x - e->position.x,
             origin.y - e->position.y,
@@ -937,32 +947,23 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
         Quaternion invRot = conjugate_quaternion(e->rotation);
         Vector3 localOrigin = quat_rotate(invRot, centerToOrigin);
         Vector3 localDir    = quat_rotate(invRot, dir);
-
-        Vector3 half = {
-            e->colliderSize.x * e->scale.x,
-            e->colliderSize.y * e->scale.y,
-            e->colliderSize.z * e->scale.z
-        };
-
+        Vector3 half = { e->colliderSize.x * e->scale.x, e->colliderSize.y * e->scale.y, e->colliderSize.z * e->scale.z };
         float tNear = -INFINITY;
         float tFar  = INFINITY;
         bool noHit = false;
-
         for (int axis = 0; axis < 3; ++axis) {
             float o = (axis == 0 ? localOrigin.x : (axis == 1 ? localOrigin.y : localOrigin.z));
             float d = (axis == 0 ? localDir.x    : (axis == 1 ? localDir.y    : localDir.z));
             float h = (axis == 0 ? half.x         : (axis == 1 ? half.y         : half.z));
-
             if (fabsf(d) < 1e-6f) {
-                if (o < -h || o > h) {
-                    noHit = true;
-                    break;
-                }
+                if (o < -h || o > h) { noHit = true; break; }
             } else {
                 float t1 = (-h - o) / d;
                 float t2 = ( h - o) / d;
                 if (t1 > t2) {
-                    float tmp = t1; t1 = t2; t2 = tmp;
+                    t1 += t2; // e.g. if swapping t1 = 3 and t2 = 5, t1 now is 8 and t2 is still 5
+                    t2 = t1 - t2; // now t2 = 8 - 5 = 3, t1 = 8
+                    t1 = t1 - t2; // now t1 = 8 - 3 = 5, t1 = 5 and t2 = 8, swapped!
                 }
                 tNear = fmaxf(tNear, t1);
                 tFar  = fminf(tFar,  t2);
@@ -978,20 +979,10 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
             result.hit = true;
             result.distance = t;
             result.hitInstanceIndex = instIdx;
-
-            // World-space hit point — direct and accurate
             result.point.x = origin.x + dir.x * t;
             result.point.y = origin.y + dir.y * t;
             result.point.z = origin.z + dir.z * t;
-
-            // Compute local hit point for normal
-            Vector3 localHit = {
-                localOrigin.x + localDir.x * t,
-                localOrigin.y + localDir.y * t,
-                localOrigin.z + localDir.z * t
-            };
-
-            // Normal from closest face
+            Vector3 localHit = { localOrigin.x + localDir.x * t, localOrigin.y + localDir.y * t, localOrigin.z + localDir.z * t };
             Vector3 localNormal = {0.0f, 0.0f, 0.0f};
             float bestDist = INFINITY;
             for (int axis = 0; axis < 3; ++axis) {
@@ -1193,9 +1184,9 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1ui(17, 0u); // unlit false
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
             glDepthMask(GL_TRUE);
-            RenderInstances(REND_OPAQUE);      // Opaque, e.g. most objects and level geometry chunks
-            RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
-            RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers
+            RenderInstances();      // Opaque, e.g. most objects and level geometry chunks
+//             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
+//             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers
             DrawDebugLines(viewProj);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

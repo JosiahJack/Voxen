@@ -231,7 +231,7 @@ void main() {
         float shadowFactor = 1.0;
         uint shadowIndex = shadowMapsIndirection[lightIdxInPVS];
         if (shadowsEnabled > 0 && shadowIndex < 1600) {
-            float smearness = distOverRange * distOverRange * 24.0 + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
+            float smearness = distOverRangeSqd * 24.0 + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
             vec3 a = abs(toLight);
             float maxAxis = max(max(a.x, a.y), a.z);
             float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
@@ -267,6 +267,7 @@ void main() {
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
+                t = clamp(t, 0.0, shadSizeLessOne);
                 uint ssbo_index = faceOff + uint(t.y) * shadSize + uint(t.x);
                 uint distInt = shadowMaps[ssbo_index];
                 float d = (float(distInt) * 0.00001);

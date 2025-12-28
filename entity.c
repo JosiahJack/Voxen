@@ -180,9 +180,6 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
 uint16_t modelTypeCountsOpaque[MODEL_IDX_MAX];
 uint16_t modelTypeCountsDoubleSided[MODEL_IDX_MAX];
 uint16_t modelTypeCountsTransparent[MODEL_IDX_MAX];
-uint16_t modelTypeOffsetsOpaque[MODEL_IDX_MAX];
-uint16_t modelTypeOffsetsDoubleSided[MODEL_IDX_MAX];
-uint16_t modelTypeOffsetsTransparent[MODEL_IDX_MAX];
 uint16_t invalidModelIndexCount;
 uint16_t startOfDoubleSidedInstances, startOfTransparentInstances;
 uint16_t loadedInstances;
@@ -192,9 +189,6 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     memset(modelTypeCountsOpaque, 0, MODEL_IDX_MAX * sizeof(uint16_t)); // Zero out all arrays and counters
     memset(modelTypeCountsDoubleSided, 0, MODEL_IDX_MAX * sizeof(uint16_t));
     memset(modelTypeCountsTransparent, 0, MODEL_IDX_MAX * sizeof(uint16_t));
-    memset(modelTypeOffsetsOpaque, 0, MODEL_IDX_MAX * sizeof(uint16_t));
-    memset(modelTypeOffsetsDoubleSided, 0, MODEL_IDX_MAX * sizeof(uint16_t));
-    memset(modelTypeOffsetsTransparent, 0, MODEL_IDX_MAX * sizeof(uint16_t));
     uint16_t* opaqueInstances      = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     uint16_t* doubleSidedInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     uint16_t* transparentInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
@@ -228,11 +222,11 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     // Compute offsets
     uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
     uint16_t i = 0;
-    for (; i < MODEL_IDX_MAX; i++) { modelTypeOffsetsOpaque[i] = currentOffset; currentOffset += modelTypeCountsOpaque[i]; }
+    for (; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsOpaque[i]; }
     startOfDoubleSidedInstances = currentOffset;
-    for (i = 0; i < MODEL_IDX_MAX; i++) { modelTypeOffsetsDoubleSided[i] = currentOffset; currentOffset += modelTypeCountsDoubleSided[i]; }
+    for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsDoubleSided[i]; }
     startOfTransparentInstances = currentOffset;
-    for (i = 0; i < MODEL_IDX_MAX; i++) { modelTypeOffsetsTransparent[i] = currentOffset; currentOffset += modelTypeCountsTransparent[i]; }
+    for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsTransparent[i]; }
     if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
 
     Entity* tempInstances = calloc(INSTANCE_COUNT,sizeof(Entity));
@@ -332,6 +326,7 @@ float intervalStepisLerping[LIGHT_COUNT][30];
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
+    voxen_globalContext.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     if (curlevel == LEVEL_CYBERSPACE) RenderLoadingProgress(100,"Loading cyberspace...");
     else RenderLoadingProgress(100,"Loading level...");
