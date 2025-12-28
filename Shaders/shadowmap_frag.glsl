@@ -22,18 +22,15 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 
-const int LIGHT_DATA_SIZE = 13;
-const int LIGHT_DATA_OFFSET_POSX = 0;
 const int LIGHT_DATA_OFFSET_POSY = 1;
 const int LIGHT_DATA_OFFSET_POSZ = 2;
-const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
 
 uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
-    uint slotIndex = pixelOffset / 4u;
+    uint slotIndex = pixelOffset >> 2u;// / 4u;
     uint packedIdx = colors[slotIndex];
-    uint localOffset = pixelOffset % 4u;
-    uint paletteIndex = (packedIdx >> (8u * localOffset)) & 0xFFu;
+    uint localOffset = pixelOffset & 3u;//% 4u;
+    uint paletteIndex = (packedIdx >> (localOffset << 3u)) & 0xFFu; // << 3u is same as * 8
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
     return color>>24;
@@ -42,20 +39,17 @@ uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
 void main() {
     if (isTransparent > 0) {
         ivec2 texSize = textureSizes[texIndex];
-        vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
-        ivec2 pixel = ivec2(uv);
-        ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
-        texUV.x = texUV.x % texSize.x;
-        texUV.y = texUV.y % texSize.y;
-        if (getTextureAlpha(texIndex,texUV) < 252u) return; // Alpha cutout threshold for {fence style textures
+        vec2 uv = vec2(TexCoord.x, 1.0 - TexCoord.y); // Invert V (aka Y), OpenGL convention vs import
+        ivec2 texUV = ivec2(uv * vec2(texSize));
+        texUV &= texSize - ivec2(1);
+        if (getTextureAlpha(texIndex,texUV) < 252u) discard; // Alpha cutout threshold for {fence style textures
     }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
-    uint ssbo_indexBase = offsetIntoSSBO + (face * shadowmapSize * shadowmapSize);
-    uint ssbo_index = ssbo_indexBase + texelCoord.y * shadowmapSize + texelCoord.x;
-    vec3 lightPos = vec3(lights[lightIndex + LIGHT_DATA_OFFSET_POSX], lights[lightIndex + LIGHT_DATA_OFFSET_POSY], lights[lightIndex + LIGHT_DATA_OFFSET_POSZ]);
+    uint ssbo_index = offsetIntoSSBO + (face * shadowmapSize * shadowmapSize) + texelCoord.y * shadowmapSize + texelCoord.x;
+    vec3 lightPos = vec3(lights[lightIndex], lights[lightIndex + LIGHT_DATA_OFFSET_POSY], lights[lightIndex + LIGHT_DATA_OFFSET_POSZ]);
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
-    uint distInt = uint(dist * 100000.0);
+    uint distInt = uint(dist * 100000.0 + 0.5);
     atomicMin(depthData[ssbo_index], distInt);
 }

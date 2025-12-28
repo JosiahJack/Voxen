@@ -644,7 +644,6 @@ typedef struct {
 	GLuint shadowmapsShaderProgram;
 	GLuint shadowmapsClearShaderProgram;
 	GLuint shadowMapSSBO;
-	GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
 	GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
 	GLuint quadVAO;
 	GLuint quadVBO;

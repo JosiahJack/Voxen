@@ -2,7 +2,7 @@
 #version 430 core
 in vec2 TexCoord;
 out vec4 FragColor;
-layout(rgba16f, binding = 1) readonly uniform image2D inputWorldPos;
+// layout(rgba16f, binding = 1) readonly uniform image2D inputWorldPos;
 
 layout(location =  2) uniform uint screenWidth;
 layout(location =  3) uniform uint screenHeight;
@@ -26,7 +26,6 @@ layout(location = 22) uniform uint shadowsEnabled;
 layout(location = 23) uniform vec3 staticColor;
 layout(location = 24) uniform mat4 viewProjection;
 layout(location = 25) uniform mat3 invViewRot;
-layout(location = 26) uniform int SSR_RES;
 layout(location = 27) uniform sampler2D tex;
 layout(location = 28) uniform float staticIntensity;
 layout(location = 30) uniform float skyRotateSpeed;
@@ -377,38 +376,6 @@ void main() {
     ivec2 uv = ivec2(gl_FragCoord.xy);                // pixel centre
     vec4 fog = vec4(0.0,0.0,0.0,0.0);
     if (!isSky) color.rgb = mix(color.rgb, fog.rgb, fog.a);
-    ivec2 pixel = ivec2(texCoordUsed * vec2(screenWidth/SSR_RES, screenHeight/SSR_RES));
-    if (reflectionsEnabled > 0) {
-        vec2 sampleUV = (vec2(pixel)) / vec2(screenWidth/SSR_RES, screenHeight/SSR_RES);
-        vec4 reflectionColor = vec4(0.0);
-        reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
-        if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
-
-        color.rgb += reflectionColor.rgb;
-    }
-
-    if (reflectionsEnabled > 0) {
-        vec2 lowResSize = vec2(screenWidth / SSR_RES, screenHeight / SSR_RES);
-        vec2 pixelLow = floor(vec2(pixel)) + 0.5;  // Center of the current low-res pixel
-        vec2 sampleUVBase = pixelLow / lowResSize;
-        vec4 reflectionColor = vec4(0.0);
-        float weightSum = 0.0;
-        for (int x = -1; x <= 1; ++x) {
-            for (int y = -1; y <= 1; ++y) {
-                vec2 offset = vec2(float(x), float(y));
-                vec2 sampleUV = (pixelLow + offset) / lowResSize;
-                vec3 samp = texture(outputImage, sampleUV).rgb;
-                reflectionColor.rgb += samp;
-                weightSum += 1.0;
-            }
-        }
-
-        reflectionColor.rgb /= weightSum;
-        if (isSky) { FragColor.rgb += reflectionColor.rgb; return; }
-
-        color.rgb += reflectionColor.rgb;
-    }
-
     vec3 aaColor = color.rgb; // Default to chromatic aberration result
     if (aaEnabled > 0) {
         // SMAA-Inspired Edge-Directed Antialiasing
@@ -471,7 +438,7 @@ void main() {
 
     if (staticIntensity > 0.0) aaColor += bandedStatic(texCoordUsed); // Banded Static (pain, emp effects, etc.)
 //         aaColor.rgb = pow(aaColor.rgb, vec3(1.0 / (float(brightnessSetting * 1.25) / 100.0))); // Brightness Adjustment Setting
-    if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(imageLoad(inputWorldPos, uv).xyz, aaColor); // Berserk last as it's a brain effect not an eye effect
+    if (berserkTimeRemaining > 0.0) aaColor = applyBerserk(/*imageLoad(inputWorldPos, uv).xyz*/ vec3(texCoordUsed.xy, uv.x), aaColor); // Berserk last as it's a brain effect not an eye effect
 
     FragColor = vec4(aaColor, 1.0); // Output final composited color
 }

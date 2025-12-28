@@ -13,7 +13,6 @@ Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLeve
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
 Voxen_Cheats               voxen_Cheats = { .god = true, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 100u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 1u };
-#define SSR_RES 4 // Ratio is (1 / SSR_RES) * render resolution.
 Voxen_GL_Comms           voxen_GL_Comms;
 uint8_t queuedLevelToLoad = 3;
 Entity instances[INSTANCE_COUNT];
@@ -79,9 +78,6 @@ void CompileShaders(void) {
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader");
     voxen_GL_Comms.textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");
-
-    computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader");
-    voxen_GL_Comms.ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
     
     computeShader = CompileShader(GL_COMPUTE_SHADER, voxelUpdate_computeShader, "Voxel Update Compute Shader");
     voxen_GL_Comms.voxelUpdateShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Update Shader Program");
@@ -138,14 +134,9 @@ void UpdateScreenSize(void) {
     glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
     glUniform1ui(2, voxen_Settings.ScreenWidth);
     glUniform1ui(3, voxen_Settings.ScreenHeight);
-    glUniform1i(26, SSR_RES);
     glUseProgram(voxen_GL_Comms.chunkShaderProgram);
     glUniform1ui(6, voxen_Settings.ScreenWidth);
     glUniform1ui(7, voxen_Settings.ScreenHeight);
-    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
-    glUniform1ui(0, voxen_Settings.ScreenWidth / SSR_RES);
-    glUniform1ui(1, voxen_Settings.ScreenHeight / SSR_RES);       
-    glUniform1i(2, SSR_RES);
     SetSkyRotateSpeed();
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
 }
@@ -269,7 +260,7 @@ void RenderShadowmaps(void) {
     float px = instances[PLAYER1].position.x, py = instances[PLAYER1].position.y, pz = instances[PLAYER1].position.z;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
-        float lightPosX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float lightPosX = lights[litIdx];
         float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float intensity = lightMaxIntensity[litIdx]; // Stable framerate for flickering lights is actually better.
@@ -352,10 +343,13 @@ void RenderShadowmaps(void) {
     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
     uint32_t shadowmapOffsetHead = 0U;
     uint16_t shadowmapCountHalf = (MAX_SHADOWMAPS / 2U);
+    uint16_t currentModelType = 0;
+    uint16_t currentTexIndex = 0;
+    bool currentIsTransparent = 0;
     for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
         uint16_t lightIdx = candidates[c].index;
         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-        float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+        float litX = lights[litIdx];
         float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
         float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
@@ -403,14 +397,18 @@ void RenderShadowmaps(void) {
                 if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 2.56f)) continue;
 
                 int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                if (currentModelType != modelType) {
+                    currentModelType = modelType;
+                    glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+                }
+                
                 glUniform1ui(0, i);
-                glUniform1ui(6, instances[i].texIndex);
-                glUniform1ui(8, isTransparent(instances[i].texIndex));
-                glBindVertexBuffer(0, voxen_GL_Comms.vbos[modelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[modelType]);
-                glDrawElements(GL_TRIANGLES, modelTriangleCounts[modelType] * 3, GL_UNSIGNED_INT, 0);
+                if (currentTexIndex != instances[i].texIndex) { currentTexIndex = instances[i].texIndex; glUniform1ui(6, instances[i].texIndex); }
+                if (currentIsTransparent != isTransparent(instances[i].texIndex)) { currentIsTransparent = isTransparent(instances[i].texIndex); glUniform1ui(8, isTransparent(instances[i].texIndex)); }
+                glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
                 drawCallsRenderedThisFrame++;
-                verticesRenderedThisFrame += modelTriangleCounts[modelType] * 3;
+                verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
             }
         }
         
@@ -641,36 +639,16 @@ void InitializeEnvironment(void) {
     glVertexArrayVertexBuffer(voxen_GL_Comms.debugLinesVAO, 0, voxen_GL_Comms.debugLinesVBO, 0, 3 * sizeof(float));
 
     GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
     GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&voxen_GL_Comms.inputNormalID,            GL_RG16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
-    glGenTextures(1, &voxen_GL_Comms.outputImageID);
-    glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  voxen_Settings.ScreenWidth / SSR_RES,  voxen_Settings.ScreenHeight / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
     glGenFramebuffers(1, &voxen_GL_Comms.gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, voxen_GL_Comms.inputImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, voxen_GL_Comms.inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, voxen_GL_Comms.inputSpecID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, voxen_GL_Comms.inputNormalID, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, voxen_GL_Comms.inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-    glDrawBuffers(4, drawBuffers);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0 };
+    glDrawBuffers(1, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
     glBindImageTexture(0, voxen_GL_Comms.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-    glBindImageTexture(1, voxen_GL_Comms.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F); // World Position XYZ
-    glBindImageTexture(2, voxen_GL_Comms.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
-    //                 3 = depth
-    glBindImageTexture(4, voxen_GL_Comms.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
-    glBindImageTexture(5, voxen_GL_Comms.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
     UpdateScreenSize();
     float* m = shadowmapsPerspectiveProjection;
@@ -812,10 +790,13 @@ void RenderInstances(void) {
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        if (currentModelType != modelType) currentModelType = modelType;
+        if (currentModelType != modelType) {
+            currentModelType = modelType;
+            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+        }
+        
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertCount;
@@ -841,10 +822,13 @@ void RenderInstances(void) {
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        if (currentModelType != modelType) currentModelType = modelType;
+        if (currentModelType != modelType) {
+            currentModelType = modelType;
+            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+        }
+        
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertCount;
@@ -881,10 +865,13 @@ void RenderInstances(void) {
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        if (currentModelType != modelType) currentModelType = modelType;
+        if (currentModelType != modelType) {
+            currentModelType = modelType;
+            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+        }
+        
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
         drawCallsRenderedThisFrame++;
         verticesRenderedThisFrame += vertCount;
@@ -1084,8 +1071,6 @@ int32_t main(int32_t argc, char* argv[]) {
         invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
         if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
             if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) {
-                DualLog("Mouse rmb released\n");
-
                 float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
                 float offsetY = cursorPosition_y - (voxen_Settings.ScreenHeight * 0.5f);
                 float ndcX = offsetX / (voxen_Settings.ScreenWidth * 0.5f);
@@ -1117,6 +1102,7 @@ int32_t main(int32_t argc, char* argv[]) {
                     voxen_Diagnostics.debugLine_endZ   = tempHit.point.z;
                     DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
                 }
+                
                 voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
             }
             
@@ -1137,7 +1123,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 if (lightDirty[lightIdx]) { // Marked all as true at level load.
                     voxelsNeedUpdated = true;
                     uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-                    float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
+                    float litX = lights[litIdx];
                     float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
                     float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
                     #pragma GCC unroll 6
@@ -1163,27 +1149,13 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1f(8, worldMin_x);
             glUniform1f(9, worldMin_z);
             glUniform3f(10, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-            glUniform1ui(14, voxen_Settings.Reflections);
             glUniform1ui(15, voxen_Settings.Shadows);
             glUniform1ui(17, 0u); // unlit false
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
             glDepthMask(GL_TRUE);
             RenderInstances();      // Opaque, e.g. most objects and level geometry chunks
-//             RenderInstances(REND_DOUBLESIDED); // Double Sided, e.g. cyber panels and foliage and negative scaled objects
-//             RenderInstances(REND_TRANSPARENT); // Transparents, e.g. windows and beakers
             DrawDebugLines(viewProj);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-            // 5. SSR (Screen Space Reflections)
-            if (voxen_Settings.Reflections > 0) {
-                glUseProgram(voxen_GL_Comms.ssrShaderProgram);
-                glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-                glUniform3f(3, instances[PLAYER1].position.x, instances[PLAYER1].position.y, instances[PLAYER1].position.z);
-                GLuint groupX_ssr = ((voxen_Settings.ScreenWidth  / SSR_RES) + 31) / 32;
-                GLuint groupY_ssr = ((voxen_Settings.ScreenHeight / SSR_RES) + 31) / 32;
-                glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-            }
         } else { // END !PAUSED BLOCK -------------------------------------------------
             glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
         }
@@ -1193,7 +1165,6 @@ int32_t main(int32_t argc, char* argv[]) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.inputImageID);
         glUniform1i(4, 4); // outputImage texture sampler2D
-        glUniform1ui(5, voxen_Settings.Reflections);
         glUniform1ui(6, voxen_Settings.AntiAliasing);
         glUniform1f(9, berserkTimeRemainingNormalized);
         glUniform1f(10, berserkSeedTime);

@@ -27,9 +27,9 @@ layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
-layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
-layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
-layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
+// layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
+// layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
+// layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
@@ -109,10 +109,10 @@ const vec4 BYTE_TO_FLOAT = vec4(1.0/255.0);
 
 vec4 getTextureColor(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
-    uint slotIndex = pixelOffset / 4u;
+    uint slotIndex = pixelOffset >> 2u;// / 4u;
     uint packedIdx = colors[slotIndex];
-    uint localOffset = pixelOffset % 4u;
-    uint paletteIndex = (packedIdx >> (8u * localOffset)) & 0xFFu;
+    uint localOffset = pixelOffset & 3u;//% 4u;
+    uint paletteIndex = (packedIdx >> (localOffset << 3u)) & 0xFFu; // << 3u is same as * 8
     uint paletteOffset = texturePaletteOffsets[texIndex];
     uint color = texturePalettes[paletteOffset + paletteIndex];
     return vec4(color & 0xFFu, (color>>8)&0xFFu, (color>>16)&0xFFu, color>>24) * BYTE_TO_FLOAT;
@@ -131,9 +131,11 @@ void main() {
     viewDir = normalize(viewDir);
     ivec2 texSize = textureSizes[texIndex];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
-    ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
-    texUV.x = texUV.x % texSize.x;
-    texUV.y = texUV.y % texSize.y;
+//     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
+//     texUV.x = texUV.x % texSize.x;
+//     texUV.y = texUV.y % texSize.y;
+    ivec2 texUV = ivec2(uv * vec2(texSize));
+    texUV &= texSize - ivec2(1);
     vec4 albedoColor = getTextureColor(texIndex,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
@@ -169,17 +171,17 @@ void main() {
     }
 
     vec4 specColor = vec4(0.0);
-    if (reflectionsEnabled > 0) {
+//     if (reflectionsEnabled > 0) {
         ivec2 texSizeSpec = textureSizes[specIndex];
         ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
         texUVSpec.x = texUVSpec.x % texSizeSpec.x;
         texUVSpec.y = texUVSpec.y % texSizeSpec.y;
         specColor = getTextureColor(specIndex,texUVSpec);
-        outSpecular = specColor;
-        vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
-        outWorldPos = worldPosPack;
-        outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
-    }
+//         outSpecular = specColor;
+//         vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
+//         outWorldPos = worldPosPack;
+//         outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
+//     }
 
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count = voxelLightListCounts[voxelIdx];
@@ -192,7 +194,7 @@ void main() {
         if (lightIdxInPVS >= 1600) continue;
 
         uint lightIdx = lightIdxInPVS * uint(LIGHT_DATA_SIZE);
-        vec3 lightPos = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_POSX], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
+        vec3 lightPos = vec3(lights[lightIdx], lights[lightIdx + LIGHT_DATA_OFFSET_POSY], lights[lightIdx + LIGHT_DATA_OFFSET_POSZ]);
         float intensity = lights[lightIdx + LIGHT_DATA_OFFSET_INTENSITY];
         if (intensity < 0.1) continue;
 

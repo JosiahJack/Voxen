@@ -62,7 +62,7 @@ void main() {
     
     for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         uint litIdx = lightIdx * LIGHT_DATA_SIZE;
-        vec3 lightPos = vec3(lights[litIdx + LIGHT_DATA_OFFSET_POSX], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
+        vec3 lightPos = vec3(lights[litIdx], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);
         float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (length(lightPos - voxelPos) < range) {
             uniqueLightLists[(voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex]] = lightIdx;
