@@ -77,8 +77,10 @@ extern bool instanceIsLODArray[INSTANCE_COUNT];
 extern float modelMatrices[INSTANCE_COUNT * 16];
 extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern uint16_t invalidModelIndexCount;
-extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
-extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
+#ifdef ONLY_LOAD_LEVEL_NEEDS
+    extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
+    extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
+#endif
 extern uint16_t entityCount;
 extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;

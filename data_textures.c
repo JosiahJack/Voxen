@@ -29,8 +29,12 @@ void LoadTextures(void) {
     double start_time = get_time();
     DebugRAM("start of LoadTextures");
     if (loadedTexturesMaxIndex > 0) {
-        memset(doubleSidedTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
-        memset(transparentTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
+        #ifdef ONLY_LOAD_LEVEL_NEEDS
+            memset(doubleSidedTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
+            memset(transparentTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
+        #else
+            return;
+        #endif
     }
 
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
@@ -48,7 +52,9 @@ void LoadTextures(void) {
     for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
         if (texture_parser.entries[k].index < loadedTexturesMaxIndex) {
             matchedParserIdxes[texture_parser.entries[k].index] = k;
-            if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true; // textureIndexUsedForCurrentLevel pre-cleared by LoadLevel parent calling function of LoadTextures
+            #ifdef ONLY_LOAD_LEVEL_NEEDS
+                if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true; // textureIndexUsedForCurrentLevel pre-cleared by LoadLevel parent calling function of LoadTextures
+            #endif
         }
     }
     

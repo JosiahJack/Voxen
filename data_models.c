@@ -107,13 +107,17 @@ void cleanup_all_mmaps(void) {
 void LoadModels(void) {
     double start_time = get_time();
     if (loadedModelsMaxIndex > 0) {
-        glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
-        glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
-        memset(modelVertexCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
-        memset(modelTriangleCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
-        memset(modelAnimationType, 0, MODEL_IDX_MAX * sizeof(uint8_t));
-        memset(modelBounds, 0, MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
-        loadedModelsMaxIndex = 0;
+        #ifdef ONLY_LOAD_LEVEL_NEEDS
+            glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
+            glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
+            memset(modelVertexCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
+            memset(modelTriangleCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
+            memset(modelAnimationType, 0, MODEL_IDX_MAX * sizeof(uint8_t));
+            memset(modelBounds, 0, MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
+            loadedModelsMaxIndex = 0;
+        #else
+            return;
+        #endif
     }
     
     uint16_t animatedModelCount = 0u;

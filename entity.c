@@ -263,33 +263,46 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     ResetLevelAudio();
 }
 
+#ifdef ONLY_LOAD_LEVEL_NEEDS
 bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
 bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
+#endif
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); OS_Exit(1); }
         
     instances[instanceIdx].index = entIdx;
+    bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
-    if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;    
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;    
+    #endif
     instances[instanceIdx].animated = modelAnimationType[instances[instanceIdx].modelIndex];
     
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
-    if (instances[instanceIdx].texIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].texIndex] = true;
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        if (instances[instanceIdx].texIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].texIndex] = true;
+    #endif
     
     instances[instanceIdx].glowIndex = entities[entIdx].glowIndex;
     if (instances[instanceIdx].glowIndex >= MAX_VALID_TEXTURE) instances[instanceIdx].glowIndex = 0;
-    if (instances[instanceIdx].glowIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].glowIndex] = true;
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        if (instances[instanceIdx].glowIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].glowIndex] = true;
+    #endif
     
     instances[instanceIdx].specIndex = entities[entIdx].specIndex;
     if (instances[instanceIdx].specIndex >= MAX_VALID_TEXTURE) instances[instanceIdx].specIndex = 0;
-    if (instances[instanceIdx].specIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].specIndex] = true;
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        if (instances[instanceIdx].specIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].specIndex] = true;
+    #endif
 
     instances[instanceIdx].normIndex = entities[entIdx].normIndex;
     if (instances[instanceIdx].normIndex >= MAX_VALID_TEXTURE) instances[instanceIdx].normIndex = 0;
-    if (instances[instanceIdx].normIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].normIndex] = true;
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        if (instances[instanceIdx].normIndex < MAX_VALID_TEXTURE) textureIndexUsedForCurrentLevel[instances[instanceIdx].normIndex] = true;
+    #endif
 
     instances[instanceIdx].lodIndex = entities[entIdx].lodIndex;
-    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  entities[entIdx].entflags & ENTFLAG_CARDCHUNK); // Decided `instances[instanceIdx].entflags = entities[entIdx].entflags;` was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_CARDCHUNK,  isCardChunk); // Decided `instances[instanceIdx].entflags = entities[entIdx].entflags;` was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
@@ -304,6 +317,8 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
+    if (!isCardChunk && entIdx > 306 && entIdx != 472 && entIdx != 473 && entIdx != 474 && entIdx != 475 && entIdx != 476) instances[instanceIdx].scale = (Vector3){ 1.0f, 1.0f, 1.0f};
+    if (entIdx == 434) instances[instanceIdx].scale = (Vector3){ 1.58f, 1.58f, 1.58f};
     for (int i=0;i<MAX_CHILD_COUNT;++i) {
         instances[instanceIdx].child[i] = entities[entIdx].child[i];
         instances[instanceIdx].child_offset[i].x = entities[entIdx].child_offset[i].x;
@@ -313,9 +328,9 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         instances[instanceIdx].child_rotation[i].y = entities[entIdx].child_rotation[i].y;
         instances[instanceIdx].child_rotation[i].z = entities[entIdx].child_rotation[i].z;
         instances[instanceIdx].child_rotation[i].w = entities[entIdx].child_rotation[i].w;
-        instances[instanceIdx].child_scale[i].x = entities[entIdx].child_scale[i].x;
-        instances[instanceIdx].child_scale[i].y = entities[entIdx].child_scale[i].y;
-        instances[instanceIdx].child_scale[i].z = entities[entIdx].child_scale[i].z;
+        instances[instanceIdx].child_scale[i].x = isCardChunk ? entities[entIdx].child_scale[i].x : 1.0f;
+        instances[instanceIdx].child_scale[i].y = isCardChunk ? entities[entIdx].child_scale[i].y : 1.0f;
+        instances[instanceIdx].child_scale[i].z = isCardChunk ? entities[entIdx].child_scale[i].z : 1.0f;
     }
     
     ApplyUnityHierarchyCorrectionAtLevelLoad(instanceIdx, entIdx);
@@ -354,8 +369,10 @@ void LoadLevel(uint8_t curlevel) {
     voxen_globalContext.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     loadedLights = 0;
-    memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
-    memset(textureIndexUsedForCurrentLevel,0,MAX_VALID_TEXTURE * sizeof(bool));
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
+        memset(textureIndexUsedForCurrentLevel,0,MAX_VALID_TEXTURE * sizeof(bool));
+    #endif
     memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
     memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
     memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies

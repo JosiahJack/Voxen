@@ -735,6 +735,14 @@ index: 337
 animated: 2
 #Models/npc_servbot_gibs.fbx
 index: 338
+#Models/reac1_1_slice45.fbx
+index: 339
+#Models/reac2_4_slice128lower.fbx
+index: 340
+#Models/grove2_4.fbx
+index: 341
+#Models/reac1_7.fbx
+index: 342
 
 #Models/papers01.fbx
 index: 484
@@ -1012,6 +1020,8 @@ index: 617
 index: 618
 #Models/table.fbx
 index: 619
+#Models/stor1_7d.fbx
+index: 620
 
 #Models/testtube.fbx
 index: 622

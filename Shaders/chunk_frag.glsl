@@ -131,8 +131,9 @@ void main() {
     viewDir = normalize(viewDir);
     ivec2 texSize = textureSizes[texIndex];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
-    ivec2 texUV = ivec2(uv * vec2(texSize));
-    texUV &= texSize - ivec2(1);
+    ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
+    texUV.x = texUV.x % texSize.x;
+    texUV.y = texUV.y % texSize.y;
     vec4 albedoColor = getTextureColor(texIndex,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 

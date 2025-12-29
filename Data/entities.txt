@@ -303,7 +303,7 @@ texture: 275
 index: 46
 model: 117
 cardchunk: 1
-texture: 32
+texture: 279
 #chunk_eng2_2d
 index: 47
 model: 666
@@ -412,33 +412,36 @@ texture: 300
 spectexture: 1257
 #chunk_exec3_1
 index: 67 
+model: 127
 cardchunk: 1
 texture: 303
 #chunk_exec3_1d
 index: 68
 model: 135
 cardchunk: 1
-glowtexture: 301
 texture: 302
+glowtexture: 301
 #chunk_exec3_2
 index: 69
+model: 129
 cardchunk: 1
 texture: 304
 #chunk_exec3_4
 index: 70
+model: 178
 cardchunk: 1
 texture: 305
 #chunk_exec4_1
 index: 71
 model: 136
 cardchunk: 1
-glowtexture: 306
 texture: 307
+glowtexture: 306
 #chunk_exec4_2
 index: 72
 model: 137
-cardchunk: 1
 texture: 308
+cardchunk: 1
 #chunk_exec4_3
 index: 73
 model: 138
@@ -482,6 +485,7 @@ cardchunk: 1
 texture: 319
 #chunk_flight1_1b
 index: 81
+model: 146
 cardchunk: 1
 texture: 318
 #chunk_flight1_2
@@ -505,6 +509,7 @@ cardchunk: 1
 texture: 322
 #chunk_flight1_5
 index: 86
+model: 147
 cardchunk: 1
 texture: 323
 #chunk_flight1_5_slice45lh
@@ -580,6 +585,7 @@ cardchunk: 1
 texture: 370
 #chunk_grove2_2
 index: 102
+model: 190
 cardchunk: 1
 texture: 371
 #chunk_grove2_3
@@ -588,6 +594,7 @@ model: 191
 texture: 372
 #chunk_grove2_4
 index: 104
+model: 341
 cardchunk: 1
 texture: 374
 glowtexture: 373
@@ -598,26 +605,32 @@ cardchunk: 1
 texture: 375
 #chunk_grove2_6
 index: 106
+model: 192
 cardchunk: 1
 texture: 376
 #chunk_grove2_7
 index: 107
+model: 191
 cardchunk: 1
 texture: 378
 #chunk_grove2_8
 index: 108
+model: 191
 cardchunk: 1
 texture: 379
 #chunk_grove2_9
 index: 109
+model: 191
 cardchunk: 1
 texture: 385
 #chunk_grove2_9b
 index: 110
+model: 191
 cardchunk: 1
 texture: 381
-#chunk_g rove2_9c
+#chunk_grove2_9c
 index: 111
+model: 191
 cardchunk: 1
 texture: 383
 #chunk_lift1
@@ -662,6 +675,7 @@ texture: 441
 glowtexture: 440
 #chunk_maint1_4b
 index: 119
+model: 223
 cardchunk: 1
 texture: 439
 glowtexture: 438
@@ -698,10 +712,12 @@ collider_sizez: 2.56
 colliderMeshIndex: 65535
 #chunk_maint1_9
 index: 124
+model: 606
 cardchunk: 1
 texture: 450
 #chunk_maint1_9d
 index: 125
+model: 620
 cardchunk: 1
 texture: 449
 glowtexture: 448
@@ -745,6 +761,7 @@ texture: 464
 glowtexture: 463
 #chunk_maint2_4d
 index: 133
+model: 233
 cardchunk: 1
 texture: 462
 glowtexture: 461
@@ -768,6 +785,7 @@ texture: 472
 glowtexture: 471
 #chunk_maint2_6d
 index: 137
+model: 238
 cardchunk: 1
 texture: 470
 glowtexture: 470
@@ -1126,6 +1144,7 @@ glowtexture: 659
 spectexture: 1231
 #chunk_rad1_2
 index: 198
+model: 501
 cardchunk: 1
 texture: 662
 glowtexture: 661
@@ -1138,6 +1157,7 @@ texture: 664
 spectexture: 1243
 #chunk_reac1_1_slice45
 index: 200
+model: 339
 texture: 664
 spectexture: 1243
 #chunk_reac1_2
@@ -1175,6 +1195,7 @@ glowtexture: 672
 spectexture: 1243
 #chunk_reac1_7
 index: 206
+model: 342
 cardchunk: 1
 texture: 676
 glowtexture: 675
@@ -1252,7 +1273,9 @@ texture: 685
 spectexture: 1235
 #chunk_reac2_4_slice128lower
 index: 219
+model: 340
 texture: 685
+spectexture: 1235
 #chunk_reac2_5
 index: 220
 model: 520
@@ -1363,6 +1386,7 @@ texture: 716
 #chunk_reac6_2
 index: 239
 cardchunk: 1
+model: 538
 texture: 717
 #chunk_reac6_3
 index: 240
@@ -1567,48 +1591,60 @@ texture: 881
 glowtexture: 881
 #chunk_sec1_1
 index: 280
+model: 178
 cardchunk: 1
 texture: 787
+spectexture: 787
 #chunk_sec1_1b
 index: 281
+model: 178
 cardchunk: 1
 texture: 785
+spectexture: 785
 #chunk_sec1_1c
 index: 282
 model: 577
 cardchunk: 1
 texture: 786
+spectexture: 786
 #chunk_sec1_1c_slice45
 index: 283
 model: 580
 texture: 786
+spectexture: 786
 #chunk_sec1_1c_slice64highlh
 index: 284
 model: 581
 texture: 786
+spectexture: 786
 #chunk_sec1_1c_slice64highrh
 index: 285
 model: 582
 texture: 786
+spectexture: 786
 #chunk_sec1_2
 index: 288
 model: 584
 cardchunk: 1
 texture: 789
+spectexture: 1233
 #chunk_sec1_2b
 index: 289
 model: 583
 cardchunk: 1
 texture: 788
+spectexture: 1233
 #chunk_sec1_3
 index: 290
 model: 585
 cardchunk: 1
 texture: 790
+spectexture: 1233
 #chunk_sec1_3_slice45
 index: 291
 model: 586
 texture: 790
+spectexture: 1233
 #chunk_stor1_1
 index: 292
 model: 597
@@ -1617,6 +1653,7 @@ texture: 824
 glowtexture: 823
 #chunk_stor1_2
 index: 293
+model: 598
 cardchunk: 1
 texture: 825
 #chunk_stor1_3
@@ -1670,6 +1707,7 @@ spectexture: 834
 normtexture: 832
 #chunk_stor1_7d
 index: 304
+model: 620
 cardchunk: 1
 texture: 831
 glowtexture: 830
@@ -1762,6 +1800,7 @@ bounceCombine: 0
 #item_arm
 index: 312
 model: 7
+texture: 28
 collider: 4
 colliderMeshIndex: 678
 mass: 1.0
@@ -3789,6 +3828,9 @@ bounceCombine: 0
 #prop_phys_toolcart
 index: 463
 model: 624
+texture: 865
+normtexture: 864
+spectexture: 866
 mass: 20.0
 linearDrag: 1.0
 angularDrag: 0.2
@@ -3802,6 +3844,7 @@ bounceCombine: 0
 #se_briefcase
 index: 464
 model: 34
+texture: 66
 glowtexture: 65
 #se_corpse_blueshirt
 index: 465
@@ -3919,9 +3962,11 @@ glowtexture: 84
 #sec_cpunode_small
 index: 479
 model: 588
+texture: 107
 #weapon_cyber_mine
 index: 480
 model: 71
+texture: 1224
 #proj_enemshot2
 index: 481
 mass: 0.3
@@ -3936,7 +3981,7 @@ frictionCombine: 0
 bounceCombine: 0
 #proj_magpulse_shot
 index: 482
-model: 645
+texture: 807
 mass: 0.3
 linearDrag: 0.0
 angularDrag: 0.05
@@ -3949,7 +3994,7 @@ frictionCombine: 0
 bounceCombine: 0
 #proj_stungun_shot
 index: 483
-model: 657
+texture: 835
 mass: 0.3
 linearDrag: 0.0
 angularDrag: 0.05
@@ -4143,18 +4188,33 @@ index: 506
 index: 507
 #door_elevator1
 index: 508
+model: 88
+texture: 202
 #door_elevator2
 index: 509
+model: 89
+texture: 203
 #door_elevator3
 index: 510
+model: 90
+texture: 204
 #door_elevator4
 index: 511
+model: 91
+texture: 206
+glowtexture: 205
 #door_secret1
 index: 512
+model: 93
+texture: 210
 #door_secret2
 index: 513
+model: 92
+texture: 209
 #door_secret3
 index: 514 
+model: 94
+texture: 211
 #func_forcebridge
 index: 515
 #prop_lift2
@@ -4214,24 +4274,36 @@ texture: 100
 model: 50
 #prop_grate1_1
 index: 527
+model: 186
+texture: 359
 #prop_grate1_2
 index: 528
+model: 187
+texture: 360
 #prop_grate1_3
 index: 529
+model: 188
+texture: 361
 #se_cabinet
 index: 530
+model: 39
+texture: 70
 #se_thermos
 index: 531
 texture: 863
 model: 623
 #prop_beaker_holder
 index: 532
+model: 15
+texture: 36
 #prop_bed
 index: 533
-texture: 537
 model: 16
+texture: 537
 #prop_bed_hospital
 index: 534
+model: 608
+texture: 113
 #prop_bed_neurosurgery
 index: 535
 texture: 18
@@ -4240,18 +4312,30 @@ spectexture: 1238
 model: 17
 #prop_bonepile1
 index: 536
+model: 19
+texture: 815
 #prop_bridgewall1
 index: 537
 #prop_broken_clock
 index: 538
+model: 38
+texture: 1117
+alttexture: 1118
+glowtexture: 1115
+altglowtexture: 1116
 #prop_brokengun
 index: 539
+model: 639
+texture: 878
 #prop_chair01
 index: 540
+model: 41
 #prop_chair02
 index: 541
+model: 42
 #prop_chair03
 index: 542
+model: 43
 #prop_chair04
 index: 543
 #prop_chair05
@@ -4265,14 +4349,21 @@ texture: 77
 glowtexture: 76
 #prop_clothes
 index: 547
+model: 47
+texture: 97
 #prop_computer
 index: 548
+model: 48
 #prop_couch
 index: 549
+model: 59
 #prop_couch2
 index: 550
+model: 59
 #prop_cpuscreen
 index: 551
+model: 178
+texture: 768
 #prop_cyber_datafrag
 index: 552
 #prop_cyber_decoy
@@ -4336,12 +4427,19 @@ index: 572
 index: 573
 #prop_healingbed
 index: 574
+model: 195
+texture: 1139
 #prop_lamp
 index: 575
 model: 212
 texture: 423
 #prop_light_emergsignal
 index: 576
+model: 216
+texture: 426
+alttexture: 424
+glowtexture: 0
+altglowtexture: 424
 #prop_microscope
 index: 577
 #prop_pipe
@@ -4398,6 +4496,8 @@ index: 601
 index: 602
 #us_paperlog
 index: 603
+model: 486
+texture: 580
 #us_puz_elevatorkeypad
 index: 604
 #us_puz_elevatorkeypad2
@@ -4822,8 +4922,12 @@ index: 735
 index: 736
 #prop_papers01
 index: 737
+model: 484
+texture: 580
 #prop_papers02
 index: 738
+model: 485
+texture: 580
 #ef_particle_blasterhit
 index: 739
 #ef_particle_ionhit

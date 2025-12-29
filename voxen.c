@@ -237,7 +237,7 @@ void UpdateVoxelLightLists(void) {
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
 #define MAX_SHADOWMAPS 56u
 #define SHADOW_MAP_SIZE 192u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 3U)) // Found that in practice only needed ~45%, oversized a little here for safety.
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
 	uint32_t numShadowsCouldRender;
 	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
@@ -292,12 +292,12 @@ void RenderShadowmaps(void) {
         float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
         float intensity = lightMaxIntensity[litIdx]; // Stable framerate for flickering lights is actually better.
         if (intensity < 0.1f) intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        if (intensity < 0.1f) continue;
+//         if (intensity < 0.1f) continue;
         
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
         if (range < 0.32f) continue;
         
-        float thresh = 0.0125f;
+        float thresh = 0.009f;
         float luminosity = (intensity / (range * range));
         if (luminosity < thresh) continue;
 
