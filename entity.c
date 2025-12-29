@@ -13,11 +13,13 @@
     void DualLogEntity(Entity ent) {
         DualLog("Entity::%s\n"
                 "    index: %u\n"
-                "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
+                "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n      DOUBLESIDED:  %u\n      TRANSPARENT:  %u\n      CHANGE_TEX_ON_ACTIVE:  %u\n      BLINK_TEX_ON_ACTIVE:  %u\n            ]\n"
                 "    modelIndex: %u\n"
                 "    animated:   %u\n"
                 "    texIndex:   %u\n"
+                "    altTexIndex:   %u\n"
                 "    glowIndex:  %u\n"
+                "    altGlowIndex:  %u\n"
                 "    specIndex:  %u\n"
                 "    normIndex:  %u\n"
                 "    lodIndex:  %u\n"
@@ -43,6 +45,9 @@
                 "    frictionCombine: %u\n"
                 "    bounceCombine: %u\n"
                 "    volume: %f\n"
+                "    persistent: %u\n"
+                "    overrideTest: %u\n"
+                "    path: %s\n"
                 , GetPrefabNameFromIndex(ent.index),
                 ent.index,
                 ent.entflags,
@@ -52,10 +57,16 @@
                     (ent.entflags & ENTFLAG_USEGRAVITY) > 0,
                     (ent.entflags & ENTFLAG_KINEMATIC) > 0,
                     (ent.entflags & ENTFLAG_RIGIDBODY) > 0,
+                    (ent.entflags & ENTFLAG_DOUBLESIDED) > 0,
+                    (ent.entflags & ENTFLAG_TRANSPARENT) > 0,
+                    (ent.entflags & ENTFLAG_CHANGE_TEX_ON_ACTIVE) > 0,
+                    (ent.entflags & ENTFLAG_BLINK_TEX_ON_ACTIVE) > 0,
                 ent.modelIndex,
                 ent.animated,
                 ent.texIndex,
+                ent.altTexIndex,
                 ent.glowIndex,
+                ent.altGlowIndex,
                 ent.specIndex,
                 ent.normIndex,
                 ent.lodIndex,
@@ -80,7 +91,10 @@
                 (double)ent.bounciness,
                 (double)ent.frictionCombine,
                 ent.bounceCombine,
-                (double)ent.volume);
+                (double)ent.volume,
+                ent.persistent,
+                ent.overrideTest,
+                ent.path);
     }
 
     void DualLogEntityInstance(uint16_t idx) {

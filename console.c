@@ -192,6 +192,12 @@ static void cmd_summon(int itemConstIndex) {
     }
 }
 
+static void cmd_printent(int entityIndex) {
+    if (entityIndex < 0 || entityIndex > INSTANCE_COUNT) { CenterStatusPrint("Enter entity instance index between 0 and %u",INSTANCE_COUNT); return; }
+    
+    DualLogEntityInstance(entityIndex);
+}
+
 static void cmd_notarget(void) { voxen_Cheats.notarget = !voxen_Cheats.notarget; CenterStatusPrint("notarget: %s", voxen_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
 static void cmd_showfps(void) { voxen_Cheats.showFPS = !voxen_Cheats.showFPS; }
 static void cmd_showlocation(void) { voxen_Cheats.showLocation = !voxen_Cheats.showLocation; }
@@ -320,6 +326,7 @@ static const ConsoleCommand g_ConsoleCommands[] = {
     { "load", {.withStr = cmd_loadlevel}, CMD_STR},
     { "loadarsenal",  {.withStr = cmd_loadarsenal}, CMD_STR},
     { "load arsenal", {.withStr = cmd_loadarsenal}, CMD_STR},
+    { "printent", {.withInt = cmd_printent}, CMD_INT},
     { "summon_obj", {.withInt = cmd_summon}, CMD_INT},
     { "summonobj", {.withInt = cmd_summon}, CMD_INT},
     { "motherlode", {.noArg = cmd_nomoney}, CMD_NOARG},

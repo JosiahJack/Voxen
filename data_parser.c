@@ -229,7 +229,9 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "animated") == 0)          entry.animated = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "alttexture") == 0)           entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "altglowtexture") == 0)    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "spectexture") == 0)       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "normtexture") == 0)       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "doublesided") == 0)       flag_set(&entry.entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, start, lineNum));
@@ -253,6 +255,8 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry.dynamicFriction = parse_float(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry.frictionCombine = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry.bounceCombine = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "changeMatOnActive") == 0) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "blinkWhenActive") == 0)   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
 
                     else if (strcmp(trimmed_key, "volume") == 0)            entry.volume = parse_float(trimmed_value, start, lineNum);
                     

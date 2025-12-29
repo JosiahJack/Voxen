@@ -16,6 +16,8 @@
 #define ENTFLAG_RIGIDBODY    32u
 #define ENTFLAG_DOUBLESIDED  64u
 #define ENTFLAG_TRANSPARENT 128u
+#define ENTFLAG_CHANGE_TEX_ON_ACTIVE 256u
+#define ENTFLAG_BLINK_TEX_ON_ACTIVE 512U
 
 typedef struct {
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
@@ -23,7 +25,9 @@ typedef struct {
     uint16_t modelIndex;
     uint8_t animated;
     uint16_t texIndex;
+    uint16_t altTexIndex;
     uint16_t glowIndex;
+    uint16_t altGlowIndex;
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;

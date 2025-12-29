@@ -123,6 +123,104 @@ __attribute__((pure)) float GetBasePlayerSpeed(bool running) {
     return retval + bonus;
 }
 
+uint16_t testPointInSolid = UINT16_MAX;
+uint16_t PointInSolid(Vector3 point) {
+    for (int i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (instances[i].collider == COLLIDER_TYPE_NONE) {
+            continue;
+        }
+
+        Vector3 pos = instances[i].position;
+        Quaternion rot = instances[i].rotation;
+        Vector3 scale = instances[i].scale;
+
+        // Step 1: Translate point relative to instance position
+        Vector3 local = Vector3_A_minus_B(point, pos);
+
+        // Step 2: Apply inverse rotation (conjugate) to undo instance rotation
+        // NOTE: This matches Unity's left-handed convention (positive X rotation tips "up" down)
+        Quaternion invRot = conjugate_quaternion(rot);
+        local = quat_rotate(invRot, local);
+
+        // Step 3: Apply inverse scale
+        if (scale.x != 0.0f) local.x /= scale.x;
+        if (scale.y != 0.0f) local.y /= scale.y;
+        if (scale.z != 0.0f) local.z /= scale.z;
+
+        // Now test in local collider space
+        switch (instances[i].collider) {
+            case COLLIDER_TYPE_BOX:
+            {
+                Vector3 center = instances[i].colliderCenter;
+                Vector3 size   = instances[i].colliderSize; // full extents
+
+                Vector3 half = (Vector3){ size.x * 0.5f, size.y * 0.5f, size.z * 0.5f };
+                Vector3 min = Vector3_A_minus_B(center, half);
+                Vector3 max = Vector3_A_plus_B(center, half);
+
+                if (local.x >= min.x && local.x <= max.x &&
+                    local.y >= min.y && local.y <= max.y &&
+                    local.z >= min.z && local.z <= max.z) {
+                    return (uint16_t)i;
+                }
+                break;
+            }
+
+            case COLLIDER_TYPE_SPHERE:
+            {
+                Vector3 center = instances[i].colliderCenter;
+                float radius = instances[i].colliderSize.x;
+
+                Vector3 offset = Vector3_A_minus_B(local, center);
+                float distSq = dot_vector3(offset, offset);
+
+                if (distSq <= radius * radius) {
+                    return (uint16_t)i;
+                }
+                break;
+            }
+
+            case COLLIDER_TYPE_CAPSULE:
+            {
+                Vector3 center = instances[i].colliderCenter;
+                float radius = instances[i].colliderSize.x;
+                float height = instances[i].colliderSize.y; // full cylinder height
+                int axis = (int)instances[i].colliderSize.z; // 0=X, 1=Y, 2=Z
+
+                Vector3 axisDir = {0.0f, 1.0f, 0.0f};
+                if (axis == 0) axisDir = (Vector3){1.0f, 0.0f, 0.0f};
+                else if (axis == 2) axisDir = (Vector3){0.0f, 0.0f, 1.0f};
+
+                Vector3 halfHeightVec = scale_vector3(axisDir, height * 0.5f);
+
+                Vector3 p1 = Vector3_A_minus_B(center, halfHeightVec);
+                Vector3 p2 = Vector3_A_plus_B(center, halfHeightVec);
+
+                Vector3 p1_to_point = Vector3_A_minus_B(local, p1);
+                Vector3 p1_to_p2     = Vector3_A_minus_B(p2, p1);
+
+                float segLenSq = dot_vector3(p1_to_p2, p1_to_p2);
+                float t = (segLenSq > 0.0f) ? dot_vector3(p1_to_point, p1_to_p2) / segLenSq : 0.0f;
+                t = vclamp(t, 0.0f, 1.0f);
+
+                Vector3 closest = Vector3_A_plus_B(p1, scale_vector3(p1_to_p2, t));
+                Vector3 toClosest = Vector3_A_minus_B(local, closest);
+
+                float distSq = dot_vector3(toClosest, toClosest);
+                if (distSq <= radius * radius) {
+                    return (uint16_t)i;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+    }
+
+    return UINT16_MAX;
+}
+
 int32_t Physics(void) {
     if (window_has_focus && !log_playback) {
         if (!voxen_globalContext.gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
@@ -131,6 +229,8 @@ int32_t Physics(void) {
             
     if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return 0;
 
+    testPointInSolid = PointInSolid(instances[PLAYER1].position);
+        
     if (voxen_Cheats.noclip) {
         instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
         flag_disable(&instances[PLAYER1].entflags, ENTFLAG_USEGRAVITY);

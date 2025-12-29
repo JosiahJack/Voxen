@@ -257,7 +257,7 @@ void main() {
             slopeBias = min(slopeBias, 0.18);
             float bias = slopeBias * (dist / range);
             bias = clamp(bias, 0.0, 0.22);
-            bias += 0.02 * pow(clamp((256.0 - float(shadSize)) / 256.0, 0.0, 1.0), 0.65);
+            bias += 0.04 * pow(clamp((256.0 - float(shadSize)) / 256.0, 0.0, 1.0), 0.65);
             float shadSizeLessOne = float(shadSize - 1);
 
             // Pseudo-Stochastic PCF sampling

@@ -298,6 +298,7 @@ bool get_cull_bit(const uint32_t* arr, int idx);
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 #define FROB_DISTANCE 4.9f
+extern uint16_t testPointInSolid;
 extern uint8_t boosterActive;
 typedef uint8_t PhysicsLayer;
 static const uint8_t PhysicsLayer_Default          = 0;

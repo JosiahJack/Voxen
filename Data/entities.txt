@@ -4603,6 +4603,8 @@ index: 686
 index: 687
 #func_switch1
 index: 688
+model: 609
+texture: 837
 collider: 1
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -4613,6 +4615,13 @@ collider_sizez: 0.32
 colliderMeshIndex: 65535
 #func_switch2
 index: 689
+model: 610
+texture: 839
+alttexture: 841
+glowtexture: 0
+altglowtexture: 840
+changeMatOnActive: 1
+blinkWhenActive: 1
 collider: 1
 collider_centerx: -0.6088825
 collider_centery: 0.0
@@ -4623,6 +4632,12 @@ collider_sizez: 16.0
 colliderMeshIndex: 65535
 #func_switch3
 index: 690
+model: 611
+texture: 842
+alttexture: 844
+glowtexture: 0
+altglowtexture: 843
+changeMatOnActive: 1
 collider: 1
 collider_centerx: -0.571252
 collider_centery: 0.001326527
@@ -4633,16 +4648,20 @@ collider_sizez: 8.0
 colliderMeshIndex: 65535
 #func_switch4
 index: 691
+model: 612
+texture: 846
 collider: 1
-collider_centerx: 1.523325
+collider_centerx: 0.06
 collider_centery: 0.0
 collider_centerz: 0.0
-collider_sizex: 5.020065
-collider_sizey: 16.0
-collider_sizez: 16.0
+collider_sizex: 0.2
+collider_sizey: 0.64
+collider_sizez: 0.64
 colliderMeshIndex: 65535
 #func_switch5
 index: 692
+model: 614
+texture: 848
 collider: 1
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -4653,6 +4672,8 @@ collider_sizez: 0.08
 colliderMeshIndex: 65535
 #func_switch5broken
 index: 693
+model: 613
+texture: 847
 collider: 1
 collider_centerx: 0.0
 collider_centery: 0.0
@@ -4663,6 +4684,8 @@ collider_sizez: 0.08
 colliderMeshIndex: 65535
 #func_switch7
 index: 694
+model: 612
+texture: 854
 collider: 1
 collider_centerx: 1.523325
 collider_centery: 0.0
@@ -4673,6 +4696,12 @@ collider_sizez: 16.0
 colliderMeshIndex: 65535
 #func_switch8
 index: 695
+model: 616
+texture: 856
+alttexture: 858
+glowtexture: 855
+altglowtexture: 857
+changeMatOnActive: 1
 collider: 1
 collider_centerx: -1.0
 collider_centery: 0.0
