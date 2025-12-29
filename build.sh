@@ -46,6 +46,7 @@ gen_header() {
 }
 
 # Shaders and their C variable names
+gen_header ./Shaders/ssr.compute                ssr_computeShader
 gen_header ./Shaders/voxels.compute             voxelUpdate_computeShader
 gen_header ./Shaders/shadowmaps_clear.compute   shadowmaps_clear_computeShader
 gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertexShaderSource
@@ -70,6 +71,7 @@ cat > Shaders/shaders.h <<'EOF'
 #include "shadowmap_frag.glsl.h"
 #include "composite_vert.glsl.h"
 #include "composite_frag.glsl.h"
+#include "ssr.compute.h"
 #include "voxels.compute.h"
 #include "shadowmaps_clear.compute.h"
 #include "bluenoise64.cginc"

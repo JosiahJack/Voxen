@@ -5,6 +5,7 @@ double scrollDelta;
 double last_mouse_x = 0.0, last_mouse_y = 0.0;
 float mouse_sensitivity = 0.1f;
 bool window_has_focus = false;
+uint16_t editModeSelection = UINT16_MAX;
 
 // GLFW Callbacks
 #pragma GCC diagnostic push

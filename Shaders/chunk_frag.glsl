@@ -19,6 +19,7 @@ layout(location =  7) uniform uint screenHeight;
 layout(location =  8) uniform float worldMin_x;
 layout(location =  9) uniform float worldMin_z;
 layout(location = 10) uniform vec3 camPos;
+layout(location = 14) uniform uint reflectionsEnabled;
 layout(location = 15) uniform uint shadowsEnabled;
 layout(location = 17) uniform uint unlit;
 layout(location = 18) uniform uint texIndex;
@@ -26,6 +27,9 @@ layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
+layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
+layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
+layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
 layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
@@ -163,11 +167,18 @@ void main() {
         glowColor = getTextureColor(glowIndex,texUVGlow);
     }
 
-    ivec2 texSizeSpec = textureSizes[specIndex];
-    ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
-    texUVSpec.x = texUVSpec.x % texSizeSpec.x;
-    texUVSpec.y = texUVSpec.y % texSizeSpec.y;
-    vec4 specColor = getTextureColor(specIndex,texUVSpec);
+    vec4 specColor = vec4(0.0);
+    if (reflectionsEnabled > 0) {
+        ivec2 texSizeSpec = textureSizes[specIndex];
+        ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
+        texUVSpec.x = texUVSpec.x % texSizeSpec.x;
+        texUVSpec.y = texUVSpec.y % texSizeSpec.y;
+        specColor = getTextureColor(specIndex,texUVSpec);
+        outSpecular = specColor;
+        vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
+        outWorldPos = worldPosPack;
+        outNormal = EncodeOctahedral(adjustedNormal) * 0.5 + 0.5;  // Map to [0,1]
+    }
 
     uint voxelIdx = GetVoxelIndex(worldPos);
     uint count = voxelLightListCounts[voxelIdx];

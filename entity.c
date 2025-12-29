@@ -7,7 +7,8 @@
 #include "voxen.h"
 #include "todo.h"
 
-//#define DEBUG_ENTITIES
+// #define DEBUG_ENTITIES
+// #define DEBUG_ENTITY_DEFINITIONS
 #ifdef DEBUG_ENTITIES
     void DualLogEntity(Entity ent) {
         DualLog("Entity::\n"
@@ -58,28 +59,28 @@
                 ent.specIndex,
                 ent.normIndex,
                 ent.lodIndex,
-                ent.position.x, ent.position.y, ent.position.z,
-                ent.rotation.x, ent.rotation.y, ent.rotation.z, ent.rotation.w,
-                ent.scale.x, ent.scale.y, ent.scale.z,
-                ent.velocity.x, ent.velocity.y, ent.velocity.z,
-                ent.angularVelocity.x, ent.angularVelocity.y, ent.angularVelocity.z,
+                (double)ent.position.x, (double)ent.position.y, (double)ent.position.z,
+                (double)ent.rotation.x, (double)ent.rotation.y, (double)ent.rotation.z, (double)ent.rotation.w,
+                (double)ent.scale.x, (double)ent.scale.y, (double)ent.scale.z,
+                (double)ent.velocity.x, (double)ent.velocity.y, (double)ent.velocity.z,
+                (double)ent.angularVelocity.x, (double)ent.angularVelocity.y, (double)ent.angularVelocity.z,
                 ent.bodyState,
                 ent.collider,
-                ent.colliderCenter.x, ent.colliderCenter.y, ent.colliderCenter.z,
-                ent.colliderSize.x, ent.colliderSize.y, ent.colliderSize.z,
+                (double)ent.colliderCenter.x, (double)ent.colliderCenter.y, (double)ent.colliderCenter.z,
+                (double)ent.colliderSize.x, (double)ent.colliderSize.y, (double)ent.colliderSize.z,
                 ent.colliderMeshIndex,
-                ent.mass,
-                ent.linearDrag,
-                ent.angularDrag,
-                ent.inertia,
-                ent.accumulatedForce.x, ent.accumulatedForce.y, ent.accumulatedForce.z,
-                ent.accumulatedTorque.x, ent.accumulatedTorque.y, ent.accumulatedTorque.z,
-                ent.dynamicFriction,
-                ent.staticFriction,
-                ent.bounciness,
-                ent.frictionCombine,
+                (double)ent.mass,
+                (double)ent.linearDrag,
+                (double)ent.angularDrag,
+                (double)ent.inertia,
+                (double)ent.accumulatedForce.x, (double)ent.accumulatedForce.y, (double)ent.accumulatedForce.z,
+                (double)ent.accumulatedTorque.x, (double)ent.accumulatedTorque.y, (double)ent.accumulatedTorque.z,
+                (double)ent.dynamicFriction,
+                (double)ent.staticFriction,
+                (double)ent.bounciness,
+                (double)ent.frictionCombine,
                 ent.bounceCombine,
-                ent.volume);
+                (double)ent.volume);
     }
 
     void DualLogEntityInstance(uint16_t idx) {
@@ -155,7 +156,9 @@ void LoadEntities(void) {
         entities[i].accumulatedTorque.y = 0.0f;
         entities[i].accumulatedTorque.z = 0.0f;
         #ifdef DEBUG_ENTITIES
-            DualLogEntity(entities[i]);
+            #ifdef DEBUG_ENTITY_DEFINITIONS
+                DualLogEntity(entities[i]);
+            #endif
         #endif
     }
 
@@ -556,6 +559,7 @@ void LoadLevel(uint8_t curlevel) {
                 posBeforeX = instances[parent].position.x;
                 posBeforeY = instances[parent].position.y;
                 posBeforeZ = instances[parent].position.z;
+                instances[parent].overrideTest = true;
             }
             AddInstance(entIdx, parent, lineNum);
             if (overridePos) {
@@ -621,6 +625,10 @@ void LoadLevel(uint8_t curlevel) {
     glUniform1f(4, worldMin_z);
     memset(lightDirty,1,LIGHT_COUNT * sizeof(bool)); // Mark all true to ensure frustums and matrices are updated for all.
     UpdateVoxelLightLists();
+    #ifdef DEBUG_ENTITIES
+        uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
+        for (int i=START_INDEX_LEVEL_INSTANCES; i < endOfModels;++i) { if (instances[i].overrideTest) DualLogEntityInstance(i); }
+    #endif
     DebugRAM("after UpdateVoxelLightLists for load level");
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
     Input_MouselookApply();

@@ -55,6 +55,7 @@ typedef struct {
     Quaternion child_rotation[MAX_CHILD_COUNT];
     Vector3    child_scale[MAX_CHILD_COUNT];
     bool persistent;
+    bool overrideTest;
     char path[128];
 } Entity;
 
