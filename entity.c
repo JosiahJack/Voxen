@@ -7,11 +7,11 @@
 #include "voxen.h"
 #include "todo.h"
 
-// #define DEBUG_ENTITIES
+#define DEBUG_ENTITIES
 // #define DEBUG_ENTITY_DEFINITIONS
 #ifdef DEBUG_ENTITIES
     void DualLogEntity(Entity ent) {
-        DualLog("Entity::\n"
+        DualLog("Entity::%s\n"
                 "    index: %u\n"
                 "    entflags: %u [\n      ACTIVE:     %u\n      CARDCHUNK:  %u\n      GROUNDED:   %u\n      USEGRAVITY: %u\n      KINEMATIC:  %u\n      RIGIDBODY:  %u\n            ]\n"
                 "    modelIndex: %u\n"
@@ -43,7 +43,7 @@
                 "    frictionCombine: %u\n"
                 "    bounceCombine: %u\n"
                 "    volume: %f\n"
-                ,
+                , GetPrefabNameFromIndex(ent.index),
                 ent.index,
                 ent.entflags,
                     (ent.entflags & ENTFLAG_ACTIVE) > 0,
@@ -117,14 +117,14 @@ void InitializeEntity(Entity* entry) {
 }
 
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-int32_t entityCount; // Number of entities loaded
+uint16_t entityCount; // Number of entities loaded
 DataParser entity_parser;
 void LoadEntities(void) {
     double start_time = get_time();
     entityCount = 0;
     if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
     
-    entityCount = entity_parser.count;
+    entityCount = (uint16_t)entity_parser.count;
     DualLog("Loading  %d entities...", entityCount);
     if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); OS_Exit(1); }
     if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }

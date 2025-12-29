@@ -124,10 +124,15 @@ void LoadModels(void) {
         if (model_parser.entries[k].index > maxIndex && model_parser.entries[k].index != UINT16_MAX) maxIndex = model_parser.entries[k].index;
     }
 
-    uint16_t actualLoadedModels = 0u;
-    for (int32_t i=0;i<MODEL_IDX_MAX;++i) actualLoadedModels += modelIndexUsedForCurrentLevel[i] ? 1u : 0u;
     loadedModelsMaxIndex = (uint16_t)maxIndex + 1U;
-    DualLog("Loading   models( %d/%d) with max index  %d ...", actualLoadedModels, model_parser.count, maxIndex);
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        uint16_t actualLoadedModels = 0u;
+        for (int32_t i=0;i<MODEL_IDX_MAX;++i) actualLoadedModels += modelIndexUsedForCurrentLevel[i] ? 1u : 0u;
+        DualLog("Loading   models( %d/%d) with max index  %d ...", actualLoadedModels, model_parser.count, maxIndex);
+    #else
+        DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
+    #endif
+    
     modelVertices       = mmap(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     uint32_t** modelTriangles      = mmap(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
@@ -154,7 +159,9 @@ void LoadModels(void) {
     DebugRAM("prior to model load loop");
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
-        if (!modelIndexUsedForCurrentLevel[parserIdx]) continue;
+        #ifdef ONLY_LOAD_LEVEL_NEEDS
+            if (!modelIndexUsedForCurrentLevel[parserIdx]) continue;
+        #endif
         
         modelAnimationType[i] = model_parser.entries[parserIdx].animated;
         if (modelAnimationType[i] > 0u) animatedModelCount++;

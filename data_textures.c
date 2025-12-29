@@ -43,7 +43,6 @@ void LoadTextures(void) {
     }
 
     loadedTexturesMaxIndex = maxIndex + 1;
-    uint16_t actualLoadedTextures = 0u;
     int32_t matchedParserIdxes[MAX_VALID_TEXTURE];
     for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) matchedParserIdxes[i] = -1;
     for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
@@ -52,9 +51,15 @@ void LoadTextures(void) {
             if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true; // textureIndexUsedForCurrentLevel pre-cleared by LoadLevel parent calling function of LoadTextures
         }
     }
-    for (int32_t i=0;i<MAX_VALID_TEXTURE;++i) actualLoadedTextures += textureIndexUsedForCurrentLevel[i] ? 1u : 0u;
+    
     if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
-    DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", actualLoadedTextures, loadedTexturesMaxIndex);
+    #ifdef ONLY_LOAD_LEVEL_NEEDS
+        uint16_t actualLoadedTextures = 0u;
+        for (int32_t i=0;i<MAX_VALID_TEXTURE;++i) actualLoadedTextures += textureIndexUsedForCurrentLevel[i] ? 1u : 0u;
+        DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", actualLoadedTextures, loadedTexturesMaxIndex);
+    #else
+        DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", loadedTexturesMaxIndex, loadedTexturesMaxIndex);    
+    #endif
     
     totalPixels = 0U;
     totalPaletteColors = 0U;
@@ -78,7 +83,9 @@ void LoadTextures(void) {
     for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
         int32_t currentIndex = matchedParserIdxes[i];
         if (currentIndex < 0) continue;
-        if (!textureIndexUsedForCurrentLevel[currentIndex]) continue;
+        #ifdef ONLY_LOAD_LEVEL_NEEDS
+            if (!textureIndexUsedForCurrentLevel[currentIndex]) continue;
+        #endif
         
         doubleSidedTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_DOUBLESIDED) > 0 ? 1 : 0;
         transparentTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_TRANSPARENT) > 0 ? 1 : 0;

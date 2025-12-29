@@ -75,6 +75,7 @@ extern uint8_t dirtyInstances[INSTANCE_COUNT];
 extern uint16_t invalidModelIndexCount;
 extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
 extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
+extern uint16_t entityCount;
 extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;

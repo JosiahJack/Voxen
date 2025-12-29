@@ -1,6 +1,7 @@
 #pragma once
 #define VERSION_STRING "v0.7.4"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
+// #define ONLY_LOAD_LEVEL_NEEDS
 
 #include <stdbool.h>
 #include <string.h>
@@ -167,7 +168,7 @@ void UpdateAmbientSounds(void);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 24000000u
+#define MAX_TOTAL_PIXELS 25000000u
 #define MAX_UNIQUE_COLORS 74000u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
