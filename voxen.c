@@ -578,6 +578,7 @@ void CenterStatusPrint(const char* fmt, ...) {
 
 void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
     instances[playerIdx].index = 767;
+    instances[playerIdx].layer = PhysicsLayer_Player;
     instances[playerIdx].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
     instances[playerIdx].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
     instances[playerIdx].rotation.w = 1.0f;
@@ -916,94 +917,21 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
         .normal = {0.0f, 0.0f, 0.0f},
         .hitInstanceIndex = INSTANCE_COUNT
     };
-
-    float playerX = instances[PLAYER1].position.x;
-    float playerY = instances[PLAYER1].position.y;
-    float playerZ = instances[PLAYER1].position.z;
-    for (uint16_t instIdx = START_INDEX_LEVEL_INSTANCES; instIdx < loadedInstances; ++instIdx) {
-        Entity* e = &instances[instIdx];
-        if (e->collider == COLLIDER_TYPE_NONE) continue;
-        if (((1u << e->layer) & layerMask) == 0) continue;
-
-        uint16_t cellIdx = PosGetCellCoords(e->position.x, e->position.z);
-        if (cellIdx < ARRSIZE &&
-            !(gridCellStates[cellIdx] & CELL_VISIBLE) &&
-            (gridCellStates[cellIdx] & CELL_OPEN)) {
-            continue;
-        }
-
-        float dx = e->position.x - playerX;
-        float dy = e->position.y - playerY;
-        float dz = e->position.z - playerZ;
-        float distSq = dx*dx + dy*dy + dz*dz;
-        float radius = modelBounds[(e->modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (distSq > (maxDist + radius) * (maxDist + radius)) continue;
-
-        Vector3 centerToOrigin = {
-            origin.x - e->position.x,
-            origin.y - e->position.y,
-            origin.z - e->position.z
-        };
-
-        Quaternion invRot = conjugate_quaternion(e->rotation);
-        Vector3 localOrigin = quat_rotate(invRot, centerToOrigin);
-        Vector3 localDir    = quat_rotate(invRot, dir);
-        Vector3 half = { e->colliderSize.x * e->scale.x, e->colliderSize.y * e->scale.y, e->colliderSize.z * e->scale.z };
-        float tNear = -INFINITY;
-        float tFar  = INFINITY;
-        bool noHit = false;
-        for (int axis = 0; axis < 3; ++axis) {
-            float o = (axis == 0 ? localOrigin.x : (axis == 1 ? localOrigin.y : localOrigin.z));
-            float d = (axis == 0 ? localDir.x    : (axis == 1 ? localDir.y    : localDir.z));
-            float h = (axis == 0 ? half.x         : (axis == 1 ? half.y         : half.z));
-            if (fabsf(d) < 1e-6f) {
-                if (o < -h || o > h) { noHit = true; break; }
-            } else {
-                float t1 = (-h - o) / d;
-                float t2 = ( h - o) / d;
-                if (t1 > t2) {
-                    t1 += t2; // e.g. if swapping t1 = 3 and t2 = 5, t1 now is 8 and t2 is still 5
-                    t2 = t1 - t2; // now t2 = 8 - 5 = 3, t1 = 8
-                    t1 = t1 - t2; // now t1 = 8 - 3 = 5, t1 = 5 and t2 = 8, swapped!
-                }
-                tNear = fmaxf(tNear, t1);
-                tFar  = fminf(tFar,  t2);
-            }
-        }
-
-        if (noHit || tNear > tFar || tFar <= 0.0f) continue;
-
-        float t = (tNear > 0.0f) ? tNear : tFar;
-        if (t > maxDist || t < 0.0f) continue;
-
-        if (t < result.distance) {
+    
+    uint16_t hitObjectIndex = UINT16_MAX;
+    for (float curDist=0.0f;curDist<maxDist;curDist+=0.02f) { // 4.9 / 0.04 = 245 tries worst case empty air
+        Vector3 checkPoint = Vector3_A_plus_B(origin, scale_vector3(dir,curDist));
+        hitObjectIndex = PointInSolid(checkPoint, layerMask);
+        if (hitObjectIndex < loadedInstances) {
             result.hit = true;
-            result.distance = t;
-            result.hitInstanceIndex = instIdx;
-            result.point.x = origin.x + dir.x * t;
-            result.point.y = origin.y + dir.y * t;
-            result.point.z = origin.z + dir.z * t;
-            Vector3 localHit = { localOrigin.x + localDir.x * t, localOrigin.y + localDir.y * t, localOrigin.z + localDir.z * t };
-            Vector3 localNormal = {0.0f, 0.0f, 0.0f};
-            float bestDist = INFINITY;
-            for (int axis = 0; axis < 3; ++axis) {
-                float p = (axis == 0 ? localHit.x : (axis == 1 ? localHit.y : localHit.z));
-                float h = (axis == 0 ? half.x : (axis == 1 ? half.y : half.z));
-                float dist = fabsf(fabsf(p) - h);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    localNormal = (Vector3){0.0f, 0.0f, 0.0f};
-                    if (axis == 0) localNormal.x = (p >= 0.0f) ? 1.0f : -1.0f;
-                    if (axis == 1) localNormal.y = (p >= 0.0f) ? 1.0f : -1.0f;
-                    if (axis == 2) localNormal.z = (p >= 0.0f) ? 1.0f : -1.0f;
-                }
-            }
-
-            result.normal = quat_rotate(e->rotation, localNormal);
-            normalize_vector(&result.normal.x, &result.normal.y, &result.normal.z);
+            result.point = checkPoint;
+            result.distance = curDist; // TODO refine the raymarch a little?  nah 0.02 good enough for effects, will apply offset along normal for bullet holes and such anyways.
+            result.normal = Vector3_A_minus_B(checkPoint,origin);
+            result.hitInstanceIndex = hitObjectIndex;
+            return result;
         }
     }
-
+    
     return result;
 }
 

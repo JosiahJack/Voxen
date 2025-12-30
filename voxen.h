@@ -317,8 +317,8 @@ static const uint8_t PhysicsLayer_Player           = 12;
 static const uint8_t PhysicsLayer_Corpse           = 13;
 static const uint8_t PhysicsLayer_PhysObjects      = 14;
 static const uint8_t PhysicsLayer_Sky              = 15;
-//static const uint8_t PhysicsLayer_               = 16;
-//static const uint8_t PhysicsLayer_               = 17;
+static const uint8_t PhysicsLayer_PlayerTriggerOnly= 16;
+static const uint8_t PhysicsLayer_Trigger          = 17;
 static const uint8_t PhysicsLayer_Door             = 18;
 static const uint8_t PhysicsLayer_InterDebris      = 19;
 static const uint8_t PhysicsLayer_Player2          = 20;
@@ -333,6 +333,12 @@ static const uint8_t PhysicsLayer_Culling          = 28;
 static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 //static const uint8_t PhysicsLayer_               = 30;
 static const uint8_t PhysicsLayer_NULL             = 31;
+#define LAYER_MASK_PLAYER_COLLIDESWITH ((1u << PhysicsLayer_Clip) | (1u << PhysicsLayer_NPCBullet) | (1u << PhysicsLayer_Player2) | (1u << PhysicsLayer_Door) \
+										| (1u << PhysicsLayer_Trigger) | (1u << PhysicsLayer_PlayerTriggerOnly) | (1u << PhysicsLayer_Default) | (1u << PhysicsLayer_TransparentFX) \
+										| (1u << PhysicsLayer_IgnoreRaycast) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_NPC))
+#define LAYER_MASK_NPC_COLLIDESWITH ((1u << PhysicsLayer_Clip) | (1u << PhysicsLayer_NPCClip) | (1u << PhysicsLayer_PlayerBullets) | (1u << PhysicsLayer_Player2) | (1u << PhysicsLayer_Player) | (1u << PhysicsLayer_Door) \
+										| (1u << PhysicsLayer_Trigger) | (1u << PhysicsLayer_NPCTrigger) | (1u << PhysicsLayer_Default) | (1u << PhysicsLayer_TransparentFX) \
+										| (1u << PhysicsLayer_IgnoreRaycast) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_NPC))
 #define LAYER_MASK_NPC_SIGHT ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry) | (1u << PhysicsLayer_Door) | (1u << PhysicsLayer_InterDebris) \
 	                          | (1u << PhysicsLayer_PhysObjects) | (1u << PhysicsLayer_Player))
 
@@ -690,10 +696,10 @@ static inline Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y
 static inline Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
 static inline float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
 static inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
+uint16_t PointInSolid(Vector3 point, uint32_t layerMask);
 void normalize_vector(float* x, float* y, float* z);
 __attribute__((pure)) Vector3 mul_mat4_vector3(const float* m, Vector3 v);
 void quat_to_matrix(Quaternion* q, float* m);
-Quaternion conjugate_quaternion(const Quaternion q);
 Quaternion axis_angle_quaternion(const Vector3 axis, float angle);
 void normalize_quaternion(Quaternion* q);
 Vector3 quat_rotate(Quaternion q, Vector3 v);

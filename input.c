@@ -5,7 +5,7 @@ double scrollDelta;
 double last_mouse_x = 0.0, last_mouse_y = 0.0;
 float mouse_sensitivity = 0.1f;
 bool window_has_focus = false;
-uint16_t editModeSelection = 653; // Test instance
+uint16_t editModeSelection = 682; // Test instance
 uint16_t editModeTestEntityDefinition = 0; // Test instance's model index
 
 // GLFW Callbacks

@@ -31,7 +31,6 @@ void quat_to_matrix(Quaternion* q, float* m) {
     m[15] = 1.0f;
 }
 
-Quaternion conjugate_quaternion(const Quaternion q) { return (Quaternion){q.w, -q.x, -q.y, -q.z}; }
 Quaternion axis_angle_quaternion(const Vector3 axis, float angle) { float s = vsinf(angle * 0.5f); return (Quaternion){vcosf(angle * 0.5f), s * axis.x, s * axis.y, s * axis.z}; }
 void normalize_quaternion(Quaternion* q) {
     float mag = vsqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
