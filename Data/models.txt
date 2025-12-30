@@ -1628,5 +1628,758 @@ index: 921
 index: 922
 #Models/npc_humanoidmutant_000181.obj
 index: 923
-#Models/npc_humanoidmutant_000182.obj
+
+#Models/npc_cyborg_drone_000001.obj
 index: 924
+#Models/npc_cyborg_drone_000002.obj
+index: 925
+#Models/npc_cyborg_drone_000003.obj
+index: 926
+#Models/npc_cyborg_drone_000004.obj
+index: 927
+#Models/npc_cyborg_drone_000005.obj
+index: 928
+#Models/npc_cyborg_drone_000006.obj
+index: 929
+#Models/npc_cyborg_drone_000007.obj
+index: 930
+#Models/npc_cyborg_drone_000008.obj
+index: 931
+#Models/npc_cyborg_drone_000009.obj
+index: 932
+#Models/npc_cyborg_drone_000010.obj
+index: 933
+#Models/npc_cyborg_drone_000011.obj
+index: 934
+#Models/npc_cyborg_drone_000012.obj
+index: 935
+#Models/npc_cyborg_drone_000013.obj
+index: 936
+#Models/npc_cyborg_drone_000014.obj
+index: 937
+#Models/npc_cyborg_drone_000015.obj
+index: 938
+#Models/npc_cyborg_drone_000016.obj
+index: 939
+#Models/npc_cyborg_drone_000017.obj
+index: 940
+#Models/npc_cyborg_drone_000018.obj
+index: 941
+#Models/npc_cyborg_drone_000019.obj
+index: 942
+#Models/npc_cyborg_drone_000020.obj
+index: 943
+#Models/npc_cyborg_drone_000021.obj
+index: 944
+#Models/npc_cyborg_drone_000022.obj
+index: 945
+#Models/npc_cyborg_drone_000023.obj
+index: 946
+#Models/npc_cyborg_drone_000024.obj
+index: 947
+#Models/npc_cyborg_drone_000025.obj
+index: 948
+#Models/npc_cyborg_drone_000026.obj
+index: 949
+#Models/npc_cyborg_drone_000027.obj
+index: 950
+#Models/npc_cyborg_drone_000028.obj
+index: 951
+#Models/npc_cyborg_drone_000029.obj
+index: 952
+#Models/npc_cyborg_drone_000030.obj
+index: 953
+#Models/npc_cyborg_drone_000031.obj
+index: 954
+#Models/npc_cyborg_drone_000032.obj
+index: 955
+#Models/npc_cyborg_drone_000033.obj
+index: 956
+#Models/npc_cyborg_drone_000034.obj
+index: 957
+#Models/npc_cyborg_drone_000035.obj
+index: 958
+#Models/npc_cyborg_drone_000036.obj
+index: 959
+#Models/npc_cyborg_drone_000037.obj
+index: 960
+#Models/npc_cyborg_drone_000038.obj
+index: 961
+#Models/npc_cyborg_drone_000039.obj
+index: 962
+#Models/npc_cyborg_drone_000040.obj
+index: 963
+#Models/npc_cyborg_drone_000041.obj
+index: 964
+#Models/npc_cyborg_drone_000042.obj
+index: 965
+#Models/npc_cyborg_drone_000043.obj
+index: 966
+#Models/npc_cyborg_drone_000044.obj
+index: 967
+#Models/npc_cyborg_drone_000045.obj
+index: 968
+#Models/npc_cyborg_drone_000046.obj
+index: 969
+#Models/npc_cyborg_drone_000047.obj
+index: 970
+#Models/npc_cyborg_drone_000048.obj
+index: 971
+#Models/npc_cyborg_drone_000049.obj
+index: 972
+#Models/npc_cyborg_drone_000050.obj
+index: 973
+#Models/npc_cyborg_drone_000051.obj
+index: 974
+#Models/npc_cyborg_drone_000052.obj
+index: 975
+#Models/npc_cyborg_drone_000053.obj
+index: 976
+#Models/npc_cyborg_drone_000054.obj
+index: 977
+#Models/npc_cyborg_drone_000055.obj
+index: 978
+#Models/npc_cyborg_drone_000056.obj
+index: 979
+#Models/npc_cyborg_drone_000057.obj
+index: 980
+#Models/npc_cyborg_drone_000058.obj
+index: 981
+#Models/npc_cyborg_drone_000059.obj
+index: 982
+#Models/npc_cyborg_drone_000060.obj
+index: 983
+#Models/npc_cyborg_drone_000061.obj
+index: 984
+#Models/npc_cyborg_drone_000062.obj
+index: 985
+#Models/npc_cyborg_drone_000063.obj
+index: 986
+#Models/npc_cyborg_drone_000064.obj
+index: 987
+#Models/npc_cyborg_drone_000065.obj
+index: 988
+#Models/npc_cyborg_drone_000066.obj
+index: 989
+#Models/npc_cyborg_drone_000067.obj
+index: 990
+#Models/npc_cyborg_drone_000068.obj
+index: 991
+#Models/npc_cyborg_drone_000069.obj
+index: 992
+#Models/npc_cyborg_drone_000070.obj
+index: 993
+#Models/npc_cyborg_drone_000071.obj
+index: 994
+#Models/npc_cyborg_drone_000072.obj
+index: 995
+#Models/npc_cyborg_drone_000073.obj
+index: 996
+#Models/npc_cyborg_drone_000074.obj
+index: 997
+#Models/npc_cyborg_drone_000075.obj
+index: 998
+#Models/npc_cyborg_drone_000076.obj
+index: 999
+#Models/npc_cyborg_drone_000077.obj
+index: 1000
+#Models/npc_cyborg_drone_000078.obj
+index: 1001
+#Models/npc_cyborg_drone_000079.obj
+index: 1002
+#Models/npc_cyborg_drone_000080.obj
+index: 1003
+#Models/npc_cyborg_drone_000081.obj
+index: 1004
+#Models/npc_cyborg_drone_000082.obj
+index: 1005
+#Models/npc_cyborg_drone_000083.obj
+index: 1006
+#Models/npc_cyborg_drone_000084.obj
+index: 1007
+#Models/npc_cyborg_drone_000085.obj
+index: 1008
+#Models/npc_cyborg_drone_000086.obj
+index: 1009
+#Models/npc_cyborg_drone_000087.obj
+index: 1010
+#Models/npc_cyborg_drone_000088.obj
+index: 1011
+#Models/npc_cyborg_drone_000089.obj
+index: 1012
+#Models/npc_cyborg_drone_000090.obj
+index: 1013
+#Models/npc_cyborg_drone_000091.obj
+index: 1014
+#Models/npc_cyborg_drone_000092.obj
+index: 1015
+#Models/npc_cyborg_drone_000093.obj
+index: 1016
+#Models/npc_cyborg_drone_000094.obj
+index: 1017
+#Models/npc_cyborg_drone_000095.obj
+index: 1018
+#Models/npc_cyborg_drone_000096.obj
+index: 1019
+#Models/npc_cyborg_drone_000097.obj
+index: 1020
+#Models/npc_cyborg_drone_000098.obj
+index: 1021
+#Models/npc_cyborg_drone_000099.obj
+index: 1022
+#Models/npc_cyborg_drone_000100.obj
+index: 1023
+#Models/npc_cyborg_drone_000101.obj
+index: 1024
+#Models/npc_cyborg_drone_000102.obj
+index: 1025
+#Models/npc_cyborg_drone_000103.obj
+index: 1026
+#Models/npc_cyborg_drone_000104.obj
+index: 1027
+#Models/npc_cyborg_drone_000105.obj
+index: 1028
+#Models/npc_cyborg_drone_000106.obj
+index: 1029
+#Models/npc_cyborg_drone_000107.obj
+index: 1030
+#Models/npc_cyborg_drone_000108.obj
+index: 1031
+#Models/npc_cyborg_drone_000109.obj
+index: 1032
+#Models/npc_cyborg_drone_000110.obj
+index: 1033
+#Models/npc_cyborg_drone_000111.obj
+index: 1034
+#Models/npc_cyborg_drone_000112.obj
+index: 1035
+#Models/npc_cyborg_drone_000113.obj
+index: 1036
+#Models/npc_cyborg_drone_000114.obj
+index: 1037
+#Models/npc_cyborg_drone_000115.obj
+index: 1038
+#Models/npc_cyborg_drone_000116.obj
+index: 1039
+#Models/npc_cyborg_drone_000117.obj
+index: 1040
+#Models/npc_cyborg_drone_000118.obj
+index: 1041
+#Models/npc_cyborg_drone_000119.obj
+index: 1042
+#Models/npc_cyborg_drone_000120.obj
+index: 1043
+#Models/npc_cyborg_drone_000121.obj
+index: 1044
+#Models/npc_cyborg_drone_000122.obj
+index: 1045
+#Models/npc_cyborg_drone_000123.obj
+index: 1046
+#Models/npc_cyborg_drone_000124.obj
+index: 1047
+#Models/npc_cyborg_drone_000125.obj
+index: 1048
+#Models/npc_cyborg_drone_000126.obj
+index: 1049
+#Models/npc_cyborg_drone_000127.obj
+index: 1050
+#Models/npc_cyborg_drone_000128.obj
+index: 1051
+#Models/npc_cyborg_drone_000129.obj
+index: 1052
+#Models/npc_cyborg_drone_000130.obj
+index: 1053
+#Models/npc_cyborg_drone_000131.obj
+index: 1054
+#Models/npc_cyborg_drone_000132.obj
+index: 1055
+#Models/npc_cyborg_drone_000133.obj
+index: 1056
+#Models/npc_cyborg_drone_000134.obj
+index: 1057
+#Models/npc_cyborg_drone_000135.obj
+index: 1058
+#Models/npc_cyborg_drone_000136.obj
+index: 1059
+#Models/npc_cyborg_drone_000137.obj
+index: 1060
+#Models/npc_cyborg_drone_000138.obj
+index: 1061
+#Models/npc_cyborg_drone_000139.obj
+index: 1062
+#Models/npc_cyborg_drone_000140.obj
+index: 1063
+#Models/npc_cyborg_drone_000141.obj
+index: 1064
+#Models/npc_cyborg_drone_000142.obj
+index: 1065
+#Models/npc_cyborg_drone_000143.obj
+index: 1066
+#Models/npc_cyborg_drone_000144.obj
+index: 1067
+#Models/npc_cyborg_drone_000145.obj
+index: 1068
+#Models/npc_cyborg_drone_000146.obj
+index: 1069
+#Models/npc_cyborg_drone_000147.obj
+index: 1070
+#Models/npc_cyborg_drone_000148.obj
+index: 1071
+#Models/npc_cyborg_drone_000149.obj
+index: 1072
+#Models/npc_cyborg_drone_000150.obj
+index: 1073
+#Models/npc_cyborg_drone_000151.obj
+index: 1074
+#Models/npc_cyborg_drone_000152.obj
+index: 1075
+#Models/npc_cyborg_drone_000153.obj
+index: 1076
+#Models/npc_cyborg_drone_000154.obj
+index: 1077
+#Models/npc_cyborg_drone_000155.obj
+index: 1078
+#Models/npc_cyborg_drone_000156.obj
+index: 1079
+#Models/npc_cyborg_drone_000157.obj
+index: 1080
+#Models/npc_cyborg_drone_000158.obj
+index: 1081
+#Models/npc_cyborg_drone_000159.obj
+index: 1082
+#Models/npc_cyborg_drone_000160.obj
+index: 1083
+#Models/npc_cyborg_drone_000161.obj
+index: 1084
+#Models/npc_cyborg_drone_000162.obj
+index: 1085
+#Models/npc_cyborg_drone_000163.obj
+index: 1086
+#Models/npc_cyborg_drone_000164.obj
+index: 1087
+#Models/npc_cyborg_drone_000165.obj
+index: 1088
+#Models/npc_cyborg_drone_000166.obj
+index: 1089
+#Models/npc_cyborg_drone_000167.obj
+index: 1090
+#Models/npc_cyborg_drone_000168.obj
+index: 1091
+#Models/npc_cyborg_drone_000169.obj
+index: 1092
+#Models/npc_cyborg_drone_000170.obj
+index: 1093
+#Models/npc_cyborg_drone_000171.obj
+index: 1094
+#Models/npc_cyborg_drone_000172.obj
+index: 1095
+#Models/npc_cyborg_drone_000173.obj
+index: 1096
+#Models/npc_cyborg_drone_000174.obj
+index: 1097
+#Models/npc_cyborg_drone_000175.obj
+index: 1098
+#Models/npc_cyborg_drone_000176.obj
+index: 1099
+#Models/npc_cyborg_drone_000177.obj
+index: 1100
+#Models/npc_cyborg_drone_000178.obj
+index: 1101
+#Models/npc_cyborg_drone_000179.obj
+index: 1102
+#Models/npc_cyborg_drone_000180.obj
+index: 1103
+#Models/npc_cyborg_drone_000181.obj
+index: 1104
+#Models/npc_cyborg_drone_000182.obj
+index: 1105
+#Models/npc_cyborg_drone_000183.obj
+index: 1106
+#Models/npc_cyborg_drone_000184.obj
+index: 1107
+#Models/npc_cyborg_drone_000185.obj
+index: 1108
+#Models/npc_cyborg_drone_000186.obj
+index: 1109
+#Models/npc_cyborg_drone_000187.obj
+index: 1110
+#Models/npc_cyborg_drone_000188.obj
+index: 1111
+#Models/npc_cyborg_drone_000189.obj
+index: 1112
+#Models/npc_cyborg_drone_000190.obj
+index: 1113
+#Models/npc_cyborg_drone_000191.obj
+index: 1114
+#Models/npc_cyborg_drone_000192.obj
+index: 1115
+#Models/npc_cyborg_drone_000193.obj
+index: 1116
+#Models/npc_cyborg_drone_000194.obj
+index: 1117
+#Models/npc_cyborg_drone_000195.obj
+index: 1118
+#Models/npc_cyborg_drone_000196.obj
+index: 1119
+#Models/npc_cyborg_drone_000197.obj
+index: 1120
+#Models/npc_cyborg_drone_000198.obj
+index: 1121
+#Models/npc_cyborg_drone_000199.obj
+index: 1122
+#Models/npc_cyborg_drone_000200.obj
+index: 1123
+#Models/npc_cyborg_drone_000201.obj
+index: 1124
+#Models/npc_cyborg_drone_000202.obj
+index: 1125
+#Models/npc_cyborg_drone_000203.obj
+index: 1126
+#Models/npc_cyborg_drone_000204.obj
+index: 1127
+#Models/npc_cyborg_drone_000205.obj
+index: 1128
+#Models/npc_cyborg_drone_000206.obj
+index: 1129
+#Models/npc_cyborg_drone_000207.obj
+index: 1130
+#Models/npc_cyborg_drone_000208.obj
+index: 1131
+#Models/npc_cyborg_drone_000209.obj
+index: 1132
+#Models/npc_cyborg_drone_000210.obj
+index: 1133
+#Models/npc_cyborg_drone_000211.obj
+index: 1134
+#Models/npc_cyborg_drone_000212.obj
+index: 1135
+#Models/npc_cyborg_drone_000213.obj
+index: 1136
+#Models/npc_cyborg_drone_000214.obj
+index: 1137
+#Models/npc_cyborg_drone_000215.obj
+index: 1138
+#Models/npc_cyborg_drone_000216.obj
+index: 1139
+#Models/npc_cyborg_drone_000217.obj
+index: 1140
+#Models/npc_cyborg_drone_000218.obj
+index: 1141
+#Models/npc_cyborg_drone_000219.obj
+index: 1142
+#Models/npc_cyborg_drone_000220.obj
+index: 1143
+#Models/npc_cyborg_drone_000221.obj
+index: 1144
+#Models/npc_cyborg_drone_000222.obj
+index: 1145
+#Models/npc_cyborg_drone_000223.obj
+index: 1146
+#Models/npc_cyborg_drone_000224.obj
+index: 1147
+#Models/npc_cyborg_drone_000225.obj
+index: 1148
+#Models/npc_cyborg_drone_000226.obj
+index: 1149
+#Models/npc_cyborg_drone_000227.obj
+index: 1150
+#Models/npc_cyborg_drone_000228.obj
+index: 1151
+#Models/npc_cyborg_drone_000229.obj
+index: 1152
+#Models/npc_cyborg_drone_000230.obj
+index: 1153
+#Models/npc_cyborg_drone_000231.obj
+index: 1154
+#Models/npc_cyborg_drone_000232.obj
+index: 1155
+#Models/npc_cyborg_drone_000233.obj
+index: 1156
+#Models/npc_cyborg_drone_000234.obj
+index: 1157
+#Models/npc_cyborg_drone_000235.obj
+index: 1158
+#Models/npc_cyborg_drone_000236.obj
+index: 1159
+#Models/npc_cyborg_drone_000237.obj
+index: 1160
+#Models/npc_cyborg_drone_000238.obj
+index: 1161
+#Models/npc_cyborg_drone_000239.obj
+index: 1162
+#Models/npc_cyborg_drone_000240.obj
+index: 1163
+#Models/npc_cyborg_drone_000241.obj
+index: 1164
+#Models/npc_cyborg_drone_000242.obj
+index: 1165
+#Models/npc_cyborg_drone_000243.obj
+index: 1166
+#Models/npc_cyborg_drone_000244.obj
+index: 1167
+#Models/npc_cyborg_drone_000245.obj
+index: 1168
+#Models/npc_cyborg_drone_000246.obj
+index: 1169
+#Models/npc_cyborg_drone_000247.obj
+index: 1170
+#Models/npc_cyborg_drone_000248.obj
+index: 1171
+#Models/npc_cyborg_drone_000249.obj
+index: 1172
+#Models/npc_cyborg_drone_000250.obj
+index: 1173
+#Models/npc_cyborg_drone_000251.obj
+index: 1174
+#Models/npc_cyborg_drone_000252.obj
+index: 1175
+#Models/npc_cyborg_drone_000253.obj
+index: 1176
+#Models/npc_cyborg_drone_000254.obj
+index: 1177
+#Models/npc_cyborg_drone_000255.obj
+index: 1178
+#Models/npc_cyborg_drone_000256.obj
+index: 1179
+#Models/npc_cyborg_drone_000257.obj
+index: 1180
+#Models/npc_cyborg_drone_000258.obj
+index: 1181
+#Models/npc_cyborg_drone_000259.obj
+index: 1182
+#Models/npc_cyborg_drone_000260.obj
+index: 1183
+#Models/npc_cyborg_drone_000261.obj
+index: 1184
+#Models/npc_cyborg_drone_000262.obj
+index: 1185
+#Models/npc_cyborg_drone_000263.obj
+index: 1186
+#Models/npc_cyborg_drone_000264.obj
+index: 1187
+#Models/npc_cyborg_drone_000265.obj
+index: 1188
+#Models/npc_cyborg_drone_000266.obj
+index: 1189
+#Models/npc_cyborg_drone_000267.obj
+index: 1190
+#Models/npc_cyborg_drone_000268.obj
+index: 1191
+#Models/npc_cyborg_drone_000269.obj
+index: 1192
+#Models/npc_cyborg_drone_000270.obj
+index: 1193
+#Models/npc_cyborg_drone_000271.obj
+index: 1194
+#Models/npc_cyborg_drone_000272.obj
+index: 1195
+#Models/npc_cyborg_drone_000273.obj
+index: 1196
+#Models/npc_cyborg_drone_000274.obj
+index: 1197
+#Models/npc_cyborg_drone_000275.obj
+index: 1198
+#Models/npc_cyborg_drone_000276.obj
+index: 1199
+#Models/npc_cyborg_drone_000277.obj
+index: 1200
+#Models/npc_cyborg_drone_000278.obj
+index: 1201
+#Models/npc_cyborg_drone_000279.obj
+index: 1202
+#Models/npc_cyborg_drone_000280.obj
+index: 1203
+#Models/npc_cyborg_drone_000281.obj
+index: 1204
+#Models/npc_cyborg_drone_000282.obj
+index: 1205
+#Models/npc_cyborg_drone_000283.obj
+index: 1206
+#Models/npc_cyborg_drone_000284.obj
+index: 1207
+#Models/npc_cyborg_drone_000285.obj
+index: 1208
+#Models/npc_cyborg_drone_000286.obj
+index: 1209
+#Models/npc_cyborg_drone_000287.obj
+index: 1210
+#Models/npc_cyborg_drone_000288.obj
+index: 1211
+#Models/npc_cyborg_drone_000289.obj
+index: 1212
+#Models/npc_cyborg_drone_000290.obj
+index: 1213
+#Models/npc_cyborg_drone_000291.obj
+index: 1214
+#Models/npc_cyborg_drone_000292.obj
+index: 1215
+#Models/npc_cyborg_drone_000293.obj
+index: 1216
+#Models/npc_cyborg_drone_000294.obj
+index: 1217
+#Models/npc_cyborg_drone_000295.obj
+index: 1218
+#Models/npc_cyborg_drone_000296.obj
+index: 1219
+#Models/npc_cyborg_drone_000297.obj
+index: 1220
+#Models/npc_cyborg_drone_000298.obj
+index: 1221
+#Models/npc_cyborg_drone_000299.obj
+index: 1222
+#Models/npc_cyborg_drone_000300.obj
+index: 1223
+#Models/npc_cyborg_drone_000301.obj
+index: 1224
+#Models/npc_cyborg_drone_000302.obj
+index: 1225
+#Models/npc_cyborg_drone_000303.obj
+index: 1226
+#Models/npc_cyborg_drone_000304.obj
+index: 1227
+#Models/npc_cyborg_drone_000305.obj
+index: 1228
+#Models/npc_cyborg_drone_000306.obj
+index: 1229
+#Models/npc_cyborg_drone_000307.obj
+index: 1230
+#Models/npc_cyborg_drone_000308.obj
+index: 1231
+#Models/npc_cyborg_drone_000309.obj
+index: 1232
+#Models/npc_cyborg_drone_000310.obj
+index: 1233
+#Models/npc_cyborg_drone_000311.obj
+index: 1234
+#Models/npc_cyborg_drone_000312.obj
+index: 1235
+#Models/npc_cyborg_drone_000313.obj
+index: 1236
+#Models/npc_cyborg_drone_000314.obj
+index: 1237
+#Models/npc_cyborg_drone_000315.obj
+index: 1238
+#Models/npc_cyborg_drone_000316.obj
+index: 1239
+#Models/npc_cyborg_drone_000317.obj
+index: 1240
+#Models/npc_cyborg_drone_000318.obj
+index: 1241
+#Models/npc_cyborg_drone_000319.obj
+index: 1242
+#Models/npc_cyborg_drone_000320.obj
+index: 1243
+#Models/npc_cyborg_drone_000321.obj
+index: 1244
+#Models/npc_cyborg_drone_000322.obj
+index: 1245
+#Models/npc_cyborg_drone_000323.obj
+index: 1246
+#Models/npc_cyborg_drone_000324.obj
+index: 1247
+#Models/npc_cyborg_drone_000325.obj
+index: 1248
+#Models/npc_cyborg_drone_000326.obj
+index: 1249
+#Models/npc_cyborg_drone_000327.obj
+index: 1250
+#Models/npc_cyborg_drone_000328.obj
+index: 1251
+#Models/npc_cyborg_drone_000329.obj
+index: 1252
+#Models/npc_cyborg_drone_000330.obj
+index: 1253
+#Models/npc_cyborg_drone_000331.obj
+index: 1254
+#Models/npc_cyborg_drone_000332.obj
+index: 1255
+#Models/npc_cyborg_drone_000333.obj
+index: 1256
+#Models/npc_cyborg_drone_000334.obj
+index: 1257
+#Models/npc_cyborg_drone_000335.obj
+index: 1258
+#Models/npc_cyborg_drone_000336.obj
+index: 1259
+#Models/npc_cyborg_drone_000337.obj
+index: 1260
+#Models/npc_cyborg_drone_000338.obj
+index: 1261
+#Models/npc_cyborg_drone_000339.obj
+index: 1262
+#Models/npc_cyborg_drone_000340.obj
+index: 1263
+#Models/npc_cyborg_drone_000341.obj
+index: 1264
+#Models/npc_cyborg_drone_000342.obj
+index: 1265
+#Models/npc_cyborg_drone_000343.obj
+index: 1266
+#Models/npc_cyborg_drone_000344.obj
+index: 1267
+#Models/npc_cyborg_drone_000345.obj
+index: 1268
+#Models/npc_cyborg_drone_000346.obj
+index: 1269
+#Models/npc_cyborg_drone_000347.obj
+index: 1270
+#Models/npc_cyborg_drone_000348.obj
+index: 1271
+#Models/npc_cyborg_drone_000349.obj
+index: 1272
+#Models/npc_cyborg_drone_000350.obj
+index: 1273
+#Models/npc_cyborg_drone_000351.obj
+index: 1274
+#Models/npc_cyborg_drone_000352.obj
+index: 1275
+#Models/npc_cyborg_drone_000353.obj
+index: 1276
+#Models/npc_cyborg_drone_000354.obj
+index: 1277
+#Models/npc_cyborg_drone_000355.obj
+index: 1278
+#Models/npc_cyborg_drone_000356.obj
+index: 1279
+#Models/npc_cyborg_drone_000357.obj
+index: 1280
+#Models/npc_cyborg_drone_000358.obj
+index: 1281
+#Models/npc_cyborg_drone_000359.obj
+index: 1282
+#Models/npc_cyborg_drone_000360.obj
+index: 1283
+#Models/npc_cyborg_drone_000361.obj
+index: 1284
+#Models/npc_cyborg_drone_000362.obj
+index: 1285
+#Models/npc_cyborg_drone_000363.obj
+index: 1286
+#Models/npc_cyborg_drone_000364.obj
+index: 1287
+#Models/npc_cyborg_drone_000365.obj
+index: 1288
+#Models/npc_cyborg_drone_000366.obj
+index: 1289
+#Models/npc_cyborg_drone_000367.obj
+index: 1290
+#Models/npc_cyborg_drone_000368.obj
+index: 1291
+#Models/npc_cyborg_drone_000369.obj
+index: 1292
+#Models/npc_cyborg_drone_000370.obj
+index: 1293
+#Models/npc_cyborg_drone_000371.obj
+index: 1294
+#Models/npc_cyborg_drone_000372.obj
+index: 1295
+#Models/npc_cyborg_drone_000373.obj
+index: 1296
+#Models/npc_cyborg_drone_000374.obj
+index: 1297
+#Models/npc_cyborg_drone_000375.obj
+index: 1298
+#Models/npc_cyborg_drone_000376.obj
+index: 1299
+#Models/npc_cyborg_drone_000377.obj
+index: 1300

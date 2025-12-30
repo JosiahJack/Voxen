@@ -72,23 +72,22 @@ typedef struct {
 	uint8_t framerate;
 } AnimationClip;
 
-#define ANIM_LOOP_ALL 0
+#define ANIM_LOOP_ALL    0
 
 #define ANIM_IDLE_CLOSED 1
-#define ANIM_OPENING 2
-#define ANIM_IDLE_OPEN 3
-#define ANIM_CLOSING 4
+#define ANIM_OPENING     2
+#define ANIM_IDLE_OPEN   3
+#define ANIM_CLOSING     4
 
-#define ANIM_IDLE 1
-#define ANIM_WALK 2
-#define ANIM_RUN 3
+#define ANIM_IDLE    1
+#define ANIM_WALK    2
+#define ANIM_RUN     3
 #define ANIM_ATTACK1 4
 #define ANIM_ATTACK2 5
 #define ANIM_ATTACK3 6
-#define ANIM_PAIN1 7
-#define ANIM_PAIN2 8
-#define ANIM_DYING 9
-#define ANIM_DEAD 10
+#define ANIM_PAIN    7
+#define ANIM_DYING   8
+#define ANIM_DEAD    9
 
 typedef struct {
     Vector3 mins;

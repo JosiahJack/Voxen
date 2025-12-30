@@ -827,6 +827,7 @@ void UpdateAnims(void) {
 //                 }
                 break;
             case 434: StepLoopingAnim(i); break;
+            case 423: StepLoopingAnim(i); break;
         }
     }
 }

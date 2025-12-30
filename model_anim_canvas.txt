@@ -8,8 +8,8 @@ For the frame range 1 to #, there is always a keyframe located at 1 and #
 Note that the (# verts) vert counts listed next to each keyframe count for subobjects are shared verts and don't take edge splits into account, e.g. the 194 verts on the v_pipe.md vs 576 when loaded with splits
 Models/door3.vmdl vmdl loaded: v=399, i=133, vert_bytes=12768, idx_bytes=1596 // Separate objects, object transform location keyframes only (Keyframe counts (2 objects): 6, 1) Frames 1 to 46, 24fps
 Models/door6.vmdl vmdl loaded: v=504, i=168, vert_bytes=16128, idx_bytes=2016 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 10, 10, 1) Frames 1 to 47, 24fps
-Models/door1.vmdl vmdl loaded: v=5190, i=1730, vert_bytes=166080, idx_bytes=20760 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 5, 5, 1) Frames 1 to 24, 24fps
-Models/door2.vmdl vmdl loaded: v=744, i=248, vert_bytes=23808, idx_bytes=2976 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 6, 6, 1) Frames 1 to 22, 24fps
+    Models/door1.vmdl vmdl loaded: v=5190, i=1730, vert_bytes=166080, idx_bytes=20760 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 5, 5, 1) Frames 1 to 24, 24fps
+    Models/door2.vmdl vmdl loaded: v=744, i=248, vert_bytes=23808, idx_bytes=2976 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 6, 6, 1) Frames 1 to 22, 24fps
 Models/door_elevator2.vmdl vmdl loaded: v=1464, i=488, vert_bytes=46848, idx_bytes=5856 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 5, 5, 1) Frames 1 to 42, 24fps
 Models/door8.vmdl vmdl loaded: v=6069, i=2023, vert_bytes=194208, idx_bytes=24276 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 9, 9, 1) Frames 1 to 50, 24fps
 Models/door9.vmdl vmdl loaded: v=9444, i=3148, vert_bytes=302208, idx_bytes=37776 // Separate objects, object transform location keyframes only (Keyframe counts (3 objects): 9, 9, 1) Frames 1 to 53, 24fps
@@ -25,7 +25,7 @@ Models/door4.vmdl vmdl loaded: v=3384, i=1128, vert_bytes=108288, idx_bytes=1353
 Models/door_wall3.vmdl vmdl loaded: v=936, i=312, vert_bytes=29952, idx_bytes=3744 // Separate objects, object transform location keyframes only (Keyframe counts (5 objects): 5, 5, 5, 5, 1) Frames 1 to 34, 24fps
 Models/eng_wallpump.vmdl vmdl loaded: v=10770, i=3590, vert_bytes=344640, idx_bytes=43080 // Separate objects, object transform location keyframes only (Keyframe counts (6 objects): 5, 5, 5, 5, 5, 1) Frames 1 to 47, 24fps
 Models/npc_cyborgassassin.vmdl vmdl loaded: v=4902, i=1634, vert_bytes=156864, idx_bytes=19608 // Skeletal, 61 keyframes, 31 bones, Frames 1 to 279, 24fps
-Models/npc_cyborg_drone.vmdl vmdl loaded: v=8841, i=2947, vert_bytes=282912, idx_bytes=35364 // Skeletal, 37 keyframes, 25 bones, Frames 1 to 377, 24fps
+    Models/npc_cyborg_drone.vmdl vmdl loaded: v=8841, i=2947, vert_bytes=282912, idx_bytes=35364 // Skeletal, 37 keyframes, 25 bones, Frames 1 to 377, 24fps
 Models/npc_execbot.vmdl vmdl loaded: v=13731, i=4577, vert_bytes=439392, idx_bytes=54924 // Skeletal, 28 keyframes, 12 bones, Frames 1 to 132, 24fps
 Models/npc_cyborgwarrior.vmdl vmdl loaded: v=4452, i=1484, vert_bytes=142464, idx_bytes=17808 // Skeletal, 37 keyframes, 28 bones, Frames 1 to 222, 24fps
 Models/npc_flierbot.vmdl vmdl loaded: v=8865, i=2955, vert_bytes=283680, idx_bytes=35460 // Single object, object transform location keyframes only, 25 keyframes, Frames 1 to 122, 24fps
@@ -35,7 +35,7 @@ Models/npc_cyborg_enforcer.vmdl vmdl loaded: v=7062, i=2354, vert_bytes=225984, 
 Models/npc_hopper.vmdl vmdl loaded: v=7974, i=2658, vert_bytes=255168, idx_bytes=31896 // Skeletal, 18 keyframes, 4 bones, Frames 1 to 180, 24fps
 Models/npc_hopper_die.vmdl vmdl loaded: v=19464, i=6488, vert_bytes=622848, idx_bytes=77856 // Morph target, 7 keyframes, 6 shape keys, Frames 1 to 90, 24fps
 Models/npc_invisomut.vmdl vmdl loaded: v=1176, i=392, vert_bytes=37632, idx_bytes=4704 // Skeletal, 35 keyframes, 10 bones, Frames 1 to 103, 24fps
-Models/npc_humanoidmutant.vmdl vmdl loaded: v=3102, i=1034, vert_bytes=99264, idx_bytes=12408 // Skeletal, 30 keyframes, 17 bones, Frames 1 to 182, 30fps
+    Models/npc_humanoidmutant.vmdl vmdl loaded: v=3102, i=1034, vert_bytes=99264, idx_bytes=12408 // Skeletal, 30 keyframes, 17 bones, Frames 1 to 182, 30fps
 Models/npc_plantmutant.vmdl vmdl loaded: v=2262, i=754, vert_bytes=72384, idx_bytes=9048 // Skeletal, 27 keyframes, 15 bones, Frames 1 to 240, 24fps
 Models/npc_sec1bot.vmdl vmdl loaded: v=13800, i=4600, vert_bytes=441600, idx_bytes=55200 // Skeletal, 10 keyframes, 5 bones, Frames 1 to 96, 24fps
 Models/npc_gortiger.vmdl vmdl loaded: v=13644, i=4548, vert_bytes=436608, idx_bytes=54576 // Skeletal, 34 keyframes, 35 bones, Frames 1 to 250, 24fps

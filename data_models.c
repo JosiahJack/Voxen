@@ -116,8 +116,21 @@ void LoadModels(void) {
     modelAnimationClips[1][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 14, .frameEnd = 24, .frameStartModelIndex = 731, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
 
     // npc_humanoid_mutant
-    modelAnimationClips[2][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 0, .frameEnd = 182, .frameStartModelIndex = 742, .frameEndModelIndex = 924, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 0, .frameEnd = 182, .frameStartModelIndex = 742, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_IDLE]     = (AnimationClip){ .frameStart = 0, .frameEnd = 38, .frameStartModelIndex = 742, .frameEndModelIndex = 780, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_WALK] = (AnimationClip){ .frameStart = 49, .frameEnd = 99, .frameStartModelIndex = 791, .frameEndModelIndex = 841, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_RUN] = (AnimationClip){ .frameStart = 49, .frameEnd = 99, .frameStartModelIndex = 791, .frameEndModelIndex = 841, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_ATTACK1] = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_ATTACK2] = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_ATTACK3] = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_PAIN] = (AnimationClip){ .frameStart = 138, .frameEnd = 151, .frameStartModelIndex = 880, .frameEndModelIndex = 893, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_DYING] = (AnimationClip){ .frameStart = 152, .frameEnd = 181, .frameStartModelIndex = 894, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_DEAD] = (AnimationClip){ .frameStart = 181, .frameEnd = 181, .frameStartModelIndex = 923, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
 
+    // npc_cyborg_drone
+    modelAnimationClips[3][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 0, .frameEnd = 377, .frameStartModelIndex = 924, .frameEndModelIndex = 1300, .speed = 1.0f, .framerate = 30u };
+
+        
     if (loadedModelsMaxIndex > 0) {
         #ifdef ONLY_LOAD_LEVEL_NEEDS
             glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
