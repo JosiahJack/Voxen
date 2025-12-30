@@ -31,6 +31,12 @@ typedef struct {
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;
+    uint8_t clip;
+    uint8_t numclips;
+    uint8_t animationNum; // Global animation identifier into short table of AnimationClip's
+    uint16_t frame;
+    double currentFrameFinished;
+	double currentFrameStartTime;
     Vector3 position;
     Quaternion rotation;
     Vector3 scale;

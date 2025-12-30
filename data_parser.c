@@ -255,6 +255,8 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry.dynamicFriction = parse_float(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry.frictionCombine = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry.bounceCombine = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "numclips") == 0)          entry.numclips = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "animationNum") == 0)      entry.animationNum = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "changeMatOnActive") == 0) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
                     else if (strcmp(trimmed_key, "blinkWhenActive") == 0)   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
 

@@ -127,7 +127,8 @@ uint16_t testPointInSolid = UINT16_MAX;
 uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (instances[i].collider == COLLIDER_TYPE_NONE || instances[i].collider == COLLIDER_TYPE_MESH) continue;
-
+        if ((instances[i].layer & layerMask)) continue;
+        
         Vector3 pos = instances[i].position;
         Quaternion rot = instances[i].rotation;
         Vector3 scale = instances[i].scale;

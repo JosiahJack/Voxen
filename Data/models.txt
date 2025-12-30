@@ -178,9 +178,7 @@ animated: 1
 #Models/door1.fbx
 index: 79
 animated: 1
-#Models/door2.fbx
-index: 80
-animated: 1
+// 80 - Animated door2.blend
 #Models/door3.fbx
 index: 81
 animated: 1
@@ -1177,3 +1175,91 @@ index: 695
 index: 696
 #Models/hw_sensaround_collider.fbx
 index: 697
+
+#Models/door2_000002.obj
+index: 699
+#Models/door2_000003.obj
+index: 700
+#Models/door2_000004.obj
+index: 701
+#Models/door2_000005.obj
+index: 702
+#Models/door2_000006.obj
+index: 703
+#Models/door2_000007.obj
+index: 704
+#Models/door2_000008.obj
+index: 705
+#Models/door2_000009.obj
+index: 706
+#Models/door2_000010.obj
+index: 707
+#Models/door2_000011.obj
+index: 708
+#Models/door2_000012.obj
+index: 709
+#Models/door2_000013.obj
+index: 710
+#Models/door2_000014.obj
+index: 711
+#Models/door2_000015.obj
+index: 712
+#Models/door2_000016.obj
+index: 713
+#Models/door2_000017.obj
+index: 714
+#Models/door2_000018.obj
+index: 715
+#Models/door2_000019.obj
+index: 716
+#Models/door2_000020.obj
+index: 717
+#Models/door2_000021.obj
+index: 718
+
+#Models/door1_000002.obj
+index: 719
+#Models/door1_000003.obj
+index: 720
+#Models/door1_000004.obj
+index: 721
+#Models/door1_000005.obj
+index: 722
+#Models/door1_000006.obj
+index: 723
+#Models/door1_000007.obj
+index: 724
+#Models/door1_000008.obj
+index: 725
+#Models/door1_000009.obj
+index: 726
+#Models/door1_000010.obj
+index: 727
+#Models/door1_000011.obj
+index: 728
+#Models/door1_000012.obj
+index: 729
+#Models/door1_000013.obj
+index: 730
+#Models/door1_000014.obj
+index: 731
+#Models/door1_000015.obj
+index: 732
+#Models/door1_000016.obj
+index: 733
+#Models/door1_000017.obj
+index: 734
+#Models/door1_000018.obj
+index: 735
+#Models/door1_000019.obj
+index: 736
+#Models/door1_000020.obj
+index: 737
+#Models/door1_000021.obj
+index: 738
+#Models/door1_000022.obj
+index: 739
+#Models/door1_000023.obj
+index: 740
+#Models/door1_000024.obj
+index: 741

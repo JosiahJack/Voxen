@@ -277,6 +277,8 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;    
     #endif
     instances[instanceIdx].animated = modelAnimationType[instances[instanceIdx].modelIndex];
+    instances[instanceIdx].numclips = entities[entIdx].numclips;
+    instances[instanceIdx].animationNum = entities[entIdx].animationNum;
     
     instances[instanceIdx].texIndex = entities[entIdx].texIndex;
     #ifdef ONLY_LOAD_LEVEL_NEEDS

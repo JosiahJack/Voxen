@@ -64,6 +64,33 @@ typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 
 typedef struct {
+	float speed;
+	uint16_t frameStart;
+	uint16_t frameEnd;
+	uint16_t frameStartModelIndex;
+	uint16_t frameEndModelIndex;
+	uint8_t framerate;
+} AnimationClip;
+
+#define ANIM_LOOP_ALL 0
+
+#define ANIM_IDLE_CLOSED 1
+#define ANIM_OPENING 2
+#define ANIM_IDLE_OPEN 3
+#define ANIM_CLOSING 4
+
+#define ANIM_IDLE 1
+#define ANIM_WALK 2
+#define ANIM_RUN 3
+#define ANIM_ATTACK1 4
+#define ANIM_ATTACK2 5
+#define ANIM_ATTACK3 6
+#define ANIM_PAIN1 7
+#define ANIM_PAIN2 8
+#define ANIM_DYING 9
+#define ANIM_DEAD 10
+
+typedef struct {
     Vector3 mins;
     Vector3 maxs;
     uint8_t type;
@@ -177,8 +204,7 @@ bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
 // ----------------------------------------------------------------------------
 // Models
-#define MODEL_COUNT 680
-#define MODEL_IDX_MAX 1024 // Max value the bit packing bits allow
+#define MODEL_IDX_MAX 2048
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
@@ -197,6 +223,9 @@ extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
 extern uint8_t modelAnimationType[MODEL_IDX_MAX];
+#define MAX_ANIMATED_MODELS 64
+#define MAX_ANIMATION_CLIPS_PER_MODEL 32
+extern AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 void LoadModels(void);
 
 // Lights

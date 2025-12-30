@@ -4196,11 +4196,15 @@ bounceCombine: 0
 index: 496
 model: 79
 texture: 185
+numclips: 4
+animationNum: 1
 #doorB
 index: 497
 model: 80
 texture: 189
 glowtexture: 188
+numclips: 4
+animationNum: 0
 #doorC
 index: 498
 model: 81

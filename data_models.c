@@ -9,16 +9,9 @@
 #include <unistd.h>
 #include "voxen.h"
 #include "entity.h"
-#define C_STRUCT struct // #include <assimp/defs.h>
-#define ASSIMP_API
-struct aiFileIO; // #include <assimp/cimport.h>
-ASSIMP_API C_STRUCT aiPropertyStore *aiCreatePropertyStore(void); // #include <assimp/cimport.h>
-ASSIMP_API const C_STRUCT aiScene *aiImportFileExWithProperties(const char *pFile, unsigned int pFlags, C_STRUCT aiFileIO *pFS, const C_STRUCT aiPropertyStore *pProps); // #include <assimp/cimport.h>
-ASSIMP_API void aiSetImportPropertyInteger(C_STRUCT aiPropertyStore *store, const char *szName, int value); // #include <assimp/cimport.h>
-ASSIMP_API void aiReleasePropertyStore(C_STRUCT aiPropertyStore *p); // #include <assimp/cimport.h>
-ASSIMP_API const char *aiGetErrorString(void); // #include <assimp/cimport.h>
-ASSIMP_API void aiReleaseImport(const C_STRUCT aiScene *pScene); // #include <assimp/cimport.h>
-#include "./External/assimp/include/scene.h" // Only 514 lines and make use of most all of it so leaving unhoovered, unlike assimp/cimport.h.
+#include <assimp/defs.h>
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
 
 DataParser model_parser;
 float** modelVertices = NULL;
@@ -27,6 +20,7 @@ uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
 uint16_t loadedModelsMaxIndex = 0;
+AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 
 static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
     strncpy(out, fbx_path, outsz - 1);
@@ -106,6 +100,20 @@ void cleanup_all_mmaps(void) {
 // uint8_t modelFBX_FileBuffer[15360000]; // 14983372 found in practice
 void LoadModels(void) {
     double start_time = get_time();
+    
+    // doorB
+    modelAnimationClips[0][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 2, .frameEnd = 21, .frameStartModelIndex = 699, .frameEndModelIndex = 718, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[0][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2, .frameEnd = 2, .frameStartModelIndex = 699, .frameEndModelIndex = 698, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[0][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 11, .frameStartModelIndex = 699, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[0][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 11, .frameEnd = 11, .frameStartModelIndex = 708, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[0][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 12, .frameEnd = 21, .frameStartModelIndex = 709, .frameEndModelIndex = 718, .speed = 1.0f, .framerate = 24u };
+    
+    // doorA
+    modelAnimationClips[1][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 2, .frameEnd = 24, .frameStartModelIndex = 719, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[1][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2, .frameEnd = 2, .frameStartModelIndex = 719, .frameEndModelIndex = 719, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[1][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 12, .frameStartModelIndex = 719, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[1][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 12, .frameEnd = 12, .frameStartModelIndex = 729, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[1][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 14, .frameEnd = 24, .frameStartModelIndex = 731, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
     if (loadedModelsMaxIndex > 0) {
         #ifdef ONLY_LOAD_LEVEL_NEEDS
             glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
@@ -168,8 +176,12 @@ void LoadModels(void) {
         #endif
         
         modelAnimationType[i] = model_parser.entries[parserIdx].animated;
-        if (modelAnimationType[i] > 0u) animatedModelCount++;
         const char *fbx_path = model_parser.entries[parserIdx].path;
+        if (modelAnimationType[i] > 0u) {
+            animatedModelCount++;
+            // Take fbx_path and turn it from yaddayadda/yadda/name.fbx into yaddayadda/yadda/name_000001.obj through ######.obj base on anim frame range (1 based, blender is source)
+        }
+        
         if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); OS_Exit(1); }
 
         char vmdl_path[512];
@@ -204,8 +216,6 @@ void LoadModels(void) {
                 triCount    += scene->mMeshes[m]->mNumFaces;
             }
             
-            if (vertexCount > 40000 || triCount > 32768) { DualLogError("Model %s exceeds limits\n", fbx_path); aiReleaseImport(scene); continue; }
-
             modelVertexCounts[i]   = vertexCount;
             modelTriangleCounts[i] = triCount;
             modelVertices[i]  = mmap(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

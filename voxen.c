@@ -782,6 +782,40 @@ void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
     debugLineVertCount = i;
 }
 
+void UpdateAnims(void) {
+    uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
+        if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
+        if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
+        
+        AnimationClip currentClip;
+        switch(instances[i].index) {
+            case 497: // doorB
+                currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
+                if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
+                    instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+                    instances[i].frame++;
+                    if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+                    else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+
+                    instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+                }
+                break;
+            case 496: // doorA
+                currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
+                if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
+                    instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+                    instances[i].frame++;
+                    if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+                    else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+
+                    instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+                }
+                break;
+        }
+    }
+}
+
 DepthSort visibleInstances[INSTANCE_COUNT];
 void RenderInstances(void) {
     glEnable(GL_CULL_FACE); // Opaques
@@ -1015,7 +1049,7 @@ int32_t main(int32_t argc, char* argv[]) {
         shadowDrawCallsRenderedThisFrame = 0;
         verticesRenderedThisFrame = 0;
         
-        // 0. View Matrix, and Projection Matrix
+        // Frame prep, View Matrix, and Projection Matrix
         float view[16]; // Also known as view matrix
         float px = instances[PLAYER1].position.x;
         float py = instances[PLAYER1].position.y;
@@ -1064,8 +1098,10 @@ int32_t main(int32_t argc, char* argv[]) {
                 voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
             }
             
+            // 0. Gameplay Update Loops
             if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_startX, voxen_Diagnostics.debugLine_startY, voxen_Diagnostics.debugLine_startZ, voxen_Diagnostics.debugLine_endX, voxen_Diagnostics.debugLine_endY, voxen_Diagnostics.debugLine_endZ);
             UpdateAmbientSounds();
+            UpdateAnims();
             
             // 1. Culling
             Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
