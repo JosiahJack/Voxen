@@ -3459,6 +3459,8 @@ bounceCombine: 0
 #npc_humanoid_mutant
 index: 434
 model: 323
+numclips: 5
+animationNum: 2
 texture: 563
 mass: 1.4
 linearDrag: 0.0

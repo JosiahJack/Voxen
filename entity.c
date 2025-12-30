@@ -320,7 +320,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
     if (!isCardChunk && entIdx > 306 && entIdx != 472 && entIdx != 473 && entIdx != 474 && entIdx != 475 && entIdx != 476) instances[instanceIdx].scale = (Vector3){ 1.0f, 1.0f, 1.0f};
-    if (entIdx == 434) instances[instanceIdx].scale = (Vector3){ 1.58f, 1.58f, 1.58f};
+//     if (entIdx == 434) instances[instanceIdx].scale = (Vector3){ 1.58f, 1.58f, 1.58f};
     for (int i=0;i<MAX_CHILD_COUNT;++i) {
         instances[instanceIdx].child[i] = entities[entIdx].child[i];
         instances[instanceIdx].child_offset[i].x = entities[entIdx].child_offset[i].x;

@@ -114,6 +114,10 @@ void LoadModels(void) {
     modelAnimationClips[1][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 12, .frameStartModelIndex = 719, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[1][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 12, .frameEnd = 12, .frameStartModelIndex = 729, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[1][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 14, .frameEnd = 24, .frameStartModelIndex = 731, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
+
+    // npc_humanoid_mutant
+    modelAnimationClips[2][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 0, .frameEnd = 182, .frameStartModelIndex = 742, .frameEndModelIndex = 924, .speed = 1.0f, .framerate = 30u };
+
     if (loadedModelsMaxIndex > 0) {
         #ifdef ONLY_LOAD_LEVEL_NEEDS
             glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);

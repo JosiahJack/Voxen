@@ -236,7 +236,7 @@ void UpdateVoxelLightLists(void) {
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
 #define MAX_SHADOWMAPS 56u
-#define SHADOW_MAP_SIZE 192u
+#define SHADOW_MAP_SIZE 384u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
 	uint32_t numShadowsCouldRender;
@@ -782,36 +782,51 @@ void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
     debugLineVertCount = i;
 }
 
+void StepLoopingAnim(uint16_t i) {
+    AnimationClip currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
+    if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
+        instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+        instances[i].frame++;
+        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+
+        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+    }
+}
+
 void UpdateAnims(void) {
     uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
         if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         
-        AnimationClip currentClip;
+//         AnimationClip currentClip;
         switch(instances[i].index) {
             case 497: // doorB
-                currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-                if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
-                    instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-                    instances[i].frame++;
-                    if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-                    else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
-
-                    instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-                }
+                StepLoopingAnim(i);
+//                 currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
+//                 if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
+//                     instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+//                     instances[i].frame++;
+//                     if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+//                     else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+// 
+//                     instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+//                 }
                 break;
             case 496: // doorA
-                currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-                if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
-                    instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-                    instances[i].frame++;
-                    if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-                    else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
-
-                    instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-                }
+                StepLoopingAnim(i);
+//                 currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
+//                 if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
+//                     instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+//                     instances[i].frame++;
+//                     if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+//                     else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+// 
+//                     instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+//                 }
                 break;
+            case 434: StepLoopingAnim(i); break;
         }
     }
 }
