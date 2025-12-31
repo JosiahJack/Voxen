@@ -337,10 +337,10 @@ normtexture: 284
 texture: 285
 #chunk_eng2_6
 index: 53
-model: 122
+model: 0
 texture: 1252
 numclips: 1
-animationNum: 12
+animationNum: 21
 // eng_wallpump, animated, not a card chunk
 #chunk_exec1_1
 index: 54
@@ -477,7 +477,9 @@ cardchunk: 1
 texture: 1228
 #chunk_fan1
 index: 79
-model: 157
+model: 0
+numclips: 1
+animationNum: 22
 cardchunk: 1
 texture: 96
 #chunk_flight1_1
@@ -3264,6 +3266,8 @@ bounceCombine: 3
 #npc_cyborg_assassin
 index: 420
 model: 306
+numclips: 8
+animationNum: 24
 texture: 545
 glowtexture: 544
 mass: 1.5
@@ -3279,6 +3283,8 @@ bounceCombine: 3
 #npc_avian_mutant
 index: 421
 model: 328
+numclips: 5
+animationNum: 35
 texture: 568
 mass: 2.0
 linearDrag: 0.0
@@ -3293,6 +3299,8 @@ bounceCombine: 3
 #npc_exec_bot
 index: 422
 model: 316
+numclips: 5
+animationNum: 29
 texture: 555
 mass: 2.2
 linearDrag: 0.0
@@ -3323,6 +3331,8 @@ bounceCombine: 3
 #npc_cortex_reaver
 index: 424
 model: 300
+numclips: 6
+animationNum: 23
 texture: 543
 mass: 5.0
 linearDrag: 0.0
@@ -3337,6 +3347,8 @@ bounceCombine: 3
 #npc_cyborg_warrior
 index: 425
 model: 315
+numclips: 7
+animationNum: 28
 texture: 554
 mass: 1.5
 linearDrag: 0.0
@@ -3351,6 +3363,8 @@ bounceCombine: 3
 #npc_cyborg_enforcer
 index: 426
 model: 314
+numclips: 8
+animationNum: 27
 texture: 550
 mass: 1.5
 linearDrag: 0.0
@@ -3365,6 +3379,8 @@ bounceCombine: 3
 #npc_cyborg_elite
 index: 427
 model: 313
+numclips: 10
+animationNum: 26
 texture: 548
 mass: 3.5
 linearDrag: 0.0
@@ -3379,6 +3395,8 @@ bounceCombine: 3
 #npc_cyborg_diego
 index: 428
 model: 309
+numclips: 6
+animationNum: 25
 texture: 546
 mass: 2.0
 linearDrag: 0.0
@@ -3393,6 +3411,8 @@ bounceCombine: 3
 #npc_sec1_bot
 index: 429
 model: 333
+numclips: 2
+animationNum: 38
 texture: 573
 mass: 1.5
 linearDrag: 0.0
@@ -3407,6 +3427,8 @@ bounceCombine: 3
 #npc_sec2_bot
 index: 430
 model: 335
+numclips: 6
+animationNum: 39
 texture: 574
 mass: 4.51
 linearDrag: 0.0
@@ -3421,6 +3443,8 @@ bounceCombine: 3
 #npc_maint_bot
 index: 431
 model: 325
+numclips: 4
+animationNum: 34
 texture: 567
 mass: 1.5
 linearDrag: 0.0
@@ -3435,6 +3459,8 @@ bounceCombine: 3
 #npc_mutant_cyborg
 index: 432
 model: 329
+numclips: 7
+animationNum: 51
 texture: 569
 mass: 3.0
 linearDrag: 0.0
@@ -3449,6 +3475,8 @@ bounceCombine: 3
 #npc_hopper
 index: 433
 model: 322
+numclips: 8
+animationNum: 32
 texture: 562
 mass: 1.0
 linearDrag: 0.0
@@ -3479,6 +3507,8 @@ bounceCombine: 3
 #npc_invisomut
 index: 435
 model: 324
+numclips: 5
+animationNum: 33
 texture: 565
 mass: 1.3
 linearDrag: 0.0
@@ -3493,6 +3523,8 @@ bounceCombine: 3
 #npc_virus_mutant
 index: 436
 model: 330
+numclips: 6
+animationNum: 41
 texture: 576
 mass: 1.4
 linearDrag: 0.0
@@ -3507,6 +3539,8 @@ bounceCombine: 3
 #npc_servbot
 index: 437
 model: 337
+numclips: 5
+animationNum: 40
 texture: 575
 mass: 2.5
 linearDrag: 0.0
@@ -3521,6 +3555,8 @@ bounceCombine: 3
 #npc_flier_bot
 index: 438
 model: 318
+numclips: 5
+animationNum: 30
 texture: 558
 mass: 1.75
 linearDrag: 0.0
@@ -3535,6 +3571,8 @@ bounceCombine: 3
 #npc_zerog_mutant
 index: 439
 model: 395
+numclips: 3
+animationNum: 42
 texture: 1170
 mass: 1.3
 linearDrag: 0.0
@@ -3549,6 +3587,8 @@ bounceCombine: 3
 #npc_gorilla_tiger_mutant
 index: 440
 model: 320
+numclips: 7
+animationNum: 31
 texture: 560
 mass: 2.0
 linearDrag: 0.0
@@ -3563,6 +3603,8 @@ bounceCombine: 3
 #npc_repairbot
 index: 441
 model: 331
+numclips: 4
+animationNum: 37
 texture: 572
 mass: 1.5
 linearDrag: 0.0
@@ -3577,6 +3619,8 @@ bounceCombine: 3
 #npc_plant_mutant
 index: 442
 model: 330
+numclips: 6
+animationNum: 36
 texture: 570
 mass: 0.8
 linearDrag: 0.0
@@ -4200,40 +4244,62 @@ frictionCombine: 0
 bounceCombine: 0
 #doorA
 index: 496
-model: 79
+model: 0
 texture: 185
 numclips: 4
 animationNum: 1
 #doorB
 index: 497
-model: 80
+model: 0
 texture: 189
 glowtexture: 188
 numclips: 4
 animationNum: 0
 #doorC
 index: 498
-model: 81
+model: 0
 texture: 184
 numclips: 4
 animationNum: 5
 #doorD
 index: 499
-model: 82
+model: 0
 numclips: 4
 animationNum: 4
 texture: 196
 glowtexture: 197
 #doorE
 index: 500
+model: 0
+numclips: 4
+animationNum: 9
+texture: 208
+glowtexture: 207
 #doorF
 index: 501
+model: 0
+numclips: 4
+animationNum: 10
+texture: 187
 #doorG
 index: 502
+model: 0
+numclips: 4
+animationNum: 11
+texture: 193
 #doorH
 index: 503
+model: 0
+numclips: 4
+animationNum: 12
+texture: 190
 #doorI
 index: 504
+model: 0
+numclips: 4
+animationNum: 13
+texture: 200
+glowtexture: 199
 #doorJ
 index: 506
 model: 82
@@ -4248,37 +4314,57 @@ animationNum: 6
 texture: 215
 #doorL
 index: 507
+model: 0
+numclips: 4
+animationNum: 8
+texture: 191
 #door_elevator1
 index: 508
-model: 88
+model: 0
+numclips: 4
+animationNum: 14
 texture: 202
 #door_elevator2
 index: 509
-model: 89
+model: 0
+numclips: 4
+animationNum: 15
 texture: 203
 #door_elevator3
 index: 510
-model: 90
+model: 0
+numclips: 4
+animationNum: 16
 texture: 204
 #door_elevator4
 index: 511
-model: 91
+model: 0
+numclips: 4
+animationNum: 17
 texture: 206
 glowtexture: 205
 #door_secret1
 index: 512
-model: 93
+model: 0
+numclips: 4
+animationNum: 19
 texture: 210
 #door_secret2
 index: 513
-model: 92
+model: 0
+numclips: 4
+animationNum: 18
 texture: 209
 #door_secret3
 index: 514 
 model: 94
+numclips: 4
+animationNum: 20
 texture: 211
 #func_forcebridge
 index: 515
+model: 78
+texture: 38
 #prop_lift2
 index: 516
 model: 215
@@ -4318,6 +4404,8 @@ index: 522
 index: 523
 #func_door_cyber
 index: 524
+model: 178
+texture: 1224
 collider: 1
 collider_centerx: 0.0
 collider_centery: 1.31
@@ -4520,6 +4608,10 @@ index: 583
 index: 584
 #prop_sparkingwire
 index: 585
+model: 0
+numclips: 1
+animationNum: 46
+texture: 71
 #prop_table
 index: 586
 #prop_tv_on_a_post
@@ -4556,44 +4648,94 @@ index: 600
 index: 601
 #us_isotopepanel
 index: 602
+model: 0
+texture: 616
+numclips: 5
+animationNum: 44
 #us_paperlog
 index: 603
 model: 486
 texture: 580
 #us_puz_elevatorkeypad
 index: 604
+model: 615
+texture: 247
 #us_puz_elevatorkeypad2
 index: 605
+model: 618
+texture: 250
 #us_puz_elevatorkeypad3
 index: 606
+model: 615
+texture: 247
 #us_puz_elevatorkeypad4
 index: 607
+model: 210
+texture: 249
 #us_puz_keypad
 index: 608
+model: 211
+texture: 414
 #us_puz_panel_blue_grid
 index: 609
+model: 0
+texture: 604
+numclips: 3
+animationNum: 43
 #us_puz_panel_brown_grid
 index: 610
+model: 0
+texture: 604
+numclips: 3
+animationNum: 43
 #us_puz_panel_gray_grid
 index: 611
+model: 0
+texture: 634
+numclips: 3
+animationNum: 43
 #us_puz_panel_red_grid
 index: 612
+model: 0
+texture: 625
+numclips: 3
+animationNum: 43
 #us_puz_panel_teal_grid
 index: 613
+model: 0
+texture: 601
+numclips: 3
+animationNum: 43
 #us_relaypanel
 index: 614
+model: 0
+texture: 617
+numclips: 4
+animationNum: 45
 #us_retinalscanner
 index: 615
+model: 79
+texture: 46
 #prop_vending1_1
 index: 616
+model: 627
+texture: 870
 #prop_vending1_2
 index: 617
+model: 628
+texture: 870
 #prop_vending1_3
 index: 618
+model: 629
+texture: 870
 #prop_vending2_1
 index: 619
+model: 614
+texture: 871
 #prop_vending2_2
 index: 620
+model: 621
+texture: 871
 #ambient_airhiss
 index: 621
 volume: 0.05
@@ -4701,68 +4843,138 @@ index: 655
 volume: 0.5
 #decal_blood_die
 index: 656
+model: 77
+texture: 237
 #decal_blood_resist
 index: 657
+model: 77
+texture: 240
 #decal_blood_stayaway
 index: 658
+model: 77
+texture: 235
 #decal_blood_words2
 index: 659
+model: 77
+texture: 236
 #decal_bloodfonta
 index: 660
+model: 178
+texture: 118
 #decal_bloodfonte
 index: 661
+model: 178
+texture: 121
 #decal_bloodfontg
 index: 662
+model: 178
+texture: 122
 #decal_bloodfonth
 index: 663
+model: 178
+texture: 89
 #decal_bloodfontr
 index: 664
+model: 178
+texture: 139
 #decal_bloodfonty
 index: 665
+model: 178
+texture: 140
 #decal_bloodsplat2
 index: 666
+model: 157
+texture: 130
 #decal_logo_antenna
 index: 667
+model: 77
+texture: 182
 #decal_logo_armory
 index: 668
+model: 77
+texture: 178
 #decal_logo_biohazard
 index: 669
+model: 77
+texture: 180
 #decal_logo_bridge
 index: 670
+model: 77
+texture: 181
 #decal_logo_cyborg
 index: 671
+model: 77
+texture: 176
 #decal_logo_gears
 index: 672
+model: 77
+texture: 174
 #decal_logo_medical
 index: 673
+model: 77
+texture: 165
 #decal_logo_radhazard
 index: 674
+model: 77
+texture: 177
 #decal_logo_research
 index: 675
+model: 77
+texture: 175
 #decal_logo_security
 index: 676
+model: 77
+texture: 167
 #decal_painting1
 index: 677
+model: 77
+texture: 218
+glowtexture: 216
+normtexture: 217
 #decal_painting2
 index: 678
+model: 77
+texture: 220
+glowtexture: 219
 #decal_painting3
 index: 679
+model: 77
+texture: 222
+glowtexture: 221
 #decal_posterbetterfuture
 index: 680
+model: 77
+texture: 226
+normtexture: 225
 #decal_postergenetics
 index: 681
+model: 77
+texture: 224
+normtexture: 223
 #decal_scorch1
 index: 682
+model: 77
+texture: 227
 #decal_scorch2
 index: 683
+model: 77
+texture: 228
 #decal_scorch3
 index: 684
+model: 77
+texture: 229
 #decal_scorch4
 index: 685
+model: 77
+texture: 230
 #decal_scorchtiny
 index: 686
+model: 77
+texture: 232
 #decal_blood_splat
 index: 687
+model: 77
+texture: 234
 #func_switch1
 index: 688
 model: 609
@@ -4996,14 +5208,34 @@ index: 739
 index: 740
 #us_puz_panel_blue_wire
 index: 741
+model: 0
+texture: 604
+numclips: 3
+animationNum: 43
 #us_puz_panel_brown_wire
 index: 742
+model: 0
+texture: 604
+numclips: 3
+animationNum: 43
 #us_puz_panel_gray_wire
 index: 743
+model: 0
+texture: 634
+numclips: 3
+animationNum: 43
 #us_puz_panel_red_wire
 index: 744
+model: 0
+texture: 625
+numclips: 3
+animationNum: 43
 #us_puz_panel_teal_wire
 index: 745
+model: 0
+texture: 601
+numclips: 3
+animationNum: 43
 #weapon_grenadeenergmine_live
 index: 746
 #decal_logo_storage

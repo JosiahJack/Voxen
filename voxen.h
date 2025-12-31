@@ -195,7 +195,7 @@ void UpdateAmbientSounds(void);
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
 #define MAX_TOTAL_PIXELS 25000000u
-#define MAX_UNIQUE_COLORS 78000u
+#define MAX_UNIQUE_COLORS 1024000u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
 bool isDoubleSided(uint32_t texIndexToCheck);
@@ -203,7 +203,7 @@ bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
 // ----------------------------------------------------------------------------
 // Models
-#define MODEL_IDX_MAX 4096
+#define MODEL_IDX_MAX 7168
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0

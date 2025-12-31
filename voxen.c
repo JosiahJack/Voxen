@@ -800,14 +800,63 @@ void UpdateAnims(void) {
         if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         
-        if (instances[i].index == 497
-            || instances[i].index == 496
-            || instances[i].index == 434
+        if (   instances[i].index == 53
+            || instances[i].index == 79
+            || instances[i].index == 420
+            || instances[i].index == 421
+            || instances[i].index == 422
             || instances[i].index == 423
+            || instances[i].index == 424
+            || instances[i].index == 425
+            || instances[i].index == 426
+            || instances[i].index == 427
+            || instances[i].index == 428
+            || instances[i].index == 429
+            || instances[i].index == 430
+            || instances[i].index == 431
+            || instances[i].index == 432
+            || instances[i].index == 433
+            || instances[i].index == 434
+            || instances[i].index == 435
+            || instances[i].index == 436
+            || instances[i].index == 437
+            || instances[i].index == 438
+            || instances[i].index == 439
+            || instances[i].index == 440
+            || instances[i].index == 441
+            || instances[i].index == 442
+            || instances[i].index == 496
+            || instances[i].index == 497
+            || instances[i].index == 498
             || instances[i].index == 499
+            || instances[i].index == 500
+            || instances[i].index == 501
+            || instances[i].index == 502
+            || instances[i].index == 503
+            || instances[i].index == 504
             || instances[i].index == 505
             || instances[i].index == 506
-            || instances[i].index == 498) {
+            || instances[i].index == 507
+            || instances[i].index == 508
+            || instances[i].index == 509
+            || instances[i].index == 510
+            || instances[i].index == 511
+            || instances[i].index == 512
+            || instances[i].index == 513
+            || instances[i].index == 514
+            || instances[i].index == 585
+            || instances[i].index == 602
+            || instances[i].index == 609
+            || instances[i].index == 610
+            || instances[i].index == 611
+            || instances[i].index == 612
+            || instances[i].index == 613
+            || instances[i].index == 614
+            || instances[i].index == 741
+            || instances[i].index == 742
+            || instances[i].index == 743
+            || instances[i].index == 744
+            || instances[i].index == 745) {
             
             StepLoopingAnim(i);
         }

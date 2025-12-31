@@ -114,12 +114,19 @@ void LoadTextures(void) {
         uint32_t palette[256];
         uint8_t  remap[256] = {0};
         uint32_t pal_size = 0;
+        int loopIter0 = 0;
+        int loopIter1 = 0;
         for (int p = 0; p < numPixels; p++) {
+            loopIter0++;
+            if (loopIter0 > 16777216) break;
+            
             uint32_t color = ((uint32_t*)pixels)[p];
             uint8_t idx = remap[color & 255];
             if (idx && palette[idx - 1] == color) { indices[p] = idx - 1; continue; }
 
             for (idx = 0; idx < pal_size; idx++) {
+                loopIter1++;
+                if (loopIter1 > 16777216) break;
                 if (palette[idx] == color) {
                     indices[p] = idx;
                     remap[color & 255] = idx + 1;
@@ -127,7 +134,7 @@ void LoadTextures(void) {
                 }
             }
             
-            if (pal_size >= 256) { DualLogError("Texture %d exceeded 256 colors\n", currentIndex); OS_Exit(1); }
+            if (pal_size >= 256) { DualLogError("Texture %s exceeded 256 colors\n", texture_parser.entries[currentIndex].path); /*OS_Exit(1);*/ break; }
                         
             palette[pal_size] = color;
             indices[p] = pal_size;

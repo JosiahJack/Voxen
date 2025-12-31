@@ -97,7 +97,14 @@ index: 36
 transparent: 1
 #Textures/beverage01.png
 index: 37
-
+#Textures/col3_forcefield.png
+index: 38
+#Textures/col4_forcefield.png
+index: 39
+#Textures/col5_forcefield.png
+index: 40
+#Textures/col7_forcefield.png
+index: 41
 #Textures/blood_core.png
 index: 42
 transparent: 1
@@ -107,7 +114,8 @@ index: 43
 index: 44
 #Textures/bridg1_2.png
 index: 45
-
+#Textures/pnl14_y.png
+index: 46
 #Textures/bridg1_3.png
 index: 47
 #Textures/bridg1_4.png
@@ -197,7 +205,8 @@ index: 86
 index: 87
 #Textures/citmat1_5.png
 index: 88
-
+#Textures/UI/bloodfont/h.png
+index: 89
 #Textures/citmat1_7.png
 index: 90
 #Textures/citmat1_8mutated.png
@@ -254,12 +263,16 @@ index: 115
 index: 116
 #Textures/console3_1.png
 index: 117
-
+#Textures/UI/bloodfont/a.png
+index: 118
 #Textures/console3_3.png
 index: 119
 #Textures/console3_4.png
 index: 120
-
+#Textures/UI/bloodfont/e.png
+index: 121
+#Textures/UI/bloodfont/g.png
+index: 122
 #Textures/console3_7.png
 index: 123
 #Textures/console3_8.png
@@ -298,6 +311,10 @@ transparent: 1
 index: 137
 #Textures/corpse_tan.png
 index: 138
+#Textures/UI/bloodfont/r.png
+index: 139
+#Textures/UI/bloodfont/y.png
+index: 140
 
 #Textures/crate2_1.png
 index: 143
@@ -436,11 +453,10 @@ index: 188
 index: 189
 #Textures/door1_5.png
 index: 190
-#Textures/door1_6_glass.png
+#Textures/door1_6.png
 index: 191
 transparent: 1
-#Textures/door1_6.png
-index: 192
+
 #Textures/door1_7.png
 index: 193
 #Textures/door7_lamp_glow.png
@@ -1730,8 +1746,7 @@ index: 867
 index: 870
 #Textures/vending2.png
 index: 871
-#Textures/vending3.png
-index: 872
+
 #Textures/v_rapier.png
 index: 873
 #Textures/w_blaster_glow.png
