@@ -203,7 +203,7 @@ bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
 // ----------------------------------------------------------------------------
 // Models
-#define MODEL_IDX_MAX 2048
+#define MODEL_IDX_MAX 4096
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0

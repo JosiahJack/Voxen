@@ -800,34 +800,16 @@ void UpdateAnims(void) {
         if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         
-//         AnimationClip currentClip;
-        switch(instances[i].index) {
-            case 497: // doorB
-                StepLoopingAnim(i);
-//                 currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-//                 if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
-//                     instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-//                     instances[i].frame++;
-//                     if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-//                     else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
-// 
-//                     instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-//                 }
-                break;
-            case 496: // doorA
-                StepLoopingAnim(i);
-//                 currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-//                 if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
-//                     instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-//                     instances[i].frame++;
-//                     if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-//                     else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
-// 
-//                     instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-//                 }
-                break;
-            case 434: StepLoopingAnim(i); break;
-            case 423: StepLoopingAnim(i); break;
+        if (instances[i].index == 497
+            || instances[i].index == 496
+            || instances[i].index == 434
+            || instances[i].index == 423
+            || instances[i].index == 499
+            || instances[i].index == 505
+            || instances[i].index == 506
+            || instances[i].index == 498) {
+            
+            StepLoopingAnim(i);
         }
     }
 }

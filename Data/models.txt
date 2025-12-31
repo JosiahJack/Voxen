@@ -172,55 +172,7 @@ index: 75
 index: 76
 #Models/d_logo.fbx
 index: 77
-#Models/door10.fbx
-index: 78
-animated: 1
-#Models/door1.fbx
-index: 79
-animated: 1
-// 80 - Animated door2.blend
-#Models/door3.fbx
-index: 81
-animated: 1
-#Models/door4.fbx
-index: 82
-animated: 1
-#Models/door5.fbx
-index: 83
-animated: 1
-#Models/door6.fbx
-index: 84
-animated: 1
-#Models/door7.fbx
-index: 85
-animated: 1
-#Models/door8.fbx
-index: 86
-animated: 1
-#Models/door9.fbx
-index: 87
-animated: 1
-#Models/door_elevator1.fbx
-index: 88
-animated: 1
-#Models/door_elevator2.fbx
-index: 89
-animated: 1
-#Models/door_elevator3.fbx
-index: 90
-animated: 1
-#Models/door_elevator4.fbx
-index: 91
-animated: 1
-#Models/door_wall1.fbx
-index: 92
-animated: 1
-#Models/door_wall2.fbx
-index: 93
-animated: 1
-#Models/door_wall3.fbx
-index: 94
-animated: 1
+
 #Models/eng1_1d.fbx
 index: 95
 #Models/eng1_1.fbx
@@ -275,9 +227,7 @@ index: 119
 index: 120
 #Models/eng2_5_slice45.fbx
 index: 121
-#Models/eng_wallpump.fbx
-index: 122
-animated: 1
+
 #Models/exec1_1d.fbx
 index: 123
 #Models/exec1_1.fbx
@@ -346,9 +296,7 @@ index: 154
 index: 155
 #Models/flight2_3.fbx
 index: 156
-#Models/flight_fanwall.fbx
-index: 157
-animated: 1
+
 #Models/flightpods_exterior.fbx
 index: 158
 #Models/foliage_fernblueflower.fbx
@@ -633,9 +581,7 @@ index: 297
 index: 298
 #Models/npc_autobomb.fbx
 index: 299
-#Models/npc_bot_cortex_reaver.fbx
-index: 300
-animated: 2
+
 #Models/npc_bot_cortex_reaver_gibs.fbx
 index: 301
 #Models/npc_cyberdog.fbx
@@ -646,91 +592,31 @@ index: 303
 index: 304
 #Models/npc_cyberreaver.fbx
 index: 305
-#Models/npc_cyborgassassin.fbx
-index: 306
-animated: 2
+
 #Models/npc_cyborgassassin_throwingstar.fbx
 index: 307
-#Models/npc_cyborgassassin_weapon.fbx
-index: 308
 
-#Models/npc_cyborg_diego.fbx
-index: 310
-animated: 2
 #Models/npc_cyborg_diegoteleportfx.fbx
 index: 311
-#Models/npc_cyborg_drone.fbx
-index: 312
-animated: 2
-#Models/npc_cyborg_elite.fbx
-index: 313
-animated: 2
-#Models/npc_cyborg_enforcer.fbx
-index: 314
-animated: 2
-#Models/npc_cyborgwarrior.fbx
-index: 315
-animated: 2
-#Models/npc_execbot.fbx
-index: 316
-animated: 2
+
 #Models/npc_execbot_gibs.fbx
 index: 317
-#Models/npc_flierbot.fbx
-index: 318
-animated: 1
+
 #Models/npc_flierbot_gibs.fbx
 index: 319
-#Models/npc_gortiger.fbx
-index: 320
-animated: 2
-#Models/npc_hopper_die.fbx
-index: 321
-animated: 3
-#Models/npc_hopper.fbx
-index: 322
-animated: 2
-#Models/npc_humanoidmutant.fbx
-index: 323
-animated: 2
-#Models/npc_invisomut.fbx
-index: 324
-animated: 2
-#Models/npc_maintenancebot.fbx
-index: 325
-animated: 1
+
 #Models/npc_maintenancebot_gibs.fbx
 index: 326
-//#Models/npc_zerogmut.glb
-//index: 327
-//animated: 3
-#Models/npc_mutant_avian.fbx
-index: 328
-animated: 2
-#Models/npc_mutant_cyborg.fbx
-index: 329
-animated: 2
-#Models/npc_plantmutant.fbx
-index: 330
-animated: 2
-#Models/npc_repairbot.fbx
-index: 331
-animated: 2
+
 #Models/npc_repairbot_gibs.fbx
 index: 332
-#Models/npc_sec1bot.fbx
-index: 333
-animated: 2
+
 #Models/npc_sec1bot_gibs.fbx
 index: 334
-#Models/npc_sec2bot.fbx
-index: 335
-animated: 2
+
 #Models/npc_sec2botgibs.fbx
 index: 336
-#Models/npc_servbot.fbx
-index: 337
-animated: 2
+
 #Models/npc_servbot_gibs.fbx
 index: 338
 #Models/reac1_1_slice45.fbx
@@ -770,12 +656,7 @@ index: 495
 index: 496
 #Models/pumpkin.fbx
 index: 497
-#Models/puzzlepanel1.fbx
-index: 498
-animated: 1
-#Models/puzzlepanel2.fbx
-index: 499
-animated: 1
+
 #Models/puzzlepanel3.fbx
 index: 500
 animated: 1
@@ -967,9 +848,7 @@ index: 593
 
 #Models/sleeping_cables.fbx
 index: 595
-#Models/sparkingwire.fbx
-index: 596
-animated: 2
+
 #Models/stor1_1.fbx
 index: 597
 #Models/stor1_3.fbx
@@ -1000,14 +879,10 @@ index: 609
 index: 610
 #Models/switch3.fbx
 index: 611
-#Models/switch4.fbx
-index: 612
-animated: 1
+
 #Models/switch5_broken.fbx
 index: 613
-#Models/switch5.fbx
-index: 614
-animated: 1
+
 #Models/switch6.fbx
 index: 615
 #Models/switch8.fbx
@@ -1043,16 +918,12 @@ index: 630
 index: 631
 #Models/v_magpulse.fbx
 index: 632
-#Models/v_pipe.fbx
-index: 633
-animated: 1
+
 #Models/v_pistol.fbx
 index: 634
 #Models/v_plasma.fbx
 index: 635
-#Models/v_rapier.fbx
-index: 636
-animated: 1
+
 #Models/warecasing.fbx
 index: 637
 #Models/w_blaster.fbx
@@ -1094,12 +965,7 @@ index: 655
 index: 656
 #Models/w_stungun.fbx
 index: 657
-#Models/xdoor1.fbx
-index: 658
-animated: 1
-#Models/xdoor2.fbx
-index: 659
-animated: 1
+
 #Models/xray_machine.fbx
 index: 660
 #Models/bridg1_1.fbx
@@ -1120,10 +986,7 @@ index: 667
 index: 668
 #Models/med1_5.fbx
 index: 669
-#Models/eng_wallpump_eng1_5.fbx
-index: 670
-#Models/eng_wallpump_rods.fbx
-index: 671
+
 #Models/access_card_collider.fbx
 index: 672
 #Models/a_hornet_collider.fbx
@@ -2383,3 +2246,526 @@ index: 1298
 index: 1299
 #Models/npc_cyborg_drone_000377.obj
 index: 1300
+
+#Models/door4_000001.obj
+index: 1301
+#Models/door4_000002.obj
+index: 1302
+#Models/door4_000003.obj
+index: 1303
+#Models/door4_000004.obj
+index: 1304
+#Models/door4_000005.obj
+index: 1305
+#Models/door4_000006.obj
+index: 1306
+#Models/door4_000007.obj
+index: 1307
+#Models/door4_000008.obj
+index: 1308
+#Models/door4_000009.obj
+index: 1309
+#Models/door4_000010.obj
+index: 1310
+#Models/door4_000011.obj
+index: 1311
+#Models/door4_000012.obj
+index: 1312
+#Models/door4_000013.obj
+index: 1313
+#Models/door4_000014.obj
+index: 1314
+#Models/door4_000015.obj
+index: 1315
+#Models/door4_000016.obj
+index: 1316
+#Models/door4_000017.obj
+index: 1317
+#Models/door4_000018.obj
+index: 1318
+#Models/door4_000019.obj
+index: 1319
+#Models/door4_000020.obj
+index: 1320
+#Models/door4_000021.obj
+index: 1321
+#Models/door4_000022.obj
+index: 1322
+#Models/door4_000023.obj
+index: 1323
+#Models/door4_000024.obj
+index: 1324
+#Models/door4_000025.obj
+index: 1325
+#Models/door4_000026.obj
+index: 1326
+#Models/door4_000027.obj
+index: 1327
+#Models/door4_000028.obj
+index: 1328
+#Models/door4_000029.obj
+index: 1329
+#Models/door4_000030.obj
+index: 1330
+#Models/door4_000031.obj
+index: 1331
+#Models/door4_000032.obj
+index: 1332
+#Models/door4_000033.obj
+index: 1333
+#Models/door4_000034.obj
+index: 1334
+#Models/door4_000035.obj
+index: 1335
+#Models/door4_000036.obj
+index: 1336
+#Models/door4_000037.obj
+index: 1337
+#Models/door4_000038.obj
+index: 1338
+#Models/door4_000039.obj
+index: 1339
+#Models/door4_000040.obj
+index: 1340
+#Models/door4_000041.obj
+index: 1341
+#Models/door4_000042.obj
+index: 1342
+#Models/door4_000043.obj
+index: 1343
+#Models/door4_000044.obj
+index: 1344
+#Models/door4_000045.obj
+index: 1345
+#Models/door4_000046.obj
+index: 1346
+#Models/door4_000047.obj
+index: 1347
+#Models/door4_000048.obj
+index: 1348
+#Models/door4_000049.obj
+index: 1349
+#Models/door4_000050.obj
+index: 1350
+#Models/door4_000051.obj
+index: 1351
+#Models/door4_000052.obj
+index: 1352
+#Models/door4_000053.obj
+index: 1353
+#Models/door4_000054.obj
+index: 1354
+#Models/door4_000055.obj
+index: 1355
+#Models/door4_000056.obj
+index: 1356
+#Models/door4_000057.obj
+index: 1357
+#Models/door4_000058.obj
+index: 1358
+#Models/door4_000059.obj
+index: 1359
+#Models/door4_000060.obj
+index: 1360
+#Models/door4_000061.obj
+index: 1361
+#Models/door4_000062.obj
+index: 1362
+#Models/door4_000063.obj
+index: 1363
+#Models/door4_000064.obj
+index: 1364
+#Models/door4_000065.obj
+index: 1365
+#Models/door4_000066.obj
+index: 1366
+#Models/door4_000067.obj
+index: 1367
+#Models/door4_000068.obj
+index: 1368
+#Models/door4_000069.obj
+index: 1369
+#Models/door4_000070.obj
+index: 1370
+#Models/door4_000071.obj
+index: 1371
+#Models/door4_000072.obj
+index: 1372
+#Models/door4_000073.obj
+index: 1373
+#Models/door4_000074.obj
+index: 1374
+#Models/door4_000075.obj
+index: 1375
+#Models/door4_000076.obj
+index: 1376
+#Models/door4_000077.obj
+index: 1377
+#Models/door4_000078.obj
+index: 1378
+#Models/door4_000079.obj
+index: 1379
+#Models/door4_000080.obj
+index: 1380
+#Models/door4_000081.obj
+index: 1381
+#Models/door4_000082.obj
+index: 1382
+#Models/door4_000083.obj
+index: 1383
+#Models/door4_000084.obj
+index: 1384
+#Models/door4_000085.obj
+index: 1385
+#Models/door4_000086.obj
+index: 1386
+#Models/door4_000087.obj
+index: 1387
+#Models/door4_000088.obj
+index: 1388
+#Models/door4_000089.obj
+index: 1389
+#Models/door4_000090.obj
+index: 1390
+#Models/door4_000091.obj
+index: 1391
+#Models/door4_000092.obj
+index: 1392
+#Models/door4_000093.obj
+index: 1393
+#Models/door4_000094.obj
+index: 1394
+#Models/door4_000095.obj
+index: 1395
+#Models/door4_000096.obj
+index: 1396
+#Models/door4_000097.obj
+index: 1397
+
+#Models/door3_000001.obj
+index: 1398
+#Models/door3_000002.obj
+index: 1399
+#Models/door3_000003.obj
+index: 1400
+#Models/door3_000004.obj
+index: 1401
+#Models/door3_000005.obj
+index: 1402
+#Models/door3_000006.obj
+index: 1403
+#Models/door3_000007.obj
+index: 1404
+#Models/door3_000008.obj
+index: 1405
+#Models/door3_000009.obj
+index: 1406
+#Models/door3_000010.obj
+index: 1407
+#Models/door3_000011.obj
+index: 1408
+#Models/door3_000012.obj
+index: 1409
+#Models/door3_000013.obj
+index: 1410
+#Models/door3_000014.obj
+index: 1411
+#Models/door3_000015.obj
+index: 1412
+#Models/door3_000016.obj
+index: 1413
+#Models/door3_000017.obj
+index: 1414
+#Models/door3_000018.obj
+index: 1415
+#Models/door3_000019.obj
+index: 1416
+#Models/door3_000020.obj
+index: 1417
+#Models/door3_000021.obj
+index: 1418
+#Models/door3_000022.obj
+index: 1419
+#Models/door3_000023.obj
+index: 1420
+#Models/door3_000024.obj
+index: 1421
+#Models/door3_000025.obj
+index: 1422
+#Models/door3_000026.obj
+index: 1423
+#Models/door3_000027.obj
+index: 1424
+#Models/door3_000028.obj
+index: 1425
+#Models/door3_000029.obj
+index: 1426
+#Models/door3_000030.obj
+index: 1427
+#Models/door3_000031.obj
+index: 1428
+#Models/door3_000032.obj
+index: 1429
+#Models/door3_000033.obj
+index: 1430
+#Models/door3_000034.obj
+index: 1431
+#Models/door3_000035.obj
+index: 1432
+#Models/door3_000036.obj
+index: 1433
+#Models/door3_000037.obj
+index: 1434
+#Models/door3_000038.obj
+index: 1435
+#Models/door3_000039.obj
+index: 1436
+#Models/door3_000040.obj
+index: 1437
+#Models/door3_000041.obj
+index: 1438
+#Models/door3_000042.obj
+index: 1439
+#Models/door3_000043.obj
+index: 1440
+#Models/door3_000044.obj
+index: 1441
+#Models/door3_000045.obj
+index: 1442
+#Models/door3_000046.obj
+index: 1443
+
+#Models/xdoor1_000001.obj
+index: 1444
+#Models/xdoor1_000002.obj
+index: 1445
+#Models/xdoor1_000003.obj
+index: 1446
+#Models/xdoor1_000004.obj
+index: 1447
+#Models/xdoor1_000005.obj
+index: 1448
+#Models/xdoor1_000006.obj
+index: 1449
+#Models/xdoor1_000007.obj
+index: 1450
+#Models/xdoor1_000008.obj
+index: 1451
+#Models/xdoor1_000009.obj
+index: 1452
+#Models/xdoor1_000010.obj
+index: 1453
+#Models/xdoor1_000011.obj
+index: 1454
+#Models/xdoor1_000012.obj
+index: 1455
+#Models/xdoor1_000013.obj
+index: 1456
+#Models/xdoor1_000014.obj
+index: 1457
+#Models/xdoor1_000015.obj
+index: 1458
+#Models/xdoor1_000016.obj
+index: 1459
+#Models/xdoor1_000017.obj
+index: 1460
+#Models/xdoor1_000018.obj
+index: 1461
+#Models/xdoor1_000019.obj
+index: 1462
+#Models/xdoor1_000020.obj
+index: 1463
+#Models/xdoor1_000021.obj
+index: 1464
+#Models/xdoor1_000022.obj
+index: 1465
+#Models/xdoor1_000023.obj
+index: 1466
+#Models/xdoor1_000024.obj
+index: 1467
+#Models/xdoor1_000025.obj
+index: 1468
+#Models/xdoor1_000026.obj
+index: 1469
+#Models/xdoor1_000027.obj
+index: 1470
+#Models/xdoor1_000028.obj
+index: 1471
+#Models/xdoor1_000029.obj
+index: 1472
+#Models/xdoor1_000030.obj
+index: 1473
+#Models/xdoor1_000031.obj
+index: 1474
+#Models/xdoor1_000032.obj
+index: 1475
+#Models/xdoor1_000033.obj
+index: 1476
+#Models/xdoor1_000034.obj
+index: 1477
+#Models/xdoor1_000035.obj
+index: 1478
+#Models/xdoor1_000036.obj
+index: 1479
+#Models/xdoor1_000037.obj
+index: 1480
+#Models/xdoor1_000038.obj
+index: 1481
+#Models/xdoor1_000039.obj
+index: 1482
+#Models/xdoor1_000040.obj
+index: 1483
+#Models/xdoor1_000041.obj
+index: 1484
+#Models/xdoor1_000042.obj
+index: 1485
+#Models/xdoor1_000043.obj
+index: 1486
+#Models/xdoor1_000044.obj
+index: 1487
+#Models/xdoor1_000045.obj
+index: 1488
+#Models/xdoor1_000046.obj
+index: 1489
+#Models/xdoor1_000047.obj
+index: 1490
+#Models/xdoor1_000048.obj
+index: 1491
+#Models/xdoor1_000049.obj
+index: 1492
+#Models/xdoor1_000050.obj
+index: 1493
+#Models/xdoor1_000051.obj
+index: 1494
+#Models/xdoor1_000052.obj
+index: 1495
+#Models/xdoor1_000053.obj
+index: 1496
+#Models/xdoor1_000054.obj
+index: 1497
+#Models/xdoor1_000055.obj
+index: 1498
+#Models/xdoor1_000056.obj
+index: 1499
+#Models/xdoor1_000057.obj
+index: 1500
+#Models/xdoor1_000058.obj
+index: 1501
+#Models/xdoor1_000059.obj
+index: 1502
+#Models/xdoor1_000060.obj
+index: 1503
+#Models/xdoor1_000061.obj
+index: 1504
+#Models/xdoor1_000062.obj
+index: 1505
+#Models/xdoor1_000063.obj
+index: 1506
+#Models/xdoor1_000064.obj
+index: 1507
+#Models/xdoor1_000065.obj
+index: 1508
+#Models/xdoor1_000066.obj
+index: 1509
+
+#Models/xdoor2_000001.obj
+index: 1510
+#Models/xdoor2_000002.obj
+index: 1511
+#Models/xdoor2_000003.obj
+index: 1512
+#Models/xdoor2_000004.obj
+index: 1513
+#Models/xdoor2_000005.obj
+index: 1514
+#Models/xdoor2_000006.obj
+index: 1515
+#Models/xdoor2_000007.obj
+index: 1516
+#Models/xdoor2_000008.obj
+index: 1517
+#Models/xdoor2_000009.obj
+index: 1518
+#Models/xdoor2_000010.obj
+index: 1519
+#Models/xdoor2_000011.obj
+index: 1520
+#Models/xdoor2_000012.obj
+index: 1521
+#Models/xdoor2_000013.obj
+index: 1522
+#Models/xdoor2_000014.obj
+index: 1523
+#Models/xdoor2_000015.obj
+index: 1524
+#Models/xdoor2_000016.obj
+index: 1525
+#Models/xdoor2_000017.obj
+index: 1526
+#Models/xdoor2_000018.obj
+index: 1527
+#Models/xdoor2_000019.obj
+index: 1528
+#Models/xdoor2_000020.obj
+index: 1529
+#Models/xdoor2_000021.obj
+index: 1530
+#Models/xdoor2_000022.obj
+index: 1531
+#Models/xdoor2_000023.obj
+index: 1532
+#Models/xdoor2_000024.obj
+index: 1533
+#Models/xdoor2_000025.obj
+index: 1534
+#Models/xdoor2_000026.obj
+index: 1535
+#Models/xdoor2_000027.obj
+index: 1536
+#Models/xdoor2_000028.obj
+index: 1537
+#Models/xdoor2_000029.obj
+index: 1538
+#Models/xdoor2_000030.obj
+index: 1539
+#Models/xdoor2_000031.obj
+index: 1540
+#Models/xdoor2_000032.obj
+index: 1541
+#Models/xdoor2_000033.obj
+index: 1542
+#Models/xdoor2_000034.obj
+index: 1543
+#Models/xdoor2_000035.obj
+index: 1544
+#Models/xdoor2_000036.obj
+index: 1545
+#Models/xdoor2_000037.obj
+index: 1546
+#Models/xdoor2_000038.obj
+index: 1547
+#Models/xdoor2_000039.obj
+index: 1548
+#Models/xdoor2_000040.obj
+index: 1549
+#Models/xdoor2_000041.obj
+index: 1550
+#Models/xdoor2_000042.obj
+index: 1551
+#Models/xdoor2_000043.obj
+index: 1552
+#Models/xdoor2_000044.obj
+index: 1553
+#Models/xdoor2_000045.obj
+index: 1554
+#Models/xdoor2_000046.obj
+index: 1555
+#Models/xdoor2_000047.obj
+index: 1556
+#Models/xdoor2_000048.obj
+index: 1557
+#Models/xdoor2_000049.obj
+index: 1558
+#Models/xdoor2_000050.obj
+index: 1559
+

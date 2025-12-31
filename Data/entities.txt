@@ -339,6 +339,8 @@ texture: 285
 index: 53
 model: 122
 texture: 1252
+numclips: 1
+animationNum: 12
 // eng_wallpump, animated, not a card chunk
 #chunk_exec1_1
 index: 54
@@ -4213,9 +4215,13 @@ animationNum: 0
 index: 498
 model: 81
 texture: 184
+numclips: 4
+animationNum: 5
 #doorD
 index: 499
 model: 82
+numclips: 4
+animationNum: 4
 texture: 196
 glowtexture: 197
 #doorE
@@ -4229,9 +4235,17 @@ index: 503
 #doorI
 index: 504
 #doorJ
-index: 505
-#doorK
 index: 506
+model: 82
+numclips: 4
+animationNum: 7
+texture: 214
+#doorK
+index: 505
+model: 82
+numclips: 4
+animationNum: 6
+texture: 215
 #doorL
 index: 507
 #door_elevator1
@@ -5010,19 +5024,9 @@ texture: 148
 index: 752
 model: 61
 texture: 149
-#chunk_eng2_6rods
-index: 753
-model: 671
-glowtexture: 1122
-texture: 1253
-// eng_wallpump rods
-#chunk_eng2_6_eng1_5
-index: 754
-model: 670
-texture: 262
-// eng_wallpump surrounding walls
+
 #npc_sec3_bot
-index: 755
+index: 753
 model: 681
 texture: 553
 #player

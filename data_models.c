@@ -101,14 +101,14 @@ void cleanup_all_mmaps(void) {
 void LoadModels(void) {
     double start_time = get_time();
     
-    // doorB
+    // doorB (door2)
     modelAnimationClips[0][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 2, .frameEnd = 21, .frameStartModelIndex = 699, .frameEndModelIndex = 718, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[0][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2, .frameEnd = 2, .frameStartModelIndex = 699, .frameEndModelIndex = 698, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[0][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 11, .frameStartModelIndex = 699, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[0][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 11, .frameEnd = 11, .frameStartModelIndex = 708, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[0][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 12, .frameEnd = 21, .frameStartModelIndex = 709, .frameEndModelIndex = 718, .speed = 1.0f, .framerate = 24u };
     
-    // doorA
+    // doorA (door1)
     modelAnimationClips[1][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 2, .frameEnd = 24, .frameStartModelIndex = 719, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[1][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2, .frameEnd = 2, .frameStartModelIndex = 719, .frameEndModelIndex = 719, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[1][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 12, .frameStartModelIndex = 719, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
@@ -128,9 +128,20 @@ void LoadModels(void) {
     modelAnimationClips[2][ANIM_DEAD] = (AnimationClip){ .frameStart = 181, .frameEnd = 181, .frameStartModelIndex = 923, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
 
     // npc_cyborg_drone
-    modelAnimationClips[3][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 0, .frameEnd = 377, .frameStartModelIndex = 924, .frameEndModelIndex = 1300, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[3][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 0, .frameEnd = 376, .frameStartModelIndex = 924, .frameEndModelIndex = 1300, .speed = 1.0f, .framerate = 24u };
 
-        
+    // doorD (door4, bulkhead 1)
+    modelAnimationClips[4][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 1, .frameEnd = 97, .frameStartModelIndex = 1301, .frameEndModelIndex = 1397, .speed = 1.0f, .framerate = 24u };
+
+    // doorC (door3)
+    modelAnimationClips[5][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 1, .frameEnd = 46, .frameStartModelIndex = 1398, .frameEndModelIndex = 1443, .speed = 1.0f, .framerate = 24u };
+
+    // doorK (xdoor1)
+    modelAnimationClips[6][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 1, .frameEnd = 66, .frameStartModelIndex = 1444, .frameEndModelIndex = 1509, .speed = 1.0f, .framerate = 24u };
+
+    // doorJ (xdoor2)
+    modelAnimationClips[7][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 1, .frameEnd = 50, .frameStartModelIndex = 1510, .frameEndModelIndex = 1559, .speed = 1.0f, .framerate = 24u };
+
     if (loadedModelsMaxIndex > 0) {
         #ifdef ONLY_LOAD_LEVEL_NEEDS
             glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);

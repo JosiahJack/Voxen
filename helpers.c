@@ -258,7 +258,7 @@ float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint3
     return parse_float(trimmed_value, initialLine, lineNum) + (float)voxen_globalContext.pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
 }
 
-const char* GetPrefabNameFromIndex(int constIndex) {
+const char* GetPrefabNameFromIndex(int constIndex) { // TODO: Just fill table with path from loading models.txt
     switch (constIndex) {
         case 0: return "chunk_black";
         case 1: return "chunk_blocker";
@@ -1013,9 +1013,7 @@ const char* GetPrefabNameFromIndex(int constIndex) {
         case 750: return "chunk_crate_impenetrable2";
         case 751: return "chunk_crate_impenetrable3";
         case 752: return "chunk_crate_impenetrable4";
-        case 753: return "chunk_eng2_6rods";
-        case 754: return "chunk_eng2_6_eng1_5";
-        case 755: return "npc_sec3_bot";
+        case 753: return "npc_sec3_bot";
         
         case 767: return "player";
     }

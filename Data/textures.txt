@@ -449,10 +449,9 @@ index: 194
 index: 195
 #Textures/door_bulk1.png
 index: 196
-#Textures/door_bulk2_glow.png
+#Textures/door_bulk1_glow.png
 index: 197
-#Textures/door_bulk2.png
-index: 198
+
 #Textures/door_bulk3_glow.png
 index: 199
 #Textures/door_bulk3.png
@@ -1318,6 +1317,7 @@ index: 641
 index: 642
 #Textures/prop_bush.png
 index: 643
+transparent: 1
 #Textures/prop_chandelier.png
 index: 644
 #Textures/prop_microscope.png
