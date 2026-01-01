@@ -308,6 +308,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&instances[instanceIdx].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
+    flag_set(&instances[instanceIdx].entflags, ENTFLAG_NO_SHADOWS,  entities[entIdx].entflags & ENTFLAG_NO_SHADOWS);
     instances[instanceIdx].collider = entities[entIdx].collider;
     instances[instanceIdx].colliderCenter.x = entities[entIdx].colliderCenter.x;
     instances[instanceIdx].colliderCenter.y = entities[entIdx].colliderCenter.y;

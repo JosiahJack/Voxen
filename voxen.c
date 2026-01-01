@@ -236,7 +236,7 @@ void UpdateVoxelLightLists(void) {
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
 #define MAX_SHADOWMAPS 56u
-#define SHADOW_MAP_SIZE 384u
+#define SHADOW_MAP_SIZE 192u
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
 	uint32_t numShadowsCouldRender;
@@ -389,6 +389,7 @@ void RenderShadowmaps(void) {
         for (uint16_t j = 3; j < endOfModels; j++) { // Skip player indices and start at 3
             if (instances[j].modelIndex >= loadedModelsMaxIndex) continue;
             if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
+            if (instances[j].entflags & ENTFLAG_NO_SHADOWS) continue;
 
             uint16_t instCellIdx = PosGetCellCoords(instances[j].position.x, instances[j].position.z);
             if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue;
@@ -799,6 +800,7 @@ void UpdateAnims(void) {
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
         if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
+        if (instances[i].numclips == 0) continue; // Invalid animation clip index
         
         if (   instances[i].index == 53
             || instances[i].index == 79

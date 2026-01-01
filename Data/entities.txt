@@ -4845,136 +4845,168 @@ volume: 0.5
 index: 656
 model: 77
 texture: 237
+noshadows: 1
 #decal_blood_resist
 index: 657
 model: 77
 texture: 240
+noshadows: 1
 #decal_blood_stayaway
 index: 658
 model: 77
 texture: 235
+noshadows: 1
 #decal_blood_words2
 index: 659
 model: 77
 texture: 236
+noshadows: 1
 #decal_bloodfonta
 index: 660
 model: 178
 texture: 118
+noshadows: 1
 #decal_bloodfonte
 index: 661
 model: 178
 texture: 121
+noshadows: 1
 #decal_bloodfontg
 index: 662
 model: 178
 texture: 122
+noshadows: 1
 #decal_bloodfonth
 index: 663
 model: 178
 texture: 89
+noshadows: 1
 #decal_bloodfontr
 index: 664
 model: 178
 texture: 139
+noshadows: 1
 #decal_bloodfonty
 index: 665
 model: 178
 texture: 140
+noshadows: 1
 #decal_bloodsplat2
 index: 666
 model: 157
 texture: 130
+noshadows: 1
 #decal_logo_antenna
 index: 667
 model: 77
 texture: 182
+noshadows: 1
 #decal_logo_armory
 index: 668
 model: 77
 texture: 178
+noshadows: 1
 #decal_logo_biohazard
 index: 669
 model: 77
 texture: 180
+noshadows: 1
 #decal_logo_bridge
 index: 670
 model: 77
 texture: 181
+noshadows: 1
 #decal_logo_cyborg
 index: 671
 model: 77
 texture: 176
+noshadows: 1
 #decal_logo_gears
 index: 672
 model: 77
 texture: 174
+noshadows: 1
 #decal_logo_medical
 index: 673
 model: 77
 texture: 165
+noshadows: 1
 #decal_logo_radhazard
 index: 674
 model: 77
 texture: 177
+noshadows: 1
 #decal_logo_research
 index: 675
 model: 77
 texture: 175
+noshadows: 1
 #decal_logo_security
 index: 676
 model: 77
 texture: 167
+noshadows: 1
 #decal_painting1
 index: 677
 model: 77
 texture: 218
 glowtexture: 216
 normtexture: 217
+noshadows: 1
 #decal_painting2
 index: 678
 model: 77
 texture: 220
 glowtexture: 219
+noshadows: 1
 #decal_painting3
 index: 679
 model: 77
 texture: 222
 glowtexture: 221
+noshadows: 1
 #decal_posterbetterfuture
 index: 680
 model: 77
 texture: 226
 normtexture: 225
+noshadows: 1
 #decal_postergenetics
 index: 681
 model: 77
 texture: 224
 normtexture: 223
+noshadows: 1
 #decal_scorch1
 index: 682
 model: 77
 texture: 227
+noshadows: 1
 #decal_scorch2
 index: 683
 model: 77
 texture: 228
+noshadows: 1
 #decal_scorch3
 index: 684
 model: 77
 texture: 229
+noshadows: 1
 #decal_scorch4
 index: 685
 model: 77
 texture: 230
+noshadows: 1
 #decal_scorchtiny
 index: 686
 model: 77
 texture: 232
+noshadows: 1
 #decal_blood_splat
 index: 687
 model: 77
 texture: 234
+noshadows: 1
 #func_switch1
 index: 688
 model: 609
@@ -5240,6 +5272,9 @@ animationNum: 43
 index: 746
 #decal_logo_storage
 index: 747
+model: 77
+texture: 169
+noshadows: 1
 #light_animated
 index: 748
 #generic_transform
