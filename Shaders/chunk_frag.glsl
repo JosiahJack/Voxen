@@ -251,6 +251,7 @@ void main() {
             slopeBias = min(slopeBias, 0.18);
             float bias = slopeBias * distOverRange;
             bias = clamp(bias, 0.0, 0.22);
+            bias += 0.04 * pow(0.25, 0.65);
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
