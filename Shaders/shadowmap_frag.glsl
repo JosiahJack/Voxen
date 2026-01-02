@@ -10,8 +10,6 @@ layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 // layout(location = 1) uniform mat4 viewProjMatrix; // end vert shader uniforms
 layout(location = 2) uniform uint face;
 layout(location = 3) uniform uint lightIndex;
-layout(location = 4) uniform uint shadowmapSize;
-layout(location = 5) uniform uint shadowmapIndirection;
 layout(location = 6) uniform uint texIndex;
 layout(location = 7) uniform uint offsetIntoSSBO;
 layout(location = 8) uniform uint isTransparent;
@@ -46,7 +44,7 @@ void main() {
     }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
-    uint ssbo_index = offsetIntoSSBO + (face * shadowmapSize * shadowmapSize) + texelCoord.y * shadowmapSize + texelCoord.x;
+    uint ssbo_index = offsetIntoSSBO + (face * 36864) + texelCoord.y * 192 + texelCoord.x;
     vec3 lightPos = vec3(lights[lightIndex], lights[lightIndex + LIGHT_DATA_OFFSET_POSY], lights[lightIndex + LIGHT_DATA_OFFSET_POSZ]);
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);

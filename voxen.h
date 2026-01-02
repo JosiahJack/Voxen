@@ -256,6 +256,7 @@ void LoadModels(void);
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern bool lightOn[LIGHT_COUNT];
+extern bool lightCastsShadows[LIGHT_COUNT];
 extern bool lightLerpOn[LIGHT_COUNT];
 extern bool lightLerpUp[LIGHT_COUNT];
 extern uint8_t lightCurrentStep[LIGHT_COUNT];
@@ -699,8 +700,6 @@ typedef struct {
 	GLuint texturePaletteOffsetsID;
 	GLuint lightsID;
 	GLuint shadowMapsIndirectionID;
-	GLuint shadowMapsSizesID;
-	GLuint shadowMapsOffsetsID;
 	GLuint cellVisibleDataID;
 	GLuint voxelUpdateShaderProgram;
 	GLuint voxelLightListCountsID;

@@ -10,8 +10,9 @@ layout(location = 0) uniform uint instanceIndex;
 layout(location = 1) uniform mat4 viewProjMatrix;
 // layout(location = 2) uniform uint face; // Start fragment uniforms
 // layout(location = 3) uniform uint lightIndex;
-// layout(location = 4) uniform uint shadowmapSize;
-// layout(location = 5) uniform uint shadowmapIndirection;
+// layout(location = 6) uniform uint texIndex;
+// layout(location = 7) uniform uint offsetIntoSSBO;
+// layout(location = 8) uniform uint isTransparent;
 
 out vec3 FragPos;
 out vec2 TexCoord;

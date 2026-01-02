@@ -32,8 +32,6 @@ layout(location = 2) out vec4 outSpecular; // GL_COLOR_ATTACHMENT2
 layout(location = 3) out vec2 outNormal;   // GL_COLOR_ATTACHMENT3
 layout(std430, binding = 5) buffer ShadowMaps { uint shadowMaps[]; };
 layout(std430, binding = 8) buffer ShadowMapsIndirection { uint shadowMapsIndirection[]; };
-layout(std430, binding = 9) buffer ShadowMapSizes { uint shadowMapSizes[]; };
-layout(std430, binding = 10) buffer ShadowMapOffsets { uint shadowMapOffsets[]; };
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
 layout(std430, binding = 13) buffer BlueNoise { float blueNoiseColors[]; };
 layout(std430, binding = 14) buffer TextureOffsets { uint textureOffsets[]; }; // Starting index in colors for each texture
@@ -233,33 +231,26 @@ void main() {
         if (shadowsEnabled > 0 && shadowIndex < 1600) {
             float smearness = distOverRangeSqd * 24.0 + intensity; // was + 10.0 instead of intensity, thought this'd be nice.
             vec3 a = abs(toLight);
-            float maxAxis = max(max(a.x, a.y), a.z);
-            float invMax = (maxAxis > 0.0) ? (1.0 / maxAxis) : 0.0;  // avoid division by zero
+            float mx = step(a.y, a.x) * step(a.z, a.x);
+            float my = step(a.x, a.y) * step(a.z, a.y);
+            vec3 mxyz = vec3(mx, my, 1.0 - mx - my);
+            vec3 sxyz = vec3(step(0.0, -toLight.x), step(0.0, -toLight.y), step(0.0, -toLight.z));
+            vec3 fxyz = vec3(mix(1.0, 0.0, sxyz.x), mix(3.0, 2.0, sxyz.y), mix(5.0, 4.0, sxyz.z));
+            uint face = uint(mxyz.x * fxyz.x + mxyz.y * fxyz.y + mxyz.z * fxyz.z);
+            float invMax = 1.0 / max(max(a.x, a.y), a.z);
             vec3 dir = -toLight * invMax;
-            uint face;
-            vec2 uv;
-            if (a.x >= a.y && a.x >= a.z) {
-                face = -toLight.x > 0.0 ? 0u : 1u;
-                uv = (face == 0u) ? vec2(-dir.z, dir.y) : vec2(dir.z, dir.y);
-            } else if (a.y >= a.x && a.y >= a.z) {
-                face = -toLight.y > 0.0 ? 2u : 3u;
-                uv = (face == 2u) ? vec2(dir.x, -dir.z) : vec2(dir.x, dir.z);
-            } else {
-                face = -toLight.z > 0.0 ? 4u : 5u;
-                uv = (face == 4u) ? vec2(dir.x, dir.y) : vec2(-dir.x, dir.y);
-            }
-
+            vec2 uvx = mix(vec2( dir.z, dir.y), vec2(-dir.z, dir.y), sxyz.x);
+            vec2 uvy = mix(vec2( dir.x, dir.z), vec2( dir.x,-dir.z), sxyz.y);
+            vec2 uvz = mix(vec2(-dir.x, dir.y), vec2( dir.x, dir.y), sxyz.z);
+            vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
             uv = uv * 0.5 + 0.5;
-            uint shadSize = shadowMapSizes[shadowIndex];
-            float shadSizef = float(shadSize);
-            uint faceOff = shadowMapOffsets[shadowIndex] + (face * shadSize * shadSize);
-            vec2 tc = uv * shadSizef;
+
+            uint faceOff = (shadowIndex * 221184) + (face * 36864); // Shadowmap size 192 so 192*192*6 and 192*192 for these.
+            vec2 tc = uv * 192.0;
             float slopeBias = 0.451 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
-            float bias = slopeBias * (dist / range);
+            float bias = slopeBias * distOverRange;
             bias = clamp(bias, 0.0, 0.22);
-            bias += 0.04 * pow(clamp((256.0 - float(shadSize)) / 256.0, 0.0, 1.0), 0.65);
-            float shadSizeLessOne = float(shadSize - 1);
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
@@ -267,8 +258,8 @@ void main() {
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
-                t = clamp(t, 0.0, shadSizeLessOne);
-                uint ssbo_index = faceOff + uint(t.y) * shadSize + uint(t.x);
+                t = clamp(t, 0.0, 191.0);
+                uint ssbo_index = faceOff + uint(t.y) * 192 + uint(t.x);
                 uint distInt = shadowMaps[ssbo_index];
                 float d = (float(distInt) * 0.00001);
                 float depthDiff = (dist) - d - bias;

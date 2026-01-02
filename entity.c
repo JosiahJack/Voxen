@@ -355,6 +355,8 @@ uint8_t lightIntervalStepsLength[LIGHT_COUNT];
 float lightIntervalSteps[LIGHT_COUNT][30];
 uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 float intervalStepisLerping[LIGHT_COUNT][30];
+bool lightCastsShadows[LIGHT_COUNT];
+
 #define LINE_LEN_MAX 81920
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
@@ -378,6 +380,7 @@ void LoadLevel(uint8_t curlevel) {
     memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
     memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
     memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
+    memset(lightCastsShadows,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
     memset(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
     memset(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
     memset(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
@@ -584,6 +587,8 @@ void LoadLevel(uint8_t curlevel) {
             } else {
                 lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = 0.0f; // Force to not be a spot light
             }
+            
+            lightCastsShadows[lightsIdx] = (lights[litIdx + LIGHT_DATA_OFFSET_RANGE] >= 0.32f);
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
