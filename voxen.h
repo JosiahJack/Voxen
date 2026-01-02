@@ -1,7 +1,7 @@
 #pragma once
 #define VERSION_STRING "v0.7.4"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-// #define ONLY_LOAD_LEVEL_NEEDS
+#define ONLY_LOAD_LEVEL_NEEDS
 
 #include <stdbool.h>
 #include <string.h>
@@ -731,6 +731,7 @@ Quaternion axis_angle_quaternion(const Vector3 axis, float angle);
 void normalize_quaternion(Quaternion* q);
 Vector3 quat_rotate(Quaternion q, Vector3 v);
 void UpdateInstanceMatrix(int32_t i);
+bool EntityIsAnimated(uint16_t entIdx);
 
 static inline Quaternion mul_quaternion(Quaternion a, Quaternion b) {
     return (Quaternion){
