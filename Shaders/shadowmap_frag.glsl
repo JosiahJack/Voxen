@@ -18,9 +18,6 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 
-const int LIGHT_DATA_OFFSET_POSY = 1;
-const int LIGHT_DATA_OFFSET_POSZ = 2;
-
 uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
     uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
     uint slotIndex = pixelOffset >> 2u;// / 4u;
