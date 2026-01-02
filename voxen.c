@@ -801,6 +801,7 @@ void RenderInstances(void) {
     glEnable(GL_CULL_FACE); // Opaques
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
     float px = instances[PLAYER1].position.x, py = instances[PLAYER1].position.y, pz = instances[PLAYER1].position.z;
     uint16_t visibleCount = 0;
     uint32_t currentTexIndex = 0;
