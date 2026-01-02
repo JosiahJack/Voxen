@@ -400,7 +400,7 @@ void RenderShadowmaps(void) {
         if (nearbyMeshCount < 1) continue;
         
         qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
-        glUniform1ui(3, lightIdx * (uint32_t)LIGHT_DATA_SIZE);
+        glUniform3f(3, litX, litY, litZ);
         voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
         glUniform1ui(7, shadowmapOffsetHead);
         uint16_t currentModelType = 0;
@@ -411,7 +411,7 @@ void RenderShadowmaps(void) {
             glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
             for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                 int i = shadows_nearMeshes[j].index;            
-                if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 2.56f)) continue;
+                if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 1.25f)) continue;
 
                 int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
                 if (currentModelType != modelType) {

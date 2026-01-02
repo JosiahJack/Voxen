@@ -6,10 +6,8 @@ in vec2 TexCoord;
 layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 
-// layout(location = 0) uniform uint instanceIndex; // start vert shader uniforms
-// layout(location = 1) uniform mat4 viewProjMatrix; // end vert shader uniforms
 layout(location = 2) uniform uint face;
-layout(location = 3) uniform uint lightIndex;
+layout(location = 3) uniform vec3 lightPos;
 layout(location = 6) uniform uint texIndex;
 layout(location = 7) uniform uint offsetIntoSSBO;
 layout(location = 8) uniform uint isTransparent;
@@ -45,7 +43,6 @@ void main() {
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     uint ssbo_index = offsetIntoSSBO + (face * 36864) + texelCoord.y * 192 + texelCoord.x;
-    vec3 lightPos = vec3(lights[lightIndex], lights[lightIndex + LIGHT_DATA_OFFSET_POSY], lights[lightIndex + LIGHT_DATA_OFFSET_POSZ]);
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
     uint distInt = uint(dist * 100000.0 + 0.5);
