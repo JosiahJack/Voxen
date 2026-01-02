@@ -167,12 +167,12 @@ void main() {
     }
 
     vec4 specColor = vec4(0.0);
+    ivec2 texSizeSpec = textureSizes[specIndex];
+    ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
+    texUVSpec.x = texUVSpec.x % texSizeSpec.x;
+    texUVSpec.y = texUVSpec.y % texSizeSpec.y;
+    specColor = getTextureColor(specIndex,texUVSpec);
     if (reflectionsEnabled > 0) {
-        ivec2 texSizeSpec = textureSizes[specIndex];
-        ivec2 texUVSpec = ivec2(int(floor(uv.x * float(texSizeSpec.x))),int(floor(uv.y * float(texSizeSpec.y))));
-        texUVSpec.x = texUVSpec.x % texSizeSpec.x;
-        texUVSpec.y = texUVSpec.y % texSizeSpec.y;
-        specColor = getTextureColor(specIndex,texUVSpec);
         outSpecular = specColor;
         vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
         outWorldPos = worldPosPack;
