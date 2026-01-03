@@ -132,6 +132,8 @@ void ParseGameData(void) {
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",voxen_globalContext.global_modname, voxen_globalContext.numLevels, voxen_globalContext.startLevel, get_time() - start_time);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
 bool parse_data_file(DataParser *parser, const char *filename) {
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
@@ -287,6 +289,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     fclose(file);
     return true;
 }
+#pragma GCC diagnostic pop
 
 __attribute__((pure)) bool isDoubleSided(uint32_t texIndexToCheck) {
     if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;

@@ -39,7 +39,7 @@ void main() {
     }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
-    uint ssbo_index = offsetIntoSSBO + (face * 36864) + texelCoord.y * 192 + texelCoord.x;
+    uint ssbo_index = offsetIntoSSBO + texelCoord.y * 192 + texelCoord.x;
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
     uint distInt = uint(dist * 100000.0 + 0.5);

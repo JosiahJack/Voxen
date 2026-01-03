@@ -386,8 +386,8 @@ void main() {
         vec4 reflectionColor = vec4(0.0);
         reflectionColor.rgb += texture(outputImage, sampleUV).rgb;
         float weightSum = 0.0;
-        for (int x = -1; x <= 1; ++x) {
-            for (int y = -1; y <= 1; ++y) {
+        for (int x = -2; x <= 2; ++x) {
+            for (int y = -2; y <= 2; ++y) {
                 vec2 offset = vec2(float(x), float(y));
                 vec2 sampleUV = (pixelLow + offset) / lowResSize;
                 vec3 samp = texture(outputImage, sampleUV).rgb;

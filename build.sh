@@ -79,7 +79,7 @@ EOF
 
 CC=gcc
 export CC=$CC
-CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g0 -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla -std=c11 -Wall -Wextra -Wdouble-promotion -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -Wformat=2 -Wshadow -Wnull-dereference -Wsuggest-attribute=pure -Wstrict-prototypes -Wno-overlength-strings -Og -march=haswell -mtune=haswell -D_GNU_SOURCE"
+CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g -fno-omit-frame-pointer -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla -std=c11 -Wall -Wextra -Wdouble-promotion -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -Wformat=2 -Wshadow -Wnull-dereference -Wsuggest-attribute=pure -Wstrict-prototypes -Wno-overlength-strings -O1 -march=haswell -mtune=haswell -D_GNU_SOURCE"
 LDFLAGS="-fuse-ld=mold -Wl,--gc-sections -flto -L./External -lassimp -lz -static-libgcc -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -ffast-math -lGL -lfontconfig"
 SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c hardware.c data_text.c entity.c data_textures.c data_fonts.c os.c todo.c"
 export CFLAGS=$CFLAGS

@@ -406,6 +406,7 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int *x, in
    z.idata = NULL;
    z.out = NULL;
    s.img_buffer += 8; // Skip header check and trust it's a .png
+   s.img_x = s.img_y = 1;
    for (;;) {
       uint32_t length = stbi__get32be(&s);
       uint32_t type   = stbi__get32be(&s);
