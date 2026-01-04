@@ -246,8 +246,7 @@ void UpdateVoxelLightLists(void) {
             float posX = voxelMinCenterX + (voxelX * VOXEL_SIZE);
             float posZ = voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
             int32_t cellIdx = PosGetCellCoords(posX, posZ);
-            if (!(gridCellStates[cellIdx] & CELL_OPEN)) continue;
-            if (!(gridCellStates[cellIdx] & CELL_VISIBLE)) continue;
+            if (!(gridCellStates[cellIdx] & CELL_VISIBLE) && (gridCellStates[cellIdx] & CELL_OPEN)) continue;
 
             uint32_t voxelIndex = voxelZ * 512 + voxelX;
             for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
