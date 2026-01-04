@@ -226,45 +226,12 @@ void UpdateDynamicLights(void) {
 }
 
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
-
-// Keep around in case CPU becomes bottleneck.  Slighty faster to do on CPU now.
-// void UpdateVoxelLightLists(void) {
-//     glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
-//     GLuint groupX_voxels = (512 + 31) / 32;
-//     GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
-//     glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
-//     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-// }
-
-uint32_t voxelLightLists[VOXEL_COUNT * 24];
-uint32_t voxelLightListCounts[VOXEL_COUNT];
 void UpdateVoxelLightLists(void) {
-    memset(voxelLightLists, 0xFFFFFFFFu, VOXEL_COUNT * 24 * sizeof(uint32_t));
-    memset(voxelLightListCounts, 0, VOXEL_COUNT * sizeof(uint32_t));
-    for (uint32_t voxelZ = 0; voxelZ < 512; ++voxelZ) {
-        for (uint32_t voxelX = 0; voxelX < 512; ++voxelX) {
-            float posX = voxelMinCenterX + (voxelX * VOXEL_SIZE);
-            float posZ = voxelMinCenterZ + (voxelZ * VOXEL_SIZE);
-            int32_t cellIdx = PosGetCellCoords(posX, posZ);
-            if (!(gridCellStates[cellIdx] & CELL_VISIBLE) && (gridCellStates[cellIdx] & CELL_OPEN)) continue;
-
-            uint32_t voxelIndex = voxelZ * 512 + voxelX;
-            for (uint32_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
-                uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-                float litX = lights[litIdx + LIGHT_DATA_OFFSET_POSX];
-                float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-                float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-                float distSqrd = squareDistance2D(posX, posZ, litX, litZ);
-                if (distSqrd < (range * range)) {
-                    voxelLightLists[(voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex]] = lightIdx;
-                    ++voxelLightListCounts[voxelIndex];
-                }
-            }
-        }
-    }
-    
-    glNamedBufferData(voxen_GL_Comms.voxelLightListCountsID, VOXEL_COUNT * sizeof(uint32_t), voxelLightListCounts, GL_DYNAMIC_DRAW);
-    glNamedBufferData(voxen_GL_Comms.voxelLightListsID, VOXEL_COUNT * 24 * sizeof(uint32_t), voxelLightLists, GL_DYNAMIC_DRAW);
+    glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
+    GLuint groupX_voxels = (512 + 31) / 32;
+    GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
+    glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
