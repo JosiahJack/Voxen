@@ -19,6 +19,7 @@ uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
+float modelBoundingRadii[MODEL_IDX_MAX];
 uint16_t loadedModelsMaxIndex = 0;
 AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 
@@ -108,6 +109,7 @@ void LoadModels(void) {
             memset(modelTriangleCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
             memset(modelAnimationType, 0, MODEL_IDX_MAX * sizeof(uint8_t));
             memset(modelBounds, 0, MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
+            memset(modelBoundingRadii, 0, MODEL_IDX_MAX * sizeof(float));
             loadedModelsMaxIndex = 0;
         #else
             return;
@@ -256,6 +258,7 @@ void LoadModels(void) {
             r = vmax(r, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
             r = vmax(r, maxx);        r = vmax(r, maxy);        r = vmax(r, maxz);
             modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
+            modelBoundingRadii[i] = r;
             write_vmdl(vmdl_path, fbx_md5, modelVertices[i], vertexCount, modelTriangles[i], triCount);
             aiReleaseImport(scene);
         } else { // Use existing .vmdl binary RAM blob (aka a cache hit was successful):

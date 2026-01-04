@@ -253,8 +253,8 @@ typedef struct {
 VoxenShadowSystem voxen_Shadow_System;
 
 typedef struct {
-    uint16_t index;
     float depth;
+    uint16_t index;
 } DepthSort;
 
 __attribute__((pure)) int32_t compareDepthSort(const void* a, const void* b) {
@@ -269,199 +269,14 @@ __attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void
     return (da > db) - (da < db);
 }
 
-DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
-float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
+// DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
+// float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 
 typedef struct {
     uint16_t index; // Original index in lights array
     float distanceSquared; // Distance to camera squared
     float score; // Priority score (lower distance, higher intensity = higher priority)
 } LightCandidate;
-
-void RenderShadowmaps(float px, float py, float pz) {
-    if (voxen_Settings.Shadows < 1) return;
-    
-    double startTime = get_time();
-    voxen_Shadow_System.numGLCallsForShadows = 0;
-    glEnable(GL_DEPTH_TEST);
-    voxen_Shadow_System.numGLCallsForShadows++;
-    LightCandidate candidates[MAX_SHADOWMAPS];
-    uint16_t heap_size = 0;
-    float bestScores[MAX_SHADOWMAPS];
-    voxen_Shadow_System.numShadowsCouldRender = 0;
-    for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
-        if (!lightCastsShadows[i]) continue;
-
-        uint32_t litIdx = i * LIGHT_DATA_SIZE;
-        float lightPosX = lights[litIdx];
-        float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
-        if (intensity < 0.1f) continue;
-        
-        float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        float thresh = 0.015f;
-        float luminosity = (intensity / (range * range));
-        if (luminosity < thresh) continue;
-
-        float dx = lightPosX - px;
-        float dy = lightPosY - py;
-        float dz = lightPosZ - pz;
-        float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPosX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPosZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        int lightCellIdx = (cellZ * WORLDX) + cellX;
-        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (!inPVS) {
-            int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F));
-            for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
-                for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                    if (!XZPairInBounds(ix, iz)) continue;
-                    int subIdx = iz * WORLDX + ix;
-                    if ((gridCellStates[subIdx] & CELL_VISIBLE) &&
-                        get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx)) {
-                        inPVS = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (!inPVS) continue;
-
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
-        
-        float score = distSqrdToPlayer / vmax(intensity, 0.01f);
-        if (dotResult > 0.5f || distSqrdToPlayer < 26.2144f) score *= 0.125f; // Favor lights in player's view cone or within 5.12 (2 world cells)
-        else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
-
-        if (heap_size < MAX_SHADOWMAPS) {
-            candidates[heap_size] = (LightCandidate){ i, distSqrdToPlayer, score };
-            bestScores[heap_size] = score;
-            heap_size++;
-        } else if (score < bestScores[0]) {  // Only compare against current worst
-            // Find worst (highest score) and replace it
-            int worstIdx = 0;
-            for (uint32_t j = 1; j < heap_size; ++j) {
-                if (bestScores[j] > bestScores[worstIdx]) worstIdx = j;
-            }
-            candidates[worstIdx] = (LightCandidate){ i, distSqrdToPlayer, score };
-            bestScores[worstIdx] = score;
-        }
-
-        voxen_Shadow_System.numShadowsCouldRender++;
-    }
-
-    double shadATime = get_time();
-    voxen_Shadow_System.shadowTimeCandidates = shadATime - startTime;
-    uint32_t numToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
-
-    // Clear shadowmaps
-    if (voxen_Shadow_System.useComputeClear) {
-        glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram); // Way faster
-        GLuint groupX_shadClear = (numToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
-        glDispatchCompute(groupX_shadClear,1,1);
-        voxen_Shadow_System.numGLCallsForShadows += 3;
-    } else {
-        GLuint clearValue = 0xFFFFFFFFu;
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
-        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!  Only used for fallback on some systems (e.g. HD4400) that can't use compute shader.
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-        voxen_Shadow_System.numGLCallsForShadows += 3;
-    }
-
-    voxen_Shadow_System.shadowTimeClear = get_time() - shadATime;
-    shadowDrawCallsRenderedThisFrame = 0;
-    memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
-    glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
-    voxen_Shadow_System.numGLCallsForShadows++;
-    uint32_t shadowmapOffsetHead = 0U;
-    voxen_Shadow_System.shadowTimeNearbys = 0.0;
-    for (uint32_t c = 0; c < numToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
-        uint16_t lightIdx = candidates[c].index;
-        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-        float litX = lights[litIdx];
-        float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
-        float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-        float effectiveRadius = vmin(lightRadius, 15.36f);
-        glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-        voxen_Shadow_System.numGLCallsForShadows++;
-        uint16_t nearbyMeshCount = 0;
-        uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
-        double nearbysTimeStart = get_time();
-        for (uint16_t j = 3; j < endOfModels; j++) { // Skip player indices and start at 3
-            if (instances[j].modelIndex >= loadedModelsMaxIndex) continue;
-            if (modelVertexCounts[instances[j].modelIndex] < 1) continue;
-            if (instances[j].entflags & ENTFLAG_NO_SHADOWS) continue;
-
-            uint16_t instCellIdx = PosGetCellCoords(instances[j].position.x, instances[j].position.z);
-            if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue;
-            
-            shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-            float obj_x = instances[j].position.x, obj_y = instances[j].position.y, obj_z = instances[j].position.z;
-            float distToLightSqrd = squareDistance3D(obj_x, obj_y, obj_z, litX, litY, litZ);
-            float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
-            if (distToLightSqrd > radSum * radSum) continue;
-            
-            shadows_nearMeshes[nearbyMeshCount].index = j;
-            shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
-            nearbyMeshCount++;
-            if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
-        }
-        
-        voxen_Shadow_System.shadowTimeNearbys += (get_time() - nearbysTimeStart);
-
-        if (nearbyMeshCount < 1) continue;
-        
-        qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
-        glUniform3f(3, litX, litY, litZ);
-        voxen_Shadow_System.numGLCallsForShadows++;
-        voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
-        uint16_t currentModelType = 0;
-        uint16_t currentTexIndex = 0;
-        bool currentIsTransparent = 0;
-        for (uint8_t face = 0; face < 6; face++) {
-            glUniform1ui(2, face);
-            glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
-            glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
-            voxen_Shadow_System.numGLCallsForShadows += 3;
-            for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
-                int i = shadows_nearMeshes[j].index;            
-                if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 1.41f)) continue;
-
-                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-                if (currentModelType != modelType) {
-                    currentModelType = modelType;
-                    glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-                    voxen_Shadow_System.numGLCallsForShadows += 2;
-                }
-                
-                glUniform1ui(0, i);
-                voxen_Shadow_System.numGLCallsForShadows++;
-                if (currentTexIndex != instances[i].texIndex) { currentTexIndex = instances[i].texIndex; glUniform1ui(6, instances[i].texIndex); voxen_Shadow_System.numGLCallsForShadows++; }
-                if (currentIsTransparent != isTransparent(instances[i].texIndex)) { currentIsTransparent = isTransparent(instances[i].texIndex); glUniform1ui(8, isTransparent(instances[i].texIndex)); voxen_Shadow_System.numGLCallsForShadows++; }
-                glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
-                voxen_Shadow_System.numGLCallsForShadows++;
-                drawCallsRenderedThisFrame++;
-                verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
-            }
-        }
-
-        shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
-        if (shadowmapOffsetHead > TOTAL_SHADOWMAP_PIXELS) { DualLogWarn("Early exit on shadowmap loop due to undersized SSBO\n"); break; }
-
-        shadowDrawCallsRenderedThisFrame++;
-    }
-
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
-    glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
-    glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-    voxen_Shadow_System.numGLCallsForShadows += 4;
-    voxen_Shadow_System.shadowTime = get_time() - startTime;
-}
 
 // ============================================================================
 // UI Rendering and Text
@@ -579,23 +394,6 @@ void CenterStatusPrint(const char* fmt, ...) {
     voxen_globalContext.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 
-void InitializePlayer(uint16_t playerIdx) { // Just setting the things that are nonzero
-    instances[playerIdx].index = 767;
-    instances[playerIdx].layer = PhysicsLayer_Player;
-    instances[playerIdx].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
-    instances[playerIdx].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
-    instances[playerIdx].rotation.w = 1.0f;
-    instances[playerIdx].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
-    instances[playerIdx].collider = COLLIDER_TYPE_CAPSULE;
-    instances[playerIdx].colliderCenter.y = 0.84f;
-    instances[playerIdx].colliderSize = (Vector3) { .x = 0.48f, .y = 2.0f, .z = COLLIDER_CAPSULE_DIRECTION_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
-    instances[playerIdx].mass = 1.0f;
-    instances[playerIdx].linearDrag = 8.0f;
-    instances[playerIdx].dynamicFriction = 0.6f;
-    instances[playerIdx].staticFriction = 0.8f;
-    instances[playerIdx].frictionCombine = PHYS_COMBINE_MUL;
-}
-
 void NewGame(void) {
     RenderLoadingProgress(100,"Loading new game...");
     memset(&questData, 0, sizeof(QuestBits));
@@ -606,7 +404,20 @@ void NewGame(void) {
     questData.lev5SecCode = random_range_u8(0u,9u);
     questData.lev6SecCode = random_range_u8(0u,9u);
     memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    InitializePlayer(PLAYER1); InitializePlayer(PLAYER2);
+    instances[PLAYER1].index = 767;
+    instances[PLAYER1].layer = PhysicsLayer_Player;
+    instances[PLAYER1].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
+    instances[PLAYER1].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
+    instances[PLAYER1].rotation.w = 1.0f;
+    instances[PLAYER1].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
+    instances[PLAYER1].collider = COLLIDER_TYPE_CAPSULE;
+    instances[PLAYER1].colliderCenter.y = 0.84f;
+    instances[PLAYER1].colliderSize = (Vector3) { .x = 0.48f, .y = 2.0f, .z = COLLIDER_CAPSULE_DIRECTION_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    instances[PLAYER1].mass = 1.0f;
+    instances[PLAYER1].linearDrag = 8.0f;
+    instances[PLAYER1].dynamicFriction = 0.6f;
+    instances[PLAYER1].staticFriction = 0.8f;
+    instances[PLAYER1].frictionCombine = PHYS_COMBINE_MUL;
     LoadLevel(voxen_globalContext.startLevel); // Must be after entities!
     voxen_globalContext.pauseRelativeTime = 0.0;
 }
@@ -819,136 +630,6 @@ void UpdateAnims(void) {
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-void RenderInstances(float px, float py, float pz) {
-    glEnable(GL_CULL_FACE); // Opaques
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    uint16_t visibleCount = 0;
-    uint32_t currentTexIndex = 0;
-    uint32_t currentNormIndex = 0;
-    uint32_t currentGlowIndex = 0;
-    uint32_t currentSpecIndex = 0;
-    uint16_t currentModelType = 0;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
-        float objx = instances[i].position.x;
-        float objz = instances[i].position.z;
-        uint16_t instCellIdx = PosGetCellCoords(objx, objz);
-        float dx = objx - px;
-        float dy = instances[i].position.y - py;
-        float dz = objz - pz;
-        float distSqrd = dx*dx + dy*dy + dz*dz;
-        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-        if (distSqrd >= FAR_PLANE_SQUARED) continue;
-        
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-        
-        visibleInstances[visibleCount].index = i;
-        visibleInstances[visibleCount].depth = distSqrd;
-        visibleCount++;
-    }
-    
-    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
-    for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
-        uint16_t i = visibleInstances[visibleIndex].index;
-        glUniform1ui(0, i);
-        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        if (currentModelType != modelType) {
-            currentModelType = modelType;
-            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-        }
-        
-        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        drawCallsRenderedThisFrame++;
-        verticesRenderedThisFrame += vertCount;
-    }
-    
-    glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
-    for (uint16_t i = startOfDoubleSidedInstances; i < startOfTransparentInstances; ++i) {
-        float objx = instances[i].position.x;
-        float objz = instances[i].position.z;
-        uint16_t instCellIdx = PosGetCellCoords(objx, objz);
-        float dx = objx - px;
-        float dy = instances[i].position.y - py;
-        float dz = objz - pz;
-        float distSqrd = dx*dx + dy*dy + dz*dz;
-        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-        if (distSqrd >= FAR_PLANE_SQUARED) continue;
-        
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-        
-        glUniform1ui(0, i);
-        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        if (currentModelType != modelType) {
-            currentModelType = modelType;
-            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-        }
-        
-        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        drawCallsRenderedThisFrame++;
-        verticesRenderedThisFrame += vertCount;
-    }
-    
-    glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
-    uint16_t startOfNextType = loadedInstances - invalidModelIndexCount;
-    visibleCount = 0;
-    for (uint16_t i = startOfTransparentInstances; i < startOfNextType; ++i) {
-        float objx = instances[i].position.x;
-        float objz = instances[i].position.z;
-        uint16_t instCellIdx = PosGetCellCoords(objx, objz);
-        float dx = objx - px;
-        float dy = instances[i].position.y - py;
-        float dz = objz - pz;
-        float distSqrd = dx*dx + dy*dy + dz*dz;
-        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
-        if (distSqrd >= FAR_PLANE_SQUARED) continue;
-        
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
-        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-        
-        visibleInstances[visibleCount].index = i;
-        visibleInstances[visibleCount].depth = distSqrd;
-        visibleCount++;
-    }
-
-    
-    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
-    for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
-        uint16_t i = visibleInstances[visibleIndex].index;
-        glUniform1ui(0, i);
-        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-        if (currentModelType != modelType) {
-            currentModelType = modelType;
-            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-        }
-        
-        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        drawCallsRenderedThisFrame++;
-        verticesRenderedThisFrame += vertCount;
-    }
-}
 
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
     RaycastHit result = {
@@ -975,6 +656,9 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
     
     return result;
 }
+
+DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
+float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();
@@ -1138,7 +822,199 @@ int32_t main(int32_t argc, char* argv[]) {
             
             if (voxelsNeedUpdated) UpdateVoxelLightLists();
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
-            if (voxen_Settings.Shadows > 0u) RenderShadowmaps(px, py, pz);
+            if (voxen_Settings.Shadows > 0u) {
+                double shadowStartTime = get_time();
+                voxen_Shadow_System.numGLCallsForShadows = 0;
+                glEnable(GL_DEPTH_TEST);
+                voxen_Shadow_System.numGLCallsForShadows++;
+                LightCandidate candidates[MAX_SHADOWMAPS];
+                uint16_t numberFoundLightCandidatesForShadows = 0;
+                float bestScores[MAX_SHADOWMAPS];
+                voxen_Shadow_System.numShadowsCouldRender = 0;
+                for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
+                    if (!lightCastsShadows[i]) continue;
+
+                    uint32_t litIdx = i * LIGHT_DATA_SIZE;
+                    float lightPosX = lights[litIdx];
+                    float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+                    float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+                    float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+                    if (intensity < 0.1f) continue;
+                    
+                    float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+                    float thresh = 0.015f;
+                    float luminosity = (intensity / (range * range));
+                    if (luminosity < thresh) continue;
+
+                    float dx = lightPosX - px;
+                    float dy = lightPosY - py;
+                    float dz = lightPosZ - pz;
+                    float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
+                    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPosX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPosZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                    int lightCellIdx = (cellZ * WORLDX) + cellX;
+                    bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+                    if (!inPVS) {
+                        int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F));
+                        for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
+                            for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
+                                if (!XZPairInBounds(ix, iz)) continue;
+                                int subIdx = iz * WORLDX + ix;
+                                if ((gridCellStates[subIdx] & CELL_VISIBLE) &&
+                                    get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx)) {
+                                    inPVS = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!inPVS) continue;
+
+                    float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+                    if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
+                    
+                    float score = distSqrdToPlayer / vmax(intensity, 0.01f);
+                    if (dotResult > 0.5f || distSqrdToPlayer < 26.2144f) score *= 0.125f; // Favor lights in player's view cone or within 5.12 (2 world cells)
+                    else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
+
+                    if (numberFoundLightCandidatesForShadows < MAX_SHADOWMAPS) {
+                        candidates[numberFoundLightCandidatesForShadows] = (LightCandidate){ i, distSqrdToPlayer, score };
+                        bestScores[numberFoundLightCandidatesForShadows] = score;
+                        numberFoundLightCandidatesForShadows++;
+                    } else if (score < bestScores[0]) {  // Only compare against current worst
+                        // Find worst (highest score) and replace it
+                        int worstIdx = 0;
+                        for (uint32_t j = 1; j < numberFoundLightCandidatesForShadows; ++j) {
+                            if (bestScores[j] > bestScores[worstIdx]) worstIdx = j;
+                        }
+                        candidates[worstIdx] = (LightCandidate){ i, distSqrdToPlayer, score };
+                        bestScores[worstIdx] = score;
+                    }
+
+                    voxen_Shadow_System.numShadowsCouldRender++;
+                }
+
+                double shadATime = get_time();
+                voxen_Shadow_System.shadowTimeCandidates = shadATime - shadowStartTime;
+                uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
+                if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
+                    // Clear shadowmaps
+                    if (voxen_Shadow_System.useComputeClear) {
+                        glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram); // Way faster
+                        GLuint groupX_shadClear = (numLightsShadowmapsToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
+                        glDispatchCompute(groupX_shadClear,1,1);
+                        voxen_Shadow_System.numGLCallsForShadows += 3;
+                    } else {
+                        GLuint clearValue = 0xFFFFFFFFu;
+                        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
+                        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!  Only used for fallback on some systems (e.g. HD4400) that can't use compute shader.
+                        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+                        voxen_Shadow_System.numGLCallsForShadows += 3;
+                    }
+
+                    voxen_Shadow_System.shadowTimeClear = get_time() - shadATime;
+                    shadowDrawCallsRenderedThisFrame = 0;
+                    memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+                    glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
+                    voxen_Shadow_System.numGLCallsForShadows++;
+                    uint32_t shadowmapOffsetHead = 0U;
+                    voxen_Shadow_System.shadowTimeNearbys = 0.0;
+                    uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
+                    uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
+                    uint16_t numShadowCasters = 0;
+                    for (int i=START_INDEX_LEVEL_INSTANCES;i<endOfModels;++i) {
+                        if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
+                        if (modelVertexCounts[instances[i].modelIndex] < 1) continue;
+                        if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
+                            
+                        uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z); // Cache cell indices once per mesh rather than once per light.
+                        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue;
+
+                        shadowCasterIndices[numShadowCasters] = i;
+                        numShadowCasters++;
+                        if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
+                    }
+                    
+                    for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
+                        double nearbysTimeStart = get_time();
+                        uint16_t lightIdx = candidates[c].index;
+                        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+                        float litX = lights[litIdx];
+                        float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
+                        float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+                        float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+                        float effectiveRadius = vmin(lightRadius, 15.36f);
+                        glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+                        voxen_Shadow_System.numGLCallsForShadows++;
+                        uint16_t nearbyMeshCount = 0;
+                        for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) { // Skip player indices and start at 3
+                            uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
+                            shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
+                            float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, litX, litY, litZ);
+                            float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
+                            if (distToLightSqrd > radSum * radSum) continue;
+                            
+                            shadows_nearMeshes[nearbyMeshCount].index = j;
+                            shadows_nearMeshes[nearbyMeshCount].depth = distToLightSqrd; 
+                            nearbyMeshCount++;
+                            if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
+                        }
+                        
+                        voxen_Shadow_System.shadowTimeNearbys += (get_time() - nearbysTimeStart);
+
+                        if (nearbyMeshCount < 1) continue;
+                        
+                        qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+                        glUniform3f(3, litX, litY, litZ);
+                        voxen_Shadow_System.numGLCallsForShadows++;
+                        voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
+                        uint16_t currentModelType = 0;
+                        uint16_t currentTexIndex = 0;
+                        bool currentIsTransparent = 0;
+                        for (uint8_t face = 0; face < 6; face++) {
+                            glUniform1ui(2, face);
+                            glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
+                            glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
+                            voxen_Shadow_System.numGLCallsForShadows += 3;
+                            for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
+                                int i = shadows_nearMeshes[j].index;            
+                                if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 1.41f)) continue;
+
+                                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                                if (currentModelType != modelType) {
+                                    currentModelType = modelType;
+                                    glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+                                    voxen_Shadow_System.numGLCallsForShadows += 2;
+                                }
+                                
+                                glUniform1ui(0, i);
+                                voxen_Shadow_System.numGLCallsForShadows++;
+                                if (currentTexIndex != instances[i].texIndex) { currentTexIndex = instances[i].texIndex; glUniform1ui(6, instances[i].texIndex); voxen_Shadow_System.numGLCallsForShadows++; }
+                                if (currentIsTransparent != isTransparent(instances[i].texIndex)) { currentIsTransparent = isTransparent(instances[i].texIndex); glUniform1ui(8, isTransparent(instances[i].texIndex)); voxen_Shadow_System.numGLCallsForShadows++; }
+                                glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
+                                voxen_Shadow_System.numGLCallsForShadows++;
+                                drawCallsRenderedThisFrame++;
+                                verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                            }
+                        }
+
+                        shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
+                        if (shadowmapOffsetHead > TOTAL_SHADOWMAP_PIXELS) { DualLogWarn("Early exit on shadowmap loop due to undersized SSBO\n"); break; }
+
+                        shadowDrawCallsRenderedThisFrame++;
+                    }
+
+                    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                    glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
+                    glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
+                    glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+                    voxen_Shadow_System.numGLCallsForShadows += 4;
+                }
+                
+                voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
+            }
+            
             memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));         // Clear dirty after shadowmaps for minimal shadowmap updating.
             memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
             
@@ -1154,7 +1030,134 @@ int32_t main(int32_t argc, char* argv[]) {
             glUniform1ui(14, voxen_Settings.Reflections);
             glUniform1ui(15, voxen_Settings.Shadows);
             glUniform1ui(17, 0u); // unlit false
-            RenderInstances(px, py, pz);      // Opaque, e.g. most objects and level geometry chunks
+            glEnable(GL_CULL_FACE); // Opaques
+            glEnable(GL_DEPTH_TEST);
+            glDisable(GL_BLEND);
+            uint16_t visibleCount = 0;
+            uint32_t currentTexIndex = 0;
+            uint32_t currentNormIndex = 0;
+            uint32_t currentGlowIndex = 0;
+            uint32_t currentSpecIndex = 0;
+            uint16_t currentModelType = 0;
+            for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
+                float objx = instances[i].position.x;
+                float objz = instances[i].position.z;
+                uint16_t instCellIdx = PosGetCellCoords(objx, objz);
+                float dx = objx - px;
+                float dy = instances[i].position.y - py;
+                float dz = objz - pz;
+                float distSqrd = dx*dx + dy*dy + dz*dz;
+                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+                if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                
+                float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+                float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+                if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+                
+                visibleInstances[visibleCount].index = i;
+                visibleInstances[visibleCount].depth = distSqrd;
+                visibleCount++;
+            }
+            
+            if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+            for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+                uint16_t i = visibleInstances[visibleIndex].index;
+                glUniform1ui(0, i);
+                if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+                if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+                if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+                if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                if (currentModelType != modelType) {
+                    currentModelType = modelType;
+                    glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+                }
+                
+                uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+                glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+                drawCallsRenderedThisFrame++;
+                verticesRenderedThisFrame += vertCount;
+            }
+            
+            glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
+            for (uint16_t i = startOfDoubleSidedInstances; i < startOfTransparentInstances; ++i) {
+                float objx = instances[i].position.x;
+                float objz = instances[i].position.z;
+                uint16_t instCellIdx = PosGetCellCoords(objx, objz);
+                float dx = objx - px;
+                float dy = instances[i].position.y - py;
+                float dz = objz - pz;
+                float distSqrd = dx*dx + dy*dy + dz*dz;
+                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+                if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                
+                float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+                float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+                if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+                
+                glUniform1ui(0, i);
+                if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+                if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+                if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+                if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                if (currentModelType != modelType) {
+                    currentModelType = modelType;
+                    glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+                }
+                
+                uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+                glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+                drawCallsRenderedThisFrame++;
+                verticesRenderedThisFrame += vertCount;
+            }
+            
+            glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
+            uint16_t startOfNextType = loadedInstances - invalidModelIndexCount;
+            visibleCount = 0;
+            for (uint16_t i = startOfTransparentInstances; i < startOfNextType; ++i) {
+                float objx = instances[i].position.x;
+                float objz = instances[i].position.z;
+                uint16_t instCellIdx = PosGetCellCoords(objx, objz);
+                float dx = objx - px;
+                float dy = instances[i].position.y - py;
+                float dz = objz - pz;
+                float distSqrd = dx*dx + dy*dy + dz*dz;
+                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
+                if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                
+                float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+                float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+                if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+                
+                visibleInstances[visibleCount].index = i;
+                visibleInstances[visibleCount].depth = distSqrd;
+                visibleCount++;
+            }
+
+            
+            if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
+            for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+                uint16_t i = visibleInstances[visibleIndex].index;
+                glUniform1ui(0, i);
+                if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+                if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+                if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+                if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+                int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                if (currentModelType != modelType) {
+                    currentModelType = modelType;
+                    glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+                }
+                
+                uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+                glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+                drawCallsRenderedThisFrame++;
+                verticesRenderedThisFrame += vertCount;
+            }
             DrawDebugLines(viewProj);
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             // 5. SSR (Screen Space Reflections)
@@ -1249,7 +1252,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_startX, (double)voxen_Diagnostics.debugLine_startY, (double)voxen_Diagnostics.debugLine_startZ, (double)voxen_Diagnostics.debugLine_endX, (double)voxen_Diagnostics.debugLine_endY, (double)voxen_Diagnostics.debugLine_endZ);
-        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Player inside: %u, named %s, St: %.3f ms, shadGL: %u, Scand: %.3f, Sclear %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, testPointInSolid, testPointInSolid == UINT16_MAX ? "-" : GetPrefabNameFromIndex(instances[testPointInSolid].index), voxen_Shadow_System.shadowTime * 1000, voxen_Shadow_System.numGLCallsForShadows, voxen_Shadow_System.shadowTimeCandidates * 1000, voxen_Shadow_System.shadowTimeNearbys * 1000);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Player inside: %u, named %s, St: %.3f ms, shadGL: %u, Shcnd: %.3f, Snear %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, testPointInSolid, testPointInSolid == UINT16_MAX ? "-" : GetPrefabNameFromIndex(instances[testPointInSolid].index), voxen_Shadow_System.shadowTime * 1000, voxen_Shadow_System.numGLCallsForShadows, voxen_Shadow_System.shadowTimeCandidates * 1000, voxen_Shadow_System.shadowTimeNearbys * 1000);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
