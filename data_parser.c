@@ -79,8 +79,8 @@ bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *i
 bool process_gamedata_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
     if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
     
-    while (data_parser_isspace((unsigned char)*key)) key++;
-    while (data_parser_isspace((unsigned char)*value)) value++;
+    while (data_parser_isspace(*key)) key++;
+    while (data_parser_isspace(*value)) value++;
     char trimmed_key[256];
     char trimmed_value[256];
     strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
@@ -89,8 +89,8 @@ bool process_gamedata_key_value(Entity *entry, const char *key, const char *valu
     trimmed_value[sizeof(trimmed_value) - 1] = '\0';
     char *key_end = trimmed_key + strlen(trimmed_key) - 1;
     char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-    while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
-    while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+    while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
+    while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
     
          if (strcmp(trimmed_key, "modname") == 0)         { strncpy(voxen_globalContext.global_modname, trimmed_value, sizeof(voxen_globalContext.global_modname) - 1); voxen_globalContext.global_modname[sizeof(voxen_globalContext.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
     else if (strcmp(trimmed_key, "levelcount") == 0)      voxen_globalContext.numLevels = parse_numberu8(trimmed_value, line, lineNum);
@@ -144,16 +144,16 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;        
         char *start = line;
-        while (data_parser_isspace((unsigned char)*start)) start++;
+        while (data_parser_isspace(*start)) start++;
         char *end = start + strlen(start) - 1;
-        while (end > start && data_parser_isspace((unsigned char)*end)) { *end = '\0'; end--; }
+        while (end > start && data_parser_isspace(*end)) { *end = '\0'; end--; }
         if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
         if (line[0] == '#') { continue; }
 
         char *colon = strchr(start, ':');
         if (colon && strncmp(start, "index", colon - start) == 0) {
             char *value = colon + 1;
-            while (data_parser_isspace((unsigned char)*value)) value++;
+            while (data_parser_isspace(*value)) value++;
             uint32_t idx = parse_numberu32(value, line, lineNum);
             if (idx > max_index) max_index = idx;
        }
@@ -181,9 +181,9 @@ bool parse_data_file(DataParser *parser, const char *filename) {
         char *start = line;
         if (strlen(start) < 3) continue; // Must have at least k:v, skip if shorter
 
-        while (data_parser_isspace((unsigned char)*start)) start++;
+        while (data_parser_isspace(*start)) start++;
         char *end = start + strlen(start) - 1;
-        while (end > start && data_parser_isspace((unsigned char)*end)) { *end = '\0'; end--; }
+        while (end > start && data_parser_isspace(*end)) { *end = '\0'; end--; }
         if (*start == '\0') continue; // Skip empty line
         if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
 
@@ -207,11 +207,11 @@ bool parse_data_file(DataParser *parser, const char *filename) {
             *colon = '\0';
             char *key = start;
             char *value = colon + 1;
-            while (data_parser_isspace((unsigned char)*key)) key++;
-            while (data_parser_isspace((unsigned char)*value)) value++;
+            while (data_parser_isspace(*key)) key++;
+            while (data_parser_isspace(*value)) value++;
             if (*key && *value) {
-                while (data_parser_isspace((unsigned char)*key)) key++;
-                while (data_parser_isspace((unsigned char)*value)) value++;
+                while (data_parser_isspace(*key)) key++;
+                while (data_parser_isspace(*value)) value++;
                 char trimmed_key[256];
                 char trimmed_value[256];
                 strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
@@ -220,8 +220,8 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 trimmed_value[sizeof(trimmed_value) - 1] = '\0';
                 char *key_end = trimmed_key + strlen(trimmed_key) - 1;
                 char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-                while (key_end > trimmed_key && data_parser_isspace((unsigned char)*key_end)) *key_end-- = '\0';
-                while (val_end > trimmed_value && data_parser_isspace((unsigned char)*val_end)) *val_end-- = '\0';
+                while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
+                while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
                 if (strncmp(trimmed_key, "chunk_", 6) == 0) {
                     strncpy(entry.path, trimmed_key, sizeof(entry.path) - 1);
                     entry.path[sizeof(entry.path) - 1] = '\0';

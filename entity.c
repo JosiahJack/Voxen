@@ -541,12 +541,14 @@ float lightIntervalSteps[LIGHT_COUNT][30];
 uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 float intervalStepisLerping[LIGHT_COUNT][30];
 bool lightCastsShadows[LIGHT_COUNT];
+uint16_t numDoorsFound;
 
 #define LINE_LEN_MAX 81920
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
+    DebugRAM("start of LoadLevel");
     voxen_globalContext.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     if (curlevel == LEVEL_CYBERSPACE) RenderLoadingProgress(100,"Loading cyberspace...");
@@ -554,10 +556,30 @@ void LoadLevel(uint8_t curlevel) {
 
     if (!voxen_globalContext.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     voxen_globalContext.levelCurrentlyLoading = true;
-    DebugRAM("start of LoadLevel");
     voxen_globalContext.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     loadedLights = 0;
+    switch(curlevel) { // Setting these as early as possible. TODO: These are Citadel specific offsets.  Ideally we just determine these from modelBounds of each instance we load later on...
+        case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
+        case 1: worldMin_x = -76.80f + ( 0.00000f +   25.5600f); worldMin_z = -56.32f + (0.0f + -5.2f); break;
+        case 2: worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); worldMin_z = -46.08f + (0.0f + -7.7f); break;
+        case 3: worldMin_x = -53.76f + (50.17400f +  -45.1200f); worldMin_z = -46.08f + (13.714f + -16.32f); break;
+        case 4: worldMin_x =  -7.68f + ( 1.17800f +  -20.4000f); worldMin_z = -64.00f + (1.292799f + 11.48f); break;
+        case 5: worldMin_x = -35.84f + ( 1.17780f +  -10.1400f); worldMin_z = -51.20f + (-1.2417f + -0.0383f); break;
+        case 6: worldMin_x = -64.00f + ( 1.29280f +   -0.6728f); worldMin_z = -71.68f + (-1.2033f + 3.76f); break;
+        case 7: worldMin_x = -58.88f + ( 1.24110f +   -6.7000f); worldMin_z = -79.36f + (-1.2544f + 1.16f); break;
+        case 8: worldMin_x = -40.96f + (-1.30560f +    1.0800f); worldMin_z = -43.52f + (1.2928f + 0.8f); break;
+        case 9: worldMin_x = -51.20f + (-1.34390f +    3.6000f); worldMin_z = -64.0f + (-1.1906f + -1.28f); break;
+        case 10:worldMin_x =-128.00f + (-0.90945f +  107.3700f); worldMin_z = -71.68f + (-1.0372f + 35.48f); break;
+        case 11:worldMin_x = -38.40f + (-1.26720f +   15.0500f); worldMin_z =  51.2f + (0.96056f + -77.94f); break;
+        case 12:worldMin_x = -34.53f + ( 0.00000f +   19.0400f); worldMin_z = -123.74f + (0.0f + 95.8f); break;
+    }
+    
+    // worldMin_x and worldMin_z are the center points of the cells at furthest extents, thus correspond to minimum x or z positions in open cells the player can access.
+    worldMin_x -= CELL_SIZE; // Add one cell gap around edges, now they are floating in guaranteed closed cells instead of empty space
+    worldMin_z -= CELL_SIZE;
+    voxelMinCenterX = worldMin_x + VOXEL_HALF;
+    voxelMinCenterZ = worldMin_z + VOXEL_HALF;
     SetAnimationTables();
     #ifdef ONLY_LOAD_LEVEL_NEEDS
         memset(modelIndexUsedForCurrentLevel,0,MODEL_IDX_MAX * sizeof(bool));
@@ -587,9 +609,9 @@ void LoadLevel(uint8_t curlevel) {
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); OS_Exit(1); }
 
-    int32_t lineNum = -1; // Start at 0 on first loop iteration, as it needs to iterate before each blank or commented line skip
+    uint32_t lineNum = 0;
     int32_t instanceIdx = PLAYER2;
-    int32_t lightsIdx = -1;
+    int32_t lightsIdx = -1; // Start at 0 on first loop iteration, -1 here due to ++ positioning, as it needs to iterate before each blank or commented line skip
     char lineSpace[LINE_LEN_MAX];
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
@@ -636,7 +658,7 @@ void LoadLevel(uint8_t curlevel) {
             *colon = '\0';           // Split string at the colon
             char *key = kvString;    // Assign key to before colon
             char *value = colon + 1; // Assing value to after colon
-            if (!key) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum+1, initialLine); OS_Exit(1); }
+            if (!key) { DualLogError("Invalid key-value pair at line %u (as viewed by text editor): %s\n", lineNum, initialLine); OS_Exit(1); }
 
             char trimmed_key[64];
             char trimmed_value[256];
@@ -791,6 +813,43 @@ void LoadLevel(uint8_t curlevel) {
                     instances[parent].position.y = posBeforeY;
                     instances[parent].position.z = posBeforeZ;
             }
+            
+            if (EntityIndexIsPortalBlockingDoor(entIdx)) {
+                float nudgeAmount = entIdx == 499 || entIdx == 509 ? 3.84f : 0.32f; // Bulkhead and giant elevator door need to nudge further to be sure.
+                instances[parent].portalIndex = numActivePortals;
+                bool isOpen = (instances[parent].doorState != DoorState_Closed); // Allows for any of DoorState_Open, DoorState_Opening, or DoorState_Closing to be considered open as far as portals are concerned so we can draw objects between the door panels.
+                float obj_x = instances[parent].position.x;
+                float obj_z = instances[parent].position.z;
+                uint16_t cellIndexCurrentX = PosGetCellCoordX(obj_x);
+                uint16_t cellIndexCurrentZ = PosGetCellCoordZ(obj_z);
+                uint16_t cellCurrent = (cellIndexCurrentZ * WORLDX) + cellIndexCurrentX;
+                uint16_t cellIndexUp = PosGetCellCoordZ(obj_z + nudgeAmount);
+                uint16_t cellIndexDn = PosGetCellCoordZ(obj_z - nudgeAmount);
+                uint16_t cellIndexRight = PosGetCellCoordX(obj_x + nudgeAmount);
+                uint16_t cellIndexLeft = PosGetCellCoordX(obj_x - nudgeAmount);
+                uint16_t cellN_idx = PosGetCellCoords(obj_x, obj_z + nudgeAmount);
+                uint16_t cellE_idx = PosGetCellCoords(obj_x + nudgeAmount, obj_z);
+                uint16_t cellS_idx = PosGetCellCoords(obj_x, obj_z - nudgeAmount);
+                uint16_t cellW_idx = PosGetCellCoords(obj_x - nudgeAmount, obj_z); // Don't actually need to check it.
+                bool isNS = (cellN_idx != cellCurrent || cellS_idx != cellCurrent);
+                if (isNS) { // Portal is a North
+                            //             South pair
+                    PortalCell cellN, cellS;
+                    cellN.x = cellS.x = PosGetCellCoordX(obj_x);
+                    cellN.z = (cellN_idx != cellCurrent) ? cellIndexUp : cellIndexCurrentZ; // Ensure that cellA is always the north cell of the pair
+                    cellS.z = (cellS_idx != cellCurrent) ? cellIndexDn : cellIndexCurrentZ;
+                    activePortals[numActivePortals] = (Portal){ .cellA = cellN, .cellB = cellS, .portalNS = true, .open = isOpen, .dirty = true };
+                } else { // Portal is an East-West pair
+                    PortalCell cellE, cellW;
+                    cellE.z = cellW.z = PosGetCellCoordZ(obj_z);
+                    cellE.x = (cellE_idx != cellCurrent) ? cellIndexRight : cellIndexCurrentX; // Ensure that cellA is always the east cell of the pair
+                    cellW.x = (cellW_idx != cellCurrent) ? cellIndexLeft : cellIndexCurrentX;
+                    activePortals[numActivePortals] = (Portal){ .cellA = cellE, .cellB = cellW, .portalNS = false, .open = isOpen, .dirty = true };
+                }
+                
+                numActivePortals++;
+            }
+            
             for (int i=0;i<MAX_CHILD_COUNT;++i) {
                 if (instances[parent].child[i] < entityCount) {
                     if (entities[entIdx].child[i] != UINT16_MAX) { // Add child
@@ -831,7 +890,7 @@ void LoadLevel(uint8_t curlevel) {
 
     fogBaseDensityForLevel *= 3.8f; // Global modifier to tweak it.
     SetFog();
-    DualLog("Loaded %d geometry chunks and %u static lights for Level %d... took %f secs\n", loadedInstances, loadedLights, curlevel, get_time() - start_time);
+    DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     LoadModels();
     LoadTextures();

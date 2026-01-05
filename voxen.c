@@ -595,19 +595,7 @@ void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
     debugLineVertCount = i;
 }
 
-void StepLoopingAnim(uint16_t i) {
-    AnimationClip currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-    if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
-        instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-        instances[i].frame++;
-        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
-
-        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-    }
-}
-
-bool EntityIsAnimated(uint16_t entIdx) {
+__attribute__((pure)) bool EntityIsAnimated(uint16_t entIdx) {
     return (   entIdx == 53
             || entIdx == 79
             || (entIdx >= 420 && entIdx <= 442)
@@ -618,15 +606,71 @@ bool EntityIsAnimated(uint16_t entIdx) {
             || (entIdx >= 741 && entIdx <= 745));
 }
 
+bool StepLoopingAnim(uint16_t i) {
+    bool portalsNeedUpdated = false;
+    AnimationClip currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
+    if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
+        instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+        instances[i].frame++;
+        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+
+        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) {
+            uint8_t portalIdx = instances[i].portalIndex;
+            if (portalIdx < MAX_PORTALS) {
+                uint16_t closedModelIndex = 719;
+                switch(instances[i].index) {
+                    case 496: closedModelIndex =  719; break; // doorA
+                    case 497: closedModelIndex =  699; break; // doorB
+                    case 498: closedModelIndex = 1398; break; // doorC
+                    case 499: closedModelIndex = 1301; break; // doorD
+                    case 500: closedModelIndex = 1612; break; // doorE
+                    case 501: closedModelIndex = 1652; break; // doorF
+                    case 503: closedModelIndex = 1742; break; // doorH
+                    case 504: closedModelIndex = 1792; break; // doorI
+                    case 508: closedModelIndex = 1845; break; // door_elevator1
+                    case 509: closedModelIndex = 1887; break; // door_elevator2
+                    case 510: closedModelIndex = 1929; break; // door_elevator3
+                    case 511: closedModelIndex = 1973; break; // door_elevator4
+                    case 512: closedModelIndex = 2078; break; // door_secret1
+                    case 513: closedModelIndex = 2036; break; // door_secret2
+                    case 514: closedModelIndex = 2120; break; // door_secret3
+                }
+            
+                bool currentState = activePortals[portalIdx].open;
+                if (instances[i].modelIndex == closedModelIndex && currentState) {
+                    activePortals[portalIdx].open = false;
+                    activePortals[portalIdx].dirty = true;
+                    portalsNeedUpdated = true;
+                } else if (!currentState) {
+                    activePortals[portalIdx].open = true;
+                    activePortals[portalIdx].dirty = true;
+                    portalsNeedUpdated = true;
+                }
+            }
+        }
+    }
+    
+    return portalsNeedUpdated;
+}
+
+void PortalCulling(void);
+
 void UpdateAnims(void) {
+    bool portalsNeedUpdated = false;
     uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
         if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         if (instances[i].numclips == 0) continue; // Invalid animation clip index
         
-        if (EntityIsAnimated(instances[i].index)) StepLoopingAnim(i);
+        if (EntityIsAnimated(instances[i].index)) {
+            if (StepLoopingAnim(i)) portalsNeedUpdated = true;
+        }
     }
+    
+    if (portalsNeedUpdated) PortalCulling();
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
@@ -659,6 +703,16 @@ RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMas
 
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
+bool UpdatedPlayerCell(void);
+
+__attribute__((pure)) bool CellNotVisible(uint16_t index) {
+    if (index > ARRSIZE) return false;
+    
+    bool cellNotVisible = !(gridCellStates[index] & CELL_VISIBLE);
+    bool cellIsOpen = (gridCellStates[index] & CELL_OPEN); // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
+    return (cellNotVisible && cellIsOpen);
+//     return (cellNotVisible);
+}
 
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();
@@ -754,6 +808,7 @@ int32_t main(int32_t argc, char* argv[]) {
         invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
         ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
         if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
+            // 0. Gameplay Update Loops
             if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) {
                 float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
                 float offsetY = cursorPosition_y - (voxen_Settings.ScreenHeight * 0.5f);
@@ -790,13 +845,13 @@ int32_t main(int32_t argc, char* argv[]) {
                 voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
             }
             
-            // 0. Gameplay Update Loops
             if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_startX, voxen_Diagnostics.debugLine_startY, voxen_Diagnostics.debugLine_startZ, voxen_Diagnostics.debugLine_endX, voxen_Diagnostics.debugLine_endY, voxen_Diagnostics.debugLine_endZ);
             UpdateAmbientSounds();
             UpdateAnims();
             
             // 1. Culling
-            Cull(); // Get world cell culling data into gridCellStates from precomputed data at init of what cells see what other cells.
+            bool voxelsNeedUpdated = UpdatedPlayerCell();
+            if (voxelsNeedUpdated) CullCore();
             
             // 2. Pass instance data to GPU
             for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { UpdateInstanceMatrix(i); } }
@@ -804,7 +859,6 @@ int32_t main(int32_t argc, char* argv[]) {
 
             // 3. Light Updates
             UpdateDynamicLights(); // Just lerps/flickers in intensity
-            bool voxelsNeedUpdated = false;
             for (int lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
                 if (lightDirty[lightIdx]) { // Marked all as true at level load.
                     voxelsNeedUpdated = true;
@@ -861,8 +915,7 @@ int32_t main(int32_t argc, char* argv[]) {
                             for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
                                 if (!XZPairInBounds(ix, iz)) continue;
                                 int subIdx = iz * WORLDX + ix;
-                                if ((gridCellStates[subIdx] & CELL_VISIBLE) &&
-                                    get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx)) {
+                                if ((gridCellStates[subIdx] & CELL_VISIBLE) && get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx)) {
                                     inPVS = true;
                                     break;
                                 }
@@ -925,7 +978,15 @@ int32_t main(int32_t argc, char* argv[]) {
                         if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
                             
                         uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z); // Cache cell indices once per mesh rather than once per light.
-                        if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue;
+                        bool cellNotVisible = (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx));
+                        if (cellNotVisible && !(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+                            if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
+                                Portal doorPortal = activePortals[instances[i].portalIndex];
+                                uint16_t cellAIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
+                                uint16_t cellBIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
+                                if (CellNotVisible(cellAIndex) && CellNotVisible(cellBIndex)) continue; // Neither cell is visible for door
+                            } else continue;
+                        }
 
                         shadowCasterIndices[numShadowCasters] = i;
                         numShadowCasters++;
@@ -1102,8 +1163,33 @@ int32_t main(int32_t argc, char* argv[]) {
                 float dy = objy - py;
                 float dz = objz - pz;
                 float distSqrd = dx*dx + dy*dy + dz*dz;
-                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
+
+                if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
+                    bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
+                    if (!inPVS) {
+                        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objx - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objz - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                        int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
+                        for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
+                            for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
+                                if (!XZPairInBounds(ix, iz)) continue;
+                                int subIdx = iz * WORLDX + ix;
+                                if ((gridCellStates[subIdx] & CELL_VISIBLE) && get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx)) {
+                                    inPVS = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!inPVS) continue;
+                } else {
+                    if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
+                    
+                    if (!(gridCellStates[instCellIdx] & CELL_OPEN)) {
+                        if (distSqrd >= 943.7184f) continue; // 30.72 * 30.72, 12 cells
+                    }
+                }
                 
                 float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
                 float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
@@ -1145,8 +1231,8 @@ int32_t main(int32_t argc, char* argv[]) {
                 float dy = instances[i].position.y - py;
                 float dz = objz - pz;
                 float distSqrd = dx*dx + dy*dy + dz*dz;
-                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
                 
                 float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
                 float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
@@ -1181,8 +1267,11 @@ int32_t main(int32_t argc, char* argv[]) {
                 float dy = instances[i].position.y - py;
                 float dz = objz - pz;
                 float distSqrd = dx*dx + dy*dy + dz*dz;
-                if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
                 if (distSqrd >= FAR_PLANE_SQUARED) continue;
+                
+                if (!(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+                    if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
+                }
                 
                 float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
                 float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;

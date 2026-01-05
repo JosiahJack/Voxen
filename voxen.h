@@ -62,6 +62,7 @@ typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
+typedef uint8_t DoorState;
 
 typedef struct {
 	float speed;
@@ -296,16 +297,32 @@ void RenderLoadingProgress(int32_t offset, const char* text);
 #define CELL_CLOSEDWEST   32u
 #define CELL_SEES_SUN     64u
 #define CELL_SEES_SKYBOX 128u
+#define MAX_PORTALS 64 // Max is 49 on Citadel level 7
 extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint32_t gridCellStates[ARRSIZE];
+typedef struct {
+	uint16_t x,z;
+} PortalCell;
+
+typedef struct {
+    PortalCell cellA;    // one side (usually the cell the door happened to just barely floating point rounding error start in)
+    PortalCell cellB;    // tother side
+    bool     portalNS; // true when the two cells share N or S edge, else they share E and W edges.
+    bool     open;     // door is open
+    bool     dirty;
+} Portal;
+Portal activePortals[MAX_PORTALS];
+
+extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
 void CullCore(void);
-void Cull(void);
 bool get_cull_bit(const uint32_t* arr, int idx);
+static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
+
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 512
@@ -644,11 +661,9 @@ static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
     return val;
 }
 
-static inline int32_t PosGetCellCoords(float pos_x, float pos_z) {
-	uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-	return (cellZ * WORLDX) + cellX;
-}
+static inline int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
+static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); }
 
 static inline bool XZPairInBounds(int32_t x, int32_t z) {
     return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);

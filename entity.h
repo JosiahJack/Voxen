@@ -36,6 +36,8 @@ typedef struct {
     uint8_t numclips;
     uint8_t animationNum; // Global animation identifier into short table of AnimationClip's
     uint16_t frame;
+    uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
+    DoorState doorState;
     double currentFrameFinished;
 	double currentFrameStartTime;
     Vector3 position;

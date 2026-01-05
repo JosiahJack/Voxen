@@ -8,10 +8,12 @@ uint32_t gridCellStates[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint16_t playerCellIdx = 0u;
 uint16_t numCellsVisible = 0u;
-float worldMin_x = 0.0f; float worldMin_z = 0.0f;
+float worldMin_x, worldMin_z;
 bool instanceIsLODArray[INSTANCE_COUNT];
 #define MAX_CULL_FILESIZE 500000
 uint8_t cullingFileBuffer[MAX_CULL_FILESIZE];
+Portal activePortals[MAX_PORTALS];
+uint8_t numActivePortals = 0;
 
 __attribute__((pure)) bool get_cull_bit(const uint32_t* arr, int idx) {
     int word = idx / 32;
@@ -565,27 +567,6 @@ void CullInit(void) {
     if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) return;
     
     DebugRAM("start of Cull_Init");    
-    switch(voxen_globalContext.currentLevel) {
-        case 0: worldMin_x = -38.40f + ( 0.00000f +    3.6000f); worldMin_z = -51.20f + (0.0f + 1.0f); break;
-        case 1: worldMin_x = -76.80f + ( 0.00000f +   25.5600f); worldMin_z = -56.32f + (0.0f + -5.2f); break;
-        case 2: worldMin_x = -40.96f + ( 0.00000f +   -2.6000f); worldMin_z = -46.08f + (0.0f + -7.7f); break;
-        case 3: worldMin_x = -53.76f + (50.17400f +  -45.1200f); worldMin_z = -46.08f + (13.714f + -16.32f); break;
-        case 4: worldMin_x =  -7.68f + ( 1.17800f +  -20.4000f); worldMin_z = -64.00f + (1.292799f + 11.48f); break;
-        case 5: worldMin_x = -35.84f + ( 1.17780f +  -10.1400f); worldMin_z = -51.20f + (-1.2417f + -0.0383f); break;
-        case 6: worldMin_x = -64.00f + ( 1.29280f +   -0.6728f); worldMin_z = -71.68f + (-1.2033f + 3.76f); break;
-        case 7: worldMin_x = -58.88f + ( 1.24110f +   -6.7000f); worldMin_z = -79.36f + (-1.2544f + 1.16f); break;
-        case 8: worldMin_x = -40.96f + (-1.30560f +    1.0800f); worldMin_z = -43.52f + (1.2928f + 0.8f); break;
-        case 9: worldMin_x = -51.20f + (-1.34390f +    3.6000f); worldMin_z = -64.0f + (-1.1906f + -1.28f); break;
-        case 10:worldMin_x =-128.00f + (-0.90945f +  107.3700f); worldMin_z = -71.68f + (-1.0372f + 35.48f); break;
-        case 11:worldMin_x = -38.40f + (-1.26720f +   15.0500f); worldMin_z =  51.2f + (0.96056f + -77.94f); break;
-        case 12:worldMin_x = -34.53f + ( 0.00000f +   19.0400f); worldMin_z = -123.74f + (0.0f + 95.8f); break;
-    }
-    
-    // worldMin_x and worldMin_z are the center points of the cells at furthest extents, thus correspond to minimum x or z positions in open cells the player can access.
-    worldMin_x -= 2.56f; // Add one cell gap around edges, now they are floating in guaranteed closed cells instead of empty space
-    worldMin_z -= 2.56f;
-    voxelMinCenterX = worldMin_x + VOXEL_HALF;
-    voxelMinCenterZ = worldMin_z + VOXEL_HALF;
     DetermineClosedEdges();
   
     // For each cell, get the visibility as though player were there and put into gridCellStates
@@ -637,29 +618,46 @@ void CullInit(void) {
     DebugRAM("end of Cull_Init");
 }
 
-void CullCore(void) {    
-    if (voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
-
-    numCellsVisible = 0;
-    int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
-    for (int32_t z=0;z<WORLDZ;++z) {
-        for (int32_t x=0;x<WORLDX;++x) {
-            int32_t cellIdx = (z * WORLDX) + x;
-            if (cellIdx == 0) { gridCellStates[0] |= CELL_VISIBLE; continue; } // Errors default here so draw them anyways.  Don't count it though.
-            if (cellIdx == playerCellIdx) { gridCellStates[playerCellIdx] |= CELL_VISIBLE; numCellsVisible++; continue; } // Always at least set player's cell.
-
-            size_t flat_idx = (size_t)(cellToCellIdx + cellIdx);
-            if (get_cull_bit(precomputedVisibleCellsFromHere,flat_idx)) {
-                numCellsVisible++;
-                gridCellStates[cellIdx] |= CELL_VISIBLE; // Get visible before putting meshes into their cells so we can nudge them a little.
+void PortalCulling(void) { // Called just once at end of animation loop for the frame after each frame perfect change to door models becoming either closed or not closed.
+    uint16_t playerCellX = PosGetCellCoordX(instances[PLAYER1].position.x);
+    uint16_t playerCellZ = PosGetCellCoordZ(instances[PLAYER1].position.z);
+    PortalCell cellA, cellB;
+    for (uint8_t portalIdx=0;portalIdx<MAX_PORTALS;++portalIdx) {
+        if (!activePortals[portalIdx].dirty) continue;
+        
+        activePortals[portalIdx].dirty = false;
+        cellA = activePortals[portalIdx].cellA; // Guaranteed order at level load.  A = N or E, B = S or W
+        cellB = activePortals[portalIdx].cellB;
+        bool isNS = activePortals[portalIdx].portalNS;
+        uint16_t cellIdxA = (cellA.z * WORLDX) + cellA.x;
+        uint16_t cellIdxB = (cellB.z * WORLDX) + cellB.x;
+        if (activePortals[portalIdx].open) { // Open the edges up
+            if (isNS) {
+                gridCellStates[cellIdxA] &= ~(CELL_CLOSEDSOUTH);
+                gridCellStates[cellIdxB] &= ~(CELL_CLOSEDNORTH);
+//                 if (entIdx == 499 || entIdx == 509) // Bulkhead or giant elevator door spans 2 cells perpendicular to its isNS direction.
             } else {
-                gridCellStates[cellIdx] &= ~CELL_VISIBLE;
+                gridCellStates[cellIdxA] &= ~(CELL_CLOSEDWEST);
+                gridCellStates[cellIdxB] &= ~(CELL_CLOSEDEAST);
+            }
+        } else {
+            if (isNS) {
+                gridCellStates[cellIdxA] |= CELL_CLOSEDSOUTH;
+                gridCellStates[cellIdxB] |= CELL_CLOSEDNORTH;
+            } else {
+                gridCellStates[cellIdxA] |= CELL_CLOSEDWEST;
+                gridCellStates[cellIdxB] |= CELL_CLOSEDEAST;
             }
         }
     }
     
-    glNamedBufferData(voxen_GL_Comms.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
-    
+    DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
+}
+
+void CullCore(void) {    
+    if (voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
+
+    numCellsVisible = 0;
     float pos_x, pos_z;
     uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((instances[PLAYER1].position.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
 	uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((instances[PLAYER1].position.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
@@ -670,15 +668,12 @@ void CullCore(void) {
     }
     
     lightDirty[0] = true;
-//     CameraViewUnculling(playerCellX,playerCellY);
-//     UpdateNPCPVS();
-//     ToggleNPCPVS();
+    PortalCulling(); // Update based on portal states.
+    glNamedBufferData(voxen_GL_Comms.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
 }
 
 void Cull(void) {
-    if (voxen_globalContext.menuActive || voxen_globalContext.gamePaused || voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
+    if (voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
 
-    // Now handle player position updating PVS. Always do UpdatedPlayerCell
-    // to set playerCellX and playerCellY.
-    if (UpdatedPlayerCell()) CullCore();
+    if (UpdatedPlayerCell()) CullCore(); // Now handle player position updating PVS. Always do UpdatedPlayerCell to set playerCellX and playerCellY.
 }

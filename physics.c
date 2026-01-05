@@ -100,13 +100,13 @@ __attribute__((pure)) float GetBasePlayerSpeed(bool running) {
     if (boosterActive > 0u) bonus = PLAYER_BOOSTER_SPEED_BOOST; // TODO proper booster hookup
     BodyState bodyState = instances[PLAYER1].bodyState;
     switch (bodyState) {
-        case BodyState_Standing: 		retval = PLAYER_MAX_WALK_SPEED;   break;
-        case BodyState_Crouch: 			retval = PLAYER_MAX_CROUCH_SPEED; break;
-        case BodyState_CrouchingDown: 	retval = PLAYER_MAX_CROUCH_SPEED; break;
-        case BodyState_StandingUp: 		retval = PLAYER_MAX_WALK_SPEED;   break;
-        case BodyState_Prone: 			retval = PLAYER_MAX_PRONE_SPEED;  break;
-        case BodyState_ProningDown: 	retval = PLAYER_MAX_PRONE_SPEED;  break;
-        case BodyState_ProningUp: 		retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case 0/*BodyState_Standing*/: 		retval = PLAYER_MAX_WALK_SPEED;   break;
+        case 1/*BodyState_Crouch*/: 		retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case 2/*BodyState_CrouchingDown*/: 	retval = PLAYER_MAX_CROUCH_SPEED; break;
+        case 3/*BodyState_StandingUp*/: 	retval = PLAYER_MAX_WALK_SPEED;   break;
+        case 4/*BodyState_Prone*/: 			retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case 5/*BodyState_ProningDown*/: 	retval = PLAYER_MAX_PRONE_SPEED;  break;
+        case 6/*BodyState_ProningUp*/: 		retval = PLAYER_MAX_PRONE_SPEED;  break;
     }
 
     if ((isSprinting/* || Inventory.a.BoosterActive()*/) && running) { // TODO proper booster hookup
