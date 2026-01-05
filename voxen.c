@@ -643,7 +643,7 @@ bool StepLoopingAnim(uint16_t i) {
                     activePortals[portalIdx].open = false;
                     activePortals[portalIdx].dirty = true;
                     portalsNeedUpdated = true;
-                } else if (!currentState) {
+                } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
                     activePortals[portalIdx].open = true;
                     activePortals[portalIdx].dirty = true;
                     portalsNeedUpdated = true;
