@@ -34,6 +34,7 @@ bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
+FrustumPlane playerFrustumPlanes[6];
 extern uint16_t editModeTestEntityDefinition;
 
 void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
@@ -117,6 +118,22 @@ void SetFog(void) {
 
 void SetVSync(void) { glfwSwapInterval(voxen_Settings.Vsync); }
 
+#define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
+#define MAX_SHADOWMAPS 56u
+#define SHADOW_MAP_SIZE 192u
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
+typedef struct {
+    double shadowTime;
+    uint32_t numGLCallsForShadows;
+	uint32_t numShadowsCouldRender;
+	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
+    float shadDotThresh;
+	bool useComputeClear;
+} VoxenShadowSystem;
+VoxenShadowSystem voxen_Shadow_System;
+
 void UpdateProjectionMatrices(void) {
     float* m;
     m = uiOrthoProjection;
@@ -132,6 +149,7 @@ void UpdateProjectionMatrices(void) {
     m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
     m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
     m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
+    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(voxen_Settings.FOV * (float)M_PI / 360.0f) * (1.0f + aspect3D * aspect3D));
 }
 
 void UpdateScreenSize(void) {
@@ -233,24 +251,6 @@ void UpdateVoxelLightLists(void) {
     glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 }
-
-#define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
-#define MAX_SHADOWMAPS 56u
-#define SHADOW_MAP_SIZE 192u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
-typedef struct {
-    double shadowTime;
-    double shadowTimeCandidates;
-    double shadowTimeClear;
-    double shadowTimeNearbys;
-    uint32_t numGLCallsForShadows;
-	uint32_t numShadowsCouldRender;
-	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
-    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
-	bool useComputeClear;
-} VoxenShadowSystem;
-VoxenShadowSystem voxen_Shadow_System;
 
 typedef struct {
     float depth;
@@ -752,6 +752,7 @@ int32_t main(int32_t argc, char* argv[]) {
         invViewRot[0] = view[0]; invViewRot[3] = view[1]; invViewRot[6] = view[2];
         invViewRot[1] = view[4]; invViewRot[4] = view[5]; invViewRot[7] = view[6];
         invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
+        ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
         if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
             if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) {
                 float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
@@ -894,8 +895,6 @@ int32_t main(int32_t argc, char* argv[]) {
                     voxen_Shadow_System.numShadowsCouldRender++;
                 }
 
-                double shadATime = get_time();
-                voxen_Shadow_System.shadowTimeCandidates = shadATime - shadowStartTime;
                 uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
                 if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
                     // Clear shadowmaps
@@ -912,13 +911,11 @@ int32_t main(int32_t argc, char* argv[]) {
                         voxen_Shadow_System.numGLCallsForShadows += 3;
                     }
 
-                    voxen_Shadow_System.shadowTimeClear = get_time() - shadATime;
                     shadowDrawCallsRenderedThisFrame = 0;
                     memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
                     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
                     voxen_Shadow_System.numGLCallsForShadows++;
                     uint32_t shadowmapOffsetHead = 0U;
-                    voxen_Shadow_System.shadowTimeNearbys = 0.0;
                     uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
                     uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
                     uint16_t numShadowCasters = 0;
@@ -935,8 +932,8 @@ int32_t main(int32_t argc, char* argv[]) {
                         if (numShadowCasters >= (SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS)) break; // Ran out of shadowcasters max for frame.
                     }
                     
+                    uint16_t numShadowingLightsHandled = 0;
                     for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
-                        double nearbysTimeStart = get_time();
                         uint16_t lightIdx = candidates[c].index;
                         uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
                         float litX = lights[litIdx];
@@ -959,23 +956,80 @@ int32_t main(int32_t argc, char* argv[]) {
                             nearbyMeshCount++;
                             if (nearbyMeshCount >= SHADOW_NEARMESH_MAX) { DualLogWarn("Shadowmapping needs larger nearMeshes count than %u!  Skipping some renderables for light %u!\n", SHADOW_NEARMESH_MAX, lightIdx); break; }
                         }
-                        
-                        voxen_Shadow_System.shadowTimeNearbys += (get_time() - nearbysTimeStart);
 
                         if (nearbyMeshCount < 1) continue;
                         
                         qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
                         glUniform3f(3, litX, litY, litZ);
                         voxen_Shadow_System.numGLCallsForShadows++;
-                        voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = shadowDrawCallsRenderedThisFrame;
+                        voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
                         uint16_t currentModelType = 0;
                         uint16_t currentTexIndex = 0;
                         bool currentIsTransparent = 0;
-                        for (uint8_t face = 0; face < 6; face++) {
+                        Vector3 corners[8] = {
+                            { litX + lightRadius, litY + lightRadius, litZ + lightRadius },
+                            { litX + lightRadius, litY + lightRadius, litZ - lightRadius },
+                            { litX + lightRadius, litY - lightRadius, litZ + lightRadius },
+                            { litX + lightRadius, litY - lightRadius, litZ - lightRadius },
+                            { litX - lightRadius, litY + lightRadius, litZ + lightRadius },
+                            { litX - lightRadius, litY + lightRadius, litZ - lightRadius },
+                            { litX - lightRadius, litY - lightRadius, litZ + lightRadius },
+                            { litX - lightRadius, litY - lightRadius, litZ - lightRadius }
+                        };
+                        
+                        bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, litX, litY, litZ, 0.64f); // Use some radius for floating point errors
+                        for (uint8_t face = 0; face < 6; face++) {                            
+                            if (!lightPositionInPlayerFrustum) { // Check if at least one of the four points of this cubemap face's frustum are within the player's frustum
+                                bool faceOverlapsPlayerView = false;
+                                switch (face) {
+                                    case 0: // +X: Right (CONFIRMED, skipping face 0 causes shadow to not cast in more positive X direction (e.g. positions more +x from light don't get shadows, aligns to face.)
+                                        if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        break;
+                                    case 1: // -X: Left (CONFIRMED, skipping face 1 causes shadow to not cast in more negative X direction.)
+                                        if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        break;
+                                    case 2: // +Y: Up (CONFIRMED, skipping face 1 causes shadow to not cast in more positive Y direction.)
+                                        if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        break;
+                                    case 3: // -Y: Down (CONFIRMED, skipping face 1 causes shadow to not cast in more negative Y direction.)
+                                        if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        break;
+                                    case 4: // +Z: Forward (CONFIRMED, skipping face 1 causes shadow to not cast in more positive Z direction.)
+                                        if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        break;
+                                    case 5: // -Z: Backward (CONFIRMED, skipping face 1 causes shadow to not cast in more negative Z direction.)
+                                        if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                                        break;
+                                }
+
+                                if (!faceOverlapsPlayerView) {
+                                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], px, py, pz, 0.48f)) continue;
+                                }
+                            }
+                            
                             glUniform1ui(2, face);
                             glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
                             glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
                             voxen_Shadow_System.numGLCallsForShadows += 3;
+                            shadowDrawCallsRenderedThisFrame++;
                             for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                                 int i = shadows_nearMeshes[j].index;            
                                 if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 1.41f)) continue;
@@ -1002,7 +1056,7 @@ int32_t main(int32_t argc, char* argv[]) {
                         shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
                         if (shadowmapOffsetHead > TOTAL_SHADOWMAP_PIXELS) { DualLogWarn("Early exit on shadowmap loop due to undersized SSBO\n"); break; }
 
-                        shadowDrawCallsRenderedThisFrame++;
+                        numShadowingLightsHandled++;
                     }
 
                     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
@@ -1041,10 +1095,11 @@ int32_t main(int32_t argc, char* argv[]) {
             uint16_t currentModelType = 0;
             for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
                 float objx = instances[i].position.x;
+                float objy = instances[i].position.y;
                 float objz = instances[i].position.z;
                 uint16_t instCellIdx = PosGetCellCoords(objx, objz);
                 float dx = objx - px;
-                float dy = instances[i].position.y - py;
+                float dy = objy - py;
                 float dz = objz - pz;
                 float distSqrd = dx*dx + dy*dy + dz*dz;
                 if (instCellIdx < ARRSIZE && (!(gridCellStates[instCellIdx] & CELL_VISIBLE) && (gridCellStates[instCellIdx] & CELL_OPEN))) continue; // For some shelves that are inset away from cells, need to still draw their items, unfortunately this means they don't ever get culled :(
@@ -1053,6 +1108,7 @@ int32_t main(int32_t argc, char* argv[]) {
                 float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
                 float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
                 if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+//                 if (!SphereInFrustum(playerFrustumPlanes, objx, objy, objz, radius)) continue;
                 
                 visibleInstances[visibleCount].index = i;
                 visibleInstances[visibleCount].depth = distSqrd;
@@ -1252,7 +1308,7 @@ int32_t main(int32_t argc, char* argv[]) {
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
         if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_startX, (double)voxen_Diagnostics.debugLine_startY, (double)voxen_Diagnostics.debugLine_startZ, (double)voxen_Diagnostics.debugLine_endX, (double)voxen_Diagnostics.debugLine_endY, (double)voxen_Diagnostics.debugLine_endZ);
-        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Player inside: %u, named %s, St: %.3f ms, shadGL: %u, Shcnd: %.3f, Snear %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, testPointInSolid, testPointInSolid == UINT16_MAX ? "-" : GetPrefabNameFromIndex(instances[testPointInSolid].index), voxen_Shadow_System.shadowTime * 1000, voxen_Shadow_System.numGLCallsForShadows, voxen_Shadow_System.shadowTimeCandidates * 1000, voxen_Shadow_System.shadowTimeNearbys * 1000);
+        if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Player inside: %u, named %s, St: %.3f ms, shadGL: %u", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, testPointInSolid, testPointInSolid == UINT16_MAX ? "-" : GetPrefabNameFromIndex(instances[testPointInSolid].index), voxen_Shadow_System.shadowTime * 1000, voxen_Shadow_System.numGLCallsForShadows);
         if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
         if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
