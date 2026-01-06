@@ -13,9 +13,8 @@ out vec3 FragPos;
 out vec2 TexCoord;
 
 void main() {
-    mat4 matrix = modelMatrices[instanceIndex];
-    vec4 matmul = matrix * vec4(position, 1.0);
-    FragPos = vec3(matmul); // World-space position
+    vec4 matmul = modelMatrices[instanceIndex] * vec4(position, 1.0);
+    FragPos = matmul.xyz; // World-space position
     gl_Position = viewProjMatrix * matmul;
     TexCoord = aTexCoord;
 }

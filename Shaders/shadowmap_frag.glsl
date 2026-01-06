@@ -18,30 +18,26 @@ layout(std430, binding = 15) buffer TextureSizes { ivec2 textureSizes[]; }; // x
 layout(std430, binding = 16) buffer TexturePalettes { uint texturePalettes[]; }; // Palette colors
 layout(std430, binding = 17) buffer TexturePaletteOffsets { uint texturePaletteOffsets[]; }; // Palette starting indices for each texture
 
-uint getTextureAlpha(uint texIndex, ivec2 texCoord) {
-    uint pixelOffset = textureOffsets[texIndex] + uint(texCoord.y) * textureSizes[texIndex].x + uint(texCoord.x);
-    uint slotIndex = pixelOffset >> 2u;// / 4u;
-    uint packedIdx = colors[slotIndex];
-    uint localOffset = pixelOffset & 3u;//% 4u;
-    uint paletteIndex = (packedIdx >> (localOffset << 3u)) & 0xFFu; // << 3u is same as * 8
-    uint paletteOffset = texturePaletteOffsets[texIndex];
-    uint color = texturePalettes[paletteOffset + paletteIndex];
-    return color>>24;
-}
-
 void main() {
-    if (isTransparent > 0) {
+    if (isTransparent > 0u) {
         ivec2 texSize = textureSizes[texIndex];
-        vec2 uv = vec2(TexCoord.x, 1.0 - TexCoord.y); // Invert V (aka Y), OpenGL convention vs import
-        ivec2 texUV = ivec2(uv * vec2(texSize));
-        texUV &= texSize - ivec2(1);
-        if (getTextureAlpha(texIndex,texUV) < 252u) discard; // Alpha cutout threshold for {fence style textures
+        vec2 uv = vec2(TexCoord.x, 1.0 - TexCoord.y);
+        ivec2 texUV = ivec2(uv * vec2(texSize)) & (texSize - ivec2(1));
+        uint pixelOffset = textureOffsets[texIndex] + uint(texUV.y) * textureSizes[texIndex].x + uint(texUV.x);
+        uint slotIndex = pixelOffset >> 2u;
+        uint packedIdx = colors[slotIndex];
+        uint localOffset = pixelOffset & 3u;
+        uint paletteIndex = (packedIdx >> (localOffset * 8u)) & 0xFFu;
+        uint color = texturePalettes[texturePaletteOffsets[texIndex] + paletteIndex];
+        if ((color >> 24) < 252u) discard;
     }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
     uint ssbo_index = offsetIntoSSBO + texelCoord.y * 192 + texelCoord.x;
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
+//     float distSquared = dot(toLight, toLight);
     uint distInt = uint(dist * 100000.0 + 0.5);
+//     uint distInt = uint(distSquared * 100000.0 + 0.5);
     atomicMin(depthData[ssbo_index], distInt);
 }

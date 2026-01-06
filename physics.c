@@ -185,11 +185,7 @@ uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
 }
 
 int32_t Physics(void) {
-    if (window_has_focus && !log_playback) {
-//         if (!voxen_globalContext.gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
-        ProcessInput();
-    }
-            
+    if (window_has_focus && !log_playback) ProcessInput();
     if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return 0;
 
     if (voxen_Cheats.noclip) {
