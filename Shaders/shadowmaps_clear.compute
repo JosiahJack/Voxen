@@ -1,11 +1,11 @@
 // shadowmaps_clear.compute
 // Compute shader for clearing the distances for shadowmaps in the SSBO to the light farplane of 15.36f 
 #version 430 core
-layout(local_size_x = 32, local_size_y = 1) in;
-
-layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+layout(binding = 0, r32f) uniform writeonly image2DArray shadowArray;
 
 void main() {
-    uvec2 pixel = gl_GlobalInvocationID.xy;
-    depthData[pixel.x] = 0xFFFFFFFFu;
+    uvec3 id = gl_GlobalInvocationID;
+    if (id.x >= 192 || id.y >= 192) return;
+    imageStore(shadowArray, ivec3(id), vec4(100000.0, 0.0, 0.0, 0.0));
 }

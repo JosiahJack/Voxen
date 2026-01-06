@@ -37,11 +37,10 @@ FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Array
 FrustumPlane playerFrustumPlanes[6];
 extern uint16_t editModeTestEntityDefinition;
 
-void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
-    glGenTextures(1, id);
-    glBindTexture(target, *id);
+void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target, GLuint filter) {
+    glGenTextures(1, id);   glBindTexture(target, *id);
     glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
-    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, filter);   glTexParameteri(target, GL_TEXTURE_MAG_FILTER, filter);
 }
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
@@ -87,7 +86,7 @@ void CompileShaders(void) {
     
     computeShader = CompileShader(GL_COMPUTE_SHADER, voxelUpdate_computeShader, "Voxel Update Compute Shader");
     voxen_GL_Comms.voxelUpdateShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Update Shader Program");
-        
+    
     computeShader = CompileShader(GL_COMPUTE_SHADER, shadowmaps_clear_computeShader, "Shadowmaps Clear Compute Shader");
     voxen_GL_Comms.shadowmapsClearShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Shadowmaps Clear Shader Program");
 
@@ -119,9 +118,7 @@ void SetFog(void) {
 void SetVSync(void) { glfwSwapInterval(voxen_Settings.Vsync); }
 
 #define SHADOW_NEARMESH_MAX 512 // 350 was too low for light 712 on security atrium
-#define MAX_SHADOWMAPS 56u
 #define SHADOW_MAP_SIZE 192u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
     double shadowTime;
     uint32_t numGLCallsForShadows;
@@ -483,11 +480,11 @@ void InitializeEnvironment(void) {
     glVertexArrayAttribBinding(voxen_GL_Comms.debugLinesVAO, 0, 0);
     glVertexArrayVertexBuffer(voxen_GL_Comms.debugLinesVAO, 0, voxen_GL_Comms.debugLinesVBO, 0, 3 * sizeof(float));
 
-    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&voxen_GL_Comms.inputNormalID,            GL_RG16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
+    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D, GL_NEAREST); // Lit Raster
+    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D, GL_NEAREST); // Raster World Positions
+    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D, GL_NEAREST); // Raster Depth
+    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D, GL_NEAREST); // Specular Colors
+    GenerateAndBindTexture(&voxen_GL_Comms.inputNormalID,            GL_RG16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D, GL_NEAREST); // Normal XYZ
     glGenTextures(1, &voxen_GL_Comms.outputImageID);
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  voxen_Settings.ScreenWidth / SSR_RES,  voxen_Settings.ScreenHeight / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -495,6 +492,7 @@ void InitializeEnvironment(void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
     
+    // Main FBO
     glGenFramebuffers(1, &voxen_GL_Comms.gBufferFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, voxen_GL_Comms.inputImageID, 0);
@@ -514,7 +512,21 @@ void InitializeEnvironment(void) {
     glBindImageTexture(5, voxen_GL_Comms.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
+    
+    // Shadowmapping FBO
+    GenerateAndBindTexture(&voxen_GL_Comms.shadowmapDepthID, GL_DEPTH_COMPONENT32, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT, GL_TEXTURE_2D, GL_NEAREST); // Shadowmap Depth
+    glGenTextures(1, &voxen_GL_Comms.shadowmaps);   glBindTexture(GL_TEXTURE_2D_ARRAY, voxen_GL_Comms.shadowmaps);
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_R32F, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, MAX_SHADOWMAPS*6);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_NEAREST);    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    CHECK_GL_ERROR(); // Prints "ERROR:GL Error at voxen.c:524: 1281" write bleeepin now
+    
+    glGenFramebuffers(1, &voxen_GL_Comms.shadowmapFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.shadowmapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, voxen_GL_Comms.shadowmapDepthID, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
+    CHECK_GL_ERROR();
     glDepthMask(GL_TRUE); // Always true, set just once ever.
     UpdateScreenSize();
     float* m = shadowmapsPerspectiveProjection;
@@ -552,7 +564,6 @@ void InitializeEnvironment(void) {
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
     voxen_GL_Comms.cellVisibleDataID       = SetupSSBO(&voxen_GL_Comms.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.shadowMapSSBO           = SetupSSBO(&voxen_GL_Comms.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
     voxen_GL_Comms.voxelLightListCountsID  = SetupSSBO(&voxen_GL_Comms.voxelLightListCountsID,   6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.shadowMapsIndirectionID = SetupSSBO(&voxen_GL_Comms.shadowMapsIndirectionID,  8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.matricesBufferID        = SetupSSBO(&voxen_GL_Comms.matricesBufferID,        11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_STATIC_DRAW);
@@ -878,6 +889,7 @@ int32_t main(int32_t argc, char* argv[]) {
             if (voxelsNeedUpdated) UpdateVoxelLightLists();
             glBindVertexArray(voxen_GL_Comms.vao_chunk);
             if (voxen_Settings.Shadows > 0u) {
+                glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.shadowmapFBO);
                 double shadowStartTime = get_time();
                 voxen_Shadow_System.numGLCallsForShadows = 0;
                 glEnable(GL_DEPTH_TEST);
@@ -950,25 +962,17 @@ int32_t main(int32_t argc, char* argv[]) {
 
                 uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
                 if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
-                    // Clear shadowmaps
-                    if (voxen_Shadow_System.useComputeClear) {
-                        glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram); // Way faster
-                        GLuint groupX_shadClear = (numLightsShadowmapsToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
-                        glDispatchCompute(groupX_shadClear,1,1);
-                        voxen_Shadow_System.numGLCallsForShadows += 3;
-                    } else {
-                        GLuint clearValue = 0xFFFFFFFFu;
-                        glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
-                        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!  Only used for fallback on some systems (e.g. HD4400) that can't use compute shader.
-                        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-                        voxen_Shadow_System.numGLCallsForShadows += 3;
-                    }
-
+                    glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram);
+                    glBindImageTexture(0, voxen_GL_Comms.shadowmaps, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+                    uint32_t layers = numLightsShadowmapsToRender * 6;
+                    glDispatchCompute((192 + 31)/32, (192 + 31)/32, layers);
+                    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    
                     shadowDrawCallsRenderedThisFrame = 0;
+//                     float clearVal = 100000.0f;
                     memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
                     glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
                     voxen_Shadow_System.numGLCallsForShadows++;
-                    uint32_t shadowmapOffsetHead = 0U;
                     uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
                     uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
                     uint16_t numShadowCasters = 0;
@@ -1086,10 +1090,15 @@ int32_t main(int32_t argc, char* argv[]) {
                                 }
                             }
                             
-                            glUniform1ui(2, face);
+                            glEnable(GL_DEPTH_TEST);
+                            glDisable(GL_BLEND);
+                            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, voxen_GL_Comms.shadowmaps, 0, (c * 6) + face);
+                            GLenum drawBuf = GL_COLOR_ATTACHMENT0;
+                            glDrawBuffers(1, &drawBuf);
+//                             glClearBufferfv(GL_COLOR, 0, &clearVal);
+                            glClear(GL_DEPTH_BUFFER_BIT);
                             glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
-                            glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
-                            voxen_Shadow_System.numGLCallsForShadows += 3;
+                            voxen_Shadow_System.numGLCallsForShadows += 7;
                             shadowDrawCallsRenderedThisFrame++;
                             for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                                 int i = shadows_nearMeshes[j].index;            
@@ -1114,19 +1123,17 @@ int32_t main(int32_t argc, char* argv[]) {
                             }
                         }
 
-                        shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
-                        if (shadowmapOffsetHead > TOTAL_SHADOWMAP_PIXELS) { DualLogWarn("Early exit on shadowmap loop due to undersized SSBO\n"); break; }
-
                         numShadowingLightsHandled++;
                     }
 
-                    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-                    glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
                     glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
                     glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
-                    voxen_Shadow_System.numGLCallsForShadows += 4;
+                    voxen_Shadow_System.numGLCallsForShadows += 2;
                 }
                 
+                glActiveTexture(GL_TEXTURE4); // Fixes red tint from shadow FBO
+                glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
+                voxen_Shadow_System.numGLCallsForShadows += 2;
                 voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
             }
             
@@ -1137,6 +1144,8 @@ int32_t main(int32_t argc, char* argv[]) {
             glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
             glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+            glBindTextureUnit(5, voxen_GL_Comms.shadowmaps);
+            glUniform1i(21, 5); // shadowmap texture array sampler2D
             glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
             glUniform1ui(3, 0u); // isUI false
             glUniform1f(8, worldMin_x);
@@ -1194,7 +1203,6 @@ int32_t main(int32_t argc, char* argv[]) {
                 float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
                 float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
                 if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-//                 if (!SphereInFrustum(playerFrustumPlanes, objx, objy, objz, radius)) continue;
                 
                 visibleInstances[visibleCount].index = i;
                 visibleInstances[visibleCount].depth = distSqrd;

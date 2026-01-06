@@ -25,6 +25,7 @@ layout(location = 17) uniform uint unlit;
 layout(location = 18) uniform uint texIndex;
 layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
+layout(location = 21) uniform sampler2DArray shadowMapsArray;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -245,7 +246,6 @@ void main() {
             vec2 uv = mxyz.x * uvx + mxyz.y * uvy + mxyz.z * uvz;
             uv = uv * 0.5 + 0.5;
 
-            uint faceOff = (shadowIndex * 221184) + (face * 36864); // Shadowmap size 192 so 192*192*6 and 192*192 for these.
             vec2 tc = uv * 192.0;
             float slopeBias = 0.451 * (1.0 - NdotL);
             slopeBias = min(slopeBias, 0.18);
@@ -256,13 +256,13 @@ void main() {
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
             float invSamples = 1.0 / float(PCF_SAMPLES);
+            uint layer = shadowIndex * 6 + int(face);
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
                 t = clamp(t, 0.0, 191.0);
-                uint ssbo_index = faceOff + uint(t.y) * 192 + uint(t.x);
-                uint distInt = shadowMaps[ssbo_index];
-                float d = (float(distInt) * 0.00001);
+                ivec3 coord = ivec3(int(t.x), int(t.y), layer);
+                float d = texelFetch(shadowMapsArray, coord, 0).r;
                 float depthDiff = (dist) - d - bias;
                 float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
                 sum += shadowContrib * invSamples;

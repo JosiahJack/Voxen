@@ -681,6 +681,7 @@ static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
     *flags = (*flags & ~bit) | (-state & bit);
 }
 
+#define MAX_SHADOWMAPS 56u
 typedef struct {
 	GLuint inputImageID;
 	GLuint inputDepthID;
@@ -693,9 +694,8 @@ typedef struct {
 	GLuint debugUnlitShaderProgram;
 	GLuint vao_chunk; // Vertex Array Object
 	GLuint shadowFBO;
-	GLuint shadowmapsShaderProgram;
 	GLuint shadowmapsClearShaderProgram;
-	GLuint shadowMapSSBO;
+	GLuint shadowmapsShaderProgram;
 	GLuint ssrShaderProgram; // SSR (Screen Space Reflections)
 	GLuint imageBlitShaderProgram; // Full Screen Quad Blit for rendering final compositing output/image effect passes
 	GLuint quadVAO;
@@ -719,6 +719,9 @@ typedef struct {
 	GLuint voxelUpdateShaderProgram;
 	GLuint voxelLightListCountsID;
 	GLuint voxelLightListsID;
+	GLuint shadowmapDepthID;
+	GLuint shadowmapFBO;
+	GLuint shadowmaps;
 	GLuint vbos[MODEL_IDX_MAX];
 	GLuint tbos[MODEL_IDX_MAX];
 } Voxen_GL_Comms;

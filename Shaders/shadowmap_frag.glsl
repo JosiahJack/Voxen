@@ -3,13 +3,13 @@
 in vec3 FragPos;
 in vec2 TexCoord;
 
-layout(std430,  binding = 5) buffer ShadowMaps { uint depthData[]; };
+// layout(location = 0) out uint outShadowmap;
+layout(location = 0) out float outShadowmap;
+
 layout(std430, binding = 19) buffer LightIndices { float lights[]; };
 
-layout(location = 2) uniform uint face;
 layout(location = 3) uniform vec3 lightPos;
 layout(location = 6) uniform uint texIndex;
-layout(location = 7) uniform uint offsetIntoSSBO;
 layout(location = 8) uniform uint isTransparent;
 
 layout(std430, binding = 12) buffer ColorBuffer { uint colors[]; }; // 1D color array (RGBA)
@@ -39,9 +39,7 @@ void main() {
     }
 
     ivec2 texelCoord = ivec2(gl_FragCoord.xy);
-    uint ssbo_index = offsetIntoSSBO + texelCoord.y * 192 + texelCoord.x;
     vec3 toLight = lightPos - FragPos;
     float dist = length(toLight);
-    uint distInt = uint(dist * 100000.0 + 0.5);
-    atomicMin(depthData[ssbo_index], distInt);
+    outShadowmap = dist;
 }
