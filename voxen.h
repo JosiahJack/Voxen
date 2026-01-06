@@ -96,7 +96,8 @@ typedef struct {
 } Trigger;
 
 typedef struct {
-    float nx, ny, nz, d;
+	Vector3 normal;
+    float d;
 } FrustumPlane;
 
 typedef struct {
@@ -178,8 +179,8 @@ typedef struct {
 	uint32_t lastFrameSecCount;
 	uint32_t framesPerLastSecond;
 	uint32_t worstFPS;
-	float debugLine_startX, debugLine_startY, debugLine_startZ;
-    float debugLine_endX, debugLine_endY, debugLine_endZ;
+	Vector3 debugLine_start;
+	Vector3 debugLine_end;
 	double debugLineFinished;
 	uint32_t drawCallsRenderedThisFrame;
 	uint32_t textDrawCallsRenderedThisFrame;
@@ -474,8 +475,6 @@ extern bool lightDirty[LIGHT_COUNT];
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;
-extern float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz;
-extern Quaternion cam_rotation;
 void Screenshot(void);
 void ToggleConsole(void);
 void ConsoleEmulator(int32_t keycode);

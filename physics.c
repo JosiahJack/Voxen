@@ -186,7 +186,7 @@ uint16_t PointInSolid(Vector3 point, uint32_t layerMask) {
 
 int32_t Physics(void) {
     if (window_has_focus && !log_playback) {
-        if (!voxen_globalContext.gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
+//         if (!voxen_globalContext.gamePaused && !voxen_Cheats.consoleActive) UpdatePlayerFacingAngles();
         ProcessInput();
     }
             
@@ -205,10 +205,10 @@ int32_t Physics(void) {
     if (!log_playback && !voxen_Cheats.consoleActive) {
         Entity* player = &instances[PLAYER1];
         Vector3 input = {0};
-        if (keyStates[GLFW_KEY_F].down)     input = Vector3_A_plus_B(input, (Vector3){cam_forwardx, 0, cam_forwardz});
-        if (keyStates[GLFW_KEY_S].down)     input = Vector3_A_minus_B(input, (Vector3){cam_forwardx, 0, cam_forwardz});
-        if (keyStates[GLFW_KEY_D].down)     input = Vector3_A_plus_B(input, (Vector3){cam_rightx,   0, cam_rightz});
-        if (keyStates[GLFW_KEY_A].down)     input = Vector3_A_minus_B(input, (Vector3){cam_rightx,   0, cam_rightz});
+        if (keyStates[GLFW_KEY_F].down)     input = Vector3_A_plus_B(input, (Vector3){instances[PLAYER1].forward.x, 0, instances[PLAYER1].forward.z});
+        if (keyStates[GLFW_KEY_S].down)     input = Vector3_A_minus_B(input, (Vector3){instances[PLAYER1].forward.x, 0, instances[PLAYER1].forward.z});
+        if (keyStates[GLFW_KEY_D].down)     input = Vector3_A_plus_B(input, (Vector3){instances[PLAYER1].right.x,   0, instances[PLAYER1].right.z});
+        if (keyStates[GLFW_KEY_A].down)     input = Vector3_A_minus_B(input, (Vector3){instances[PLAYER1].right.x,   0, instances[PLAYER1].right.z});
         if (keyStates[GLFW_KEY_C].down/* && noclip*/) input.y -= 1.0f; // Temporarily allow for now until I have collision working
         if (keyStates[GLFW_KEY_V].down/* && noclip*/) input.y += 1.0f;
 

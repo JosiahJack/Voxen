@@ -10,7 +10,7 @@
 
 Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
-Voxen_Cheats               voxen_Cheats = { .god = true, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
+Voxen_Cheats               voxen_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 50u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 1u };
 uint8_t SSR_RES = 8; // Ratio is (1 / SSR_RES) * render resolution.
 Voxen_GL_Comms           voxen_GL_Comms;
@@ -20,8 +20,7 @@ float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
 GLuint instancesBuffer;
 QuestBits questData;
-Quaternion cam_rotation = { .w = 1.0f };
-float cam_forwardx, cam_forwardy, cam_forwardz, cam_rightx, cam_righty, cam_rightz, berserkFinished, berserkSeedTime, aspect3D = 1.0f, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
+float berserkFinished, berserkSeedTime, aspect3D = 1.0f, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];
 int32_t cursorPosition_x = 680, cursorPosition_y = 384; // Separate internal cursor from system cursor.  This gets relatively pushed around by real cursor movement to give consistent platform behavior.
@@ -124,23 +123,19 @@ void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and fallin
 }
 
 void UpdatePlayerFacingAngles(void) {
-    float x2 = cam_rotation.x * cam_rotation.x;
-    float y2 = cam_rotation.y * cam_rotation.y;
-    float z2 = cam_rotation.z * cam_rotation.z;
-    float xy = cam_rotation.x * cam_rotation.y;
-    float xz = cam_rotation.x * cam_rotation.z;
-    float yz = cam_rotation.y * cam_rotation.z;
-    float wx = cam_rotation.w * cam_rotation.x;
-    float wy = cam_rotation.w * cam_rotation.y;
-    float wz = cam_rotation.w * cam_rotation.z;
-    cam_forwardx = 2.0f * (xz + wy);  // Forward X
-    cam_forwardy = 2.0f * (yz - wx);  // Forward Y
-    cam_forwardz = 1.0f - 2.0f * (x2 + y2); // Forward Z
-    cam_rightx = 1.0f - 2.0f * (y2 + z2);  // Right X
-    cam_righty = 2.0f * (xy + wz);  // Right Y
-    cam_rightz = 2.0f * (xz - wy);  // Right Z
-    normalize_vector(&cam_forwardx, &cam_forwardy, &cam_forwardz); // Normalize forward
-    normalize_vector(&cam_rightx, &cam_righty, &cam_rightz); // Normalize strafe
+    float x2 = instances[PLAYER1].rotation.x * instances[PLAYER1].rotation.x;
+    float y2 = instances[PLAYER1].rotation.y * instances[PLAYER1].rotation.y;
+    float z2 = instances[PLAYER1].rotation.z * instances[PLAYER1].rotation.z;
+    float xy = instances[PLAYER1].rotation.x * instances[PLAYER1].rotation.y;
+    float xz = instances[PLAYER1].rotation.x * instances[PLAYER1].rotation.z;
+    float yz = instances[PLAYER1].rotation.y * instances[PLAYER1].rotation.z;
+    float wx = instances[PLAYER1].rotation.w * instances[PLAYER1].rotation.x;
+    float wy = instances[PLAYER1].rotation.w * instances[PLAYER1].rotation.y;
+    float wz = instances[PLAYER1].rotation.w * instances[PLAYER1].rotation.z;
+    instances[PLAYER1].forward = (Vector3){ 2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };
+    instances[PLAYER1].right = (Vector3){ 1.0f - 2.0f * (y2 + z2), 2.0f * (xy + wz), 2.0f * (xz - wy) };
+    instances[PLAYER1].forward = normalize_vector3(instances[PLAYER1].forward);
+    instances[PLAYER1].right = normalize_vector3(instances[PLAYER1].right);
 }
 
 // Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
@@ -151,7 +146,7 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     float cy = vcosf(yaw * 0.5f);
     float sy = vsinf(yaw * 0.5f);
     float cp = vcosf(pitch * 0.5f);
-    float sp = vsinf(pitch * 0.5f); // using vsinf breaks it!
+    float sp = vsinf(pitch * 0.5f);
     float cr = vcosf(roll * 0.5f);
     float sr = vsinf(roll * 0.5f);
     q->w = cy * cp * cr + sy * sp * sr;
@@ -166,8 +161,10 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
 }
 
 void Input_MouselookApply(void) {
-    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,cam_roll);
-    else               quat_from_yaw_pitch_roll(&cam_rotation,cam_yaw,cam_pitch,    0.0f);
+    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
+    else               quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,    0.0f);
+    
+    UpdatePlayerFacingAngles();
 }
 
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
@@ -377,42 +374,41 @@ void UpdateScreenSize(void) {
 }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
-void mat4_lookat_from(float* m, Quaternion* camRotation, float x, float y, float z) {
-    float rotation[16];
-    quat_to_matrix(camRotation, rotation);
-    float right[3]   = { rotation[0], rotation[1], rotation[2] };   // X+ (right)
-    float up[3]      = { rotation[4], rotation[5], rotation[6] };   // Y+ (up)
-    float forward[3] = { rotation[8], rotation[9], rotation[10] };  // Z+ (forward)
-    m[0]  = right[0];   m[1]  = up[0];   m[2]  = -forward[0]; m[3]  = 0.0f;
-    m[4]  = right[1];   m[5]  = up[1];   m[6]  = -forward[1]; m[7]  = 0.0f;
-    m[8]  = right[2];   m[9]  = up[2];   m[10] = -forward[2]; m[11] = 0.0f;
-    m[12] = -dot(right[0], right[1], right[2], x, y, z);   // -dot(right, eye)
-    m[13] = -dot(up[0], up[1], up[2], x, y, z);      // -dot(up, eye)
-    m[14] = dot(forward[0], forward[1], forward[2], x, y, z);  // dot(forward, eye)
-    m[15] = 1.0f;
+void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
+    float x = camRotation->x, y = camRotation->y, z = camRotation->z, w = camRotation->w;
+    float x2 = x * x, y2 = y * y, z2 = z * z;
+    float xy = x * y, xz = x * z, yz = y * z;
+    float wx = w * x, wy = w * y, wz = w * z;
+    Vector3 right   = { 1.0f - 2.0f * (y2 + z2),        2.0f * (xy + wz),        2.0f * (xz - wy) };  // X+ (right)
+    Vector3 up      = {        2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2),        2.0f * (yz + wx) };  // Y+ (up)
+    Vector3 forward = {        2.0f * (xz + wy),        2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };  // Z+ (forward)
+    m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x; m[3]  = 0.0f;
+    m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y; m[7]  = 0.0f;
+    m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z; m[11] = 0.0f;
+    m[12] = -dot_vector3(right, eye); m[13] = -dot_vector3(up, eye); m[14] = dot_vector3(forward, eye); m[15] = 1.0f;
 }
 
-__attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, float cx, float cy, float cz, float radius) {
-    if ((planes[0].nx * cx + planes[0].ny * cy + planes[0].nz * cz + planes[0].d) < -radius) return false;
-    if ((planes[1].nx * cx + planes[1].ny * cy + planes[1].nz * cz + planes[1].d) < -radius) return false;
-    if ((planes[2].nx * cx + planes[2].ny * cy + planes[2].nz * cz + planes[2].d) < -radius) return false;
-    if ((planes[3].nx * cx + planes[3].ny * cy + planes[3].nz * cz + planes[3].d) < -radius) return false;
-    if ((planes[4].nx * cx + planes[4].ny * cy + planes[4].nz * cz + planes[4].d) < -radius) return false;
-    if ((planes[5].nx * cx + planes[5].ny * cy + planes[5].nz * cz + planes[5].d) < -radius) return false;
+__attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) {
+    if ((planes[0].normal.x * c.x + planes[0].normal.y * c.y + planes[0].normal.z * c.z + planes[0].d) < -radius) return false;
+    if ((planes[1].normal.x * c.x + planes[1].normal.y * c.y + planes[1].normal.z * c.z + planes[1].d) < -radius) return false;
+    if ((planes[2].normal.x * c.x + planes[2].normal.y * c.y + planes[2].normal.z * c.z + planes[2].d) < -radius) return false;
+    if ((planes[3].normal.x * c.x + planes[3].normal.y * c.y + planes[3].normal.z * c.z + planes[3].d) < -radius) return false;
+    if ((planes[4].normal.x * c.x + planes[4].normal.y * c.y + planes[4].normal.z * c.z + planes[4].d) < -radius) return false;
+    if ((planes[5].normal.x * c.x + planes[5].normal.y * c.y + planes[5].normal.z * c.z + planes[5].d) < -radius) return false;
     return true;
 }
 
 void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
-    planes[0].nx = m[3]  + m[0];  planes[0].ny = m[7]  + m[4];  planes[0].nz = m[11] + m[8];  planes[0].d = m[15] + m[12]; // Left
-    planes[1].nx = m[3]  - m[0];  planes[1].ny = m[7]  - m[4];  planes[1].nz = m[11] - m[8];  planes[1].d = m[15] - m[12]; // Right
-    planes[2].nx = m[3]  + m[1];  planes[2].ny = m[7]  + m[5];  planes[2].nz = m[11] + m[9];  planes[2].d = m[15] + m[13]; // Bottom
-    planes[3].nx = m[3]  - m[1];  planes[3].ny = m[7]  - m[5];  planes[3].nz = m[11] - m[9];  planes[3].d = m[15] - m[13]; // Top
-    planes[4].nx = m[3]  + m[2];  planes[4].ny = m[7]  + m[6];  planes[4].nz = m[11] + m[10]; planes[4].d = m[15] + m[14]; // Near
-    planes[5].nx = m[3]  - m[2];  planes[5].ny = m[7]  - m[6];  planes[5].nz = m[11] - m[10]; planes[5].d = m[15] - m[14]; // Far
+    planes[0].normal.x = m[3]  + m[0];  planes[0].normal.y = m[7]  + m[4];  planes[0].normal.z = m[11] + m[8];  planes[0].d = m[15] + m[12]; // Left
+    planes[1].normal.x = m[3]  - m[0];  planes[1].normal.y = m[7]  - m[4];  planes[1].normal.z = m[11] - m[8];  planes[1].d = m[15] - m[12]; // Right
+    planes[2].normal.x = m[3]  + m[1];  planes[2].normal.y = m[7]  + m[5];  planes[2].normal.z = m[11] + m[9];  planes[2].d = m[15] + m[13]; // Bottom
+    planes[3].normal.x = m[3]  - m[1];  planes[3].normal.y = m[7]  - m[5];  planes[3].normal.z = m[11] - m[9];  planes[3].d = m[15] - m[13]; // Top
+    planes[4].normal.x = m[3]  + m[2];  planes[4].normal.y = m[7]  + m[6];  planes[4].normal.z = m[11] + m[10]; planes[4].d = m[15] + m[14]; // Near
+    planes[5].normal.x = m[3]  - m[2];  planes[5].normal.y = m[7]  - m[6];  planes[5].normal.z = m[11] - m[10]; planes[5].d = m[15] - m[14]; // Far
     for (int i = 0; i < 6; i++) {
-        float len = vsqrtf(planes[i].nx*planes[i].nx + planes[i].ny*planes[i].ny + planes[i].nz*planes[i].nz);
+        float len = vsqrtf(planes[i].normal.x*planes[i].normal.x + planes[i].normal.y*planes[i].normal.y + planes[i].normal.z*planes[i].normal.z);
         if (len > 0.0f) {
-            planes[i].nx /= len; planes[i].ny /= len; planes[i].nz /= len; planes[i].d /= len; // Normalize
+            planes[i].normal.x /= len; planes[i].normal.y /= len; planes[i].normal.z /= len; planes[i].d /= len; // Normalize
         }
     }
 }
@@ -425,12 +421,10 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         if (lightDirty[lightIdx]) { // Marked all as true at level load.
             *voxelsNeedUpdated = true;
             uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-            float litX = lights[litIdx];
-            float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-            float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+            Vector3 lightPos = (Vector3){ lights[litIdx], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) {
-                mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], litX, litY, litZ);
+                mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
                 mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
                 ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
             }
@@ -492,15 +486,6 @@ __attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void
     float db = ((const DepthSort*)b)->depth;
     return (da > db) - (da < db);
 }
-
-// DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
-// float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-
-typedef struct {
-    uint16_t index; // Original index in lights array
-    float distanceSquared; // Distance to camera squared
-    float score; // Priority score (lower distance, higher intensity = higher priority)
-} LightCandidate;
 
 // ============================================================================
 // UI Rendering and Text
@@ -632,7 +617,7 @@ void NewGame(void) {
     instances[PLAYER1].layer = PhysicsLayer_Player;
     instances[PLAYER1].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
     instances[PLAYER1].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
-    instances[PLAYER1].rotation.w = 1.0f;
+    instances[PLAYER1].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     instances[PLAYER1].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
     instances[PLAYER1].collider = COLLIDER_TYPE_CAPSULE;
     instances[PLAYER1].colliderCenter.y = 0.84f;
@@ -754,7 +739,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
     InitFontAtlasses();
     RenderLoadingProgress(80,"Loading...");
-    Input_MouselookApply(); // Input
+//     Input_MouselookApply(); // Input process first time to get correct starting orientation so player isn't looking at the wall.
     InitializeAudio(); // Audio    
     LoadTextForLanguage(voxen_Settings.Language);
     LoadLogTextForLanguage(voxen_Settings.Language);
@@ -815,12 +800,12 @@ void DrawDebugLines(float* viewProj) {
     voxen_Diagnostics.debugLineVertCount = 0;
 }
 
-void AddDebugLine(float x1, float y1, float z1, float x2, float y2, float z2) {
+void AddDebugLine(Vector3 start, Vector3 end) {
     if (voxen_Diagnostics.debugLineVertCount + 6 > MAX_DEBUG_LINE_VERTS * 3) return;
 
     int32_t i = voxen_Diagnostics.debugLineVertCount;
-    debugLineBuffer[i++] = x1; debugLineBuffer[i++] = y1; debugLineBuffer[i++] = z1;
-    debugLineBuffer[i++] = x2; debugLineBuffer[i++] = y2; debugLineBuffer[i++] = z2;
+    debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
+    debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
     voxen_Diagnostics.debugLineVertCount = i;
 }
 
@@ -849,7 +834,7 @@ bool StepLoopingAnim(uint16_t i) {
             uint8_t portalIdx = instances[i].portalIndex;
             if (portalIdx < MAX_PORTALS) {
                 uint16_t closedModelIndex = 719;
-                switch(instances[i].index) {
+                switch(instances[i].index) { // TODO Make this data driven from entities.txt on each, or models.txt
                     case 496: closedModelIndex =  719; break; // doorA
                     case 497: closedModelIndex =  699; break; // doorB
                     case 498: closedModelIndex = 1398; break; // doorC
@@ -902,8 +887,6 @@ void UpdateAnims(void) {
     if (portalsNeedUpdated) PortalCulling();
 }
 
-DepthSort visibleInstances[INSTANCE_COUNT];
-
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
     RaycastHit result = {
         .hit = false,
@@ -942,7 +925,14 @@ __attribute__((pure)) bool CellNotVisible(uint16_t index) {
     return (cellNotVisible && cellIsOpen);
 }
 
-void RenderShadowmaps(float px, float py, float pz) {
+typedef struct {
+    uint16_t index; // Original index in lights array
+    float distanceSquared; // Distance to camera squared
+    float score; // Priority score (lower distance, higher intensity = higher priority)
+    Vector3 position;
+} LightCandidate;
+
+void RenderShadowmaps(void) {
     double shadowStartTime = get_time();
     voxen_Shadow_System.numGLCallsForShadows = 0;
     glEnable(GL_DEPTH_TEST);
@@ -951,13 +941,12 @@ void RenderShadowmaps(float px, float py, float pz) {
     uint16_t numberFoundLightCandidatesForShadows = 0;
     float bestScores[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
+    Vector3 playerPos = instances[PLAYER1].position;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         if (!lightCastsShadows[i]) continue;
 
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
-        float lightPosX = lights[litIdx];
-        float lightPosY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-        float lightPosZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
+        Vector3 lightPos = (Vector3){ lights[litIdx], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
         float intensity = lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
         if (intensity < 0.1f) continue;
         
@@ -966,12 +955,10 @@ void RenderShadowmaps(float px, float py, float pz) {
         float luminosity = (intensity / (range * range));
         if (luminosity < thresh) continue;
 
-        float dx = lightPosX - px;
-        float dy = lightPosY - py;
-        float dz = lightPosZ - pz;
-        float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPosX - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPosZ - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        Vector3 delta = Vector3_A_minus_B(lightPos, playerPos);
+        float distSqrdToPlayer = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         int lightCellIdx = (cellZ * WORLDX) + cellX;
         bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
         if (!inPVS) {
@@ -989,7 +976,7 @@ void RenderShadowmaps(float px, float py, float pz) {
         }
         if (!inPVS) continue;
 
-        float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+        float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         
         float score = distSqrdToPlayer / vmax(intensity, 0.01f);
@@ -997,7 +984,7 @@ void RenderShadowmaps(float px, float py, float pz) {
         else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
 
         if (numberFoundLightCandidatesForShadows < MAX_SHADOWMAPS) {
-            candidates[numberFoundLightCandidatesForShadows] = (LightCandidate){ i, distSqrdToPlayer, score };
+            candidates[numberFoundLightCandidatesForShadows] = (LightCandidate){ i, distSqrdToPlayer, score, lightPos };
             bestScores[numberFoundLightCandidatesForShadows] = score;
             numberFoundLightCandidatesForShadows++;
         } else if (score < bestScores[0]) {  // Only compare against current worst
@@ -1006,7 +993,7 @@ void RenderShadowmaps(float px, float py, float pz) {
             for (uint32_t j = 1; j < numberFoundLightCandidatesForShadows; ++j) {
                 if (bestScores[j] > bestScores[worstIdx]) worstIdx = j;
             }
-            candidates[worstIdx] = (LightCandidate){ i, distSqrdToPlayer, score };
+            candidates[worstIdx] = (LightCandidate){ i, distSqrdToPlayer, score, lightPos };
             bestScores[worstIdx] = score;
         }
 
@@ -1015,7 +1002,7 @@ void RenderShadowmaps(float px, float py, float pz) {
 
     uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
-        // Clear shadowmaps
+        // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         if (voxen_Shadow_System.useComputeClear) {
             glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram); // Way faster
             GLuint groupX_shadClear = (numLightsShadowmapsToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
@@ -1062,9 +1049,6 @@ void RenderShadowmaps(float px, float py, float pz) {
         for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
             uint16_t lightIdx = candidates[c].index;
             uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-            float litX = lights[litIdx];
-            float litY = lights[litIdx + LIGHT_DATA_OFFSET_POSY];
-            float litZ = lights[litIdx + LIGHT_DATA_OFFSET_POSZ];
             float lightRadius = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             float effectiveRadius = vmin(lightRadius, 15.36f);
             glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -1073,7 +1057,7 @@ void RenderShadowmaps(float px, float py, float pz) {
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) { // Skip player indices and start at 3
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
                 shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS];
-                float distToLightSqrd = squareDistance3D(instances[j].position.x, instances[j].position.y, instances[j].position.z, litX, litY, litZ);
+                float distToLightSqrd = dist_sq_vector3(instances[j].position, candidates[c].position);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
                 if (distToLightSqrd > radSum * radSum) continue;
                 
@@ -1086,68 +1070,68 @@ void RenderShadowmaps(float px, float py, float pz) {
             if (nearbyMeshCount < 1) continue;
             
             qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
-            glUniform3f(3, litX, litY, litZ);
+            glUniform3f(3, candidates[c].position.x, candidates[c].position.y, candidates[c].position.z);
             voxen_Shadow_System.numGLCallsForShadows++;
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
             uint16_t currentModelType = 0;
             uint16_t currentTexIndex = 0;
             bool currentIsTransparent = 0;
             Vector3 corners[8] = {
-                { litX + lightRadius, litY + lightRadius, litZ + lightRadius },
-                { litX + lightRadius, litY + lightRadius, litZ - lightRadius },
-                { litX + lightRadius, litY - lightRadius, litZ + lightRadius },
-                { litX + lightRadius, litY - lightRadius, litZ - lightRadius },
-                { litX - lightRadius, litY + lightRadius, litZ + lightRadius },
-                { litX - lightRadius, litY + lightRadius, litZ - lightRadius },
-                { litX - lightRadius, litY - lightRadius, litZ + lightRadius },
-                { litX - lightRadius, litY - lightRadius, litZ - lightRadius }
+                { candidates[c].position.x + lightRadius, candidates[c].position.y + lightRadius, candidates[c].position.z + lightRadius },
+                { candidates[c].position.x + lightRadius, candidates[c].position.y + lightRadius, candidates[c].position.z - lightRadius },
+                { candidates[c].position.x + lightRadius, candidates[c].position.y - lightRadius, candidates[c].position.z + lightRadius },
+                { candidates[c].position.x + lightRadius, candidates[c].position.y - lightRadius, candidates[c].position.z - lightRadius },
+                { candidates[c].position.x - lightRadius, candidates[c].position.y + lightRadius, candidates[c].position.z + lightRadius },
+                { candidates[c].position.x - lightRadius, candidates[c].position.y + lightRadius, candidates[c].position.z - lightRadius },
+                { candidates[c].position.x - lightRadius, candidates[c].position.y - lightRadius, candidates[c].position.z + lightRadius },
+                { candidates[c].position.x - lightRadius, candidates[c].position.y - lightRadius, candidates[c].position.z - lightRadius }
             };
             
-            bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, litX, litY, litZ, 0.64f); // Use some radius for floating point errors
+            bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, candidates[c].position, 0.64f); // Use some radius for floating point errors
             for (uint8_t face = 0; face < 6; face++) {                            
                 if (!lightPositionInPlayerFrustum) { // Check if at least one of the four points of this cubemap face's frustum are within the player's frustum
                     bool faceOverlapsPlayerView = false;
                     switch (face) {
                         case 0: // +X: Right (CONFIRMED, skipping face 0 causes shadow to not cast in more positive X direction (e.g. positions more +x from light don't get shadows, aligns to face.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                             break;
                         case 1: // -X: Left (CONFIRMED, skipping face 1 causes shadow to not cast in more negative X direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                             break;
                         case 2: // +Y: Up (CONFIRMED, skipping face 1 causes shadow to not cast in more positive Y direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                             break;
                         case 3: // -Y: Down (CONFIRMED, skipping face 1 causes shadow to not cast in more negative Y direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                             break;
                         case 4: // +Z: Forward (CONFIRMED, skipping face 1 causes shadow to not cast in more positive Z direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                             break;
                         case 5: // -Z: Backward (CONFIRMED, skipping face 1 causes shadow to not cast in more negative Z direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), (Vector3){ cam_forwardx, cam_forwardy, cam_forwardz }) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                             break;
                     }
 
                     if (!faceOverlapsPlayerView) {
-                        if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], px, py, pz, 0.48f)) continue;
+                        if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) continue;
                     }
                 }
                 
@@ -1158,7 +1142,7 @@ void RenderShadowmaps(float px, float py, float pz) {
                 voxen_Diagnostics.shadowDrawCallsRenderedThisFrame++;
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;            
-                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position.x, instances[i].position.y, instances[i].position.z, shadows_nearMeshRadii[j] * 1.41f)) continue;
+                    if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
 
                     int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
                     if (currentModelType != modelType) {
@@ -1273,10 +1257,10 @@ double RenderUI(void) {
     // Diagnostics / Debugging
     float debugTextStartY = GetScreenRelativeY(0.075f);
     float leftPad = GetScreenRelativeX(0.0125f);
-    if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
+    if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_startX, (double)voxen_Diagnostics.debugLine_startY, (double)voxen_Diagnostics.debugLine_startZ, (double)voxen_Diagnostics.debugLine_endX, (double)voxen_Diagnostics.debugLine_endY, (double)voxen_Diagnostics.debugLine_endZ);
+    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_start.x, (double)voxen_Diagnostics.debugLine_start.y, (double)voxen_Diagnostics.debugLine_start.z, (double)voxen_Diagnostics.debugLine_end.x, (double)voxen_Diagnostics.debugLine_end.y, (double)voxen_Diagnostics.debugLine_end.z);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Player inside: %u, named %s, St: %.3f ms, shadGL: %u", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, testPointInSolid, testPointInSolid == UINT16_MAX ? "-" : GetPrefabNameFromIndex(instances[testPointInSolid].index), voxen_Shadow_System.shadowTime * 1000, voxen_Shadow_System.numGLCallsForShadows);
     if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
     if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
@@ -1326,45 +1310,32 @@ void Frob(Vector3 pos) {
     float ndcX = offsetX / (voxen_Settings.ScreenWidth * 0.5f);
     float ndcY = -offsetY / (voxen_Settings.ScreenHeight * 0.5f);  // flip Y
     float tanFov = tanf(voxen_Settings.FOV * 0.5f * PI / 180.0f);
-    float viewX = ndcX * tanFov * aspect3D;
-    float viewY = ndcY * tanFov;
-    float viewZ = -1.0f;
-    float len = sqrtf(viewX*viewX + viewY*viewY + viewZ*viewZ);
-    viewX /= len; viewY /= len; viewZ /= len;
-    float upX = cam_righty * (-cam_forwardz) - cam_rightz * (-cam_forwardy);
-    float upY = cam_rightz * (-cam_forwardx) - cam_rightx * (-cam_forwardz);
-    float upZ = cam_rightx * (-cam_forwardy) - cam_righty * (-cam_forwardx);
-    float upLen = sqrtf(upX*upX + upY*upY + upZ*upZ);
-    if (upLen > 0.001f) { upX /= upLen; upY /= upLen; upZ /= upLen; }
-    Vector3 dir = (Vector3){ viewX * cam_rightx + viewY * upX + viewZ * (-cam_forwardx), viewX * cam_righty + viewY * upY + viewZ * (-cam_forwardy), viewX * cam_rightz + viewY * upZ + viewZ * (-cam_forwardz) };
-    voxen_Diagnostics.debugLine_startX = pos.x;
-    voxen_Diagnostics.debugLine_startY = pos.y;
-    voxen_Diagnostics.debugLine_startZ = pos.z;
-    voxen_Diagnostics.debugLine_endX   = pos.x + dir.x * FROB_DISTANCE;
-    voxen_Diagnostics.debugLine_endY   = pos.y + dir.y * FROB_DISTANCE;
-    voxen_Diagnostics.debugLine_endZ   = pos.z + dir.z * FROB_DISTANCE;
+    Vector3 view = (Vector3){ ndcX * tanFov * aspect3D, ndcY * tanFov, -1.0f };
+    view = normalize_vector3(view);
+    Vector3 up = (Vector3){ instances[PLAYER1].right.y * (-instances[PLAYER1].forward.z) - instances[PLAYER1].right.z * (-instances[PLAYER1].forward.y), instances[PLAYER1].right.z * (-instances[PLAYER1].forward.x) - instances[PLAYER1].right.x * (-instances[PLAYER1].forward.z), instances[PLAYER1].right.x * (-instances[PLAYER1].forward.y) - instances[PLAYER1].right.y * (-instances[PLAYER1].forward.x) };
+    up = normalize_vector3(up);
+    Vector3 dir = (Vector3){ view.x * instances[PLAYER1].right.x + view.y * up.x + view.z * (-instances[PLAYER1].forward.x), view.x * instances[PLAYER1].right.y + view.y * up.y + view.z * (-instances[PLAYER1].forward.y), view.x * instances[PLAYER1].right.z + view.y * up.z + view.z * (-instances[PLAYER1].forward.z) };
+    voxen_Diagnostics.debugLine_start = pos;
+    voxen_Diagnostics.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
     if (tempHit.hit) {
-        voxen_Diagnostics.debugLine_endX   = tempHit.point.x;
-        voxen_Diagnostics.debugLine_endY   = tempHit.point.y;
-        voxen_Diagnostics.debugLine_endZ   = tempHit.point.z;
-        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex,
-                GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index,
-                (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
+        voxen_Diagnostics.debugLine_end = tempHit.point;
+        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
     }
     
     voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
 }
 
 void UpdateGameplay(void) {
-    if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position);
-    if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) {
-        AddDebugLine(voxen_Diagnostics.debugLine_startX, voxen_Diagnostics.debugLine_startY, voxen_Diagnostics.debugLine_startZ, voxen_Diagnostics.debugLine_endX, voxen_Diagnostics.debugLine_endY, voxen_Diagnostics.debugLine_endZ);
-    }
+    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
     
+    if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position);
+    if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_start, voxen_Diagnostics.debugLine_end);
     UpdateAmbientSounds();
     UpdateAnims();
 }
+
+DepthSort visibleInstances[INSTANCE_COUNT];
 
 void Render(void) {
     voxen_Diagnostics.drawCallsRenderedThisFrame = 0; // Reset per frame
@@ -1375,10 +1346,21 @@ void Render(void) {
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
-    float px = instances[PLAYER1].position.x;
-    float py = instances[PLAYER1].position.y;
-    float pz = instances[PLAYER1].position.z;
-    mat4_lookat_from(view,&cam_rotation, px, py, pz);
+    Vector3 playerPos = instances[PLAYER1].position;
+    {// mat4_lookat_from(view,&instances[PLAYER1].rotation, playerPos); Manually inlined for performance
+        float x = instances[PLAYER1].rotation.x, y = instances[PLAYER1].rotation.y, z = instances[PLAYER1].rotation.z, w = instances[PLAYER1].rotation.w;
+        float x2 = x * x, y2 = y * y, z2 = z * z;
+        float xy = x * y, xz = x * z, yz = y * z;
+        float wx = w * x, wy = w * y, wz = w * z;
+        Vector3 right   = { 1.0f - 2.0f * (y2 + z2),        2.0f * (xy + wz),        2.0f * (xz - wy) };  // X+ (right)
+        Vector3 up      = {        2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2),        2.0f * (yz + wx) };  // Y+ (up)
+        Vector3 forward = {        2.0f * (xz + wy),        2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };  // Z+ (forward)
+        view[0]  = right.x; view[1]  = up.x; view[2]  = -forward.x; view[3]  = 0.0f;
+        view[4]  = right.y; view[5]  = up.y; view[6]  = -forward.y; view[7]  = 0.0f;
+        view[8]  = right.z; view[9]  = up.z; view[10] = -forward.z; view[11] = 0.0f;
+        view[12] = -dot_vector3(right, playerPos); view[13] = -dot_vector3(up, playerPos); view[14] = dot_vector3(forward, playerPos); view[15] = 1.0f;
+    }
+    
     float viewProj[16]; // view-projection matrix
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
     float invViewRot[9];
@@ -1387,7 +1369,8 @@ void Render(void) {
     invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------   
-        if (voxen_Settings.Shadows > 0u) RenderShadowmaps(px, py, pz);
+        glBindVertexArray(voxen_GL_Comms.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
+        if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
         memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));         // Clear dirty after shadowmaps for minimal shadowmap updating.
         memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
         
@@ -1399,7 +1382,7 @@ void Render(void) {
         glUniform1ui(3, 0u); // isUI false
         glUniform1f(8, worldMin_x);
         glUniform1f(9, worldMin_z);
-        glUniform3f(10, px, py, pz);
+        glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
         glUniform1ui(14, voxen_Settings.Reflections);
         glUniform1ui(15, voxen_Settings.Shadows);
         glUniform1ui(17, 0u); // unlit false
@@ -1413,21 +1396,17 @@ void Render(void) {
         uint32_t currentSpecIndex = 0;
         uint16_t currentModelType = 0;
         for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
-            float objx = instances[i].position.x;
-            float objy = instances[i].position.y;
-            float objz = instances[i].position.z;
-            uint16_t instCellIdx = PosGetCellCoords(objx, objz);
-            float dx = objx - px;
-            float dy = objy - py;
-            float dz = objz - pz;
-            float distSqrd = dx*dx + dy*dy + dz*dz;
+            Vector3 objPos = instances[i].position;
+            uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+            Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
+            float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
 
             if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
                 bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
                 if (!inPVS) {
-                    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objx - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objz - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
                     int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
                     for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
                         for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
@@ -1449,7 +1428,7 @@ void Render(void) {
                 }
             }
             
-            float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+            float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
             if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
             
@@ -1481,17 +1460,14 @@ void Render(void) {
         
         glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
         for (uint16_t i = startOfDoubleSidedInstances; i < startOfTransparentInstances; ++i) {
-            float objx = instances[i].position.x;
-            float objz = instances[i].position.z;
-            uint16_t instCellIdx = PosGetCellCoords(objx, objz);
-            float dx = objx - px;
-            float dy = instances[i].position.y - py;
-            float dz = objz - pz;
-            float distSqrd = dx*dx + dy*dy + dz*dz;
+            Vector3 objPos = instances[i].position;
+            uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+            Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
+            float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
             if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
             
-            float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+            float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
             if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
             
@@ -1517,20 +1493,17 @@ void Render(void) {
         uint16_t startOfNextType = loadedInstances - invalidModelIndexCount;
         visibleCount = 0;
         for (uint16_t i = startOfTransparentInstances; i < startOfNextType; ++i) {
-            float objx = instances[i].position.x;
-            float objz = instances[i].position.z;
-            uint16_t instCellIdx = PosGetCellCoords(objx, objz);
-            float dx = objx - px;
-            float dy = instances[i].position.y - py;
-            float dz = objz - pz;
-            float distSqrd = dx*dx + dy*dy + dz*dz;
+            Vector3 objPos = instances[i].position;
+            uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+            Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
+            float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
             if (distSqrd >= FAR_PLANE_SQUARED) continue;
             
             if (!(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
                 if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
             }
             
-            float dotResult = dot(dx, dy, dz, cam_forwardx, cam_forwardy, cam_forwardz);
+            float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
             float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
             if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
             
@@ -1566,7 +1539,7 @@ void Render(void) {
         if (voxen_Settings.Reflections > 0) {
             glUseProgram(voxen_GL_Comms.ssrShaderProgram);
             glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-            glUniform3f(3, px, py, pz);
+            glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
             GLuint groupX_ssr = ((voxen_Settings.ScreenWidth  / SSR_RES) + 31) / 32;
             GLuint groupY_ssr = ((voxen_Settings.ScreenHeight / SSR_RES) + 31) / 32;
             glDispatchCompute(groupX_ssr, groupY_ssr, 1);
@@ -1576,7 +1549,7 @@ void Render(void) {
         glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
     }
     
-    RenderCompositePass(px, py, pz, viewProj, invViewRot); // 6. Render final meshes' results with full screen quad
+    RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot); // 6. Render final meshes' results with full screen quad
     double time_now = RenderUI();                          // 7. UI
     
     // 8. Diagnostics
@@ -1599,13 +1572,14 @@ void Render(void) {
     CHECK_GL_ERROR();
 }
 
-void MainLoop(void) {
+void UpdateTime(void) {
     voxen_globalContext.current_time = get_time();
     double frame_time = voxen_globalContext.current_time - voxen_globalContext.last_topframe_time;
     voxen_globalContext.last_topframe_time = voxen_globalContext.current_time;
     if (!voxen_globalContext.gamePaused) voxen_globalContext.pauseRelativeTime += frame_time;
-    
-    InputClearRisingAndFallingEdges();
+}
+
+void UpdateEvents(void) {
     glfwPollEvents();
     if (glfwWindowShouldClose(voxen_globalContext.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
     voxen_globalContext.timeSinceLastPhysicsTick = voxen_globalContext.pauseRelativeTime - voxen_globalContext.last_physics_time;
@@ -1625,28 +1599,17 @@ void MainLoop(void) {
     }
 
     if (EventQueueProcess()) OS_Exit(1); // Do everything
-    if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); return; }
-         
-    if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------
-        UpdateGameplay(); // 0. Gameplay Update Loops
-        bool voxelsNeedUpdated = UpdatedPlayerCell();
-        voxelsNeedUpdated = UpdateLights(&voxelsNeedUpdated);
-        if (voxelsNeedUpdated) CullCore(); // 1. Culling
-        bool uploadInstances = false;
-        for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { uploadInstances = true; UpdateInstanceMatrix(i); } }
-        if (uploadInstances) glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-        glBindVertexArray(voxen_GL_Comms.vao_chunk);
-    }
+}
+
+void UpdateVoxelsAndInstances(void) {
+    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
     
-    Render();
-    voxen_Diagnostics.globalFrameNum++;
-    #ifdef DEBUG_RAM_OUTPUT
-        if (voxen_Diagnostics.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
-        else if (voxen_Diagnostics.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
-        else if (voxen_Diagnostics.globalFrameNum == 200) DebugRAM("after 200 frames of running");
-        else if (voxen_Diagnostics.globalFrameNum == 500) DebugRAM("after 500 frames of running");
-        else if (voxen_Diagnostics.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
-    #endif
+    bool voxelsNeedUpdated = UpdatedPlayerCell();
+    voxelsNeedUpdated = UpdateLights(&voxelsNeedUpdated);
+    if (voxelsNeedUpdated) CullCore(); // 1. Culling
+    bool uploadInstances = false;
+    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { uploadInstances = true; UpdateInstanceMatrix(i); } }
+    if (uploadInstances) glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
 
 int32_t main(int32_t argc, char* argv[]) {
@@ -1684,6 +1647,23 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment(argc,argv[1],argv[2]);
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    while(1) MainLoop();
+    while(1) { // Main Loop
+        UpdateTime();
+        InputClearRisingAndFallingEdges();
+        UpdateEvents();
+        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
+        
+        UpdateGameplay();
+        UpdateVoxelsAndInstances();
+        Render();
+        voxen_Diagnostics.globalFrameNum++;
+        #ifdef DEBUG_RAM_OUTPUT
+            if (voxen_Diagnostics.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
+            else if (voxen_Diagnostics.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
+            else if (voxen_Diagnostics.globalFrameNum == 200) DebugRAM("after 200 frames of running");
+            else if (voxen_Diagnostics.globalFrameNum == 500) DebugRAM("after 500 frames of running");
+            else if (voxen_Diagnostics.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
+        #endif
+    }
     return 0;
 }

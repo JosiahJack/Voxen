@@ -43,6 +43,8 @@ typedef struct {
     Vector3 position;
     Quaternion rotation;
     Vector3 scale;
+    Vector3 forward;
+    Vector3 right;
     Vector3 velocity;
     Vector3 angularVelocity;
     BodyState bodyState;

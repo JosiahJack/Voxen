@@ -907,7 +907,6 @@ void LoadLevel(uint8_t curlevel) {
         for (int i=START_INDEX_LEVEL_INSTANCES; i < endOfModels;++i) { if (instances[i].overrideTest) DualLogEntityInstance(i); }
     #endif
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
-    Input_MouselookApply();
     voxen_globalContext.levelCurrentlyLoading = false;
     DualLog("LoadLevel completed!\n");
 }
