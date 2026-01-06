@@ -900,20 +900,12 @@ void LoadLevel(uint8_t curlevel) {
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
-    glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
-    glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
-    glUniform1f(0, voxelMinCenterX);
-    glUniform1f(1, voxelMinCenterZ);
-    glUniform1ui(2, loadedLights);
-    glUniform1f(3, worldMin_x);
-    glUniform1f(4, worldMin_z);
+    dirtyInstances[0] = true;
     memset(lightDirty,1,LIGHT_COUNT * sizeof(bool)); // Mark all true to ensure frustums and matrices are updated for all.
-    UpdateVoxelLightLists();
     #ifdef DEBUG_ENTITIES
         uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
         for (int i=START_INDEX_LEVEL_INSTANCES; i < endOfModels;++i) { if (instances[i].overrideTest) DualLogEntityInstance(i); }
     #endif
-    DebugRAM("after UpdateVoxelLightLists for load level");
     //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
     Input_MouselookApply();
     voxen_globalContext.levelCurrentlyLoading = false;

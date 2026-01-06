@@ -206,7 +206,7 @@ void Screenshot(void) {
     time_t now = time(NULL);
     struct tm *utc_time = localtime(&now);    
     if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, VERSION_STRING, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
+    snprintf(filename, sizeof(filename), "Screenshots/%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
     if (!stbi_write_bmp(filename, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 

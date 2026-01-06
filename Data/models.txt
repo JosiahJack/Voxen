@@ -546,7 +546,7 @@ index: 277
 index: 278
 #Models/med2_1d.fbx
 index: 279
-#Models/med2_1.fbx
+#Models/med2_1.obj
 index: 280
 #Models/med2_1_slice32RH.fbx
 index: 281
@@ -601,7 +601,7 @@ index: 305
 #Models/npc_cyborgassassin_throwingstar.fbx
 index: 307
 
-#Models/npc_cyborg_diegoteleportfx.fbx
+#Models/npc_cyborg_diegoteleportfx.obj
 index: 311
 
 #Models/npc_execbot_gibs.fbx
@@ -877,7 +877,7 @@ index: 607
 index: 608
 #Models/switch1.fbx
 index: 609
-#Models/switch2.fbx
+#Models/switch2.obj
 index: 610
 #Models/switch3.fbx
 index: 611

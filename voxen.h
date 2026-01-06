@@ -1,5 +1,4 @@
 #pragma once
-#define VERSION_STRING "v0.7.4"
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 #define ONLY_LOAD_LEVEL_NEEDS
 
@@ -105,6 +104,7 @@ typedef struct {
 	bool inventoryMode;
 	double last_time;
 	double last_topframe_time;
+	double last_physics_time;
 	double current_time;
 	double timeSinceLastPhysicsTick;
 	double screenshotTimeout;
@@ -181,6 +181,13 @@ typedef struct {
 	float debugLine_startX, debugLine_startY, debugLine_startZ;
     float debugLine_endX, debugLine_endY, debugLine_endZ;
 	double debugLineFinished;
+	uint32_t drawCallsRenderedThisFrame;
+	uint32_t textDrawCallsRenderedThisFrame;
+	uint32_t uiImageDrawCallsRenderedThisFrame;
+	uint32_t shadowDrawCallsRenderedThisFrame;
+	uint32_t verticesRenderedThisFrame;
+	uint32_t drawCallsNormal;
+	uint32_t debugLineVertCount;
 } VoxenDiagnostics;
 extern VoxenDiagnostics voxen_Diagnostics;
 // ----------------------------------------------------------------------------
@@ -463,8 +470,6 @@ Quaternion cubemapOrientationQuaternion[6] = {
 };
 extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 void SetFog(void);
-extern uint32_t drawCallsRenderedThisFrame;
-extern uint32_t verticesRenderedThisFrame;
 extern bool lightDirty[LIGHT_COUNT];
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;

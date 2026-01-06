@@ -192,8 +192,6 @@ int32_t Physics(void) {
             
     if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return 0;
 
-    testPointInSolid = PointInSolid(instances[PLAYER1].position, LAYER_MASK_PLAYER_COLLIDESWITH);
-        
     if (voxen_Cheats.noclip) {
         instances[PLAYER1].collider = COLLIDER_TYPE_NONE;
         flag_disable(&instances[PLAYER1].entflags, ENTFLAG_USEGRAVITY);
@@ -243,7 +241,16 @@ int32_t Physics(void) {
     Vector3 wishPos = Vector3_A_plus_B(instances[PLAYER1].position, scale_vector3(instances[PLAYER1].velocity, (float)voxen_globalContext.timeSinceLastPhysicsTick));
     instances[PLAYER1].angularVelocity = instances[PLAYER1].accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
     instances[PLAYER1].accumulatedForce = instances[PLAYER1].accumulatedTorque = (Vector3){0.0f,0.0f,0.0f};
-    if (voxen_Cheats.noclip) { instances[PLAYER1].position = wishPos; return 0; }
+    if (voxen_Cheats.noclip) { 
+        instances[PLAYER1].position = wishPos; return 0;
+    } else {
+        testPointInSolid = PointInSolid(Vector3_A_plus_B(wishPos,(Vector3){0.0f,0.005f,0.0f}), LAYER_MASK_PLAYER_COLLIDESWITH);
+        if (testPointInSolid == UINT16_MAX) {
+            instances[PLAYER1].position = wishPos;
+        }
+        
+        return 0;
+    }
     
     flag_disable(&instances[PLAYER1].entflags, ENTFLAG_GROUNDED);
     bool hit = false;
