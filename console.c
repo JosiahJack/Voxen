@@ -3,7 +3,6 @@
 #include <stdlib.h> // For atoi
 #include <stdio.h> // For snprintf
 #include "voxen.h"
-#include "entity.h"
 #include "todo.h"
 
 #define MAX_HISTORY 7

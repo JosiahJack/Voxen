@@ -4,7 +4,6 @@
 #include "os.h"
 #include "./External/miniaudio.h"
 #include "voxen.h"
-#include "entity.h"
 
 #define MAX_CHANNELS 16
 #define MAX_AMBIENT_NOISES 128

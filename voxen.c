@@ -2,11 +2,12 @@
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
-#include "entity.h"
 #include "External/stb_image.h"
 #include "Shaders/shaders.h"
 #include "todo.h"
 #include "data_models.c"
+#include "dynamic_culling.c"
+void Physics_Init(void);
 
 Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
@@ -41,25 +42,379 @@ float mouse_sensitivity = 0.1f;
 bool window_has_focus = false;
 uint16_t editModeSelection = 682; // Test instance
 uint16_t editModeTestEntityDefinition = 0; // Test instance's model index
+float voxelMinCenterX, voxelMinCenterZ;
+
+#define MAX_SHADOWMAPS 48u
+#define SHADOW_MAP_SIZE 192u
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
+typedef struct {
+    double shadowTime;
+	uint32_t numShadowsCouldRender;
+	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
+    float shadDotThresh;
+	bool useComputeClear;
+} VoxenShadowSystem;
+VoxenShadowSystem voxen_Shadow_System;
+
+uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
+    if (str == NULL || *str == '\0') { DualLogError("Invalid input blank string, from line[%d]: %s\n", lineNum+1, line); return 0; }
+    while (data_parser_isspace((char)*str)) str++;
+    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
+    char* endptr;
+    errno = 0;
+    unsigned long val = strtoul(str, &endptr, 10);
+    if (errno != 0 || val > UINT32_MAX) { DualLogError("Invalid input %s\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
+    return (uint32_t)val;
+}
+
+uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT16_MAX) { DualLogError("Value out of range for uint16_t: %u\n      from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (uint16_t)retval;
+}
+
+uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t retval = parse_numberu32(str, line, lineNum);
+    if (retval > UINT8_MAX) { DualLogError("Value out of range for uint8_t: %u\n      from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
+    return (uint8_t)retval;
+}
+
+bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
+    uint32_t parseval = parse_numberu32(str, line, lineNum);
+    if (parseval > 1) DualLogWarn("Loaded %u\n      in place where expected a boolean from line[%u]: %s\n",parseval, lineNum+1, line);
+    return parseval > 0 ? true : false;
+}
+
+float parse_float(const char* str, const char* line, uint32_t lineNum) {
+    if (str == NULL || *str == '\0') { DualLogError("Invalid float input blank string, from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
+    char* endptr;
+    errno = 0;
+    float val = strtof(str, &endptr);
+    if (errno != 0) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      gave errno %u\n", str, lineNum+1, line, errno); return 0.0f; }
+    if (*endptr != '\0') { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      missing null terminator, *endptr: %u\n", str, lineNum+1, line, *endptr); return 0.0f; }
+    if (endptr == str) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      end is equal to start\n", str, lineNum+1, line); return 0.0f; }
+    return val;
+}
+
+bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum) {
+    *is_comment = false;
+    *is_eof = false;
+    *is_newline = false;
+    size_t pos = 0;
+    int32_t c;
+    while ((c = fgetc(file)) != EOF && data_parser_isspace(c) && c != '\n');
+    if (c == EOF) { *is_eof = true; return false; }
+    if (c == '\n') { *is_newline = true; return false; }
+    
+    if (c == '/' && (c = fgetc(file)) == '/') {
+        *is_comment = true;
+        while ((c = fgetc(file)) != EOF && c != '\n');
+        return false;
+    }
+    
+    if (c != EOF) token[pos++] = c;
+    while ((c = fgetc(file)) != EOF && c != delimiter && c != '\n' && pos < max_len - 1) { token[pos++] = c; }
+    token[pos] = '\0';
+    if (pos >= max_len - 1) DualLogError("Token truncated at line %u\n", *lineNum);
+    if (c == EOF) *is_eof = 1u;
+    else if (c == '\n') *is_newline = 1u;
+    return pos > 0;
+}
+
+// Unique set separate from savedata path and resource data to keep it focussed
+bool process_gamedata_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
+    if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
+    
+    while (data_parser_isspace(*key)) key++;
+    while (data_parser_isspace(*value)) value++;
+    char trimmed_key[256];
+    char trimmed_value[256];
+    strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
+    strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
+    trimmed_key[sizeof(trimmed_key) - 1] = '\0';
+    trimmed_value[sizeof(trimmed_value) - 1] = '\0';
+    char *key_end = trimmed_key + strlen(trimmed_key) - 1;
+    char *val_end = trimmed_value + strlen(trimmed_value) - 1;
+    while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
+    while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
+    
+         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(voxen_globalContext.global_modname, trimmed_value, sizeof(voxen_globalContext.global_modname) - 1); voxen_globalContext.global_modname[sizeof(voxen_globalContext.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
+    else if (strcmp(trimmed_key, "levelcount") == 0)      voxen_globalContext.numLevels = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "startlevel") == 0)      voxen_globalContext.startLevel = parse_numberu8(trimmed_value, line, lineNum);
+    else return false;
+    return true;
+}
+
+void SetSkyRotateSpeed(void) {
+    static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
+    float skyRotateSpeed = speeds[voxen_Cheats.dizzyLevel];
+    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    glUniform1f(30, skyRotateSpeed);
+}
+
+void SetFog(void) {
+    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUniform3f(4, fogColorR * fogBaseDensityForLevel, fogColorG * fogBaseDensityForLevel, fogColorB * fogBaseDensityForLevel); // TODO: Add gunsmoke accumulation
+}
+
+void SetVSync(void) { glfwSwapInterval(voxen_Settings.Vsync); }
+
+void UpdateProjectionMatrices(void) {
+    float* m;
+    m = uiOrthoProjection;
+    m[0] = 2.0f / (float)voxen_Settings.ScreenWidth; m[1] =                                         0.0f; m[2] =  0.0f; m[3] = 0.0f;
+    m[4] =                                     0.0f; m[5] = -2.0f / ((float)voxen_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
+    m[8] =                                     0.0f; m[9] =                                         0.0f; m[10]= -1.0f; m[11]= 0.0f;
+    m[12]=                                    -1.0f; m[13]=                                         1.0f; m[14]=  0.0f; m[15]= 1.0f;
+    
+    aspect3D = (float)voxen_Settings.ScreenWidth / (float)voxen_Settings.ScreenHeight;
+    float f = vcot(voxen_Settings.FOV * PI / 360.0f);
+    m = rasterPerspectiveProjection;
+    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
+    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
+    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
+    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
+    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(voxen_Settings.FOV * (float)M_PI / 360.0f) * (1.0f + aspect3D * aspect3D));
+}
+
+void UpdateScreenSize(void) {
+    UpdateProjectionMatrices();
+    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    glUniform1ui(2, voxen_Settings.ScreenWidth);
+    glUniform1ui(3, voxen_Settings.ScreenHeight);
+    glUniform1i(26, SSR_RES);
+    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUniform1ui(6, voxen_Settings.ScreenWidth);
+    glUniform1ui(7, voxen_Settings.ScreenHeight);
+    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
+    glUniform1ui(0, voxen_Settings.ScreenWidth / SSR_RES);
+    glUniform1ui(1, voxen_Settings.ScreenHeight / SSR_RES);       
+    glUniform1i(2, SSR_RES);
+}
+
+void ApplySettings(void) {
+    UpdateScreenSize();
+    SetSkyRotateSpeed();
+    SetVSync();
+    SetFog();
+    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    glUniform1ui(5, voxen_Settings.Reflections);
+    glUniform1ui(6, voxen_Settings.AntiAliasing);
+    glUniform1f(14, voxen_Settings.FOV);
+    glUniform1f(16, aspect3D);
+    glUniform1ui(22, voxen_Settings.Shadows);
+    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUniform1ui(14, voxen_Settings.Reflections);   glUniform1ui(15, voxen_Settings.Shadows);
+}
+
+// Load Game/Mod Definition
+void ParseGameData(void) {
+    double start_time = get_time();
+    const char* filename = "./Data/gamedata.txt";
+    DualLog("Loading game definition from %s...",filename);    
+    Entity entry;
+    InitializeEntity(&entry);
+    FILE *gamedatfile = fopen(filename, "r");
+    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); OS_Exit(1); }
+    
+    uint32_t lineNum = 0;
+    bool is_eof;
+    while (!feof(gamedatfile)) {
+        char token[256];
+        bool is_comment, is_newline;
+        if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
+            if (is_comment || is_newline) { lineNum += is_newline; continue; }
+        }
+        
+        char key[256];
+        strncpy(key, token, sizeof(key) - 1);
+        key[sizeof(key) - 1] = '\0';
+        if (!read_token(gamedatfile, token, sizeof(token), '\n', &is_comment, &is_eof, &is_newline, &lineNum)) continue;
+        
+        process_gamedata_key_value(&entry, key, token, key, lineNum);
+        lineNum += 1;
+    }
+    
+    fclose(gamedatfile);
+    if (strcmp(voxen_globalContext.global_modname, "Citadel") == 0) voxen_globalContext.global_modIsCitadel = true;
+    ApplySettings();
+    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",voxen_globalContext.global_modname, voxen_globalContext.numLevels, voxen_globalContext.startLevel, get_time() - start_time);
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-truncation"
+bool parse_data_file(DataParser *parser, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
+    
+    char line[1024];
+    uint32_t lineNum = 0;
+    uint32_t max_index = 0;
+    while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
+        lineNum++;        
+        char *start = line;
+        while (data_parser_isspace(*start)) start++;
+        char *end = start + strlen(start) - 1;
+        while (end > start && data_parser_isspace(*end)) { *end = '\0'; end--; }
+        if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
+        if (line[0] == '#') { continue; }
+
+        char *colon = strchr(start, ':');
+        if (colon && strncmp(start, "index", colon - start) == 0) {
+            char *value = colon + 1;
+            while (data_parser_isspace(*value)) value++;
+            uint32_t idx = parse_numberu32(value, line, lineNum);
+            if (idx > max_index) max_index = idx;
+       }
+    }
+
+    if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
+
+    uint32_t entry_count = max_index + 1;
+    if (entry_count > parser->capacity) {
+        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
+        parser->entries = new_entries;
+        for (uint32_t i = parser->capacity; i < entry_count; ++i) InitializeEntity(&parser->entries[i]);
+        parser->capacity = entry_count;
+    }
+    
+    parser->count = entry_count;
+    rewind(file);
+    Entity entry;
+    InitializeEntity(&entry);
+    int32_t entries_stored = 0;
+    lineNum = 0;
+    int32_t currentChild = -1;
+    while (fgets(line, sizeof(line), file)) {
+        lineNum++;
+        char *start = line;
+        if (strlen(start) < 3) continue; // Must have at least k:v, skip if shorter
+
+        while (data_parser_isspace(*start)) start++;
+        char *end = start + strlen(start) - 1;
+        while (end > start && data_parser_isspace(*end)) { *end = '\0'; end--; }
+        if (*start == '\0') continue; // Skip empty line
+        if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
+
+        if (*start == '#' && *(start + 1) != '#') {
+            // Store previous entry if valid
+            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
+                parser->entries[entry.index] = entry;
+                entries_stored++;
+            }
+            
+            // Start new entry
+            InitializeEntity(&entry);
+            strncpy(entry.path, start + 1, sizeof(entry.path) - 1);
+            entry.path[sizeof(entry.path) - 1] = '\0';
+            continue;
+        }
+
+        // Handle key-value pair
+        char *colon = strchr(start, ':');
+        if (colon) {
+            *colon = '\0';
+            char *key = start;
+            char *value = colon + 1;
+            while (data_parser_isspace(*key)) key++;
+            while (data_parser_isspace(*value)) value++;
+            if (*key && *value) {
+                while (data_parser_isspace(*key)) key++;
+                while (data_parser_isspace(*value)) value++;
+                char trimmed_key[256];
+                char trimmed_value[256];
+                strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
+                strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
+                trimmed_key[sizeof(trimmed_key) - 1] = '\0';
+                trimmed_value[sizeof(trimmed_value) - 1] = '\0';
+                char *key_end = trimmed_key + strlen(trimmed_key) - 1;
+                char *val_end = trimmed_value + strlen(trimmed_value) - 1;
+                while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
+                while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
+                if (strncmp(trimmed_key, "chunk_", 6) == 0) {
+                    strncpy(entry.path, trimmed_key, sizeof(entry.path) - 1);
+                    entry.path[sizeof(entry.path) - 1] = '\0';
+                } else {
+                         if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "persistent") == 0)        entry.persistent = parse_bool(trimmed_value, start, lineNum); // Didn't feel worthy of being considered an entflag so left separte
+                    else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "animated") == 0)          entry.animated = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "alttexture") == 0)           entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "altglowtexture") == 0)    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "spectexture") == 0)       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "normtexture") == 0)       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "doublesided") == 0)       flag_set(&entry.entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "transparent") == 0)       flag_set(&entry.entflags,ENTFLAG_TRANSPARENT,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "cardchunk") == 0)         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
+
+                    else if (strcmp(trimmed_key, "collider") == 0)          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_centerx") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_centery") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_centerz") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_sizex") == 0)    entry.colliderSize.x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_sizey") == 0)    entry.colliderSize.y = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "collider_sizez") == 0)    entry.colliderSize.z = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "colliderMeshIndex") == 0) entry.colliderMeshIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "mass") == 0)              entry.mass = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "linearDrag") == 0)        entry.linearDrag = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "angularDrag") == 0)       entry.angularDrag = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "kinematic") == 0)         flag_set(&entry.entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "useGravity") == 0)        flag_set(&entry.entflags,ENTFLAG_USEGRAVITY,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "bounciness") == 0)        entry.bounciness = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry.dynamicFriction = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry.frictionCombine = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry.bounceCombine = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "numclips") == 0)          entry.numclips = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "animationNum") == 0)      entry.animationNum = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "changeMatOnActive") == 0) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "blinkWhenActive") == 0)   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "noshadows") == 0)         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value, start, lineNum));
+
+                    else if (strcmp(trimmed_key, "volume") == 0)            entry.volume = parse_float(trimmed_value, start, lineNum);
+                    
+                    else if (strcmp(trimmed_key, "##child") == 0) {
+                        ++currentChild;
+                        if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children %u! Minivan is full!!\n", currentChild); OS_Exit(1); }
+                        
+                        entry.child[currentChild] = parse_numberu16(trimmed_value, start, lineNum);
+                    } else if (strcmp(trimmed_key, "child_offsetx") == 0)    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child_offsety") == 0)    entry.child_offset[currentChild].y = parse_float(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "child_offsetz") == 0)    entry.child_offset[currentChild].z = parse_float(trimmed_value, start, lineNum);
+                }
+            } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
+        } else {
+            DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
+        }
+    }
+
+    // Store last entry
+    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
+        parser->entries[entry.index] = entry;
+        entries_stored++;
+    }
+
+    fclose(file);
+    return true;
+}
+#pragma GCC diagnostic pop
 
 // GLFW Callbacks
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
     if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        if (log_playback) {
-            log_playback = false;
-            DualLog("Exited log playback manually.  Control returned\n");
-        } else {
-            EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
+        if (log_playback) { log_playback = false; DualLog("Exited log playback manually.  Control returned\n"); return; }
+        
+        EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
+    } else {
+        if (!log_playback) {
+            if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent(EV_KEYDOWN, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
+            else if (action == GLFW_RELEASE) EnqueueEvent(EV_KEYUP, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
         }
-
-        return;
-    }
-    
-    if (!log_playback) {
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent(EV_KEYDOWN, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-        else if (action == GLFW_RELEASE) EnqueueEvent(EV_KEYUP, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
@@ -123,19 +478,10 @@ void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and fallin
 }
 
 void UpdatePlayerFacingAngles(void) {
-    float x2 = instances[PLAYER1].rotation.x * instances[PLAYER1].rotation.x;
-    float y2 = instances[PLAYER1].rotation.y * instances[PLAYER1].rotation.y;
-    float z2 = instances[PLAYER1].rotation.z * instances[PLAYER1].rotation.z;
-    float xy = instances[PLAYER1].rotation.x * instances[PLAYER1].rotation.y;
-    float xz = instances[PLAYER1].rotation.x * instances[PLAYER1].rotation.z;
-    float yz = instances[PLAYER1].rotation.y * instances[PLAYER1].rotation.z;
-    float wx = instances[PLAYER1].rotation.w * instances[PLAYER1].rotation.x;
-    float wy = instances[PLAYER1].rotation.w * instances[PLAYER1].rotation.y;
-    float wz = instances[PLAYER1].rotation.w * instances[PLAYER1].rotation.z;
-    instances[PLAYER1].forward = (Vector3){ 2.0f * (xz + wy), 2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };
-    instances[PLAYER1].right = (Vector3){ 1.0f - 2.0f * (y2 + z2), 2.0f * (xy + wz), 2.0f * (xz - wy) };
-    instances[PLAYER1].forward = normalize_vector3(instances[PLAYER1].forward);
-    instances[PLAYER1].right = normalize_vector3(instances[PLAYER1].right);
+    Quaternion rot = instances[PLAYER1].rotation;
+    float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
+    instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
+    instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
 }
 
 // Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
@@ -153,12 +499,7 @@ void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, flo
     q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
     q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
     q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
-    
-    // Normalize quaterrnion
-    float len = vsqrtf(q->w * q->w + q->x * q->x + q->y * q->y + q->z * q->z);
-    if (len > 1e-6f) { q->x /= len; q->y /= len; q->z /= len; q->w /= len; }
-    else { q->x = 0.0f; q->y = 0.0f; q->z = 0.0f; q->w = 1.0f; }
-}
+} // Skipping quat normalization, not needed
 
 void Input_MouselookApply(void) {
     if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
@@ -198,10 +539,16 @@ void ProcessInput(void) {
     if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
     // End Debug Inputs
     
-    // =========== PAUSE BARRIER ==================
-    if (voxen_globalContext.gamePaused || voxen_Cheats.consoleActive) return;
+    if (keyStates[GLFW_KEY_F12].pressed && voxen_globalContext.current_time > voxen_globalContext.screenshotTimeout) {
+        Screenshot();
+        voxen_globalContext.screenshotTimeout = voxen_globalContext.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
+    }
     
-    uint16_t testlightIdx = (741 * LIGHT_DATA_SIZE);
+    if (keyStates[GLFW_KEY_ESCAPE].pressed) { voxen_globalContext.gamePaused = !voxen_globalContext.gamePaused; return; }
+    if (!window_has_focus || log_playback) return;
+    if (voxen_globalContext.gamePaused || voxen_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
+    
+        uint16_t testlightIdx = (741 * LIGHT_DATA_SIZE);
     if (keyStates[GLFW_KEY_1].down) {
         lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] += 0.01f; lightDirty[741] = true;
     } else if (keyStates[GLFW_KEY_2].down) {
@@ -239,6 +586,8 @@ void ProcessInput(void) {
         cursorPosition_x = voxen_Settings.ScreenWidth / 2;
         cursorPosition_y = voxen_Settings.ScreenHeight / 2;
     }
+    
+    ApplyPlayerMovements();
 }
 
 void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
@@ -308,69 +657,6 @@ GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* d
     return *id;
 }
 
-void SetSkyRotateSpeed(void) {
-    static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
-    float skyRotateSpeed = speeds[voxen_Cheats.dizzyLevel];
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
-    glUniform1f(30, skyRotateSpeed);
-}
-
-void SetFog(void) {
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform3f(4, fogColorR * fogBaseDensityForLevel, fogColorG * fogBaseDensityForLevel, fogColorB * fogBaseDensityForLevel); // TODO: Add gunsmoke accumulation
-}
-
-void SetVSync(void) { glfwSwapInterval(voxen_Settings.Vsync); }
-
-#define MAX_SHADOWMAPS 48u
-#define SHADOW_MAP_SIZE 192u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
-typedef struct {
-    double shadowTime;
-	uint32_t numShadowsCouldRender;
-	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
-    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
-    float shadDotThresh;
-	bool useComputeClear;
-} VoxenShadowSystem;
-VoxenShadowSystem voxen_Shadow_System;
-
-void UpdateProjectionMatrices(void) {
-    float* m;
-    m = uiOrthoProjection;
-    m[0] = 2.0f / (float)voxen_Settings.ScreenWidth; m[1] =                                         0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                                     0.0f; m[5] = -2.0f / ((float)voxen_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                                     0.0f; m[9] =                                         0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                                    -1.0f; m[13]=                                         1.0f; m[14]=  0.0f; m[15]= 1.0f;
-    
-    aspect3D = (float)voxen_Settings.ScreenWidth / (float)voxen_Settings.ScreenHeight;
-    float f = vcot(voxen_Settings.FOV * PI / 360.0f);
-    m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
-    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(voxen_Settings.FOV * (float)M_PI / 360.0f) * (1.0f + aspect3D * aspect3D));
-}
-
-void UpdateScreenSize(void) {
-    UpdateProjectionMatrices();
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
-    glUniform1ui(2, voxen_Settings.ScreenWidth);
-    glUniform1ui(3, voxen_Settings.ScreenHeight);
-    glUniform1i(26, SSR_RES);
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform1ui(6, voxen_Settings.ScreenWidth);
-    glUniform1ui(7, voxen_Settings.ScreenHeight);
-    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
-    glUniform1ui(0, voxen_Settings.ScreenWidth / SSR_RES);
-    glUniform1ui(1, voxen_Settings.ScreenHeight / SSR_RES);       
-    glUniform1i(2, SSR_RES);
-    SetSkyRotateSpeed();
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
-}
-
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
 void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept around for light views for shadowmap cubemap faces.
     float x = camRotation->x, y = camRotation->y, z = camRotation->z, w = camRotation->w;
@@ -411,6 +697,14 @@ void ExtractFrustumPlanes(float* m, FrustumPlane* planes) {
     }
 }
 
+Quaternion cubemapOrientationQuaternion[6] = {
+    {0.0f, 0.707106781f, 0.0f, 0.707106781f},  // +X: Right
+    {0.0f, -0.707106781f, 0.0f, 0.707106781f}, // -X: Left
+    {-0.707106781f, 0.0f, 0.0f, 0.707106781f}, // +Y: Up
+    {0.707106781f, 0.0f, 0.0f, 0.707106781f},  // -Y: Down
+    {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
+    {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
+};
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 bool UpdateLights(bool* voxelsNeedUpdated) {
     if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return false;
@@ -521,8 +815,19 @@ __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float st
             && cursorPosition_y >= endY   && cursorPosition_y <= startY); // 0 == top
 }
 
+Color textColors[TEXT_COLOR_COUNT] = {
+    {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White
+    { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow
+    { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
+    { 0.372549020f, 0.654901961f,  0.168627451f, 1.0f}, // 3 Green
+    { 0.917647059f, 0.137254902f,  0.168627451f, 1.0f}, // 4 Red
+    {         1.0f, 0.498039216f,          0.0f, 1.0f}, // 5 Orange
+    { 0.674509804f, 0.058823529f,  0.070588235f, 1.0f}, // 6 StopD Red
+    { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight
+    { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}  // 8 StopD Red Pause Title
+};
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char* format, ...) {
+void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char * restrict format, ...) {
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(voxen_GL_Comms.textShaderProgram);
@@ -585,14 +890,14 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
     }
 }
 
-void RenderLoadingProgress(int32_t offset, const char* text) { // Only adds 0.01secs to game startup time.
+void RenderLoadingProgress(int32_t offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     RenderFormattedText(voxen_Settings.ScreenWidth / 2 - offset, voxen_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL, text);
     glfwSwapBuffers(voxen_globalContext.window);
 }
 
 char statusText[TEXT_BUFFER_SIZE];
-void CenterStatusPrint(const char* fmt, ...) {
+void CenterStatusPrint(const char * restrict fmt, ...) {
     va_list args;
     va_start(args, fmt);
     (void)vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
@@ -612,19 +917,21 @@ void NewGame(void) {
     questData.lev6SecCode = random_range_u8(0u,9u);
     memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     instances[PLAYER1].index = 767;
-    instances[PLAYER1].layer = PhysicsLayer_Player;
+    instances[PLAYER1].layer = 12; // PhysicsLayer_Player
     instances[PLAYER1].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
     instances[PLAYER1].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
     instances[PLAYER1].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
     instances[PLAYER1].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
     instances[PLAYER1].collider = COLLIDER_TYPE_CAPSULE;
     instances[PLAYER1].colliderCenter.y = 0.84f;
-    instances[PLAYER1].colliderSize = (Vector3) { .x = 0.48f, .y = 2.0f, .z = COLLIDER_CAPSULE_DIRECTION_Y_F}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    instances[PLAYER1].colliderSize = (Vector3) { .x = 0.48f, .y = 2.0f, .z = 1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
     instances[PLAYER1].mass = 1.0f;
     instances[PLAYER1].linearDrag = 8.0f;
     instances[PLAYER1].dynamicFriction = 0.6f;
     instances[PLAYER1].staticFriction = 0.8f;
     instances[PLAYER1].frictionCombine = PHYS_COMBINE_MUL;
+//     instances[PLAYER1].physics_handle = Physics_CreateCharacterCapsule(instances[PLAYER1].colliderSize.x, instances[PLAYER1].colliderSize.y, instances[PLAYER1].position, PhysicsLayer_Player, instances[PLAYER1].mass, false); // false == dynamic
+    Physics_CreatePlayer(instances[PLAYER1].position);
     LoadLevel(voxen_globalContext.startLevel); // Must be after entities!
     voxen_globalContext.pauseRelativeTime = 0.0;
     voxen_globalContext.last_physics_time = get_time();
@@ -665,6 +972,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     voxen_Shadow_System.useComputeClear = (maxWorkGroupCountX > 65536); // Some systems limit the workgroup size to uint16_t (e.g. Mesa on Intel HD4400), so fallback to slower big hammer but reliable glClearBufferData instead for shadowmaps clear
     Input_Init(voxen_globalContext.window);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
     CompileShaders();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     GLuint vaos[4]; GLuint vbos[4];
@@ -729,7 +1037,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
     glDepthMask(GL_TRUE); // Always true, set just once ever.
-    UpdateScreenSize();
+
     float* m = shadowmapsPerspectiveProjection;
     m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
@@ -737,7 +1045,6 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     m[12]= 0.0f; m[13]= 0.0f; m[14]= -2.0f * LIGHT_RANGE_MAX * NEAR_PLANE / (LIGHT_RANGE_MAX - NEAR_PLANE); m[15]=  0.0f;
     InitFontAtlasses();
     RenderLoadingProgress(80,"Loading...");
-//     Input_MouselookApply(); // Input process first time to get correct starting orientation so player isn't looking at the wall.
     InitializeAudio(); // Audio    
     LoadTextForLanguage(voxen_Settings.Language);
     LoadLogTextForLanguage(voxen_Settings.Language);
@@ -761,6 +1068,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
+    Physics_Init();
     LoadEntities();
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
@@ -885,30 +1193,40 @@ void UpdateAnims(void) {
     if (portalsNeedUpdated) PortalCulling();
 }
 
-RaycastHit Raycast(Vector3 origin, Vector3 dir, float maxDist, uint32_t layerMask) {
-    RaycastHit result = {
-        .hit = false,
-        .distance = maxDist,
-        .point = {0.0f, 0.0f, 0.0f},
-        .normal = {0.0f, 0.0f, 0.0f},
-        .hitInstanceIndex = INSTANCE_COUNT
-    };
+#define FROB_DISTANCE 4.9f
+void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
+    float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
+    float offsetY = cursorPosition_y - (voxen_Settings.ScreenHeight * 0.5f);
+    float ndcX = offsetX / (voxen_Settings.ScreenWidth * 0.5f);
+    float ndcY = -offsetY / (voxen_Settings.ScreenHeight * 0.5f);  // flip Y
+    float tanFov = tanf(voxen_Settings.FOV * 0.5f * PI / 180.0f);
+    Vector3 view = (Vector3){ ndcX * tanFov * aspect3D, ndcY * tanFov, -1.0f };
+    view = normalize_vector3(view);
+    Vector3 flipForward = (Vector3){ -forward.x, -forward.y, -forward.z};
+    Vector3 up = normalize_vector3( cross_vector3(right, flipForward) );
+    Vector3 dir = (Vector3){ view.x * right.x + view.y * up.x + view.z * (flipForward.x),
+                             view.x * right.y + view.y * up.y + view.z * (flipForward.y),
+                             view.x * right.z + view.y * up.z + view.z * (flipForward.z) };
+                             
+    voxen_Diagnostics.debugLine_start = pos;
+    voxen_Diagnostics.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
+
+//     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
+//     if (tempHit.hit) {
+//         voxen_Diagnostics.debugLine_end = tempHit.point;
+//         DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
+//     }
     
-    uint16_t hitObjectIndex = UINT16_MAX;
-    for (float curDist=0.0f;curDist<maxDist;curDist+=0.02f) { // 4.9 / 0.04 = 245 tries worst case empty air
-        Vector3 checkPoint = Vector3_A_plus_B(origin, scale_vector3(dir,curDist));
-        hitObjectIndex = PointInSolid(checkPoint, layerMask);
-        if (hitObjectIndex < loadedInstances) {
-            result.hit = true;
-            result.point = checkPoint;
-            result.distance = curDist; // TODO refine the raymarch a little?  nah 0.02 good enough for effects, will apply offset along normal for bullet holes and such anyways.
-            result.normal = Vector3_A_minus_B(checkPoint,origin);
-            result.hitInstanceIndex = hitObjectIndex;
-            return result;
-        }
-    }
+    voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
+}
+
+void UpdateGameplay(void) {
+    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
     
-    return result;
+    if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
+    if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_start, voxen_Diagnostics.debugLine_end);
+    UpdateAmbientSounds();
+    UpdateAnims();
 }
 
 #define SHADOW_NEARMESH_MAX 384 // 350 was too low for light 712 on security atrium
@@ -934,6 +1252,8 @@ typedef struct {
 } LightCandidate;
 
 void RenderShadowmaps(void) {
+    if (voxen_Settings.Shadows < 1u) return;
+    
     double shadowStartTime = get_time();
     glEnable(GL_DEPTH_TEST);
     LightCandidate candidates[MAX_SHADOWMAPS];
@@ -1062,60 +1382,97 @@ void RenderShadowmaps(void) {
 
             if (nearbyMeshCount < 1) continue;
             
-//             qsort(shadows_nearMeshes, nearbyMeshCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)... Fewer draw calls, half shadow CPU cost by skipping this, costs ever so slight amount of increased GPU time.
             glUniform3f(3, candidates[c].position.x, candidates[c].position.y, candidates[c].position.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
-            Vector3 corners[8] = {
-                { candidates[c].position.x + effectiveRadius, candidates[c].position.y + effectiveRadius, candidates[c].position.z + effectiveRadius },
-                { candidates[c].position.x + effectiveRadius, candidates[c].position.y + effectiveRadius, candidates[c].position.z - effectiveRadius },
-                { candidates[c].position.x + effectiveRadius, candidates[c].position.y - effectiveRadius, candidates[c].position.z + effectiveRadius },
-                { candidates[c].position.x + effectiveRadius, candidates[c].position.y - effectiveRadius, candidates[c].position.z - effectiveRadius },
-                { candidates[c].position.x - effectiveRadius, candidates[c].position.y + effectiveRadius, candidates[c].position.z + effectiveRadius },
-                { candidates[c].position.x - effectiveRadius, candidates[c].position.y + effectiveRadius, candidates[c].position.z - effectiveRadius },
-                { candidates[c].position.x - effectiveRadius, candidates[c].position.y - effectiveRadius, candidates[c].position.z + effectiveRadius },
-                { candidates[c].position.x - effectiveRadius, candidates[c].position.y - effectiveRadius, candidates[c].position.z - effectiveRadius }
-            };
-            
             bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, candidates[c].position, 0.64f); // Use some radius for floating point errors
+            #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                            
                 if (!lightPositionInPlayerFrustum) { // Check if at least one of the four points of this cubemap face's frustum are within the player's frustum
                     bool faceOverlapsPlayerView = false;
                     switch (face) {
-                        case 0: // +X: Right (CONFIRMED, skipping face 0 causes shadow to not cast in more positive X direction (e.g. positions more +x from light don't get shadows, aligns to face.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                        case 0: { // +X: Right
+                                Vector3 corner0 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner0,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner1 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner1,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner2 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner2,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner3 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner3,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            }
                             break;
-                        case 1: // -X: Left (CONFIRMED, skipping face 1 causes shadow to not cast in more negative X direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                        case 1: { // -X: Left
+                                Vector3 corner4 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner4,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner5 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner5,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner6 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner6,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner7 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner7,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            }
                             break;
-                        case 2: // +Y: Up (CONFIRMED, skipping face 1 causes shadow to not cast in more positive Y direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                        case 2: { // +Y: Up
+                                Vector3 corner0 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner0,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner1 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner1,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner4 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner4,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner5 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner5,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            }
                             break;
-                        case 3: // -Y: Down (CONFIRMED, skipping face 1 causes shadow to not cast in more negative Y direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                        case 3: { // -Y: Down
+                                Vector3 corner2 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner2,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner3 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner3,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner6 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner6,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner7 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner7,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            }
                             break;
-                        case 4: // +Z: Forward (CONFIRMED, skipping face 1 causes shadow to not cast in more positive Z direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[0],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[2],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[4],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[6],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                        case 4: { // +Z: Forward
+                                Vector3 corner0 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner0,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner2 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner2,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner4 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner4,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner6 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner6,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            }
                             break;
-                        case 5: // -Z: Backward (CONFIRMED, skipping face 1 causes shadow to not cast in more negative Z direction.)
-                            if (dot_vector3(Vector3_A_minus_B(corners[1],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[3],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[5],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            if (dot_vector3(Vector3_A_minus_B(corners[7],instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                        case 5: { // -Z: Backward
+                                Vector3 corner1 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner1,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner3 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner3,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner5 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner5,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+
+                                Vector3 corner7 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, -effectiveRadius });
+                                if (dot_vector3(Vector3_A_minus_B(corner7,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
+                            }
                             break;
                     }
 
@@ -1159,13 +1516,11 @@ void RenderShadowmaps(void) {
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
-void RenderCompositePass(float px, float py, float pz, float* viewProj, float* invViewRot) {
+void RenderCompositePass(float px, float py, float pz, float * restrict viewProj, float * restrict invViewRot) {
     glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.inputImageID);
     glUniform1i(4, 4); // outputImage texture sampler2D
-    glUniform1ui(5, voxen_Settings.Reflections);
-    glUniform1ui(6, voxen_Settings.AntiAliasing);
     float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)voxen_globalContext.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
     if (berserkFinished < (float)voxen_globalContext.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
     glUniform1f(9, berserkTimeRemainingNormalized);
@@ -1173,9 +1528,7 @@ void RenderCompositePass(float px, float py, float pz, float* viewProj, float* i
     glUniform1ui(11, voxen_Settings.Brightness);
     glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
     glUniform3f(13, px, py, pz);
-    glUniform1f(14, voxen_Settings.FOV);
     glUniform1f(15, (float)voxen_globalContext.pauseRelativeTime * 0.1f);
-    glUniform1f(16, aspect3D);
     glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
     glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && voxen_globalContext.currentLevel != LEVEL_CYBERSPACE);
     glUniform1ui(19, ((voxen_globalContext.currentLevel >= 10 && voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
@@ -1186,7 +1539,6 @@ void RenderCompositePass(float px, float py, float pz, float* viewProj, float* i
     }
     
     glUniform1ui(20, shieldOnType);
-    glUniform1ui(22, voxen_Settings.Shadows);
     Color painStaticColor = GetPainStaticColor();
     glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
     glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
@@ -1201,6 +1553,7 @@ void RenderCompositePass(float px, float py, float pz, float* viewProj, float* i
 }
 
 double RenderUI(void) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     voxen_Diagnostics.drawCallsNormal = voxen_Diagnostics.drawCallsRenderedThisFrame;
     float screenCenterX = (float)voxen_Settings.ScreenWidth / 2;
     float screenCenterY = (float)voxen_Settings.ScreenHeight / 2;
@@ -1241,7 +1594,7 @@ double RenderUI(void) {
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_start.x, (double)voxen_Diagnostics.debugLine_start.y, (double)voxen_Diagnostics.debugLine_start.z, (double)voxen_Diagnostics.debugLine_end.x, (double)voxen_Diagnostics.debugLine_end.y, (double)voxen_Diagnostics.debugLine_end.z);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Player inside: %u, named %s, St: %.3f ms", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, testPointInSolid, testPointInSolid == UINT16_MAX ? "-" : GetPrefabNameFromIndex(instances[testPointInSolid].index), voxen_Shadow_System.shadowTime * 1000);
+    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
     if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
     if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
@@ -1284,45 +1637,118 @@ double RenderUI(void) {
     return time_now;
 }
 
-void Frob(Vector3 pos) {
-    float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
-    float offsetY = cursorPosition_y - (voxen_Settings.ScreenHeight * 0.5f);
-    float ndcX = offsetX / (voxen_Settings.ScreenWidth * 0.5f);
-    float ndcY = -offsetY / (voxen_Settings.ScreenHeight * 0.5f);  // flip Y
-    float tanFov = tanf(voxen_Settings.FOV * 0.5f * PI / 180.0f);
-    Vector3 view = (Vector3){ ndcX * tanFov * aspect3D, ndcY * tanFov, -1.0f };
-    view = normalize_vector3(view);
-    Vector3 up = (Vector3){ instances[PLAYER1].right.y * (-instances[PLAYER1].forward.z) - instances[PLAYER1].right.z * (-instances[PLAYER1].forward.y), instances[PLAYER1].right.z * (-instances[PLAYER1].forward.x) - instances[PLAYER1].right.x * (-instances[PLAYER1].forward.z), instances[PLAYER1].right.x * (-instances[PLAYER1].forward.y) - instances[PLAYER1].right.y * (-instances[PLAYER1].forward.x) };
-    up = normalize_vector3(up);
-    Vector3 dir = (Vector3){ view.x * instances[PLAYER1].right.x + view.y * up.x + view.z * (-instances[PLAYER1].forward.x), view.x * instances[PLAYER1].right.y + view.y * up.y + view.z * (-instances[PLAYER1].forward.y), view.x * instances[PLAYER1].right.z + view.y * up.z + view.z * (-instances[PLAYER1].forward.z) };
-    voxen_Diagnostics.debugLine_start = pos;
-    voxen_Diagnostics.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
-    RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
-    if (tempHit.hit) {
-        voxen_Diagnostics.debugLine_end = tempHit.point;
-        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
-    }
-    
-    voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
-}
-
-void UpdateGameplay(void) {
-    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
-    
-    if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position);
-    if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_start, voxen_Diagnostics.debugLine_end);
-    UpdateAmbientSounds();
-    UpdateAnims();
-}
-
 DepthSort visibleInstances[INSTANCE_COUNT];
 
+void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx, Vector3 playerPos, bool transparents) {
+    uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
+    for (uint16_t i = instancesStartIdx; i < instancesEndIdx; ++i) {
+        Vector3 objPos = instances[i].position;
+        uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
+        Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
+        float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        if (distSqrd >= FAR_PLANE_SQUARED) continue;
+
+        if (EntityIndexIsPortalBlockingDoor(instances[i].index) && !transparents) { // Extra checks only needed for opaque portal blocking doors.
+            bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
+            if (!inPVS) {
+                uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+                int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
+                for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
+                    for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
+                        if (!XZPairInBounds(ix, iz)) continue;
+                        int subIdx = iz * WORLDX + ix;
+                        if ((gridCellStates[subIdx] & CELL_VISIBLE) && get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx)) {
+                            inPVS = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!inPVS) continue;
+        } else {
+            if (!(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+                if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
+            }
+            
+            if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f) continue; // 30.72 * 30.72, 12 cells
+        }
+        
+        float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
+        float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
+        if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
+        
+        visibleInstances[visibleCount].index = i;
+        visibleInstances[visibleCount].depth = distSqrd;
+        visibleCount++;
+    }
+    
+    if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), transparents ? compareDepthSort : compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
+    for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
+        uint16_t i = visibleInstances[visibleIndex].index;
+        glUniform1ui(0, i);
+        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+        if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
+        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        if (currentModelType != modelType) {
+            currentModelType = modelType;
+            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+        }
+        
+        uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
+        glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
+        voxen_Diagnostics.drawCallsRenderedThisFrame++;
+        voxen_Diagnostics.verticesRenderedThisFrame += vertCount;
+    }
+}
+
+void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
+    glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
+    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
+    glUniform1ui(3, 0u); /* isUI false */    glUniform1ui(17, 0u); // unlit false
+    glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
+    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, startOfDoubleSidedInstances, playerPos, false);
+    
+    glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
+    RenderInstancesBetween(startOfDoubleSidedInstances, startOfTransparentInstances, playerPos, false);
+    
+    glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
+    RenderInstancesBetween(startOfTransparentInstances, loadedInstances - invalidModelIndexCount, playerPos, true);
+    
+    DrawDebugLines(viewProj);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void RenderSSR(float* viewProj, Vector3 playerPos) {
+    if (voxen_Settings.Reflections < 1u) return;
+    
+    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
+    glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
+    glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
+    GLuint groupX_ssr = ((voxen_Settings.ScreenWidth  / SSR_RES) + 31) / 32;
+    GLuint groupY_ssr = ((voxen_Settings.ScreenHeight / SSR_RES) + 31) / 32;
+    glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+}
+
+void UpdateDiagnosticPoll(double time_now) {
+    voxen_globalContext.last_time = time_now;
+    if ((time_now - voxen_Diagnostics.lastFrameSecCountTime) < 1.00) return;
+    
+    voxen_Diagnostics.lastFrameSecCountTime = time_now;
+    voxen_Diagnostics.framesPerLastSecond = voxen_Diagnostics.globalFrameNum - voxen_Diagnostics.lastFrameSecCount;
+    if (voxen_Diagnostics.framesPerLastSecond < voxen_Diagnostics.worstFPS && voxen_Diagnostics.globalFrameNum > 2000) voxen_Diagnostics.worstFPS = voxen_Diagnostics.framesPerLastSecond; // After startup, keep track of worst framerate seen.
+    voxen_Diagnostics.lastFrameSecCount = voxen_Diagnostics.globalFrameNum;
+}
+
 void Render(void) {
-    voxen_Diagnostics.drawCallsRenderedThisFrame = 0; // Reset per frame
-    voxen_Diagnostics.textDrawCallsRenderedThisFrame = 0;
-    voxen_Diagnostics.uiImageDrawCallsRenderedThisFrame = 0;
-    voxen_Diagnostics.shadowDrawCallsRenderedThisFrame = 0;
-    voxen_Diagnostics.verticesRenderedThisFrame = 0;
+    voxen_Diagnostics.drawCallsRenderedThisFrame = voxen_Diagnostics.textDrawCallsRenderedThisFrame = voxen_Diagnostics.uiImageDrawCallsRenderedThisFrame = voxen_Diagnostics.shadowDrawCallsRenderedThisFrame = voxen_Diagnostics.verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
@@ -1343,211 +1769,20 @@ void Render(void) {
     
     float viewProj[16]; // view-projection matrix
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
-    float invViewRot[9];
-    invViewRot[0] = view[0]; invViewRot[3] = view[1]; invViewRot[6] = view[2];
-    invViewRot[1] = view[4]; invViewRot[4] = view[5]; invViewRot[7] = view[6];
-    invViewRot[2] = view[8]; invViewRot[5] = view[9]; invViewRot[8] = view[10];
+    float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
-    if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) { // !PAUSED BLOCK -------------------------------------------------   
+    if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) {
         glBindVertexArray(voxen_GL_Comms.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
-        if (voxen_Settings.Shadows > 0u) RenderShadowmaps();
-        memset(lightDirty,0,LIGHT_COUNT * sizeof(bool));         // Clear dirty after shadowmaps for minimal shadowmap updating.
+        RenderShadowmaps();
+        memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
         memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-        
-        // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-        glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into  
-        glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-        glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
-        glUniform1ui(3, 0u); // isUI false
-        glUniform1f(8, worldMin_x);
-        glUniform1f(9, worldMin_z);
-        glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-        glUniform1ui(14, voxen_Settings.Reflections);
-        glUniform1ui(15, voxen_Settings.Shadows);
-        glUniform1ui(17, 0u); // unlit false
-        glEnable(GL_CULL_FACE); // Opaques
-        glEnable(GL_DEPTH_TEST);
-        glDisable(GL_BLEND);
-        uint16_t visibleCount = 0;
-        uint32_t currentTexIndex = 0;
-        uint32_t currentNormIndex = 0;
-        uint32_t currentGlowIndex = 0;
-        uint32_t currentSpecIndex = 0;
-        uint16_t currentModelType = 0;
-        for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < startOfDoubleSidedInstances; ++i) {
-            Vector3 objPos = instances[i].position;
-            uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
-            Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
-            float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-            if (distSqrd >= FAR_PLANE_SQUARED) continue;
+        RenderInstances(viewProj, playerPos);
+        RenderSSR(viewProj, playerPos); // Screen Space Reflections
+    }
 
-            if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
-                bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
-                if (!inPVS) {
-                    uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                    uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((objPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-                    int r = vfloor(5.12f * (1.0f / WORLDCELL_WIDTH_F));
-                    for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
-                        for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                            if (!XZPairInBounds(ix, iz)) continue;
-                            int subIdx = iz * WORLDX + ix;
-                            if ((gridCellStates[subIdx] & CELL_VISIBLE) && get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx)) {
-                                inPVS = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                if (!inPVS) continue;
-            } else {
-                if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
-                
-                if (!(gridCellStates[instCellIdx] & CELL_OPEN)) {
-                    if (distSqrd >= 943.7184f) continue; // 30.72 * 30.72, 12 cells
-                }
-            }
-            
-            float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-            if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-            
-            visibleInstances[visibleCount].index = i;
-            visibleInstances[visibleCount].depth = distSqrd;
-            visibleCount++;
-        }
-        
-        if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
-        for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
-            uint16_t i = visibleInstances[visibleIndex].index;
-            glUniform1ui(0, i);
-            if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-            if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-            if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-            if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-            if (currentModelType != modelType) {
-                currentModelType = modelType;
-                glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-            }
-            
-            uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-            glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-            voxen_Diagnostics.drawCallsRenderedThisFrame++;
-            voxen_Diagnostics.verticesRenderedThisFrame += vertCount;
-        }
-        
-        glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
-        for (uint16_t i = startOfDoubleSidedInstances; i < startOfTransparentInstances; ++i) {
-            Vector3 objPos = instances[i].position;
-            uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
-            Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
-            float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-            if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
-            
-            float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-            if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-            
-            glUniform1ui(0, i);
-            if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-            if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-            if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-            if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-            if (currentModelType != modelType) {
-                currentModelType = modelType;
-                glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-            }
-            
-            uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-            glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-            voxen_Diagnostics.drawCallsRenderedThisFrame++;
-            voxen_Diagnostics.verticesRenderedThisFrame += vertCount;
-        }
-        
-        glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
-        uint16_t startOfNextType = loadedInstances - invalidModelIndexCount;
-        visibleCount = 0;
-        for (uint16_t i = startOfTransparentInstances; i < startOfNextType; ++i) {
-            Vector3 objPos = instances[i].position;
-            uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
-            Vector3 delta = Vector3_A_minus_B(objPos, playerPos);
-            float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
-            if (distSqrd >= FAR_PLANE_SQUARED) continue;
-            
-            if (!(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
-            }
-            
-            float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
-            float radius = modelBounds[(instances[i].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 2.0f;
-            if (dotResult < 0.0f && distSqrd > (radius * radius)) continue;
-            
-            visibleInstances[visibleCount].index = i;
-            visibleInstances[visibleCount].depth = distSqrd;
-            visibleCount++;
-        }
-
-        if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), compareDepthSort); // Sort by depth (descending for back-to-front)
-        for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
-            uint16_t i = visibleInstances[visibleIndex].index;
-            glUniform1ui(0, i);
-            if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
-            if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-            if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-            if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-            int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
-            if (currentModelType != modelType) {
-                currentModelType = modelType;
-                glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
-            }
-            
-            uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
-            glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-            voxen_Diagnostics.drawCallsRenderedThisFrame++;
-            voxen_Diagnostics.verticesRenderedThisFrame += vertCount;
-        }
-        
-        DrawDebugLines(viewProj);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // 5. SSR (Screen Space Reflections)
-        if (voxen_Settings.Reflections > 0) {
-            glUseProgram(voxen_GL_Comms.ssrShaderProgram);
-            glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-            glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
-            GLuint groupX_ssr = ((voxen_Settings.ScreenWidth  / SSR_RES) + 31) / 32;
-            GLuint groupY_ssr = ((voxen_Settings.ScreenHeight / SSR_RES) + 31) / 32;
-            glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        }
-    } else { // END !PAUSED BLOCK -------------------------------------------------
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); // Allow text to still render while paused
-    }
-    
-    RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot); // 6. Render final meshes' results with full screen quad
-    double time_now = RenderUI();                          // 7. UI
-    
-    // 8. Diagnostics
-    voxen_globalContext.last_time = time_now;
-    if ((time_now - voxen_Diagnostics.lastFrameSecCountTime) >= 1.00) {
-        voxen_Diagnostics.lastFrameSecCountTime = time_now;
-        voxen_Diagnostics.framesPerLastSecond = voxen_Diagnostics.globalFrameNum - voxen_Diagnostics.lastFrameSecCount;
-        if (voxen_Diagnostics.framesPerLastSecond < voxen_Diagnostics.worstFPS && voxen_Diagnostics.globalFrameNum > 2000) voxen_Diagnostics.worstFPS = voxen_Diagnostics.framesPerLastSecond; // After startup, keep track of worst framerate seen.
-        voxen_Diagnostics.lastFrameSecCount = voxen_Diagnostics.globalFrameNum;
-    }
-    
-    if (keyStates[GLFW_KEY_F12].pressed && time_now > voxen_globalContext.screenshotTimeout) {
-        Screenshot();
-        voxen_globalContext.screenshotTimeout = time_now + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-    }
-    
-    if (keyStates[GLFW_KEY_ESCAPE].pressed) voxen_globalContext.gamePaused = !voxen_globalContext.gamePaused;
-    voxen_Diagnostics.cpuTime = get_time() - voxen_globalContext.current_time;
+    RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot);
+    UpdateDiagnosticPoll( RenderUI() );
+    voxen_Diagnostics.cpuTime = get_time() - voxen_globalContext.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(voxen_globalContext.window); // Present frame
     CHECK_GL_ERROR();
 }
@@ -1628,9 +1863,11 @@ int32_t main(int32_t argc, char* argv[]) {
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     while(1) { // Main Loop
+        ProcessInput(); // Calls ApplyPlayerMovements()
+        UpdatePlayerFacingAngles();
         UpdateTime();
         InputClearRisingAndFallingEdges();
-        UpdateEvents();
+        UpdateEvents(); // Calls Physics()
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
         
         UpdateGameplay();

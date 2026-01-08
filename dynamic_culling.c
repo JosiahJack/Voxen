@@ -28,37 +28,38 @@ static inline void set_cull_bit(uint32_t* arr, int idx, bool val) {
     else arr[word] &= ~(1U << bit);
 }
 
+static unsigned char* LoadCullPNG(const char* name, int level) {
+    char path[256];
+    sprintf(path, "./Data/%s_%d.png", name, level);
+    FILE* fp = fopen(path, "rb");
+    if (!fp) { DualLogError("Failed to open %s\n", path); OS_Exit(1); }
+
+    fseek(fp, 0, SEEK_END);
+    size_t size = ftell(fp);
+    if (size > MAX_CULL_FILESIZE) { DualLogError("PNG too large: %s\n", path); OS_Exit(1); }
+    fseek(fp, 0, SEEK_SET);
+
+    size_t read_size = fread(cullingFileBuffer, 1, size, fp);
+    fclose(fp);
+    if (read_size != size) { DualLogError("Failed to read %s\n", path); OS_Exit(1); }
+
+    int w, h;
+    unsigned char* pixels = stbi_load_from_memory(cullingFileBuffer, size, &w, &h);
+    if (!pixels) { DualLogError("STB failed: %s\n", path); OS_Exit(1); }
+    return pixels;
+}
+
+#define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
 void DetermineClosedEdges(void) {
     stbi__arena_init();
-    FILE* fp;
-    size_t file_size, read_size;
-    int32_t wpng, hpng;
-    
-    // ------------------- Open Cells ------------------
-    char filename2[256];
-    sprintf(filename2,"./Data/worldcellopen_%d.png", voxen_globalContext.currentLevel);
-    fp = fopen(filename2, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename2); OS_Exit(1); }
-    
-    fseek(fp, 0, SEEK_END);
-    file_size = ftell(fp);
-    if (file_size > MAX_CULL_FILESIZE) { DualLogError("PNG file %s too large (%zu bytes)\n", filename2, file_size); OS_Exit(1); }
-    
-    fseek(fp, 0, SEEK_SET);
-    read_size = fread(cullingFileBuffer, 1, file_size, fp);
-    fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename2); OS_Exit(1); }
-    unsigned char* openPixels = stbi_load_from_memory(cullingFileBuffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
-	if (!openPixels) { DualLogError("Failed to read %s for culling open cells\n", filename2); OS_Exit(1); }
- 
+    unsigned char* openPixels  = LoadCullPNG("worldcellopen", voxen_globalContext.currentLevel);
     unsigned char openData_r, openData_g, openData_b;
     uint16_t totalOpenCells = 0;
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~CELL_OPEN;
-            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
-            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            int32_t pixelIdx = PIXEL_IDX(x,z);
             openData_r = openPixels[pixelIdx + 0];
             openData_g = openPixels[pixelIdx + 1];
             openData_b = openPixels[pixelIdx + 2];
@@ -72,34 +73,14 @@ void DetermineClosedEdges(void) {
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-
-    // ------------------- Closed Edges ------------------    
-    char filename[256];
-    sprintf(filename,"./Data/worldedgesclosed_%d.png", voxen_globalContext.currentLevel);
-
-    fp = fopen(filename, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename); OS_Exit(1); }
-    
-    fseek(fp, 0, SEEK_END);
-    file_size = ftell(fp);
-    if (file_size > MAX_CULL_FILESIZE) { DualLogError("PNG file %s too large (%zu bytes)\n", filename, file_size); OS_Exit(1); }
-    
-    fseek(fp, 0, SEEK_SET);
-    read_size = fread(cullingFileBuffer, 1, file_size, fp);
-    fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename); OS_Exit(1); }
-
-    unsigned char* edgePixels = stbi_load_from_memory(cullingFileBuffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
-    if (!edgePixels) { DualLogError("Failed to read %s for culling closed edges\n", filename); OS_Exit(1); }
-
+    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed", voxen_globalContext.currentLevel);
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
     uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
     for (int32_t x=0;x<WORLDX;x++) {
         for (int32_t z=0;z<WORLDZ;z++) {
             int32_t cellIdx = (z * WORLDX) + x;
             gridCellStates[cellIdx] &= ~(CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST); // Mark all edges not closed
-            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
-            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            int32_t pixelIdx = PIXEL_IDX(x,z);
             closedData_r = edgePixels[pixelIdx + 0];
             closedData_g = edgePixels[pixelIdx + 1];
             closedData_b = edgePixels[pixelIdx + 2];
@@ -107,48 +88,23 @@ void DetermineClosedEdges(void) {
             if (closedData_r > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDNORTH; closedCountNorth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
             if (closedData_g > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDEAST; closedCountEast += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
             if (closedData_b > 127) { gridCellStates[cellIdx] |= CELL_CLOSEDSOUTH; closedCountSouth += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0; }
-            if (   (closedData_r < 255 && closedData_r > 0)
-                || (closedData_g < 255 && closedData_g > 0)
-                || (closedData_b < 255 && closedData_b > 0)) {
-                
+            if ((closedData_r < 255 && closedData_r > 0) || (closedData_g < 255 && closedData_g > 0) || (closedData_b < 255 && closedData_b > 0)) {
                 // Anything that has closed west edge will be not at full 255 on at least one channel.
                 // Typical for all other edge conditions is to use full brightness 255 on the channel(s).
-                // All 4 closed would be 128 128 128 but this doesn't ever happen.
-                // None closed is 0 0 0
+                // All 4 closed would be 128 128 128 but this doesn't ever happen. None closed is 0 0 0
                 gridCellStates[cellIdx] |= CELL_CLOSEDWEST; closedCountWest += gridCellStates[cellIdx] & CELL_OPEN ? 1 : 0;
             }
             
-            if (closedData_a > 0 && closedData_a < 255) {
-                gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST;
-            }
+            if (closedData_a > 0 && closedData_a < 255) gridCellStates[cellIdx] |= CELL_CLOSEDNORTH | CELL_CLOSEDEAST | CELL_CLOSEDSOUTH | CELL_CLOSEDWEST;
         }
     }
-    
-    DualLog("found %d open cells, closed edges N: %d, S: %d, E: %d, W: %d...",totalOpenCells,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
-    
-    // ------------------- Sky/Sun Visibility ------------------    
-    char filename3[256];
-    sprintf(filename3,"./Data/worldcellskyvis_%d.png", voxen_globalContext.currentLevel);
-    fp = fopen(filename3, "rb");
-    if (!fp) { DualLogError("Failed to open %s\n", filename3); OS_Exit(1); }
-    
-    fseek(fp, 0, SEEK_END);
-    file_size = ftell(fp);
-    if (file_size > MAX_CULL_FILESIZE) { DualLogError("PNG file %s too large (%zu bytes)\n", filename3, file_size); OS_Exit(1); }
-    
-    fseek(fp, 0, SEEK_SET);
-    read_size = fread(cullingFileBuffer, 1, file_size, fp);
-    fclose(fp);
-    if (read_size != file_size) { DualLogError("Failed to read %s\n", filename3); OS_Exit(1); }
-    unsigned char* skyPixels = stbi_load_from_memory(cullingFileBuffer, file_size, &wpng, &hpng); // I handmade them, well what can ya do
-    if (!skyPixels) { DualLogError("Failed to read %s for culling sky visibility\n", filename3); OS_Exit(1); }
-
+        
+    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis", voxen_globalContext.currentLevel);
     unsigned char skyData_r, skyData_g, skyData_b;
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx = (z * WORLDX) + x;
-            int32_t flippedZ = (WORLDZ - 1) - z; // Flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
-            int32_t pixelIdx = (x + (flippedZ * WORLDX)) * 4; // 4 channels
+            int32_t pixelIdx = PIXEL_IDX(x,z);
             skyData_r = skyPixels[pixelIdx + 0];
             skyData_g = skyPixels[pixelIdx + 1];
             skyData_b = skyPixels[pixelIdx + 2];
@@ -159,6 +115,7 @@ void DetermineClosedEdges(void) {
     }
     
     munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
+    DualLog("found %d open cells, closed edges N: %d, S: %d, E: %d, W: %d...",totalOpenCells,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }
 
@@ -678,8 +635,6 @@ void CullCore(void) {
     glNamedBufferData(voxen_GL_Comms.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
 }
 
-void Cull(void) {
-    if (voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
-
-    if (UpdatedPlayerCell()) CullCore(); // Now handle player position updating PVS. Always do UpdatedPlayerCell to set playerCellX and playerCellY.
+void Cull(void) { // Now handle player position updating PVS. Always do UpdatedPlayerCell to set playerCellX and playerCellY.
+    if ((voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) && UpdatedPlayerCell()) CullCore();
 }

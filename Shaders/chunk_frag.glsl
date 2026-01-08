@@ -294,10 +294,12 @@ void main() {
     lighting.rgb += vec3(dither);
 
     // Fog
-    float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0); // This is inverse of fog dist so * (1 / 71.68 far plane)
-    float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
-    fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
-    if (unlit == 0) lighting = mix(fogColor, lighting, 1.0 - fogFac);
+    if (unlit == 0) {
+        float fogFac = clamp(distToPixel * 0.013950893, 0.0, 1.0); // This is inverse of fog dist so * (1 / 71.68 far plane)
+        float lum = dot(lighting, vec3(0.299, 0.587, 0.114));
+        fogFac = clamp(fogFac * (1.0 - lum), 0.0, 1.0);
+        lighting = mix(fogColor, lighting, 1.0 - fogFac);
+    }
 
     outAlbedo = vec4(lighting.rgb, albedoColor.a);
 }

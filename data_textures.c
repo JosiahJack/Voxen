@@ -10,7 +10,6 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <string.h>
-#include "entity.h"
 #include <unistd.h>
 
 DataParser texture_parser;

@@ -23,7 +23,6 @@
 // TODO: Directional light shadowmapping just for sunlight
 // TODO: Let user switch monitors from settings, especially in fullscreen.
 #include "voxen.h"
-#include "entity.h"
 #include "todo.h"
 
 float correctionX, correctionY, correctionZ;

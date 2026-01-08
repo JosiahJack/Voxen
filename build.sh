@@ -78,16 +78,23 @@ cat > Shaders/shaders.h <<'EOF'
 EOF
 
 CC=gcc
+CPP=g++
 export CC=$CC
-CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g -fno-omit-frame-pointer -pedantic-errors -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla -std=c11 -Wall -Wextra -Wdouble-promotion -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -Wformat=2 -Wshadow -Wnull-dereference -Wsuggest-attribute=pure -Wstrict-prototypes -Wno-overlength-strings -Werror=implicit-function-declaration -O1 -march=haswell -mtune=haswell -D_GNU_SOURCE"
-LDFLAGS="-fuse-ld=mold -Wl,--gc-sections -flto -L./External -lassimp -lz -static-libgcc -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -ffast-math -lGL -lfontconfig"
-SOURCES="voxen.c data_parser.c physics.c matvecquat.c audio.c helpers.c console.c event.c hardware.c data_text.c entity.c data_textures.c data_fonts.c os.c todo.c"
+CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g -fno-omit-frame-pointer -pedantic-errors -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla -std=c11 -Wall -Wextra -Wdouble-promotion -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -Wformat=2 -Wshadow -Wnull-dereference -Wsuggest-attribute=pure -Wstrict-prototypes -Wno-overlength-strings -Werror=implicit-function-declaration -Og -march=haswell -mtune=haswell -D_GNU_SOURCE"
+CMINUSMINUSFLAGS="-I./External -pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -g -fno-omit-frame-pointer -pedantic-errors -fno-common -Wvla -std=c++20 -Wall -Wextra -Wdouble-promotion -D_FORTIFY_SOURCE=2 -D_GLIBCXX_ASSERTIONS -Wformat=2 -Wshadow -Wnull-dereference -Wno-overlength-strings -Og -march=haswell -mtune=haswell -D_GNU_SOURCE"
+LDFLAGS="-Wl,--gc-sections -flto -L./External -lassimp -lz -static-libgcc -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -ffast-math -lGL -lfontconfig"
+SOURCES="voxen.c matvecquat.c audio.c helpers.c console.c event.c hardware.c data_text.c entity.c data_textures.c data_fonts.c os.c todo.c"
 export CFLAGS=$CFLAGS
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
+shopt -s globstar
+cp ./External/Jolt/Objects/*.o "$TEMP_DIR"/
+# cp ./External/Jolt/**/*.cpp "$TEMP_DIR"/
+# printf "%s\n" "$TEMP_DIR"/*.cpp | xargs -P12 -I{} $CPP -c {} $CMINUSMINUSFLAGS -o ./{}.o
+g++ -c physics.cpp -I./External -o "$TEMP_DIR"/physics.o
 # cp ./External/assimp/*.o "$TEMP_DIR"/
 cp ./External/glad/glad.o "$TEMP_DIR"/
-mold -run g++ "$TEMP_DIR"/*.o -o voxen $LDFLAGS #g++ for linker to fix compile issues manually linking in Assimp .o files
+g++ "$TEMP_DIR"/*.o $LDFLAGS -o voxen $LDFLAGS
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."
@@ -95,7 +102,7 @@ if [ $link_status -ne 0 ]; then
 fi
 
 if [ $# -eq 0 ] || [ "$1" != "ci" ]; then
-    rm -f "$TEMP_DIR"/*.o ./Shaders/*.h
+   rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp
 fi
 
 build_end=$(now_ms)

@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
-#include "entity.h"
+#include "voxen.h"
 #include "voxen.h"
 #include "todo.h"
 
@@ -107,7 +107,7 @@ void InitializeEntity(Entity* entry) {
     entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
-    entry->layer = PhysicsLayer_Default;
+    entry->layer = 0u; // PhysicsLayer_Default
     entry->animated = 0u;
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;
@@ -192,6 +192,15 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
             }
         }
     }
+}
+
+__attribute__((pure)) bool isDoubleSided(uint32_t texIndexToCheck) {
+    if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
+    return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
+}
+__attribute__((pure)) bool isTransparent(uint32_t texIndexToCheck) {
+    if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
+    return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
 }
 
 uint16_t modelTypeCountsOpaque[MODEL_IDX_MAX];
@@ -345,7 +354,7 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
         instances[instanceIdx].child_scale[i].z = isCardChunk ? entities[entIdx].child_scale[i].z : 1.0f;
     }
     
-    ApplyUnityHierarchyCorrectionAtLevelLoad(instanceIdx, entIdx);
+    ApplyUnityHierarchyCorrectionAtLevelLoad(instanceIdx, entIdx); // TODO: Manually fix these all up to not be needed.
     dirtyInstances[instanceIdx] = true;
     loadedInstances++;
 }
@@ -894,6 +903,31 @@ void LoadLevel(uint8_t curlevel) {
     DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     LoadModels();
+    for (int i=0;i<loadedInstances;++i) {
+        if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
+        if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
+        if (instances[i].index != 174) continue;
+        
+        uint32_t handle = 0;    
+        Vector3 pos = instances[i].position;
+        Vector3 offset = instances[i].colliderCenter;
+        Vector3 size = instances[i].colliderSize;
+        uint8_t layer = instances[i].layer;
+        float mass = instances[i].mass;
+        bool isStatic = !(instances[i].entflags & ENTFLAG_RIGIDBODY);
+        uint16_t mdx = instances[i].modelIndex;
+    //     switch (instances[i].collider) {
+    //         case COLLIDER_TYPE_NONE:       handle = 0; break;
+    //         case COLLIDER_TYPE_SPHERE:     handle = Physics_CreateSphere(size.x, pos, layer, mass, isStatic); break;
+    //         case COLLIDER_TYPE_BOX:        handle = Physics_CreateBox(size, offset, pos, instances[i].rotation, layer, mass, isStatic); break;
+    //         case COLLIDER_TYPE_CAPSULE:    handle = Physics_CreateCapsule(size.x, size.y, pos, instances[i].rotation, layer, mass, isStatic); break;
+    //         case COLLIDER_TYPE_CONVEXMESH:
+                if (modelVertexCounts[mdx] < 3 && modelTriangleCounts[mdx] > 0) DualLogError("Convex mesh collider on entity %u uses model %u with no vertices!\n", i, mdx);
+                else handle = Physics_CreateMeshCollider(modelVertices[mdx], modelTriangles[mdx], modelVertexCounts[mdx], modelTriangleCounts[mdx], pos, instances[i].rotation, layer, mass, isStatic);
+    //     }
+    
+        instances[i].physics_handle = handle;
+    }
     LoadTextures();
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");

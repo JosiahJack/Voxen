@@ -8,13 +8,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "voxen.h"
-#include "entity.h"
 #include <assimp/defs.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 
 DataParser model_parser;
 float** modelVertices = NULL;
+uint32_t** modelTriangles = NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 uint8_t modelAnimationType[MODEL_IDX_MAX] = {0}; // 1kb
@@ -134,7 +134,7 @@ void LoadModels(void) {
     #endif
     
     modelVertices       = mmap(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    uint32_t** modelTriangles      = mmap(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    modelTriangles      = mmap(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     DebugRAM("after main mmap block");
     size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
     int32_t* indexToParser = mmap(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
@@ -325,6 +325,6 @@ void LoadModels(void) {
     glFlush();
     glFinish();
     DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
-    cleanup_all_mmaps();
+//     cleanup_all_mmaps();
     DebugRAM("After Load Models");
 }

@@ -3,6 +3,7 @@
 #include "os.h"
 #include "voxen.h"
 void exit(int status);
+int32_t Physics(void);
 
 double lastJournalWriteTime = 0;
 FILE* activeLogFile = NULL;

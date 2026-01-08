@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "voxen.h"
-#include "entity.h"
 extern uint16_t loadedModelsMaxIndex;
 extern float aspect3D;
 extern float rasterPerspectiveProjection[16];
