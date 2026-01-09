@@ -394,7 +394,7 @@ index: 201
 index: 202
 #Models/hw_lantern.fbx
 index: 203
-#Models/hw_navunit.fbx
+#Models/hw_navunit.obj
 index: 204
 #Models/hw_sensaround.fbx
 index: 205
@@ -1038,7 +1038,7 @@ index: 693
 index: 694
 #Models/hw_lantern_collider.fbx
 index: 695
-#Models/hw_navunit_collider.fbx
+#Models/hw_navunit_collider.obj
 index: 696
 #Models/hw_sensaround_collider.fbx
 index: 697

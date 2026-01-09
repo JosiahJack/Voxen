@@ -1,6 +1,6 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-#define ONLY_LOAD_LEVEL_NEEDS
+// #define ONLY_LOAD_LEVEL_NEEDS
 
 #include <string.h>
 #include <stdarg.h>
@@ -270,8 +270,8 @@ uint32_t Physics_CreateCapsule(float radius, float height, Vector3 position, Qua
 uint32_t Physics_CreateConvexMesh(const float* vertices, uint32_t vertexCount, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic);
 uint32_t Physics_CreateMeshCollider(const float* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t triCount, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic);
 void Physics_CreatePlayer(Vector3 position);
-void Physics_PreStep(float dt);
 void Physics_DestroyBody(uint32_t handle);
+RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask);
 void ApplyPlayerMovements(void);
 // ----------------------------------------------------------------------------
 // Input

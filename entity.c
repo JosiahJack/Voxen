@@ -282,12 +282,13 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].index = entIdx;
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[instanceIdx].modelIndex = entities[entIdx].modelIndex;
+    instances[instanceIdx].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
     instances[instanceIdx].animated = modelAnimationType[instances[instanceIdx].modelIndex];
     instances[instanceIdx].numclips = entities[entIdx].numclips;
     instances[instanceIdx].animationNum = entities[entIdx].animationNum;
     #ifdef ONLY_LOAD_LEVEL_NEEDS
         if (instances[instanceIdx].modelIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[instances[instanceIdx].modelIndex] = true;
-        
+        if (instances[instanceIdx].colliderMeshIndex < MODEL_IDX_MAX) modelIndexUsedForCurrentLevel[instances[instanceIdx].colliderMeshIndex] = true;
         if (EntityIsAnimated(entIdx)) {
             uint16_t numClips = entities[entIdx].numclips;
             uint16_t animNum = entities[entIdx].animationNum;
@@ -335,11 +336,9 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
     instances[instanceIdx].colliderSize.x = entities[entIdx].colliderSize.x;
     instances[instanceIdx].colliderSize.y = entities[entIdx].colliderSize.y;
     instances[instanceIdx].colliderSize.z = entities[entIdx].colliderSize.z;
-    instances[instanceIdx].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
     instances[instanceIdx].mass = entities[entIdx].mass > 0.0f ? entities[entIdx].mass : 1.0f; // Nonzero fallback.
     instances[instanceIdx].linearDrag = entities[entIdx].linearDrag > 0.0f ? entities[entIdx].linearDrag : 0.0f;
     instances[instanceIdx].angularDrag = entities[entIdx].angularDrag > 0.0f ? entities[entIdx].angularDrag : 0.05f;
-//     if (!isCardChunk && entIdx > 306 && entIdx != 472 && entIdx != 473 && entIdx != 474 && entIdx != 475 && entIdx != 476) instances[instanceIdx].scale = (Vector3){ 1.0f, 1.0f, 1.0f};
     for (int i=0;i<MAX_CHILD_COUNT;++i) {
         instances[instanceIdx].child[i] = entities[entIdx].child[i];
         instances[instanceIdx].child_offset[i].x = entities[entIdx].child_offset[i].x;
@@ -903,31 +902,39 @@ void LoadLevel(uint8_t curlevel) {
     DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     LoadModels();
-    for (int i=0;i<loadedInstances;++i) {
-        if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
-        if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
-        if (instances[i].index != 174) continue;
-        
-        uint32_t handle = 0;    
-        Vector3 pos = instances[i].position;
-        Vector3 offset = instances[i].colliderCenter;
-        Vector3 size = instances[i].colliderSize;
-        uint8_t layer = instances[i].layer;
-        float mass = instances[i].mass;
-        bool isStatic = !(instances[i].entflags & ENTFLAG_RIGIDBODY);
-        uint16_t mdx = instances[i].modelIndex;
-    //     switch (instances[i].collider) {
-    //         case COLLIDER_TYPE_NONE:       handle = 0; break;
-    //         case COLLIDER_TYPE_SPHERE:     handle = Physics_CreateSphere(size.x, pos, layer, mass, isStatic); break;
-    //         case COLLIDER_TYPE_BOX:        handle = Physics_CreateBox(size, offset, pos, instances[i].rotation, layer, mass, isStatic); break;
-    //         case COLLIDER_TYPE_CAPSULE:    handle = Physics_CreateCapsule(size.x, size.y, pos, instances[i].rotation, layer, mass, isStatic); break;
-    //         case COLLIDER_TYPE_CONVEXMESH:
-                if (modelVertexCounts[mdx] < 3 && modelTriangleCounts[mdx] > 0) DualLogError("Convex mesh collider on entity %u uses model %u with no vertices!\n", i, mdx);
-                else handle = Physics_CreateMeshCollider(modelVertices[mdx], modelTriangles[mdx], modelVertexCounts[mdx], modelTriangleCounts[mdx], pos, instances[i].rotation, layer, mass, isStatic);
-    //     }
-    
-        instances[i].physics_handle = handle;
-    }
+//     for (int i=0;i<loadedInstances;++i) {
+//         if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
+//         if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
+//         if (instances[i].collider == COLLIDER_TYPE_CONVEXMESH && instances[i].colliderMeshIndex >= loadedModelsMaxIndex) continue;
+//         
+//         uint32_t handle = 0;
+//         Vector3 pos = instances[i].position;
+//         Vector3 offset = instances[i].colliderCenter;
+//         Vector3 size = instances[i].colliderSize;
+//         uint8_t layer = instances[i].layer;
+//         float mass = instances[i].mass;
+//         bool isStatic = !(instances[i].entflags & ENTFLAG_RIGIDBODY);
+//         uint16_t mdx = instances[i].collider == COLLIDER_TYPE_CONVEXMESH ? instances[i].colliderMeshIndex : instances[i].modelIndex;
+//         switch (instances[i].collider) {
+//             case COLLIDER_TYPE_NONE:       handle = 0; break;
+//             case COLLIDER_TYPE_SPHERE:     handle = Physics_CreateSphere(size.x, pos, layer, mass, isStatic); break;
+//             case COLLIDER_TYPE_BOX:        handle = Physics_CreateBox(size, offset, pos, instances[i].rotation, layer, mass, isStatic); break;
+//             case COLLIDER_TYPE_CAPSULE:    handle = Physics_CreateCapsule(size.x, size.y, pos, instances[i].rotation, layer, mass, isStatic); break;
+//             case COLLIDER_TYPE_CONVEXMESH:
+//                 if (modelVertexCounts[mdx] < 3 && modelTriangleCounts[mdx] > 0) DualLogError("Convex mesh collider on entity %u uses model %u with no vertices!\n", i, mdx);
+//                 else handle = Physics_CreateConvexMesh(modelVertices[mdx], modelVertexCounts[mdx], pos, instances[i].rotation, layer, mass, isStatic);
+//                 
+//                 break;
+//             case COLLIDER_TYPE_MESH:
+//                 DualLog("Full mesh collider for %s\n",GetPrefabNameFromIndex(instances[i].index));
+//                 if (modelVertexCounts[mdx] < 3 && modelTriangleCounts[mdx] > 0) DualLogError("Convex mesh collider on entity %u uses model %u with no vertices!\n", i, mdx);
+//                 else handle = Physics_CreateMeshCollider(modelVertices[mdx], modelTriangles[mdx], modelVertexCounts[mdx], modelTriangleCounts[mdx], pos, instances[i].rotation, layer, mass, isStatic);
+//                 
+//                 break;
+//         }
+//     
+//         instances[i].physics_handle = handle;
+//     }
     LoadTextures();
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");

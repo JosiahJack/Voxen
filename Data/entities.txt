@@ -1013,12 +1013,16 @@ model: 270
 texture: 505
 normtexture: 504
 spectexture: 1267
+collider: 5
+colliderMeshIndex: 270
 #chunk_med1_9d_ofs144_90
 index: 177
 model: 272
 texture: 505
 normtexture: 504
 spectexture: 1267
+collider: 5
+colliderMeshIndex: 272
 #chunk_med2_1
 index: 178
 model: 280
@@ -1086,6 +1090,14 @@ model: 288
 texture: 527
 glowtexture: 526
 spectexture: 539
+collider: 1
+collider_centerx: 0.0
+collider_centery: 1.44
+collider_centerz: 0.0
+collider_sizex: 2.56
+collider_sizey: 0.32
+collider_sizez: 2.56
+colliderMeshIndex: 65535
 #chunk_med2_6
 index: 188
 model: 289

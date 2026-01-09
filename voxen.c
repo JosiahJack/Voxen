@@ -931,7 +931,7 @@ void NewGame(void) {
     instances[PLAYER1].staticFriction = 0.8f;
     instances[PLAYER1].frictionCombine = PHYS_COMBINE_MUL;
 //     instances[PLAYER1].physics_handle = Physics_CreateCharacterCapsule(instances[PLAYER1].colliderSize.x, instances[PLAYER1].colliderSize.y, instances[PLAYER1].position, PhysicsLayer_Player, instances[PLAYER1].mass, false); // false == dynamic
-    Physics_CreatePlayer(instances[PLAYER1].position);
+//     Physics_CreatePlayer(instances[PLAYER1].position);
     LoadLevel(voxen_globalContext.startLevel); // Must be after entities!
     voxen_globalContext.pauseRelativeTime = 0.0;
     voxen_globalContext.last_physics_time = get_time();
@@ -1068,7 +1068,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
-    Physics_Init();
+//     Physics_Init();
     LoadEntities();
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
