@@ -325,6 +325,6 @@ void LoadModels(void) {
     glFlush();
     glFinish();
     DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
-//     cleanup_all_mmaps();
+//     cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
     DebugRAM("After Load Models");
 }

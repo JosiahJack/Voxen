@@ -7,11 +7,10 @@
 #include "todo.h"
 #include "data_models.c"
 #include "dynamic_culling.c"
-void Physics_Init(void);
 
 Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
-Voxen_Cheats               voxen_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
+Voxen_Cheats               voxen_Cheats = { .god = false, .noclip = false, .showLocation = true, .showFPS = true, .editMode = true };
 VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 50u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 1u, .Vsync = 0u };
 uint8_t SSR_RES = 8; // Ratio is (1 / SSR_RES) * render resolution.
 Voxen_GL_Comms           voxen_GL_Comms;
@@ -1068,7 +1067,6 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
-//     Physics_Init();
     LoadEntities();
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
@@ -1595,6 +1593,7 @@ double RenderUI(void) {
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_start.x, (double)voxen_Diagnostics.debugLine_start.y, (double)voxen_Diagnostics.debugLine_start.z, (double)voxen_Diagnostics.debugLine_end.x, (double)voxen_Diagnostics.debugLine_end.y, (double)voxen_Diagnostics.debugLine_end.z);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
+    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
     if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
     if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
@@ -1798,7 +1797,9 @@ void UpdateEvents(void) {
     glfwPollEvents();
     if (glfwWindowShouldClose(voxen_globalContext.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
     voxen_globalContext.timeSinceLastPhysicsTick = voxen_globalContext.pauseRelativeTime - voxen_globalContext.last_physics_time;
-    if (!log_playback && !voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) {
+    if (!log_playback && !voxen_globalContext.gamePaused && !voxen_globalContext.menuActive
+        && voxen_globalContext.timeSinceLastPhysicsTick > (1.0f / 144.0f)) {
+        
         voxen_globalContext.last_physics_time = voxen_globalContext.pauseRelativeTime;
         EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
     }
@@ -1862,6 +1863,7 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment(argc,argv[1],argv[2]);
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
+    voxen_globalContext.pauseRelativeTime = get_time();
     while(1) { // Main Loop
         ProcessInput(); // Calls ApplyPlayerMovements()
         UpdatePlayerFacingAngles();

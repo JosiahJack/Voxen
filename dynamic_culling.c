@@ -5,6 +5,8 @@ extern uint8_t*  stbi__arena_base;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 
 uint32_t gridCellStates[ARRSIZE];
+float gridCellFloorHeight[ARRSIZE];
+float gridCellCeilingHeight[ARRSIZE];
 uint32_t precomputedVisibleCellsFromHere[PRECOMPUTED_VISIBILITY_SIZE];
 uint16_t playerCellIdx = 0u;
 uint16_t numCellsVisible = 0u;

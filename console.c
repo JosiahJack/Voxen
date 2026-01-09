@@ -87,8 +87,10 @@ __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd
 
 static void cmd_noclip(void) {
     voxen_Cheats.noclip = !voxen_Cheats.noclip;
-    if (voxen_Cheats.noclip) CenterStatusPrint("noclip: %s", voxen_Text.stringTable[1000]); // "ACTIVATED"
-    else CenterStatusPrint("noclip: %s", voxen_Text.stringTable[717]); // "DISABLED"
+    if (voxen_Cheats.noclip) {
+        CenterStatusPrint("noclip: %s", voxen_Text.stringTable[1000]); // "ACTIVATED"
+        instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
+    } else CenterStatusPrint("noclip: %s", voxen_Text.stringTable[717]); // "DISABLED"
 }
 
 static void cmd_edit(void) {

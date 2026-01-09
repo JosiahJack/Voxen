@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <float.h>
 #include "voxen.h"
 #include "voxen.h"
 #include "todo.h"
@@ -902,10 +903,31 @@ void LoadLevel(uint8_t curlevel) {
     DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
     LoadModels();
-//     for (int i=0;i<loadedInstances;++i) {
-//         if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
-//         if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
-//         if (instances[i].collider == COLLIDER_TYPE_CONVEXMESH && instances[i].colliderMeshIndex >= loadedModelsMaxIndex) continue;
+    // Set Physics
+    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = -FLT_MAX;
+    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = FLT_MAX;
+    for (int i=PLAYER1;i<loadedInstances;++i) {
+        int32_t cellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
+        instances[i].cellIndex = cellIdx;
+        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(instances[i].index)) instances[i].gravity = 1.0f; // Normal gravity
+        else instances[i].gravity = 0.0f;
+        
+        if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
+        if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
+        if (instances[i].collider == COLLIDER_TYPE_CONVEXMESH && instances[i].colliderMeshIndex >= loadedModelsMaxIndex) continue;
+        
+        if (instances[i].collider == COLLIDER_TYPE_BOX) {
+            Quaternion quat = instances[i].rotation;
+            Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
+            float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
+            Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
+            float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
+            float floorHeight = (floorangle <= 30.0f) ? instances[i].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
+            if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
+            float ceilHeight = (ceilangle <= 30.0f) ? instances[i].position.y + 1.28f : FLT_MAX;
+            if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
+            continue;
+        }
 //         
 //         uint32_t handle = 0;
 //         Vector3 pos = instances[i].position;
@@ -934,7 +956,21 @@ void LoadLevel(uint8_t curlevel) {
 //         }
 //     
 //         instances[i].physics_handle = handle;
-//     }
+    }
+    
+    float levelMinFloor = FLT_MAX;
+    float levelMaxCeil = -FLT_MAX;
+    for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
+        if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
+        if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
+    }
+    
+    DualLog("Min floor level for %d: %f, Max ceil %f\n", curlevel, (double)levelMinFloor, (double)levelMaxCeil);
+    for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
+        if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
+        if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
+    }
+
     LoadTextures();
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");

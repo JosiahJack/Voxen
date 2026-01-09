@@ -1,6 +1,6 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-// #define ONLY_LOAD_LEVEL_NEEDS
+#define ONLY_LOAD_LEVEL_NEEDS
 
 #include <string.h>
 #include <stdarg.h>
@@ -21,6 +21,17 @@ static inline float vclamp(float x, float a, float b) { return x < a ? a : (x > 
 static inline float vsqrtf(float x) { union { float f; unsigned int i; } u = { x }; u.i = 0x1fbd1df5 + (u.i >> 1); return 0.5f * (u.f + x / u.f); }
 static inline float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 static inline float vcosf(float x) { return vsinf(x + 1.57079632f); }
+static inline float vacosf(float x) {
+    float negate = (x < 0.0f) ? 1.0f : 0.0f;
+    x = vabs(x);
+    float ret = -0.0187293f;
+    ret = ret * x + 0.0742610f;
+    ret = ret * x - 0.2121144f;
+    ret = ret * x + 1.5707288f;
+    ret = ret * vsqrtf(1.0f - x);
+    ret = ret - 2.0f * negate * ret;
+    return negate * PI + (1.0f - 2.0f * negate) * ret;
+}
 static inline float vtan(float x) { return vsinf(x) / vcosf(x); }
 static inline float vcot(float x) { float x2 = x * x; float t = x + (x2 * x) * 0.33333333f; return 1.0f / t; }
 static inline float deg2rad(float degrees) { return degrees * (PI / 180.0f); }
@@ -47,7 +58,6 @@ static inline float vexp2f(float x) {
 
 static inline float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline float vpow(float a, float b) { return vexp(b * vlog(a)); }
-
 
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
@@ -195,6 +205,8 @@ extern uint8_t queuedLevelToLoad;
 extern uint16_t playerCellIdx;
 extern uint16_t numCellsVisible;
 extern uint32_t gridCellStates[ARRSIZE];
+extern float gridCellFloorHeight[ARRSIZE];
+extern float gridCellCeilingHeight[ARRSIZE];
 extern Portal activePortals[MAX_PORTALS];
 extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
@@ -437,7 +449,7 @@ static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
 
 static inline int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
-static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); }
+static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
 
 static inline bool XZPairInBounds(int32_t x, int32_t z) {
     return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
@@ -463,6 +475,7 @@ static inline Vector3 Vector3_A_minus_B(Vector3 a, Vector3 b) { return (Vector3)
 static inline Vector3 scale_vector3(Vector3 v, float s) { Vector3 res = {v.x * s, v.y * s, v.z * s}; return res; }
 static inline float dot(float x1, float y1, float z1, float x2, float y2, float z2) { return x1*x2 + y1*y2 + z1*z2; }
 static inline float dot_vector3(Vector3 a, Vector3 b) { return dot(a.x,a.y,a.z, b.x,b.y,b.z); }
+static inline float quat_dot(Quaternion a, Quaternion b) { return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w; }
 static inline float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vector3(v, v)); }
 static inline Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
 static inline Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
@@ -480,6 +493,12 @@ void normalize_quaternion(Quaternion* q);
 Vector3 quat_rotate(Quaternion q, Vector3 v);
 void UpdateInstanceMatrix(int32_t i);
 bool EntityIsAnimated(uint16_t entIdx);
+
+static inline float quat_angle_deg(Quaternion a, Quaternion b) {
+    float d = vabs(quat_dot(a, b));
+    if (d > 1.0f) d = 1.0f;
+    return vacosf(d) * 2.0f * (180.0f / PI);
+}
 
 static inline Quaternion mul_quaternion(Quaternion a, Quaternion b) {
     return (Quaternion){
