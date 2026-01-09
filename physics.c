@@ -119,28 +119,40 @@ void UpdateVelocityFromGravity(void) {
     }
 }
 
-void ApplyVelocityUntilCollision(uint16_t instanceIdx) {
-    Vector3 currentPosition = instances[instanceIdx].position;
-    instances[instanceIdx].cellIndex = PosGetCellCoords(currentPosition.x, currentPosition.z);
-    if (instanceIdx > loadedInstances) return;
-    if (!(instances[instanceIdx].index != PLAYER1 || ConstIndexIsDynamicObject(instances[instanceIdx].index))) return;
-    if (magnitude_vector3(instances[instanceIdx].velocity) < 0.05f) return;
+void ApplyVelocityUntilCollision(uint16_t i) {
+    Vector3 currentPosition = instances[i].position;
+    instances[i].cellIndex = PosGetCellCoords(currentPosition.x, currentPosition.z);
+    float mag = magnitude_vector3(instances[i].velocity);
+    if (i > loadedInstances) return;
+    if (!(instances[i].index != PLAYER1 || ConstIndexIsDynamicObject(instances[i].index))) return;
+    if (mag < 0.05f) return;
     
-    Vector3 newPosition = Vector3_A_plus_B(currentPosition, scale_vector3(instances[instanceIdx].velocity, (float)voxen_globalContext.timeSinceLastPhysicsTick));
+    Vector3 dir = normalize_vector3(instances[i].velocity);
+    Vector3 currentHitPos = Vector3_A_plus_B(instances[i].position, scale_vector3(dir, PLAYER_RADIUS));
+                                                                                  
+    Vector3 newPosition = Vector3_A_plus_B(currentPosition, scale_vector3(instances[i].velocity, (float)voxen_globalContext.timeSinceLastPhysicsTick));
+    Vector3 newHitPos = Vector3_A_plus_B(currentHitPos, scale_vector3(instances[i].velocity, (float)voxen_globalContext.timeSinceLastPhysicsTick));
+    if (i <= PLAYER2 && voxen_Cheats.noclip) { instances[i].position = newPosition; return; }
+    
     int32_t cellCoordsCurrentX = PosGetCellCoordX(currentPosition.x);
     int32_t cellCoordsCurrentZ = PosGetCellCoordZ(currentPosition.z);
-    int32_t cellCoordsX = PosGetCellCoordX(newPosition.x);
-    int32_t cellCoordsZ = PosGetCellCoordZ(newPosition.z);
+    int32_t cellCoordsCurrentHitPosX = PosGetCellCoordX(currentHitPos.x);
+    int32_t cellCoordsCurrentHitPosZ = PosGetCellCoordZ(currentHitPos.z);
+    if (cellCoordsCurrentHitPosX != cellCoordsCurrentX) cellCoordsCurrentX = cellCoordsCurrentHitPosX;
+    if (cellCoordsCurrentHitPosZ != cellCoordsCurrentZ) cellCoordsCurrentZ = cellCoordsCurrentHitPosZ;
+    int32_t cellCoordsX = PosGetCellCoordX(newHitPos.x);
+    int32_t cellCoordsZ = PosGetCellCoordZ(newHitPos.z);
     int32_t cellCoordsCurrent = (cellCoordsCurrentZ * WORLDX) + cellCoordsCurrentX;
     int32_t cellCoords = (cellCoordsZ * WORLDX) + cellCoordsX;
-    bool blockedNorth = false, blockedSouth = false, blockedWest = false, blockedEast = false;
-    if (cellCoordsZ > cellCoordsCurrentZ) blockedNorth = (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDNORTH);
-    if (cellCoordsZ < cellCoordsCurrentZ) blockedSouth = (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDSOUTH);
-    if (cellCoordsX > cellCoordsCurrentX) blockedEast = (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDEAST);
-    if (cellCoordsX < cellCoordsCurrentX) blockedWest = (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDWEST);
-    bool ceilFloorBlocked = false;
-    if (newPosition.y < gridCellFloorHeight[cellCoords] || newPosition.y > gridCellCeilingHeight[cellCoords]) ceilFloorBlocked = true;
-    if (((gridCellStates[cellCoords] & CELL_OPEN) && !blockedNorth && !blockedSouth && !blockedWest && !blockedEast && !ceilFloorBlocked) || (instanceIdx <= PLAYER2 && voxen_Cheats.noclip)) instances[instanceIdx].position = newPosition;
+    if (cellCoordsZ > cellCoordsCurrentZ && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDNORTH)) { instances[i].velocity.z = 0; return; } // blocked north
+    if (cellCoordsZ < cellCoordsCurrentZ && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDSOUTH)) { instances[i].velocity.z = 0; return; } // blocked south
+    if (cellCoordsX > cellCoordsCurrentX && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDEAST)) { instances[i].velocity.x = 0; return; } // blocked east
+    if (cellCoordsX < cellCoordsCurrentX && (gridCellStates[cellCoordsCurrent] & CELL_CLOSEDWEST)) { instances[i].velocity.x = 0; return; } // blocked west
+    if (newHitPos.y < gridCellFloorHeight[cellCoords]) { instances[i].velocity.y = 0; return; } // floor blocked
+    if (newHitPos.y > gridCellCeilingHeight[cellCoords]) { instances[i].velocity.y = 0; return; } // ceiling blocked
+    if (!(gridCellStates[cellCoords] & CELL_OPEN)) { instances[i].velocity = scale_vector3(dir,0); return; } // void blocked
+        
+    instances[i].position = newPosition; // It moves! It lives!!
 }
 
 void UpdatePositions(void) {
