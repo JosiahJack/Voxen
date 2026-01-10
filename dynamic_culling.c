@@ -573,7 +573,7 @@ void CullInit(void) {
 
     gridCellStates[0] |= CELL_VISIBLE; // Errors default here so draw them anyways.
     CullCore(); // Do first Cull pass, forcing as player moved to new cell.
-    glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
+    glUseProgram(Sys_Render.voxelUpdateShaderProgram);
     glUniform1f(0, voxelMinCenterX);
     glUniform1f(1, voxelMinCenterZ);
     glUniform1ui(2, loadedLights);
@@ -634,7 +634,7 @@ void CullCore(void) {
     
     lightDirty[0] = true;
     PortalCulling(); // Update based on portal states.
-    glNamedBufferData(voxen_GL_Comms.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
+    glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
 }
 
 void Cull(void) { // Now handle player position updating PVS. Always do UpdatedPlayerCell to set playerCellX and playerCellY.

@@ -334,13 +334,13 @@ void SaveConfig(void) {
 
 void SetSkyRotateSpeed(void) {
     static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
-    float skyRotateSpeed = speeds[voxen_Cheats.dizzyLevel];
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    float skyRotateSpeed = speeds[Sys_Cheats.dizzyLevel];
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1f(30, skyRotateSpeed);
 }
 
 void SetFog(void) {
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUseProgram(Sys_Render.chunkShaderProgram);
     glUniform3f(4, fogColorR * fogBaseDensityForLevel, fogColorG * fogBaseDensityForLevel, fogColorB * fogBaseDensityForLevel); // TODO: Add gunsmoke accumulation
 }
 
@@ -366,14 +366,14 @@ void UpdateProjectionMatrices(void) {
 
 void UpdateScreenSize(void) {
     UpdateProjectionMatrices();
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1ui(2, Sys_Settings.ScreenWidth);
     glUniform1ui(3, Sys_Settings.ScreenHeight);
     glUniform1i(26, Sys_Settings.SSR_RES);
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUseProgram(Sys_Render.chunkShaderProgram);
     glUniform1ui(6, Sys_Settings.ScreenWidth);
     glUniform1ui(7, Sys_Settings.ScreenHeight);
-    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
+    glUseProgram(Sys_Render.ssrShaderProgram);
     glUniform1ui(0, Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES);
     glUniform1ui(1, Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES);       
     glUniform1i(2, Sys_Settings.SSR_RES);
@@ -410,13 +410,13 @@ void ApplySettings(void) {
     SetGI();
     SetSpeakerMode();
     SetLanguage();
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1ui(5, Sys_Settings.Reflections);
     glUniform1ui(6, Sys_Settings.AntiAliasing);
     glUniform1f(14, Sys_Settings.FOV);
     glUniform1f(16, (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
     glUniform1ui(22, Sys_Settings.Shadows);
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUseProgram(Sys_Render.chunkShaderProgram);
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     DualLog("Applied configuration settings\nSys_Settings.ModelDetail: %u\n", Sys_Settings.ModelDetail);
     // TODO: Render config view on the menu
@@ -493,7 +493,7 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
         Sys_Input.last_mouse_y = ypos;
         if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
         
-        if (voxen_Diagnostics.globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
+        if (Sys_Dx.globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
@@ -532,7 +532,7 @@ void Input_Init(GLFWwindow* window) {
 
 int32_t Input_KeyDown(int32_t keycode) {
     if (keycode >= 0 && keycode < MAX_KEYS) Sys_Input.keyStates[keycode].pressed = Sys_Input.keyStates[keycode].down = true;
-    if (voxen_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
+    if (Sys_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
     return 0;
 }
 
@@ -688,7 +688,7 @@ void ProcessInput(void) {
     
     if (Menu()) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
     if (!Sys_Input.window_has_focus || log_playback) return;
-    if (Sys_Global.gamePaused || voxen_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
+    if (Sys_Global.gamePaused || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
     
     // Debug test light TODO: Remove later once player lantern is working
     uint16_t testlightIdx = (741 * LIGHT_DATA_SIZE);

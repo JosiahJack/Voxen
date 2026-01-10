@@ -54,8 +54,8 @@ float fatigue;
 
 float GetBasePlayerSpeed(bool running) {
     bool isSprinting = Sprint();
-    if (voxen_Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
-    if (voxen_Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
+    if (Sys_Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
+    if (Sys_Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
     if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
     float retval = PLAYER_MAX_WALK_SPEED;
@@ -94,8 +94,8 @@ void ApplyPlayerMovements(void) {
     if (Backpedal())     input = Vector3_A_minus_B(input, (Vector3){forward.x, 0, forward.z});
     if (StrafeRight())     input = Vector3_A_plus_B(input, (Vector3){right.x, 0, right.z});
     if (StrafeLeft())     input = Vector3_A_minus_B(input, (Vector3){right.x, 0, right.z});
-    if (SwimDn()/* && voxen_Cheats.noclip*/) input.y -= 1.0f; // Temporarily allow for now until I have collision working
-    if (SwimUp()/* && voxen_Cheats.noclip*/) input.y += 1.0f;
+    if (SwimDn()/* && Sys_Cheats.noclip*/) input.y -= 1.0f; // Temporarily allow for now until I have collision working
+    if (SwimUp()/* && Sys_Cheats.noclip*/) input.y += 1.0f;
     input = normalize_vector3(input);
     float intent = magnitude_vector3(input);
     float speed = GetBasePlayerSpeed(intent > 0.1f);
@@ -113,7 +113,7 @@ void UpdateVelocityFromGravity(void) {
     for (int32_t i=PLAYER1;i<loadedInstances;++i) {
         if (i > loadedInstances) return;
         if (instances[i].gravity < 0.01f && instances[i].gravity > -0.01f) continue;
-        if (i <= (int32_t)PLAYER2 && voxen_Cheats.noclip) continue;
+        if (i <= (int32_t)PLAYER2 && Sys_Cheats.noclip) continue;
         
         instances[i].velocity = Vector3_A_plus_B(instances[i].velocity, scale_vector3(gravityVelocity, instances[i].gravity * (float)Sys_Global.timeSinceLastPhysicsTick));
     }
@@ -134,7 +134,7 @@ void ApplyVelocityUntilCollision(uint16_t i) {
                                                                                   
     Vector3 newPosition = Vector3_A_plus_B(currentPosition, scale_vector3(instances[i].velocity, (float)Sys_Global.timeSinceLastPhysicsTick));
     Vector3 newHitPos = Vector3_A_plus_B(currentHitPos, scale_vector3(instances[i].velocity, (float)Sys_Global.timeSinceLastPhysicsTick));
-    if (i <= PLAYER2 && voxen_Cheats.noclip) { instances[i].position = newPosition; return; }
+    if (i <= PLAYER2 && Sys_Cheats.noclip) { instances[i].position = newPosition; return; }
     
     int32_t cellCoordsCurrentX = PosGetCellCoordX(currentPosition.x);
     int32_t cellCoordsCurrentZ = PosGetCellCoordZ(currentPosition.z);

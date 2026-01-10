@@ -7,11 +7,10 @@
 #include "todo.h"
 #include "data_models.c"
 #include "dynamic_culling.c"
-
-GlobalContext Sys_Global = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
-VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
-Voxen_Cheats               voxen_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
-Voxen_GL_Comms           voxen_GL_Comms;
+GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
+DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
+CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
+RenderSystem Sys_Render;
 uint8_t queuedLevelToLoad = 3;
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -348,32 +347,32 @@ void CompileShaders(void) {
     GLuint vertShader, fragShader, computeShader;
     vertShader = CompileShader(GL_VERTEX_SHADER, vertexShaderSource, "Chunk Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, fragmentShaderTraditional, "Chunk Fragment Shader");
-    voxen_GL_Comms.chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");
+    Sys_Render.chunkShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Chunk Shader Program");
     
     vertShader = CompileShader(GL_VERTEX_SHADER, debugUnlitVertexShaderSource, "Debug Unlit Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, debugUnlitFragmentShaderSource, "Debug Unlit Fragment Shader");
-    voxen_GL_Comms.debugUnlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Debug Unlit Shader Program");
+    Sys_Render.debugUnlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Debug Unlit Shader Program");
 
     vertShader = CompileShader(GL_VERTEX_SHADER, shadowmapVertexShaderSource, "Shadowmaps Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, shadowmapFragmentShaderSource, "Shadowmaps Fragment Shader");
-    voxen_GL_Comms.shadowmapsShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmaps Shader Program");
+    Sys_Render.shadowmapsShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Shadowmaps Shader Program");
 
     vertShader = CompileShader(GL_VERTEX_SHADER, textVertexShaderSource, "Text Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, textFragmentShaderSource, "Text Fragment Shader");
-    voxen_GL_Comms.textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");
+    Sys_Render.textShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Text Shader Program");
     
     computeShader = CompileShader(GL_COMPUTE_SHADER, ssr_computeShader, "Screen Space Reflections Compute Shader");
-    voxen_GL_Comms.ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
+    Sys_Render.ssrShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Screen Space Reflections Shader Program");
     
     computeShader = CompileShader(GL_COMPUTE_SHADER, voxelUpdate_computeShader, "Voxel Update Compute Shader");
-    voxen_GL_Comms.voxelUpdateShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Update Shader Program");
+    Sys_Render.voxelUpdateShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Voxel Update Shader Program");
         
     computeShader = CompileShader(GL_COMPUTE_SHADER, shadowmaps_clear_computeShader, "Shadowmaps Clear Compute Shader");
-    voxen_GL_Comms.shadowmapsClearShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Shadowmaps Clear Shader Program");
+    Sys_Render.shadowmapsClearShaderProgram = LinkProgram((GLuint[]){computeShader}, 1, "Shadowmaps Clear Shader Program");
 
     vertShader = CompileShader(GL_VERTEX_SHADER,   quadVertexShaderSource,   "Image Blit Vertex Shader");
     fragShader = CompileShader(GL_FRAGMENT_SHADER, quadFragmentShaderSource, "Image Blit Fragment Shader");
-    voxen_GL_Comms.imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
+    Sys_Render.imageBlitShaderProgram = LinkProgram((GLuint[]){vertShader, fragShader}, 2, "Image Blit Shader Program");
 }
 
 GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
@@ -477,9 +476,9 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         }
     }
 
-    glNamedBufferData(voxen_GL_Comms.lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+    glNamedBufferData(Sys_Render.lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
     if (*voxelsNeedUpdated) {
-        glUseProgram(voxen_GL_Comms.voxelUpdateShaderProgram);
+        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
         GLuint groupX_voxels = (512 + 31) / 32;
         GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
         glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
@@ -515,15 +514,15 @@ void RenderUIImage(float x, float y, float width, float height, uint32_t texInde
     glEnable(GL_BLEND);
     glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
     glDisable(GL_CULL_FACE);
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glBindVertexArray(voxen_GL_Comms.textVAO);
+    glUseProgram(Sys_Render.chunkShaderProgram);
+    glBindVertexArray(Sys_Render.textVAO);
     glUniform1ui(1, 0);
     glUniform1ui(3, 1u);  // isUI true
     glUniform1ui(17, 1u); // unlit is true
     glUniform1ui(19, 0);
     glUniform1ui(20, 0);
     glUniformMatrix4fv(2, 1, GL_FALSE, uiOrthoProjection);
-    glBindBuffer(GL_ARRAY_BUFFER, voxen_GL_Comms.textVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.textVBO);
     float x1 = x + width;
     float y1 = y + height;
     float z = 0.0f;
@@ -531,9 +530,9 @@ void RenderUIImage(float x, float y, float width, float height, uint32_t texInde
     glUniform1ui(18, texIndex);
     glBufferData(GL_ARRAY_BUFFER, 30 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    voxen_Diagnostics.drawCallsRenderedThisFrame++;
-    voxen_Diagnostics.uiImageDrawCallsRenderedThisFrame++;
-    voxen_Diagnostics.verticesRenderedThisFrame += 6;    
+    Sys_Dx.drawCallsRenderedThisFrame++;
+    Sys_Dx.uiImageDrawCallsRenderedThisFrame++;
+    Sys_Dx.verticesRenderedThisFrame += 6;    
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -557,7 +556,7 @@ float textVertexData[8192]; // Reusable buffer for text vertices.  Most text onl
 void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char * restrict format, ...) {
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
-    glUseProgram(voxen_GL_Comms.textShaderProgram);
+    glUseProgram(Sys_Render.textShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, uiOrthoProjection);
     glUniform4f(3, textColors[color].r, textColors[color].g, textColors[color].b, textColors[color].a);
     if (fontID == FONT_STOPD) glBindTextureUnit(6, fontAtlasTexStopD);
@@ -566,7 +565,7 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
     glUniform2f(4, 1.0f / (float)FONT_ATLAS_SIZE, 1.0f / (float)FONT_ATLAS_SIZE);
     glUniform1ui(2, fontID);
     glUniform1i(1, 6); // textTexture sampler2D
-    glBindVertexArray(voxen_GL_Comms.textVAO);
+    glBindVertexArray(Sys_Render.textVAO);
     size_t vertexCount = 0;
     const char* p = uiTextBuffer;
     float xpos = x, ypos = y + GetScreenRelativeY(0.0211f);
@@ -609,11 +608,11 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
     }
     
     if (vertexCount > 0) {
-        glNamedBufferData(voxen_GL_Comms.textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
+        glNamedBufferData(Sys_Render.textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
-        voxen_Diagnostics.drawCallsRenderedThisFrame++;
-        voxen_Diagnostics.textDrawCallsRenderedThisFrame++;
-        voxen_Diagnostics.verticesRenderedThisFrame += vertexCount * 6;
+        Sys_Dx.drawCallsRenderedThisFrame++;
+        Sys_Dx.textDrawCallsRenderedThisFrame++;
+        Sys_Dx.verticesRenderedThisFrame += vertexCount * 6;
     }
 }
 
@@ -670,7 +669,7 @@ float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
 
 void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     double init_start_time = get_time();
-    voxen_Diagnostics.globalFrameNum = 0;
+    Sys_Dx.globalFrameNum = 0;
     DebugRAM("prior to event system init");
     DualLog("Voxen by W. Josiah Jack, MIT-0 licensed\n");
     EventSystemInit(argc,command,command_input1);
@@ -705,63 +704,63 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     GLuint vaos[4]; GLuint vbos[4];
     glCreateVertexArrays(4, vaos);
     glCreateBuffers(3, vbos);
-    voxen_GL_Comms.quadVAO = vaos[0]; voxen_GL_Comms.vao_chunk = vaos[1]; voxen_GL_Comms.textVAO = vaos[2]; voxen_GL_Comms.debugLinesVAO = vaos[3];
-    voxen_GL_Comms.quadVBO = vbos[0];                                     voxen_GL_Comms.textVBO = vbos[1]; voxen_GL_Comms.debugLinesVBO = vbos[2];
+    Sys_Render.quadVAO = vaos[0]; Sys_Render.vao_chunk = vaos[1]; Sys_Render.textVAO = vaos[2]; Sys_Render.debugLinesVAO = vaos[3];
+    Sys_Render.quadVBO = vbos[0];                                     Sys_Render.textVBO = vbos[1]; Sys_Render.debugLinesVBO = vbos[2];
     float quadBlit_vertices[] = { 1.0f, -1.0f, 1.0f, 0.0f,    1.0f, 1.0f, 1.0f, 1.0f,    -1.0f,1.0f, 0.0f, 1.0f,   -1.0f, -1.0f, 0.0f, 0.0f }; // 4 verts, 4 floats each pos.xy, uv.xy
-    glNamedBufferData(voxen_GL_Comms.quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
+    glNamedBufferData(Sys_Render.quadVBO, sizeof(quadBlit_vertices), quadBlit_vertices, GL_STATIC_DRAW);
 
-    glVertexArrayAttribFormat(voxen_GL_Comms.quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
-    glVertexArrayAttribFormat(voxen_GL_Comms.quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
-    glVertexArrayVertexBuffer(voxen_GL_Comms.quadVAO, 0, voxen_GL_Comms.quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
-    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(voxen_GL_Comms.quadVAO, i, 0); glEnableVertexArrayAttrib(voxen_GL_Comms.quadVAO, i); }
+    glVertexArrayAttribFormat(Sys_Render.quadVAO, 0, 2, GL_FLOAT, GL_FALSE, 0); // DSA: Set position format
+    glVertexArrayAttribFormat(Sys_Render.quadVAO, 1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float)); // DSA: Set texcoord format
+    glVertexArrayVertexBuffer(Sys_Render.quadVAO, 0, Sys_Render.quadVBO, 0, 4 * sizeof(float)); // DSA: Link VBO to VAO
+    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.quadVAO, i, 0); glEnableVertexArrayAttrib(Sys_Render.quadVAO, i); }
     
-    glVertexArrayAttribFormat(voxen_GL_Comms.vao_chunk, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
-    glVertexArrayAttribFormat(voxen_GL_Comms.vao_chunk, 1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
-    glVertexArrayAttribFormat(voxen_GL_Comms.vao_chunk, 2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
-    for (uint8_t i = 0; i < 3; i++) { glVertexArrayAttribBinding(voxen_GL_Comms.vao_chunk, i, 0); glEnableVertexArrayAttrib(voxen_GL_Comms.vao_chunk, i); }
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk, 0, 3, GL_FLOAT, GL_FALSE, 0); // Position (vec3)
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk, 1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float)); // Normal (vec3)
+    glVertexArrayAttribFormat(Sys_Render.vao_chunk, 2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float)); // Tex Coord (vec2)
+    for (uint8_t i = 0; i < 3; i++) { glVertexArrayAttribBinding(Sys_Render.vao_chunk, i, 0); glEnableVertexArrayAttrib(Sys_Render.vao_chunk, i); }
     
-    glVertexArrayAttribFormat(voxen_GL_Comms.textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
-    glVertexArrayAttribFormat(voxen_GL_Comms.textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
-    glVertexArrayVertexBuffer(voxen_GL_Comms.textVAO, 0, voxen_GL_Comms.textVBO, 0, 5 * sizeof(float));
-    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(voxen_GL_Comms.textVAO, i, 0); glEnableVertexArrayAttrib(voxen_GL_Comms.textVAO, i); }
+    glVertexArrayAttribFormat(Sys_Render.textVAO, 0, 3, GL_FLOAT, GL_FALSE, 0); // pos (x,y,z) 4 floats per vertex, stride = 4*sizeof(float)
+    glVertexArrayAttribFormat(Sys_Render.textVAO, 1, 2, GL_FLOAT, GL_FALSE, 3 * sizeof(float));  // uv (s,t)
+    glVertexArrayVertexBuffer(Sys_Render.textVAO, 0, Sys_Render.textVBO, 0, 5 * sizeof(float));
+    for (uint8_t i = 0; i < 2; i++) { glVertexArrayAttribBinding(Sys_Render.textVAO, i, 0); glEnableVertexArrayAttrib(Sys_Render.textVAO, i); }
     
-    glNamedBufferStorage(voxen_GL_Comms.debugLinesVBO, MAX_DEBUG_LINE_VERTS * 3 * sizeof(float), NULL, GL_DYNAMIC_STORAGE_BIT);  // persistent, client-writable
-    glVertexArrayAttribFormat(voxen_GL_Comms.debugLinesVAO, 0, 3, GL_FLOAT, GL_FALSE, 0);
-    glEnableVertexArrayAttrib(voxen_GL_Comms.debugLinesVAO, 0);
-    glVertexArrayAttribBinding(voxen_GL_Comms.debugLinesVAO, 0, 0);
-    glVertexArrayVertexBuffer(voxen_GL_Comms.debugLinesVAO, 0, voxen_GL_Comms.debugLinesVBO, 0, 3 * sizeof(float));
+    glNamedBufferStorage(Sys_Render.debugLinesVBO, MAX_DEBUG_LINE_VERTS * 3 * sizeof(float), NULL, GL_DYNAMIC_STORAGE_BIT);  // persistent, client-writable
+    glVertexArrayAttribFormat(Sys_Render.debugLinesVAO, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glEnableVertexArrayAttrib(Sys_Render.debugLinesVAO, 0);
+    glVertexArrayAttribBinding(Sys_Render.debugLinesVAO, 0, 0);
+    glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO, 0, Sys_Render.debugLinesVBO, 0, 3 * sizeof(float));
 
-    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&voxen_GL_Comms.inputNormalID,            GL_RG16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
-    glGenTextures(1, &voxen_GL_Comms.outputImageID);
-    glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
+    GenerateAndBindTexture(&Sys_Render.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,        GL_RGBA16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&Sys_Render.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+    GenerateAndBindTexture(&Sys_Render.inputSpecID,              GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
+    GenerateAndBindTexture(&Sys_Render.inputNormalID,            GL_RG16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
+    glGenTextures(1, &Sys_Render.outputImageID);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,  Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
     
-    glGenFramebuffers(1, &voxen_GL_Comms.gBufferFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, voxen_GL_Comms.inputImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, voxen_GL_Comms.inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, voxen_GL_Comms.inputSpecID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, voxen_GL_Comms.inputNormalID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, voxen_GL_Comms.inputDepthID, 0);
+    glGenFramebuffers(1, &Sys_Render.gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, Sys_Render.inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, Sys_Render.inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, Sys_Render.inputSpecID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, Sys_Render.inputNormalID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Sys_Render.inputDepthID, 0);
     GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
     glDrawBuffers(4, drawBuffers);
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
-    glBindImageTexture(0, voxen_GL_Comms.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-    glBindImageTexture(1, voxen_GL_Comms.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F); // World Position XYZ
-    glBindImageTexture(2, voxen_GL_Comms.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
+    glBindImageTexture(0, Sys_Render.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
+    glBindImageTexture(1, Sys_Render.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F); // World Position XYZ
+    glBindImageTexture(2, Sys_Render.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
     //                 3 = depth
-    glBindImageTexture(4, voxen_GL_Comms.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
-    glBindImageTexture(5, voxen_GL_Comms.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
+    glBindImageTexture(4, Sys_Render.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
+    glBindImageTexture(5, Sys_Render.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
     glDepthMask(GL_TRUE); // Always true, set just once ever.
 
@@ -797,47 +796,47 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     LoadEntities();
     float mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(&modelMatrices[0], mat, 16 * sizeof(float)); // Null instance matrix used for UI
-    voxen_GL_Comms.cellVisibleDataID       = SetupSSBO(&voxen_GL_Comms.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.shadowMapSSBO           = SetupSSBO(&voxen_GL_Comms.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
-    voxen_GL_Comms.voxelLightListCountsID  = SetupSSBO(&voxen_GL_Comms.voxelLightListCountsID,   6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.shadowMapsIndirectionID = SetupSSBO(&voxen_GL_Comms.shadowMapsIndirectionID,  8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.matricesBufferID        = SetupSSBO(&voxen_GL_Comms.matricesBufferID,        11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_STATIC_DRAW);
-    voxen_GL_Comms.colorBufferID           = SetupSSBO(&voxen_GL_Comms.colorBufferID,           12, MAX_TOTAL_PIXELS * sizeof(uint8_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.blueNoiseBuffer         = SetupSSBO(&voxen_GL_Comms.blueNoiseBuffer,         13, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
-    voxen_GL_Comms.textureOffsetsID        = SetupSSBO(&voxen_GL_Comms.textureOffsetsID,        14, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.textureSizesID          = SetupSSBO(&voxen_GL_Comms.textureSizesID,          15, MAX_VALID_TEXTURE * 2 * sizeof(int32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.texturePalettesID       = SetupSSBO(&voxen_GL_Comms.texturePalettesID,       16, MAX_UNIQUE_COLORS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.texturePaletteOffsetsID = SetupSSBO(&voxen_GL_Comms.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.lightsID                = SetupSSBO(&voxen_GL_Comms.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
-    voxen_GL_Comms.voxelLightListsID       = SetupSSBO(&voxen_GL_Comms.voxelLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.cellVisibleDataID       = SetupSSBO(&Sys_Render.cellVisibleDataID,        4, ARRSIZE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.shadowMapSSBO           = SetupSSBO(&Sys_Render.shadowMapSSBO,            5, TOTAL_SHADOWMAP_PIXELS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);    
+    Sys_Render.voxelLightListCountsID  = SetupSSBO(&Sys_Render.voxelLightListCountsID,   6, VOXEL_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.shadowMapsIndirectionID = SetupSSBO(&Sys_Render.shadowMapsIndirectionID,  8, LIGHT_COUNT * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.matricesBufferID        = SetupSSBO(&Sys_Render.matricesBufferID,        11, INSTANCE_COUNT * 16 * sizeof(float), modelMatrices, GL_STATIC_DRAW);
+    Sys_Render.colorBufferID           = SetupSSBO(&Sys_Render.colorBufferID,           12, MAX_TOTAL_PIXELS * sizeof(uint8_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.blueNoiseBuffer         = SetupSSBO(&Sys_Render.blueNoiseBuffer,         13, 12288 * sizeof(float), blueNoise, GL_STATIC_DRAW);
+    Sys_Render.textureOffsetsID        = SetupSSBO(&Sys_Render.textureOffsetsID,        14, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.textureSizesID          = SetupSSBO(&Sys_Render.textureSizesID,          15, MAX_VALID_TEXTURE * 2 * sizeof(int32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       16, MAX_UNIQUE_COLORS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
+    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
 
 void DrawDebugLines(float* viewProj) {
-    if (voxen_Diagnostics.debugLineVertCount < 1) return;
+    if (Sys_Dx.debugLineVertCount < 1) return;
     
-    glNamedBufferSubData(voxen_GL_Comms.debugLinesVBO, 0, voxen_Diagnostics.debugLineVertCount * sizeof(float), debugLineBuffer);
-    glUseProgram(voxen_GL_Comms.debugUnlitShaderProgram);
+    glNamedBufferSubData(Sys_Render.debugLinesVBO, 0, Sys_Dx.debugLineVertCount * sizeof(float), debugLineBuffer);
+    glUseProgram(Sys_Render.debugUnlitShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, viewProj);
     glLineWidth(10.0f);
     glDisable(GL_DEPTH_TEST);
-    glBindVertexArray(voxen_GL_Comms.debugLinesVAO);
-    glDrawArrays(GL_LINES, 0, voxen_Diagnostics.debugLineVertCount / 3);
+    glBindVertexArray(Sys_Render.debugLinesVAO);
+    glDrawArrays(GL_LINES, 0, Sys_Dx.debugLineVertCount / 3);
     glEnable(GL_DEPTH_TEST);
-    voxen_Diagnostics.drawCallsRenderedThisFrame++;
-    voxen_Diagnostics.verticesRenderedThisFrame += voxen_Diagnostics.debugLineVertCount / 3;
-    voxen_Diagnostics.debugLineVertCount = 0;
+    Sys_Dx.drawCallsRenderedThisFrame++;
+    Sys_Dx.verticesRenderedThisFrame += Sys_Dx.debugLineVertCount / 3;
+    Sys_Dx.debugLineVertCount = 0;
 }
 
 void AddDebugLine(Vector3 start, Vector3 end) {
-    if (voxen_Diagnostics.debugLineVertCount + 6 > MAX_DEBUG_LINE_VERTS * 3) return;
+    if (Sys_Dx.debugLineVertCount + 6 > MAX_DEBUG_LINE_VERTS * 3) return;
 
-    int32_t i = voxen_Diagnostics.debugLineVertCount;
+    int32_t i = Sys_Dx.debugLineVertCount;
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
-    voxen_Diagnostics.debugLineVertCount = i;
+    Sys_Dx.debugLineVertCount = i;
 }
 
 __attribute__((pure)) bool EntityIsAnimated(uint16_t entIdx) {
@@ -933,22 +932,22 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
                              view.x * right.y + view.y * up.y + view.z * (flipForward.y),
                              view.x * right.z + view.y * up.z + view.z * (flipForward.z) };
                              
-    voxen_Diagnostics.debugLine_start = pos;
-    voxen_Diagnostics.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
+    Sys_Dx.debugLine_start = pos;
+    Sys_Dx.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
     if (tempHit.hit) {
-        voxen_Diagnostics.debugLine_end = tempHit.point;
+        Sys_Dx.debugLine_end = tempHit.point;
         DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
     }
     
-    voxen_Diagnostics.debugLineFinished = Sys_Global.current_time + 3.0;
+    Sys_Dx.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
 void UpdateGameplay(void) {
     if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
     
     if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
-    if (Sys_Global.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_start, voxen_Diagnostics.debugLine_end);
+    if (Sys_Global.current_time < Sys_Dx.debugLineFinished) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
     UpdateAmbientSounds();
     UpdateAnims();
 }
@@ -1046,20 +1045,20 @@ void RenderShadowmaps(void) {
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         if (voxen_Shadow_System.useComputeClear) {
-            glUseProgram(voxen_GL_Comms.shadowmapsClearShaderProgram); // Way faster
+            glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
             GLuint groupX_shadClear = (numLightsShadowmapsToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
             glDispatchCompute(groupX_shadClear,1,1);
         } else {
             GLuint clearValue = 0xFFFFFFFFu;
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, voxen_GL_Comms.shadowMapSSBO);
+            glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.shadowMapSSBO);
             glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!  Only used for fallback on some systems (e.g. HD4400) that can't use compute shader.
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
         }
 
-        voxen_Diagnostics.shadowDrawCallsRenderedThisFrame = 0;
+        Sys_Dx.shadowDrawCallsRenderedThisFrame = 0;
         memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-        glUseProgram(voxen_GL_Comms.shadowmapsShaderProgram);
+        glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
         uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
@@ -1208,7 +1207,7 @@ void RenderShadowmaps(void) {
                 glUniform1ui(2, face);
                 glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
                 glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
-                voxen_Diagnostics.shadowDrawCallsRenderedThisFrame++;
+                Sys_Dx.shadowDrawCallsRenderedThisFrame++;
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;            
                     if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
@@ -1216,16 +1215,16 @@ void RenderShadowmaps(void) {
                     int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
                     if (currentModelType != modelType) {
                         currentModelType = modelType;
-                        glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-                        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+                        glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+                        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
                     }
                     
                     glUniform1ui(0, i);
                     if (currentTexIndex != instances[i].texIndex) { currentTexIndex = instances[i].texIndex; glUniform1ui(6, instances[i].texIndex); }
                     if (currentIsTransparent != isTransparent(instances[i].texIndex)) { currentIsTransparent = isTransparent(instances[i].texIndex); glUniform1ui(8, isTransparent(instances[i].texIndex)); }
                     glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
-                    voxen_Diagnostics.drawCallsRenderedThisFrame++;
-                    voxen_Diagnostics.verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                    Sys_Dx.drawCallsRenderedThisFrame++;
+                    Sys_Dx.verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
             }
 
@@ -1234,16 +1233,16 @@ void RenderShadowmaps(void) {
         }
 
         glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-        glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
+        glNamedBufferData(Sys_Render.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     }
     
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
 void RenderCompositePass(float px, float py, float pz, float * restrict viewProj, float * restrict invViewRot) {
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.inputImageID);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
     glUniform1i(4, 4); // outputImage texture sampler2D
     float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)Sys_Global.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
     if (berserkFinished < (float)Sys_Global.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
@@ -1269,16 +1268,16 @@ void RenderCompositePass(float px, float py, float pz, float * restrict viewProj
     glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
     glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
     glUniform1f(28, GetPainStatic());
-    glBindVertexArray(voxen_GL_Comms.quadVAO);
+    glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    voxen_Diagnostics.drawCallsRenderedThisFrame++;
-    voxen_Diagnostics.verticesRenderedThisFrame += 4;
+    Sys_Dx.drawCallsRenderedThisFrame++;
+    Sys_Dx.verticesRenderedThisFrame += 4;
 }
 
 double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    voxen_Diagnostics.drawCallsNormal = voxen_Diagnostics.drawCallsRenderedThisFrame;
+    Sys_Dx.drawCallsNormal = Sys_Dx.drawCallsRenderedThisFrame;
     float screenCenterX = (float)Sys_Settings.ScreenWidth / 2;
     float screenCenterY = (float)Sys_Settings.ScreenHeight / 2;
     float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
@@ -1314,33 +1313,32 @@ double RenderUI(void) {
     // Diagnostics / Debugging
     float debugTextStartY = GetScreenRelativeY(0.075f);
     float leftPad = GetScreenRelativeX(0.0125f);
-    if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_start.x, (double)voxen_Diagnostics.debugLine_start.y, (double)voxen_Diagnostics.debugLine_start.z, (double)voxen_Diagnostics.debugLine_end.x, (double)voxen_Diagnostics.debugLine_end.y, (double)voxen_Diagnostics.debugLine_end.z);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
-    if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
+    if (!Sys_Cheats.noHUD && Sys_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
+    if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+    if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
+    if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    if (Sys_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
     double time_now = get_time();
-    if (voxen_Cheats.showFPS && !voxen_Cheats.noHUD) {
+    if (Sys_Cheats.showFPS && !Sys_Cheats.noHUD) {
         double thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
-        double cpuFrameTime = voxen_Diagnostics.cpuTime * 1000.0;
+        double cpuFrameTime = Sys_Dx.cpuTime * 1000.0;
         uint8_t timingColor = TEXT_WHITE;
         if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
         if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        voxen_Diagnostics.drawCallsRenderedThisFrame += 2; voxen_Diagnostics.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
+        Sys_Dx.drawCallsRenderedThisFrame += 2; Sys_Dx.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
         RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
         RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u",
-                            voxen_Diagnostics.framesPerLastSecond, voxen_Diagnostics.worstFPS, voxen_Diagnostics.drawCallsRenderedThisFrame, voxen_Diagnostics.drawCallsNormal, voxen_Diagnostics.uiImageDrawCallsRenderedThisFrame,
-                            voxen_Diagnostics.textDrawCallsRenderedThisFrame, voxen_Diagnostics.shadowDrawCallsRenderedThisFrame, voxen_Diagnostics.verticesRenderedThisFrame, voxen_Cheats.editMode);
+                            Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame,
+                            Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
     }
     
     float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
     float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
     float shootModePos_y = 0.0f;
-    if (!Sys_Global.gamePaused && !voxen_Cheats.noHUD) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+    if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
     if (Sys_Global.inventoryMode) {
         if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
@@ -1419,22 +1417,22 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
         int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
         if (currentModelType != modelType) {
             currentModelType = modelType;
-            glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[currentModelType]);
+            glBindVertexBuffer(0, Sys_Render.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[currentModelType]);
         }
         
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        voxen_Diagnostics.drawCallsRenderedThisFrame++;
-        voxen_Diagnostics.verticesRenderedThisFrame += vertCount;
+        Sys_Dx.drawCallsRenderedThisFrame++;
+        Sys_Dx.verticesRenderedThisFrame += vertCount;
     }
 }
 
 void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-    glBindFramebuffer(GL_FRAMEBUFFER, voxen_GL_Comms.gBufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
+    glUseProgram(Sys_Render.chunkShaderProgram);
     glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
     glUniform1ui(3, 0u); /* isUI false */    glUniform1ui(17, 0u); // unlit false
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
@@ -1453,7 +1451,7 @@ void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geome
 void RenderSSR(float* viewProj, Vector3 playerPos) {
     if (Sys_Settings.Reflections < 1u) return;
     
-    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
+    glUseProgram(Sys_Render.ssrShaderProgram);
     glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
     glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
     GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
@@ -1464,16 +1462,16 @@ void RenderSSR(float* viewProj, Vector3 playerPos) {
 
 void UpdateDiagnosticPoll(double time_now) {
     Sys_Global.last_time = time_now;
-    if ((time_now - voxen_Diagnostics.lastFrameSecCountTime) < 1.00) return;
+    if ((time_now - Sys_Dx.lastFrameSecCountTime) < 1.00) return;
     
-    voxen_Diagnostics.lastFrameSecCountTime = time_now;
-    voxen_Diagnostics.framesPerLastSecond = voxen_Diagnostics.globalFrameNum - voxen_Diagnostics.lastFrameSecCount;
-    if (voxen_Diagnostics.framesPerLastSecond < voxen_Diagnostics.worstFPS && voxen_Diagnostics.globalFrameNum > 2000) voxen_Diagnostics.worstFPS = voxen_Diagnostics.framesPerLastSecond; // After startup, keep track of worst framerate seen.
-    voxen_Diagnostics.lastFrameSecCount = voxen_Diagnostics.globalFrameNum;
+    Sys_Dx.lastFrameSecCountTime = time_now;
+    Sys_Dx.framesPerLastSecond = Sys_Dx.globalFrameNum - Sys_Dx.lastFrameSecCount;
+    if (Sys_Dx.framesPerLastSecond < Sys_Dx.worstFPS && Sys_Dx.globalFrameNum > 2000) Sys_Dx.worstFPS = Sys_Dx.framesPerLastSecond; // After startup, keep track of worst framerate seen.
+    Sys_Dx.lastFrameSecCount = Sys_Dx.globalFrameNum;
 }
 
 void Render(void) {
-    voxen_Diagnostics.drawCallsRenderedThisFrame = voxen_Diagnostics.textDrawCallsRenderedThisFrame = voxen_Diagnostics.uiImageDrawCallsRenderedThisFrame = voxen_Diagnostics.shadowDrawCallsRenderedThisFrame = voxen_Diagnostics.verticesRenderedThisFrame = 0; // Reset per frame
+    Sys_Dx.drawCallsRenderedThisFrame = Sys_Dx.textDrawCallsRenderedThisFrame = Sys_Dx.uiImageDrawCallsRenderedThisFrame = Sys_Dx.shadowDrawCallsRenderedThisFrame = Sys_Dx.verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
@@ -1497,7 +1495,7 @@ void Render(void) {
     float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-        glBindVertexArray(voxen_GL_Comms.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
+        glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
         RenderShadowmaps();
         memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
         memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
@@ -1507,7 +1505,7 @@ void Render(void) {
 
     RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot);
     UpdateDiagnosticPoll( RenderUI() );
-    voxen_Diagnostics.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
+    Sys_Dx.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(Sys_Global.window); // Present frame
     CHECK_GL_ERROR();
 }
@@ -1551,7 +1549,7 @@ static void UpdateVoxelsAndInstances(void) {
     if (voxelsNeedUpdated) CullCore(); // 1. Culling
     bool uploadInstances = false;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { uploadInstances = true; UpdateInstanceMatrix(i); } }
-    if (uploadInstances) glNamedBufferData(voxen_GL_Comms.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
+    if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
 
 int32_t main(int32_t argc, char* argv[]) {
@@ -1601,13 +1599,13 @@ int32_t main(int32_t argc, char* argv[]) {
         UpdateGameplay();
         UpdateVoxelsAndInstances();
         Render();
-        voxen_Diagnostics.globalFrameNum++;
+        Sys_Dx.globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT
-            if (voxen_Diagnostics.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
-            else if (voxen_Diagnostics.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
-            else if (voxen_Diagnostics.globalFrameNum == 200) DebugRAM("after 200 frames of running");
-            else if (voxen_Diagnostics.globalFrameNum == 500) DebugRAM("after 500 frames of running");
-            else if (voxen_Diagnostics.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
+            if (Sys_Dx.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }
+            else if (Sys_Dx.globalFrameNum == 100) { DebugRAM("after 100 frames of running"); }
+            else if (Sys_Dx.globalFrameNum == 200) DebugRAM("after 200 frames of running");
+            else if (Sys_Dx.globalFrameNum == 500) DebugRAM("after 500 frames of running");
+            else if (Sys_Dx.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
         #endif
     }
     return 0;

@@ -68,7 +68,7 @@ int32_t EventExecute(Event* event) {
 int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f) {
     if (eventQueueEnd >= MAX_EVENTS_PER_FRAME) { DualLogError("Queue buffer filled!\n"); return 1; }
 
-    eventQueue[eventQueueEnd].frameNum = voxen_Diagnostics.globalFrameNum;
+    eventQueue[eventQueueEnd].frameNum = Sys_Dx.globalFrameNum;
     eventQueue[eventQueueEnd].type = type;
     eventQueue[eventQueueEnd].timestamp = 0;
     eventQueue[eventQueueEnd].payload1i = payload1i;
@@ -112,7 +112,7 @@ int32_t ReadActiveLog() {
     int32_t events_processed = 0;
     if (eof_reached) return 2; // Indicate EOF was previously reached
 
-    DualLog("------ ReadActiveLog start for frame %d ------\n", voxen_Diagnostics.globalFrameNum);
+    DualLog("------ ReadActiveLog start for frame %d ------\n", Sys_Dx.globalFrameNum);
     while (events_processed < MAX_EVENTS_PER_FRAME) {
         size_t read_count = fread(&event, sizeof(Event), 1, activeLogFile);
         if (read_count != 1) {
@@ -127,20 +127,20 @@ int32_t ReadActiveLog() {
 
         if (!IsPlayableEventType(event.type)) continue; // Skip unplayable events
 
-        if (event.frameNum == voxen_Diagnostics.globalFrameNum) {
+        if (event.frameNum == Sys_Dx.globalFrameNum) {
             // Enqueue events matching the current frame
             EnqueueEvent(event.type, event.payload1i, event.payload2i, event.payload1f, event.payload2f);
             events_processed++;
             DualLog("Enqueued event %d from log for frame %d\n", event.type, event.frameNum);
-        } else if (event.frameNum > voxen_Diagnostics.globalFrameNum) {
+        } else if (event.frameNum > Sys_Dx.globalFrameNum) {
             // Event is for a future frame; seek back and stop processing
             fseek(activeLogFile, -(long)sizeof(Event), SEEK_CUR);
-            DualLog("Readback of %d events for this frame %d from log\n", events_processed, voxen_Diagnostics.globalFrameNum);
+            DualLog("Readback of %d events for this frame %d from log\n", events_processed, Sys_Dx.globalFrameNum);
             return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if no matching events
         } // If event.frameNum < globalFrameNum, skip it (past event)
     }
 
-    DualLog("End of log. Readback of %d events for this frame %d from log\n", events_processed, voxen_Diagnostics.globalFrameNum);
+    DualLog("End of log. Readback of %d events for this frame %d from log\n", events_processed, Sys_Dx.globalFrameNum);
     return events_processed > 0 ? 0 : 1; // 0 if events processed, 1 if limit reached with no matching events
 }
 
@@ -213,7 +213,7 @@ int32_t EventQueueProcess(void) {
     while (eventIndex < eventQueueEnd) {
         if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
 
-        eventQueue[eventIndex].frameNum = voxen_Diagnostics.globalFrameNum;
+        eventQueue[eventIndex].frameNum = Sys_Dx.globalFrameNum;
         eventQueue[eventIndex].timestamp = Sys_Global.current_time;
         eventQueue[eventIndex].deltaTime_ns = Sys_Global.current_time - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
         eventJournalIndex++; // Increment now to then write event into the journal.  Still written to during playback for time deltas but never logged to .dem

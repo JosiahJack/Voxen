@@ -103,8 +103,8 @@ void LoadModels(void) {
     double start_time = get_time();    
     if (loadedModelsMaxIndex > 0) {
         #ifdef ONLY_LOAD_LEVEL_NEEDS
-            glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
-            glDeleteBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
+            glDeleteBuffers(loadedModelsMaxIndex, Sys_Render.vbos);
+            glDeleteBuffers(loadedModelsMaxIndex, Sys_Render.tbos);
             memset(modelVertexCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
             memset(modelTriangleCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
             memset(modelAnimationType, 0, MODEL_IDX_MAX * sizeof(uint8_t));
@@ -294,8 +294,8 @@ void LoadModels(void) {
     DebugRAM("after model load loop");
     munmap(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
-    glGenBuffers(loadedModelsMaxIndex, voxen_GL_Comms.vbos);
-    glGenBuffers(loadedModelsMaxIndex, voxen_GL_Comms.tbos);
+    glGenBuffers(loadedModelsMaxIndex, Sys_Render.vbos);
+    glGenBuffers(loadedModelsMaxIndex, Sys_Render.tbos);
     uint32_t totalVertices = 0, totalTris = 0;
     for (int i = 0; i < loadedModelsMaxIndex; ++i) {
         if (modelVertexCounts[i] == 0) continue;
@@ -304,13 +304,13 @@ void LoadModels(void) {
         totalVertices += modelVertexCounts[i];
         size_t triSize  = modelTriangleCounts[i] * 3 * sizeof(uint32_t);
         totalTris += (uint32_t)triSize;
-        glBindBuffer(GL_ARRAY_BUFFER, voxen_GL_Comms.vbos[i]);
+        glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, voxen_GL_Comms.tbos[i]);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);

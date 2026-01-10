@@ -111,7 +111,7 @@ typedef struct {
 	uint32_t verticesRenderedThisFrame;
 	uint32_t drawCallsNormal;
 	uint32_t debugLineVertCount;
-} VoxenDiagnostics;
+} DiagnosticsSystem;
 
 #define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define MAX_SHADOWMAPS 48u
@@ -141,7 +141,7 @@ typedef struct {
 	bool showFPS;
 	bool editMode;
 	uint8_t dizzyLevel;
-} Voxen_Cheats;
+} CheatsSystem;
 
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
 #define TEXT_STRING_COUNT 1100
@@ -729,4 +729,4 @@ typedef struct {
 	GLuint voxelLightListsID;
 	GLuint vbos[MODEL_IDX_MAX];
 	GLuint tbos[MODEL_IDX_MAX];
-} Voxen_GL_Comms;
+} RenderSystem;

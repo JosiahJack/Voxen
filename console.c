@@ -14,9 +14,9 @@ static int historyPos = 0;
 
 void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
-    if (!voxen_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
-    voxen_Cheats.consoleActive = !voxen_Cheats.consoleActive; // Tilde
-    if (voxen_Cheats.consoleActive) Sys_Global.inventoryMode = true;
+    if (!Sys_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
+    Sys_Cheats.consoleActive = !Sys_Cheats.consoleActive; // Tilde
+    if (Sys_Cheats.consoleActive) Sys_Global.inventoryMode = true;
     else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) {
         Sys_Global.inventoryMode = false;
         cursorPosition_x = (int32_t)((float)Sys_Settings.ScreenWidth * 0.5f);
@@ -86,28 +86,28 @@ __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd
 }
 
 static void cmd_noclip(void) {
-    voxen_Cheats.noclip = !voxen_Cheats.noclip;
-    if (voxen_Cheats.noclip) {
+    Sys_Cheats.noclip = !Sys_Cheats.noclip;
+    if (Sys_Cheats.noclip) {
         CenterStatusPrint("noclip: %s", voxen_Text.stringTable[1000]); // "ACTIVATED"
         instances[PLAYER1].velocity = (Vector3){ 0.0f, 0.0f, 0.0f };
     } else CenterStatusPrint("noclip: %s", voxen_Text.stringTable[717]); // "DISABLED"
 }
 
 static void cmd_edit(void) {
-    voxen_Cheats.editMode = !voxen_Cheats.editMode;
-    if (voxen_Cheats.editMode) {
+    Sys_Cheats.editMode = !Sys_Cheats.editMode;
+    if (Sys_Cheats.editMode) {
         CenterStatusPrint("edit mode: %s", voxen_Text.stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
-        voxen_Cheats.noclip = true;
-        voxen_Cheats.notarget = true;
+        Sys_Cheats.noclip = true;
+        Sys_Cheats.notarget = true;
     } else {
         CenterStatusPrint("%s", voxen_Text.stringTable[999]); // "Edit Mode deactivated, normal play"
-        voxen_Cheats.noclip = false;
-        voxen_Cheats.notarget = false;
+        Sys_Cheats.noclip = false;
+        Sys_Cheats.notarget = false;
     }
 }
 
 static void cmd_savegeometry(void) {
-    if (!voxen_Cheats.editMode) { CenterStatusPrint("savegeometry only works in edit mode!"); return; }
+    if (!Sys_Cheats.editMode) { CenterStatusPrint("savegeometry only works in edit mode!"); return; }
 
     char filename[64];
     snprintf(filename, sizeof(filename), "./Data/level%u.txt", Sys_Global.currentLevel);
@@ -199,39 +199,39 @@ static void cmd_printent(int entityIndex) {
     DualLogEntityInstance(entityIndex);
 }
 
-static void cmd_notarget(void) { voxen_Cheats.notarget = !voxen_Cheats.notarget; CenterStatusPrint("notarget: %s", voxen_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
-static void cmd_showfps(void) { voxen_Cheats.showFPS = !voxen_Cheats.showFPS; }
-static void cmd_showlocation(void) { voxen_Cheats.showLocation = !voxen_Cheats.showLocation; }
+static void cmd_notarget(void) { Sys_Cheats.notarget = !Sys_Cheats.notarget; CenterStatusPrint("notarget: %s", Sys_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
+static void cmd_showfps(void) { Sys_Cheats.showFPS = !Sys_Cheats.showFPS; }
+static void cmd_showlocation(void) { Sys_Cheats.showLocation = !Sys_Cheats.showLocation; }
 static void cmd_help(void) { CenterStatusPrint("There's no one to save you now Hacker!"); }
 static void cmd_nomoney(void) { CenterStatusPrint("Nice try, there's no money here."); }
-static void cmd_god(void) { voxen_Cheats.god = !voxen_Cheats.god; CenterStatusPrint("god mode: %s", voxen_Cheats.god ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
+static void cmd_god(void) { Sys_Cheats.god = !Sys_Cheats.god; CenterStatusPrint("god mode: %s", Sys_Cheats.god ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
 static void cmd_energy(void) {
-    voxen_Cheats.redbull = !voxen_Cheats.redbull; 
-    if (voxen_Cheats.redbull) CenterStatusPrint("%s", voxen_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
+    Sys_Cheats.redbull = !Sys_Cheats.redbull; 
+    if (Sys_Cheats.redbull) CenterStatusPrint("%s", voxen_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
     else CenterStatusPrint("%s", voxen_Text.stringTable[1005]); // Energy usage normal
 }
 
 static void cmd_dizzy(void) {
-    voxen_Cheats.dizzyLevel++;
-    if (voxen_Cheats.dizzyLevel > 4) voxen_Cheats.dizzyLevel = 0;
+    Sys_Cheats.dizzyLevel++;
+    if (Sys_Cheats.dizzyLevel > 4) Sys_Cheats.dizzyLevel = 0;
     SetSkyRotateSpeed();
 }
 
 static void cmd_bottomless(void) {
-    voxen_Cheats.bottomless = !voxen_Cheats.bottomless;
-    if (voxen_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s", voxen_Text.stringTable[1002]); // "Bring it!"
+    Sys_Cheats.bottomless = !Sys_Cheats.bottomless;
+    if (Sys_Cheats.bottomless) CenterStatusPrint("bottomlessclip! %s", voxen_Text.stringTable[1002]); // "Bring it!"
     else CenterStatusPrint("%s", voxen_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
 }
 
 static void cmd_nohud(void) {
-    voxen_Cheats.noHUD = !voxen_Cheats.noHUD;
-    if (voxen_Cheats.noHUD) CenterStatusPrint("%s", voxen_Text.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
+    Sys_Cheats.noHUD = !Sys_Cheats.noHUD;
+    if (Sys_Cheats.noHUD) CenterStatusPrint("%s", voxen_Text.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
     else CenterStatusPrint("HUD %s", voxen_Text.stringTable[1000]); // "ACTIVATED"
 }
 
 static void cmd_iamshodan(void) {
-    voxen_Cheats.superoverride = !voxen_Cheats.superoverride;
-    if (voxen_Cheats.superoverride) {
+    Sys_Cheats.superoverride = !Sys_Cheats.superoverride;
+    if (Sys_Cheats.superoverride) {
         CenterStatusPrint("%s", voxen_Text.stringTable[1010]); // "Full security override enabled!"
     } else {
         CenterStatusPrint("%s", voxen_Text.stringTable[1009]); // "SHODAN has regained control of security from you"
@@ -293,8 +293,8 @@ static void cmd_ai(void)             { CenterStatusPrint("Only AI allowed around
 static void cmd_aireal(void)         { CenterStatusPrint("In my magnificence, I shape clay, crafting new lifeforms..."); }
 
 static void cmd_staminup(void) {
-    voxen_Cheats.fatigueCheat = !voxen_Cheats.fatigueCheat;
-    if (voxen_Cheats.fatigueCheat) {
+    Sys_Cheats.fatigueCheat = !Sys_Cheats.fatigueCheat;
+    if (Sys_Cheats.fatigueCheat) {
         CenterStatusPrint("Stamin-Up! %s", voxen_Text.stringTable[1013]);
     } else {
         CenterStatusPrint("%s", voxen_Text.stringTable[1012]);

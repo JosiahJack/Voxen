@@ -84,8 +84,8 @@ extern GlobalContext Sys_Global;
 extern QuestBits questData;
 extern SettingsSystem Sys_Settings;
 extern VoxenShadowSystem voxen_Shadow_System;
-extern VoxenDiagnostics voxen_Diagnostics;
-extern Voxen_Cheats voxen_Cheats;
+extern DiagnosticsSystem Sys_Dx;
+extern CheatsSystem Sys_Cheats;
 extern Voxen_Text voxen_Text;
 // ----------------------------------------------------------------------------
 // Audio
@@ -516,7 +516,7 @@ static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
     *flags = (*flags & ~bit) | (-state & bit);
 }
 
-extern Voxen_GL_Comms voxen_GL_Comms; // Added last to make use of all defines for sizes.
+extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
 
 // Math, Vectors, Quaternions
 static inline Vector3 Vector3_A_plus_B(Vector3 a, Vector3 b) { return (Vector3){a.x + b.x, a.y + b.y, a.z + b.z}; }
