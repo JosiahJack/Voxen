@@ -18,45 +18,45 @@
 
 float fatigue;
 
-static uint32_t GetCollisionMask(uint8_t layer) {
-    switch (layer) {
-        case PhysicsLayer_Default:           return 0x217efe07u;
-        case PhysicsLayer_TransparentFX:     return 0x7c1e07u;
-        case PhysicsLayer_IgnoreRaycast:     return 0x7c3e07u;
-        case PhysicsLayer_Water:             return 0x0u;
-        case PhysicsLayer_UI:                return 0x0u;
-        case PhysicsLayer_GunViewModel:      return 0x0u;
-        case PhysicsLayer_Geometry:          return 0x178fc07u;
-        case PhysicsLayer_NPC:               return 0x6f61e07u;
-        case PhysicsLayer_PlayerBullets:     return 0x217e6607u;
-        case PhysicsLayer_Player:            return 0x5770607u;
-        case PhysicsLayer_Corpse:            return 0x10c4a05u;
-        case PhysicsLayer_PhysObjects:       return 0x17e6a01u;
-        case PhysicsLayer_Sky:               return 0x201u;
-        case PhysicsLayer_PlayerTriggerOnly: return 0x701000u;
-        case PhysicsLayer_Trigger:           return 0x1785c01u;
-        case PhysicsLayer_Door:              return 0x1707c07u;
-        case PhysicsLayer_InterDebris:       return 0xa6a07u;
-        case PhysicsLayer_Player2:           return 0x5675e07u;
-        case PhysicsLayer_Player3:           return 0x5575e07u;
-        case PhysicsLayer_Player4:           return 0x5375e07u;
-        case PhysicsLayer_NPCTrigger:        return 0x400u;
-        case PhysicsLayer_NPCBullet:         return 0x20767a01u;
-        case PhysicsLayer_NPCClip:           return 0x400u;
-        case PhysicsLayer_Clip:              return 0x701400u;
-        case PhysicsLayer_Automap:           return 0x0u;
-        case PhysicsLayer_Culling:           return 0x0u;
-        case PhysicsLayer_CorpseSearchable:  return 0x1000801u;
-    }
-    
-    return 0;
-}
+// static uint32_t GetCollisionMask(uint8_t layer) {
+//     switch (layer) {
+//         case PhysicsLayer_Default:           return 0x217efe07u;
+//         case PhysicsLayer_TransparentFX:     return 0x7c1e07u;
+//         case PhysicsLayer_IgnoreRaycast:     return 0x7c3e07u;
+//         case PhysicsLayer_Water:             return 0x0u;
+//         case PhysicsLayer_UI:                return 0x0u;
+//         case PhysicsLayer_GunViewModel:      return 0x0u;
+//         case PhysicsLayer_Geometry:          return 0x178fc07u;
+//         case PhysicsLayer_NPC:               return 0x6f61e07u;
+//         case PhysicsLayer_PlayerBullets:     return 0x217e6607u;
+//         case PhysicsLayer_Player:            return 0x5770607u;
+//         case PhysicsLayer_Corpse:            return 0x10c4a05u;
+//         case PhysicsLayer_PhysObjects:       return 0x17e6a01u;
+//         case PhysicsLayer_Sky:               return 0x201u;
+//         case PhysicsLayer_PlayerTriggerOnly: return 0x701000u;
+//         case PhysicsLayer_Trigger:           return 0x1785c01u;
+//         case PhysicsLayer_Door:              return 0x1707c07u;
+//         case PhysicsLayer_InterDebris:       return 0xa6a07u;
+//         case PhysicsLayer_Player2:           return 0x5675e07u;
+//         case PhysicsLayer_Player3:           return 0x5575e07u;
+//         case PhysicsLayer_Player4:           return 0x5375e07u;
+//         case PhysicsLayer_NPCTrigger:        return 0x400u;
+//         case PhysicsLayer_NPCBullet:         return 0x20767a01u;
+//         case PhysicsLayer_NPCClip:           return 0x400u;
+//         case PhysicsLayer_Clip:              return 0x701400u;
+//         case PhysicsLayer_Automap:           return 0x0u;
+//         case PhysicsLayer_Culling:           return 0x0u;
+//         case PhysicsLayer_CorpseSearchable:  return 0x1000801u;
+//     }
+//     
+//     return 0;
+// }
 
 float GetBasePlayerSpeed(bool running) {
-    bool isSprinting = keyStates[GLFW_KEY_LEFT_SHIFT].down; // TODO handle keybind
+    bool isSprinting = Sprint();
     if (voxen_Cheats.noclip && isSprinting) return PLAYER_MAX_CYBER_SPEED * 2.5f;
     if (voxen_Cheats.noclip) return PLAYER_MAX_CYBER_SPEED * 1.5f;
-    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
+    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) return PLAYER_MAX_CYBER_SPEED; //Cyber space speed
 
     float retval = PLAYER_MAX_WALK_SPEED;
     float bonus = 0.0f;
@@ -90,12 +90,12 @@ void ApplyPlayerMovements(void) {
     Vector3 forward = instances[PLAYER1].forward;
     Vector3 right = instances[PLAYER1].right;
     Vector3 input = {0};    
-    if (keyStates[GLFW_KEY_F].down)     input = Vector3_A_plus_B(input, (Vector3){forward.x, 0, forward.z});
-    if (keyStates[GLFW_KEY_S].down)     input = Vector3_A_minus_B(input, (Vector3){forward.x, 0, forward.z});
-    if (keyStates[GLFW_KEY_D].down)     input = Vector3_A_plus_B(input, (Vector3){right.x, 0, right.z});
-    if (keyStates[GLFW_KEY_A].down)     input = Vector3_A_minus_B(input, (Vector3){right.x, 0, right.z});
-    if (keyStates[GLFW_KEY_C].down/* && voxen_Cheats.noclip*/) input.y -= 1.0f; // Temporarily allow for now until I have collision working
-    if (keyStates[GLFW_KEY_V].down/* && voxen_Cheats.noclip*/) input.y += 1.0f;
+    if (Forward())     input = Vector3_A_plus_B(input, (Vector3){forward.x, 0, forward.z});
+    if (Backpedal())     input = Vector3_A_minus_B(input, (Vector3){forward.x, 0, forward.z});
+    if (StrafeRight())     input = Vector3_A_plus_B(input, (Vector3){right.x, 0, right.z});
+    if (StrafeLeft())     input = Vector3_A_minus_B(input, (Vector3){right.x, 0, right.z});
+    if (SwimDn()/* && voxen_Cheats.noclip*/) input.y -= 1.0f; // Temporarily allow for now until I have collision working
+    if (SwimUp()/* && voxen_Cheats.noclip*/) input.y += 1.0f;
     input = normalize_vector3(input);
     float intent = magnitude_vector3(input);
     float speed = GetBasePlayerSpeed(intent > 0.1f);
@@ -103,7 +103,7 @@ void ApplyPlayerMovements(void) {
     Vector3 currentVel = instances[PLAYER1].velocity;
     float accel = boosterActive ? 1.0f : 3.0f;
     Vector3 deltaVel = Vector3_A_minus_B(wishVel, currentVel);
-    Vector3 appliedVel = Vector3_A_plus_B(currentVel, scale_vector3(deltaVel, (accel * (float)voxen_globalContext.timeSinceLastPhysicsTick)));
+    Vector3 appliedVel = Vector3_A_plus_B(currentVel, scale_vector3(deltaVel, (accel * (float)Sys_Global.timeSinceLastPhysicsTick)));
     instances[PLAYER1].velocity = appliedVel; // Gravity applied elsewhere same as everything else.
 }
 
@@ -113,9 +113,9 @@ void UpdateVelocityFromGravity(void) {
     for (int32_t i=PLAYER1;i<loadedInstances;++i) {
         if (i > loadedInstances) return;
         if (instances[i].gravity < 0.01f && instances[i].gravity > -0.01f) continue;
-        if (i <= PLAYER2 && voxen_Cheats.noclip) continue;
+        if (i <= (int32_t)PLAYER2 && voxen_Cheats.noclip) continue;
         
-        instances[i].velocity = Vector3_A_plus_B(instances[i].velocity, scale_vector3(gravityVelocity, instances[i].gravity * (float)voxen_globalContext.timeSinceLastPhysicsTick));
+        instances[i].velocity = Vector3_A_plus_B(instances[i].velocity, scale_vector3(gravityVelocity, instances[i].gravity * (float)Sys_Global.timeSinceLastPhysicsTick));
     }
 }
 
@@ -132,8 +132,8 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     Vector3 dir = normalize_vector3(instances[i].velocity);
     Vector3 currentHitPos = Vector3_A_plus_B(instances[i].position, scale_vector3(dir, PLAYER_RADIUS));
                                                                                   
-    Vector3 newPosition = Vector3_A_plus_B(currentPosition, scale_vector3(instances[i].velocity, (float)voxen_globalContext.timeSinceLastPhysicsTick));
-    Vector3 newHitPos = Vector3_A_plus_B(currentHitPos, scale_vector3(instances[i].velocity, (float)voxen_globalContext.timeSinceLastPhysicsTick));
+    Vector3 newPosition = Vector3_A_plus_B(currentPosition, scale_vector3(instances[i].velocity, (float)Sys_Global.timeSinceLastPhysicsTick));
+    Vector3 newHitPos = Vector3_A_plus_B(currentHitPos, scale_vector3(instances[i].velocity, (float)Sys_Global.timeSinceLastPhysicsTick));
     if (i <= PLAYER2 && voxen_Cheats.noclip) { instances[i].position = newPosition; return; }
     
     int32_t cellCoordsCurrentX = PosGetCellCoordX(currentPosition.x);
@@ -178,115 +178,40 @@ int32_t Physics(void) {
     return 0; // Ok.
 }
 
-// uint32_t Physics_CreateConvexMesh(const float* vertices, uint32_t vertexCount, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic) {
-//     if (vertexCount > 255 || vertexCount < 3) {  DualLogError("Invalid vert count for convex hull: %d (max ~255)\n", vertexCount); return 0; }
-//     
-//     uint8_t objectLayer = layer;
-//     if (isStatic) objectLayer = Layers::NON_MOVING;
-//     JPH::Array<JPH::Vec3> joltVerts;
-//     joltVerts.reserve(vertexCount);
-//     uint8_t stride = 8; // x,y,z,nx,ny,nz,u,v flat buffer
-//     uint16_t floatCount = vertexCount * stride;
-//     for (int i = 0; i < floatCount; i += stride) joltVerts.push_back(JPH::Vec3(vertices[i + 0], vertices[i + 1], vertices[i + 2]));
-//     JPH::ConvexHullShapeSettings shape(joltVerts, JPH::cDefaultConvexRadius, nullptr);
-//     shape.SetEmbedded();
-//     JPH::BodyCreationSettings settings(&shape, GetVoxenToJoltPosition(position), GetVoxenToJoltQuaternion(rotation), isStatic ? JPH::EMotionType::Static : JPH::EMotionType::Dynamic, objectLayer);
-//     settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateMassAndInertia;
-//     if (!isStatic) settings.mMassPropertiesOverride.mMass = mass;
-//     JPH::BodyID bodyID = gPhysicsSystem->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::Activate);
-//     uint32_t handle = gNextBodyHandle++; gBodyMap[handle] = bodyID;
-//     return handle;
-// }
+RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask) {
+    RaycastHit result = { .hit = false };
+    (void)origin;
+    (void)dir;
+    (void)distance;
+    (void)layerMask;
+    return result;
+}
 
-// uint32_t Physics_CreateMeshCollider(const float* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t triCount, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic) {
-//     if (!vertices || !indices || vertexCount < 3 || triCount == 0) {
-//         DualLogError("Invalid mesh data (null ptr or too small)\n");
-//         return 0;
-//     }
-//     if (!isStatic) {
-//         isStatic = true; // Force to true for now for testing meshes.
-//         DualLogError("MeshShape only for static, marked as static\n");
-//     }
-// 
-//     JPH::VertexList vertList;
-//     vertList.reserve(vertexCount);
-//     for (uint32_t i = 0; i < vertexCount; ++i) {
-//         uint32_t offset = i * VERTEX_ATTRIBUTES_COUNT;
-//         float x = vertices[offset + 0];
-//         float y = vertices[offset + 1];
-//         float z = vertices[offset + 2];
-//         if (!isfinite(x + y + z)) {  // Catch NaN/inf
-//             DualLogError("Bad vertex %u\n", i);
-//             return 0;
-//         }
-//         vertList.push_back(JPH::Float3(x, y, -z));
-//     }
-// 
-//     JPH::IndexedTriangleList triList;
-//     triList.reserve(triCount);
-//     for (uint32_t t = 0; t < triCount; ++t) {
-//         uint32_t a = indices[t*3 + 0];
-//         uint32_t b = indices[t*3 + 1];
-//         uint32_t c = indices[t*3 + 2];
-//         if (a >= vertexCount || b >= vertexCount || c >= vertexCount) { DualLogError("Bad index in tri %u\n", t); return 0; }
-// 
-//         triList.push_back(JPH::IndexedTriangle(a, b, c, 0));
-//     }
-// 
-//     JPH::MeshShapeSettings shape(vertList, triList);
-//     shape.Sanitize();
-// 
-//     JPH::ShapeSettings::ShapeResult result = shape.Create();
-//     if (!result.IsValid()) { DualLogError("MeshShape.Create() failed: %s\n", result.GetError().c_str()); return 0; }
-// 
-//     JPH::BodyCreationSettings settings(result.Get(), GetVoxenToJoltPosition(position), GetVoxenToJoltQuaternion(rotation), JPH::EMotionType::Static, Layers::NON_MOVING);
-//     JPH::BodyID bodyID = gPhysicsSystem->GetBodyInterface().CreateAndAddBody(settings, JPH::EActivation::DontActivate);
-//     if (bodyID.IsInvalid()) return 0;
-// 
-//     uint32_t handle = gNextBodyHandle++;
-//     gBodyMap[handle] = bodyID;
-//     return handle;
-// }
+void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount) {
+    for (int i=0;i<maxCount;++i) hits[i].hit = false;
+    //uint16_t hitHead = 0;
+    (void)origin;
+    (void)dir;
+    (void)distance;
+    (void)layerMask;
+}
 
-// RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask) {
-//     JPH::RRayCast ray{JPH::RVec3(origin.x, origin.y, origin.z), JPH::Vec3(dir.x, dir.y, dir.z) * distance};
-//     JPH::RayCastResult hit;
-//     LayerFilter layerFilter(layerMask);
-//     if (gPhysicsSystem->GetNarrowPhaseQuery().CastRay(ray, hit, JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING), layerFilter)) {
-//         JPH::RVec3 hitPos = ray.GetPointOnRay(hit.mFraction * distance);
-//         Vector3 point = {(float)hitPos.GetX(), (float)hitPos.GetY(), (float)hitPos.GetZ()};
-//         Vector3 normal = {0,0,1};
-//         { JPH::BodyLockRead lock(gPhysicsSystem->GetBodyLockInterface(), hit.mBodyID);
-//           if (lock.Succeeded()) {
-//               const JPH::Body& body = lock.GetBody();
-//               JPH::Vec3 n = body.GetWorldSpaceSurfaceNormal(hit.mSubShapeID2, hitPos);
-//               normal = {(float)n.GetX(), (float)n.GetY(), (float)n.GetZ()};
-//           }
-//         }
-//         uint16_t hitIdx = UINT16_MAX;
-//         for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) {
-//             if (instances[i].physics_handle && gBodyMap[instances[i].physics_handle] == hit.mBodyID) { hitIdx = i; break; }
-//         }
-//         return (RaycastHit){.point = point, .normal = normal, .distance = hit.mFraction * distance, .hitInstanceIndex = hitIdx, .hit = true};
-//     }
-//     return (RaycastHit){.hit = false};
-// }
-/*
-class AnyHitCollideShapeCollector : public JPH::CollideShapeCollector {
-    public:
-        bool had_hit = false;
-        virtual void AddHit(const JPH::CollideShapeResult&) override { had_hit = true; ResetEarlyOutFraction(0.0f); }
-};
+RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers) {
+    RaycastHit result = { .hit = false };
+    Vector3 dir = Vector3_A_minus_B(end, start);
+    (void)capsuleRadius;
+    (void)dir;
+    (void)layerMask;
+    (void)castDist;
+    (void)hitTriggers;
+    return result;
+}
 
-bool Physics_CheckCapsule(float posX, float posY, float posZ, float radius, float height, uint32_t layerMask) {
-    float half = height * 0.5f - radius;
-    JPH::CapsuleShape shape(half, radius);
-    JPH::CollideShapeSettings settings;
-    AnyHitCollideShapeCollector collector;
-    LayerFilter layerFilter(layerMask);
-    gPhysicsSystem->GetNarrowPhaseQuery().CollideShape(&shape, JPH::Vec3::sReplicate(1.0f), JPH::Mat44::sTranslation(JPH::Vec3(posX, posY + radius + half, posZ)), settings, JPH::RVec3::sZero(), collector, JPH::SpecifiedBroadPhaseLayerFilter(BroadPhaseLayers::NON_MOVING), layerFilter);
-    return collector.had_hit;
-}*/
-
-// } // extern "C"
-
+bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask) {
+    (void)start;
+    (void)end;
+    (void)capsuleRadius;
+    (void)capsuleHeight;
+    (void)layerMask;
+    return false;
+}

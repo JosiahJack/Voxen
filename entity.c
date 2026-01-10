@@ -558,14 +558,14 @@ uint16_t numDoorsFound;
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
-    voxen_globalContext.levelCurrentlyLoading = true;
+    Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     if (curlevel == LEVEL_CYBERSPACE) RenderLoadingProgress(100,"Loading cyberspace...");
     else RenderLoadingProgress(100,"Loading level...");
 
-    if (!voxen_globalContext.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
-    voxen_globalContext.levelCurrentlyLoading = true;
-    voxen_globalContext.currentLevel = curlevel;
+    if (!Sys_Global.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    Sys_Global.levelCurrentlyLoading = true;
+    Sys_Global.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
     loadedLights = 0;
     switch(curlevel) { // Setting these as early as possible. TODO: These are Citadel specific offsets.  Ideally we just determine these from modelBounds of each instance we load later on...
@@ -609,7 +609,7 @@ void LoadLevel(uint8_t curlevel) {
     memset(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
     memset(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
     memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
-    if (curlevel >= voxen_globalContext.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, voxen_globalContext.numLevels - 1); OS_Exit(1); }
+    if (curlevel >= Sys_Global.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Sys_Global.numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
     memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
@@ -983,8 +983,8 @@ void LoadLevel(uint8_t curlevel) {
         uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
         for (int i=START_INDEX_LEVEL_INSTANCES; i < endOfModels;++i) { if (instances[i].overrideTest) DualLogEntityInstance(i); }
     #endif
-    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f,100);
-    voxen_globalContext.levelCurrentlyLoading = false;
+    //play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f,100);
+    Sys_Global.levelCurrentlyLoading = false;
     DualLog("LoadLevel completed!\n");
 }
 #pragma GCC diagnostic pop

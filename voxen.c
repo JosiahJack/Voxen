@@ -8,11 +8,9 @@
 #include "data_models.c"
 #include "dynamic_culling.c"
 
-Voxen_GlobalContext voxen_globalContext = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
+GlobalContext Sys_Global = { .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
 VoxenDiagnostics      voxen_Diagnostics = { .worstFPS = UINT32_MAX };
-Voxen_Cheats               voxen_Cheats = { .god = false, .noclip = false, .showLocation = true, .showFPS = true, .editMode = true };
-VoxenSettings            voxen_Settings = { .ScreenWidth = 1366u, .ScreenHeight = 768u, .Shadows = 1u, .AntiAliasing = 1u, .Brightness = 50u, .VolumeMusic = 20u, .FOV = 65.0f, .Reflections = 1u, .Vsync = 0u };
-uint8_t SSR_RES = 8; // Ratio is (1 / SSR_RES) * render resolution.
+Voxen_Cheats               voxen_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 Voxen_GL_Comms           voxen_GL_Comms;
 uint8_t queuedLevelToLoad = 3;
 Entity instances[INSTANCE_COUNT];
@@ -32,29 +30,9 @@ static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 1
 static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
 FrustumPlane playerFrustumPlanes[6];
-extern uint16_t editModeTestEntityDefinition;
-KeyState keyStates[MAX_KEYS] = {{0}};
-KeyState mouseButtons[MAX_MOUSE_BUTTONS] = {{0}};
-double scrollDelta;
-double last_mouse_x = 0.0, last_mouse_y = 0.0;
-float mouse_sensitivity = 0.1f;
-bool window_has_focus = false;
 uint16_t editModeSelection = 682; // Test instance
 uint16_t editModeTestEntityDefinition = 0; // Test instance's model index
 float voxelMinCenterX, voxelMinCenterZ;
-
-#define MAX_SHADOWMAPS 48u
-#define SHADOW_MAP_SIZE 192u
-#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
-typedef struct {
-    double shadowTime;
-	uint32_t numShadowsCouldRender;
-	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
-    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
-    float shadDotThresh;
-	bool useComputeClear;
-} VoxenShadowSystem;
 VoxenShadowSystem voxen_Shadow_System;
 
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
@@ -139,73 +117,11 @@ bool process_gamedata_key_value(Entity *entry, const char *key, const char *valu
     while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
     while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
     
-         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(voxen_globalContext.global_modname, trimmed_value, sizeof(voxen_globalContext.global_modname) - 1); voxen_globalContext.global_modname[sizeof(voxen_globalContext.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
-    else if (strcmp(trimmed_key, "levelcount") == 0)      voxen_globalContext.numLevels = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "startlevel") == 0)      voxen_globalContext.startLevel = parse_numberu8(trimmed_value, line, lineNum);
+         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(Sys_Global.global_modname, trimmed_value, sizeof(Sys_Global.global_modname) - 1); Sys_Global.global_modname[sizeof(Sys_Global.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
+    else if (strcmp(trimmed_key, "levelcount") == 0)      Sys_Global.numLevels = parse_numberu8(trimmed_value, line, lineNum);
+    else if (strcmp(trimmed_key, "startlevel") == 0)      Sys_Global.startLevel = parse_numberu8(trimmed_value, line, lineNum);
     else return false;
     return true;
-}
-
-void SetSkyRotateSpeed(void) {
-    static const float speeds[] = { 0.05f, 1.0f, 2.5f, 3.75f, 6.25f };
-    float skyRotateSpeed = speeds[voxen_Cheats.dizzyLevel];
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
-    glUniform1f(30, skyRotateSpeed);
-}
-
-void SetFog(void) {
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform3f(4, fogColorR * fogBaseDensityForLevel, fogColorG * fogBaseDensityForLevel, fogColorB * fogBaseDensityForLevel); // TODO: Add gunsmoke accumulation
-}
-
-void SetVSync(void) { glfwSwapInterval(voxen_Settings.Vsync); }
-
-void UpdateProjectionMatrices(void) {
-    float* m;
-    m = uiOrthoProjection;
-    m[0] = 2.0f / (float)voxen_Settings.ScreenWidth; m[1] =                                         0.0f; m[2] =  0.0f; m[3] = 0.0f;
-    m[4] =                                     0.0f; m[5] = -2.0f / ((float)voxen_Settings.ScreenHeight); m[6] =  0.0f; m[7] = 0.0f;
-    m[8] =                                     0.0f; m[9] =                                         0.0f; m[10]= -1.0f; m[11]= 0.0f;
-    m[12]=                                    -1.0f; m[13]=                                         1.0f; m[14]=  0.0f; m[15]= 1.0f;
-    
-    aspect3D = (float)voxen_Settings.ScreenWidth / (float)voxen_Settings.ScreenHeight;
-    float f = vcot(voxen_Settings.FOV * PI / 360.0f);
-    m = rasterPerspectiveProjection;
-    m[0] = f / aspect3D; m[1] = 0.0f; m[2] =                                                      0.0f; m[3] =  0.0f;
-    m[4] =         0.0f; m[5] =    f; m[6] =                                                      0.0f; m[7] =  0.0f;
-    m[8] =         0.0f; m[9] = 0.0f; m[10]=      -(FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE); m[11]= -1.0f;
-    m[12]=         0.0f; m[13]= 0.0f; m[14]= -2.0f * FAR_PLANE * NEAR_PLANE / (FAR_PLANE - NEAR_PLANE); m[15]=  0.0f;
-    voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan(voxen_Settings.FOV * (float)M_PI / 360.0f) * (1.0f + aspect3D * aspect3D));
-}
-
-void UpdateScreenSize(void) {
-    UpdateProjectionMatrices();
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
-    glUniform1ui(2, voxen_Settings.ScreenWidth);
-    glUniform1ui(3, voxen_Settings.ScreenHeight);
-    glUniform1i(26, SSR_RES);
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform1ui(6, voxen_Settings.ScreenWidth);
-    glUniform1ui(7, voxen_Settings.ScreenHeight);
-    glUseProgram(voxen_GL_Comms.ssrShaderProgram);
-    glUniform1ui(0, voxen_Settings.ScreenWidth / SSR_RES);
-    glUniform1ui(1, voxen_Settings.ScreenHeight / SSR_RES);       
-    glUniform1i(2, SSR_RES);
-}
-
-void ApplySettings(void) {
-    UpdateScreenSize();
-    SetSkyRotateSpeed();
-    SetVSync();
-    SetFog();
-    glUseProgram(voxen_GL_Comms.imageBlitShaderProgram);
-    glUniform1ui(5, voxen_Settings.Reflections);
-    glUniform1ui(6, voxen_Settings.AntiAliasing);
-    glUniform1f(14, voxen_Settings.FOV);
-    glUniform1f(16, aspect3D);
-    glUniform1ui(22, voxen_Settings.Shadows);
-    glUseProgram(voxen_GL_Comms.chunkShaderProgram);
-    glUniform1ui(14, voxen_Settings.Reflections);   glUniform1ui(15, voxen_Settings.Shadows);
 }
 
 // Load Game/Mod Definition
@@ -237,9 +153,9 @@ void ParseGameData(void) {
     }
     
     fclose(gamedatfile);
-    if (strcmp(voxen_globalContext.global_modname, "Citadel") == 0) voxen_globalContext.global_modIsCitadel = true;
+    if (strcmp(Sys_Global.global_modname, "Citadel") == 0) Sys_Global.global_modIsCitadel = true;
     ApplySettings();
-    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",voxen_globalContext.global_modname, voxen_globalContext.numLevels, voxen_globalContext.startLevel, get_time() - start_time);
+    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
 }
 
 #pragma GCC diagnostic push
@@ -401,194 +317,6 @@ bool parse_data_file(DataParser *parser, const char *filename) {
 }
 #pragma GCC diagnostic pop
 
-// GLFW Callbacks
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
-    if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        if (log_playback) { log_playback = false; DualLog("Exited log playback manually.  Control returned\n"); return; }
-        
-        EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-    } else {
-        if (!log_playback) {
-            if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent(EV_KEYDOWN, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-            else if (action == GLFW_RELEASE) EnqueueEvent(EV_KEYUP, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-        }
-    }
-}
-
-static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (!log_playback && window_has_focus) {
-        int32_t dx = (int32_t)(xpos - last_mouse_x);
-        int32_t dy = (int32_t)(ypos - last_mouse_y);
-        last_mouse_x = xpos;
-        last_mouse_y = ypos;
-        if (ignore_next_mouse_delta) { ignore_next_mouse_delta = false; return; }
-        
-        if (voxen_Diagnostics.globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-    }
-}
-
-static void window_focus_callback(GLFWwindow* window, int32_t focused) {
-    window_has_focus = focused != 0;
-    ignore_next_mouse_delta = true;
-    glfwSetInputMode(window, GLFW_CURSOR, window_has_focus ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
-}
-
-static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return;
-    if (action == GLFW_PRESS) {
-        mouseButtons[button].down = true;
-        mouseButtons[button].pressed = true;
-        EnqueueEvent(EV_KEYDOWN, button + 1000, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED); // offset mouse events if needed
-    } else if (action == GLFW_RELEASE) {
-        mouseButtons[button].down = false;
-        mouseButtons[button].released = true;
-        EnqueueEvent(EV_KEYUP, button + 1000, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-    }
-}
-
-static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) { scrollDelta += yoffset; }
-#pragma GCC diagnostic pop
-
-void Input_Init(GLFWwindow* window) {
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetCursorPosCallback(window, cursor_pos_callback);
-    glfwSetWindowFocusCallback(window, window_focus_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-}
-
-int32_t Input_KeyDown(int32_t keycode) {
-    if (keycode >= 0 && keycode < MAX_KEYS) keyStates[keycode].pressed = keyStates[keycode].down = true;
-    if (voxen_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
-    return 0;
-}
-
-int32_t Input_KeyUp(int32_t keycode) {
-    if (keycode >= 0 && keycode < MAX_KEYS) keyStates[keycode].pressed = keyStates[keycode].down = false;
-    return 0;
-}
-
-void InputClearRisingAndFallingEdges(void) { // Clear keypress rising and falling edge triggers
-    for (int32_t i=0;i<MAX_KEYS;++i)          keyStates[i].pressed = keyStates[i].released = false;       // Can't memset as we want to preserve down state
-    for (int32_t i=0;i<MAX_MOUSE_BUTTONS;i++) mouseButtons[i].pressed = mouseButtons[i].released = false; // Can't memset as we want to preserve down state
-    scrollDelta = 0;
-}
-
-void UpdatePlayerFacingAngles(void) {
-    Quaternion rot = instances[PLAYER1].rotation;
-    float y2 = rot.y * rot.y;  float xz = rot.x * rot.z;  float wy = rot.w * rot.y;
-    instances[PLAYER1].forward = normalize_vector3((Vector3){ 2.0f * (xz + wy), 2.0f * (rot.y * rot.z - rot.w * rot.x), 1.0f - 2.0f * (rot.x * rot.x + y2) });
-    instances[PLAYER1].right = normalize_vector3((Vector3){ 1.0f - 2.0f * (y2 + rot.z * rot.z), 2.0f * (rot.x * rot.y + rot.w * rot.z), 2.0f * (xz - wy) });
-}
-
-// Create a quaternion from yaw (around Y), pitch (around X), and roll (around Z) in degrees
-void quat_from_yaw_pitch_roll(Quaternion* q, float yaw_deg, float pitch_deg, float roll_deg) {
-    float yaw = deg2rad(yaw_deg);   // Around Y (up)
-    float pitch = deg2rad(pitch_deg); // Around X (right)
-    float roll = deg2rad(roll_deg);  // Around Z (forward)
-    float cy = vcosf(yaw * 0.5f);
-    float sy = vsinf(yaw * 0.5f);
-    float cp = vcosf(pitch * 0.5f);
-    float sp = vsinf(pitch * 0.5f);
-    float cr = vcosf(roll * 0.5f);
-    float sr = vsinf(roll * 0.5f);
-    q->w = cy * cp * cr + sy * sp * sr;
-    q->x = cy * sp * cr + sy * cp * sr; // X-axis (pitch)
-    q->y = sy * cp * cr - cy * sp * sr; // Y-axis (yaw)
-    q->z = cy * cp * sr - sy * sp * cr; // Z-axis (roll)
-} // Skipping quat normalization, not needed
-
-void Input_MouselookApply(void) {
-    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,cam_roll);
-    else               quat_from_yaw_pitch_roll(&instances[PLAYER1].rotation,cam_yaw,cam_pitch,    0.0f);
-    
-    UpdatePlayerFacingAngles();
-}
-
-int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
-    if (CursorVisible()) {
-        int32_t newX = cursorPosition_x + xrel;
-        if (newX > voxen_Settings.ScreenWidth) newX = voxen_Settings.ScreenWidth;
-        if (newX < 0) newX = 0;
-        cursorPosition_x = newX;
-        int32_t newY = cursorPosition_y + yrel;
-        if (newY > voxen_Settings.ScreenHeight) newY = voxen_Settings.ScreenHeight;
-        if (newY < 0) newY = 0;
-        cursorPosition_y = newY;
-    }
-    
-    if (voxen_globalContext.gamePaused || voxen_globalContext.inventoryMode) return 0;
-    
-    cam_yaw += (float)xrel * mouse_sensitivity;
-    if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
-    if (cam_yaw < 0.0f) cam_yaw += 360.0f;
-    cam_pitch += (float)yrel * mouse_sensitivity;
-    if (cam_pitch > 89.0f) cam_pitch = 89.0f; // Avoid gimbal lock at pure 90deg
-    if (cam_pitch < -89.0f) cam_pitch = -89.0f;
-    Input_MouselookApply();
-    return 0;
-}
-
-void ProcessInput(void) {
-    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(voxen_globalContext.window);
-    if (keyStates[GLFW_KEY_GRAVE_ACCENT].pressed) ToggleConsole();
-    
-    if (keyStates[GLFW_KEY_LEFT_CONTROL].down && keyStates[GLFW_KEY_E].pressed) play_wav("./Audio/weapons/wpistol.wav",0.5f);
-    // End Debug Inputs
-    
-    if (keyStates[GLFW_KEY_F12].pressed && voxen_globalContext.current_time > voxen_globalContext.screenshotTimeout) {
-        Screenshot();
-        voxen_globalContext.screenshotTimeout = voxen_globalContext.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
-    }
-    
-    if (keyStates[GLFW_KEY_ESCAPE].pressed) { voxen_globalContext.gamePaused = !voxen_globalContext.gamePaused; return; }
-    if (!window_has_focus || log_playback) return;
-    if (voxen_globalContext.gamePaused || voxen_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
-    
-        uint16_t testlightIdx = (741 * LIGHT_DATA_SIZE);
-    if (keyStates[GLFW_KEY_1].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] += 0.01f; lightDirty[741] = true;
-    } else if (keyStates[GLFW_KEY_2].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] -= 0.01f; lightDirty[741] = true;
-    }
-    
-    if (keyStates[GLFW_KEY_3].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSY] += 0.01f; lightDirty[741] = true;
-    } else if (keyStates[GLFW_KEY_4].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSY] -= 0.01f; lightDirty[741] = true;
-    }
-    
-    if (keyStates[GLFW_KEY_5].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSZ] += 0.01f; lightDirty[741] = true;
-    } else if (keyStates[GLFW_KEY_6].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSZ] -= 0.01f; lightDirty[741] = true;
-    }
-    
-    if (keyStates[GLFW_KEY_I].pressed) {
-        editModeTestEntityDefinition++;
-        if (editModeTestEntityDefinition >= entityCount) editModeTestEntityDefinition = 0u;
-        Vector3 oldPos = instances[editModeSelection].position;
-        Quaternion oldRot = instances[editModeSelection].rotation;
-        Vector3 oldScale = instances[editModeSelection].scale;
-        instances[editModeSelection] = entities[editModeTestEntityDefinition];
-        instances[editModeSelection].position = oldPos;
-        instances[editModeSelection].rotation = oldRot;
-        instances[editModeSelection].scale = oldScale;
-        DualLogEntityInstance(editModeSelection);
-    }
-        
-    if (keyStates[GLFW_KEY_TAB].pressed) {
-        ignore_next_mouse_delta = true;
-        voxen_globalContext.inventoryMode = !voxen_globalContext.inventoryMode;
-        cursorPosition_x = voxen_Settings.ScreenWidth / 2;
-        cursorPosition_y = voxen_Settings.ScreenHeight / 2;
-    }
-    
-    ApplyPlayerMovements();
-}
-
 void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
     glGenTextures(1, id);
     glBindTexture(target, *id);
@@ -706,7 +434,7 @@ Quaternion cubemapOrientationQuaternion[6] = {
 };
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 bool UpdateLights(bool* voxelsNeedUpdated) {
-    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return false;
+    if (Sys_Global.gamePaused || Sys_Global.menuActive) return false;
     
     for (int lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         if (lightDirty[lightIdx]) { // Marked all as true at level load.
@@ -729,18 +457,18 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
 
         float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
-        if (lightLerpTime[i] < (float)voxen_globalContext.pauseRelativeTime) {
+        if (lightLerpTime[i] < (float)Sys_Global.pauseRelativeTime) {
             lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
             lightLerpUp[i] = !lightLerpUp[i];
             lightCurrentStep[i]++;
             if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0; // Wrap and start over continuous looping
             lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-            lightLerpTime[i] = (float)voxen_globalContext.pauseRelativeTime + lightLerpStepTime[i];
-            lightLerpStartTime[i] = (float)voxen_globalContext.pauseRelativeTime;
+            lightLerpTime[i] = (float)Sys_Global.pauseRelativeTime + lightLerpStepTime[i];
+            lightLerpStartTime[i] = (float)Sys_Global.pauseRelativeTime;
         } else if (lightLerpOn[i]) {
             if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
                 if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                    lightLerpValue[i] = ((float)voxen_globalContext.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                    lightLerpValue[i] = ((float)Sys_Global.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
                     float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
                     lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * lerpVal);
                     lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
@@ -780,8 +508,8 @@ __attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void
 
 // ============================================================================
 // UI Rendering and Text
-__attribute__((pure)) float GetScreenRelativeX(float percentage) { return (float)voxen_Settings.ScreenWidth * percentage; }
-__attribute__((pure)) float GetScreenRelativeY(float percentage) { return (float)voxen_Settings.ScreenHeight * percentage; }
+float GetScreenRelativeX(float percentage) { return (float)Sys_Settings.ScreenWidth * percentage; }
+float GetScreenRelativeY(float percentage) { return (float)Sys_Settings.ScreenHeight * percentage; }
 
 void RenderUIImage(float x, float y, float width, float height, uint32_t texIndex) {
     glEnable(GL_BLEND);
@@ -891,8 +619,8 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
 
 void RenderLoadingProgress(int32_t offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    RenderFormattedText(voxen_Settings.ScreenWidth / 2 - offset, voxen_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL, text);
-    glfwSwapBuffers(voxen_globalContext.window);
+    RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL, text);
+    glfwSwapBuffers(Sys_Global.window);
 }
 
 char statusText[TEXT_BUFFER_SIZE];
@@ -902,7 +630,7 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
     (void)vsnprintf(statusText, TEXT_BUFFER_SIZE, fmt, args);
     va_end(args);
     DualLog("%s\n",statusText);
-    voxen_globalContext.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
+    Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 
 void NewGame(void) {
@@ -931,10 +659,10 @@ void NewGame(void) {
     instances[PLAYER1].frictionCombine = PHYS_COMBINE_MUL;
 //     instances[PLAYER1].physics_handle = Physics_CreateCharacterCapsule(instances[PLAYER1].colliderSize.x, instances[PLAYER1].colliderSize.y, instances[PLAYER1].position, PhysicsLayer_Player, instances[PLAYER1].mass, false); // false == dynamic
 //     Physics_CreatePlayer(instances[PLAYER1].position);
-    LoadLevel(voxen_globalContext.startLevel); // Must be after entities!
-    voxen_globalContext.pauseRelativeTime = 0.0;
-    voxen_globalContext.last_physics_time = get_time();
-    voxen_globalContext.last_topframe_time = voxen_globalContext.last_physics_time - 0.05;
+    LoadLevel(Sys_Global.startLevel); // Must be after entities!
+    Sys_Global.pauseRelativeTime = 0.0;
+    Sys_Global.last_physics_time = get_time();
+    Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
 }
 
 #define MAX_DEBUG_LINE_VERTS 4096                // 2048 lines max per frame
@@ -954,22 +682,22 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 0);
-    voxen_globalContext.window = glfwCreateWindow(voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, "Voxen", NULL, NULL);
-    if (!voxen_globalContext.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
+    LoadConfig(); // Get settings before setting window size.
+    Sys_Global.window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
+    if (!Sys_Global.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
         
-    glfwMakeContextCurrent(voxen_globalContext.window);
+    glfwMakeContextCurrent(Sys_Global.window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
-    CycleToNextMonitor(voxen_globalContext.window);
-    glfwSetInputMode(voxen_globalContext.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    SetVSync();
+    CycleToNextMonitor(Sys_Global.window);
+    glfwSetInputMode(Sys_Global.window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     DualLog("OpenGL Version: %s, ", (const char*)glGetString(GL_VERSION));
     DualLog("GPU: %s", (const char*)glGetString(GL_RENDERER));
     OS_CPUInfo();
     GLint maxWorkGroupCountX;
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxWorkGroupCountX);
     voxen_Shadow_System.useComputeClear = (maxWorkGroupCountX > 65536); // Some systems limit the workgroup size to uint16_t (e.g. Mesa on Intel HD4400), so fallback to slower big hammer but reliable glClearBufferData instead for shadowmaps clear
-    Input_Init(voxen_globalContext.window);
+    Input_Init(Sys_Global.window);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
     CompileShaders();
@@ -1003,14 +731,14 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glVertexArrayAttribBinding(voxen_GL_Comms.debugLinesVAO, 0, 0);
     glVertexArrayVertexBuffer(voxen_GL_Comms.debugLinesVAO, 0, voxen_GL_Comms.debugLinesVBO, 0, 3 * sizeof(float));
 
-    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&voxen_GL_Comms.inputNormalID,            GL_RG16F, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
+    GenerateAndBindTexture(&voxen_GL_Comms.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&voxen_GL_Comms.inputWorldPosID,        GL_RGBA16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&voxen_GL_Comms.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+    GenerateAndBindTexture(&voxen_GL_Comms.inputSpecID,              GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
+    GenerateAndBindTexture(&voxen_GL_Comms.inputNormalID,            GL_RG16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
     glGenTextures(1, &voxen_GL_Comms.outputImageID);
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  voxen_Settings.ScreenWidth / SSR_RES,  voxen_Settings.ScreenHeight / SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,  Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -1045,10 +773,9 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     InitFontAtlasses();
     RenderLoadingProgress(80,"Loading...");
     InitializeAudio(); // Audio    
-    LoadTextForLanguage(voxen_Settings.Language);
-    LoadLogTextForLanguage(voxen_Settings.Language);
+    ApplySettings(); // After loading of text.
     ParseGameData();
-    glfwSetWindowTitle(voxen_globalContext.window, voxen_globalContext.global_modname);
+    glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
     int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     int windowIconFileSize = OS_FileSize(fp);
     uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
@@ -1062,7 +789,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     image.width  = w;
     image.height = h;
     image.pixels = pixels;
-    glfwSetWindowIcon(voxen_globalContext.window, 1, &image);
+    glfwSetWindowIcon(Sys_Global.window, 1, &image);
     file_buffer = OS_DeallocateRAM(file_buffer, windowIconFileSize);
     stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
     DebugRAM("after freeing window bar icon");
@@ -1083,7 +810,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     voxen_GL_Comms.texturePaletteOffsetsID = SetupSSBO(&voxen_GL_Comms.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.lightsID                = SetupSSBO(&voxen_GL_Comms.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
     voxen_GL_Comms.voxelLightListsID       = SetupSSBO(&voxen_GL_Comms.voxelLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-//     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)voxen_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
+//     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -1127,8 +854,8 @@ __attribute__((pure)) bool EntityIsAnimated(uint16_t entIdx) {
 bool StepLoopingAnim(uint16_t i) {
     bool portalsNeedUpdated = false;
     AnimationClip currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-    if (instances[i].currentFrameFinished < voxen_globalContext.current_time) {
-        instances[i].currentFrameFinished = voxen_globalContext.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+    if (instances[i].currentFrameFinished < Sys_Global.current_time) {
+        instances[i].currentFrameFinished = Sys_Global.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
         instances[i].frame++;
         if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
         else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
@@ -1193,11 +920,11 @@ void UpdateAnims(void) {
 
 #define FROB_DISTANCE 4.9f
 void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
-    float offsetX = cursorPosition_x - (voxen_Settings.ScreenWidth * 0.5f);
-    float offsetY = cursorPosition_y - (voxen_Settings.ScreenHeight * 0.5f);
-    float ndcX = offsetX / (voxen_Settings.ScreenWidth * 0.5f);
-    float ndcY = -offsetY / (voxen_Settings.ScreenHeight * 0.5f);  // flip Y
-    float tanFov = tanf(voxen_Settings.FOV * 0.5f * PI / 180.0f);
+    float offsetX = cursorPosition_x - (Sys_Settings.ScreenWidth * 0.5f);
+    float offsetY = cursorPosition_y - (Sys_Settings.ScreenHeight * 0.5f);
+    float ndcX = offsetX / (Sys_Settings.ScreenWidth * 0.5f);
+    float ndcY = -offsetY / (Sys_Settings.ScreenHeight * 0.5f);  // flip Y
+    float tanFov = tanf((float)Sys_Settings.FOV * 0.5f * PI / 180.0f);
     Vector3 view = (Vector3){ ndcX * tanFov * aspect3D, ndcY * tanFov, -1.0f };
     view = normalize_vector3(view);
     Vector3 flipForward = (Vector3){ -forward.x, -forward.y, -forward.z};
@@ -1208,21 +935,20 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
                              
     voxen_Diagnostics.debugLine_start = pos;
     voxen_Diagnostics.debugLine_end   = (Vector3){ dir.x * FROB_DISTANCE + pos.x, dir.y * FROB_DISTANCE + pos.y, dir.z * FROB_DISTANCE + pos.z };
-
-//     RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
-//     if (tempHit.hit) {
-//         voxen_Diagnostics.debugLine_end = tempHit.point;
-//         DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
-//     }
+    RaycastHit tempHit = Raycast(pos, dir, FROB_DISTANCE, LAYER_MASK_PLAYER_FROB);
+    if (tempHit.hit) {
+        voxen_Diagnostics.debugLine_end = tempHit.point;
+        DualLog("Raycast hit!  Hit object %u named of entity type %s(%u) at hit point %f %f %f\n", tempHit.hitInstanceIndex, GetPrefabNameFromIndex(instances[tempHit.hitInstanceIndex].index), instances[tempHit.hitInstanceIndex].index, (double)tempHit.point.x, (double)tempHit.point.y, (double)tempHit.point.z);
+    }
     
-    voxen_Diagnostics.debugLineFinished = voxen_globalContext.current_time + 3.0;
+    voxen_Diagnostics.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
 void UpdateGameplay(void) {
-    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
+    if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
     
-    if (mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
-    if (voxen_globalContext.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_start, voxen_Diagnostics.debugLine_end);
+    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
+    if (Sys_Global.current_time < voxen_Diagnostics.debugLineFinished) AddDebugLine(voxen_Diagnostics.debugLine_start, voxen_Diagnostics.debugLine_end);
     UpdateAmbientSounds();
     UpdateAnims();
 }
@@ -1250,7 +976,7 @@ typedef struct {
 } LightCandidate;
 
 void RenderShadowmaps(void) {
-    if (voxen_Settings.Shadows < 1u) return;
+    if (Sys_Settings.Shadows < 1u) return;
     
     double shadowStartTime = get_time();
     glEnable(GL_DEPTH_TEST);
@@ -1345,7 +1071,7 @@ void RenderShadowmaps(void) {
                 
             uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z); // Cache cell indices once per mesh rather than once per light.
             bool cellNotVisible = (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx));
-            if (cellNotVisible && !(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+            if (cellNotVisible && !(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
                 if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
                     Portal doorPortal = activePortals[instances[i].portalIndex];
                     uint16_t cellAIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
@@ -1487,7 +1213,7 @@ void RenderShadowmaps(void) {
                     int i = shadows_nearMeshes[j].index;            
                     if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
 
-                    int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+                    int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
                     if (currentModelType != modelType) {
                         currentModelType = modelType;
                         glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1507,7 +1233,7 @@ void RenderShadowmaps(void) {
             numShadowingLightsHandled++;
         }
 
-        glViewport(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight);
+        glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
         glNamedBufferData(voxen_GL_Comms.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     }
     
@@ -1519,21 +1245,21 @@ void RenderCompositePass(float px, float py, float pz, float * restrict viewProj
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, voxen_GL_Comms.inputImageID);
     glUniform1i(4, 4); // outputImage texture sampler2D
-    float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)voxen_globalContext.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
-    if (berserkFinished < (float)voxen_globalContext.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
+    float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)Sys_Global.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
+    if (berserkFinished < (float)Sys_Global.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
     glUniform1f(9, berserkTimeRemainingNormalized);
     glUniform1f(10, berserkSeedTime);
-    glUniform1ui(11, voxen_Settings.Brightness);
+    glUniform1ui(11, Sys_Settings.Brightness);
     glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
     glUniform3f(13, px, py, pz);
-    glUniform1f(15, (float)voxen_globalContext.pauseRelativeTime * 0.1f);
-    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || voxen_globalContext.currentLevel == LEVEL_CYBERSPACE);
-    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && voxen_globalContext.currentLevel != LEVEL_CYBERSPACE);
-    glUniform1ui(19, ((voxen_globalContext.currentLevel >= 10 && voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
+    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
+    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
+    glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     uint32_t shieldOnType = 0u; // No shield green tint.
     if (questData.ShieldActivated) {
-        if (voxen_globalContext.currentLevel == 6 || voxen_globalContext.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-        else if (voxen_globalContext.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+        if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+        else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
     }
     
     glUniform1ui(20, shieldOnType);
@@ -1553,10 +1279,10 @@ void RenderCompositePass(float px, float py, float pz, float * restrict viewProj
 double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     voxen_Diagnostics.drawCallsNormal = voxen_Diagnostics.drawCallsRenderedThisFrame;
-    float screenCenterX = (float)voxen_Settings.ScreenWidth / 2;
-    float screenCenterY = (float)voxen_Settings.ScreenHeight / 2;
+    float screenCenterX = (float)Sys_Settings.ScreenWidth / 2;
+    float screenCenterY = (float)Sys_Settings.ScreenHeight / 2;
     float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
-    if (voxen_globalContext.gamePaused) {
+    if (Sys_Global.gamePaused) {
         float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
         float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);
         float pauseBGY = screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
@@ -1589,17 +1315,17 @@ double RenderUI(void) {
     float debugTextStartY = GetScreenRelativeY(0.075f);
     float leftPad = GetScreenRelativeX(0.0125f);
     if (!voxen_Cheats.noHUD && voxen_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
-    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", voxen_globalContext.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+    if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Debug line start: %.2f, %.2f, %.2f, end: %.2f, %.2f, %.2f", (double)voxen_Diagnostics.debugLine_start.x, (double)voxen_Diagnostics.debugLine_start.y, (double)voxen_Diagnostics.debugLine_start.z, (double)voxen_Diagnostics.debugLine_end.x, (double)voxen_Diagnostics.debugLine_end.y, (double)voxen_Diagnostics.debugLine_end.z);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", GetPrefabNameFromIndex(instances[editModeSelection].index), editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
     if (!voxen_Cheats.noHUD) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
     if (voxen_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-    if (voxen_globalContext.statusTextDecayFinished > voxen_globalContext.current_time) RenderFormattedText(leftPad + (voxen_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
     double time_now = get_time();
     if (voxen_Cheats.showFPS && !voxen_Cheats.noHUD) {
-        double thisFrameTime = (time_now - voxen_globalContext.last_time) * 1000.0;
+        double thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
         double cpuFrameTime = voxen_Diagnostics.cpuTime * 1000.0;
         uint8_t timingColor = TEXT_WHITE;
         if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
@@ -1614,21 +1340,21 @@ double RenderUI(void) {
     float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
     float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
     float shootModePos_y = 0.0f;
-    if (!voxen_globalContext.gamePaused && !voxen_Cheats.noHUD) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
-    if (voxen_globalContext.inventoryMode) {
+    if (!Sys_Global.gamePaused && !voxen_Cheats.noHUD) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+    if (Sys_Global.inventoryMode) {
         if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
-            if (mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
-                voxen_globalContext.inventoryMode = false;
-                cursorPosition_x = voxen_Settings.ScreenWidth / 2;
-                cursorPosition_y = voxen_Settings.ScreenHeight / 2;
+            if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
+                Sys_Global.inventoryMode = false;
+                cursorPosition_x = Sys_Settings.ScreenWidth / 2;
+                cursorPosition_y = Sys_Settings.ScreenHeight / 2;
             }
         }
     }
     
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
-    bool menuOrInventoryCursorStyle = (voxen_globalContext.gamePaused || voxen_globalContext.menuActive);
+    bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
     uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
-    float cursorSize = (float)voxen_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE * (menuOrInventoryCursorStyle ? 3.0f : 1.0f);
+    float cursorSize = (float)Sys_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE * (menuOrInventoryCursorStyle ? 3.0f : 1.0f);
     float cursorHalfSize = cursorSize * 0.5f;
     if (CursorVisible()) RenderUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
     else RenderUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
@@ -1666,7 +1392,7 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
             }
             if (!inPVS) continue;
         } else {
-            if (!(voxen_globalContext.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+            if (!(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
                 if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
             }
             
@@ -1690,7 +1416,7 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
         if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
         if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
         if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
-        int32_t modelType = instanceIsLODArray[i] && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
+        int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
         if (currentModelType != modelType) {
             currentModelType = modelType;
             glBindVertexBuffer(0, voxen_GL_Comms.vbos[currentModelType], 0, VERTEX_ATTRIBUTES_COUNT * sizeof(float));
@@ -1725,19 +1451,19 @@ void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geome
 }
 
 void RenderSSR(float* viewProj, Vector3 playerPos) {
-    if (voxen_Settings.Reflections < 1u) return;
+    if (Sys_Settings.Reflections < 1u) return;
     
     glUseProgram(voxen_GL_Comms.ssrShaderProgram);
     glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
     glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
-    GLuint groupX_ssr = ((voxen_Settings.ScreenWidth  / SSR_RES) + 31) / 32;
-    GLuint groupY_ssr = ((voxen_Settings.ScreenHeight / SSR_RES) + 31) / 32;
+    GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
+    GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
     glDispatchCompute(groupX_ssr, groupY_ssr, 1);
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
 void UpdateDiagnosticPoll(double time_now) {
-    voxen_globalContext.last_time = time_now;
+    Sys_Global.last_time = time_now;
     if ((time_now - voxen_Diagnostics.lastFrameSecCountTime) < 1.00) return;
     
     voxen_Diagnostics.lastFrameSecCountTime = time_now;
@@ -1770,7 +1496,7 @@ void Render(void) {
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
     float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
-    if (!voxen_globalContext.gamePaused && !voxen_globalContext.menuActive) {
+    if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
         glBindVertexArray(voxen_GL_Comms.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
         RenderShadowmaps();
         memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
@@ -1781,26 +1507,26 @@ void Render(void) {
 
     RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot);
     UpdateDiagnosticPoll( RenderUI() );
-    voxen_Diagnostics.cpuTime = get_time() - voxen_globalContext.current_time; // Measure time over everything this frame before GPU swap buffers
-    glfwSwapBuffers(voxen_globalContext.window); // Present frame
+    voxen_Diagnostics.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
+    glfwSwapBuffers(Sys_Global.window); // Present frame
     CHECK_GL_ERROR();
 }
 
-void UpdateTime(void) {
-    voxen_globalContext.current_time = get_time();
-    double frame_time = voxen_globalContext.current_time - voxen_globalContext.last_topframe_time;
-    voxen_globalContext.last_topframe_time = voxen_globalContext.current_time;
-    if (!voxen_globalContext.gamePaused) voxen_globalContext.pauseRelativeTime += frame_time;
+static inline void UpdateTime(void) {
+    Sys_Global.current_time = get_time();
+    double frame_time = Sys_Global.current_time - Sys_Global.last_topframe_time;
+    Sys_Global.last_topframe_time = Sys_Global.current_time;
+    if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += frame_time;
 }
 
-void UpdateEvents(void) {
+static inline void UpdateEvents(void) {
     glfwPollEvents();
-    if (glfwWindowShouldClose(voxen_globalContext.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-    voxen_globalContext.timeSinceLastPhysicsTick = voxen_globalContext.pauseRelativeTime - voxen_globalContext.last_physics_time;
-    if (!log_playback && !voxen_globalContext.gamePaused && !voxen_globalContext.menuActive
-        && voxen_globalContext.timeSinceLastPhysicsTick > (1.0f / 144.0f)) {
+    if (glfwWindowShouldClose(Sys_Global.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
+    Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
+    if (!log_playback && !Sys_Global.gamePaused && !Sys_Global.menuActive
+        && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
         
-        voxen_globalContext.last_physics_time = voxen_globalContext.pauseRelativeTime;
+        Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
         EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
     }
 
@@ -1817,8 +1543,8 @@ void UpdateEvents(void) {
     if (EventQueueProcess()) OS_Exit(1); // Do everything
 }
 
-void UpdateVoxelsAndInstances(void) {
-    if (voxen_globalContext.gamePaused || voxen_globalContext.menuActive) return;
+static void UpdateVoxelsAndInstances(void) {
+    if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
     
     bool voxelsNeedUpdated = UpdatedPlayerCell();
     voxelsNeedUpdated = UpdateLights(&voxelsNeedUpdated);
@@ -1863,7 +1589,7 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment(argc,argv[1],argv[2]);
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    voxen_globalContext.pauseRelativeTime = get_time();
+    Sys_Global.pauseRelativeTime = get_time();
     while(1) { // Main Loop
         ProcessInput(); // Calls ApplyPlayerMovements()
         UpdatePlayerFacingAngles();

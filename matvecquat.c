@@ -2,10 +2,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "voxen.h"
-extern uint16_t loadedModelsMaxIndex;
-extern float aspect3D;
-extern float rasterPerspectiveProjection[16];
-extern float shadowmapsPerspectiveProjection[16];
 
 void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
 __attribute__((pure)) Vector3 mul_mat4_vector3(const float* m, Vector3 v) { return (Vector3){m[0]*v.x+m[4]*v.y+m[8]*v.z+m[12], m[1]*v.x+m[5]*v.y+m[9]*v.z+m[13], m[2]*v.x+m[6]*v.y+m[10]*v.z+m[14]}; }

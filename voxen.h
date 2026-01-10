@@ -80,9 +80,10 @@ void DualLogError(const char* fmt, ...);
 #define ANIM_DYING   8
 #define ANIM_DEAD    9
 
-extern Voxen_GlobalContext voxen_globalContext;
+extern GlobalContext Sys_Global;
 extern QuestBits questData;
-extern VoxenSettings voxen_Settings;
+extern SettingsSystem Sys_Settings;
+extern VoxenShadowSystem voxen_Shadow_System;
 extern VoxenDiagnostics voxen_Diagnostics;
 extern Voxen_Cheats voxen_Cheats;
 extern Voxen_Text voxen_Text;
@@ -150,9 +151,6 @@ void LoadModels(void);
 #define LIGHT_DATA_OFFSET_G 11
 #define LIGHT_DATA_OFFSET_B 12
 // Make sure these match in chunk.glsl shader!
-                   
-#define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
-   // Make sure this ^^^ matches in shadowmaps_clear_selective compute shader!
 
 #define LIGHT_MAX_INTENSITY 8.0f
 #define LIGHT_RANGE_MAX 15.36f
@@ -225,8 +223,6 @@ static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (en
 #define PHYS_COMBINE_MIN 1
 #define PHYS_COMBINE_MUL 2
 #define PHYS_COMBINE_MAX 3
-#define FORCEMODE_ACCUMULATE 0
-#define FORCEMODE_IMPULSE 1
 #define COLLIDER_TYPE_NONE 0
 #define COLLIDER_TYPE_BOX 1
 #define COLLIDER_TYPE_SPHERE 2
@@ -276,30 +272,72 @@ extern uint8_t boosterActive;
 void UpdateInstanceMatrix(int32_t i);
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
 int32_t Physics(void); // Main event tick
-uint32_t Physics_CreateSphere(float radius, Vector3 position,  uint32_t layer, float mass, bool isStatic);
-uint32_t Physics_CreateBox(Vector3 colliderSize, Vector3 offset, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic);
-uint32_t Physics_CreateCapsule(float radius, float height, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic);
-uint32_t Physics_CreateConvexMesh(const float* vertices, uint32_t vertexCount, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic);
-uint32_t Physics_CreateMeshCollider(const float* vertices, const uint32_t* indices, uint32_t vertexCount, uint32_t triCount, Vector3 position, Quaternion rotation, uint8_t layer, float mass, bool isStatic);
-void Physics_CreatePlayer(Vector3 position);
-void Physics_DestroyBody(uint32_t handle);
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask);
+void RaycastAll(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask, RaycastHit* hits, uint16_t maxCount);
+bool CheckCapsule(Vector3 start, Vector3 end, float capsuleRadius, float capsuleHeight, uint32_t layerMask);
+RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float castDist, uint32_t layerMask, bool hitTriggers);
 void ApplyPlayerMovements(void);
 // ----------------------------------------------------------------------------
 // Input
-#define MAX_KEYS 512
-#define MAX_MOUSE_BUTTONS 8
-extern KeyState keyStates[MAX_KEYS];
-extern KeyState mouseButtons[MAX_MOUSE_BUTTONS];
-extern bool window_has_focus;
-extern double last_mouse_x, last_mouse_y;
-extern bool ignore_next_mouse_delta;
+extern InputSystem Sys_Input;
 void CycleToNextMonitor(GLFWwindow* window);
 void Input_Init(GLFWwindow* window);
 void Input_MouselookApply(void);
 int32_t Input_KeyDown(int32_t scancode);
 int32_t Input_KeyUp(int32_t scancode);
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel);
+void ProcessInput(void);
+bool MouseWheelBoundAndRolled(int setCode);
+void UpdatePlayerFacingAngles(void);
+void InputClearRisingAndFallingEdges(void);
+bool Forward(void);
+bool StrafeLeft(void);
+bool Backpedal(void);
+bool StrafeRight(void);
+bool Jump(void);
+bool JumpDown(void);
+bool Crouch(void);
+bool Prone(void);
+bool LeanLeft(void);
+bool LeanRight(void);
+bool Sprint(void);
+bool TurnLeft(void);
+bool TurnRight(void);
+bool LookUp(void);
+bool LookDown(void);
+bool RecentLog(void);
+bool Biomonitor(void);
+bool Sensaround(void);
+bool Lantern(void);
+bool Shield(void);
+bool Infrared(void);
+bool Email(void);
+bool Booster(void);
+bool Jumpjets(void);
+bool Attack(void);
+bool Use(void);
+bool Menu(void);
+bool ToggleMode(void);
+bool Reload(void);
+bool WeaponCycUp(void);
+bool WeaponCycDown(void);
+bool Grenade(void);
+bool GrenadeCycUp(void);
+bool GrenadeCycDown(void);
+bool ChangeAmmoType(void);
+bool Patch(void);
+bool PatchCycUp(void);
+bool PatchCycDown(void);
+bool Map(void);
+bool SwimUp(void);
+bool SwimDn(void);
+bool SwapAmmoType(void);
+bool Console(void);
+bool MouseWheelUp(void);
+bool MouseWheelDn(void);
+void LoadConfig(void);
+void SaveConfig(void);
+void ApplySettings(void);
 // ----------------------------------------------------------------------------
 // Rendering
 #define DEBUG_OPENGL
@@ -320,6 +358,11 @@ extern bool lightDirty[LIGHT_COUNT];
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;
+extern uint16_t loadedModelsMaxIndex;
+extern float aspect3D;
+extern float rasterPerspectiveProjection[16];
+extern float shadowmapsPerspectiveProjection[16];
+extern float uiOrthoProjection[16];
 void Screenshot(void);
 void ToggleConsole(void);
 void ConsoleEmulator(int32_t keycode);
@@ -442,6 +485,12 @@ static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* 
 }
 
 static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
+    if (val > max) return max;
+    if (val < min) return min;
+    return val;
+}
+
+static inline float clampf(float val, float min, float max) {
     if (val > max) return max;
     if (val < min) return min;
     return val;

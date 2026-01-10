@@ -14,13 +14,13 @@ static int historyPos = 0;
 
 void ToggleConsole(void) {
     static bool inventoryModeWasActivePriorToConsole = false;
-    if (!voxen_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = voxen_globalContext.inventoryMode;
+    if (!voxen_Cheats.consoleActive) inventoryModeWasActivePriorToConsole = Sys_Global.inventoryMode;
     voxen_Cheats.consoleActive = !voxen_Cheats.consoleActive; // Tilde
-    if (voxen_Cheats.consoleActive) voxen_globalContext.inventoryMode = true;
-    else if (!inventoryModeWasActivePriorToConsole && voxen_globalContext.inventoryMode) {
-        voxen_globalContext.inventoryMode = false;
-        cursorPosition_x = (int32_t)((float)voxen_Settings.ScreenWidth * 0.5f);
-        cursorPosition_y = (int32_t)((float)voxen_Settings.ScreenHeight * 0.5f);
+    if (voxen_Cheats.consoleActive) Sys_Global.inventoryMode = true;
+    else if (!inventoryModeWasActivePriorToConsole && Sys_Global.inventoryMode) {
+        Sys_Global.inventoryMode = false;
+        cursorPosition_x = (int32_t)((float)Sys_Settings.ScreenWidth * 0.5f);
+        cursorPosition_y = (int32_t)((float)Sys_Settings.ScreenHeight * 0.5f);
     }
 }
 
@@ -110,7 +110,7 @@ static void cmd_savegeometry(void) {
     if (!voxen_Cheats.editMode) { CenterStatusPrint("savegeometry only works in edit mode!"); return; }
 
     char filename[64];
-    snprintf(filename, sizeof(filename), "./Data/level%u.txt", voxen_globalContext.currentLevel);
+    snprintf(filename, sizeof(filename), "./Data/level%u.txt", Sys_Global.currentLevel);
     FILE* f = fopen(filename, "w");
     if (!f) { CenterStatusPrint("Failed to open %s for writing!", filename); return; }
 
@@ -164,12 +164,12 @@ static int ParseLevelArg(const char* arg) {
     }
 
     int level = atoi(clean);
-    if (level >= 0 && level < voxen_globalContext.numLevels) return level;
+    if (level >= 0 && level < Sys_Global.numLevels) return level;
     return -1; // Invalid
 }
 
 static void cmd_loadlevel(const char* arg) {
-    if (voxen_globalContext.menuActive) { CenterStatusPrint("%s", voxen_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
+    if (Sys_Global.menuActive) { CenterStatusPrint("%s", voxen_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 
     int level = ParseLevelArg(arg);
     if (level >= 0) {
@@ -182,7 +182,7 @@ static void cmd_loadlevel(const char* arg) {
     }
 }
 
-static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < voxen_globalContext.numLevels) { EnableCheatArsenal(level); } }
+static void cmd_loadarsenal(const char* arg) { int level = ParseLevelArg(arg); if (level >= 0 && level < Sys_Global.numLevels) { EnableCheatArsenal(level); } }
 
 static void cmd_summon(int itemConstIndex) {
     if (!ConstIndexInBounds(itemConstIndex)) {
@@ -427,7 +427,7 @@ void ConsoleEmulator(int32_t keycode) {
     if (keycode == GLFW_KEY_UP) RecallHistory(1);
     else if (keycode == GLFW_KEY_DOWN) RecallHistory(-1);
     
-    if (keycode == GLFW_KEY_U && keyStates[GLFW_KEY_LEFT_CONTROL].down) {
+    if (keycode == GLFW_KEY_U && Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down) {
         consoleEntryText[0] = '\0'; // Clear the input
         currentEntryLength = 0;
         return;
@@ -456,7 +456,7 @@ void ConsoleEmulator(int32_t keycode) {
         }
     } else if (keycode == GLFW_KEY_MINUS || keycode == GLFW_KEY_KP_SUBTRACT) {
         if (currentEntryLength < (TEXT_BUFFER_SIZE - 1)) {
-            char c = (keyStates[GLFW_KEY_LEFT_SHIFT].down || keyStates[GLFW_KEY_RIGHT_SHIFT].down) ? '_' : '-';
+            char c = (Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down) ? '_' : '-';
             consoleEntryText[currentEntryLength] = c;
             consoleEntryText[currentEntryLength + 1] = '\0';
             currentEntryLength++;

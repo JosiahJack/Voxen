@@ -196,7 +196,7 @@ void EventSystemInit(int32_t argc, char* command, char* command_input1) {
         usingManualLog = true;
     }
     
-    voxen_globalContext.last_time = get_time();
+    Sys_Global.last_time = get_time();
     lastJournalWriteTime = get_time();
 }
 
@@ -214,10 +214,10 @@ int32_t EventQueueProcess(void) {
         if (eventQueue[eventIndex].type == EV_NULL) break; // End of queue
 
         eventQueue[eventIndex].frameNum = voxen_Diagnostics.globalFrameNum;
-        eventQueue[eventIndex].timestamp = voxen_globalContext.current_time;
-        eventQueue[eventIndex].deltaTime_ns = voxen_globalContext.current_time - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
+        eventQueue[eventIndex].timestamp = Sys_Global.current_time;
+        eventQueue[eventIndex].deltaTime_ns = Sys_Global.current_time - eventJournal[eventJournalIndex].timestamp; // Twould be zero if eventJournalIndex == 0, no need to try to assign it as something else; avoiding branch.
         eventJournalIndex++; // Increment now to then write event into the journal.  Still written to during playback for time deltas but never logged to .dem
-        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (voxen_globalContext.current_time - lastJournalWriteTime) > 5.0) {
+        if (eventJournalIndex >= EVENT_JOURNAL_BUFFER_SIZE || (Sys_Global.current_time - lastJournalWriteTime) > 5.0) {
             if (!log_playback) { JournalLog(); lastJournalWriteTime = get_time(); }
             clear_ev_journal(); // Also sets eventJournalIndex to 0.
         }

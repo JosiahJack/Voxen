@@ -198,22 +198,22 @@ void Screenshot(void) {
         if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
     }
     
-    unsigned char* pixels = malloc(voxen_Settings.ScreenWidth * voxen_Settings.ScreenHeight * 4 * sizeof(char));
-    glReadPixels(0, 0, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    unsigned char* pixels = malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
+    glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     char timestamp[32];
     char filename[96];
     time_t now = time(NULL);
     struct tm *utc_time = localtime(&now);    
     if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
     snprintf(filename, sizeof(filename), "Screenshots/%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
-    if (!stbi_write_bmp(filename, voxen_Settings.ScreenWidth, voxen_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n");
+    if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n");
     else DualLog("Saved screenshot %s\n", filename);
 
     free(pixels);
 }
 
 __attribute__((pure)) bool CursorVisible(void) {
-    return (voxen_globalContext.inventoryMode || voxen_globalContext.menuActive || voxen_globalContext.gamePaused);
+    return (Sys_Global.inventoryMode || Sys_Global.menuActive || Sys_Global.gamePaused);
 }
 
 uint32_t random_range_rng = 0x12345678u; // Global seed
@@ -254,7 +254,7 @@ int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c
 // finished) somewhere instead of (finished < time) which is my usual Quake
 // derived timer pattern.
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) {
-    return parse_float(trimmed_value, initialLine, lineNum) + (float)voxen_globalContext.pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
+    return parse_float(trimmed_value, initialLine, lineNum) + (float)Sys_Global.pauseRelativeTime; // Add current instance's relative time to get same timer in context of current time.  See above notes.
 }
 
 const char* GetPrefabNameFromIndex(int constIndex) { // TODO: Just fill table with path from loading models.txt

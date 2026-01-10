@@ -54,7 +54,7 @@ static unsigned char* LoadCullPNG(const char* name, int level) {
 #define PIXEL_IDX(x, z) ((x) + ((WORLDZ - 1 - (z)) * WORLDX)) * 4 // 4 channels, flip z to have desired bottom-left origin 0,0 vs stbi_load's top-left
 void DetermineClosedEdges(void) {
     stbi__arena_init();
-    unsigned char* openPixels  = LoadCullPNG("worldcellopen", voxen_globalContext.currentLevel);
+    unsigned char* openPixels  = LoadCullPNG("worldcellopen", Sys_Global.currentLevel);
     unsigned char openData_r, openData_g, openData_b;
     uint16_t totalOpenCells = 0;
     for (int32_t x=0;x<WORLDX;++x) {
@@ -75,7 +75,7 @@ void DetermineClosedEdges(void) {
     }
 
     gridCellStates[0] |= CELL_OPEN; // Force the fallback error cell to be open (forced visible later, open is static, visible is transient)
-    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed", voxen_globalContext.currentLevel);
+    unsigned char* edgePixels = LoadCullPNG("worldedgesclosed", Sys_Global.currentLevel);
     unsigned char closedData_r, closedData_g, closedData_b, closedData_a;
     uint16_t closedCountNorth = 0, closedCountSouth = 0, closedCountEast = 0, closedCountWest = 0;
     for (int32_t x=0;x<WORLDX;x++) {
@@ -101,7 +101,7 @@ void DetermineClosedEdges(void) {
         }
     }
         
-    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis", voxen_globalContext.currentLevel);
+    unsigned char* skyPixels = LoadCullPNG("worldcellskyvis", Sys_Global.currentLevel);
     unsigned char skyData_r, skyData_g, skyData_b;
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
@@ -496,7 +496,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
     for (int32_t x=0;x<WORLDX;++x) {
         for (int32_t z=0;z<WORLDZ;++z) {
             int32_t cellIdx_xz = (z * WORLDX) + x;
-            if (voxen_globalContext.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
+            if (Sys_Global.currentLevel == 5) { // Citadel flight level hackarounds for algorithm discrepancies at glancing angles.
                 if (   (x <= 15 && startX <= 15) || (z <= 9 && startZ <= 9)
                     || (x >= 32 && startX >= 32)
                     || (z == 31 && startZ == 31 && x >= 27 && startX >= 27)
@@ -523,7 +523,7 @@ void DetermineVisibleCells(int32_t startX, int32_t startZ) {
 void CullInit(void) {
     double start_time = get_time();    
     DualLog("Culling...");
-    if (voxen_globalContext.currentLevel == LEVEL_CYBERSPACE) return;
+    if (Sys_Global.currentLevel == LEVEL_CYBERSPACE) return;
     
     DebugRAM("start of Cull_Init");    
     DetermineClosedEdges();
@@ -547,7 +547,7 @@ void CullInit(void) {
                 }
             }
             
-            if (voxen_globalContext.currentLevel == 10) {
+            if (Sys_Global.currentLevel == 10) {
                 if ((x == 15 || x == 16) && z == 23) { // Fix up problem cells at odd angle where ddx doesn't work.
                     size_t flat_idx = (size_t)(cellIdx * ARRSIZE) + ((11 * WORLDX) + 12);
                     set_cull_bit(precomputedVisibleCellsFromHere,flat_idx,true);
@@ -620,7 +620,7 @@ void PortalCulling(void) { // Called just once at end of animation loop for the 
 }
 
 void CullCore(void) {    
-    if (voxen_globalContext.currentLevel >= LEVEL_CYBERSPACE) return;
+    if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return;
 
     numCellsVisible = 0;
     float pos_x, pos_z;
@@ -638,5 +638,5 @@ void CullCore(void) {
 }
 
 void Cull(void) { // Now handle player position updating PVS. Always do UpdatedPlayerCell to set playerCellX and playerCellY.
-    if ((voxen_globalContext.currentLevel < LEVEL_CYBERSPACE) && UpdatedPlayerCell()) CullCore();
+    if ((Sys_Global.currentLevel < LEVEL_CYBERSPACE) && UpdatedPlayerCell()) CullCore();
 }

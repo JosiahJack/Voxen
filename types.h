@@ -33,20 +33,66 @@ typedef struct {
 	uint8_t currentLevel;
 	bool gamePaused;
 	bool menuActive;
-} Voxen_GlobalContext;
+} GlobalContext;
 
 typedef struct {
+	int32_t InputCodeSettings[42];
 	uint16_t ScreenWidth;
 	uint16_t ScreenHeight;
-	uint8_t Shadows;
-	uint8_t AntiAliasing;
+	bool Fullscreen;
+	uint8_t FOV;
 	uint8_t Brightness;
-	uint8_t VolumeMusic;
-	uint8_t Language;
-	float FOV;
+	uint8_t Gamma;
+	uint8_t AntiAliasing;
+	uint8_t Shadows;
 	uint8_t Reflections;
-	int32_t Vsync;
-} VoxenSettings;
+	uint8_t Vsync;
+	uint8_t ModelDetail;
+	uint8_t GI;
+	uint8_t SpeakerMode;
+	uint8_t Reverb;
+	uint8_t VolumeMaster;
+	uint8_t VolumeMusic;
+	uint8_t VolumeMessage;
+	uint8_t VolumeEffects;
+	uint8_t Language;
+	uint8_t DynamicMusic;
+	uint8_t Footsteps;
+	uint8_t InvertLook;
+	uint8_t InvertCyberspaceLook;
+	uint8_t QuickItemPickup;
+	uint8_t QuickReloadWeapons;
+	uint8_t MouseSensitivity;
+	uint8_t NoShootMode;
+	uint8_t HeadBob;
+	uint8_t SSR_RES;
+} SettingsSystem;
+
+typedef struct {
+    bool down;
+    bool pressed;
+    bool released;
+} KeyState;
+
+#define MAX_KEYS 512
+#define MAX_MOUSE_BUTTONS 8
+#define MAX_JOYSTICK_BUTTONS 16
+#define MAX_JOYSTICK_HATS 5
+#define MAX_GAMEPAD_BUTTONS 20
+typedef struct {
+	KeyState keyStates[MAX_KEYS];
+	KeyState mouseButtons[MAX_MOUSE_BUTTONS];
+	KeyState gamepadButtons[MAX_GAMEPAD_BUTTONS];
+	bool joystickPresent[GLFW_JOYSTICK_LAST + 1];
+	KeyState joystickButtons[GLFW_JOYSTICK_LAST + 1][MAX_JOYSTICK_BUTTONS];
+	KeyState joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
+	bool window_has_focus;
+	double last_mouse_x, last_mouse_y;
+	double scrollDelta;
+	bool ignore_next_mouse_delta;
+	bool lastUse;
+	bool isCapsLockOn;
+} InputSystem;
 
 typedef struct {
 	uint32_t globalFrameNum;
@@ -66,6 +112,20 @@ typedef struct {
 	uint32_t drawCallsNormal;
 	uint32_t debugLineVertCount;
 } VoxenDiagnostics;
+
+#define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
+#define MAX_SHADOWMAPS 48u
+#define SHADOW_MAP_SIZE 192u
+#define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
+typedef struct {
+    double shadowTime;
+	uint32_t numShadowsCouldRender;
+	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+    uint32_t shadowmapIndirectionList[LIGHT_COUNT];
+    float shadDotThresh;
+	bool useComputeClear;
+} VoxenShadowSystem;
 
 typedef struct {
 	bool god;
@@ -146,12 +206,6 @@ typedef struct {
     uint16_t hitInstanceIndex;
     bool hit;
 } RaycastHit;
-
-typedef struct {
-    bool down;
-    bool pressed;
-    bool released;
-} KeyState;
 
 typedef struct {
 	int lev1SecCode;

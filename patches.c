@@ -14,8 +14,8 @@ void ActivatePatch(int index) { // Expects the usableItems index
     //         patchCounts[2]--;
     //         if (patchCounts[2] <= 0) { depleted = true; }
     //         if (!(patchActive & PATCH_BERSERK)) patchActive += PATCH_BERSERK;
-            berserkFinished = voxen_globalContext.pauseRelativeTime + PATCH_TIME_BERSERK;
-            berserkSeedTime = voxen_globalContext.current_time;
+            berserkFinished = Sys_Global.pauseRelativeTime + PATCH_TIME_BERSERK;
+            berserkSeedTime = Sys_Global.current_time;
             break;
 //         case 15:
 //             // Detox Patch
