@@ -131,20 +131,21 @@ int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
     if (!(lastX == x && lastZ == z)) {
         if (XZPairInBounds(lastX,lastZ)) {
             int32_t cellIdx_last = (lastZ * WORLDX) + lastX;
+            uint32_t cell = gridCellStates[cellIdx_last];
             if (lastZ == z) {
                 if (lastX > x) { // [  x  ][lastX]
-                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) return -1;
+                    if (cell & CELL_CLOSEDWEST) return -1;
                 } else { // Less than x since == x was already checked.
-                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDEAST) return -1;
+                    if (cell & CELL_CLOSEDEAST) return -1;
                 }
             }
 
             if (lastX == x) {
                 if (lastZ > z) { // [lastZ]
                                  // [  y  ]
-                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) return -1;
+                    if (cell & CELL_CLOSEDSOUTH) return -1;
                 } else { // Less than y since == y was already checked.
-                    if (gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) return -1;
+                    if (cell & CELL_CLOSEDNORTH) return -1;
                 }
             }
 
@@ -158,46 +159,53 @@ int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
                 cellIdx_neighborEast = cellIdx_neighborEast > ARRSIZE ? ARRSIZE : cellIdx_neighborEast;
                 int32_t cellIdx_neighborWest = (lastZ * WORLDX) + lastX - 1;
                 cellIdx_neighborWest = cellIdx_neighborWest > ARRSIZE ? ARRSIZE : cellIdx_neighborWest;
-                
+                uint32_t northNeighbor = gridCellStates[cellIdx_neighborNorth];
+                uint32_t southNeighbor = gridCellStates[cellIdx_neighborSouth];
+                uint32_t eastNeighbor = gridCellStates[cellIdx_neighborEast];
+                uint32_t westNeighbor = gridCellStates[cellIdx_neighborWest];
                 if (lastZ > z && lastX > x) { // [Nb][ 1]
                                               // [ 2][Na]
+                    if ((cell & CELL_CLOSEDSOUTH) && (cell & CELL_CLOSEDWEST)) return -1;// Check cell 1 only
+                    
                     bool neighborClosedWest = false;
                     bool neighborClosedSouth = false;
-                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedWest = (gridCellStates[cellIdx_neighborSouth] & CELL_CLOSEDWEST) && (gridCellStates[cellIdx_neighborSouth] & CELL_OPEN);
-                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedSouth = (gridCellStates[cellIdx_neighborWest] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_neighborWest] & CELL_OPEN);
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST)) return -1;// Check cell 1 only
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) && neighborClosedWest) return -1; // Check cell 1 and Neighbor a (Na)
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1; // Check cell 1 and Neighbor b (Nb)
+                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedWest = (southNeighbor & CELL_CLOSEDWEST) && (southNeighbor & CELL_OPEN);
+                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedSouth = (westNeighbor & CELL_CLOSEDSOUTH) && (westNeighbor & CELL_OPEN);
+                    if ((cell & CELL_CLOSEDWEST) && neighborClosedWest) return -1; // Check cell 1 and Neighbor a (Na)
+                    if ((cell & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1; // Check cell 1 and Neighbor b (Nb)
                     if (neighborClosedWest && neighborClosedSouth) return -1; // Check Neighbor a (Na) and Neighbor b (Nb)
                 } else if (lastZ < z && lastX < x) { // [ ][2]
                                                      // [1][ ]return
+                    if ((cell & CELL_CLOSEDNORTH) && (cell & CELL_CLOSEDEAST)) return -1;
+                    
                     bool neighborClosedEast = false;
                     bool neighborClosedNorth = false;
-                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedEast = (gridCellStates[cellIdx_neighborNorth] & CELL_CLOSEDEAST) && (gridCellStates[cellIdx_neighborNorth] & CELL_OPEN);
-                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedNorth = (gridCellStates[cellIdx_neighborEast] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_neighborEast] & CELL_OPEN);
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDEAST)) return -1;
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
+                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedEast = (northNeighbor & CELL_CLOSEDEAST) && (northNeighbor & CELL_OPEN);
+                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedNorth = (eastNeighbor & CELL_CLOSEDNORTH) && (eastNeighbor & CELL_OPEN);
+                    if ((cell & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
+                    if ((cell & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
                     if (neighborClosedEast && neighborClosedNorth) return -1;
                 } else if (lastZ > z && lastX < x) { // [1][ ]
                                                      // [ ][2]
+                    if ((cell & CELL_CLOSEDSOUTH) && (cell & CELL_CLOSEDEAST)) return -1;
+                    
                     bool neighborClosedEast = false;
                     bool neighborClosedSouth = false;
-                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedEast = (gridCellStates[cellIdx_neighborSouth] & CELL_CLOSEDEAST) && (gridCellStates[cellIdx_neighborSouth] & CELL_OPEN);
-                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedSouth = (gridCellStates[cellIdx_neighborEast] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_neighborEast] & CELL_OPEN);
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDEAST)) return -1;
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1;
+                    if (XZPairInBounds(lastX,lastZ - 1)) neighborClosedEast = (southNeighbor & CELL_CLOSEDEAST) && (southNeighbor & CELL_OPEN);
+                    if (XZPairInBounds(lastX + 1,lastZ)) neighborClosedSouth = (eastNeighbor & CELL_CLOSEDSOUTH) && (eastNeighbor & CELL_OPEN);
+                    if ((cell & CELL_CLOSEDEAST) && neighborClosedEast) return -1;
+                    if ((cell & CELL_CLOSEDSOUTH) && neighborClosedSouth) return -1;
                     if (neighborClosedEast && neighborClosedSouth) return -1;
                 } else if (lastZ < z && lastX > x) { // [2][ ]
                                                      // [ ][1]
+                    if ((cell & CELL_CLOSEDNORTH) && (cell & CELL_CLOSEDWEST)) return -1;
+                    
                     bool neighborClosedWest = false;
                     bool neighborClosedNorth = false;
-                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedWest = (gridCellStates[cellIdx_neighborNorth] & CELL_CLOSEDWEST) && (gridCellStates[cellIdx_neighborNorth] & CELL_OPEN);
-                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedNorth = (gridCellStates[cellIdx_neighborWest] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_neighborWest] & CELL_OPEN);
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && (gridCellStates[cellIdx_last] & CELL_CLOSEDWEST)) return -1;
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDWEST) && neighborClosedWest) return -1;
-                    if ((gridCellStates[cellIdx_last] & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
+                    if (XZPairInBounds(lastX,lastZ + 1)) neighborClosedWest = (northNeighbor & CELL_CLOSEDWEST) && (northNeighbor & CELL_OPEN);
+                    if (XZPairInBounds(lastX - 1,lastZ)) neighborClosedNorth = (westNeighbor & CELL_CLOSEDNORTH) && (westNeighbor & CELL_OPEN);
+                    if ((cell & CELL_CLOSEDWEST) && neighborClosedWest) return -1;
+                    if ((cell & CELL_CLOSEDNORTH) && neighborClosedNorth) return -1;
                     if (neighborClosedWest && neighborClosedNorth) return -1;
                 }
             }
@@ -205,7 +213,7 @@ int32_t CastRayCellCheck(int32_t x, int32_t z, int32_t lastX, int32_t lastZ) {
     }
     
     if (XZPairInBounds(x,z)) {
-        int32_t cellIdx_xz = (z * WORLDX) + x; 
+        int32_t cellIdx_xz = (z * WORLDX) + x;
         if (gridCellStates[cellIdx_xz] & CELL_OPEN) gridCellStates[cellIdx_xz] |= CELL_VISIBLE;
         else gridCellStates[cellIdx_xz] &= ~CELL_VISIBLE;
         

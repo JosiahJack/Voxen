@@ -993,6 +993,7 @@ void RenderShadowmaps(void) {
             for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
                 for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
                     if (!XZPairInBounds(ix, iz)) continue;
+                    
                     int subIdx = iz * WORLDX + ix;
                     if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
                         inPVS = true;
@@ -1032,8 +1033,11 @@ void RenderShadowmaps(void) {
         // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         if (voxen_Shadow_System.useComputeClear) {
             glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
-            GLuint groupX_shadClear = (numLightsShadowmapsToRender * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U) + 31) / 32;
-            glDispatchCompute(groupX_shadClear,1,1);
+            for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
+                glUniform1ui(0, c);
+                GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+                glDispatchCompute(groupX_shadClear,6,1);
+            }
         } else {
             GLuint clearValue = 0xFFFFFFFFu;
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.shadowMapSSBO);

@@ -505,22 +505,10 @@ static inline float clampf(float val, float min, float max) {
 static inline int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
-
-static inline bool XZPairInBounds(int32_t x, int32_t z) {
-    return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0);
-}
-
-static inline void flag_enable(uint32_t *flags, uint32_t bit) {
-    *flags |= bit;
-}
-
-static inline void flag_disable(uint32_t *flags, uint32_t bit) {
-    *flags &= ~bit;
-}
-
-static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) {
-    *flags = (*flags & ~bit) | (-state & bit);
-}
+static inline bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
+static inline void flag_enable(uint32_t *flags, uint32_t bit) { *flags |= bit; }
+static inline void flag_disable(uint32_t *flags, uint32_t bit) { *flags &= ~bit; }
+static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 
 extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
 
