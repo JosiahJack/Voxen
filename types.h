@@ -137,12 +137,11 @@ typedef struct {
 #define TOTAL_SHADOWMAP_PIXELS (MAX_SHADOWMAPS * (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE * 6U))
 typedef struct {
     double shadowTime;
-	uint32_t numShadowsCouldRender;
-	uint32_t shadowmapSizes[MAX_SHADOWMAPS];
-	uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
+    uint32_t numShadowsCouldRender;
+    uint32_t shadowmapSizes[MAX_SHADOWMAPS];
+    uint32_t shadowmapOffsets[MAX_SHADOWMAPS];
     uint32_t shadowmapIndirectionList[LIGHT_COUNT];
     float shadDotThresh;
-	bool useComputeClear;
 } VoxenShadowSystem;
 
 typedef struct {

@@ -692,9 +692,6 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     DualLog("OpenGL Version: %s, ", (const char*)glGetString(GL_VERSION));
     DualLog("GPU: %s", (const char*)glGetString(GL_RENDERER));
     OS_CPUInfo();
-    GLint maxWorkGroupCountX;
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &maxWorkGroupCountX);
-    voxen_Shadow_System.useComputeClear = (maxWorkGroupCountX > 65536); // Some systems limit the workgroup size to uint16_t (e.g. Mesa on Intel HD4400), so fallback to slower big hammer but reliable glClearBufferData instead for shadowmaps clear
     Input_Init(Sys_Global.window);
     glFrontFace(GL_CCW); // Set triangle sorting order (GL_CW vs GL_CCW)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Globally same alpha blending
@@ -1031,18 +1028,11 @@ void RenderShadowmaps(void) {
     uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        if (voxen_Shadow_System.useComputeClear) {
-            glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
-            for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
-                glUniform1ui(0, c);
-                GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-                glDispatchCompute(groupX_shadClear,6,1);
-            }
-        } else {
-            GLuint clearValue = 0xFFFFFFFFu;
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.shadowMapSSBO);
-            glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &clearValue); // Adds 72mb to RAM!!  Only used for fallback on some systems (e.g. HD4400) that can't use compute shader.
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+        glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
+        for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
+            glUniform1ui(0, c);
+            GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+            glDispatchCompute(groupX_shadClear,6,1);
         }
 
         Sys_Dx.shadowDrawCallsRenderedThisFrame = 0;
@@ -1403,10 +1393,10 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
         glUniform1ui(0, i);
-        if (currentNormIndex != (uint32_t)instances[i].normIndex) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
+        if (currentNormIndex != (uint32_t)instances[i].normIndex || instances[i].normIndex == 0) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
-        if (currentGlowIndex != (uint32_t)instances[i].glowIndex) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
-        if (currentSpecIndex != (uint32_t)instances[i].specIndex) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
+        if (currentGlowIndex != (uint32_t)instances[i].glowIndex || instances[i].glowIndex == 0) { currentGlowIndex = (uint32_t)instances[i].glowIndex; glUniform1ui(19, currentGlowIndex); }
+        if (currentSpecIndex != (uint32_t)instances[i].specIndex || instances[i].specIndex == 0) { currentSpecIndex = (uint32_t)instances[i].specIndex; glUniform1ui(20, currentSpecIndex); }
         int32_t modelType = (instanceIsLODArray[i] || Sys_Settings.ModelDetail < 1u) && instances[i].lodIndex < loadedModelsMaxIndex ? instances[i].lodIndex : instances[i].modelIndex;
         if (currentModelType != modelType) {
             currentModelType = modelType;
