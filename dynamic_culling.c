@@ -627,8 +627,8 @@ void PortalCulling(void) { // Called just once at end of animation loop for the 
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
 }
 
-void CullCore(void) {    
-    if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return;
+bool CullCore(void) {    
+    if (Sys_Global.currentLevel >= LEVEL_CYBERSPACE) return false;
 
     numCellsVisible = 0;
     float pos_x, pos_z;
@@ -640,11 +640,8 @@ void CullCore(void) {
         instanceIsLODArray[i] = (distSqrd >= 655.36f); // 25.6f * 25.6f
     }
     
-    lightDirty[0] = true;
     PortalCulling(); // Update based on portal states.
     glNamedBufferData(Sys_Render.cellVisibleDataID,ARRSIZE * sizeof(uint32_t), gridCellStates, GL_DYNAMIC_DRAW);
+    return true;
 }
 
-void Cull(void) { // Now handle player position updating PVS. Always do UpdatedPlayerCell to set playerCellX and playerCellY.
-    if ((Sys_Global.currentLevel < LEVEL_CYBERSPACE) && UpdatedPlayerCell()) CullCore();
-}

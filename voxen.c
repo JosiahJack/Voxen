@@ -852,6 +852,7 @@ bool StepLoopingAnim(uint16_t i) {
         else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
 
         instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+        dirtyInstances[i] = true;
         if (EntityIndexIsPortalBlockingDoor(instances[i].index)) {
             uint8_t portalIdx = instances[i].portalIndex;
             if (portalIdx < MAX_PORTALS) {
@@ -1026,7 +1027,7 @@ void RenderShadowmaps(void) {
     }
 
     uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
-    bool foundDirtyLight = false;
+    bool foundDirtyLight = false || Sys_Render.shadowmapsNeedUpdated;
     for (uint32_t i=0;i<numLightsShadowmapsToRender;++i) { if (lightDirty[candidates[i].index]) foundDirtyLight = true; }
     numLightsShadowmapsToRender = foundDirtyLight ? numLightsShadowmapsToRender : 0;
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
@@ -1227,6 +1228,7 @@ void RenderShadowmaps(void) {
         glNamedBufferData(Sys_Render.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     }
     
+    Sys_Render.shadowmapsNeedUpdated = false;
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
@@ -1530,11 +1532,11 @@ static inline void UpdateEvents(void) {
 }
 
 static void UpdateVoxelsAndInstances(void) {
-    bool voxelsNeedUpdated = UpdatedPlayerCell();
-    voxelsNeedUpdated = UpdateLights(&voxelsNeedUpdated);
-    if (voxelsNeedUpdated) CullCore(); // 1. Culling
+    Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
+    Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
+    if (Sys_Render.shadowmapsNeedUpdated) CullCore(); // 1. Culling
     bool uploadInstances = false;
-    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { uploadInstances = true; UpdateInstanceMatrix(i); } }
+    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { uploadInstances = true; Sys_Render.shadowmapsNeedUpdated = true; UpdateInstanceMatrix(i); } }
     if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
 

@@ -210,7 +210,7 @@ extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
-void CullCore(void);
+bool CullCore(void);
 bool get_cull_bit(const uint32_t* arr, int idx);
 static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 // Credits

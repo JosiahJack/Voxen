@@ -125,7 +125,7 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     Vector3 currentPosition = instances[i].position;
     instances[i].cellIndex = PosGetCellCoords(currentPosition.x, currentPosition.z);
     float mag = magnitude_vector3(instances[i].velocity);
-    if (i > loadedInstances) return;
+    if (i > PLAYER1/*loadedInstances*/) return;
     if (!(instances[i].index != PLAYER1 || ConstIndexIsDynamicObject(instances[i].index))) return;
     if (mag < 0.05f) return;
     
@@ -155,6 +155,7 @@ void ApplyVelocityUntilCollision(uint16_t i) {
     if (!(gridCellStates[cellCoords] & CELL_OPEN)) { instances[i].velocity = scale_vector3(dir,-reboundVelocity); return; } // void blocked
         
     instances[i].position = newPosition; // It moves! It lives!!
+    dirtyInstances[i] = true;
 }
 
 void UpdatePositions(void) {
