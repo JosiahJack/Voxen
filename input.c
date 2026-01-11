@@ -418,7 +418,7 @@ void ApplySettings(void) {
     glUniform1ui(22, Sys_Settings.Shadows);
     glUseProgram(Sys_Render.chunkShaderProgram);
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
-    DualLog("Applied configuration settings\nSys_Settings.ModelDetail: %u\n", Sys_Settings.ModelDetail);
+    DualLog("Applied configuration settings\n");
     // TODO: Render config view on the menu
 }
 

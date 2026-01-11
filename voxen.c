@@ -7,7 +7,8 @@
 #include "todo.h"
 #include "data_models.c"
 #include "dynamic_culling.c"
-GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .startLevel = 3, .numLevels = 2 };
+#include "credits.c"
+GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
@@ -153,7 +154,6 @@ void ParseGameData(void) {
     
     fclose(gamedatfile);
     if (strcmp(Sys_Global.global_modname, "Citadel") == 0) Sys_Global.global_modIsCitadel = true;
-    ApplySettings();
     DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
 }
 
@@ -482,7 +482,6 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         GLuint groupX_voxels = (512 + 31) / 32;
         GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
         glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     }
     
     return *voxelsNeedUpdated;
@@ -772,8 +771,8 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     InitFontAtlasses();
     RenderLoadingProgress(80,"Loading...");
     InitializeAudio(); // Audio    
-    ApplySettings(); // After loading of text.
     ParseGameData();
+    ApplySettings(); // After loading of text and game data.
     glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
     int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     int windowIconFileSize = OS_FileSize(fp);
@@ -814,9 +813,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     DebugRAM("InitializeEnvironment end");
 }
 
-void DrawDebugLines(float* viewProj) {
-    if (Sys_Dx.debugLineVertCount < 1) return;
-    
+void DrawDebugLines(float* viewProj) {    
     glNamedBufferSubData(Sys_Render.debugLinesVBO, 0, Sys_Dx.debugLineVertCount * sizeof(float), debugLineBuffer);
     glUseProgram(Sys_Render.debugUnlitShaderProgram);
     glUniformMatrix4fv(0, 1, GL_FALSE, viewProj);
@@ -831,8 +828,6 @@ void DrawDebugLines(float* viewProj) {
 }
 
 void AddDebugLine(Vector3 start, Vector3 end) {
-    if (Sys_Dx.debugLineVertCount + 6 > MAX_DEBUG_LINE_VERTS * 3) return;
-
     int32_t i = Sys_Dx.debugLineVertCount;
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
@@ -943,11 +938,9 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
     Sys_Dx.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
-void UpdateGameplay(void) {
-    if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
-    
+void UpdateGameplay(void) {    
     if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
-    if (Sys_Global.current_time < Sys_Dx.debugLineFinished) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
+    if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
     UpdateAmbientSounds();
     UpdateAnims();
 }
@@ -958,13 +951,7 @@ DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typical
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 bool UpdatedPlayerCell(void);
 
-__attribute__((pure)) bool CellNotVisible(uint16_t index) {
-    if (index > ARRSIZE) return false;
-    
-    bool cellNotVisible = !(gridCellStates[index] & CELL_VISIBLE);
-    bool cellIsOpen = (gridCellStates[index] & CELL_OPEN); // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
-    return (cellNotVisible && cellIsOpen);
-}
+static inline bool CellNotVisible(uint16_t index) { return ((gridCellStates[index] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN); } // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
 
 typedef struct {
     uint16_t index; // Original index in lights array
@@ -974,9 +961,7 @@ typedef struct {
     Vector3 position;
 } LightCandidate;
 
-void RenderShadowmaps(void) {
-    if (Sys_Settings.Shadows < 1u) return;
-    
+void RenderShadowmaps(void) {    
     double shadowStartTime = get_time();
     glEnable(GL_DEPTH_TEST);
     LightCandidate candidates[MAX_SHADOWMAPS];
@@ -984,6 +969,7 @@ void RenderShadowmaps(void) {
     float bestScores[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
     Vector3 playerPos = instances[PLAYER1].position;
+    float pfx = instances[PLAYER1].forward.x;    float pfy = instances[PLAYER1].forward.y;    float pfz = instances[PLAYER1].forward.z;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         if (!lightCastsShadows[i]) continue;
 
@@ -996,8 +982,8 @@ void RenderShadowmaps(void) {
         float luminosity = (intensity / (range * range));
         if (luminosity < SHADOW_LIGHT_THRESH) continue;
 
-        Vector3 delta = Vector3_A_minus_B(lightPos, playerPos);
-        float distSqrdToPlayer = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
+        float dx = lightPos.x - playerPos.x;    float dy = lightPos.y - playerPos.y;    float dz = lightPos.z - playerPos.z;
+        float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
         uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
         int lightCellIdx = (cellZ * WORLDX) + cellX;
@@ -1008,7 +994,7 @@ void RenderShadowmaps(void) {
                 for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
                     if (!XZPairInBounds(ix, iz)) continue;
                     int subIdx = iz * WORLDX + ix;
-                    if ((gridCellStates[subIdx] & CELL_VISIBLE) && get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx)) {
+                    if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
                         inPVS = true;
                         break;
                     }
@@ -1017,7 +1003,7 @@ void RenderShadowmaps(void) {
         }
         if (!inPVS) continue;
 
-        float dotResult = dot_vector3(delta, instances[PLAYER1].forward);
+        float dotResult = (dx*pfx + dy*pfy + dz*pfz);//dot_vector3(delta, instances[PLAYER1].forward);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         
         float score = distSqrdToPlayer / vmax(intensity, 0.01f);
@@ -1064,12 +1050,12 @@ void RenderShadowmaps(void) {
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<endOfModels;++i) {
-            if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
-            if (modelVertexCounts[instances[i].modelIndex] < 1) continue;
+            uint16_t mdx = instances[i].modelIndex;
+            if (modelVertexCounts[mdx] < 3) continue;
+            if (mdx >= loadedModelsMaxIndex) continue;
             if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
-                
-            uint16_t instCellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z); // Cache cell indices once per mesh rather than once per light.
-            bool cellNotVisible = (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx));
+
+            bool cellNotVisible = CellNotVisible(PosGetCellCoords(instances[i].position.x, instances[i].position.z)); // Cache cell indices once per mesh rather than once per light.
             if (cellNotVisible && !(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
                 if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
                     Portal doorPortal = activePortals[instances[i].portalIndex];
@@ -1089,11 +1075,13 @@ void RenderShadowmaps(void) {
         for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
             uint16_t lightIdx = candidates[c].index;
             float effectiveRadius = vmin(candidates[c].radius, 15.36f);
+            Vector3 lightPos = candidates[c].position;
             uint16_t nearbyMeshCount = 0;
             for (uint16_t shadowCasterInstanceIdx = 0; shadowCasterInstanceIdx < numShadowCasters; shadowCasterInstanceIdx++) { // Skip player indices and start at 3
                 uint16_t j = shadowCasterIndices[shadowCasterInstanceIdx];
                 shadows_nearMeshRadii[nearbyMeshCount] = modelBounds[(instances[j].modelIndex * BOUNDS_ATTRIBUTES_COUNT) + BOUNDS_DATA_OFFSET_RADIUS] * 0.99f;
-                float distToLightSqrd = dist_sq_vector3(instances[j].position, candidates[c].position);
+                Vector3 d = Vector3_A_minus_B(instances[j].position, lightPos);
+                float distToLightSqrd = dot_vector3(d, d);
                 float radSum = (effectiveRadius + shadows_nearMeshRadii[nearbyMeshCount]);
                 if (distToLightSqrd >= radSum * radSum) continue;
                 
@@ -1321,6 +1309,7 @@ double RenderUI(void) {
     if (Sys_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
 
+    CreditsScroll();
     double time_now = get_time();
     if (Sys_Cheats.showFPS && !Sys_Cheats.noHUD) {
         double thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
@@ -1381,7 +1370,7 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
                     for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
                         if (!XZPairInBounds(ix, iz)) continue;
                         int subIdx = iz * WORLDX + ix;
-                        if ((gridCellStates[subIdx] & CELL_VISIBLE) && get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx)) {
+                        if (get_cull_bit(precomputedVisibleCellsFromHere, instCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
                             inPVS = true;
                             break;
                         }
@@ -1391,7 +1380,7 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
             if (!inPVS) continue;
         } else {
             if (!(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (instCellIdx < ARRSIZE && CellNotVisible(instCellIdx)) continue;
+                if (CellNotVisible(instCellIdx)) continue;
             }
             
             if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f) continue; // 30.72 * 30.72, 12 cells
@@ -1444,27 +1433,21 @@ void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geome
     glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
     RenderInstancesBetween(startOfTransparentInstances, loadedInstances - invalidModelIndexCount, playerPos, true);
     
-    DrawDebugLines(viewProj);
+    if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void RenderSSR(float* viewProj, Vector3 playerPos) {
-    if (Sys_Settings.Reflections < 1u) return;
-    
+void RenderSSR(float* viewProj, Vector3 playerPos) {    
     glUseProgram(Sys_Render.ssrShaderProgram);
     glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
     glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
     GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
     GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
     glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 }
 
-void UpdateDiagnosticPoll(double time_now) {
-    Sys_Global.last_time = time_now;
-    if ((time_now - Sys_Dx.lastFrameSecCountTime) < 1.00) return;
-    
-    Sys_Dx.lastFrameSecCountTime = time_now;
+void UpdateDiagnosticPoll(void) {    
+    Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
     Sys_Dx.framesPerLastSecond = Sys_Dx.globalFrameNum - Sys_Dx.lastFrameSecCount;
     if (Sys_Dx.framesPerLastSecond < Sys_Dx.worstFPS && Sys_Dx.globalFrameNum > 2000) Sys_Dx.worstFPS = Sys_Dx.framesPerLastSecond; // After startup, keep track of worst framerate seen.
     Sys_Dx.lastFrameSecCount = Sys_Dx.globalFrameNum;
@@ -1496,15 +1479,16 @@ void Render(void) {
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
     if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
         glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
-        RenderShadowmaps();
+        if (Sys_Settings.Shadows > 0u) RenderShadowmaps();
         memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
         memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
         RenderInstances(viewProj, playerPos);
-        RenderSSR(viewProj, playerPos); // Screen Space Reflections
+        if (Sys_Settings.Reflections > 0u) RenderSSR(viewProj, playerPos); // Screen Space Reflections
     }
 
     RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot);
-    UpdateDiagnosticPoll( RenderUI() );
+    Sys_Global.last_time = RenderUI();
+    if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) UpdateDiagnosticPoll();
     Sys_Dx.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(Sys_Global.window); // Present frame
     CHECK_GL_ERROR();
@@ -1513,6 +1497,7 @@ void Render(void) {
 static inline void UpdateTime(void) {
     Sys_Global.current_time = get_time();
     double frame_time = Sys_Global.current_time - Sys_Global.last_topframe_time;
+    Sys_Global.absoluteTime += frame_time;
     Sys_Global.last_topframe_time = Sys_Global.current_time;
     if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += frame_time;
 }
@@ -1542,8 +1527,6 @@ static inline void UpdateEvents(void) {
 }
 
 static void UpdateVoxelsAndInstances(void) {
-    if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
-    
     bool voxelsNeedUpdated = UpdatedPlayerCell();
     voxelsNeedUpdated = UpdateLights(&voxelsNeedUpdated);
     if (voxelsNeedUpdated) CullCore(); // 1. Culling
@@ -1587,7 +1570,7 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment(argc,argv[1],argv[2]);
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    Sys_Global.pauseRelativeTime = get_time();
+    Sys_Global.absoluteTime = Sys_Global.pauseRelativeTime = get_time();
     while(1) { // Main Loop
         ProcessInput(); // Calls ApplyPlayerMovements()
         UpdatePlayerFacingAngles();
@@ -1596,8 +1579,8 @@ int32_t main(int32_t argc, char* argv[]) {
         UpdateEvents(); // Calls Physics()
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
         
-        UpdateGameplay();
-        UpdateVoxelsAndInstances();
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateGameplay();
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateVoxelsAndInstances();
         Render();
         Sys_Dx.globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT

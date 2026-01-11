@@ -213,7 +213,11 @@ void CullInit(void);
 void CullCore(void);
 bool get_cull_bit(const uint32_t* arr, int idx);
 static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
-
+// Credits
+extern char creditStats[4096];
+void CreditsStats(void);
+void CreditsScroll(void);
+void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char * restrict format, ...);
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 512
@@ -455,7 +459,9 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 // Helper Functions
 extern uint32_t random_range_rng;
 double get_time(void);
-void md5(const uint8_t *data, size_t len, uint8_t out[16]);
+void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
+uint64_t file_stamp(const FileFingerprint *fp);
+bool get_file_fingerprint(const char *path, FileFingerprint *fp);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
 int data_parser_isspace(char c);

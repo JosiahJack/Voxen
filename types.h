@@ -24,6 +24,7 @@ typedef struct {
 	double timeSinceLastPhysicsTick;
 	double screenshotTimeout;
 	double pauseRelativeTime;
+	double absoluteTime;
 	double statusTextDecayFinished;
 	bool levelCurrentlyLoading;
 	char global_modname[256];
@@ -31,8 +32,25 @@ typedef struct {
 	uint8_t startLevel;
 	uint8_t numLevels; // Can be set by gamedata.txt
 	uint8_t currentLevel;
+	uint8_t difficultyCombat;
+	uint8_t difficultyPuzzle;
+	uint8_t difficultyMission;
+	uint8_t difficultyCyber;
 	bool gamePaused;
 	bool menuActive;
+	uint16_t ressurections;
+	uint16_t deaths;
+	uint16_t kills;
+	uint16_t cyberkills;
+	uint32_t shotsFired;
+	uint32_t grenadesThrown;
+	uint32_t damageDealt;
+	uint32_t damageReceived;
+	uint32_t savesScummed;
+	uint8_t creditsPageIndex;
+	bool creditsActive;
+	uint8_t creditsLength;
+	char playerName[32];
 } GlobalContext;
 
 typedef struct {
@@ -241,6 +259,13 @@ typedef struct {
 	bool BridgeSeparated;
 	bool IsolinearChipsetInstalled;
 } QuestBits;
+
+typedef struct {
+    uint64_t mtime_ns;
+    uint64_t size;
+    uint64_t inode;
+    uint64_t dev;
+} FileFingerprint;
 
 // BodyState
 typedef uint8_t BodyState;
@@ -642,11 +667,12 @@ typedef struct {
     uint8_t numclips;
     uint8_t animationNum; // Global animation identifier into short table of AnimationClip's
     uint16_t frame;
-	int32_t cellIndex;
+    int32_t cellIndex;
     uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
     double currentFrameFinished;
-	double currentFrameStartTime;
+    double currentFrameStartTime;
+    double animSwapFinished;
     Vector3 position;
     Quaternion rotation;
     Vector3 scale;
@@ -654,7 +680,7 @@ typedef struct {
     Vector3 right;
     Vector3 velocity;
     Vector3 angularVelocity;
-	float gravity;
+    float gravity;
     BodyState bodyState;
     uint32_t layer;
     ColliderType collider;

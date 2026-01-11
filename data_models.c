@@ -31,24 +31,27 @@ static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
     else if (strlen(out) + 5 < outsz) strcat(out, ".vmdl");
 }
 
-static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
+static bool load_vmdl(const char *vmdl_path, uint64_t fbx_stamp, float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
     int fd = open(vmdl_path, O_RDONLY);
     if (fd < 0) return false;
 
     struct stat st;
     if (fstat(fd, &st) < 0) { close(fd); return false; }
-    if (st.st_size < 16 + 4 + 4) { close(fd); return false; }
+    if ((size_t)st.st_size < sizeof(uint64_t) + 4 + 4) { close(fd); return false; }
     
     uint8_t *map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
     if (map == MAP_FAILED) return false;
-    if (memcmp(map, expected_md5, 16) != 0) { munmap(map, (size_t)st.st_size); return false; }
+    
+    uint64_t file_stamp_on_disk;
+    memcpy(&file_stamp_on_disk, map, sizeof(uint64_t));
+    if (file_stamp_on_disk != fbx_stamp) { munmap(map, (size_t)st.st_size); return false; }
 
-    const uint8_t *p = map + 16;
+    const uint8_t *p = map + sizeof(uint64_t);
     uint32_t vcnt = *(uint32_t*)p; p += 4; *out_vcount = vcnt;
     uint32_t icnt = *(uint32_t*)p; p += 4; *out_icount = icnt;
     size_t vert_bytes = vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
     size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
-    size_t expected   = 16 + 4 + vert_bytes + 4 + idx_bytes;
+    size_t expected   = sizeof(uint64_t) + 4 + vert_bytes + 4 + idx_bytes;
     if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, (size_t)st.st_size); return false; }
     if (p + vert_bytes + idx_bytes > map + (size_t)st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, (size_t)st.st_size); return false; }
 
@@ -60,16 +63,17 @@ static bool load_vmdl(const char *vmdl_path, uint8_t expected_md5[16], float **o
     return true;
 }
 
-static void write_vmdl(const char *vmdl_path, const uint8_t md5[16], const float *verts, uint32_t vcnt, const uint32_t *triangleIndices, uint32_t triCount) {
+static void write_vmdl(const char *vmdl_path, const uint64_t fbx_stamp, const float *verts, uint32_t vcnt, const uint32_t *triangleIndices, uint32_t triCount) {
     int fd = open(vmdl_path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
     if (fd < 0) return;
 
-    size_t total = 16 + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
+    size_t total = sizeof(uint64_t) + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
     uint8_t *buf = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     if (!buf) { close(fd); return; }
 
     uint8_t *p = buf;
-    memcpy(p, md5, 16); p += 16;
+    *(uint64_t *)p = fbx_stamp;
+    p += sizeof(uint64_t);
     *(uint32_t*)p = vcnt; p += 4;
     *(uint32_t*)p = triCount; p += 4;
     memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
@@ -176,23 +180,12 @@ void LoadModels(void) {
         make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
         if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); OS_Exit(1); }
 
-        uint8_t fbx_md5[16];
-        int fbx_fp = open(fbx_path, O_RDONLY);
-        if (!fbx_fp) { DualLogError("Failed to open %s\n", fbx_path); OS_Exit(1); }
-
-        struct stat fbxstat;
-        fstat(fbx_fp, &fbxstat);
-        uint8_t* buf = mmap(NULL, (size_t)fbxstat.st_size, PROT_READ, MAP_PRIVATE, fbx_fp, 0);
-        close(fbx_fp);
-        if (buf == MAP_FAILED) { DualLogError("mmap failed for %s\n", fbx_path); OS_Exit(1); }
-
-        size_t fbxread = (size_t)read(fbx_fp, buf, (size_t)fbxstat.st_size);
-        if (fbxread == 0) DualLogError("Read failure for %s\n", fbx_path);
-                                                     
-        md5(buf, (size_t)fbxstat.st_size, fbx_md5);
-        munmap(buf, (size_t)fbxstat.st_size);
+        FileFingerprint fp;
+        if (!get_file_fingerprint(fbx_path, &fp)) { DualLogError("File change detection failed for %s\n", fbx_path); continue; }
+        
+        uint64_t fbx_stamp = file_stamp(&fp);
         float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;
-        bool cache_hit = load_vmdl(vmdl_path, fbx_md5, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
+        bool cache_hit = load_vmdl(vmdl_path, fbx_stamp, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
         if (!cache_hit) {
             DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
             const struct aiScene *scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_Triangulate*/ 0x8 | /*aiProcess_GenNormals*/ 0x20 | 0x800/*aiProcess_ImproveCacheLocality*/ | /*aiProcess_JoinIdenticalVertices*/ 0x2, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
@@ -259,7 +252,7 @@ void LoadModels(void) {
             r = vmax(r, maxx);        r = vmax(r, maxy);        r = vmax(r, maxz);
             modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
             modelBoundingRadii[i] = r;
-            write_vmdl(vmdl_path, fbx_md5, modelVertices[i], vertexCount, modelTriangles[i], triCount);
+            write_vmdl(vmdl_path, fbx_stamp, modelVertices[i], vertexCount, modelTriangles[i], triCount);
             aiReleaseImport(scene);
         } else { // Use existing .vmdl binary RAM blob (aka a cache hit was successful):
             modelVertexCounts[i]   = cached_vcnt;

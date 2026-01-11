@@ -277,8 +277,8 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
 bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
 bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
 #endif
-void AddInstance(uint16_t entIdx, uint16_t instanceIdx, uint32_t lineNum) {
-    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity %d was %d, exceeds max defined entity count of %d\n",lineNum,entIdx,entityCount); OS_Exit(1); }
+void AddInstance(uint16_t entIdx, uint16_t instanceIdx) {
+    if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
         
     instances[instanceIdx].index = entIdx;
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
@@ -816,7 +816,7 @@ void LoadLevel(uint8_t curlevel) {
                 posBeforeZ = instances[parent].position.z;
                 instances[parent].overrideTest = true;
             }
-            AddInstance(entIdx, parent, lineNum);
+            AddInstance(entIdx, parent);
             if (overridePos) {
                     instances[parent].position.x = posBeforeX;
                     instances[parent].position.y = posBeforeY;
@@ -864,7 +864,7 @@ void LoadLevel(uint8_t curlevel) {
                 if (instances[parent].child[i] < entityCount) {
                     if (entities[entIdx].child[i] != UINT16_MAX) { // Add child
                         instanceIdx++; // Increment head of the list an extra time for the child entity.
-                        AddInstance(entities[entIdx].child[i], instanceIdx, lineNum);
+                        AddInstance(entities[entIdx].child[i], instanceIdx);
                         instances[instanceIdx].index = entities[entIdx].child[i];
                         instances[instanceIdx].position.x = instances[parent].position.x + entities[entIdx].child_offset[i].x;
                         instances[instanceIdx].position.y = instances[parent].position.y + entities[entIdx].child_offset[i].y;

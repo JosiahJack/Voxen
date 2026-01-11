@@ -69,6 +69,7 @@ uint GetVoxelIndex(vec3 worldPos) {
 }
 
 const int PCF_SAMPLES = 12;
+const float invSamples = 1.0 / float(PCF_SAMPLES);
 const vec2 poissonDisk[PCF_SAMPLES] = vec2[](
     vec2(0.0),
     vec2( 0.0248, -0.0983),
@@ -255,7 +256,6 @@ void main() {
 
             // Pseudo-Stochastic PCF sampling
             float sum = 0.0;
-            float invSamples = 1.0 / float(PCF_SAMPLES);
             for (int si = 0; si < PCF_SAMPLES; ++si) {
                 vec2 off = poissonDisk[si] * smearness;
                 vec2 t = tc + off;
@@ -265,10 +265,10 @@ void main() {
                 float d = (float(distInt) * 0.00001);
                 float depthDiff = (dist) - d - bias;
                 float shadowContrib = clamp(1.0 - depthDiff / 0.005, 0.0, 1.0);
-                sum += shadowContrib * invSamples;
+                sum += shadowContrib;
             }
 
-            shadowFactor = sum;
+            shadowFactor = sum * invSamples;
         }
 
         vec3 lightColor = vec3(lights[lightIdx + LIGHT_DATA_OFFSET_R], lights[lightIdx + LIGHT_DATA_OFFSET_G], lights[lightIdx + LIGHT_DATA_OFFSET_B]);

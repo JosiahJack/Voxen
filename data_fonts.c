@@ -1,6 +1,6 @@
 // data_fonts.c - Load Font Atlasses
 // #include "voxen.h" limited includes
-// #define FONT_GEN // Turn on when wanting to rebuild Font Atlases
+#define FONT_GEN // Turn on when wanting to rebuild Font Atlases
 #include "os.h"
 #include <malloc.h>
 #include <sys/mman.h>
@@ -213,12 +213,12 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     return 0;
 }
 
-static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint8_t ttf_md5[16], const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
+static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint64_t file_stamp, const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
     FILE *f = fopen(path, "wb");
     if (!f) { DualLogError("Failed to write font cache %s\n", path); OS_Exit(1); }
 
     fwrite(&expected_glyphs, 1, 4, f);
-    fwrite(ttf_md5, 1, 16, f);
+    fwrite(&file_stamp, 1, sizeof(uint64_t), f);
     fwrite(&actual_packed, 1, 4, f);
     fwrite(&fixed_advance, 1, 4, f);  // ← store
     fwrite(packed, sizeof(stbtt_packedchar), actual_packed, f);
@@ -227,14 +227,14 @@ static void write_font_cache(const char *path, uint32_t expected_glyphs, const u
 }
 #endif
 
-static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint8_t expected_md5[16], stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
+static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint64_t file_stamp, stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
     int fd = open(path, O_RDONLY);
     if (fd < 0) return false;
 
     struct stat st;
     if (fstat(fd, &st) < 0) { close(fd); DualLogWarn("fstat failed %s\n", path); return false; }
     size_t sz = (size_t)st.st_size;
-    if (sz < 28 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { close(fd); DualLogWarn("cache too small %s\n", path); return false; }
+    if (sz < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { close(fd); DualLogWarn("cache too small %s\n", path); return false; }
 
     uint8_t *map = mmap(NULL, sz, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
@@ -248,12 +248,10 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
         return false;
     }
 
-    const uint8_t *md5 = p; p += 16;
-    if (memcmp(md5, expected_md5, 16) != 0) {
-        munmap(map, sz);
-        DualLogWarn("MD5 mismatch %s\n", path);
-        return false;
-    }
+    uint64_t file_stamp_on_disk;
+    memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
+    p += sizeof(uint64_t);
+    if (file_stamp_on_disk != file_stamp) { munmap(map, sz); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
 
     uint32_t actual_packed = *(uint32_t*)p; p += 4;
     float fixed_advance = *(float*)p; p += 4;
@@ -295,15 +293,18 @@ void InitFontAtlasses(void) {
     if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); OS_Exit(1); }
 
-    uint8_t pri_md5[16], sec_md5[16];
-    md5(primaryFontData, pri_sz, pri_md5);
-    md5(sec_data, sec_sz, sec_md5);
+    FileFingerprint fp1, fp2;
+    if (!get_file_fingerprint(pri_path, &fp1)) DualLogError("File change detection failed for %s\n", pri_path);
+    if (!get_file_fingerprint(sec_path, &fp2)) DualLogError("File change detection failed for %s\n", sec_path);
+        
+    uint64_t fbx_stamp1 = file_stamp(&fp1);
+    uint64_t fbx_stamp2 = file_stamp(&fp2);
     int32_t pri_expected = 0, sec_expected = 0;
     for (int i = 0; i < numFontRanges; i++) { pri_expected += fontRanges[i].count; sec_expected += fontRangesStopD[i].count; }
     const char *pri_cache = "./Fonts/SystemShockText.vfnt";
     const char *sec_cache = "./Fonts/StopD.vfnt";
-    bool pri_hit = load_font_cache(pri_cache, pri_expected, pri_md5, fontPackedChar, &numPackedGlyphs, &fixedNumberAdvanceWidth, &fontAtlasTex);
-    bool sec_hit = load_font_cache(sec_cache, sec_expected, sec_md5, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
+    bool pri_hit = load_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, &numPackedGlyphs, &fixedNumberAdvanceWidth, &fontAtlasTex);
+    bool sec_hit = load_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
     if (pri_hit && sec_hit) {
         free(primaryFontData); free(sec_data);
         malloc_trim(0);
@@ -349,7 +350,7 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    write_font_cache(pri_cache, pri_expected, pri_md5, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
+    write_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
     free(bmp);
 
     // Secondary
@@ -392,7 +393,7 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    write_font_cache(sec_cache, sec_expected, sec_md5, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
+    write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
     free(bmp);
     free(primaryFontData);
     free(sec_data);
