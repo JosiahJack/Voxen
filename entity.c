@@ -977,8 +977,9 @@ void LoadLevel(uint8_t curlevel) {
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
-    dirtyInstances[0] = true;
-    memset(lightDirty,1,LIGHT_COUNT * sizeof(bool)); // Mark all true to ensure frustums and matrices are updated for all.
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) dirtyInstances[i] = true;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedLights; i++) lightDirty[i] = true;
+    memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     #ifdef DEBUG_ENTITIES
         uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
         for (int i=START_INDEX_LEVEL_INSTANCES; i < endOfModels;++i) { if (instances[i].overrideTest) DualLogEntityInstance(i); }

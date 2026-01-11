@@ -1026,6 +1026,9 @@ void RenderShadowmaps(void) {
     }
 
     uint32_t numLightsShadowmapsToRender = vmin(voxen_Shadow_System.numShadowsCouldRender, MAX_SHADOWMAPS);
+    bool foundDirtyLight = false;
+    for (uint32_t i=0;i<numLightsShadowmapsToRender;++i) { if (lightDirty[candidates[i].index]) foundDirtyLight = true; }
+    numLightsShadowmapsToRender = foundDirtyLight ? numLightsShadowmapsToRender : 0;
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
         // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
@@ -1087,6 +1090,12 @@ void RenderShadowmaps(void) {
 
             if (nearbyMeshCount < 1) continue;
             
+//             glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
+//             glUniform1ui(0, c);
+//             GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
+//             glDispatchCompute(groupX_shadClear,6,1);
+          
+//             glUseProgram(Sys_Render.shadowmapsShaderProgram);
             glUniform3f(3, candidates[c].position.x, candidates[c].position.y, candidates[c].position.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
             bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, candidates[c].position, 0.64f); // Use some radius for floating point errors
