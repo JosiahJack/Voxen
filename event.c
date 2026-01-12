@@ -58,7 +58,6 @@ int32_t EventExecute(Event* event) {
         case EV_MOUSEMOVE: return Input_MouseMove(event->payload1i,event->payload2i);
         case EV_PHYSICS_TICK: return Physics();
 //         case EV_PARTICLE_TICK: return ParticleSystemStep();
-        case EV_QUIT: return 1; break;
     }
 
     DualLogError("Unknown event %d\n",event->type);

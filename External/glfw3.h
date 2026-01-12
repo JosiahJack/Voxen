@@ -523,6 +523,7 @@ GLFWAPI int glfwGetGamepadState(int jid, GLFWgamepadstate* state);
 #define GLFW_OPENGL_PROFILE         0x00022008
 #define GLFW_CLIENT_API             0x00022001
 
+GLFWframebuffersizefun glfwSetFramebufferSizeCallback (GLFWwindow *window, GLFWframebuffersizefun callback);
 GLFWAPI GLFWglproc glfwGetProcAddress(const char* procname);
 GLFWAPI int glfwInit(void);
 GLFWAPI const char* glfwGetVersionString(void);

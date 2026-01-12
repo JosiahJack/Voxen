@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include "os.h"
 #include "voxen.h"
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
@@ -364,7 +365,19 @@ void UpdateProjectionMatrices(void) {
     voxen_Shadow_System.shadDotThresh = 1.0f / vsqrtf(1.0f + vtan((float)Sys_Settings.FOV * PI / 360.0f) * (1.0f + aspect3D * aspect3D));
 }
 
-void UpdateScreenSize(void) {
+void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
+    if (*id == 0) glGenTextures(1, id);
+    glBindTexture(target, *id);
+    glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+}
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
+    Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
+    DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
+    glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     UpdateProjectionMatrices();
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1ui(2, Sys_Settings.ScreenWidth);
@@ -377,7 +390,34 @@ void UpdateScreenSize(void) {
     glUniform1ui(0, Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES);
     glUniform1ui(1, Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES);       
     glUniform1i(2, Sys_Settings.SSR_RES);
+    GenerateAndBindTexture(&Sys_Render.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
+    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,        GL_RGBA16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
+    GenerateAndBindTexture(&Sys_Render.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
+    GenerateAndBindTexture(&Sys_Render.inputSpecID,              GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
+    GenerateAndBindTexture(&Sys_Render.inputNormalID,            GL_RG16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
+    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, Sys_Render.inputImageID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, Sys_Render.inputWorldPosID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, Sys_Render.inputSpecID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, Sys_Render.inputNormalID, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Sys_Render.inputDepthID, 0);
+    glBindImageTexture(0, Sys_Render.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
+    glBindImageTexture(1, Sys_Render.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F); // World Position XYZ
+    glBindImageTexture(2, Sys_Render.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
+    //                 3 = depth
+    glBindImageTexture(4, Sys_Render.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
+    glBindImageTexture(5, Sys_Render.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glGenTextures(1, &Sys_Render.outputImageID);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,  Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
+#pragma GCC diagnostic pop
 
 void SetGI(void) {
     if (Sys_Settings.GI) {
@@ -403,7 +443,7 @@ void SetLanguage(void) {
 }
 
 void ApplySettings(void) {
-    UpdateScreenSize();
+    UpdateScreenSize(Sys_Global.window, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     SetSkyRotateSpeed();
     SetVSync();
     SetFog();
@@ -428,8 +468,7 @@ void ApplySettings(void) {
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
     if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         if (log_playback) { log_playback = false; DualLog("Exited log playback manually.  Control returned\n"); return; }
-        
-        EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
+        else OS_Exit(0);
     } else {
         if (!log_playback) {
             if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent(EV_KEYDOWN, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);

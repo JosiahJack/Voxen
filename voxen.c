@@ -316,13 +316,6 @@ bool parse_data_file(DataParser *parser, const char *filename) {
 }
 #pragma GCC diagnostic pop
 
-void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int32_t height, GLenum format, GLenum type, GLenum target) {
-    glGenTextures(1, id);
-    glBindTexture(target, *id);
-    glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, NULL);
-    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-}
-
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &source, NULL);
@@ -679,9 +672,10 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
-    glfwWindowHint(GLFW_RESIZABLE, 0);
+    glfwWindowHint(GLFW_RESIZABLE, 1);
     LoadConfig(); // Get settings before setting window size.
     Sys_Global.window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
+    glfwSetFramebufferSizeCallback(Sys_Global.window, UpdateScreenSize);
     if (!Sys_Global.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
         
     glfwMakeContextCurrent(Sys_Global.window);
@@ -726,40 +720,6 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glVertexArrayAttribBinding(Sys_Render.debugLinesVAO, 0, 0);
     glVertexArrayVertexBuffer(Sys_Render.debugLinesVAO, 0, Sys_Render.debugLinesVBO, 0, 3 * sizeof(float));
 
-    GenerateAndBindTexture(&Sys_Render.inputImageID,             GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Lit Raster
-    GenerateAndBindTexture(&Sys_Render.inputWorldPosID,        GL_RGBA16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA,         GL_FLOAT, GL_TEXTURE_2D); // Raster World Positions
-    GenerateAndBindTexture(&Sys_Render.inputDepthID, GL_DEPTH_COMPONENT32, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_DEPTH_COMPONENT,         GL_FLOAT, GL_TEXTURE_2D); // Raster Depth
-    GenerateAndBindTexture(&Sys_Render.inputSpecID,              GL_RGBA8, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,            GL_RGBA, GL_UNSIGNED_BYTE, GL_TEXTURE_2D); // Specular Colors
-    GenerateAndBindTexture(&Sys_Render.inputNormalID,            GL_RG16F, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight,              GL_RG,         GL_FLOAT, GL_TEXTURE_2D); // Normal XYZ
-    glGenTextures(1, &Sys_Render.outputImageID);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,  Sys_Settings.ScreenWidth / Sys_Settings.SSR_RES,  Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    
-    glGenFramebuffers(1, &Sys_Render.gBufferFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, Sys_Render.inputImageID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, Sys_Render.inputWorldPosID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, Sys_Render.inputSpecID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, Sys_Render.inputNormalID, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, Sys_Render.inputDepthID, 0);
-    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
-    glDrawBuffers(4, drawBuffers);
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
-    glBindImageTexture(0, Sys_Render.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
-    glBindImageTexture(1, Sys_Render.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F); // World Position XYZ
-    glBindImageTexture(2, Sys_Render.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
-    //                 3 = depth
-    glBindImageTexture(4, Sys_Render.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
-    glBindImageTexture(5, Sys_Render.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
-    glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.outputImageID);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
-    glDepthMask(GL_TRUE); // Always true, set just once ever.
-
     float* m = shadowmapsPerspectiveProjection;
     m[0] = 1.0f; m[1] = 0.0f; m[2] =                                                                  0.0f; m[3] =  0.0f;
     m[4] = 0.0f; m[5] = 1.0f; m[6] =                                                                  0.0f; m[7] =  0.0f;
@@ -769,7 +729,15 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     RenderLoadingProgress(80,"Loading...");
     InitializeAudio(); // Audio    
     ParseGameData();
+    glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
+    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
+    GLenum drawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+    glDrawBuffers(4, drawBuffers);
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE) DualLogError("Framebuffer incomplete: Error code %d\n", status);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
+    glDepthMask(GL_TRUE); // Always true, set just once ever.
     glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
     int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     int windowIconFileSize = OS_FileSize(fp);
@@ -1508,8 +1476,6 @@ static inline void UpdateTime(void) {
 }
 
 static inline void UpdateEvents(void) {
-    glfwPollEvents();
-    if (glfwWindowShouldClose(Sys_Global.window)) EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
     Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
     if (!log_playback && !Sys_Global.gamePaused && !Sys_Global.menuActive
         && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
@@ -1522,10 +1488,7 @@ static inline void UpdateEvents(void) {
         int32_t read_status = ReadActiveLog();
         if (read_status == 2) { // EOF reached, no more events
             DualLog("Log playback completed.  Control returned.\n");
-        } else if (read_status == -1) { // Read error
-            DualLogError("Error reading log file, exiting playback\n");
-            EnqueueEvent(EV_QUIT,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-        }
+        } else if (read_status == -1) { DualLogError("Error reading log file, exiting playback\n"); OS_Exit(1); }
     }
 
     if (EventQueueProcess()) OS_Exit(1); // Do everything
@@ -1577,9 +1540,11 @@ int32_t main(int32_t argc, char* argv[]) {
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     Sys_Global.absoluteTime = Sys_Global.pauseRelativeTime = get_time();
     while(1) { // Main Loop
-        ProcessInput(); // Calls ApplyPlayerMovements()
-        UpdatePlayerFacingAngles();
+        if (glfwWindowShouldClose(Sys_Global.window)) OS_Exit(0);
         UpdateTime();
+        glfwPollEvents();
+        ProcessInput(); // Calls ApplyPlayerMovements()
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
         InputClearRisingAndFallingEdges();
         UpdateEvents(); // Calls Physics()
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
@@ -1595,6 +1560,5 @@ int32_t main(int32_t argc, char* argv[]) {
             else if (Sys_Dx.globalFrameNum == 500) DebugRAM("after 500 frames of running");
             else if (Sys_Dx.globalFrameNum == 1000) DebugRAM("after 1000 frames of running");
         #endif
-    }
-    return 0;
+    } return 0;
 }

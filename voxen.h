@@ -174,6 +174,7 @@ extern float lightMinIntensity[LIGHT_COUNT];
 extern float lightMaxIntensity[LIGHT_COUNT];
 void UpdateVoxelLightLists(void);
 void RenderLoadingProgress(int32_t offset, const char* text);
+void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height);
 
 #define LEVEL_CYBERSPACE 13
 #define WORLDX 64
@@ -425,8 +426,6 @@ float GetScreenRelativeY(float percentage);
 #define EV_PLAYAUDIO_STREAM 41u
 #define EV_PHYSICS_TICK 50u
 #define EV_PARTICLE_TICK 60u
-#define EV_PAUSE 254u
-#define EV_QUIT 255u
 #define EV_INT_FIELD_UNUSED 0
 #define EV_FLOAT_FIELD_UNUSED 0.0f
 #define EVENT_JOURNAL_BUFFER_SIZE 1000
