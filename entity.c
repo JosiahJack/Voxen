@@ -904,8 +904,7 @@ void LoadLevel(uint8_t curlevel) {
     DebugRAM("end of LoadLevel instances");
     LoadModels();
     // Set Physics
-    for (int i=0;i<ARRSIZE;++i) gridCellFloorHeight[i] = -FLT_MAX;
-    for (int i=0;i<ARRSIZE;++i) gridCellCeilingHeight[i] = FLT_MAX;
+    for (int i=0;i<ARRSIZE;++i) { gridCellFloorHeight[i] = -FLT_MAX; gridCellCeilingHeight[i] = FLT_MAX;}
     for (int i=PLAYER1;i<loadedInstances;++i) {
         int32_t cellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
         instances[i].cellIndex = cellIdx;
@@ -978,7 +977,14 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(120,"Loading voxel lighting data...");
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) dirtyInstances[i] = true;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedLights; i++) lightDirty[i] = true;
+    for (uint16_t i = 0; i < loadedLights; i++) {
+        uint32_t litIdx = i * LIGHT_DATA_SIZE;
+        lightDirty[i] = true;
+        lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
+        lightInPVS[i] = false;
+    }
+    memset(voxelLightLists, 0, VOXEL_COUNT * 24 * sizeof(uint32_t));
+    memset(voxelLightListCounts,0, VOXEL_COUNT * sizeof(uint32_t));
     memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     #ifdef DEBUG_ENTITIES
         uint16_t endOfModels = loadedInstances - invalidModelIndexCount;

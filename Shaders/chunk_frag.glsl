@@ -206,7 +206,7 @@ void main() {
         float distOverRange = dist / range;
         float distOverRangeSqd = distOverRange * distOverRange;
         float attenuation = (1.0 - distOverRangeSqd) * lambertian;
-        if (attenuation < 0.05) continue;
+        if (attenuation < 0.015) continue;
 
         float spotAng = lights[lightIdx + LIGHT_DATA_OFFSET_SPOTANG];
         float spotFalloff = 1.0;

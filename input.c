@@ -730,23 +730,21 @@ void ProcessInput(void) {
     if (Sys_Global.gamePaused || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
     
     // Debug test light TODO: Remove later once player lantern is working
-    uint16_t testlightIdx = (741 * LIGHT_DATA_SIZE);
-    if (Sys_Input.keyStates[GLFW_KEY_1].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] += 0.01f; lightDirty[741] = true;
-    } else if (Sys_Input.keyStates[GLFW_KEY_2].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSX] -= 0.01f; lightDirty[741] = true;
-    }
-    
-    if (Sys_Input.keyStates[GLFW_KEY_3].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSY] += 0.01f; lightDirty[741] = true;
-    } else if (Sys_Input.keyStates[GLFW_KEY_4].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSY] -= 0.01f; lightDirty[741] = true;
-    }
-    
-    if (Sys_Input.keyStates[GLFW_KEY_5].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSZ] += 0.01f; lightDirty[741] = true;
-    } else if (Sys_Input.keyStates[GLFW_KEY_6].down) {
-        lights[testlightIdx + LIGHT_DATA_OFFSET_POSZ] -= 0.01f; lightDirty[741] = true;
+    uint16_t testLight = 741;
+    uint16_t testLightIdx = (testLight * LIGHT_DATA_SIZE);
+    Vector3 testLightPos = (Vector3){ lights[testLightIdx + LIGHT_DATA_OFFSET_POSX], lights[testLightIdx + LIGHT_DATA_OFFSET_POSY], lights[testLightIdx + LIGHT_DATA_OFFSET_POSZ] };
+    float mx = 0.0f, my = 0.0f, mz = 0.0f;
+    bool moveTestLight =    Sys_Input.keyStates[GLFW_KEY_1].down || Sys_Input.keyStates[GLFW_KEY_2].down
+                         || Sys_Input.keyStates[GLFW_KEY_3].down || Sys_Input.keyStates[GLFW_KEY_4].down
+                         || Sys_Input.keyStates[GLFW_KEY_5].down || Sys_Input.keyStates[GLFW_KEY_6].down;
+    if (moveTestLight) {
+        if (Sys_Input.keyStates[GLFW_KEY_1].down) mx =  0.01f;
+        if (Sys_Input.keyStates[GLFW_KEY_2].down) mx = -0.01f;
+        if (Sys_Input.keyStates[GLFW_KEY_3].down) my =  0.01f;
+        if (Sys_Input.keyStates[GLFW_KEY_4].down) my = -0.01f;
+        if (Sys_Input.keyStates[GLFW_KEY_5].down) mz =  0.01f;
+        if (Sys_Input.keyStates[GLFW_KEY_6].down) mz = -0.01f;
+        MoveLight(testLight, Vector3_A_plus_B(testLightPos, (Vector3){ mx, my, mz }));
     }
     
     // Debug test entity for confirming model+texture setup + collisions TODO: Remove after combing through entity types.

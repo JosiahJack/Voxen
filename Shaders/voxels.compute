@@ -13,6 +13,8 @@ layout(location = 1) uniform float voxelMinCenterZ;
 layout(location = 2) uniform uint loadedLights;
 layout(location = 3) uniform float worldMin_x;
 layout(location = 4) uniform float worldMin_z;
+layout(location = 5) uniform vec3 camPos;
+layout(location = 6) uniform vec3 camForward;
 
 const int WORLD_X_VOXELCOUNT = 512;
 const int MAX_LIGHTS_PER_VOXEL = 24;
@@ -54,10 +56,15 @@ void main() {
     uint voxelX = gl_GlobalInvocationID.x;
     uint voxelZ = gl_GlobalInvocationID.y;
     uint voxelIndex = (voxelZ * WORLD_X_VOXELCOUNT) + voxelX;
-    for (int i = 0; i < MAX_LIGHTS_PER_VOXEL; i++) uniqueLightLists[voxelIndex * MAX_LIGHTS_PER_VOXEL + i] = 0xFFFFFFFFu;
     voxelLightListCounts[voxelIndex] = 0u;
     vec3 voxelPos = vec3(voxelMinCenterX + (voxelX * VOXEL_SIZE), 0.0, voxelMinCenterZ + (voxelZ * VOXEL_SIZE));
-    uint cellIdx = PosGetCellCoords(voxelPos);
+    vec3 cam = vec3(camPos.x, 0.0, camPos.z);
+    vec3 toCam = voxelPos - cam;
+    float distToVox = length(toCam);
+    if (distToVox > 71.68) return;
+    if (dot(toCam,camForward) < 0.0 && distToVox > 20.48) return;
+    
+//     uint cellIdx = PosGetCellCoords(voxelPos);
 //     if ((gridCellStates[cellIdx] & CELL_VISIBLE) == 0u && ((gridCellStates[cellIdx] & CELL_OPEN) >= 1u)) return;
     
     for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
@@ -70,4 +77,6 @@ void main() {
             if (voxelLightListCounts[voxelIndex] >= MAX_LIGHTS_PER_VOXEL) return;
         }
     }
+    
+    for (uint i = voxelLightListCounts[voxelIndex]; i < MAX_LIGHTS_PER_VOXEL; i++) uniqueLightLists[voxelIndex * MAX_LIGHTS_PER_VOXEL + i] = 0xFFFFFFFFu;
 }

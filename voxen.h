@@ -1,6 +1,6 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-#define ONLY_LOAD_LEVEL_NEEDS
+// #define ONLY_LOAD_LEVEL_NEEDS
 
 #include <string.h>
 #include <stdarg.h>
@@ -123,6 +123,7 @@ extern uint32_t** modelTriangles;
 extern uint16_t loadedTexturesMaxIndex;
 extern uint16_t loadedModelsMaxIndex;
 extern uint16_t loadedLights;
+extern Vector3 lightsNewPosition[LIGHT_COUNT];
 extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
@@ -158,6 +159,7 @@ void LoadModels(void);
 
 extern float lights[LIGHT_COUNT * LIGHT_DATA_SIZE];
 extern bool lightOn[LIGHT_COUNT];
+extern bool lightInPVS[LIGHT_COUNT];
 extern bool lightCastsShadows[LIGHT_COUNT];
 extern bool lightLerpOn[LIGHT_COUNT];
 extern bool lightLerpUp[LIGHT_COUNT];
@@ -212,6 +214,7 @@ extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
 void CullInit(void);
 bool CullCore(void);
+void MoveLight(uint16_t lightIdx, Vector3 newPos);
 bool get_cull_bit(const uint32_t* arr, int idx);
 static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (entIdx >= 496 && entIdx <= 514 && entIdx != 502 && entIdx != 505 && entIdx != 506 && entIdx != 507); }// All doors except see-through doors.
 // Credits
@@ -360,6 +363,10 @@ void ApplySettings(void);
 extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 void SetFog(void);
 extern bool lightDirty[LIGHT_COUNT];
+#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
+#define VOXEL_LIGHT_IDX_CLEAR_VALUE 0xFFFFFFFFu
+extern uint32_t voxelLightLists[VOXEL_COUNT * 24];
+extern uint32_t voxelLightListCounts[VOXEL_COUNT];
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;

@@ -8,6 +8,7 @@
 #include "data_models.c"
 #include "dynamic_culling.c"
 #include "credits.c"
+const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
 GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
@@ -424,20 +425,110 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 0.0f, 0.0f, 1.0f},                  // +Z: Forward
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
-#define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
+
+uint32_t voxelLightLists[VOXEL_COUNT * 24];
+uint32_t voxelLightListCounts[VOXEL_COUNT];
+bool lightInPVS[LIGHT_COUNT];
+Vector3 lightsNewPosition[LIGHT_COUNT];
+void MoveLight(uint16_t lightIdx, Vector3 newPos) {
+    lightsNewPosition[lightIdx] = newPos;
+    lightDirty[lightIdx] = true;
+}
+
 bool UpdateLights(bool* voxelsNeedUpdated) {
     if (Sys_Global.gamePaused || Sys_Global.menuActive) return false;
     
-    for (int lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
+    for (uint16_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {        
         if (lightDirty[lightIdx]) { // Marked all as true at level load.
             *voxelsNeedUpdated = true;
             uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-            Vector3 lightPos = (Vector3){ lights[litIdx], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
+
+            // Remove light from all voxel lists at current location before moving light
+            Vector3 lightPosOld = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
+            uint16_t voxXold = (uint16_t)clamp((int32_t)vfloor((lightPosOld.x - voxelMinCenterX) / VOXEL_SIZE), 0, 511);
+            uint16_t voxZold = (uint16_t)clamp((int32_t)vfloor((lightPosOld.z - voxelMinCenterZ) / VOXEL_SIZE), 0, 511);
+            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+            int r1 = vceil(range * (1.0f / VOXEL_SIZE));
+            int voxMinX = vmax(voxXold - r1,0);
+            int voxMaxX = vmin((int)voxXold + r1,511);
+            int voxMinZ = vmax(voxZold - r1,0);
+            int voxMaxZ = vmin((int)voxZold + r1,511);
+//             uint32_t subtractCount = 0;
+            for (int ix = voxMinX; ix <= voxMaxX; ++ix) {
+                for (int iz = voxMinZ; iz <= voxMaxZ; ++iz) {
+                    uint32_t voxelIndex = (iz * 512) + ix;
+                    for (int i=0; i<MAX_LIGHTS_PER_VOXEL; ++i) {
+                        uint32_t currentVoxLightListIndex = (voxelIndex * MAX_LIGHTS_PER_VOXEL) + i;
+                        if (voxelLightLists[currentVoxLightListIndex] == lightIdx) {
+                            voxelLightLists[currentVoxLightListIndex] = VOXEL_LIGHT_IDX_CLEAR_VALUE; // Found this light, clear it.
+                            for (uint32_t j=currentVoxLightListIndex;j<vmin(voxelLightListCounts[voxelIndex],MAX_LIGHTS_PER_VOXEL);++j) {
+                                voxelLightLists[j] = voxelLightLists[j+1]; // Shift remaining list down
+                            }
+                            
+                            if (voxelLightListCounts[voxelIndex] > 0) voxelLightListCounts[voxelIndex]--; // Decrease count for this list.
+//                             subtractCount++;
+                            break; // Light only should exist once in the list.
+                        }
+                    }
+                }
+            }
+            
+//             if (subtractCount > 0) DualLog("Light %u subtracted itself from %u voxels' lists with range %f, at voxel %u, %u with vox with vmins %u,%u and vmaxs %u,%u\n", lightIdx, subtractCount, (double)range, voxXold, voxZold, voxMinX, voxMinZ, voxMaxX, voxMaxZ);
+
+            // Update to new position
+            lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
+            lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lightsNewPosition[lightIdx].y;
+            lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lightsNewPosition[lightIdx].z;
+            Vector3 lightPos = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
+
+            // Now update voxel light lists for voxels in range of new light position
+            uint16_t voxX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - voxelMinCenterX) / VOXEL_SIZE), 0, 511);
+            uint16_t voxZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - voxelMinCenterZ) / VOXEL_SIZE), 0, 511);
+            int r2 = vceil(range * (1.0f / VOXEL_SIZE));
+            voxMinX = vmax(voxXold - r2,0);
+            voxMaxX = vmin((int)voxX + r2,511);
+            voxMinZ = vmax(voxZold - r2,0);
+            voxMaxZ = vmin((int)voxZ + r2,511);
+//             uint32_t voxelCountForLight = 0;
+            for (int ix = voxMinX; ix <= voxMaxX; ++ix) {
+                for (int iz = voxMinZ; iz <= voxMaxZ; ++iz) {
+                    uint32_t voxelIndex = (iz * 512) + ix;
+                    if (voxelLightListCounts[voxelIndex] >= MAX_LIGHTS_PER_VOXEL) continue; // Voxel is full, skip it.
+
+                    uint32_t currentVoxLightListIndex = (voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex];
+                    voxelLightLists[currentVoxLightListIndex] = lightIdx; // Put light into the list for this voxel.
+                    voxelLightListCounts[voxelIndex]++;
+//                     voxelCountForLight++;
+//                     if (voxelLightListCounts[voxelIndex] >= MAX_LIGHTS_PER_VOXEL) DualLogWarn("Voxel filled up at voxel %u, %u for light at %f, %f\n", ix, iz, (double)lightPos.x, (double)lightPos.z);
+                }
+            }
+            
+//             if (voxelCountForLight > 0) DualLog("Light %u added itself to %u voxels' lists with range %f, at voxel %u, %u with vox with vmins %u,%u and vmaxs %u,%u\n", lightIdx, voxelCountForLight, (double)range, voxXold, voxZold, voxMinX, voxMinZ, voxMaxX, voxMaxZ);
+
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) {
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
                 mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
                 ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
+            }
+            
+            uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+            uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+            int lightCellIdx = (cellZ * WORLDX) + cellX;
+            int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
+            lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+            if (!lightInPVS[lightIdx]) {
+                for (int ix = cellX - r; ix <= (int)cellX + r; ++ix) {
+                    for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
+                        if (!XZPairInBounds(ix, iz)) continue;
+                        
+                        int subIdx = iz * WORLDX + ix;
+                        if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
+                            lightInPVS[lightIdx] = true;
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
@@ -469,14 +560,20 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
         }
     }
 
-    glNamedBufferData(Sys_Render.lightsID,loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-    if (*voxelsNeedUpdated) {
-        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-        GLuint groupX_voxels = (512 + 31) / 32;
-        GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
-        glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
-    }
-    
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
+//     if (*voxelsNeedUpdated) {
+//         float px = instances[PLAYER1].position.x; float py = instances[PLAYER1].position.y; float pz = instances[PLAYER1].position.z;
+//         float fx = instances[PLAYER1].forward.x;  float fy = instances[PLAYER1].forward.y;  float fz = instances[PLAYER1].forward.z;
+//         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+//         glUniform3f(5, px, py, pz);
+//         glUniform3f(6, fx, fy, fz);
+//         GLuint groupX_voxels = (512 + 31) / 32;
+//         GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
+//         glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
+//     }
+
+    glNamedBufferData(Sys_Render.voxelLightListCountsID, VOXEL_COUNT * sizeof(uint32_t), voxelLightListCounts, GL_DYNAMIC_DRAW);
+    glNamedBufferData(Sys_Render.uniqueLightListsID, VOXEL_COUNT * 24 * sizeof(uint32_t), voxelLightLists, GL_DYNAMIC_DRAW);
     return *voxelsNeedUpdated;
 }
 
@@ -663,7 +760,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     double init_start_time = get_time();
     Sys_Dx.globalFrameNum = 0;
     DebugRAM("prior to event system init");
-    DualLog("Voxen by W. Josiah Jack, MIT-0 licensed\n");
+    DualLog("%s by W. Josiah Jack, MIT-0 licensed\n", EngineName);
     EventSystemInit(argc,command,command_input1);
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
@@ -772,7 +869,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       16, MAX_UNIQUE_COLORS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
-    Sys_Render.voxelLightListsID       = SetupSSBO(&Sys_Render.voxelLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.uniqueLightListsID       = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
 //     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
@@ -947,29 +1044,10 @@ void RenderShadowmaps(void) {
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
         float luminosity = (intensity / (range * range));
         if (luminosity < SHADOW_LIGHT_THRESH) continue;
-
+        if (!lightInPVS[i]) continue;
+        
         float dx = lightPos.x - playerPos.x;    float dy = lightPos.y - playerPos.y;    float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-        int lightCellIdx = (cellZ * WORLDX) + cellX;
-        bool inPVS = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-        if (!inPVS) {
-            int r = vfloor(range * (1.0f / WORLDCELL_WIDTH_F));
-            for (int ix = cellX - r; ix <= (int)cellX + r && !inPVS; ++ix) {
-                for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                    if (!XZPairInBounds(ix, iz)) continue;
-                    
-                    int subIdx = iz * WORLDX + ix;
-                    if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
-                        inPVS = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (!inPVS) continue;
-
         float dotResult = (dx*pfx + dy*pfy + dz*pfz);//dot_vector3(delta, instances[PLAYER1].forward);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         
@@ -1200,7 +1278,7 @@ void RenderShadowmaps(void) {
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
-void RenderCompositePass(float px, float py, float pz, float * restrict viewProj, float * restrict invViewRot) {
+static inline void RenderCompositePass(float px, float py, float pz, float * restrict viewProj, float * restrict invViewRot) {
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
@@ -1236,7 +1314,7 @@ void RenderCompositePass(float px, float py, float pz, float * restrict viewProj
     Sys_Dx.verticesRenderedThisFrame += 4;
 }
 
-double RenderUI(void) {
+static inline double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     Sys_Dx.drawCallsNormal = Sys_Dx.drawCallsRenderedThisFrame;
     float screenCenterX = (float)Sys_Settings.ScreenWidth / 2;
@@ -1324,7 +1402,7 @@ double RenderUI(void) {
 
 DepthSort visibleInstances[INSTANCE_COUNT];
 
-void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx, Vector3 playerPos, bool transparents) {
+static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx, Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     for (uint16_t i = instancesStartIdx; i < instancesEndIdx; ++i) {
         Vector3 objPos = instances[i].position;
@@ -1390,7 +1468,7 @@ void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx
     }
 }
 
-void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
+static inline void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
     glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
@@ -1410,20 +1488,13 @@ void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geome
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void RenderSSR(float* viewProj, Vector3 playerPos) {    
+static inline void RenderSSR(float* viewProj, Vector3 playerPos) {    
     glUseProgram(Sys_Render.ssrShaderProgram);
     glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
     glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
     GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
     GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
     glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-}
-
-void UpdateDiagnosticPoll(void) {    
-    Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
-    Sys_Dx.framesPerLastSecond = Sys_Dx.globalFrameNum - Sys_Dx.lastFrameSecCount;
-    if (Sys_Dx.framesPerLastSecond < Sys_Dx.worstFPS && Sys_Dx.globalFrameNum > 2000) Sys_Dx.worstFPS = Sys_Dx.framesPerLastSecond; // After startup, keep track of worst framerate seen.
-    Sys_Dx.lastFrameSecCount = Sys_Dx.globalFrameNum;
 }
 
 void Render(void) {
@@ -1461,37 +1532,16 @@ void Render(void) {
 
     RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot);
     Sys_Global.last_time = RenderUI();
-    if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) UpdateDiagnosticPoll();
+    if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
+        Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
+        Sys_Dx.framesPerLastSecond = Sys_Dx.globalFrameNum - Sys_Dx.lastFrameSecCount;
+        if (Sys_Dx.framesPerLastSecond < Sys_Dx.worstFPS && Sys_Dx.globalFrameNum > 2000) Sys_Dx.worstFPS = Sys_Dx.framesPerLastSecond; // After startup, keep track of worst framerate seen.
+        Sys_Dx.lastFrameSecCount = Sys_Dx.globalFrameNum;
+    }
+    
     Sys_Dx.cpuTime = get_time() - Sys_Global.current_time; // Measure time over everything this frame before GPU swap buffers
     glfwSwapBuffers(Sys_Global.window); // Present frame
     CHECK_GL_ERROR();
-}
-
-static inline void UpdateTime(void) {
-    Sys_Global.current_time = get_time();
-    double frame_time = Sys_Global.current_time - Sys_Global.last_topframe_time;
-    Sys_Global.absoluteTime += frame_time;
-    Sys_Global.last_topframe_time = Sys_Global.current_time;
-    if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += frame_time;
-}
-
-static inline void UpdateEvents(void) {
-    Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
-    if (!log_playback && !Sys_Global.gamePaused && !Sys_Global.menuActive
-        && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
-        
-        Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
-        EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-    }
-
-    if (log_playback) { // Enqueue all logged events for the current frame.
-        int32_t read_status = ReadActiveLog();
-        if (read_status == 2) { // EOF reached, no more events
-            DualLog("Log playback completed.  Control returned.\n");
-        } else if (read_status == -1) { DualLogError("Error reading log file, exiting playback\n"); OS_Exit(1); }
-    }
-
-    if (EventQueueProcess()) OS_Exit(1); // Do everything
 }
 
 static void UpdateVoxelsAndInstances(void) {
@@ -1508,11 +1558,9 @@ int32_t main(int32_t argc, char* argv[]) {
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
     OpenConsoleLogFile();
     DebugRAM("program start");
-    if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { DualLog("-----------------------------------------------------------\nVoxen, the Voxel Lit Open Source Game Engine\nby W. Josiah Jack\nMIT-0 licensed\n"); return 0; }
-    if ((argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
-        || (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0)) ) {
-        DualLog("Voxen the Voxel Lit Open Source Game Engine\n");
-        DualLog("-------------------------------------------------------------\n");
+    if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { DualLog("-----------------------------------------------------------\n%s\nby W. Josiah Jack\nMIT-0 licensed\n", EngineName); return 0; }
+    if ((argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))) {
+        DualLog("%s\n-------------------------------------------------------------\n", EngineName);
         DualLog("   This is a game engine designed for optimized focused usage\n");
         DualLog("   of OpenGL, making heavy use of GPU Driven rendering\n");
         DualLog("   techniques, a unified event system for debugging and log\n");
@@ -1520,16 +1568,14 @@ int32_t main(int32_t argc, char* argv[]) {
         DualLog("   files and using definition files for what to do with the\n");
         DualLog("   data.\n\n");
         DualLog("   This project aims to have minimal overhead, profiling,\n");
-        DualLog("   traceability, robustness, and low level control.\n\n");
-        DualLog("\n");
+        DualLog("   traceability, robustness, and low level control.\n\n\n");
         DualLog("Valid arguments:\n");
         DualLog(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
         DualLog("-v, --version\n    Prints version information\n\n");
         DualLog("play <file>\n    Plays back recorded log from current directory\n\n");
         DualLog("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
         DualLog("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
-        DualLog("-h, --help\n    Provides this help text.  Neat!\n");
-        DualLog("-----------------------------------------------------------\n");
+        DualLog("-h, --help\n    Provides this help text.  Neat!\n-----------------------------------------------------------\n");
         return 0;
     }
 
@@ -1541,12 +1587,34 @@ int32_t main(int32_t argc, char* argv[]) {
     Sys_Global.absoluteTime = Sys_Global.pauseRelativeTime = get_time();
     while(1) { // Main Loop
         if (glfwWindowShouldClose(Sys_Global.window)) OS_Exit(0);
-        UpdateTime();
+        
+        // Update Time
+        Sys_Global.current_time = get_time();
+        double frame_time = Sys_Global.current_time - Sys_Global.last_topframe_time;
+        Sys_Global.absoluteTime += frame_time;
+        Sys_Global.last_topframe_time = Sys_Global.current_time;
+        if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += frame_time;
+    
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements()
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
         InputClearRisingAndFallingEdges();
-        UpdateEvents(); // Calls Physics()
+        // Update Events, calls Physics()
+        Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
+        if (!log_playback && !Sys_Global.gamePaused && !Sys_Global.menuActive && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
+            Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
+            EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
+        }
+
+        if (log_playback) { // Enqueue all logged events for the current frame.
+            int32_t read_status = ReadActiveLog();
+            if (read_status == 2) { // EOF reached, no more events
+                DualLog("Log playback completed.  Control returned.\n");
+            } else if (read_status == -1) { DualLogError("Error reading log file, exiting playback\n"); OS_Exit(1); }
+        }
+
+        if (EventQueueProcess()) OS_Exit(1); // Do everything
+    
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
         
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateGameplay();

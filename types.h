@@ -751,7 +751,7 @@ typedef struct {
 	GLuint cellVisibleDataID;
 	GLuint voxelUpdateShaderProgram;
 	GLuint voxelLightListCountsID;
-	GLuint voxelLightListsID;
+	GLuint uniqueLightListsID;
 	GLuint vbos[MODEL_IDX_MAX];
 	GLuint tbos[MODEL_IDX_MAX];
 	bool shadowmapsNeedUpdated;
