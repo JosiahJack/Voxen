@@ -1,7 +1,8 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
 // #define ONLY_LOAD_LEVEL_NEEDS
-
+// #define DEBUG_ENTITIES
+// #define DEBUG_ENTITY_DEFINITIONS
 #include <string.h>
 #include <stdarg.h>
 #include "./External/glad/gl.h"
@@ -248,7 +249,7 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
 #define PLAYER_TRANSITION_TO_PRONE_ADD 0.1f
 #define PLAYER_CAMERA_OFFSET_Y 0.84f
 extern uint16_t testPointInSolid;
-extern uint8_t boosterActive;
+extern bool boosterActive;
 
 #define LAYER_MASK_PLAYER_COLLIDESWITH ((1u << PhysicsLayer_Clip) | (1u << PhysicsLayer_NPCBullet) | (1u << PhysicsLayer_Player2) | (1u << PhysicsLayer_Door) \
 										| (1u << PhysicsLayer_Trigger) | (1u << PhysicsLayer_PlayerTriggerOnly) | (1u << PhysicsLayer_Default) | (1u << PhysicsLayer_TransparentFX) \
@@ -360,6 +361,7 @@ void ApplySettings(void);
 #define FAR_PLANE (71.68f) // Max player view, level 6 crawlway 28 cells
 #define NEAR_PLANE (0.02f)
 #define FAR_PLANE_SQUARED (FAR_PLANE * FAR_PLANE)
+#define MAX_DEBUG_LINE_VERTS 8
 extern float fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 void SetFog(void);
 extern bool lightDirty[LIGHT_COUNT];
@@ -396,7 +398,6 @@ void SetSkyRotateSpeed(void);
 #define TEXT_STOPD_RED 6
 #define TEXT_STOPD_RED_HIGHLIGHT 7
 #define TEXT_STOPD_RED_PAUSETITLE 8
-#define TEXT_COLOR_COUNT 9
 extern char** audiologNames;
 extern char** audiologSubjects;
 extern char** audiologSenders;
@@ -415,7 +416,6 @@ void LoadTextForLanguage(uint8_t lang);
 void LoadLogTextForLanguage(uint8_t lang);
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
 float TextWidth(const char *utf8, int32_t fontID);
-uint32_t DecodeUTF8(const char **p);
 void InitFontAtlasses(void);
 float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
@@ -620,3 +620,23 @@ void DualLogEntityInstance(uint16_t idx);
 void DualLogEntity(Entity ent);
 void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
+
+#define GEOMETRY_LOD_CARD_MODEL_IDX 178 // Need to specify in gamedata.txt
+extern float correctionX, correctionY, correctionZ;
+extern float correctionNPCX, correctionNPCY, correctionNPCZ;
+extern float correctionDoorsX, correctionDoorsY, correctionDoorsZ;
+extern float correctionDynamicsX, correctionDynamicsY, correctionDynamicsZ;
+extern float correctionLightsSaveableX, correctionLightsSaveableY, correctionLightsSaveableZ;
+extern float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticImmutableZ;
+extern float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
+extern float correctionLightX, correctionLightY, correctionLightZ;
+void SetUnityHierarchyOffsets(uint8_t curlevel);
+void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t entIdx);
+void EnableCheatArsenal(uint8_t level);
+uint16_t SpawnDynamicObject(int val, bool cheat);
+void cmd_kill(void);
+void cmd_undo(void);
+void cmd_shake(void);
+float GetPainStatic(void);
+Color GetPainStaticColor(void);
+void CycleToNextMonitor(GLFWwindow* window);

@@ -1,16 +1,11 @@
 // stb_image.h - PNG Load System
-#include <stdint.h>
-void DualLog(const char* fmt, ...);
-void DualLogError(const char* fmt, ...);
 extern unsigned char *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t *x, int32_t *y);
-#include <stddef.h>
 extern int32_t stbi_arena_size;
 extern uint8_t*  stbi__arena_base;
 extern void stbi__arena_init(void);
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
 
 #ifdef STB_IMAGE_IMPLEMENTATION
-#include <sys/mman.h>
 uint8_t* stbi__arena_base = NULL;
 uint8_t* stbi__arena_cursor = NULL;
 uint8_t* stbi__arena_end = NULL;

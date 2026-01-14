@@ -1,9 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include "os.h"
-#include "voxen.h"
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
@@ -147,16 +141,6 @@ InputElement inputElements[149] = {
     { "UNUSED", 0 } // 148
 };
 
-static char* trim(char* s) {
-    while (isspace((unsigned char)*s)) s++;
-    if (*s == 0) return s;
-
-    char* e = s + strlen(s) - 1;
-    while (e > s && isspace((unsigned char)*e)) e--;
-    e[1] = 0;
-    return s;
-}
-
 int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
     for (int i=0;i<149;++i) {
         if (!strcmp(val, inputElements[i].name)) return i;
@@ -165,13 +149,42 @@ int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
     return 148;
 }
 
+char* data_parser_trim(char* s) {
+    while (data_parser_isspace((unsigned char)*s)) s++;
+    if (*s == 0) return s;
+
+    char* e = s + strlen(s) - 1;
+    while (e > s && data_parser_isspace((unsigned char)*e)) e--;
+    e[1] = 0;
+    return s;
+}
+
+int atoi(const char *str) {
+    while (data_parser_isspace(*str)) str++;
+    int sign = 1;
+         if (*str == '-') { sign = -1; str++; }
+    else if (*str == '+') str++;
+
+    if (*str < '0' || *str > '9') return 0;
+    int result = 0;
+    while (*str >= '0' && *str <= '9') {
+        int digit = *str - '0';
+        if (result > (INT_MAX - digit) / 10) return (sign == 1) ? INT_MAX : INT_MIN;
+
+        result = result * 10 + digit;
+        str++;
+    }
+
+    return sign * result;
+}
+
 void LoadConfig(void) {
     FILE* f = fopen("./Data/Config.ini", "r");
     if (!f) return;
 
     char line[512];
     while (fgets(line, sizeof(line), f)) { // Loop by line
-        char* s = trim(line);
+        char* s = data_parser_trim(line);
         if (*s == 0) continue;
         if (s[0] == '/' && s[1] == '/') continue;
 
@@ -179,8 +192,8 @@ void LoadConfig(void) {
         if (!eq) continue;
 
         *eq = 0;
-        char* key = trim(s);
-        char* val = trim(eq + 1); // After trimming key and value whitespace, check for matching setting on this line.
+        char* key = data_parser_trim(s);
+        char* val = data_parser_trim(eq + 1); // After trimming key and value whitespace, check for matching setting on this line.
              if (!strcmp(key, "ResolutionWidth"))      Sys_Settings.ScreenWidth          = (uint16_t)atoi(val);
         else if (!strcmp(key, "ResolutionHeight"))     Sys_Settings.ScreenHeight         = (uint16_t)atoi(val);
         else if (!strcmp(key, "Fullscreen"))           Sys_Settings.Fullscreen           = (uint8_t)atoi(val);
@@ -758,7 +771,9 @@ void ProcessInput(void) {
         instances[editModeSelection].position = oldPos;
         instances[editModeSelection].rotation = oldRot;
         instances[editModeSelection].scale = oldScale;
-        DualLogEntityInstance(editModeSelection);
+        #ifdef DEBUG_ENTITIES
+            DualLogEntityInstance(editModeSelection);
+        #endif
     }
         
     if (ToggleMode()) {

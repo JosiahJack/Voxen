@@ -1,4 +1,3 @@
-#include "os.h"
 uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
 extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
@@ -625,6 +624,7 @@ void PortalCulling(void) { // Called just once at end of animation loop for the 
     }
     
     DetermineVisibleCells(playerCellX,playerCellZ); // Recompute full PVS with new closed edges for all portal states.  So much for the precomputed set.
+    for (uint16_t i = 0; i < loadedLights; i++) lightDirty[i] = true;
 }
 
 bool CullCore(void) {    

@@ -1,5 +1,5 @@
 // miniaudio.h - Audio System
-// HEAVILY REDUCED BY W/ JOSIAH JACK, YOU'VE BEEN WARNED
+// HEAVILY REDUCED BY W. JOSIAH JACK, YOU'VE BEEN WARNED
 #ifndef miniaudio_h
 #define miniaudio_h
 #define MA_STRINGIFY(x)     #x

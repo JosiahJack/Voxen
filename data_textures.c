@@ -1,28 +1,10 @@
 // data_textures.c - Load textures from raw .png files on disk
-#include "os.h"
-#include "voxen.h"
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
-#include "External/stb_image.h"
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <string.h>
-#include <unistd.h>
-
 DataParser texture_parser;
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
 uint16_t loadedTexturesMaxIndex;
 bool doubleSidedTexture[MAX_VALID_TEXTURE];
 bool transparentTexture[MAX_VALID_TEXTURE];
-
-typedef union {
-    uint32_t u32;
-    uint8_t  u8[4];
-} Packed4;
 
 void LoadTextures(void) {
     double start_time = get_time();
@@ -95,7 +77,7 @@ void LoadTextures(void) {
         doubleSidedTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_DOUBLESIDED) > 0 ? 1 : 0;
         transparentTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_TRANSPARENT) > 0 ? 1 : 0;
         int fd = open(texture_parser.entries[currentIndex].path, O_RDONLY);
-        if (fd < 0) { DualLogError("Failed to open %s: %s\n", texture_parser.entries[currentIndex].path, strerror(errno)); OS_Exit(1); }
+        if (fd < 0) { DualLogError("Failed to open %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
 
         struct stat st;
         fstat(fd, &st);

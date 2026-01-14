@@ -1,17 +1,4 @@
 // data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
-#include "os.h"
-#include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include "voxen.h"
-#include <assimp/defs.h>
-#include <assimp/cimport.h>
-#include <assimp/scene.h>
-
 DataParser model_parser;
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
@@ -318,6 +305,6 @@ void LoadModels(void) {
     glFlush();
     glFinish();
     DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
-//     cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
+    cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
     DebugRAM("After Load Models");
 }

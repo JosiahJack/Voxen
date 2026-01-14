@@ -1,9 +1,9 @@
 // audio.c
 #include <string.h>
 #include <stdio.h>
-#include "os.h"
+// #include "os.h"
 #include "./External/miniaudio.h"
-#include "voxen.h"
+// #include "voxen.h"
 
 #define MAX_CHANNELS 16
 #define MAX_AMBIENT_NOISES 128
@@ -12,6 +12,8 @@ ma_sound mp3_sounds[2]; // For crossfading
 ma_sound wav_sounds[MAX_CHANNELS];
 int32_t wav_count = 0;
 // Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
+//        play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
+//        play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f,100);
 
 void InitializeAudio(void) {
     ma_result result;
@@ -115,7 +117,7 @@ static const AmbientDef* ambient_def_by_index(uint16_t idx) {
     return NULL;
 }
 
-void UpdateAmbientSounds(void) {
+inline void UpdateAmbientSounds(void) {
     const Vector3* player = &instances[PLAYER1].position;
     const float max_range = 7.68f;
     const float max_range_sq = max_range * max_range;

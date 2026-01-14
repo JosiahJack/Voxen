@@ -60,7 +60,7 @@ float GetBasePlayerSpeed(bool running) {
 
     float retval = PLAYER_MAX_WALK_SPEED;
     float bonus = 0.0f;
-    if (boosterActive > 0u) bonus = PLAYER_BOOSTER_SPEED_BOOST;
+    if (boosterActive) bonus = PLAYER_BOOSTER_SPEED_BOOST;
     BodyState bodyState = instances[PLAYER1].bodyState;
     switch (bodyState) {
         case BodyState_Standing:      retval = PLAYER_MAX_WALK_SPEED;   break;

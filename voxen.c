@@ -1,19 +1,31 @@
 // voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
 #include "External/stb_image.h"
 #include "Shaders/shaders.h"
-#include "todo.h"
+#include "entity.c"
+#include "data_textures.c"
 #include "data_models.c"
 #include "dynamic_culling.c"
 #include "credits.c"
+#include "audio.c"
+#include "input.c"
 const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
 GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
-uint8_t queuedLevelToLoad = 3;
+uint8_t queuedLevelToLoad = 255u;
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
@@ -30,292 +42,26 @@ bool lightDirty[LIGHT_COUNT];
 static float lightView[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightView[i][face][0 ... 15]
 static float lightViewProj[LIGHT_COUNT][6][4][4]; // Array of Array of 6 Arrays of 16 floats (matrix 4x4).  lightViewProj[i][face][0 ... 15]
 FrustumPlane lightFrustumPlanes[LIGHT_COUNT][6][6]; // Array of Array of 6 Arrays of FrustumPlane structs (four floats).  lightFrustumPlanes[i][face][.nx,.ny,, .nz, .d]
+uint16_t loadedLights, editModeSelection = 682, editModeTestEntityDefinition = 0; // Test instance and its model index
 FrustumPlane playerFrustumPlanes[6];
-uint16_t editModeSelection = 682; // Test instance
-uint16_t editModeTestEntityDefinition = 0; // Test instance's model index
 float voxelMinCenterX, voxelMinCenterZ;
 VoxenShadowSystem voxen_Shadow_System;
-
-uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum) {
-    if (str == NULL || *str == '\0') { DualLogError("Invalid input blank string, from line[%d]: %s\n", lineNum+1, line); return 0; }
-    while (data_parser_isspace((char)*str)) str++;
-    if (*str == '-') { DualLogError("Invalid input, negative not allowed (%s)\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
-    char* endptr;
-    errno = 0;
-    unsigned long val = strtoul(str, &endptr, 10);
-    if (errno != 0 || val > UINT32_MAX) { DualLogError("Invalid input %s\n      from line[%d]: %s\n", str, lineNum+1, line); return 0; }
-    return (uint32_t)val;
-}
-
-uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT16_MAX) { DualLogError("Value out of range for uint16_t: %u\n      from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (uint16_t)retval;
-}
-
-uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t retval = parse_numberu32(str, line, lineNum);
-    if (retval > UINT8_MAX) { DualLogError("Value out of range for uint8_t: %u\n      from line[%d]: %s\n", retval, lineNum+1, line); return 0; }
-    return (uint8_t)retval;
-}
-
-bool parse_bool(const char* str, const char* line, uint32_t lineNum) {
-    uint32_t parseval = parse_numberu32(str, line, lineNum);
-    if (parseval > 1) DualLogWarn("Loaded %u\n      in place where expected a boolean from line[%u]: %s\n",parseval, lineNum+1, line);
-    return parseval > 0 ? true : false;
-}
-
-float parse_float(const char* str, const char* line, uint32_t lineNum) {
-    if (str == NULL || *str == '\0') { DualLogError("Invalid float input blank string, from line[%d]: %s\n", lineNum+1, line); return 0.0f; }
-    char* endptr;
-    errno = 0;
-    float val = strtof(str, &endptr);
-    if (errno != 0) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      gave errno %u\n", str, lineNum+1, line, errno); return 0.0f; }
-    if (*endptr != '\0') { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      missing null terminator, *endptr: %u\n", str, lineNum+1, line, *endptr); return 0.0f; }
-    if (endptr == str) { DualLogError("Invalid float input %s\n      from line[%d]: %s\n      end is equal to start\n", str, lineNum+1, line); return 0.0f; }
-    return val;
-}
-
-bool read_token(FILE *file, char *token, size_t max_len, char delimiter, bool *is_comment, bool *is_eof, bool *is_newline, uint32_t *lineNum) {
-    *is_comment = false;
-    *is_eof = false;
-    *is_newline = false;
-    size_t pos = 0;
-    int32_t c;
-    while ((c = fgetc(file)) != EOF && data_parser_isspace(c) && c != '\n');
-    if (c == EOF) { *is_eof = true; return false; }
-    if (c == '\n') { *is_newline = true; return false; }
-    
-    if (c == '/' && (c = fgetc(file)) == '/') {
-        *is_comment = true;
-        while ((c = fgetc(file)) != EOF && c != '\n');
-        return false;
-    }
-    
-    if (c != EOF) token[pos++] = c;
-    while ((c = fgetc(file)) != EOF && c != delimiter && c != '\n' && pos < max_len - 1) { token[pos++] = c; }
-    token[pos] = '\0';
-    if (pos >= max_len - 1) DualLogError("Token truncated at line %u\n", *lineNum);
-    if (c == EOF) *is_eof = 1u;
-    else if (c == '\n') *is_newline = 1u;
-    return pos > 0;
-}
-
-// Unique set separate from savedata path and resource data to keep it focussed
-bool process_gamedata_key_value(Entity *entry, const char *key, const char *value, const char *line, uint32_t lineNum) {
-    if (!key || !value) { DualLogError("Invalid key-value pair at line %u: %s\n", lineNum, line); return false; }
-    
-    while (data_parser_isspace(*key)) key++;
-    while (data_parser_isspace(*value)) value++;
-    char trimmed_key[256];
-    char trimmed_value[256];
-    strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
-    strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
-    trimmed_key[sizeof(trimmed_key) - 1] = '\0';
-    trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-    char *key_end = trimmed_key + strlen(trimmed_key) - 1;
-    char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-    while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
-    while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
-    
-         if (strcmp(trimmed_key, "modname") == 0)         { strncpy(Sys_Global.global_modname, trimmed_value, sizeof(Sys_Global.global_modname) - 1); Sys_Global.global_modname[sizeof(Sys_Global.global_modname) - 1] = '\0'; entry->index = 0; } // Game/Mod Definition enforces setting entry index to 0 here, at least one of these must do it.  The game definition only has one index, 0.
-    else if (strcmp(trimmed_key, "levelcount") == 0)      Sys_Global.numLevels = parse_numberu8(trimmed_value, line, lineNum);
-    else if (strcmp(trimmed_key, "startlevel") == 0)      Sys_Global.startLevel = parse_numberu8(trimmed_value, line, lineNum);
-    else return false;
-    return true;
-}
-
-// Load Game/Mod Definition
-void ParseGameData(void) {
-    double start_time = get_time();
-    const char* filename = "./Data/gamedata.txt";
-    DualLog("Loading game definition from %s...",filename);    
-    Entity entry;
-    InitializeEntity(&entry);
-    FILE *gamedatfile = fopen(filename, "r");
-    if (!gamedatfile) { DualLogError("\nCannot open %s\n", filename); DualLogError("Could not parse %s!\n", filename); OS_Exit(1); }
-    
-    uint32_t lineNum = 0;
-    bool is_eof;
-    while (!feof(gamedatfile)) {
-        char token[256];
-        bool is_comment, is_newline;
-        if (!read_token(gamedatfile, token, sizeof(token), ':', &is_comment, &is_eof, &is_newline, &lineNum)) {
-            if (is_comment || is_newline) { lineNum += is_newline; continue; }
-        }
-        
-        char key[256];
-        strncpy(key, token, sizeof(key) - 1);
-        key[sizeof(key) - 1] = '\0';
-        if (!read_token(gamedatfile, token, sizeof(token), '\n', &is_comment, &is_eof, &is_newline, &lineNum)) continue;
-        
-        process_gamedata_key_value(&entry, key, token, key, lineNum);
-        lineNum += 1;
-    }
-    
-    fclose(gamedatfile);
-    if (strcmp(Sys_Global.global_modname, "Citadel") == 0) Sys_Global.global_modIsCitadel = true;
-    DualLog(" loaded Game Definition for %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
-}
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-truncation"
-bool parse_data_file(DataParser *parser, const char *filename) {
-    FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s: %s\n", filename, strerror(errno)); return false; }
-    
-    char line[1024];
-    uint32_t lineNum = 0;
-    uint32_t max_index = 0;
-    while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
-        lineNum++;        
-        char *start = line;
-        while (data_parser_isspace(*start)) start++;
-        char *end = start + strlen(start) - 1;
-        while (end > start && data_parser_isspace(*end)) { *end = '\0'; end--; }
-        if (*start == '\0' || (start[0] == '/' && start[1] == '/')) continue;
-        if (line[0] == '#') { continue; }
-
-        char *colon = strchr(start, ':');
-        if (colon && strncmp(start, "index", colon - start) == 0) {
-            char *value = colon + 1;
-            while (data_parser_isspace(*value)) value++;
-            uint32_t idx = parse_numberu32(value, line, lineNum);
-            if (idx > max_index) max_index = idx;
-       }
-    }
-
-    if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
-
-    uint32_t entry_count = max_index + 1;
-    if (entry_count > parser->capacity) {
-        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
-        parser->entries = new_entries;
-        for (uint32_t i = parser->capacity; i < entry_count; ++i) InitializeEntity(&parser->entries[i]);
-        parser->capacity = entry_count;
-    }
-    
-    parser->count = entry_count;
-    rewind(file);
-    Entity entry;
-    InitializeEntity(&entry);
-    int32_t entries_stored = 0;
-    lineNum = 0;
-    int32_t currentChild = -1;
-    while (fgets(line, sizeof(line), file)) {
-        lineNum++;
-        char *start = line;
-        if (strlen(start) < 3) continue; // Must have at least k:v, skip if shorter
-
-        while (data_parser_isspace(*start)) start++;
-        char *end = start + strlen(start) - 1;
-        while (end > start && data_parser_isspace(*end)) { *end = '\0'; end--; }
-        if (*start == '\0') continue; // Skip empty line
-        if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
-
-        if (*start == '#' && *(start + 1) != '#') {
-            // Store previous entry if valid
-            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
-                parser->entries[entry.index] = entry;
-                entries_stored++;
-            }
-            
-            // Start new entry
-            InitializeEntity(&entry);
-            strncpy(entry.path, start + 1, sizeof(entry.path) - 1);
-            entry.path[sizeof(entry.path) - 1] = '\0';
-            continue;
-        }
-
-        // Handle key-value pair
-        char *colon = strchr(start, ':');
-        if (colon) {
-            *colon = '\0';
-            char *key = start;
-            char *value = colon + 1;
-            while (data_parser_isspace(*key)) key++;
-            while (data_parser_isspace(*value)) value++;
-            if (*key && *value) {
-                while (data_parser_isspace(*key)) key++;
-                while (data_parser_isspace(*value)) value++;
-                char trimmed_key[256];
-                char trimmed_value[256];
-                strncpy(trimmed_key, key, sizeof(trimmed_key) - 1);
-                strncpy(trimmed_value, value, sizeof(trimmed_value) - 1);
-                trimmed_key[sizeof(trimmed_key) - 1] = '\0';
-                trimmed_value[sizeof(trimmed_value) - 1] = '\0';
-                char *key_end = trimmed_key + strlen(trimmed_key) - 1;
-                char *val_end = trimmed_value + strlen(trimmed_value) - 1;
-                while (key_end > trimmed_key && data_parser_isspace(*key_end)) *key_end-- = '\0';
-                while (val_end > trimmed_value && data_parser_isspace(*val_end)) *val_end-- = '\0';
-                if (strncmp(trimmed_key, "chunk_", 6) == 0) {
-                    strncpy(entry.path, trimmed_key, sizeof(entry.path) - 1);
-                    entry.path[sizeof(entry.path) - 1] = '\0';
-                } else {
-                         if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "persistent") == 0)        entry.persistent = parse_bool(trimmed_value, start, lineNum); // Didn't feel worthy of being considered an entflag so left separte
-                    else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "animated") == 0)          entry.animated = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "alttexture") == 0)           entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "altglowtexture") == 0)    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "spectexture") == 0)       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "normtexture") == 0)       entry.normIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "doublesided") == 0)       flag_set(&entry.entflags,ENTFLAG_DOUBLESIDED,parse_bool(trimmed_value, start, lineNum));
-                    else if (strcmp(trimmed_key, "transparent") == 0)       flag_set(&entry.entflags,ENTFLAG_TRANSPARENT,parse_bool(trimmed_value, start, lineNum));
-                    else if (strcmp(trimmed_key, "cardchunk") == 0)         flag_set(&entry.entflags,ENTFLAG_CARDCHUNK,  parse_bool(trimmed_value, start, lineNum));
-
-                    else if (strcmp(trimmed_key, "collider") == 0)          entry.collider = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "collider_centerx") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "collider_centery") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "collider_centerz") == 0)  entry.colliderCenter.x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "collider_sizex") == 0)    entry.colliderSize.x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "collider_sizey") == 0)    entry.colliderSize.y = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "collider_sizez") == 0)    entry.colliderSize.z = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "colliderMeshIndex") == 0) entry.colliderMeshIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "mass") == 0)              entry.mass = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "linearDrag") == 0)        entry.linearDrag = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "angularDrag") == 0)       entry.angularDrag = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "kinematic") == 0)         flag_set(&entry.entflags,ENTFLAG_KINEMATIC, parse_bool(trimmed_value, start, lineNum));
-                    else if (strcmp(trimmed_key, "useGravity") == 0)        flag_set(&entry.entflags,ENTFLAG_USEGRAVITY,parse_bool(trimmed_value, start, lineNum));
-                    else if (strcmp(trimmed_key, "bounciness") == 0)        entry.bounciness = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "dynamicFriction") == 0)   entry.dynamicFriction = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry.frictionCombine = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry.bounceCombine = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "numclips") == 0)          entry.numclips = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "animationNum") == 0)      entry.animationNum = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "changeMatOnActive") == 0) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
-                    else if (strcmp(trimmed_key, "blinkWhenActive") == 0)   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
-                    else if (strcmp(trimmed_key, "noshadows") == 0)         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value, start, lineNum));
-
-                    else if (strcmp(trimmed_key, "volume") == 0)            entry.volume = parse_float(trimmed_value, start, lineNum);
-                    
-                    else if (strcmp(trimmed_key, "##child") == 0) {
-                        ++currentChild;
-                        if (currentChild >= MAX_CHILD_COUNT) { DualLogError("Too many children %u! Minivan is full!!\n", currentChild); OS_Exit(1); }
-                        
-                        entry.child[currentChild] = parse_numberu16(trimmed_value, start, lineNum);
-                    } else if (strcmp(trimmed_key, "child_offsetx") == 0)    entry.child_offset[currentChild].x = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child_offsety") == 0)    entry.child_offset[currentChild].y = parse_float(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "child_offsetz") == 0)    entry.child_offset[currentChild].z = parse_float(trimmed_value, start, lineNum);
-                }
-            } else DualLogWarn("Invalid key-value pair at line %u: %s\n", lineNum, start);
-        } else {
-            DualLogWarn("No colon found in line %u: %s\n", lineNum, start);
-        }
-    }
-
-    // Store last entry
-    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
-        parser->entries[entry.index] = entry;
-        entries_stored++;
-    }
-
-    fclose(file);
-    return true;
-}
-#pragma GCC diagnostic pop
+float lightMinIntensity[LIGHT_COUNT];
+float lightMaxIntensity[LIGHT_COUNT];
+bool lightOn[LIGHT_COUNT];
+bool lightLerpOn[LIGHT_COUNT];
+bool lightLerpUp[LIGHT_COUNT];
+uint8_t lightCurrentStep[LIGHT_COUNT];
+float lightLerpValue[LIGHT_COUNT];
+float lightLerpTime[LIGHT_COUNT];
+float lightLerpStepTime[LIGHT_COUNT];
+float lightLerpStartTime[LIGHT_COUNT];
+uint8_t lightIntervalStepsLength[LIGHT_COUNT];
+float lightIntervalSteps[LIGHT_COUNT][30];
+uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
+float intervalStepisLerping[LIGHT_COUNT][30];
+bool lightCastsShadows[LIGHT_COUNT];
+bool boosterActive;
 
 GLuint CompileShader(GLenum type, const char *source, const char *shaderName) {
     GLuint shader = glCreateShader(type);
@@ -443,68 +189,11 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
             *voxelsNeedUpdated = true;
             uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
 
-            // Remove light from all voxel lists at current location before moving light
-            Vector3 lightPosOld = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-            uint16_t voxXold = (uint16_t)clamp((int32_t)vfloor((lightPosOld.x - voxelMinCenterX) / VOXEL_SIZE), 0, 511);
-            uint16_t voxZold = (uint16_t)clamp((int32_t)vfloor((lightPosOld.z - voxelMinCenterZ) / VOXEL_SIZE), 0, 511);
-            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-            int r1 = vceil(range * (1.0f / VOXEL_SIZE));
-            int voxMinX = vmax(voxXold - r1,0);
-            int voxMaxX = vmin((int)voxXold + r1,511);
-            int voxMinZ = vmax(voxZold - r1,0);
-            int voxMaxZ = vmin((int)voxZold + r1,511);
-//             uint32_t subtractCount = 0;
-            for (int ix = voxMinX; ix <= voxMaxX; ++ix) {
-                for (int iz = voxMinZ; iz <= voxMaxZ; ++iz) {
-                    uint32_t voxelIndex = (iz * 512) + ix;
-                    for (int i=0; i<MAX_LIGHTS_PER_VOXEL; ++i) {
-                        uint32_t currentVoxLightListIndex = (voxelIndex * MAX_LIGHTS_PER_VOXEL) + i;
-                        if (voxelLightLists[currentVoxLightListIndex] == lightIdx) {
-                            voxelLightLists[currentVoxLightListIndex] = VOXEL_LIGHT_IDX_CLEAR_VALUE; // Found this light, clear it.
-                            for (uint32_t j=currentVoxLightListIndex;j<vmin(voxelLightListCounts[voxelIndex],MAX_LIGHTS_PER_VOXEL);++j) {
-                                voxelLightLists[j] = voxelLightLists[j+1]; // Shift remaining list down
-                            }
-                            
-                            if (voxelLightListCounts[voxelIndex] > 0) voxelLightListCounts[voxelIndex]--; // Decrease count for this list.
-//                             subtractCount++;
-                            break; // Light only should exist once in the list.
-                        }
-                    }
-                }
-            }
-            
-//             if (subtractCount > 0) DualLog("Light %u subtracted itself from %u voxels' lists with range %f, at voxel %u, %u with vox with vmins %u,%u and vmaxs %u,%u\n", lightIdx, subtractCount, (double)range, voxXold, voxZold, voxMinX, voxMinZ, voxMaxX, voxMaxZ);
-
             // Update to new position
             lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
             lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lightsNewPosition[lightIdx].y;
             lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lightsNewPosition[lightIdx].z;
             Vector3 lightPos = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-
-            // Now update voxel light lists for voxels in range of new light position
-            uint16_t voxX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - voxelMinCenterX) / VOXEL_SIZE), 0, 511);
-            uint16_t voxZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - voxelMinCenterZ) / VOXEL_SIZE), 0, 511);
-            int r2 = vceil(range * (1.0f / VOXEL_SIZE));
-            voxMinX = vmax(voxXold - r2,0);
-            voxMaxX = vmin((int)voxX + r2,511);
-            voxMinZ = vmax(voxZold - r2,0);
-            voxMaxZ = vmin((int)voxZ + r2,511);
-//             uint32_t voxelCountForLight = 0;
-            for (int ix = voxMinX; ix <= voxMaxX; ++ix) {
-                for (int iz = voxMinZ; iz <= voxMaxZ; ++iz) {
-                    uint32_t voxelIndex = (iz * 512) + ix;
-                    if (voxelLightListCounts[voxelIndex] >= MAX_LIGHTS_PER_VOXEL) continue; // Voxel is full, skip it.
-
-                    uint32_t currentVoxLightListIndex = (voxelIndex * MAX_LIGHTS_PER_VOXEL) + voxelLightListCounts[voxelIndex];
-                    voxelLightLists[currentVoxLightListIndex] = lightIdx; // Put light into the list for this voxel.
-                    voxelLightListCounts[voxelIndex]++;
-//                     voxelCountForLight++;
-//                     if (voxelLightListCounts[voxelIndex] >= MAX_LIGHTS_PER_VOXEL) DualLogWarn("Voxel filled up at voxel %u, %u for light at %f, %f\n", ix, iz, (double)lightPos.x, (double)lightPos.z);
-                }
-            }
-            
-//             if (voxelCountForLight > 0) DualLog("Light %u added itself to %u voxels' lists with range %f, at voxel %u, %u with vox with vmins %u,%u and vmaxs %u,%u\n", lightIdx, voxelCountForLight, (double)range, voxXold, voxZold, voxMinX, voxMinZ, voxMaxX, voxMaxZ);
-
             #pragma GCC unroll 6
             for (int j=0;j<6;++j) {
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
@@ -515,6 +204,7 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
             uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
             uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
             int lightCellIdx = (cellZ * WORLDX) + cellX;
+            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
             int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
             lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
             if (!lightInPVS[lightIdx]) {
@@ -561,19 +251,17 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
     }
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, Sys_Render.lightsID); glBufferData(GL_SHADER_STORAGE_BUFFER, loadedLights * LIGHT_DATA_SIZE * sizeof(float), lights, GL_DYNAMIC_DRAW);
-//     if (*voxelsNeedUpdated) {
-//         float px = instances[PLAYER1].position.x; float py = instances[PLAYER1].position.y; float pz = instances[PLAYER1].position.z;
-//         float fx = instances[PLAYER1].forward.x;  float fy = instances[PLAYER1].forward.y;  float fz = instances[PLAYER1].forward.z;
-//         glUseProgram(Sys_Render.voxelUpdateShaderProgram);
-//         glUniform3f(5, px, py, pz);
-//         glUniform3f(6, fx, fy, fz);
-//         GLuint groupX_voxels = (512 + 31) / 32;
-//         GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
-//         glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
-//     }
-
-    glNamedBufferData(Sys_Render.voxelLightListCountsID, VOXEL_COUNT * sizeof(uint32_t), voxelLightListCounts, GL_DYNAMIC_DRAW);
-    glNamedBufferData(Sys_Render.uniqueLightListsID, VOXEL_COUNT * 24 * sizeof(uint32_t), voxelLightLists, GL_DYNAMIC_DRAW);
+    if (*voxelsNeedUpdated) {
+        float px = instances[PLAYER1].position.x; float py = instances[PLAYER1].position.y; float pz = instances[PLAYER1].position.z;
+        float fx = instances[PLAYER1].forward.x;  float fy = instances[PLAYER1].forward.y;  float fz = instances[PLAYER1].forward.z;
+        glUseProgram(Sys_Render.voxelUpdateShaderProgram);
+        glUniform3f(5, px, py, pz);
+        glUniform3f(6, fx, fy, fz);
+        GLuint groupX_voxels = (512 + 31) / 32;
+        GLuint groupZ_voxels = (512 + 31) / 32; // Actually just a local size y, but for z axis voxels
+        glDispatchCompute(groupX_voxels,groupZ_voxels, 1);
+    }
+    
     return *voxelsNeedUpdated;
 }
 
@@ -626,11 +314,10 @@ void RenderUIImage(float x, float y, float width, float height, uint32_t texInde
 }
 
 __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
-    return (   cursorPosition_x >= startX && cursorPosition_x <= endX     // 0 == left
-            && cursorPosition_y >= endY   && cursorPosition_y <= startY); // 0 == top
+    return (cursorPosition_x >= startX && cursorPosition_x <= endX /* 0 == left */ && cursorPosition_y >= endY && cursorPosition_y <= startY); /* 0 == top */
 }
 
-Color textColors[TEXT_COLOR_COUNT] = {
+Color textColors[9] = {
     {         1.0f,         1.0f,          1.0f, 1.0f}, // 0 White
     { 0.890196078f, 0.874509804f,          0.0f, 1.0f}, // 1 Yellow
     { 0.623529412f, 0.611764706f,          0.0f, 1.0f}, // 2 Dark Yellow 0.8902f * 0.7f, 0.8745f * 0.7f, 0f
@@ -641,6 +328,7 @@ Color textColors[TEXT_COLOR_COUNT] = {
     { 0.941176471f, 0.282352941f,  0.298039216f, 1.0f}, // 7 StopD Red Highlight
     { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}  // 8 StopD Red Pause Title
 };
+
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
 void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char * restrict format, ...) {
     va_list args;
@@ -664,7 +352,30 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
     float paddingUV = 12.0f / (float)FONT_ATLAS_SIZE; // This is for the black outline around all text for readability.
     float borderWidthPixels = 2.0f;
     while (*p) {
-        uint32_t codepoint = DecodeUTF8(&p);
+        // Decode UTF8
+        const unsigned char *s = (const unsigned char *)p;
+        uint32_t codepoint = 0;
+        if (*s < 0x80) {          // 1-byte ASCII
+            codepoint = *s++;
+        } else if ((*s & 0xE0) == 0xC0) { // 2-byte
+            codepoint  = (*s & 0x1F) << 6;
+            codepoint |= (s[1] & 0x3F);
+            s += 2;
+        } else if ((*s & 0xF0) == 0xE0) { // 3-byte
+            codepoint  = (*s & 0x0F) << 12;
+            codepoint |= (s[1] & 0x3F) << 6;
+            codepoint |= (s[2] & 0x3F);
+            s += 3;
+        } else if ((*s & 0xF8) == 0xF0) { // 4-byte
+            codepoint  = (*s & 0x07) << 18;
+            codepoint |= (s[1] & 0x3F) << 12;
+            codepoint |= (s[2] & 0x3F) << 6;
+            codepoint |= (s[3] & 0x3F);
+            s += 4;
+        } else {
+            s++; // invalid byte
+        }
+        p = (const char *)s;
         characterCount++;
         if (codepoint == '\n' || characterCount > 120) {
             xpos = x;
@@ -745,16 +456,11 @@ void NewGame(void) {
     instances[PLAYER1].dynamicFriction = 0.6f;
     instances[PLAYER1].staticFriction = 0.8f;
     instances[PLAYER1].frictionCombine = PHYS_COMBINE_MUL;
-//     instances[PLAYER1].physics_handle = Physics_CreateCharacterCapsule(instances[PLAYER1].colliderSize.x, instances[PLAYER1].colliderSize.y, instances[PLAYER1].position, PhysicsLayer_Player, instances[PLAYER1].mass, false); // false == dynamic
-//     Physics_CreatePlayer(instances[PLAYER1].position);
     LoadLevel(Sys_Global.startLevel); // Must be after entities!
     Sys_Global.pauseRelativeTime = 0.0;
     Sys_Global.last_physics_time = get_time();
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
 }
-
-#define MAX_DEBUG_LINE_VERTS 4096                // 2048 lines max per frame
-float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
 
 void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     double init_start_time = get_time();
@@ -837,21 +543,25 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glDepthMask(GL_TRUE); // Always true, set just once ever.
     glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
     int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
-    int windowIconFileSize = OS_FileSize(fp);
-    uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
-    OS_Close(fp);
-    int w = 1, h = 1;
-    stbi__arena_init();
-    unsigned char* pixels = stbi_load_from_memory(file_buffer, windowIconFileSize, &w, &h);
-    if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
-    
-    GLFWimage image;
-    image.width  = w;
-    image.height = h;
-    image.pixels = pixels;
-    glfwSetWindowIcon(Sys_Global.window, 1, &image);
-    file_buffer = OS_DeallocateRAM(file_buffer, windowIconFileSize);
-    stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
+    if (fp == 0) {
+        int windowIconFileSize = OS_FileSize(fp);
+        uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
+        if (!file_buffer) { DualLogError("Could not open backed buffer for ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
+        
+        OS_Close(fp);
+        int w = 1, h = 1;
+        stbi__arena_init();
+        unsigned char* pixels = stbi_load_from_memory(file_buffer, windowIconFileSize, &w, &h);
+        if (!pixels) { DualLogError("Failed to load icon: ./Textures/UI/menudot1.png\n"); OS_Exit(1); }
+        
+        GLFWimage image;
+        image.width  = w;
+        image.height = h;
+        image.pixels = pixels;
+        glfwSetWindowIcon(Sys_Global.window, 1, &image);
+        file_buffer = OS_DeallocateRAM(file_buffer, windowIconFileSize);
+        stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
+    }
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);
     LoadEntities();
@@ -870,11 +580,11 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
     Sys_Render.uniqueLightListsID       = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-//     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
 
+float debugLineBuffer[MAX_DEBUG_LINE_VERTS * 3]; // xyz only
 void DrawDebugLines(float* viewProj) {    
     glNamedBufferSubData(Sys_Render.debugLinesVBO, 0, Sys_Dx.debugLineVertCount * sizeof(float), debugLineBuffer);
     glUseProgram(Sys_Render.debugUnlitShaderProgram);
@@ -1001,13 +711,6 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
     Sys_Dx.debugLineFinished = Sys_Global.current_time + 3.0;
 }
 
-void UpdateGameplay(void) {    
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
-    if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
-    UpdateAmbientSounds();
-    UpdateAnims();
-}
-
 #define SHADOW_NEARMESH_MAX 384 // 350 was too low for light 712 on security atrium
 #define SHADOW_LIGHT_THRESH 0.015f
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
@@ -1077,8 +780,7 @@ void RenderShadowmaps(void) {
     for (uint32_t i=0;i<numLightsShadowmapsToRender;++i) { if (lightDirty[candidates[i].index]) foundDirtyLight = true; }
     numLightsShadowmapsToRender = foundDirtyLight ? numLightsShadowmapsToRender : 0;
     if (numLightsShadowmapsToRender > 0) { // Added since there is now work between here and the for loop so this is beneficial to check.
-        // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
-        glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
+        glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Clear shadowmaps.  One might think that this would be less performant than standard shadowmap FBO with gl clears and textures but in fact this is faster on all but the oldest hardware (e.g. 10yrs old is fine, 13yrs suffers a small hit).
         for (uint32_t c=0;c<numLightsShadowmapsToRender;++c) {
             glUniform1ui(0, c);
             GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
@@ -1117,7 +819,7 @@ void RenderShadowmaps(void) {
         uint16_t numShadowingLightsHandled = 0, currentModelType = 0, currentTexIndex = 0;
         bool currentIsTransparent = 0;
         for (uint32_t c = 0; c < numLightsShadowmapsToRender; ++c) { // Render top MAX_SHADOWMAPS candidates
-            uint16_t lightIdx = candidates[c].index;
+            uint16_t lightIdx = candidates[c].index;            
             float effectiveRadius = vmin(candidates[c].radius, 15.36f);
             Vector3 lightPos = candidates[c].position;
             uint16_t nearbyMeshCount = 0;
@@ -1136,16 +838,11 @@ void RenderShadowmaps(void) {
             }
 
             if (nearbyMeshCount < 1) continue;
-            
-//             glUseProgram(Sys_Render.shadowmapsClearShaderProgram); // Way faster
-//             glUniform1ui(0, c);
-//             GLuint groupX_shadClear = ((SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) + 31) / 32;
-//             glDispatchCompute(groupX_shadClear,6,1);
-          
-//             glUseProgram(Sys_Render.shadowmapsShaderProgram);
+
             glUniform3f(3, candidates[c].position.x, candidates[c].position.y, candidates[c].position.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
             bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, candidates[c].position, 0.64f); // Use some radius for floating point errors
+            uint8_t numFacesRendered = 0;
             #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                            
                 if (!lightPositionInPlayerFrustum) { // Check if at least one of the four points of this cubemap face's frustum are within the player's frustum
@@ -1264,8 +961,10 @@ void RenderShadowmaps(void) {
                     Sys_Dx.drawCallsRenderedThisFrame++;
                     Sys_Dx.verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
+                
+                numFacesRendered++;
             }
-
+            
             shadowmapOffsetHead += (SHADOW_MAP_SIZE * SHADOW_MAP_SIZE) * 6;
             numShadowingLightsHandled++;
         }
@@ -1587,7 +1286,8 @@ int32_t main(int32_t argc, char* argv[]) {
     Sys_Global.absoluteTime = Sys_Global.pauseRelativeTime = get_time();
     while(1) { // Main Loop
         if (glfwWindowShouldClose(Sys_Global.window)) OS_Exit(0);
-        
+        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
+       
         // Update Time
         Sys_Global.current_time = get_time();
         double frame_time = Sys_Global.current_time - Sys_Global.last_topframe_time;
@@ -1595,11 +1295,11 @@ int32_t main(int32_t argc, char* argv[]) {
         Sys_Global.last_topframe_time = Sys_Global.current_time;
         if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += frame_time;
     
+        // Update Events, calls Physics()
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements()
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
-        InputClearRisingAndFallingEdges();
-        // Update Events, calls Physics()
+        InputClearRisingAndFallingEdges();        
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
         if (!log_playback && !Sys_Global.gamePaused && !Sys_Global.menuActive && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
             Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
@@ -1614,10 +1314,14 @@ int32_t main(int32_t argc, char* argv[]) {
         }
 
         if (EventQueueProcess()) OS_Exit(1); // Do everything
-    
-        if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }
+            
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) { // Update Gameplay
+            if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
+            if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
+            UpdateAmbientSounds();
+            UpdateAnims();
+        }
         
-        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateGameplay();
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateVoxelsAndInstances();
         Render();
         Sys_Dx.globalFrameNum++;

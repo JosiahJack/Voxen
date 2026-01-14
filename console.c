@@ -3,7 +3,6 @@
 #include <stdlib.h> // For atoi
 #include <stdio.h> // For snprintf
 #include "voxen.h"
-#include "todo.h"
 
 #define MAX_HISTORY 7
 static int32_t currentEntryLength = 0;
@@ -82,7 +81,7 @@ __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd
         if (c1 != c2) return 0;
     }
 
-    return *cmd == '\0' && (*input == '\0' || isspace((unsigned char)*input) || *input == '_' || *input == '\0');
+    return *cmd == '\0' && (*input == '\0' || data_parser_isspace((unsigned char)*input) || *input == '_' || *input == '\0');
 }
 
 static void cmd_noclip(void) {
@@ -196,7 +195,9 @@ static void cmd_summon(int itemConstIndex) {
 static void cmd_printent(int entityIndex) {
     if (entityIndex < 0 || entityIndex > INSTANCE_COUNT) { CenterStatusPrint("Enter entity instance index between 0 and %u",INSTANCE_COUNT); return; }
     
-    DualLogEntityInstance(entityIndex);
+    #ifdef DEBUG_ENTITIES
+        DualLogEntityInstance(entityIndex);
+    #endif
 }
 
 static void cmd_notarget(void) { Sys_Cheats.notarget = !Sys_Cheats.notarget; CenterStatusPrint("notarget: %s", Sys_Cheats.notarget ? voxen_Text.stringTable[1000] : voxen_Text.stringTable[717]); }
@@ -395,11 +396,11 @@ void ProcessConsoleCommand(const char* command) {
     strncpy(ts, command, sizeof(ts)-1);
     ts[sizeof(ts)-1] = '\0';
     const char* command_trimmed = ts;
-    while (*command_trimmed && isspace((unsigned char)*command_trimmed)) command_trimmed++;
+    while (*command_trimmed && data_parser_isspace((unsigned char)*command_trimmed)) command_trimmed++;
     const char* space = command_trimmed;
-    while (*space && !isspace((unsigned char)*space)) space++;
+    while (*space && !data_parser_isspace((unsigned char)*space)) space++;
     const char* arg_start = space;
-    while (*arg_start && isspace((unsigned char)*arg_start)) arg_start++;
+    while (*arg_start && data_parser_isspace((unsigned char)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
     for (const ConsoleCommand* cmd = g_ConsoleCommands; cmd->name; ++cmd) {

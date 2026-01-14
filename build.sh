@@ -79,14 +79,16 @@ EOF
 
 CC=gcc
 export CC=$CC
-CFLAGS="-pipe -fno-ident -fno-asynchronous-unwind-tables -fstack-protector-all -fdata-sections -ffunction-sections -s -fno-omit-frame-pointer -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla -std=c11 -Wall -Wextra -Wdouble-promotion -D_FORTIFY_SOURCE=2 -Wformat=2 -Wshadow -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -Werror=implicit-function-declaration -Og -march=haswell -mtune=haswell -D_GNU_SOURCE"
-LDFLAGS="-Wl,--gc-sections -L./External -lassimp -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL -lfontconfig"
-SOURCES="voxen.c matvecquat.c physics.c audio.c input.c helpers.c console.c event.c hardware.c data_text.c entity.c data_textures.c data_fonts.c os.c todo.c"
+CFLAGS="-pipe -fno-ident -fdata-sections -ffunction-sections -g1 -fno-omit-frame-pointer -fstrict-aliasing -Wstrict-aliasing=2 \
+       -fno-common -Walloca -Wstack-usage=262144 -Wvla -std=c11 -Wall -Wextra -Wdouble-promotion -Wformat=2 -Wshadow -Wnull-dereference \
+       -Wstrict-prototypes -Wno-overlength-strings -Werror=implicit-function-declaration -Og -march=haswell -mtune=haswell -D_GNU_SOURCE"
+LDFLAGS="-Wl,--gc-sections -L./External -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL -lfontconfig"
+SOURCES="voxen.c matvecquat.c physics.c helpers.c console.c event.c level.c data_parser.c data_text.c data_fonts.c os.c todo.c"
 export CFLAGS=$CFLAGS
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 cp ./External/glad/glad.o "$TEMP_DIR"/
-mold -run g++ "$TEMP_DIR"/*.o $LDFLAGS -o voxen $LDFLAGS #g++ for linker to fix compile issues manually linking in Assimp .o files
+mold -run gcc "$TEMP_DIR"/*.o $LDFLAGS -o voxen $LDFLAGS #g++ for linker to fix compile issues manually linking in Assimp .o files
 link_status=$?
 if [ $link_status -ne 0 ]; then
     echo "ERROR: Linking failed."

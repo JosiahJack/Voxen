@@ -2,11 +2,9 @@
 // #include "voxen.h" limited includes
 #define FONT_GEN // Turn on when wanting to rebuild Font Atlases
 #include "os.h"
-#include <malloc.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/types.h>
+#include <unistd.h>
+#include <malloc.h>
 #include "./External/glad/gl.h"
 #include "./External/glfw3.h"
 #include "voxen.h"
@@ -50,6 +48,7 @@ typedef struct {
 static stbtt_fontinfo primaryFontInfo;
 static stbtt_fontinfo secondaryFontInfo;
 static unsigned char *primaryFontData;
+static unsigned char *sec_data;
 #ifdef FONT_GEN
     static int32_t numFallbackFonts = 0;
     static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
@@ -144,31 +143,23 @@ float TextWidth(const char *utf8, int fontID) {
 }
 
 #ifdef FONT_GEN
-static LoadedFont *LoadFallbackFont(const char *path) {
+static LoadedFont *LoadFallbackFont(char *path) {
     for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
         if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
     }
 
     if (numFallbackFonts >= MAX_FALLBACK_FONTS) return NULL;
 
-    FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
-    
-    fseek(f, 0, SEEK_END);
-    size_t size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    unsigned char *data = malloc(size);
-    if (!data) { fclose(f); return NULL; }
-    if (fread(data, 1, size, f) != size) { fclose(f); free(data); return NULL; }
-    
-    fclose(f);
+    int fd; int fontFileSize; uint8_t *data = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
+    if (fontFileSize <= 0 || data == NULL || fd < 0) { DualLogError("Could not find fallback font for %s\n", path); return NULL;}
+
     stbtt_fontinfo info;
-    if (!stbtt_InitFont(&info, data, 0)) { free(data); return NULL; }
+    if (!stbtt_InitFont(&info, data, 0)) { OS_DeallocateRAM(data, fontFileSize); return NULL; }
 
     LoadedFont *lf = &fallbackFonts[numFallbackFonts++];
     lf->path = strdup(path);
     lf->data = data;
-    lf->size = size;
+    lf->size = fontFileSize;
     lf->info = info;
     return lf;
 }
@@ -195,7 +186,7 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     char *fontfile = NULL;
     if (match) {
         FcChar8 *file8 = NULL;
-        if (FcPatternGetString(match, FC_FILE, 0, &file8) == FcResultMatch) fontfile = strdup((const char*)file8);
+        if (FcPatternGetString(match, FC_FILE, 0, &file8) == FcResultMatch) fontfile = strdup((char*)file8);
         FcPatternDestroy(match);
     }
     
@@ -214,48 +205,38 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
 }
 
 static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint64_t file_stamp, const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
-    FILE *f = fopen(path, "wb");
-    if (!f) { DualLogError("Failed to write font cache %s\n", path); OS_Exit(1); }
-
-    fwrite(&expected_glyphs, 1, 4, f);
-    fwrite(&file_stamp, 1, sizeof(uint64_t), f);
-    fwrite(&actual_packed, 1, 4, f);
-    fwrite(&fixed_advance, 1, 4, f);  // ← store
-    fwrite(packed, sizeof(stbtt_packedchar), actual_packed, f);
-    fwrite(bitmap, 1, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, f);
-    fclose(f);
+    int fd = OS_OpenWriteonly(path);
+    OS_Write(fd, &expected_glyphs, sizeof(uint32_t), path);
+    OS_Write(fd, &file_stamp, sizeof(uint64_t), path);
+    OS_Write(fd, &actual_packed, sizeof(uint32_t), path);
+    OS_Write(fd, &fixed_advance, sizeof(float), path);
+    OS_Write(fd, packed, sizeof(stbtt_packedchar) * actual_packed, path);
+    OS_Write(fd, bitmap, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, path);
+    OS_Close(fd);
 }
 #endif
 
 static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint64_t file_stamp, stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
-    int fd = open(path, O_RDONLY);
-    if (fd < 0) return false;
-
-    struct stat st;
-    if (fstat(fd, &st) < 0) { close(fd); DualLogWarn("fstat failed %s\n", path); return false; }
-    size_t sz = (size_t)st.st_size;
-    if (sz < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { close(fd); DualLogWarn("cache too small %s\n", path); return false; }
-
-    uint8_t *map = mmap(NULL, sz, PROT_READ, MAP_PRIVATE, fd, 0);
-    close(fd);
-    if (map == MAP_FAILED) { DualLogError("mmap failed %s\n", path); return false; }
+    int fd; int fontFileSize; uint8_t *map = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
+    if (!map || fd <= 0 || fontFileSize <= 0) return false;
+    if (fontFileSize < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { close(fd); DualLogWarn("cache too small %s\n", path); return false; }
 
     const uint8_t *p = map;
     int32_t file_expected = *(int32_t*)p; p += 4;
     if (file_expected != expected_glyphs) {
-        munmap(map, sz);
         DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs);
+        OS_DeallocateRAM(map, fontFileSize);
         return false;
     }
 
     uint64_t file_stamp_on_disk;
     memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
     p += sizeof(uint64_t);
-    if (file_stamp_on_disk != file_stamp) { munmap(map, sz); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
+    if (file_stamp_on_disk != file_stamp) { OS_DeallocateRAM(map, fontFileSize); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
 
     uint32_t actual_packed = *(uint32_t*)p; p += 4;
     float fixed_advance = *(float*)p; p += 4;
-    if (actual_packed > MAX_GLYPHS) { munmap(map, sz); return false; }
+    if (actual_packed > MAX_GLYPHS) { OS_DeallocateRAM(map, fontFileSize); return false; }
 
     memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
     *out_num = (int32_t)actual_packed;
@@ -265,7 +246,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     glTextureStorage2D(*out_tex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(*out_tex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, p);
     glFinish();
-    munmap(map, sz);
+    OS_DeallocateRAM(map, fontFileSize);
     glTextureParameteri(*out_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(*out_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTextureParameteri(*out_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -278,25 +259,15 @@ void InitFontAtlasses(void) {
     DualLog("Loaded    2 fonts...");
     const char *pri_path = "./Fonts/SystemShockText.ttf";
     const char *sec_path = "./Fonts/StopD.ttf";
-    FILE *f = fopen(pri_path, "rb"); if (!f) { DualLogError("Missing %s\n", pri_path); OS_Exit(1); }
-    
-    fseek(f, 0, SEEK_END); size_t pri_sz = (size_t)ftell(f); fseek(f, 0, SEEK_SET);
-    primaryFontData = malloc(pri_sz);
-    size_t read = fread(primaryFontData, 1, pri_sz, f); fclose(f);
-    if (read != (size_t)pri_sz) { DualLogError("Failed to read full SystemShockText.ttf at: %s\n", pri_path); OS_Exit(1); }
-    f = fopen(sec_path, "rb"); if (!f) { DualLogError("Missing %s\n", sec_path); OS_Exit(1); }
-    
-    fseek(f, 0, SEEK_END); size_t sec_sz = (size_t)ftell(f); fseek(f, 0, SEEK_SET);
-    unsigned char *sec_data = malloc(sec_sz);
-    read = fread(sec_data, 1, sec_sz, f); fclose(f);
-    if (read != (size_t)sec_sz) { DualLogError("Failed to read full StopD.ttf at: %s\n", sec_path); OS_Exit(1); }
+    int fd1; int pri_sz; primaryFontData = OS_OpenAndAllocateFileBufferReadonly(pri_path, &fd1, &pri_sz);
+    int fd2; int sec_sz; sec_data = OS_OpenAndAllocateFileBufferReadonly(sec_path, &fd2, &sec_sz);
+    if (fd1 <= 0 || fd2 <= 0 || pri_sz <= 0 || sec_sz <= 0 || primaryFontData == NULL || sec_data == NULL) { DualLogError("Could not open primary or secondary fonts\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); OS_Exit(1); }
 
     FileFingerprint fp1, fp2;
     if (!get_file_fingerprint(pri_path, &fp1)) DualLogError("File change detection failed for %s\n", pri_path);
     if (!get_file_fingerprint(sec_path, &fp2)) DualLogError("File change detection failed for %s\n", sec_path);
-        
     uint64_t fbx_stamp1 = file_stamp(&fp1);
     uint64_t fbx_stamp2 = file_stamp(&fp2);
     int32_t pri_expected = 0, sec_expected = 0;
@@ -305,12 +276,7 @@ void InitFontAtlasses(void) {
     const char *sec_cache = "./Fonts/StopD.vfnt";
     bool pri_hit = load_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, &numPackedGlyphs, &fixedNumberAdvanceWidth, &fontAtlasTex);
     bool sec_hit = load_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
-    if (pri_hit && sec_hit) {
-        free(primaryFontData); free(sec_data);
-        malloc_trim(0);
-        DualLog("in %.3f s\n", get_time() - t0);
-        return;
-    }
+    if (pri_hit && sec_hit) { DualLog("in %.3f s\n", get_time() - t0); return; }
 
     DualLog("Font ranges changed or .vfnt files not present – regenerating...\n");
 
@@ -395,38 +361,9 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
     free(bmp);
-    free(primaryFontData);
-    free(sec_data);
     malloc_trim(0);
     DualLog(" regenerated in %.3f s\n", get_time() - t0);
 #else
     DualLog("Font config not turned on, go set FONT_GEN at top of data_fonts.c\n");
 #endif
-}
-
-uint32_t DecodeUTF8(const char **p) {
-    const unsigned char *s = (const unsigned char *)*p;
-    uint32_t codepoint = 0;
-    if (*s < 0x80) {          // 1-byte ASCII
-        codepoint = *s++;
-    } else if ((*s & 0xE0) == 0xC0) { // 2-byte
-        codepoint  = (*s & 0x1F) << 6;
-        codepoint |= (s[1] & 0x3F);
-        s += 2;
-    } else if ((*s & 0xF0) == 0xE0) { // 3-byte
-        codepoint  = (*s & 0x0F) << 12;
-        codepoint |= (s[1] & 0x3F) << 6;
-        codepoint |= (s[2] & 0x3F);
-        s += 3;
-    } else if ((*s & 0xF8) == 0xF0) { // 4-byte
-        codepoint  = (*s & 0x07) << 18;
-        codepoint |= (s[1] & 0x3F) << 12;
-        codepoint |= (s[2] & 0x3F) << 6;
-        codepoint |= (s[3] & 0x3F);
-        s += 4;
-    } else {
-        s++; // invalid byte
-    }
-    *p = (const char *)s;
-    return codepoint;
 }
