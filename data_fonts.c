@@ -196,7 +196,9 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
     
     LoadedFont *lf = LoadFallbackFont(fontfile);
     free(fontfile);
-    malloc_trim(0);
+    #if defined(LINUX) || defined(ANDROID)
+        malloc_trim(0);
+    #endif
     if (!lf) return 0;
     
     glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
@@ -361,7 +363,9 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
     free(bmp);
-    malloc_trim(0);
+    #if defined(LINUX) || defined(ANDROID)
+        malloc_trim(0);
+    #endif
     DualLog(" regenerated in %.3f s\n", get_time() - t0);
 #else
     DualLog("Font config not turned on, go set FONT_GEN at top of data_fonts.c\n");

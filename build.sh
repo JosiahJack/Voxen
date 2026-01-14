@@ -118,16 +118,16 @@ EOF
 LINUX_CC="gcc"
 WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
-COMMON_CFLAGS="-pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra -fno-omit-frame-pointer \
-               -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla -Wdouble-promotion \
-               -Wformat=2 -Wshadow -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings -Werror=implicit-function-declaration \
-               -Og -D_GNU_SOURCE"
+COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra \
+               -fno-omit-frame-pointer -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla \
+               -Wdouble-promotion -Wformat=2 -Wshadow -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
+               -Werror=implicit-function-declaration -Og -D_GNU_SOURCE"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Windows -lassimp -lglfw3 -lgdi32 -lopengl32 -lm -l:libglfw3.5.dll -l:libminiaudio.0.11.22.dll"
+    LDFLAGS="-L./External/ -L./External/Windows -l:assimp-vc143-mt.dll -lglfw3 -lgdi32 -lopengl32 -lm -l:libglfw3.5.dll -l:libminiaudio.0.11.22.dll"
     OBJ_DIR="./External/Windows"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen.exe"

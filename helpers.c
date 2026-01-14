@@ -1,21 +1,15 @@
 // helpers.c - Helper Functions for various things
-#include <sys/stat.h>
 #include <time.h>
+#include <malloc.h>
+#include "os.h"
+#include "voxen.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
-#include "voxen.h"
-#ifdef DEBUG_RAM_OUTPUT
-#include <malloc.h>
-#endif
 
 double get_time(void) {
     struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
-        DualLogError("clock_gettime failed\n");
-        return 0.0;
-    }
-
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) { DualLogError("clock_gettime failed\n"); return 0.0; }
     return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
 }
 
@@ -58,13 +52,40 @@ static inline uint64_t mix64(uint64_t x) {
 uint64_t file_stamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
 
 bool get_file_fingerprint(const char *path, FileFingerprint *fp) {
-    struct stat st;
-    if (stat(path, &st) != 0) return false;
+    #ifdef _WIN32
+        // Use CreateFile to get a handle (required for detailed file info)
+        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == INVALID_HANDLE_VALUE) return false;
 
-    fp->mtime_ns = (uint64_t)st.st_mtim.tv_sec * 1000000000ull + (uint64_t)st.st_mtim.tv_nsec;
-    fp->size  = (uint64_t)st.st_size;
-    fp->inode = (uint64_t)st.st_ino;
-    fp->dev   = (uint64_t)st.st_dev;
+        BY_HANDLE_FILE_INFORMATION bhfi;
+        if (!GetFileInformationByHandle(hFile, &bhfi)) {
+            CloseHandle(hFile);
+            return false;
+        }
+
+        // Convert FILETIME to 100-nanosecond intervals since Jan 1, 1601
+        ULARGE_INTEGER ft;
+        ft.LowPart = bhfi.ftLastWriteTime.dwLowDateTime;
+        ft.HighPart = bhfi.ftLastWriteTime.dwHighDateTime;
+        
+        fp->mtime_ns = ft.QuadPart * 100; // Windows is 100ns units
+        fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
+        // Inode equivalent: FileIndex
+        fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
+        // Dev equivalent: Volume Serial Number
+        fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
+
+        CloseHandle(hFile);
+    #else // Linux, Mac, Android
+        struct stat st;
+        if (stat(path, &st) != 0) return false;
+
+        fp->mtime_ns = (uint64_t)st.st_mtim.tv_sec * 1000000000ull + (uint64_t)st.st_mtim.tv_nsec;
+        fp->size  = (uint64_t)st.st_size;
+        fp->inode = (uint64_t)st.st_ino;
+        fp->dev   = (uint64_t)st.st_dev;
+    #endif
     return true;
 }
 

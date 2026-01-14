@@ -1,7 +1,7 @@
 // voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#include <assimp/cimport.h>
-#include <assimp/scene.h>
+#include "./External/assimp/cimport.h"
+#include "./External/assimp/scene.h"
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
 #define STB_IMAGE_IMPLEMENTATION

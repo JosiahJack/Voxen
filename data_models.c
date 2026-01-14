@@ -55,7 +55,7 @@ static void write_vmdl(const char *vmdl_path, const uint64_t fbx_stamp, const fl
     if (fd < 0) return;
 
     size_t total = sizeof(uint64_t) + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
-    uint8_t *buf = mmap(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+    uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     if (!buf) { close(fd); return; }
 
     uint8_t *p = buf;
@@ -67,7 +67,7 @@ static void write_vmdl(const char *vmdl_path, const uint64_t fbx_stamp, const fl
     memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
     size_t written = (size_t)write(fd, buf, total);
     if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
-    munmap(buf,total);
+    OS_DeallocateRAM(buf,total);
     close(fd);
 }
 
@@ -86,7 +86,7 @@ void add_mmap_cleanup(void* ptr, size_t size) {
 }
 
 void cleanup_all_mmaps(void) {
-    for (int i = 0; i < mmap_cleanup_count; i++) munmap(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
+    for (int i = 0; i < mmap_cleanup_count; i++) OS_DeallocateRAM(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
 }
 
 // uint8_t modelFBX_FileBuffer[15360000]; // 14983372 found in practice
@@ -124,11 +124,11 @@ void LoadModels(void) {
         DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
     #endif
     
-    modelVertices       = mmap(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    modelTriangles      = mmap(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    DebugRAM("after main mmap block");
+    modelVertices       = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    modelTriangles      = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    DebugRAM("after main OS_AllocateRAM block");
     size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
-    int32_t* indexToParser = mmap(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+    int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
     for (uint32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = (int32_t)k;
     }
@@ -186,8 +186,8 @@ void LoadModels(void) {
             
             modelVertexCounts[i]   = vertexCount;
             modelTriangleCounts[i] = triCount;
-            modelVertices[i]  = mmap(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-            modelTriangles[i] =  mmap(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            modelVertices[i]  = OS_AllocateRAM(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            modelTriangles[i] =  OS_AllocateRAM(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
             uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
             float minx = 1E9f, miny = 1E9f, minz = 1E9f;
             float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
@@ -272,7 +272,7 @@ void LoadModels(void) {
     }
 
     DebugRAM("after model load loop");
-    munmap(indexToParser,indexToParser_size);
+    OS_DeallocateRAM(indexToParser,indexToParser_size);
     aiReleasePropertyStore(props);
     glGenBuffers(loadedModelsMaxIndex, Sys_Render.vbos);
     glGenBuffers(loadedModelsMaxIndex, Sys_Render.tbos);

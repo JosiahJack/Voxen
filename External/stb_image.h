@@ -12,7 +12,7 @@ uint8_t* stbi__arena_end = NULL;
 
 void stbi__arena_init(void) {
     if (!stbi__arena_base) {
-        stbi__arena_base = mmap(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        stbi__arena_base = OS_AllocateRAM(NULL, STBI_ARENA_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         stbi__arena_cursor = stbi__arena_base;
         stbi__arena_end    = stbi__arena_base + STBI_ARENA_SIZE;
     }

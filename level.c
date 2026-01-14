@@ -80,7 +80,9 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
 
     free(transparentInstances); free(doubleSidedInstances); free(opaqueInstances); free(tempInstances);
     free(modelTypeCountsOpaque); free(modelTypeCountsDoubleSided); free(modelTypeCountsTransparent);
-    malloc_trim(0);
+    #if defined(LINUX) || defined(ANDROID)
+        malloc_trim(0);
+    #endif
     DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
     DualLog(" took %f secs\n", get_time() - start_time);
     ResetLevelAudio();

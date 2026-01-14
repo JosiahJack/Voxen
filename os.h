@@ -3,11 +3,12 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <fcntl.h>
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
-    #include <windows.h>
-    #include <io.h>           // for _get_osfhandle
-    #include <fcntl.h>        // O_RDONLY etc.
+    #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
+    #include <windows.h> // The things I do for my players, yeesh
+    #include <io.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     HANDLE OS_OpenReadonly(const char* filePath);

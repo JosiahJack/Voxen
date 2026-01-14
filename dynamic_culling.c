@@ -115,7 +115,7 @@ void DetermineClosedEdges(void) {
         }
     }
     
-    munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
+    OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
     DualLog("found %d open cells, closed edges N: %d, S: %d, E: %d, W: %d...",totalOpenCells,closedCountNorth,closedCountSouth,closedCountEast,closedCountWest);
     DebugRAM("end of dynamic culling DetermineClosedEdges");
 }

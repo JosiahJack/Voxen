@@ -5,7 +5,7 @@ void OS_Exit(int errorNumber) { _exit(errorNumber); } // Full yoink, no mercy, u
 
 int64_t OS_RawWrite(OsFileHandle fd, const void* buf, size_t count, const char* filePath) {
     #ifdef WINDOWS
-        if (fd == -1 || fd == (int)INVALID_HANDLE_VALUE) { DualLogError("Invalid file handle for write to %s\n", filePath); return -1; }
+        if (fd == INVALID_HANDLE_VALUE) { DualLogError("Invalid file handle for write to %s\n", filePath); return -1; }
 
         HANDLE h = (HANDLE)(intptr_t)fd;  // assuming fd is from _open_osfhandle or similar
         DWORD written = 0;
@@ -56,7 +56,7 @@ void OS_Write(OsFileHandle fd, const void* buffer, size_t size, const char* file
 OsFileHandle OS_OpenReadonly(const char* filePath) {
     #ifdef WINDOWS
         HANDLE fp = CreateFileA(filePath, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
-        if (fp == INVALID_HANDLE_VALUE) { DualLog("Could not find file %s\n", filePath); return OS_INVALID_HANDLE }
+        if (fp == INVALID_HANDLE_VALUE) { DualLog("Could not find file %s\n", filePath); return OS_INVALID_HANDLE; }
     #else // Linux, Mac, Android
         OsFileHandle fp = open(filePath, O_RDONLY);
         if (fp < 0) { DualLog("Could not find file %s: %s\n", filePath, strerror(errno)); return OS_INVALID_HANDLE; }
@@ -72,8 +72,8 @@ OsFileHandle OS_OpenWriteonly(const char* filePath) {
     #else // Linux, Mac, Android
         OsFileHandle fp = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (!fp) { DualLogError("Failed to open %s: %s\n", filePath, strerror(errno)); OS_Exit(1); }
+        return fp;
     #endif
-    return fp;
 }
 
 int OS_FileSize(OsFileHandle fileDescriptor) {

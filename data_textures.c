@@ -58,8 +58,8 @@ void LoadTextures(void) {
     size_t palettes_size         = MAX_UNIQUE_COLORS * sizeof(uint32_t);
     size_t indices_size          = MAX_TOTAL_PIXELS * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
-    void* arena = mmap(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
-    if (arena == MAP_FAILED) { DualLogError("Failed to mmap texture arena\n"); OS_Exit(1); }
+    void* arena = OS_AllocateRAM(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+    if (arena == MAP_FAILED) { DualLogError("Failed to allocate texture arena\n"); OS_Exit(1); }
     uint8_t* cur = (uint8_t*)arena;
     uint32_t* textureOffsets        = (uint32_t*)cur; cur += offsets_size;
     int32_t*  textureSizes          = (int32_t*)cur;  cur += sizes_size;
@@ -81,12 +81,12 @@ void LoadTextures(void) {
 
         struct stat st;
         fstat(fd, &st);
-        void* map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+        void* map = OS_AllocateRAM(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
         close(fd);
-        if (map == MAP_FAILED) { DualLogError("Failed to mmap %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
+        if (map == MAP_FAILED) { DualLogError("Failed to allocate %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
 
         unsigned char* pixels = stbi_load_from_memory(map, (size_t)st.st_size, &widths[currentIndex], &heights[currentIndex]);
-        munmap(map, (size_t)st.st_size);
+        OS_DeallocateRAM(map, (size_t)st.st_size);
         if (!pixels) { DualLogError("stbi_load failed for %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
 
         totalPixels += widths[currentIndex] * heights[currentIndex];
@@ -152,9 +152,9 @@ void LoadTextures(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
-    munmap(arena, arena_size); arena = NULL;
-    munmap(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
+    OS_DeallocateRAM(arena, arena_size); arena = NULL;
+    OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
     double end_time = get_time();
     DualLog(" took %.6f secs\n", end_time - start_time);
-    DebugRAM("After LoadTextures and after munmap of LoadTextures arena and stbi arena");
+    DebugRAM("After LoadTextures and after deallocation of LoadTextures arena and stbi arena");
 }

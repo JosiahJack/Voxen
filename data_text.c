@@ -150,7 +150,9 @@ void LoadLogTextForLanguage(uint8_t lang) {
     FREE_ARRAY(audiologSenders,     TEXT_LOGS_COUNT);
     FREE_ARRAY(audiologSubjects,    TEXT_LOGS_COUNT);
     FREE_ARRAY(audioLogSpeech2Text, TEXT_LOGS_COUNT);
-    malloc_trim(0);
+    #if defined(LINUX) || defined(ANDROID)
+        malloc_trim(0);
+    #endif
     memset(voxen_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
     memset(voxen_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
     memset(voxen_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
