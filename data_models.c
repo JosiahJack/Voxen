@@ -26,7 +26,7 @@ static bool load_vmdl(const char *vmdl_path, uint64_t fbx_stamp, float **out_ver
     if (fstat(fd, &st) < 0) { close(fd); return false; }
     if ((size_t)st.st_size < sizeof(uint64_t) + 4 + 4) { close(fd); return false; }
     
-    uint8_t *map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
+    uint8_t *map = OS_AllocateRAM(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
     if (map == MAP_FAILED) return false;
     
     uint64_t file_stamp_on_disk;

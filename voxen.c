@@ -1,10 +1,5 @@
 // voxen.c
 // Description: A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include "os.h" // Operating System calls shim layer.
