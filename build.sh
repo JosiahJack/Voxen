@@ -135,7 +135,7 @@ elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-Wl,--gc-sections -L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL -lfontconfig"
+    LDFLAGS="-Wl,--gc-sections -L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Mac"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen_mac"
@@ -151,7 +151,7 @@ else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
-    LDFLAGS="-Wl,--gc-sections -L./External/ -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL -lfontconfig"
+    LDFLAGS="-Wl,--gc-sections -L./External/ -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Linux"
     GLAD_OBJ="${OBJ_DIR}/glad/glad.o"
     BINARY_NAME="voxen"

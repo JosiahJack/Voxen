@@ -1,5 +1,4 @@
 // data_fonts.c - Load Font Atlasses
-#define FONT_GEN // Turn on when wanting to rebuild Font Atlases
 #include "os.h"
 #include <fcntl.h>
 #include <unistd.h>
@@ -9,27 +8,14 @@
 #include "voxen.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
-#ifdef FONT_GEN
-    #ifdef WINDOWS
-        // TODO: 
-    #else
-        #include <fontconfig/fontconfig.h>
-    #endif
-#endif
-int close (int filedes); // #include <unistd.h>
 
-#define MAX_FALLBACK_FONTS 32
-#ifdef FONT_GEN
-    static char *xstrdup(const char *s) {
-        size_t len = strlen(s) + 1;
-        char *p = malloc(len);
-        if (p) memcpy(p, s, len);
-        return p;
-    }
-#endif
-#define strdup xstrdup
-// ----------------------------------------------------------------------------
-// Text
+static char *xstrdup(const char *s) {
+    size_t len = strlen(s) + 1;
+    char *p = malloc(len);
+    if (p) memcpy(p, s, len);
+    return p;
+}
+
 float genericTextHeightFac = 0.025f;
 float genericTextWidthFac = 0.0125f;
 float genericTextHeightFacStopD = 0.07f;
@@ -40,6 +26,19 @@ GLuint fontAtlasTex;
 GLuint fontAtlasTexStopD;
 stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
+float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
+float fixedNumberAdvanceWidthStopD = 0.0f;
+
+static const char* const fallbackFontPaths[] = {
+    "./Fonts/FreeSerifBold.ttf",
+    "./Fonts/cambriab.ttf",
+    "./Fonts/NotoSansCJK-Bold.ttc"
+};
+
+static const char* const fontPaths[] = {
+    "./Fonts/SystemShockText.ttf",
+    "./Fonts/StopD.ttf"
+};
 
 typedef struct {
     char *path;
@@ -48,15 +47,9 @@ typedef struct {
     stbtt_fontinfo info;
 } LoadedFont;
 
-static stbtt_fontinfo primaryFontInfo;
-static stbtt_fontinfo secondaryFontInfo;
-static unsigned char *primaryFontData;
-static unsigned char *sec_data;
-#ifdef FONT_GEN
-    static int32_t numFallbackFonts = 0;
-    static LoadedFont fallbackFonts[MAX_FALLBACK_FONTS];
-    static FcConfig *fontCfg = NULL;
-#endif
+static stbtt_fontinfo fontInfo[5];
+static unsigned char *fontData[5];
+LoadedFont fallbackFonts[3]; 
 
 typedef struct {
     int32_t first;   // first codepoint in range
@@ -92,9 +85,6 @@ __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int font
     return -1;
 }
 
-float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
-float fixedNumberAdvanceWidthStopD = 0.0f;
-
 static int Utf8ToCodepoint(const char **p) {
     const unsigned char *s = (const unsigned char*)*p;
     int cp = 0;
@@ -125,87 +115,41 @@ float TextWidth(const char *utf8, int fontID) {
 
         if (prevGlyph != -1 && advance > 0.0f) { // Kerning
             if (fontID == FONT_NORMAL && packedIdx >= 0) {
-                int kern = stbtt_GetGlyphKernAdvance(&primaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&primaryFontInfo, cp));
+                int kern = stbtt_GetGlyphKernAdvance(&fontInfo[0], prevGlyph, stbtt_FindGlyphIndex(&fontInfo[0], cp));
                 
-                int fheight = ttSHORT(primaryFontInfo.data + primaryFontInfo.hhea + 4) - ttSHORT(primaryFontInfo.data + primaryFontInfo.hhea + 6);
+                int fheight = ttSHORT(fontInfo[0].data + fontInfo[0].hhea + 4) - ttSHORT(fontInfo[0].data + fontInfo[0].hhea + 6);
                 float kernScaleForPixelHeight = (float)GetScreenRelativeY(genericTextHeightFac) / (float)fheight;
                 width += (float)kern * kernScaleForPixelHeight;
             } else if (fontID == FONT_STOPD && packedIdx >= 0) {
-                int kern = stbtt_GetGlyphKernAdvance(&secondaryFontInfo, prevGlyph, stbtt_FindGlyphIndex(&secondaryFontInfo, cp));
-                int fheight = ttSHORT(secondaryFontInfo.data + secondaryFontInfo.hhea + 4) - ttSHORT(secondaryFontInfo.data + secondaryFontInfo.hhea + 6);
+                int kern = stbtt_GetGlyphKernAdvance(&fontInfo[1], prevGlyph, stbtt_FindGlyphIndex(&fontInfo[1], cp));
+                int fheight = ttSHORT(fontInfo[1].data + fontInfo[1].hhea + 4) - ttSHORT(fontInfo[1].data + fontInfo[1].hhea + 6);
                 float kernScaleForPixelHeight = (float)GetScreenRelativeY(genericTextHeightFacStopD) / (float)fheight;
                 width += (float)kern * kernScaleForPixelHeight;
             }
         }
 
         width += advance;
-        prevGlyph = (packedIdx >= 0) ? stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &secondaryFontInfo : &primaryFontInfo), cp) : -1;
+        prevGlyph = (packedIdx >= 0) ? stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &fontInfo[1] : &fontInfo[0]), cp) : -1;
     }
     
     return width;
 }
 
-#ifdef FONT_GEN
-static LoadedFont *LoadFallbackFont(char *path) {
-    for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
-        if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
-    }
-
-    if (numFallbackFonts >= MAX_FALLBACK_FONTS) return NULL;
-
-    OsFileHandle fd; int fontFileSize; uint8_t *data = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
-    if (fontFileSize <= 0 || data == NULL || fd < 0) { DualLogError("Could not find fallback font for %s\n", path); return NULL;}
-
-    stbtt_fontinfo info;
-    if (!stbtt_InitFont(&info, data, 0)) { OS_DeallocateRAM(data, fontFileSize); return NULL; }
-
-    LoadedFont *lf = &fallbackFonts[numFallbackFonts++];
-    lf->path = strdup(path);
-    lf->data = data;
-    lf->size = fontFileSize;
-    lf->info = info;
-    return lf;
+static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx) {
+    OsFileHandle fd; int fontFileSize; fontData[fontInfoIdx] = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
+    (void)stbtt_InitFont(&fontInfo[fontInfoIdx], fontData[fontInfoIdx], 0);
+    return (LoadedFont){ .path = xstrdup(path), .data = fontData[fontInfoIdx], .size = fontFileSize, .info = fontInfo[fontInfoIdx] };
 }
 
 static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
-    int glyph = stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &secondaryFontInfo : &primaryFontInfo), codepoint);
-    if (glyph) { *outFont = &primaryFontInfo; return glyph; }
+    int glyph = stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &fontInfo[1] : &fontInfo[0]), codepoint);
+    if (glyph) { *outFont = (fontID == FONT_STOPD ? &fontInfo[1] : &fontInfo[0]); return glyph; }
 
-    for (int i = 0; i < numFallbackFonts; i++) {
+    for (int i = 0; i < 3; i++) {        
         glyph = stbtt_FindGlyphIndex(&fallbackFonts[i].info, codepoint);
         if (glyph) { *outFont = &fallbackFonts[i].info; return glyph; }
     }
 
-    if (!fontCfg) fontCfg = FcInitLoadConfigAndFonts();
-    FcCharSet *cs = FcCharSetCreate();
-    FcCharSetAddChar(cs, (FcChar32)codepoint);
-    FcPattern *pat = FcPatternCreate();
-    FcPatternAddCharSet(pat, FC_CHARSET, cs);
-    FcPatternAddInteger(pat, FC_WEIGHT, FC_WEIGHT_BOLD);
-    FcConfigSubstitute(NULL, pat, FcMatchPattern);
-    FcDefaultSubstitute(pat);
-    FcResult result;
-    FcPattern *match = FcFontMatch(NULL, pat, &result); // Takes ~0.21secs
-    char *fontfile = NULL;
-    if (match) {
-        FcChar8 *file8 = NULL;
-        if (FcPatternGetString(match, FC_FILE, 0, &file8) == FcResultMatch) fontfile = strdup((char*)file8);
-        FcPatternDestroy(match);
-    }
-    
-    FcPatternDestroy(pat);
-    FcCharSetDestroy(cs);
-    if (!fontfile) return 0;
-    
-    LoadedFont *lf = LoadFallbackFont(fontfile);
-    free(fontfile);
-    #if defined(LINUX) || defined(ANDROID)
-        malloc_trim(0);
-    #endif
-    if (!lf) return 0;
-    
-    glyph = stbtt_FindGlyphIndex(&lf->info, codepoint);
-    if (glyph) { *outFont = &lf->info; return glyph; }
     return 0;
 }
 
@@ -219,7 +163,6 @@ static void write_font_cache(const char *path, uint32_t expected_glyphs, const u
     OS_Write(fd, bitmap, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, path);
     OS_Close(fd);
 }
-#endif
 
 static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint64_t file_stamp, stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
     OsFileHandle fd; int fontFileSize; uint8_t *map = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
@@ -261,20 +204,19 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
 
 void InitFontAtlasses(void) {
     double t0 = get_time();
-    DualLog("Loaded    2 fonts...");
-    const char *pri_path = "./Fonts/SystemShockText.ttf";
-    const char *sec_path = "./Fonts/StopD.ttf";
-    OsFileHandle fd1; int pri_sz; primaryFontData = OS_OpenAndAllocateFileBufferReadonly(pri_path, &fd1, &pri_sz);
-    OsFileHandle fd2; int sec_sz; sec_data = OS_OpenAndAllocateFileBufferReadonly(sec_path, &fd2, &sec_sz);
-    if (fd1 == OS_INVALID_HANDLE || fd2 == OS_INVALID_HANDLE || pri_sz <= 0 || sec_sz <= 0 || primaryFontData == NULL || sec_data == NULL) { DualLogError("Could not open primary or secondary fonts\n"); OS_Exit(1); }
-    if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); OS_Exit(1); }
-    if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); OS_Exit(1); }
+    DualLog("Loaded    5 fonts...");
+    OsFileHandle fd1; int sz1; fontData[0] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[0], &fd1, &sz1);
+    OsFileHandle fd2; int sz2; fontData[1] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[1], &fd2, &sz2);
+    if (fd1 == OS_INVALID_HANDLE || fd2 == OS_INVALID_HANDLE || sz1 <= 0 || sz2 <= 0 || fontData[0] == NULL || fontData[1] == NULL) { DualLogError("Could not open fonts\n"); OS_Exit(1); }
+    if (!stbtt_InitFont(&fontInfo[0], fontData[0], 0)) { DualLogError("%s font init failed\n", fontPaths[0]); OS_Exit(1); }
+    if (!stbtt_InitFont(&fontInfo[1], fontData[1], 0)) { DualLogError("%s font init failed\n", fontPaths[1]); OS_Exit(1); }
 
+    // Check if either the primary font or secondary font .vfnt cache file is out of date prompting an atlas rebuild.
     FileFingerprint fp1, fp2;
-    if (!OS_GetFileFingerprint(pri_path, &fp1)) DualLogError("File change detection failed for %s\n", pri_path);
-    if (!OS_GetFileFingerprint(sec_path, &fp2)) DualLogError("File change detection failed for %s\n", sec_path);
-    uint64_t fbx_stamp1 = file_stamp(&fp1);
-    uint64_t fbx_stamp2 = file_stamp(&fp2);
+    if (!OS_GetFileFingerprint(fontPaths[0], &fp1)) DualLogError("File change detection failed for %s\n", fontPaths[0]);
+    if (!OS_GetFileFingerprint(fontPaths[1], &fp2)) DualLogError("File change detection failed for %s\n", fontPaths[1]);
+    uint64_t fbx_stamp1 = OS_GetFilestamp(&fp1);
+    uint64_t fbx_stamp2 = OS_GetFilestamp(&fp2);
     int32_t pri_expected = 0, sec_expected = 0;
     for (int i = 0; i < numFontRanges; i++) { pri_expected += fontRanges[i].count; sec_expected += fontRangesStopD[i].count; }
     const char *pri_cache = "./Fonts/SystemShockText.vfnt";
@@ -283,9 +225,11 @@ void InitFontAtlasses(void) {
     bool sec_hit = load_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, &numPackedGlyphsStopD, &fixedNumberAdvanceWidthStopD, &fontAtlasTexStopD);
     if (pri_hit && sec_hit) { DualLog("in %.3f s\n", get_time() - t0); return; }
 
-    DualLog("Font ranges changed or .vfnt files not present – regenerating...\n");
+    fallbackFonts[0] = LoadFallbackFont(fallbackFontPaths[0], 2); // Preload known fallback fonts for Cyrillic, Kanji, etc.
+    fallbackFonts[1] = LoadFallbackFont(fallbackFontPaths[1], 3);
+    fallbackFonts[2] = LoadFallbackFont(fallbackFontPaths[2], 4);
+    DualLog("Font ranges changed or .vfnt files not present – regenerating...");
 
-#ifdef FONT_GEN
     // Primary
     unsigned char *bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
     stbtt_pack_context pc;
@@ -302,10 +246,10 @@ void InitFontAtlasses(void) {
             stbtt_fontinfo *font = NULL;
             int g = GetGlyphAndFont(cp, &font, FONT_NORMAL);
             if (!g) continue;
-            unsigned char *data = (font == &primaryFontInfo) ? primaryFontData
-                : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
+            
+            unsigned char *data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
             float height = h;
-            if (font != &primaryFontInfo) height *= 1.2f;
+            if (font != &fontInfo[0]) height *= 1.2f;
             stbtt_PackFontRange(&pc, data, 0, height, cp, 1, &fontPackedChar[numPackedGlyphs]);
             int idx = numPackedGlyphs++;
             if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidth = vmax(fixedNumberAdvanceWidth, fontPackedChar[idx].xadvance);
@@ -337,18 +281,18 @@ void InitFontAtlasses(void) {
         for (int i = 0; i < fontRangesStopD[r].count; i++) {
             if (numPackedGlyphsStopD >= MAX_GLYPHS) break;
             uint32_t cp = fontRangesStopD[r].first + i;
-            int g = stbtt_FindGlyphIndex(&secondaryFontInfo, cp);
-            stbtt_fontinfo *font = &secondaryFontInfo;
-            unsigned char *data = sec_data;
+            int g = stbtt_FindGlyphIndex(&fontInfo[1], cp);
+            stbtt_fontinfo *font = &fontInfo[1];
+            unsigned char *data = fontData[1];
             if (!g) {
                 g = GetGlyphAndFont(cp, &font, FONT_STOPD);
                 if (!g) continue;
                 
-                data = (font == &primaryFontInfo) ? primaryFontData : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
+                data = (font == &fontInfo[0]) ? fontData[0] : ((LoadedFont*)((char*)font - offsetof(LoadedFont, info)))->data;
             }
             
             float height = h2;
-            if (font != &secondaryFontInfo) height *= 1.2f;
+            if (font != &fontInfo[1]) height *= 1.2f;
             stbtt_PackFontRange(&pc2, data, 0, height, cp, 1, &fontPackedCharStopD[numPackedGlyphsStopD]);
             int idx = numPackedGlyphsStopD++;
             if (cp >= '0' && cp <= '9') fixedNumberAdvanceWidthStopD = vmax(fixedNumberAdvanceWidthStopD, fontPackedCharStopD[idx].xadvance);
@@ -369,8 +313,5 @@ void InitFontAtlasses(void) {
     #if defined(LINUX) || defined(ANDROID)
         malloc_trim(0);
     #endif
-    DualLog(" regenerated in %.3f s\n", get_time() - t0);
-#else
-    DualLog("Font config not turned on, go set FONT_GEN at top of data_fonts.c\n");
-#endif
+    DualLog(" took %.3f s\n", get_time() - t0);
 }

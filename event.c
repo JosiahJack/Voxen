@@ -21,34 +21,32 @@ bool journalFirstWrite = true;
 // Logs both to log file and console, usage same as printf
 void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
     va_list copy; va_copy(copy, args);
-    if (prefix) fprintf(stream, "%s\033[0m", prefix);
-    vfprintf(stream, fmt, args);
-    fprintf(stream, "\033[0m"); fflush(stream);
+    #ifdef WINDOWS
+        if (prefix) fprintf(stream, "%s", prefix);
+        vfprintf(stream, fmt, args);
+        fflush(stream);
+    #else
+        if (prefix) fprintf(stream, "%s\033[0m", prefix);
+        vfprintf(stream, fmt, args);
+        fprintf(stream, "\033[0m"); fflush(stream);        
+    #endif
     if (prefix) fprintf(console_log_file, "%s ", prefix);
     vfprintf(console_log_file, fmt, copy); fflush(console_log_file);
     va_end(copy);
 }
 
-void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
-void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
-void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+#ifdef WINDOWS
+    void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+    void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "WARN:", fmt, args); va_end(args); }
+    void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "ERROR:", fmt, args); va_end(args); }
+#else
+    void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+    void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
+    void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+#endif
 
 void OpenConsoleLogFile(void) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
-    #ifdef WINDOWS
-        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
-        DWORD dwMode = 0;
-        if (GetConsoleMode(hOut, &dwMode)) {
-            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-            SetConsoleMode(hOut, dwMode);
-        }
-
-        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
-        if (GetConsoleMode(hErr, &dwMode)) {
-            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-            SetConsoleMode(hErr, dwMode);
-        }
-    #endif
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
 }
 

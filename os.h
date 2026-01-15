@@ -231,7 +231,7 @@ static inline uint64_t mix64(uint64_t x) {
     return x;
 }
 
-static inline uint64_t file_stamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
+static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
 
 static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
     #ifdef _WIN32
@@ -245,7 +245,7 @@ static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) 
         ULARGE_INTEGER ft;
         ft.LowPart = bhfi.ftLastWriteTime.dwLowDateTime;
         ft.HighPart = bhfi.ftLastWriteTime.dwHighDateTime;
-        fp->mtime_ns = ft.QuadPart * 100; // Windows is 100ns units
+        fp->mtime_ns = ft.QuadPart; // Windows is 100ns units
         fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
         fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
         fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
