@@ -1372,6 +1372,18 @@ SUM:                                           830            447           7152
 --------------------------------------------------------------------------------
 ```
 
+❯ wc -l *.[ch] 2>/dev/null | sort -nr | head -n 10
+  8509 total
+  1295 voxen.c
+   788 input.c
+   751 types.h
+   672 level.c
+   647 dynamic_culling.c
+   640 voxen.h
+   479 console.c
+   335 todo.c
+   317 data_par
+
 
 Main Rig.  Settings:
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.

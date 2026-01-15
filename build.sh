@@ -84,19 +84,19 @@ gen_header() {
 }
 
 # Shaders and their C variable names
-gen_header ./Shaders/ssr.compute                ssr_computeShader
-gen_header ./Shaders/voxels.compute             voxelUpdate_computeShader
-gen_header ./Shaders/shadowmaps_clear.compute   shadowmaps_clear_computeShader
-gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertexShaderSource
-gen_header ./Shaders/debugunlit_frag.glsl       debugUnlitFragmentShaderSource
-gen_header ./Shaders/chunk_vert.glsl            vertexShaderSource
-gen_header ./Shaders/chunk_frag.glsl            fragmentShaderTraditional
-gen_header ./Shaders/text_vert.glsl             textVertexShaderSource
-gen_header ./Shaders/text_frag.glsl             textFragmentShaderSource
-gen_header ./Shaders/composite_vert.glsl        quadVertexShaderSource
-gen_header ./Shaders/composite_frag.glsl        quadFragmentShaderSource
-gen_header ./Shaders/shadowmap_vert.glsl        shadowmapVertexShaderSource
-gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragmentShaderSource
+gen_header ./Shaders/ssr.compute                ssrComputeSrc
+gen_header ./Shaders/voxels.compute             voxelUpdateComputeSrc
+gen_header ./Shaders/shadowmaps_clear.compute   shadowmapsClearComputeSrc
+gen_header ./Shaders/debugunlit_vert.glsl       debugUnlitVertSrc
+gen_header ./Shaders/debugunlit_frag.glsl       debugUnlitFragSrc
+gen_header ./Shaders/chunk_vert.glsl            vertSrc
+gen_header ./Shaders/chunk_frag.glsl            fragSrc
+gen_header ./Shaders/text_vert.glsl             textVertSrc
+gen_header ./Shaders/text_frag.glsl             textFragSrc
+gen_header ./Shaders/composite_vert.glsl        quadVertSrc
+gen_header ./Shaders/composite_frag.glsl        quadFragSrc
+gen_header ./Shaders/shadowmap_vert.glsl        shadowmapVertSrc
+gen_header ./Shaders/shadowmap_frag.glsl        shadowmapFragSrc
 cat > Shaders/shaders.h <<'EOF'
 #pragma once
 #include "text_vert.glsl.h"
