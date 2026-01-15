@@ -232,7 +232,7 @@ static inline uint64_t mix64(uint64_t x) {
 }
 
 // static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
-static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size) ^ mix64(fp->inode) ^ mix64(fp->dev); }
+static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size); }
 
 static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
     #ifdef _WIN32
@@ -244,16 +244,12 @@ static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) 
         if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
 
         fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
-        fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
-        fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
         CloseHandle(hFile);
     #else // Linux, Mac, Android
         struct stat st;
         if (stat(path, &st) != 0) return false;
 
         fp->size  = (uint64_t)st.st_size;
-        fp->inode = (uint64_t)st.st_ino;
-        fp->dev   = (uint64_t)st.st_dev;
     #endif
     return true;
 }
