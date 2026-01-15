@@ -231,7 +231,8 @@ static inline uint64_t mix64(uint64_t x) {
     return x;
 }
 
-static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
+// static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
+static inline uint64_t OS_GetFilestamp(const FileFingerprint *fp) { return mix64(fp->size) ^ mix64(fp->inode) ^ mix64(fp->dev); }
 
 static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
     #ifdef _WIN32
@@ -242,10 +243,6 @@ static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) 
         BY_HANDLE_FILE_INFORMATION bhfi;
         if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
 
-        ULARGE_INTEGER ft;
-        ft.LowPart = bhfi.ftLastWriteTime.dwLowDateTime;
-        ft.HighPart = bhfi.ftLastWriteTime.dwHighDateTime;
-        fp->mtime_ns = ft.QuadPart; // Windows is 100ns units
         fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
         fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
         fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
@@ -254,9 +251,6 @@ static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) 
         struct stat st;
         if (stat(path, &st) != 0) return false;
 
-        // Convert Linux nanoseconds to 100ns intervals to match Windows FILETIME
-        uint64_t total_ns = (uint64_t)st.st_mtim.tv_sec * 1000000000ull + (uint64_t)st.st_mtim.tv_nsec;
-        fp->mtime_ns = total_ns / 100; 
         fp->size  = (uint64_t)st.st_size;
         fp->inode = (uint64_t)st.st_ino;
         fp->dev   = (uint64_t)st.st_dev;
