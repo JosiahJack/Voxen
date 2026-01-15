@@ -8,9 +8,22 @@
 #include "External/stb_image_write.h"
 
 double get_time(void) {
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) { DualLogError("clock_gettime failed\n"); return 0.0; }
-    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
+    #ifdef WINDOWS
+        static LARGE_INTEGER frequency;
+        static BOOL initialized = FALSE;
+        if (!initialized) {
+            QueryPerformanceFrequency(&frequency);
+            initialized = TRUE;
+        }
+        
+        LARGE_INTEGER counter;
+        QueryPerformanceCounter(&counter);
+        return (double)counter.QuadPart / frequency.QuadPart;
+    #else
+        struct timespec ts;
+        if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) { DualLogError("clock_gettime failed\n"); return 0.0; }
+        return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
+    #endif
 }
 
 // Get USS aka the total RAM uniquely allocated for the process (btop shows RSS so pulls in shared libs and double counts shared RAM).
@@ -39,46 +52,6 @@ void DebugRAM(const char *context) {
 #pragma GCC diagnostic pop
 
 void print_bytes_no_newline(int32_t count) { DualLog("%d bytes | %f kb | %f Mb",count,(double)count / 1000.0,(double)count / 1000000.0); }
-
-static inline uint64_t mix64(uint64_t x) {
-    x ^= x >> 33;
-    x *= 0xff51afd7ed558ccdULL;
-    x ^= x >> 33;
-    x *= 0xc4ceb9fe1a85ec53ULL;
-    x ^= x >> 33;
-    return x;
-}
-
-uint64_t file_stamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
-
-bool get_file_fingerprint(const char *path, FileFingerprint *fp) {
-    #ifdef _WIN32
-        // Use CreateFile to get a handle (required for detailed file info)
-        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile == OS_INVALID_HANDLE) return false;
-
-        BY_HANDLE_FILE_INFORMATION bhfi;
-        if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
-
-        ULARGE_INTEGER ft;
-        ft.LowPart = bhfi.ftLastWriteTime.dwLowDateTime;
-        ft.HighPart = bhfi.ftLastWriteTime.dwHighDateTime;
-        fp->mtime_ns = ft.QuadPart * 100; // Windows is 100ns units
-        fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
-        fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
-        fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
-        CloseHandle(hFile);
-    #else // Linux, Mac, Android
-        struct stat st;
-        if (stat(path, &st) != 0) return false;
-
-        fp->mtime_ns = (uint64_t)st.st_mtim.tv_sec * 1000000000ull + (uint64_t)st.st_mtim.tv_nsec;
-        fp->size  = (uint64_t)st.st_size;
-        fp->inode = (uint64_t)st.st_ino;
-        fp->dev   = (uint64_t)st.st_dev;
-    #endif
-    return true;
-}
 
 bool ConstIndexInBounds(int constdex) { return (constdex >= 0 && constdex <= 760); }
 bool ConstIndexIsGeometry(int constdex) { return (constdex >= 0 && constdex <= 306 && constdex != 112 && constdex != 279) || constdex == 760; }

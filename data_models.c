@@ -158,7 +158,7 @@ void LoadModels(void) {
         if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); OS_Exit(1); }
 
         FileFingerprint fp;
-        if (!get_file_fingerprint(fbx_path, &fp)) { DualLogError("File change detection failed for %s\n", fbx_path); continue; }
+        if (!OS_GetFileFingerprint(fbx_path, &fp)) { DualLogError("File change detection failed for %s\n", fbx_path); continue; }
         
         uint64_t fbx_stamp = file_stamp(&fp);
         float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;

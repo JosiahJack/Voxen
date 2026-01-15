@@ -8,8 +8,6 @@
 #define MA_NO_WAV               // if you don't need WAV loading
 #define MA_NO_FLAC
 #define MA_NO_MP3
-#define MA_NO_RESOURCE_MANAGER // removes file loading helpers
-#define MA_NO_NODE_GRAPH        // removes the entire mixer/effects system
 #define MA_NO_EFFECTS           // (redundant if node graph is off)
 #define MA_NO_GENERATION        // removes sine/square/noise generators
 #define MA_NO_SSE2              // optional, removes SSE2 paths

@@ -115,7 +115,11 @@ typedef void (*ma_proc)(void);
 #endif
 
 #if !defined(MA_API)
-    #define MA_API extern
+    #ifdef MA_WIN32
+        #define MA_API __declspec(dllexport)
+    #else
+        #define MA_API extern
+    #endif
 #endif
 
 #if !defined(MA_STATIC)
@@ -5697,23 +5701,21 @@ MA_API ma_result ma_fopen(FILE** ppFile, const char* pFilePath, const char* pOpe
 
 #if defined(_WIN32) || defined(__APPLE__)
     *ppFile = fopen(pFilePath, pOpenMode);
+    if (*ppFile == NULL) return MA_ERROR;
+    return MA_SUCCESS;
 #else
     #if defined(_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 64 && defined(_LARGEFILE64_SOURCE)
         *ppFile = fopen64(pFilePath, pOpenMode);
     #else
         *ppFile = fopen(pFilePath, pOpenMode);
     #endif
-#endif
     if (*ppFile == NULL) {
         ma_result result = ma_result_from_errno(errno);
-        if (result == MA_SUCCESS) {
-            result = MA_ERROR;   /* Just a safety check to make sure we never ever return success when pFile == NULL. */
-        }
-
-        return result;
+        if (result == MA_SUCCESS) return MA_ERROR;   /* Just a safety check to make sure we never ever return success when pFile == NULL. */
     }
 
     return MA_SUCCESS;
+#endif
 }
 
 #if defined(_WIN32)
@@ -5722,20 +5724,14 @@ MA_API ma_result ma_fopen(FILE** ppFile, const char* pFilePath, const char* pOpe
     #endif
 #endif
 
-MA_API ma_result ma_wfopen(FILE** ppFile, const wchar_t* pFilePath, const wchar_t* pOpenMode, const ma_allocation_callbacks* pAllocationCallbacks)
-{
-    if (ppFile != NULL) {
-        *ppFile = NULL;  /* Safety. */
-    }
-
-    if (pFilePath == NULL || pOpenMode == NULL || ppFile == NULL) {
-        return MA_INVALID_ARGS;
-    }
+MA_API ma_result ma_wfopen(FILE** ppFile, const wchar_t* pFilePath, const wchar_t* pOpenMode, const ma_allocation_callbacks* pAllocationCallbacks) {
+    if (ppFile != NULL) *ppFile = NULL;  /* Safety. */
+    if (pFilePath == NULL || pOpenMode == NULL || ppFile == NULL) return MA_INVALID_ARGS;
 
 #if defined(MA_HAS_WFOPEN)
     {
         *ppFile = _wfopen(pFilePath, pOpenMode);
-        if (*ppFile == NULL) return ma_result_from_errno(errno);
+        if (*ppFile == NULL) return MA_ERROR;
 
         (void)pAllocationCallbacks;
     }

@@ -259,13 +259,6 @@ typedef struct {
 	bool IsolinearChipsetInstalled;
 } QuestBits;
 
-typedef struct {
-    uint64_t mtime_ns;
-    uint64_t size;
-    uint64_t inode;
-    uint64_t dev;
-} FileFingerprint;
-
 // BodyState
 typedef uint8_t BodyState;
 static const uint8_t BodyState_Standing = 0;

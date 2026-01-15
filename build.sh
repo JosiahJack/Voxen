@@ -119,15 +119,15 @@ LINUX_CC="gcc"
 WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
 COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra \
-               -fno-omit-frame-pointer -fstrict-aliasing -Wstrict-aliasing=2 -fno-common -Walloca -Wstack-usage=262144 -Wvla \
-               -Wdouble-promotion -Wformat=2 -Wshadow -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
+               -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 -Wvla \
+               -Wdouble-promotion -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
                -Werror=implicit-function-declaration -Og -D_GNU_SOURCE"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
     CFLAGS="-D_WIN32 $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Windows -l:assimp-vc143-mt.dll -lglfw3 -lgdi32 -lopengl32 -lm -l:libglfw3.5.dll -l:libminiaudio.0.11.22.dll"
+    LDFLAGS="-L./ -L./External/ -L./External/Windows -l:assimp-vc143-mt.dll -lgdi32 -lopengl32 -lm -l:glfw3.dll"
     OBJ_DIR="./External/Windows"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen.exe"
@@ -183,9 +183,9 @@ total_build_time=$((build_end - shader_start))
 echo "Build completed in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  ./"$BINARY_NAME" ;;   # or wine voxen.exe if testing on linux
-        mac)      ./"$BINARY_NAME" ;;
-        android)  echo "Android binary built — deploy manually to device/emulator" ;;
+        windows)  wine ./"$BINARY_NAME" ;;   # or wine voxen.exe if testing on linux
+#         mac)      ./"$BINARY_NAME" ;;
+#         android)  echo "Android binary built — deploy manually to device/emulator" ;;
         *)        ./"$BINARY_NAME" ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.

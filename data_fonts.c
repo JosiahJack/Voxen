@@ -147,7 +147,6 @@ float TextWidth(const char *utf8, int fontID) {
 
 #ifdef FONT_GEN
 static LoadedFont *LoadFallbackFont(char *path) {
-    DualLog("Loading fallback font file %s\n", path);
     for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
         if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
     }
@@ -224,7 +223,7 @@ static void write_font_cache(const char *path, uint32_t expected_glyphs, const u
 
 static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint64_t file_stamp, stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
     OsFileHandle fd; int fontFileSize; uint8_t *map = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
-    if (!map || fd <= 0 || fontFileSize <= 0) return false;
+    if (!map || fd == OS_INVALID_HANDLE || fontFileSize <= 0) return false;
     if (fontFileSize < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { OS_Close(fd); DualLogWarn("cache too small %s\n", path); return false; }
 
     const uint8_t *p = map;
@@ -267,13 +266,13 @@ void InitFontAtlasses(void) {
     const char *sec_path = "./Fonts/StopD.ttf";
     OsFileHandle fd1; int pri_sz; primaryFontData = OS_OpenAndAllocateFileBufferReadonly(pri_path, &fd1, &pri_sz);
     OsFileHandle fd2; int sec_sz; sec_data = OS_OpenAndAllocateFileBufferReadonly(sec_path, &fd2, &sec_sz);
-    if (fd1 <= 0 || fd2 <= 0 || pri_sz <= 0 || sec_sz <= 0 || primaryFontData == NULL || sec_data == NULL) { DualLogError("Could not open primary or secondary fonts\n"); OS_Exit(1); }
+    if (fd1 == OS_INVALID_HANDLE || fd2 == OS_INVALID_HANDLE || pri_sz <= 0 || sec_sz <= 0 || primaryFontData == NULL || sec_data == NULL) { DualLogError("Could not open primary or secondary fonts\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); OS_Exit(1); }
 
     FileFingerprint fp1, fp2;
-    if (!get_file_fingerprint(pri_path, &fp1)) DualLogError("File change detection failed for %s\n", pri_path);
-    if (!get_file_fingerprint(sec_path, &fp2)) DualLogError("File change detection failed for %s\n", sec_path);
+    if (!OS_GetFileFingerprint(pri_path, &fp1)) DualLogError("File change detection failed for %s\n", pri_path);
+    if (!OS_GetFileFingerprint(sec_path, &fp2)) DualLogError("File change detection failed for %s\n", sec_path);
     uint64_t fbx_stamp1 = file_stamp(&fp1);
     uint64_t fbx_stamp2 = file_stamp(&fp2);
     int32_t pri_expected = 0, sec_expected = 0;

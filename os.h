@@ -9,6 +9,13 @@
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
+typedef struct {
+    uint64_t mtime_ns;
+    uint64_t size;
+    uint64_t inode;
+    uint64_t dev;
+} FileFingerprint;
+
 #define OS_Exit(x) _exit( (x) )
 #if defined(_WIN32) || defined(_WIN64)
     #define WINDOWS
@@ -213,4 +220,46 @@ static inline void OS_CPUInfo(void) {
         }
     #endif
     DualLog("CPU: %s | Cores: %d\n", brand, cores);
+}
+
+static inline uint64_t mix64(uint64_t x) {
+    x ^= x >> 33;
+    x *= 0xff51afd7ed558ccdULL;
+    x ^= x >> 33;
+    x *= 0xc4ceb9fe1a85ec53ULL;
+    x ^= x >> 33;
+    return x;
+}
+
+static inline uint64_t file_stamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->mtime_ns); h ^= mix64(fp->size); h ^= mix64(fp->inode); h ^= mix64(fp->dev); return h; }
+
+static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) {
+    #ifdef _WIN32
+        // Use CreateFile to get a handle (required for detailed file info)
+        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == OS_INVALID_HANDLE) return false;
+
+        BY_HANDLE_FILE_INFORMATION bhfi;
+        if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
+
+        ULARGE_INTEGER ft;
+        ft.LowPart = bhfi.ftLastWriteTime.dwLowDateTime;
+        ft.HighPart = bhfi.ftLastWriteTime.dwHighDateTime;
+        fp->mtime_ns = ft.QuadPart * 100; // Windows is 100ns units
+        fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
+        fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
+        fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
+        CloseHandle(hFile);
+    #else // Linux, Mac, Android
+        struct stat st;
+        if (stat(path, &st) != 0) return false;
+
+        // Convert Linux nanoseconds to 100ns intervals to match Windows FILETIME
+        uint64_t total_ns = (uint64_t)st.st_mtim.tv_sec * 1000000000ull + (uint64_t)st.st_mtim.tv_nsec;
+        fp->mtime_ns = total_ns / 100; 
+        fp->size  = (uint64_t)st.st_size;
+        fp->inode = (uint64_t)st.st_ino;
+        fp->dev   = (uint64_t)st.st_dev;
+    #endif
+    return true;
 }

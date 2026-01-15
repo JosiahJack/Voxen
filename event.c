@@ -35,6 +35,20 @@ void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); Dua
 
 void OpenConsoleLogFile(void) {
     console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
+    #ifdef WINDOWS
+        HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD dwMode = 0;
+        if (GetConsoleMode(hOut, &dwMode)) {
+            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hOut, dwMode);
+        }
+
+        HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+        if (GetConsoleMode(hErr, &dwMode)) {
+            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hErr, dwMode);
+        }
+    #endif
     if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
 }
 

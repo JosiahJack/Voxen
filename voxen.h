@@ -466,8 +466,6 @@ void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* of
 extern uint32_t random_range_rng;
 double get_time(void);
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
-uint64_t file_stamp(const FileFingerprint *fp);
-bool get_file_fingerprint(const char *path, FileFingerprint *fp);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
 int data_parser_isspace(char c);
