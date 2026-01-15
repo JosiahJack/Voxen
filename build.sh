@@ -118,6 +118,7 @@ EOF
 LINUX_CC="gcc"
 WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
+MAC_CC="gcc"
 COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 -Wvla \
                -Wdouble-promotion -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
@@ -133,9 +134,9 @@ if [ "$PLATFORM" = "windows" ]; then
     BINARY_NAME="voxen.exe"
 elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
-    LINKER="mold -run gcc"
+    LINKER=$LINUX_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-Wl,--gc-sections -L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Mac"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen_mac"

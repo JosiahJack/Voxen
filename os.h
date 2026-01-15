@@ -62,6 +62,7 @@ typedef struct {
     
     #if defined(__APPLE__)
         #define MAC
+        #include <sys/types.h>
     #endif
     typedef int OsFileHandle;
     #define OS_INVALID_HANDLE -1
@@ -186,8 +187,8 @@ static inline void OS_DeallocateRAM(void* ramSpacePointer, size_t size) {
 
 static inline void OS_CPUInfo(void) {
     char brand[256] = "Unknown CPU";
-    int cores = 1;
-    #if defined(_WIN32)
+    int cores = 0;
+    #if defined(WINDOWS)
         SYSTEM_INFO si; GetSystemInfo(&si);
         cores = si.dwNumberOfProcessors;
         HKEY k;
@@ -196,10 +197,10 @@ static inline void OS_CPUInfo(void) {
             RegQueryValueExA(k, "ProcessorNameString", NULL, NULL, (LPBYTE)brand, &s);
             RegCloseKey(k);
         }
-    #elif defined(__APPLE__)
-        size_t s = sizeof(brand), c = sizeof(cores);
-        sysctlbyname("machdep.cpu.brand_string", brand, &s, NULL, 0);
-        sysctlbyname("hw.logicalcpu", &cores, &c, NULL, 0);
+    #elif defined(MAC)
+//         size_t s = sizeof(brand), c = sizeof(cores);
+//         sysctlbyname("machdep.cpu.brand_string", brand, &s, NULL, 0);
+//         sysctlbyname("hw.logicalcpu", &cores, &c, NULL, 0);
     #else // Linux / Android
         cores = sysconf(_SC_NPROCESSORS_ONLN); // One-liner for Linux cores
         OsFileHandle fd = open("/proc/cpuinfo", O_RDONLY);
