@@ -729,6 +729,7 @@ bool TakeScreenshot(void) {  return GetKeyPressed(41); }
 void ProcessInput(void) {
     Input_PollJoysticks();
     Input_PollGamepad();
+    if (Sys_Input.keyStates[GLFW_KEY_E].pressed) play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f,100);
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
     if (Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down && Sys_Input.keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(Sys_Global.window); // TODO: Remove?  Kinda handy.
     if (Console()) ToggleConsole();

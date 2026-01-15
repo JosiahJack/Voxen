@@ -2,6 +2,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
 #define MA_ENABLE_WASAPI // For windows
+#define MA_ENABLE_DSOUND
 #define MA_ENABLE_PULSEAUDIO // For Linux
 #define MA_ENABLE_COREAUDIO  // For Mac
 #define MA_NO_ENCODING          // (you probably don't need this either)
