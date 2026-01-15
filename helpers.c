@@ -54,28 +54,19 @@ uint64_t file_stamp(const FileFingerprint *fp) { uint64_t h = 0; h ^= mix64(fp->
 bool get_file_fingerprint(const char *path, FileFingerprint *fp) {
     #ifdef _WIN32
         // Use CreateFile to get a handle (required for detailed file info)
-        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (hFile == INVALID_HANDLE_VALUE) return false;
+        HANDLE hFile = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile == OS_INVALID_HANDLE) return false;
 
         BY_HANDLE_FILE_INFORMATION bhfi;
-        if (!GetFileInformationByHandle(hFile, &bhfi)) {
-            CloseHandle(hFile);
-            return false;
-        }
+        if (!GetFileInformationByHandle(hFile, &bhfi)) { CloseHandle(hFile); return false; }
 
-        // Convert FILETIME to 100-nanosecond intervals since Jan 1, 1601
         ULARGE_INTEGER ft;
         ft.LowPart = bhfi.ftLastWriteTime.dwLowDateTime;
         ft.HighPart = bhfi.ftLastWriteTime.dwHighDateTime;
-        
         fp->mtime_ns = ft.QuadPart * 100; // Windows is 100ns units
         fp->size     = ((uint64_t)bhfi.nFileSizeHigh << 32) | bhfi.nFileSizeLow;
-        // Inode equivalent: FileIndex
         fp->inode    = ((uint64_t)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
-        // Dev equivalent: Volume Serial Number
         fp->dev      = (uint64_t)bhfi.dwVolumeSerialNumber;
-
         CloseHandle(hFile);
     #else // Linux, Mac, Android
         struct stat st;
@@ -144,12 +135,8 @@ bool ConstIndexIsStaticObjectImmutable(int constdex) {
 }
 
 void Screenshot(void) {
-    struct stat st = {0};
-    if (stat("Screenshots", &st) == -1) { // Check and make ./Screenshots/ folder if it doesn't exist yet.
-        if (mkdir("Screenshots", 0755) != 0) { DualLogError("Failed to create Screenshots folder\n"); return; }
-    }
-    
-    unsigned char* pixels = malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
+    OS_MakeFolder("Screenshots");
+    unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
     glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
     char timestamp[32];
     char filename[96];
@@ -157,10 +144,8 @@ void Screenshot(void) {
     struct tm *utc_time = localtime(&now);    
     if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
     snprintf(filename, sizeof(filename), "Screenshots/%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
-    if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n");
-    else DualLog("Saved screenshot %s\n", filename);
-
-    free(pixels);
+    if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);
+    OS_DeallocateRAM(pixels, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
 }
 
 __attribute__((pure)) bool CursorVisible(void) {

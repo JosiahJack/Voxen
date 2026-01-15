@@ -19,19 +19,12 @@ static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
 }
 
 static bool load_vmdl(const char *vmdl_path, uint64_t fbx_stamp, float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
-    int fd = open(vmdl_path, O_RDONLY);
-    if (fd < 0) return false;
-
-    struct stat st;
-    if (fstat(fd, &st) < 0) { close(fd); return false; }
-    if ((size_t)st.st_size < sizeof(uint64_t) + 4 + 4) { close(fd); return false; }
-    
-    uint8_t *map = OS_AllocateRAM(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0); close(fd);
-    if (map == MAP_FAILED) return false;
+    OsFileHandle fd; int st_size; uint8_t* map = OS_OpenAndAllocateFileBufferReadonly(vmdl_path, &fd, &st_size);
+    if ((size_t)st_size < sizeof(uint64_t) + 4 + 4) return false;
     
     uint64_t file_stamp_on_disk;
     memcpy(&file_stamp_on_disk, map, sizeof(uint64_t));
-    if (file_stamp_on_disk != fbx_stamp) { munmap(map, (size_t)st.st_size); return false; }
+    if (file_stamp_on_disk != fbx_stamp) { OS_DeallocateRAM(map, (size_t)st_size); return false; }
 
     const uint8_t *p = map + sizeof(uint64_t);
     uint32_t vcnt = *(uint32_t*)p; p += 4; *out_vcount = vcnt;
@@ -39,24 +32,22 @@ static bool load_vmdl(const char *vmdl_path, uint64_t fbx_stamp, float **out_ver
     size_t vert_bytes = vcnt * VERTEX_ATTRIBUTES_COUNT * sizeof(float);
     size_t idx_bytes  = icnt * 3 * sizeof(uint32_t);
     size_t expected   = sizeof(uint64_t) + 4 + vert_bytes + 4 + idx_bytes;
-    if (expected != (size_t)st.st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st.st_size, expected, vcnt, icnt); munmap(map, (size_t)st.st_size); return false; }
-    if (p + vert_bytes + idx_bytes > map + (size_t)st.st_size) { DualLogError("vmdl data overflow\n"); munmap(map, (size_t)st.st_size); return false; }
+    if (expected != (size_t)st_size) { DualLogError("vmdl corrupted: size %zu, expected %zu from vertex count %u and tri count %u\n", st_size, expected, vcnt, icnt); OS_DeallocateRAM(map, (size_t)st_size); return false; }
+    if (p + vert_bytes + idx_bytes > map + (size_t)st_size) { DualLogError("vmdl data overflow\n"); OS_DeallocateRAM(map, (size_t)st_size); return false; }
 
     *out_verts  = (float*)p;
     p += vert_bytes;
     *out_idx    = (uint32_t*)p;
     *out_map = map;
-    *out_mapsz = (size_t)st.st_size;
+    *out_mapsz = (size_t)st_size;
     return true;
 }
 
 static void write_vmdl(const char *vmdl_path, const uint64_t fbx_stamp, const float *verts, uint32_t vcnt, const uint32_t *triangleIndices, uint32_t triCount) {
-    int fd = open(vmdl_path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
-    if (fd < 0) return;
-
+    OsFileHandle fd = OS_OpenWriteonly(vmdl_path);
     size_t total = sizeof(uint64_t) + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
-    uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
-    if (!buf) { close(fd); return; }
+    uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
+    if (!buf) { OS_Close(fd); return; }
 
     uint8_t *p = buf;
     *(uint64_t *)p = fbx_stamp;
@@ -65,10 +56,9 @@ static void write_vmdl(const char *vmdl_path, const uint64_t fbx_stamp, const fl
     *(uint32_t*)p = triCount; p += 4;
     memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
     memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
-    size_t written = (size_t)write(fd, buf, total);
-    if (written != (size_t)total) DualLogError("write_vmdl: partial write %zd/%zu\n", written, total);
+    OS_Write(fd, buf, total, vmdl_path);
     OS_DeallocateRAM(buf,total);
-    close(fd);
+    OS_Close(fd);
 }
 
 typedef struct {
@@ -124,11 +114,11 @@ void LoadModels(void) {
         DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
     #endif
     
-    modelVertices       = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    modelTriangles      = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    modelVertices       = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    modelTriangles      = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     DebugRAM("after main OS_AllocateRAM block");
     size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
-    int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
+    int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
     for (uint32_t k = 0; k < model_parser.count; k++) {
         if (model_parser.entries[k].index != UINT16_MAX) indexToParser[model_parser.entries[k].index] = (int32_t)k;
     }
@@ -186,8 +176,8 @@ void LoadModels(void) {
             
             modelVertexCounts[i]   = vertexCount;
             modelTriangleCounts[i] = triCount;
-            modelVertices[i]  = OS_AllocateRAM(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-            modelTriangles[i] =  OS_AllocateRAM(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            modelVertices[i]  = OS_AllocateRAM(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+            modelTriangles[i] =  OS_AllocateRAM(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
             uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
             float minx = 1E9f, miny = 1E9f, minz = 1E9f;
             float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;

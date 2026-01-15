@@ -1,5 +1,4 @@
 // data_fonts.c - Load Font Atlasses
-// #include "voxen.h" limited includes
 #define FONT_GEN // Turn on when wanting to rebuild Font Atlases
 #include "os.h"
 #include <fcntl.h>
@@ -11,7 +10,11 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 #ifdef FONT_GEN
-    #include <fontconfig/fontconfig.h>
+    #ifdef WINDOWS
+        // TODO: 
+    #else
+        #include <fontconfig/fontconfig.h>
+    #endif
 #endif
 int close (int filedes); // #include <unistd.h>
 
@@ -144,13 +147,14 @@ float TextWidth(const char *utf8, int fontID) {
 
 #ifdef FONT_GEN
 static LoadedFont *LoadFallbackFont(char *path) {
+    DualLog("Loading fallback font file %s\n", path);
     for (int i = 0; i < numFallbackFonts; i++) { // Check cache first
         if (strcmp(fallbackFonts[i].path, path) == 0) return &fallbackFonts[i];
     }
 
     if (numFallbackFonts >= MAX_FALLBACK_FONTS) return NULL;
 
-    int fd; int fontFileSize; uint8_t *data = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
+    OsFileHandle fd; int fontFileSize; uint8_t *data = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
     if (fontFileSize <= 0 || data == NULL || fd < 0) { DualLogError("Could not find fallback font for %s\n", path); return NULL;}
 
     stbtt_fontinfo info;
@@ -207,7 +211,7 @@ static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t
 }
 
 static void write_font_cache(const char *path, uint32_t expected_glyphs, const uint64_t file_stamp, const stbtt_packedchar *packed, uint32_t actual_packed, float fixed_advance, const unsigned char *bitmap) {
-    int fd = OS_OpenWriteonly(path);
+    OsFileHandle fd = OS_OpenWriteonly(path);
     OS_Write(fd, &expected_glyphs, sizeof(uint32_t), path);
     OS_Write(fd, &file_stamp, sizeof(uint64_t), path);
     OS_Write(fd, &actual_packed, sizeof(uint32_t), path);
@@ -219,9 +223,9 @@ static void write_font_cache(const char *path, uint32_t expected_glyphs, const u
 #endif
 
 static bool load_font_cache(const char *path, int32_t expected_glyphs, const uint64_t file_stamp, stbtt_packedchar *out_packed, int32_t *out_num, float *out_fixed_advance, GLuint *out_tex) {
-    int fd; int fontFileSize; uint8_t *map = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
+    OsFileHandle fd; int fontFileSize; uint8_t *map = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
     if (!map || fd <= 0 || fontFileSize <= 0) return false;
-    if (fontFileSize < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { close(fd); DualLogWarn("cache too small %s\n", path); return false; }
+    if (fontFileSize < 20 + FONT_ATLAS_SIZE * FONT_ATLAS_SIZE) { OS_Close(fd); DualLogWarn("cache too small %s\n", path); return false; }
 
     const uint8_t *p = map;
     int32_t file_expected = *(int32_t*)p; p += 4;
@@ -261,8 +265,8 @@ void InitFontAtlasses(void) {
     DualLog("Loaded    2 fonts...");
     const char *pri_path = "./Fonts/SystemShockText.ttf";
     const char *sec_path = "./Fonts/StopD.ttf";
-    int fd1; int pri_sz; primaryFontData = OS_OpenAndAllocateFileBufferReadonly(pri_path, &fd1, &pri_sz);
-    int fd2; int sec_sz; sec_data = OS_OpenAndAllocateFileBufferReadonly(sec_path, &fd2, &sec_sz);
+    OsFileHandle fd1; int pri_sz; primaryFontData = OS_OpenAndAllocateFileBufferReadonly(pri_path, &fd1, &pri_sz);
+    OsFileHandle fd2; int sec_sz; sec_data = OS_OpenAndAllocateFileBufferReadonly(sec_path, &fd2, &sec_sz);
     if (fd1 <= 0 || fd2 <= 0 || pri_sz <= 0 || sec_sz <= 0 || primaryFontData == NULL || sec_data == NULL) { DualLogError("Could not open primary or secondary fonts\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&primaryFontInfo, primaryFontData, 0)) { DualLogError("Primary font init failed\n"); OS_Exit(1); }
     if (!stbtt_InitFont(&secondaryFontInfo, sec_data, 0)) { DualLogError("Secondary font init failed\n"); OS_Exit(1); }

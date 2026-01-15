@@ -537,7 +537,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0); // Needed to render loading progress.
     glDepthMask(GL_TRUE); // Always true, set just once ever.
     glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
-    int fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
+    OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
     if (fp == 0) {
         int windowIconFileSize = OS_FileSize(fp);
         uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
@@ -554,8 +554,8 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
         image.height = h;
         image.pixels = pixels;
         glfwSetWindowIcon(Sys_Global.window, 1, &image);
-        file_buffer = OS_DeallocateRAM(file_buffer, windowIconFileSize);
-        stbi__arena_base = OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE);
+        OS_DeallocateRAM(file_buffer, windowIconFileSize);
+        OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
     }
     DebugRAM("after freeing window bar icon");
     DualLog("GL buffers, FBO, fonts, audio, localization, and window init took %f secs\n", get_time() - init_start_time);

@@ -58,8 +58,7 @@ void LoadTextures(void) {
     size_t palettes_size         = MAX_UNIQUE_COLORS * sizeof(uint32_t);
     size_t indices_size          = MAX_TOTAL_PIXELS * sizeof(uint8_t);
     size_t arena_size = offsets_size + sizes_size + palette_offsets_size + palettes_size + indices_size;
-    void* arena = OS_AllocateRAM(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, -1, 0);
-    if (arena == MAP_FAILED) { DualLogError("Failed to allocate texture arena\n"); OS_Exit(1); }
+    void* arena = OS_AllocateRAM(NULL, arena_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
     uint8_t* cur = (uint8_t*)arena;
     uint32_t* textureOffsets        = (uint32_t*)cur; cur += offsets_size;
     int32_t*  textureSizes          = (int32_t*)cur;  cur += sizes_size;
@@ -76,17 +75,9 @@ void LoadTextures(void) {
         
         doubleSidedTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_DOUBLESIDED) > 0 ? 1 : 0;
         transparentTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_TRANSPARENT) > 0 ? 1 : 0;
-        int fd = open(texture_parser.entries[currentIndex].path, O_RDONLY);
-        if (fd < 0) { DualLogError("Failed to open %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
-
-        struct stat st;
-        fstat(fd, &st);
-        void* map = OS_AllocateRAM(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-        close(fd);
-        if (map == MAP_FAILED) { DualLogError("Failed to allocate %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
-
-        unsigned char* pixels = stbi_load_from_memory(map, (size_t)st.st_size, &widths[currentIndex], &heights[currentIndex]);
-        OS_DeallocateRAM(map, (size_t)st.st_size);
+        OsFileHandle fd; int st_size; void* map = OS_OpenAndAllocateFileBufferReadonly(texture_parser.entries[currentIndex].path, &fd, &st_size);
+        unsigned char* pixels = stbi_load_from_memory(map, (size_t)st_size, &widths[currentIndex], &heights[currentIndex]);
+        OS_DeallocateRAM(map, (size_t)st_size);
         if (!pixels) { DualLogError("stbi_load failed for %s\n", texture_parser.entries[currentIndex].path); OS_Exit(1); }
 
         totalPixels += widths[currentIndex] * heights[currentIndex];
