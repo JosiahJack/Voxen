@@ -77,6 +77,7 @@ typedef struct {
 	uint8_t DynamicMusic;
 	uint8_t Footsteps;
 	uint8_t InvertLook;
+	uint8_t InvertInventoryCycling;
 	uint8_t InvertCyberspaceLook;
 	uint8_t QuickItemPickup;
 	uint8_t QuickReloadWeapons;

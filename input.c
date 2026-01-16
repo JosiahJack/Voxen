@@ -83,15 +83,9 @@ typedef struct {
     int value;
 } InputElement;
 InputElement inputElements[149] = {
-    { "A", GLFW_KEY_A }, // 0
-    { "B", GLFW_KEY_B }, // 1
-    { "C", GLFW_KEY_C }, // 2
-    { "D", GLFW_KEY_D }, // 3
-    { "E", GLFW_KEY_E }, // 4
-    { "F", GLFW_KEY_F }, // 5
-    { "G", GLFW_KEY_G }, // 6
-    { "H", GLFW_KEY_H }, // 7
-    { "I", GLFW_KEY_I }, // 8
+    { "A", GLFW_KEY_A }, { "B", GLFW_KEY_B }, { "C", GLFW_KEY_C }, // 2
+    { "D", GLFW_KEY_D }, { "E", GLFW_KEY_E }, { "F", GLFW_KEY_F }, // 5
+    { "G", GLFW_KEY_G }, { "H", GLFW_KEY_H }, { "I", GLFW_KEY_I }, // 8
     { "J", GLFW_KEY_J }, { "K", GLFW_KEY_K }, { "L", GLFW_KEY_L }, // 11
     { "M", GLFW_KEY_M }, { "N", GLFW_KEY_N }, { "O", GLFW_KEY_O }, { "P", GLFW_KEY_P }, // 15
     { "Q", GLFW_KEY_Q }, { "R", GLFW_KEY_R }, { "S", GLFW_KEY_S }, { "T", GLFW_KEY_T }, // 19
@@ -178,94 +172,86 @@ int atoi(const char *str) {
     return sign * result;
 }
 
+typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType;
+typedef struct {
+    const char* name;
+    void* ptr;
+    SettingType type;
+} Setting;
+#define S_U8(n, v)  { n, &Sys_Settings.v, SETTING_U8 }
+#define S_U16(n, v) { n, &Sys_Settings.v, SETTING_U16 }
+#define S_IN(n, i)  { n, &Sys_Settings.InputCodeSettings[i], SETTING_INPUT }
+const Setting configTable[] = {
+    S_U16("ResolutionWidth", ScreenWidth),
+    S_U16("ResolutionHeight", ScreenHeight),
+    S_U8("Fullscreen", Fullscreen),
+    S_U8("FOV", FOV),
+    S_U8("Brightness", Brightness),
+    S_U8("Gamma", Gamma),
+    S_U8("AA", AntiAliasing),
+    S_U8("Shadows", Shadows),
+    S_U8("SSR", Reflections),
+    S_U8("VSync", Vsync),
+    S_U8("ModelDetail", ModelDetail),
+    S_U8("GI", GI),
+    S_U8("SpeakerMode", SpeakerMode),
+    S_U8("Reverb", Reverb),
+    S_U8("VolumeMaster", VolumeMaster),
+    S_U8("VolumeMusic", VolumeMusic),
+    S_U8("VolumeMessage", VolumeMessage),
+    S_U8("VolumeEffects", VolumeEffects),
+    S_U8("Language", Language),
+    S_U8("DynamicMusic", DynamicMusic),
+    S_U8("Footsteps", Footsteps),
+    S_U8("InvertLook", InvertLook),
+    S_U8("InvertCyberspaceLook", InvertCyberspaceLook),
+    S_U8("InvertInventoryCycling", InvertInventoryCycling),
+    S_U8("QuickItemPickup", QuickItemPickup),
+    S_U8("QuickReloadWeapons", QuickReloadWeapons),
+    S_U8("MouseSensitivity", MouseSensitivity),
+    S_U8("NoShootMode", NoShootMode),
+    S_U8("HeadBob", HeadBob),
+    S_IN("Forward", 0), S_IN("Strafe Left", 1), S_IN("Backpedal", 2), S_IN("Strafe Right", 3),
+    S_IN("Jump", 4), S_IN("Crouch", 5), S_IN("Prone", 6), S_IN("Lean Left", 7),
+    S_IN("Lean Right", 8), S_IN("Sprint", 9), S_IN("Turn Left", 10), S_IN("Turn Right", 11),
+    S_IN("Look Up", 12), S_IN("Look Down", 13), S_IN("Recent Log", 14), S_IN("Biomonitor", 15),
+    S_IN("Sensaround", 16), S_IN("Lantern", 17), S_IN("Shield", 18), S_IN("Infrared", 19),
+    S_IN("Email", 20), S_IN("Booster", 21), S_IN("Jumpjets", 22), S_IN("Attack", 23),
+    S_IN("Use", 24), S_IN("Menu/Back", 25), S_IN("Toggle Mode", 26), S_IN("Reload", 27),
+    S_IN("Weapon +", 28), S_IN("Weapon -", 29), S_IN("Grenade", 30), S_IN("Grenade +", 31),
+    S_IN("Grenade -", 32), S_IN("Ammo Type", 33), S_IN("Patch Use", 34), S_IN("Patch +", 35),
+    S_IN("Patch -", 36), S_IN("Full Map", 37), S_IN("Swim Up", 38), S_IN("Swim Down", 39), S_IN("Screenshot", 40)
+};
+const int configTableSize = sizeof(configTable) / sizeof(Setting);
+
 void LoadConfig(void) {
     FILE* f = fopen("./Data/Config.ini", "r");
     if (!f) return;
 
     char line[512];
-    while (fgets(line, sizeof(line), f)) { // Loop by line
+    while (fgets(line, sizeof(line), f)) {
         char* s = data_parser_trim(line);
-        if (*s == 0) continue;
-        if (s[0] == '/' && s[1] == '/') continue;
+        if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
 
         char* eq = strchr(s, '=');
         if (!eq) continue;
-
         *eq = 0;
-        char* key = data_parser_trim(s);
-        char* val = data_parser_trim(eq + 1); // After trimming key and value whitespace, check for matching setting on this line.
-             if (!strcmp(key, "ResolutionWidth"))      Sys_Settings.ScreenWidth          = (uint16_t)atoi(val);
-        else if (!strcmp(key, "ResolutionHeight"))     Sys_Settings.ScreenHeight         = (uint16_t)atoi(val);
-        else if (!strcmp(key, "Fullscreen"))           Sys_Settings.Fullscreen           = (uint8_t)atoi(val);
-        else if (!strcmp(key, "FOV"))                  Sys_Settings.FOV                  = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Brightness"))           Sys_Settings.Brightness           = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Gamma"))                Sys_Settings.Gamma                = (uint8_t)atoi(val);
-        else if (!strcmp(key, "AA"))                   Sys_Settings.AntiAliasing         = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Shadows"))              Sys_Settings.Shadows              = (uint8_t)atoi(val);
-        else if (!strcmp(key, "SSR"))                  Sys_Settings.Reflections          = (uint8_t)atoi(val);
-        else if (!strcmp(key, "VSync"))                Sys_Settings.Vsync                = (uint8_t)atoi(val);
-        else if (!strcmp(key, "ModelDetail"))          Sys_Settings.ModelDetail          = (uint8_t)atoi(val);
-        else if (!strcmp(key, "GI"))                   Sys_Settings.GI                   = (uint8_t)atoi(val);
-        else if (!strcmp(key, "SpeakerMode"))          Sys_Settings.SpeakerMode          = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Reverb"))               Sys_Settings.Reverb               = (uint8_t)atoi(val);
-        else if (!strcmp(key, "VolumeMaster"))         Sys_Settings.VolumeMaster         = (uint8_t)atoi(val);
-        else if (!strcmp(key, "VolumeMusic"))          Sys_Settings.VolumeMusic          = (uint8_t)atoi(val);
-        else if (!strcmp(key, "VolumeMessage"))        Sys_Settings.VolumeMessage        = (uint8_t)atoi(val);
-        else if (!strcmp(key, "VolumeEffects"))        Sys_Settings.VolumeEffects        = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Language"))             Sys_Settings.Language             = (uint8_t)atoi(val);
-        else if (!strcmp(key, "DynamicMusic"))         Sys_Settings.DynamicMusic         = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Footsteps"))            Sys_Settings.Footsteps            = (uint8_t)atoi(val);
-        else if (!strcmp(key, "InvertLook"))           Sys_Settings.InvertLook           = (uint8_t)atoi(val);
-        else if (!strcmp(key, "InvertCyberspaceLook")) Sys_Settings.InvertCyberspaceLook = (uint8_t)atoi(val);
-        else if (!strcmp(key, "QuickItemPickup"))      Sys_Settings.QuickItemPickup      = (uint8_t)atoi(val);
-        else if (!strcmp(key, "QuickReloadWeapons"))   Sys_Settings.QuickReloadWeapons   = (uint8_t)atoi(val);
-        else if (!strcmp(key, "MouseSensitivity"))     Sys_Settings.MouseSensitivity     = (uint8_t)atoi(val);
-        else if (!strcmp(key, "NoShootMode"))          Sys_Settings.NoShootMode          = (uint8_t)atoi(val);
-        else if (!strcmp(key, "HeadBob"))              Sys_Settings.HeadBob              = (uint8_t)atoi(val);
-        else if (!strcmp(key, "Forward"))              Sys_Settings.InputCodeSettings[0]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Strafe Left"))          Sys_Settings.InputCodeSettings[1]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Backpedal"))            Sys_Settings.InputCodeSettings[2]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Strafe Right"))         Sys_Settings.InputCodeSettings[3]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Jump"))                 Sys_Settings.InputCodeSettings[4]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Crouch"))               Sys_Settings.InputCodeSettings[5]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Prone"))                Sys_Settings.InputCodeSettings[6]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Lean Left"))            Sys_Settings.InputCodeSettings[7]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Lean Right"))           Sys_Settings.InputCodeSettings[8]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Sprint"))               Sys_Settings.InputCodeSettings[9]  = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Turn Left"))            Sys_Settings.InputCodeSettings[10] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Turn Right"))           Sys_Settings.InputCodeSettings[11] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Look Up"))              Sys_Settings.InputCodeSettings[12] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Look Down"))            Sys_Settings.InputCodeSettings[13] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Recent Log"))           Sys_Settings.InputCodeSettings[14] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Biomonitor"))           Sys_Settings.InputCodeSettings[15] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Sensaround"))           Sys_Settings.InputCodeSettings[16] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Lantern"))              Sys_Settings.InputCodeSettings[17] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Shield"))               Sys_Settings.InputCodeSettings[18] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Infrared"))             Sys_Settings.InputCodeSettings[19] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "E-reader"))             Sys_Settings.InputCodeSettings[20] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Booster"))              Sys_Settings.InputCodeSettings[21] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Jumpjets"))             Sys_Settings.InputCodeSettings[22] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Attack"))               Sys_Settings.InputCodeSettings[23] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Use"))                  Sys_Settings.InputCodeSettings[24] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Menu/Back"))            Sys_Settings.InputCodeSettings[25] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Toggle Mode"))          Sys_Settings.InputCodeSettings[26] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Reload"))               Sys_Settings.InputCodeSettings[27] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Weapon +"))             Sys_Settings.InputCodeSettings[28] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Weapon -"))             Sys_Settings.InputCodeSettings[29] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Grenade"))              Sys_Settings.InputCodeSettings[30] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Grenade +"))            Sys_Settings.InputCodeSettings[31] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Grenade -"))            Sys_Settings.InputCodeSettings[32] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Ammo Type"))            Sys_Settings.InputCodeSettings[33] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Patch Use"))            Sys_Settings.InputCodeSettings[34] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Patch +"))              Sys_Settings.InputCodeSettings[35] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Patch -"))              Sys_Settings.InputCodeSettings[36] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Full Map"))             Sys_Settings.InputCodeSettings[37] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Swim Up"))              Sys_Settings.InputCodeSettings[38] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Swim Down"))            Sys_Settings.InputCodeSettings[39] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Toggle Console"))       Sys_Settings.InputCodeSettings[40] = GetGLFWIndirectionIndexForAnInput(val);
-        else if (!strcmp(key, "Screenshot"))           Sys_Settings.InputCodeSettings[41] = GetGLFWIndirectionIndexForAnInput(val);
-    }
 
+        char* key = data_parser_trim(s);
+        char* val = data_parser_trim(eq + 1);
+
+        for (int i = 0; i < configTableSize; i++) {
+            if (!strcmp(key, configTable[i].name)) {
+                if (configTable[i].type == SETTING_U8) 
+                    *(uint8_t*)configTable[i].ptr = (uint8_t)atoi(val);
+                else if (configTable[i].type == SETTING_U16) 
+                    *(uint16_t*)configTable[i].ptr = (uint16_t)atoi(val);
+                else if (configTable[i].type == SETTING_INPUT) 
+                    *(uint16_t*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);
+                break;
+            }
+        }
+    }
     fclose(f);
 }
 
@@ -273,76 +259,14 @@ void SaveConfig(void) {
     FILE* f = fopen("./Data/Config.ini", "w");
     if (!f) { DualLogError("Unable to save ./Data/Config.ini!\n"); return; }
 
-    fprintf(f, "ResolutionWidth = %u\n",      Sys_Settings.ScreenWidth);
-    fprintf(f, "ResolutionHeight = %u\n",     Sys_Settings.ScreenHeight);
-    fprintf(f, "Fullscreen = %u\n",           Sys_Settings.Fullscreen);
-    fprintf(f, "FOV = %u\n",                  Sys_Settings.FOV);
-    fprintf(f, "Brightness = %u\n",           Sys_Settings.Brightness);
-    fprintf(f, "Gamma = %u\n",                Sys_Settings.Gamma);
-    fprintf(f, "AA = %u\n",                   Sys_Settings.AntiAliasing);
-    fprintf(f, "Shadows = %u\n",              Sys_Settings.Shadows);
-    fprintf(f, "SSR = %u\n",                  Sys_Settings.Reflections);
-    fprintf(f, "VSync = %u\n",                Sys_Settings.Vsync);
-    fprintf(f, "ModelDetail = %u\n",          Sys_Settings.ModelDetail);
-    fprintf(f, "GI = %u\n",                   Sys_Settings.GI);
-    fprintf(f, "SpeakerMode = %u\n",          Sys_Settings.SpeakerMode);
-    fprintf(f, "Reverb = %u\n",               Sys_Settings.Reverb);
-    fprintf(f, "VolumeMaster = %u\n",         Sys_Settings.VolumeMaster);
-    fprintf(f, "VolumeMusic = %u\n",          Sys_Settings.VolumeMusic);
-    fprintf(f, "VolumeMessage = %u\n",        Sys_Settings.VolumeMessage);
-    fprintf(f, "VolumeEffects = %u\n",        Sys_Settings.VolumeEffects);
-    fprintf(f, "Language = %u\n",             Sys_Settings.Language);
-    fprintf(f, "DynamicMusic = %u\n",         Sys_Settings.DynamicMusic);
-    fprintf(f, "Footsteps = %u\n",            Sys_Settings.Footsteps);
-    fprintf(f, "InvertLook = %u\n",           Sys_Settings.InvertLook);
-    fprintf(f, "InvertCyberspaceLook = %u\n", Sys_Settings.InvertCyberspaceLook);
-    fprintf(f, "QuickItemPickup = %u\n",      Sys_Settings.QuickItemPickup);
-    fprintf(f, "QuickReloadWeapons = %u\n",   Sys_Settings.QuickReloadWeapons);
-    fprintf(f, "MouseSensitivity = %u\n",     Sys_Settings.MouseSensitivity);
-    fprintf(f, "NoShootMode = %u\n",          Sys_Settings.NoShootMode);
-    fprintf(f, "HeadBob = %u\n",              Sys_Settings.HeadBob);
-    fprintf(f, "Forward = %s\n",            inputElements[Sys_Settings.InputCodeSettings[0]].name);
-    fprintf(f, "Strafe Left = %s\n",        inputElements[Sys_Settings.InputCodeSettings[1]].name);
-    fprintf(f, "Backpedal = %s\n",          inputElements[Sys_Settings.InputCodeSettings[2]].name);
-    fprintf(f, "Strafe Right = %s\n",       inputElements[Sys_Settings.InputCodeSettings[3]].name);
-    fprintf(f, "Jump = %s\n",               inputElements[Sys_Settings.InputCodeSettings[4]].name);
-    fprintf(f, "Crouch = %s\n",             inputElements[Sys_Settings.InputCodeSettings[5]].name);
-    fprintf(f, "Prone = %s\n",              inputElements[Sys_Settings.InputCodeSettings[6]].name);
-    fprintf(f, "Lean Left = %s\n",          inputElements[Sys_Settings.InputCodeSettings[7]].name);
-    fprintf(f, "Lean Right = %s\n",         inputElements[Sys_Settings.InputCodeSettings[8]].name);
-    fprintf(f, "Sprint = %s\n",             inputElements[Sys_Settings.InputCodeSettings[9]].name);
-    fprintf(f, "Turn Left = %s\n",          inputElements[Sys_Settings.InputCodeSettings[10]].name);
-    fprintf(f, "Turn Right = %s\n",         inputElements[Sys_Settings.InputCodeSettings[11]].name);
-    fprintf(f, "Look Up = %s\n",            inputElements[Sys_Settings.InputCodeSettings[12]].name);
-    fprintf(f, "Look Down = %s\n",          inputElements[Sys_Settings.InputCodeSettings[13]].name);
-    fprintf(f, "Recent Log = %s\n",         inputElements[Sys_Settings.InputCodeSettings[14]].name);
-    fprintf(f, "Biomonitor = %s\n",         inputElements[Sys_Settings.InputCodeSettings[15]].name);
-    fprintf(f, "Sensaround = %s\n",         inputElements[Sys_Settings.InputCodeSettings[16]].name);
-    fprintf(f, "Lantern = %s\n",            inputElements[Sys_Settings.InputCodeSettings[17]].name);
-    fprintf(f, "Shield = %s\n",             inputElements[Sys_Settings.InputCodeSettings[18]].name);
-    fprintf(f, "Infrared = %s\n",           inputElements[Sys_Settings.InputCodeSettings[19]].name);
-    fprintf(f, "E-reader = %s\n",           inputElements[Sys_Settings.InputCodeSettings[20]].name);
-    fprintf(f, "Booster = %s\n",            inputElements[Sys_Settings.InputCodeSettings[21]].name);
-    fprintf(f, "Jumpjets = %s\n",           inputElements[Sys_Settings.InputCodeSettings[22]].name);
-    fprintf(f, "Attack = %s\n",             inputElements[Sys_Settings.InputCodeSettings[23]].name);
-    fprintf(f, "Use = %s\n",                inputElements[Sys_Settings.InputCodeSettings[24]].name);
-    fprintf(f, "Menu/Back = %s\n",          inputElements[Sys_Settings.InputCodeSettings[25]].name);
-    fprintf(f, "Toggle Mode = %s\n",        inputElements[Sys_Settings.InputCodeSettings[26]].name);
-    fprintf(f, "Reload = %s\n",             inputElements[Sys_Settings.InputCodeSettings[27]].name);
-    fprintf(f, "Weapon + = %s\n",           inputElements[Sys_Settings.InputCodeSettings[28]].name);
-    fprintf(f, "Weapon - = %s\n",           inputElements[Sys_Settings.InputCodeSettings[29]].name);
-    fprintf(f, "Grenade = %s\n",            inputElements[Sys_Settings.InputCodeSettings[30]].name);
-    fprintf(f, "Grenade + = %s\n",          inputElements[Sys_Settings.InputCodeSettings[31]].name);
-    fprintf(f, "Grenade - = %s\n",          inputElements[Sys_Settings.InputCodeSettings[32]].name);
-    fprintf(f, "Ammo Type = %s\n",          inputElements[Sys_Settings.InputCodeSettings[33]].name);
-    fprintf(f, "Patch Use = %s\n",          inputElements[Sys_Settings.InputCodeSettings[34]].name);
-    fprintf(f, "Patch + = %s\n",            inputElements[Sys_Settings.InputCodeSettings[35]].name);
-    fprintf(f, "Patch - = %s\n",            inputElements[Sys_Settings.InputCodeSettings[36]].name);
-    fprintf(f, "Full Map = %s\n",           inputElements[Sys_Settings.InputCodeSettings[37]].name);
-    fprintf(f, "Swim Up = %s\n",            inputElements[Sys_Settings.InputCodeSettings[38]].name);
-    fprintf(f, "Swim Down = %s\n",          inputElements[Sys_Settings.InputCodeSettings[39]].name);
-    fprintf(f, "Toggle Console = %s\n",     inputElements[Sys_Settings.InputCodeSettings[40]].name);
-    fprintf(f, "Screenshot = %s\n",         inputElements[Sys_Settings.InputCodeSettings[41]].name);
+    for (int i = 0; i < configTableSize; i++) {
+        if (configTable[i].type == SETTING_U8)
+            fprintf(f, "%s = %u\n", configTable[i].name, *(uint8_t*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_U16)
+            fprintf(f, "%s = %u\n", configTable[i].name, *(uint16_t*)configTable[i].ptr);
+        else if (configTable[i].type == SETTING_INPUT)
+            fprintf(f, "%s = %s\n", configTable[i].name, inputElements[*(uint16_t*)configTable[i].ptr].name);
+    }
     fclose(f);
 }
 
@@ -723,7 +647,7 @@ bool PatchCycDown(void) {return GetKeyPressed(36); }
 bool Map(void) {         return GetKeyPressed(37); }
 bool SwimUp(void) {      return GetKey(38); }
 bool SwimDn(void) {      return GetKey(39); }
-bool Console(void) {     return GetKeyPressed(40); }
+bool Console(void) {     return Sys_Input.keyStates[GLFW_KEY_GRAVE_ACCENT].pressed; }
 bool TakeScreenshot(void) {  return GetKeyPressed(41); }
 
 void ProcessInput(void) {
