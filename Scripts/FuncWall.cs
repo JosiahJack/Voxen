@@ -87,12 +87,12 @@ public class FuncWall : MonoBehaviour {
 
 	void MoveStart() {
 		currentState = FuncStates.MovingStart;
-		startTime = PauseScript.a.relativeTime + 10f;
+		startTime = Sys_Global.pauseRelativeTime + 10f;
 	}
 
 	void MoveTarget() {
 		currentState = FuncStates.MovingTarget;
-		startTime = PauseScript.a.relativeTime + 10f;
+		startTime = Sys_Global.pauseRelativeTime + 10f;
 	}
 
 	void MoveToPosition(Vector3 goalPosition, FuncStates newState) {
@@ -107,7 +107,7 @@ public class FuncWall : MonoBehaviour {
 		if (float.IsNaN(percentMoved)) percentMoved = 0f;
 		if (percentMoved > 1.0f) percentMoved = 1.0f;
 		if (percentMoved < 0f) percentMoved = 0f;
-		if (distanceLeft <= 0.04f || startTime < PauseScript.a.relativeTime) {
+		if (distanceLeft <= 0.04f || startTime < Sys_Global.pauseRelativeTime) {
 			currentState = newState;
 			if (SFXSource != null) {
 				SFXSource.Stop ();
@@ -121,7 +121,7 @@ public class FuncWall : MonoBehaviour {
 	}
 
 	void FixedUpdate() {
-		if (PauseScript.a.Paused()) return;
+		if (Sys_Global.gamePaused) return;
 		if (PauseScript.a.mainMenu.activeSelf) return;
 
 		switch (currentState) {

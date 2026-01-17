@@ -9,20 +9,20 @@ public class CodeScreen : MonoBehaviour {
     
     void Start() {
         mr = GetComponent<MeshRenderer>();
-        tickFinished = PauseScript.a.relativeTime + 0.3f;
+        tickFinished = Sys_Global.pauseRelativeTime + 0.3f;
     }
     
     void Update() {
-        if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+        if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
-		if (tickFinished - PauseScript.a.relativeTime > 0.3f) {
-			tickFinished = PauseScript.a.relativeTime + 0.3f;
+		if (tickFinished - Sys_Global.pauseRelativeTime > 0.3f) {
+			tickFinished = Sys_Global.pauseRelativeTime + 0.3f;
 		}
 
-        if (tickFinished > PauseScript.a.relativeTime) return;
+        if (tickFinished > Sys_Global.pauseRelativeTime) return;
         
-        tickFinished = PauseScript.a.relativeTime + 0.3f;
+        tickFinished = Sys_Global.pauseRelativeTime + 0.3f;
 
         // Integer overload is maximum exclusive.  Confirmed maximum return
 		// value is 9 and not 10 for Random.Range's below.

@@ -243,7 +243,7 @@ public class MFDManager : MonoBehaviour  {
 
 	public void Start () {
 		a = this;
-		a.logFinished = PauseScript.a.relativeTime;
+		a.logFinished = Sys_Global.pauseRelativeTime;
 		a.logActive = false;
 		a.TabReset(true);
 		a.TabReset(false);
@@ -263,8 +263,8 @@ public class MFDManager : MonoBehaviour  {
 		a.tabNotified = new bool[] {false, false, false, false};
 		a.highlightStatus = new bool[] {false, false, false, false};
 		a.highlightTickCount = new int[] {0,0,0,0};
-		a.blinkFinished = blinkTick + PauseScript.a.relativeTime;
-		a.beepFinished = beepTick + PauseScript.a.relativeTime;
+		a.blinkFinished = blinkTick + Sys_Global.pauseRelativeTime;
+		a.beepFinished = beepTick + Sys_Global.pauseRelativeTime;
 		MainTabButton.image.overrideSprite = MFDSpriteSelected;
 		DisableAllCenterTabs();
 		HardwareTabButton.image.overrideSprite = MFDSprite;
@@ -333,16 +333,16 @@ public class MFDManager : MonoBehaviour  {
 
 		// Unpaused Actions
 		// Check and toggle pause state on UI Audio Sources
-		if (!audPaused && (PauseScript.a.Paused() || PauseScript.a.MenuActive())) {
+		if (!audPaused && (Sys_Global.gamePaused || Sys_Global.menuActive)) {
 			for (int i=0;i<UIAudSource.Length;i++) UIAudSource[i].Pause(); 
 			audPaused = true;
-		} else if (audPaused && !(PauseScript.a.Paused() || PauseScript.a.MenuActive())) {
+		} else if (audPaused && !(Sys_Global.gamePaused || Sys_Global.menuActive)) {
 			for (int i=0;i<UIAudSource.Length;i++) UIAudSource[i].UnPause();
 			audPaused = false;			
 		}
 		
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1)) {
 			mouseClickHeldOverGUI = false;
@@ -481,8 +481,8 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	void LateUpdate() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		// Neither LMB nor RMB is being held, reset this to false.
 		if (!Input.GetMouseButton(0) && !Input.GetMouseButton(1)) {
@@ -504,8 +504,8 @@ public class MFDManager : MonoBehaviour  {
 
 			if (foundsome) {
 				// You've got mail!
-				if (blinkFinished < PauseScript.a.relativeTime) {
-					blinkFinished = blinkTick + PauseScript.a.relativeTime;
+				if (blinkFinished < Sys_Global.pauseRelativeTime) {
+					blinkFinished = blinkTick + Sys_Global.pauseRelativeTime;
 					Inventory.a.hardwareIsActive[2] = !Inventory.a.hardwareIsActive[2];
 					if (Inventory.a.hardwareIsActive[2]) {
 						hwb.buttons[5].image.overrideSprite = hwb.buttonActive1[5];
@@ -513,8 +513,8 @@ public class MFDManager : MonoBehaviour  {
 						hwb.buttons[5].image.overrideSprite = hwb.buttonDeactive[5];
 					}
 				}
-				if (beepFinished < PauseScript.a.relativeTime && Inventory.a.beepDone) {
-					beepFinished = beepTick + PauseScript.a.relativeTime;
+				if (beepFinished < Sys_Global.pauseRelativeTime && Inventory.a.beepDone) {
+					beepFinished = beepTick + Sys_Global.pauseRelativeTime;
 					beepCount++;
 					if (beepCount >= 3) { Inventory.a.beepDone = false; beepCount = 0; } // Reset beeping, notification done.
 					Utils.PlayOneShotSavable(hwb.SFX,Const.a.sounds[83]); // emailalert, GO active handled by guard clause.
@@ -527,7 +527,7 @@ public class MFDManager : MonoBehaviour  {
 
 	void LogReaderUpdate() {
 		if (!logActive) return;
-		if (logFinished >= PauseScript.a.relativeTime) return;
+		if (logFinished >= Sys_Global.pauseRelativeTime) return;
 		if (logType == AudioLogType.Papers) return;
 		if (logType == AudioLogType.TextOnly) return;
 		if (logType == AudioLogType.Vmail) return;
@@ -1216,7 +1216,7 @@ public class MFDManager : MonoBehaviour  {
 		logReaderContainer.GetComponent<LogTextReaderManager>().SendTextToReader(index);
 		logTable.SetActive(false);
 		logLevelsFolder.SetActive(false);
-		if (Const.a.audioLogs[index] != null) logFinished = PauseScript.a.relativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
+		if (Const.a.audioLogs[index] != null) logFinished = Sys_Global.pauseRelativeTime + Const.a.audioLogs[index].length + 0.1f; //add slight delay after log is finished playing to make sure we don't cut off audio in case there's a frame delay for audio start
 		logActive = true;
 		logType = Const.a.audioLogType[index];
 	}
@@ -1689,7 +1689,7 @@ public class MFDManager : MonoBehaviour  {
 
 	public void NotifyToCenterTab(int tabNum) {
 		tabNotified[tabNum] = true;
-		centerTabsTickFinished = PauseScript.a.relativeTime + centerTabsTickTime;
+		centerTabsTickFinished = Sys_Global.pauseRelativeTime + centerTabsTickTime;
 		ToggleHighlightOnCenterTabButton(tabNum);
 	}
 

@@ -37,7 +37,7 @@ public class AIAnimationController : MonoBehaviour {
 	public void Start () {
 	    if (initialized) return;
 	    
-	    animSwapFinished = PauseScript.a.relativeTime;
+	    animSwapFinished = Sys_Global.pauseRelativeTime;
 		anim = GetComponent<Animator>();
 		smR = GetComponentInChildren<SkinnedMeshRenderer>(true);
 		if (smR != null) checkVisWithSMR = true;
@@ -68,7 +68,7 @@ public class AIAnimationController : MonoBehaviour {
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) {
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
 			if (!pauseStateUpdated) {
 				if (anim.speed != 0) anim.speed = 0;
 				pauseStateUpdated = true;
@@ -95,7 +95,7 @@ public class AIAnimationController : MonoBehaviour {
 			return;
 		}
 		
-		if (aic.currentState == AIState.Run && aic.tranquilizeFinished >= PauseScript.a.relativeTime) {
+		if (aic.currentState == AIState.Run && aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
 			Idle();
 			return;
 		}
@@ -115,7 +115,7 @@ public class AIAnimationController : MonoBehaviour {
 	}
 
 	void Idle () {
-		if (aic.asleep || aic.tranquilizeFinished >= PauseScript.a.relativeTime) {
+		if (aic.asleep || aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
 			if (anim.speed > 0) anim.speed = 0;
 		} else {
 			if (anim.speed != 1f) anim.speed = 1f;
@@ -150,8 +150,8 @@ public class AIAnimationController : MonoBehaviour {
 			}
 		} else {
 			 // Prevent flickering by using a delay timer.
-			if (animSwapFinished < PauseScript.a.relativeTime) {
-				animSwapFinished = PauseScript.a.relativeTime + 0.5f;
+			if (animSwapFinished < Sys_Global.pauseRelativeTime) {
+				animSwapFinished = Sys_Global.pauseRelativeTime + 0.5f;
 				anim.Play("Idle");
 				clipName = "Idle";
 			}

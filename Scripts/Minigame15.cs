@@ -90,7 +90,7 @@ public class Minigame15 : MonoBehaviour {
                 new Vector3(position[i].x,position[i].y,0f);
         }
 
-        slideTickFinished = PauseScript.a.relativeTime;
+        slideTickFinished = Sys_Global.pauseRelativeTime;
     }
 
     private void SetAlignments() {
@@ -121,8 +121,8 @@ public class Minigame15 : MonoBehaviour {
     }
 
     void Update() {
-        if (PauseScript.a.Paused()) return;
-        if (PauseScript.a.MenuActive()) return;
+        if (Sys_Global.gamePaused) return;
+        if (Sys_Global.menuActive) return;
 
         if      (AABBCursorCheck(col1Left,col1Right,row1Up,row1Dn)) BtnCheck(1);
         else if (AABBCursorCheck(col2Left,col2Right,row1Up,row1Dn)) BtnCheck(2);
@@ -153,11 +153,11 @@ public class Minigame15 : MonoBehaviour {
             }
         }
 
-        if (slideTickFinished < PauseScript.a.relativeTime) {
-            float tdiff = PauseScript.a.relativeTime - slideTickFinished;
+        if (slideTickFinished < Sys_Global.pauseRelativeTime) {
+            float tdiff = Sys_Global.pauseRelativeTime - slideTickFinished;
             float tickCount = tdiff / 0.04f;
             float shift = tickCount * 12f;
-            slideTickFinished = PauseScript.a.relativeTime + 0.04f;
+            slideTickFinished = Sys_Global.pauseRelativeTime + 0.04f;
             for (int i=1;i<=16;i++) {
                 if (!sliding[i]) continue;
 
@@ -211,7 +211,7 @@ public class Minigame15 : MonoBehaviour {
             ydiff = Mathf.Abs(ydiff) > 2f ? ydiff : 0f;
             Vector2 sliddirBefore = new Vector2(xdiff,ydiff);
             slideDir[to] = new Vector2(Utils.Sign(xdiff),Utils.Sign(ydiff));
-            slideTickFinished = PauseScript.a.relativeTime + 0.1f;
+            slideTickFinished = Sys_Global.pauseRelativeTime + 0.1f;
         }
 
         curNum[to] = fromNum;

@@ -27,7 +27,7 @@ public class BioMonitor : MonoBehaviour {
 	}
 
     void Update() {
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
 		if (!Inventory.a.hardwareIsActive[6]) return;
 		if (beatFinished >= Time.time) return;
 

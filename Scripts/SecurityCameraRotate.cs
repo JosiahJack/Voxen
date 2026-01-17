@@ -21,7 +21,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start () {
-		waitingFinished = PauseScript.a.relativeTime;
+		waitingFinished = Sys_Global.pauseRelativeTime;
 		rotatePositive = true;
 		if (this.enabled) active = true;
 		else active = false;
@@ -32,7 +32,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (mR != null) {
 				if (!mR.isVisible || !mR.enabled) return;
 			} else {
@@ -40,7 +40,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 				return;
 			}
 
-			if (waitingFinished < PauseScript.a.relativeTime) {
+			if (waitingFinished < Sys_Global.pauseRelativeTime) {
 				if (rotatePositive) RotatePositive();
 				else                RotateNegative();
 			}
@@ -51,7 +51,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 		if (((transform.rotation.eulerAngles.y + 1f) >= endYAngle)
 			&& ((transform.rotation.eulerAngles.y - 1f) <= endYAngle)) {
 			rotatePositive = false;
-			waitingFinished = PauseScript.a.relativeTime + waitTime;
+			waitingFinished = Sys_Global.pauseRelativeTime + waitTime;
 			return;
 		}
 		
@@ -63,7 +63,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 		if (((transform.rotation.eulerAngles.y + 1f) >= startYAngle)
 			&& ((transform.rotation.eulerAngles.y - 1f) <= startYAngle)) {
 			rotatePositive = true;
-			waitingFinished = PauseScript.a.relativeTime + waitTime;
+			waitingFinished = Sys_Global.pauseRelativeTime + waitTime;
 			return;
 		}
 		

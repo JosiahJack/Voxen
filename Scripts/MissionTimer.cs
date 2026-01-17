@@ -21,7 +21,7 @@ public class MissionTimer : MonoBehaviour {
 	void Awake() {
 		a = this;
 		a.t = 6000f;
-		a.timerFinished = PauseScript.a.relativeTime + 1f;
+		a.timerFinished = Sys_Global.pauseRelativeTime + 1f;
 		a.currentMission = Const.a.stringTable[504];
 		a.currentMissionIndex = 0;
 		a.timesUP = false;
@@ -47,8 +47,8 @@ public class MissionTimer : MonoBehaviour {
 
     void Update() {
 		if (Const.a.difficultyMission < 3) return;
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 		if (MouseLookScript.a.inCyberSpace) return; // timer doesn't count down in cyberspace, yay!
 
 		if (timesUP) {
@@ -85,13 +85,13 @@ public class MissionTimer : MonoBehaviour {
 			case 3: if (Const.a.questData.BridgeSeparated) UpdateToNextMission(2700f,506,4); break;
 		}
 
-		if (timerFinished < PauseScript.a.relativeTime) {
+		if (timerFinished < Sys_Global.pauseRelativeTime) {
 			t -= 1f;
 			minutes = Mathf.Floor(t/60f);
 			seconds = t - (minutes*60);
 			text.text = (minutes.ToString("00") + ":" + seconds.ToString("00"));
 			timerTypeText.text = currentMission;
-			timerFinished = PauseScript.a.relativeTime + 1f;
+			timerFinished = Sys_Global.pauseRelativeTime + 1f;
 		}
     }
 }

@@ -661,10 +661,10 @@ public class Music : MonoBehaviour {
             if (remaining > audBuffer) return;
         }
 
-		if (inCombat && !inZone && combatImpulseFinished < PauseScript.a.relativeTime) {
+		if (inCombat && !inZone && combatImpulseFinished < Sys_Global.pauseRelativeTime) {
 			inCombat = false;
 			PlayTrack(LevelManager.a.currentLevel,TrackType.Combat, MusicType.Override);
-			combatImpulseFinished = PauseScript.a.relativeTime + 20f;
+			combatImpulseFinished = Sys_Global.pauseRelativeTime + 20f;
 			return;
 		}
 

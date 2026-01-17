@@ -14,7 +14,7 @@ public class DelayedSpawn : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void OnEnable() {
-		if (PauseScript.a != null) timerFinished = PauseScript.a.relativeTime + delay;
+		if (PauseScript.a != null) timerFinished = Sys_Global.pauseRelativeTime + delay;
         else timerFinished = delay;
 
 		active = true;
@@ -22,7 +22,7 @@ public class DelayedSpawn : MonoBehaviour {
 
 	void Update() {
 		if (!active) return;
-		if (timerFinished >= PauseScript.a.relativeTime) return;
+		if (timerFinished >= Sys_Global.pauseRelativeTime) return;
 
 		active = false; // Once only, unless we do self after the list.
 		for (int i=0;i<objectsToSpawn.Length;i++) {

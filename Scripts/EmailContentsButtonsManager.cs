@@ -7,7 +7,7 @@ public class EmailContentsButtonsManager : MonoBehaviour {
 	public MultiMediaLogButton[] mmLBs;
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			for (int i=0; i<EmailButtons.Length; i++) {
 				// Only show category buttons for levels we have logs from
 				if (mmLBs[i].logReferenceIndex == -1) continue;

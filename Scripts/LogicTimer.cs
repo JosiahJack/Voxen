@@ -13,17 +13,17 @@ public class LogicTimer : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		intervalFinished = PauseScript.a.relativeTime + (useRandomTimes ? Random.Range(randomMin,randomMax) : timeInterval);
+		intervalFinished = Sys_Global.pauseRelativeTime + (useRandomTimes ? Random.Range(randomMin,randomMax) : timeInterval);
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive() && active) {
-			if (intervalFinished < PauseScript.a.relativeTime) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive && active) {
+			if (intervalFinished < Sys_Global.pauseRelativeTime) {
 				if (useRandomTimes) {
-					intervalFinished = PauseScript.a.relativeTime
+					intervalFinished = Sys_Global.pauseRelativeTime
 									   + Random.Range(randomMin,randomMax);
 				} else {
-					intervalFinished = PauseScript.a.relativeTime
+					intervalFinished = Sys_Global.pauseRelativeTime
 									   + timeInterval;
 				}
 				UseTargets();

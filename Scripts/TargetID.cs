@@ -41,7 +41,7 @@ public class TargetID : MonoBehaviour {
 
 		if (dd.attackType == AttackType.Tranq) {
 			currentText = Const.a.stringTable[536]; // STUNNED
-			damageTimeFinished = PauseScript.a.relativeTime - 1f; // Expire damage text, Update handles "STUNNED"
+			damageTimeFinished = Sys_Global.pauseRelativeTime - 1f; // Expire damage text, Update handles "STUNNED"
 		} else {
 			if (damage > linkedHM.maxhealth * 0.75f) {
 				currentText = Const.a.stringTable[514]; // SEVERE DAMAGE
@@ -55,7 +55,7 @@ public class TargetID : MonoBehaviour {
 				currentText = Const.a.stringTable[511]; // NO DAMAGE
 			}
 			damageTime = (damage == 0f) ? 1f : 2.5f;
-			damageTimeFinished = PauseScript.a.relativeTime + damageTime;
+			damageTimeFinished = Sys_Global.pauseRelativeTime + damageTime;
 			text.text = currentText;
 		}
 	}
@@ -81,7 +81,7 @@ public class TargetID : MonoBehaviour {
 			}
 
 			if (linkedHM.isNPC && linkedHM.aic != null) {
-				if (linkedHM.aic.tranquilizeFinished > PauseScript.a.relativeTime) {
+				if (linkedHM.aic.tranquilizeFinished > Sys_Global.pauseRelativeTime) {
 					stunned = true;
 				} else {
 					stunned = false;
@@ -105,7 +105,7 @@ public class TargetID : MonoBehaviour {
 			return;
 		}
 
-		if (lifetimeFinished < PauseScript.a.relativeTime) {
+		if (lifetimeFinished < Sys_Global.pauseRelativeTime) {
 			Deactivate();
 			return;
 		}
@@ -152,11 +152,11 @@ public class TargetID : MonoBehaviour {
 		if (currentText != System.String.Empty) {
 			if (linkedHM != null) {
 				if (linkedHM.aic != null) {
-					if (linkedHM.aic.tranquilizeFinished > PauseScript.a.relativeTime
-						&& damageTimeFinished < PauseScript.a.relativeTime) {
+					if (linkedHM.aic.tranquilizeFinished > Sys_Global.pauseRelativeTime
+						&& damageTimeFinished < Sys_Global.pauseRelativeTime) {
 						currentText = Const.a.stringTable[536]; // STUNNED
 					} else {
-						if (damageTimeFinished < PauseScript.a.relativeTime) {
+						if (damageTimeFinished < Sys_Global.pauseRelativeTime) {
 							currentText = "";
 							if (!Inventory.a.hasHardware[4]
 								&& (currentText != Const.a.stringTable[511])) {

@@ -45,8 +45,8 @@ public class LightAnimation : MonoBehaviour {
 		differenceInIntensity = (maxIntensity - minIntensity);
 		if (intervalSteps.Length != 0) {
 			stepTime = intervalSteps[currentStep];
-			lerpTime = PauseScript.a.relativeTime + stepTime;
-			lerpStartTime = PauseScript.a.relativeTime;
+			lerpTime = Sys_Global.pauseRelativeTime + stepTime;
+			lerpStartTime = Sys_Global.pauseRelativeTime;
 		} else {
 			noSteps = true;
 			animLight.intensity = maxIntensity;
@@ -99,12 +99,12 @@ public class LightAnimation : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (lightOn) {
 				if (!noSteps) {
 					if (lerpUp) {
 						// Going from minIntensity to maxIntensity
-						if (lerpTime < PauseScript.a.relativeTime) {
+						if (lerpTime < Sys_Global.pauseRelativeTime) {
 							if (animLight.intensity != maxIntensity) {
 								animLight.intensity = maxIntensity;
 								ScaleSEGIEmitter();
@@ -116,15 +116,15 @@ public class LightAnimation : MonoBehaviour {
 								currentStep = 0;
 
 							stepTime = intervalSteps[currentStep];
-							lerpTime = PauseScript.a.relativeTime + stepTime;
-							lerpStartTime = PauseScript.a.relativeTime;
+							lerpTime = Sys_Global.pauseRelativeTime + stepTime;
+							lerpStartTime = Sys_Global.pauseRelativeTime;
 							if (lerpTime == 0f)
 								lerpTime = 0.1f;
 						} else {
 							if (lerpOn) {
 								if (currentStep < intervalStepisLerping.Length) {
 									if (intervalStepisLerping[currentStep]) {
-										lerpValue = (PauseScript.a.relativeTime - lerpStartTime)/(lerpTime - lerpStartTime); // percent towards goal time
+										lerpValue = (Sys_Global.pauseRelativeTime - lerpStartTime)/(lerpTime - lerpStartTime); // percent towards goal time
 										lerpValue = minIntensity + (differenceInIntensity * (lerpValue));
 										if (animLight.intensity != lerpValue) {
 											animLight.intensity = lerpValue;
@@ -136,7 +136,7 @@ public class LightAnimation : MonoBehaviour {
 						}
 					} else {
 						// Going from maxIntensity to minIntensity
-						if (lerpTime < PauseScript.a.relativeTime) {
+						if (lerpTime < Sys_Global.pauseRelativeTime) {
 							if (animLight.intensity != minIntensity) {
 								animLight.intensity = minIntensity;
 								ScaleSEGIEmitter();
@@ -148,8 +148,8 @@ public class LightAnimation : MonoBehaviour {
 								currentStep = 0;
 							
 							stepTime = intervalSteps[currentStep];
-							lerpTime = PauseScript.a.relativeTime + stepTime;
-							lerpStartTime = PauseScript.a.relativeTime;
+							lerpTime = Sys_Global.pauseRelativeTime + stepTime;
+							lerpStartTime = Sys_Global.pauseRelativeTime;
 							if (lerpTime == 0f)
 								lerpTime = 0.1f;
 						} else {
@@ -159,7 +159,7 @@ public class LightAnimation : MonoBehaviour {
 
 								if (currentStep < intervalStepisLerping.Length) {
 									if (intervalStepisLerping[currentStep]) {
-										lerpValue = (PauseScript.a.relativeTime - lerpStartTime)/(lerpTime - lerpStartTime); // percent towards goal time
+										lerpValue = (Sys_Global.pauseRelativeTime - lerpStartTime)/(lerpTime - lerpStartTime); // percent towards goal time
 										lerpValue = minIntensity + (differenceInIntensity * (1-lerpValue));
 										if (animLight.intensity != lerpValue) {
 											animLight.intensity = lerpValue;

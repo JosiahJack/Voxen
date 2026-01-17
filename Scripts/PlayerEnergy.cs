@@ -28,7 +28,7 @@ public class PlayerEnergy : MonoBehaviour {
 		tempF = 0;
 		drainJPM = 0;
 		energy = 54f; //max is 255 
-		tickFinished = PauseScript.a.relativeTime + tick + Random.value; // random offset seed to prevent ticks lining up and causing frame hiccups
+		tickFinished = Sys_Global.pauseRelativeTime + tick + Random.value; // random offset seed to prevent ticks lining up and causing frame hiccups
     }
     
     void TargetIdentifierSenseTargets() {
@@ -58,10 +58,10 @@ public class PlayerEnergy : MonoBehaviour {
     }
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			tempF = 1f;
 			bool activeEnergyDrainers = false;
-			if (tickFinished < PauseScript.a.relativeTime) {
+			if (tickFinished < Sys_Global.pauseRelativeTime) {
 				drainJPM = 0;
 				// 0 System Analyzer doesn't take energy
 
@@ -138,7 +138,7 @@ public class PlayerEnergy : MonoBehaviour {
 					activeEnergyDrainers = true;
 					TakeEnergy(tempF);
 				}
-				tickFinished = PauseScript.a.relativeTime + tick;
+				tickFinished = Sys_Global.pauseRelativeTime + tick;
 			}
 
 			// Turn everything off when we are out of energy

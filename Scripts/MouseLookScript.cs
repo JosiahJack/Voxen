@@ -128,7 +128,7 @@ public class MouseLookScript : MonoBehaviour {
 		firstTimePickup = true;
 		firstTimeSearch = true;
 		inCyberSpace = false;
-		shakeFinished = PauseScript.a.relativeTime;
+		shakeFinished = Sys_Global.pauseRelativeTime;
 		returnFromCyberspaceFinished = 0;
 		dropFinished = 0;
 
@@ -137,9 +137,9 @@ public class MouseLookScript : MonoBehaviour {
         // -> -> MainCamera: MouseLookScript component.
 		playerCapsuleTransform = transform.parent.transform.parent.transform;
 
-		randomShakeFinished = PauseScript.a.relativeTime;
-		randomKlaxonFinished = PauseScript.a.relativeTime;
-		headBobShiftFinished = PauseScript.a.relativeTime;
+		randomShakeFinished = Sys_Global.pauseRelativeTime;
+		randomKlaxonFinished = Sys_Global.pauseRelativeTime;
+		headBobShiftFinished = Sys_Global.pauseRelativeTime;
 		bobTarget = 0.3f;
     }
     
@@ -158,7 +158,7 @@ public class MouseLookScript : MonoBehaviour {
 			MainMenuHandler.a.LoadGame(7);
 		}
 
-        if (PauseScript.a.MenuActive()) {
+        if (Sys_Global.menuActive) {
 			// Ignore mouselook and turn off camera when main menu is up.
 			if (!MainMenuHandler.a.fileBrowserOpen) Cursor.visible = false;
 			else Cursor.visible = true;
@@ -167,8 +167,8 @@ public class MouseLookScript : MonoBehaviour {
 			return;
 		}
 
-		if (PauseScript.a.Paused()) return;
-		if (PlayerMovement.a.ressurectingFinished > PauseScript.a.relativeTime) return;
+		if (Sys_Global.gamePaused) return;
+		if (PlayerMovement.a.ressurectingFinished > Sys_Global.pauseRelativeTime) return;
 
 		Utils.EnableCamera(playerCamera);
 
@@ -194,14 +194,14 @@ public class MouseLookScript : MonoBehaviour {
 			&& LevelManager.a.currentLevel != 13   // Not Cyberspace
 			&& LevelManager.a.currentLevel != 9) { // Not the bridge, separated
 
-			if (randomShakeFinished < PauseScript.a.relativeTime) {
-				randomShakeFinished = PauseScript.a.relativeTime
+			if (randomShakeFinished < Sys_Global.pauseRelativeTime) {
+				randomShakeFinished = Sys_Global.pauseRelativeTime
 				                      + UnityEngine.Random.Range(5f,20f);
 				ScreenShake(3f,2f);
 			}
 			
-			if (randomKlaxonFinished < PauseScript.a.relativeTime) {
-				randomKlaxonFinished = PauseScript.a.relativeTime
+			if (randomKlaxonFinished < Sys_Global.pauseRelativeTime) {
+				randomKlaxonFinished = Sys_Global.pauseRelativeTime
 				                       + UnityEngine.Random.Range(10f,20f);
 
 				Utils.PlayUIOneShotSavable(104); // klaxon
@@ -1015,7 +1015,7 @@ public class MouseLookScript : MonoBehaviour {
 		// If not shaking or bobbing, this will stay this to lerp to normal.
 // 		headBobY = Const.a.playerCameraOffsetY
 // 				   * PlayerMovement.a.currentCrouchRatio;
-		if (shakeFinished > PauseScript.a.relativeTime) {
+		if (shakeFinished > Sys_Global.pauseRelativeTime) {
 			headBobX = transform.localPosition.x
 					   + UnityEngine.Random.Range(shakeForce * -0.17f,
 												  shakeForce * 0.17f);
@@ -1034,8 +1034,8 @@ public class MouseLookScript : MonoBehaviour {
 			if (PlayerMovement.a.relForward + PlayerMovement.a.relSideways != 0
 				&& Const.a.HeadBob) {
 
-				if (headBobShiftFinished < PauseScript.a.relativeTime) {
-					headBobShiftFinished = PauseScript.a.relativeTime + 0.2f;
+				if (headBobShiftFinished < Sys_Global.pauseRelativeTime) {
+					headBobShiftFinished = Sys_Global.pauseRelativeTime + 0.2f;
 					if (!PlayerMovement.a.isSprinting) {
 						headBobShiftFinished += 0.1f;
 					}
@@ -1303,7 +1303,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (inventoryMode) return;
 
 		GUIState.a.ClearOverButton();
-		if (PauseScript.a.MenuActive() || PauseScript.a.Paused()) {
+		if (Sys_Global.menuActive || Sys_Global.gamePaused) {
 			Cursor.lockState = CursorLockMode.None;
 		} else {
 			#if UNITY_EDITOR
@@ -1399,7 +1399,7 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	public void ScreenShake (float force, float duration) {
-		shakeFinished = PauseScript.a.relativeTime + duration;
+		shakeFinished = Sys_Global.pauseRelativeTime + duration;
 		if (force < 0.48f) shakeForce = force;
 		else shakeForce = 0.48f;
 	}

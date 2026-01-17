@@ -20,7 +20,7 @@ public class FireWorkThang : MonoBehaviour {
     }
 
     void OnEnable() {
-        tickFinished = PauseScript.a.relativeTime;
+        tickFinished = Sys_Global.pauseRelativeTime;
         curScale = Random.Range(minScale,maxScale);
         if (changeFracPerSecond < 0.001f) changeFracPerSecond = 0.5f; // 2 secs
         waitAtFull = false;
@@ -32,18 +32,18 @@ public class FireWorkThang : MonoBehaviour {
     }
 
     void Update() {
-        if (PauseScript.a.Paused()) return;
-        if (PauseScript.a.MenuActive()) return;
-        if (tickFinished >= PauseScript.a.relativeTime) return;
+        if (Sys_Global.gamePaused) return;
+        if (Sys_Global.menuActive) return;
+        if (tickFinished >= Sys_Global.pauseRelativeTime) return;
 
         float delta = (1f / 60f);
-        tickFinished = PauseScript.a.relativeTime + delta;
+        tickFinished = Sys_Global.pauseRelativeTime + delta;
         if (waitAtFull) {
             waitAtFull = false;
             waitAtMin = false;
             curScale = minScale;
             waitAtMin = true;
-            tickFinished = PauseScript.a.relativeTime
+            tickFinished = Sys_Global.pauseRelativeTime
                            + Random.Range(waitTimeMinMin,waitTimeMinMax);
         } else if (waitAtMin) {
             waitAtMin = false;
@@ -56,7 +56,7 @@ public class FireWorkThang : MonoBehaviour {
         if (curScale > maxScale) {
             curScale = maxScale;
             waitAtFull = true;
-            tickFinished = PauseScript.a.relativeTime + waitTimeFull;
+            tickFinished = Sys_Global.pauseRelativeTime + waitTimeFull;
         }
 
         transform.localScale = new Vector3(curScale,curScale,curScale);

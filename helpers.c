@@ -135,6 +135,10 @@ uint8_t random_range_u8(uint8_t a, uint8_t b) {
     return (uint8_t)(a + (v % n));
 }
 
+uint8_t random_range(float a, float b) {
+    return a + ((b - a) * ((float)rand() / RAND_MAX));
+}
+
 int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
 
 // Using "relative time" = pauseRelativeTime and "finished" = some

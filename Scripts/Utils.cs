@@ -1547,7 +1547,7 @@ public class Utils {
 		return index;
 	}
 
-    // Using "relative time" = PauseScript.a.relativeTime and "finished" = some
+    // Using "relative time" = Sys_Global.pauseRelativeTime and "finished" = some
     // script's timer float value, e.g. attackFinished, in the notes below...
     //
     // If the relative time is 123 when we save and finished is 156, then when
@@ -1572,7 +1572,7 @@ public class Utils {
 													  string name) {
 
         if (PauseScript.a == null) return name + ":0000.00000";
-        float val = timerValue - PauseScript.a.relativeTime; // Remove current
+        float val = timerValue - Sys_Global.pauseRelativeTime; // Remove current
                                                              // instance's
                                                              // relative time.
         return FloatToString(val,name);
@@ -1583,7 +1583,7 @@ public class Utils {
 
         float val = GetFloatFromString(savedTimer,name);
         if (PauseScript.a == null) return val;
-        return PauseScript.a.relativeTime + val; // Add current instance's
+        return Sys_Global.pauseRelativeTime + val; // Add current instance's
                                                  // relative time to get same
                                                  // timer in context of current
                                                  // time.  See above notes.

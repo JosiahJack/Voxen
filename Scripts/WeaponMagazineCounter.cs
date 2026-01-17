@@ -35,7 +35,7 @@ public class WeaponMagazineCounter : MonoBehaviour {
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
 		
 		int index = WeaponCurrent.a.weaponCurrent; // 0 to 6, 7 slots
 		// Changed from this:

@@ -13,7 +13,7 @@ public class CyberTimer : MonoBehaviour {
 
 	void Awake() {
 		t = 60f * 10f;
-		timerFinished = PauseScript.a.relativeTime + 1f;
+		timerFinished = Sys_Global.pauseRelativeTime + 1f;
 	}
 
     public void Reset(int diff) {
@@ -26,14 +26,14 @@ public class CyberTimer : MonoBehaviour {
     }
 
     void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (t <= 0) MouseLookScript.a.ExitCyberspace();
-			if (timerFinished < PauseScript.a.relativeTime) {
+			if (timerFinished < Sys_Global.pauseRelativeTime) {
 				t -= 1f;
 				minutes = Mathf.Floor(t/60f);
 				seconds = t - (minutes*60);
 				text.text = (minutes.ToString("00") + ":" + seconds.ToString("00"));
-				timerFinished = PauseScript.a.relativeTime + 1f;
+				timerFinished = Sys_Global.pauseRelativeTime + 1f;
 			}
 		}
     }

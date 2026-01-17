@@ -142,7 +142,7 @@ public class WeaponCurrent : MonoBehaviour {
 	}
 
 	public void WeaponChange(int useableItemIndex, int buttonIndex) {
-		if (WeaponFire.a.reloadFinished > PauseScript.a.relativeTime) return;
+		if (WeaponFire.a.reloadFinished > Sys_Global.pauseRelativeTime) return;
 		if (useableItemIndex == -1 || buttonIndex > 6 || buttonIndex < 0) {
 			MFDManager.a.SetAmmoIcons(-1,false); // Clear the ammo icons.
 			//Debug.Log("Early exit on WeaponChange() in WeaponCurrent.cs!");
@@ -163,8 +163,8 @@ public class WeaponCurrent : MonoBehaviour {
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		if (justChangedWeap) {
 			justChangedWeap = false;
@@ -177,8 +177,8 @@ public class WeaponCurrent : MonoBehaviour {
 	}
 
 	public void UpdateWeaponViewModels() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		int useableIndex = weaponIndex;
 		int setWep = weaponIndex;

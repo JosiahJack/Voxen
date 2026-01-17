@@ -25,12 +25,12 @@ public class TeleportTouch : MonoBehaviour {
 		if (col.gameObject.CompareTag("Player")) {
 			HealthManager hm = Utils.GetMainHealthManager(col.gameObject);
 			if (hm != null) {
-				if (hm.health > 0f && justUsed < PauseScript.a.relativeTime) {
+				if (hm.health > 0f && justUsed < Sys_Global.pauseRelativeTime) {
 					MFDManager.a.teleportFX.SetActive(true);
 					TeleportTouch tt = allTeleportTouches[targetDestinationID];
 					if (tt != null) {
 						col.transform.position = tt.transform.position; // Do it!
-						tt.justUsed = PauseScript.a.relativeTime + 1.0f;
+						tt.justUsed = Sys_Global.pauseRelativeTime + 1.0f;
 					}
 					
 					Utils.PlayUIOneShotSavable(106);

@@ -1,47 +1,6 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics; // Stopwatch
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Runtime.Serialization;
-using System.Text;
-using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.SceneManagement;
-using UnityEngine.Networking;
-
-// GLOBAL SCRIPT EXECUTION ORDER (set in Unity Project Settings, here for ref)
-// UnityEngine.EventSystems.EventSystems.EventSystem -1000
-// Music           -950
-// Const           -900
-// PauseScript     -899
-// Level           -800
-// LevelManager    -700
-// MainMenuHandler -500
-// UnityEngine.InputSystem.PlayerInput -100
-//                 --   Default Time   --
-// UnityEngine.UI.ToggleGroup 10
-// PlayerReferenceManager 100
-// HealthManager    400
-// MFDManager       600
-// AIController     700
-// CameraView       750
-// DynamicCulling   800
-// TargetIO         950
-// SEGI            1100
-// UnityStandardAssets.ImageEffects.ScreenSpaceAmbientOcclusion 1200
-// TextLocalization 1300
 
 public class Const : MonoBehaviour {
-	public float shadowThreshold = 0.042f; // checked in inspector to be 0.042f too
-	//Item constants
-	public QuestBits questData;
-	public Texture2D[] useableItemsFrobIcons;
-    public Sprite[] useableItemsIcons;
 
-	//Audiolog constants
 	public string[] audiologNames;
 	[HideInInspector] public string[] audiologSenders;
 	public string[] audiologSubjects;
@@ -116,88 +75,6 @@ public class Const : MonoBehaviour {
 	 MeleeEnergy
 	 Projectile // index 15*/
 
-	//NPC constants
-	[HideInInspector] public string[] nameForNPC;
-	[HideInInspector] public AttackType[] attackTypeForNPC;
-	[HideInInspector] public AttackType[] attackTypeForNPC2;
-	[HideInInspector] public AttackType[] attackTypeForNPC3;
-	[HideInInspector] public float[] damageForNPC; // Primary attack damage
-	[HideInInspector] public float[] damageForNPC2; // Secondary attack damage
-	[HideInInspector] public float[] damageForNPC3; // Grenade attack damage
-	public float[] rangeForNPC; // Primary attack range
-	public float[] rangeForNPC2; // Secondary attack range
-	public float[] rangeForNPC3; // Grenade throw range
-	[HideInInspector] public float[] healthForNPC;
-	[HideInInspector] public float[] healthForCyberNPC;
-	[HideInInspector] public PerceptionLevel[] perceptionForNPC;
-	[HideInInspector] public float[] disruptabilityForNPC;
-	[HideInInspector] public float[] armorvalueForNPC;
-	[HideInInspector] public AIMoveType[] moveTypeForNPC;
-	[HideInInspector] public float[] defenseForNPC;
-	[HideInInspector] public float[] yawSpeedForNPC;
-	[HideInInspector] public float[] fovForNPC;
-	[HideInInspector] public float[] fovAttackForNPC;
-	[HideInInspector] public float[] fovStartMovementForNPC;
-	[HideInInspector] public float[] distToSeeBehindForNPC;
-	[HideInInspector] public float[] sightRangeForNPC;
-	[HideInInspector] public float[] walkSpeedForNPC;
-	public float[] runSpeedForNPC;
-	[HideInInspector] public float[] attack1SpeedForNPC;
-	[HideInInspector] public float[] attack2SpeedForNPC;
-	[HideInInspector] public float[] attack3SpeedForNPC;
-	[HideInInspector] public float[] attack3ForceForNPC;
-	[HideInInspector] public float[] attack3RadiusForNPC;
-	[HideInInspector] public float[] timeToPainForNPC;
-	[HideInInspector] public float[] timeBetweenPainForNPC;
-	[HideInInspector] public float[] timeTillDeadForNPC;
-	[HideInInspector] public float[] timeToActualAttack1ForNPC;
-	[HideInInspector] public float[] timeToActualAttack2ForNPC;
-	[HideInInspector] public float[] timeToActualAttack3ForNPC;
-	[HideInInspector] public float[] timeBetweenAttack1ForNPC;
-	[HideInInspector] public float[] timeBetweenAttack2ForNPC;
-	[HideInInspector] public float[] timeBetweenAttack3ForNPC;
-	[HideInInspector] public float[] timeToChangeEnemyForNPC;
-	[HideInInspector] public float[] timeIdleSFXMinForNPC;
-	[HideInInspector] public float[] timeIdleSFXMaxForNPC;
-	[HideInInspector] public float[] timeAttack1WaitMinForNPC;
-	[HideInInspector] public float[] timeAttack1WaitMaxForNPC;
-	[HideInInspector] public float[] timeAttack1WaitChanceForNPC;
-	[HideInInspector] public float[] timeAttack2WaitMinForNPC;
-	[HideInInspector] public float[] timeAttack2WaitMaxForNPC;
-	[HideInInspector] public float[] timeAttack2WaitChanceForNPC;
-	[HideInInspector] public float[] timeAttack3WaitMinForNPC;
-	[HideInInspector] public float[] timeAttack3WaitMaxForNPC;
-	[HideInInspector] public float[] timeAttack3WaitChanceForNPC;
-	[HideInInspector] public PoolType[] attack1ProjectileLaunchedTypeForNPC;
-	[HideInInspector] public PoolType[] attack2ProjectileLaunchedTypeForNPC;
-	[HideInInspector] public PoolType[] attack3ProjectileLaunchedTypeForNPC;
-	[HideInInspector] public float[] projectileSpeedAttack1ForNPC;
-	[HideInInspector] public float[] projectileSpeedAttack2ForNPC;
-	[HideInInspector] public float[] projectileSpeedAttack3ForNPC;
-	[HideInInspector] public bool[] hasLaserOnAttack1ForNPC;
-	[HideInInspector] public bool[] hasLaserOnAttack2ForNPC;
-	[HideInInspector] public bool[] hasLaserOnAttack3ForNPC;
-	[HideInInspector] public bool[] explodeOnAttack3ForNPC;
-	[HideInInspector] public bool[] preactivateMeleeCollidersForNPC;
-	public float[] huntTimeForNPC;
-	[HideInInspector] public float[] flightHeightForNPC;
-	[HideInInspector] public bool[] flightHeightIsPercentageForNPC;
-	[HideInInspector] public bool[] switchMaterialOnDeathForNPC;
-	[HideInInspector] public float[] hearingRangeForNPC;
-	[HideInInspector] public float[] timeForTranquilizationForNPC;
-	[HideInInspector] public bool[] hopsOnMoveForNPC;
-												      // NPC Sounds       0,   1,   2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
-	[HideInInspector] public int[] sfxIdleForNPC =         new   int[]{  -1,  -1,  -1, -1, 58, -1, 59, -1, 59, 52, -1, -1, -1, -1, -1, -1,121, -1, -1, -1,121,118, -1, -1, -1, -1, -1, -1, -1};
-	[HideInInspector] public int[] sfxSightSoundForNPC =   new   int[]{  -1,  -1, 111,150, 58,150, 59,152,152, -1,150,150,151,152,150, -1,121, -1,151,150,121,119,151, -1, -1, -1, -1, -1, -1};
-	[HideInInspector] public int[] sfxAttack1ForNPC =      new   int[]{  -1,  -1, 108, -1, -1,146, -1,146,252,247, -1, -1, -1, -1, -1,122, -1,108,146, -1, -1,118, -1,125,258,258,258,258,258};
-	[HideInInspector] public int[] sfxAttack2ForNPC =      new   int[]{  -1, 256,  -1,148, 50, 50, 50, 50, 50,250, 50, 50,146,259,148, -1,121, -1, -1,147, -1, -1,146, -1,258,258,258,258,258};
-	[HideInInspector] public int[] sfxAttack3ForNPC =      new   int[]{  -1,  -1,  -1, -1, -1,244,244,244,245, -1, -1,149, -1, -1, -1, -1, -1, -1, -1,244, -1, -1, -1, -1,258,258,258,258,258};
-	[HideInInspector] public int[] sfxDeathForNPC =        new   int[]{  -1,  48, 110,143, 48,145, 48, 51, 47, 47,142,143,144, 47,162,123,120,134,144,144,120,117,144,124, -1, -1, -1, -1, -1};
-	[HideInInspector] public float[] deathBurstTimerForNPC=new float[]{0.0f,0.0f, 0.1f,0.0f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.0f,0.45f,0.75f,0.1f,0.0f,0.0f,0.1f,0.224f,0.9f,0.0f,0.1f,0.1f,0.1f,0.2f,0.1f,0.1f,0.1f,0.1f,0.1f};
-	[HideInInspector] public NPCType[] typeForNPC;
-	[HideInInspector] public int[] projectile1PrefabForNPC;
-	[HideInInspector] public int[] projectile2PrefabForNPC;
-	[HideInInspector] public int[] projectile3PrefabForNPC;
 
 	// System constants
 	[HideInInspector] public string[] creditsText;
@@ -1534,7 +1411,7 @@ CreateBlackTexture:
 		
 		// Credit Stats and Times
 		s1.Clear();
-		s1.Append(Utils.FloatToString(PauseScript.a.relativeTime,"GameTime"));
+		s1.Append(Utils.FloatToString(Sys_Global.pauseRelativeTime,"GameTime"));
 		s1.Append(Utils.splitChar);
 		s1.Append(Utils.FloatToString(PauseScript.a.absoluteTime,"TotalPlayTime"));
 		s1.Append(Utils.splitChar);
@@ -1848,7 +1725,7 @@ CreateBlackTexture:
 			
 			// The global time from which everything checks it's
 			// somethingerotherFinished timer states.
-			PauseScript.a.relativeTime = Utils.GetFloatFromString(entries[index],"GameTime"); index++;
+			Sys_Global.pauseRelativeTime = Utils.GetFloatFromString(entries[index],"GameTime"); index++;
 			PauseScript.a.absoluteTime = Utils.GetFloatFromString(entries[index],"TotalPlayTime"); index++;
 			kills = Utils.GetIntFromString(entries[index],"kills"); index++;
 			cyberkills = Utils.GetIntFromString(entries[index],"cyberkills"); index++;

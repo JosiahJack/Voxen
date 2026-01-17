@@ -84,11 +84,11 @@ public class BiomonitorGraphSystem : MonoBehaviour {
         for (int y=0;y<graphHeight;y++) currentColors[y] = backgroundColor;
 
         ymax = (currentColors.Length - 1);
-		beatFinished = PauseScript.a.relativeTime;
-        tick0Finished = PauseScript.a.relativeTime + tick0;
-        tick1Finished = PauseScript.a.relativeTime + tick1;
-        tick2Finished = PauseScript.a.relativeTime + tick2;
-        tickFinished = PauseScript.a.relativeTime + tick;
+		beatFinished = Sys_Global.pauseRelativeTime;
+        tick0Finished = Sys_Global.pauseRelativeTime + tick0;
+        tick1Finished = Sys_Global.pauseRelativeTime + tick1;
+        tick2Finished = Sys_Global.pauseRelativeTime + tick2;
+        tickFinished = Sys_Global.pauseRelativeTime + tick;
         currentIndex0 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
         currentIndex1 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
         currentIndex2 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
@@ -108,32 +108,32 @@ public class BiomonitorGraphSystem : MonoBehaviour {
     }
 
     public void IncrementERG() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
         currentIndex0++;
         if (currentIndex0 >= graphWidth) currentIndex0 = 0;
     }
 
     public void IncrementCHI() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
         currentIndex1++;
         if (currentIndex1 >= graphWidth) currentIndex1 = 0;
     }
 
     public void IncrementECG() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
         currentIndex2++;
         if (currentIndex2 >= graphWidth) currentIndex2 = 0;
     }
 
     public void Update() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		// Energy Usage
 		ergValue = (PlayerEnergy.a.drainJPM / 255f);
@@ -142,25 +142,25 @@ public class BiomonitorGraphSystem : MonoBehaviour {
 
 		// Chi Brain Waves
         float brainFactor = 0.15f;
-        if (PlayerPatch.a.geniusFinishedTime > PauseScript.a.relativeTime) {
+        if (PlayerPatch.a.geniusFinishedTime > Sys_Global.pauseRelativeTime) {
             brainFactor = 0.35f + UnityEngine.Random.Range(-0.3f,0.3f);
         }
 
         if (MFDManager.a.FPS.activeInHierarchy) {
             chiValue = ((MFDManager.a.msecs/16f) * 0.5f) - 2f;
         } else {
-            chiValue = Mathf.Sin(PauseScript.a.relativeTime * 10f * brainFactor);
+            chiValue = Mathf.Sin(Sys_Global.pauseRelativeTime * 10f * brainFactor);
         }
 
 		// ECG: Create shifted sine wave for heart beat.
 		// Apply percent fatigued to 200bpm max heart rate with baseline 50bpm.
 		fatigueFactor = ((PlayerMovement.a.fatigue / 100f) * 120f) + graphAdd;
         fatigueFactor = fatigueFactor / 60f;
-		if (beatFinished < PauseScript.a.relativeTime) {
-            beatFinished = PauseScript.a.relativeTime + (1f/fatigueFactor);
+		if (beatFinished < Sys_Global.pauseRelativeTime) {
+            beatFinished = Sys_Global.pauseRelativeTime + (1f/fatigueFactor);
         }
 
-		beatShift = (beatFinished - PauseScript.a.relativeTime)
+		beatShift = (beatFinished - Sys_Global.pauseRelativeTime)
                     / (1f/fatigueFactor);
 		if (beatShift > 0.94f) ecgValue = Mathf.Sin(beatShift * freq);
 		else ecgValue = 0;
@@ -170,8 +170,8 @@ public class BiomonitorGraphSystem : MonoBehaviour {
 			ecgValue += UnityEngine.Random.Range(-beatVariation,beatVariation);
 		}
 
-        if (tick0Finished < PauseScript.a.relativeTime) {
-            tick0Finished = PauseScript.a.relativeTime + tick0;
+        if (tick0Finished < Sys_Global.pauseRelativeTime) {
+            tick0Finished = Sys_Global.pauseRelativeTime + tick0;
             Push(0,ergValue);
             IncrementERG();
             Push(0,ergValue);
@@ -179,11 +179,11 @@ public class BiomonitorGraphSystem : MonoBehaviour {
             Push(0,ergValue);
         }
 
-        if (tick1Finished < PauseScript.a.relativeTime) {
+        if (tick1Finished < Sys_Global.pauseRelativeTime) {
             if (MFDManager.a.FPS.activeInHierarchy) {
-                tick1Finished = PauseScript.a.relativeTime + tick2;
+                tick1Finished = Sys_Global.pauseRelativeTime + tick2;
             } else {
-                tick1Finished = PauseScript.a.relativeTime + tick1;
+                tick1Finished = Sys_Global.pauseRelativeTime + tick1;
             }
             Push(1,chiValue);
             IncrementCHI();
@@ -194,8 +194,8 @@ public class BiomonitorGraphSystem : MonoBehaviour {
             Push(1,chiValue);
         }
 
-        if (tick2Finished < PauseScript.a.relativeTime) {
-            tick2Finished = PauseScript.a.relativeTime + tick2;
+        if (tick2Finished < Sys_Global.pauseRelativeTime) {
+            tick2Finished = Sys_Global.pauseRelativeTime + tick2;
             Push(2,ecgValue);
             IncrementECG();
             Push(2,ecgValue);
@@ -268,8 +268,8 @@ public class BiomonitorGraphSystem : MonoBehaviour {
             }
         }
 
-        if (tickFinished < PauseScript.a.relativeTime) {
-            tickFinished = PauseScript.a.relativeTime + tick;
+        if (tickFinished < Sys_Global.pauseRelativeTime) {
+            tickFinished = Sys_Global.pauseRelativeTime + tick;
             IncrementERG();
             IncrementCHI();
             IncrementECG();

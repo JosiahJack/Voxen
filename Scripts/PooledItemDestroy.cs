@@ -8,13 +8,13 @@ public class PooledItemDestroy : MonoBehaviour {
 	private float timerFinished = 9999999f;
 
 	void OnEnable () {
-		timerFinished = PauseScript.a.relativeTime + itemLifeTime;
+		timerFinished = Sys_Global.pauseRelativeTime + itemLifeTime;
 	}
 
 	void Update() {
 		if (onlyOnce && doneYet) return;
 
-		if (timerFinished < PauseScript.a.relativeTime) {
+		if (timerFinished < Sys_Global.pauseRelativeTime) {
 			timerFinished = 9999999f;
 			if (onlyOnce) doneYet = true;
 			gameObject.SetActive(false);

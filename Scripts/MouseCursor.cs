@@ -137,7 +137,7 @@ public class MouseCursor : MonoBehaviour {
 	}
 	
 	private void EnableTooltips() {
-		if (toolTipHasText && !PauseScript.a.Paused() && !PauseScript.a.MenuActive() && (MouseLookScript.a.inventoryMode || liveGrenade)) {
+		if (toolTipHasText && !Sys_Global.gamePaused && !Sys_Global.menuActive && (MouseLookScript.a.inventoryMode || liveGrenade)) {
 			switch(toolTipType) {
 				case Handedness.LH:
 					tooltipLeft.SetActive(true);
@@ -195,7 +195,7 @@ public class MouseCursor : MonoBehaviour {
 		UpdateInventoryAddHelper();
 
 		// Maintain cursor mode.
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) {
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
 			Cursor.lockState = CursorLockMode.None;
 		} else if (MouseLookScript.a.inventoryMode) {
 // 			#if UNITY_EDITOR
@@ -217,7 +217,7 @@ public class MouseCursor : MonoBehaviour {
 			if (MinigameCursor.a.mouseOverPanel) hideCursorForMinigame = true;
 		}
 
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) {
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
             // Pause / Menu Cursor
  			SetCursorPositionMovable();
 			DisableTooltips();
@@ -316,8 +316,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void UpdateSafeZone() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		if (cursorPosition.x < (0.96925f * Screen.width) && cursorPosition.x > (0.029282f * Screen.width)
 			&& cursorPosition.y > (0.13541f * Screen.height) && cursorPosition.y < (0.70703f * Screen.height)) {
@@ -326,8 +326,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void UpdateEventSystemPointerStatus() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		pev.position = cursorPosition;
 		graphicCastResults.Clear();
@@ -358,8 +358,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void CheckIfOutOfScreenBounds() {
-		if (PauseScript.a.MenuActive()) return;
-		if (PauseScript.a.Paused()) return;
+		if (Sys_Global.menuActive) return;
+		if (Sys_Global.gamePaused) return;
 
 		if (cursorPosition.y > Screen.height || cursorPosition.y < 0
 			|| cursorPosition.x < 0 || cursorPosition.x > Screen.width) {
@@ -368,8 +368,8 @@ public class MouseCursor : MonoBehaviour {
 	}
 
 	void UpdateInventoryAddHelper() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		if (cursorPosition.y > (0.13541f*Screen.height)
 			&& cursorPosition.y < (0.70703f*Screen.height)

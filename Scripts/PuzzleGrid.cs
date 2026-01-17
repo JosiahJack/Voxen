@@ -103,7 +103,7 @@ public class PuzzleGrid : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) UpdateCellImages();
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateCellImages();
 	}
 
 	public void OnGridCellClick (int index) {

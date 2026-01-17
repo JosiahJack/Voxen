@@ -17,9 +17,9 @@ public class TickIndicatorAnimation : MonoBehaviour {
 
 	void Update() {
 		if (!gameObject.activeSelf) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.menuActive) return;
 
-		if (nextthink < PauseScript.a.relativeTime) {
+		if (nextthink < Sys_Global.pauseRelativeTime) {
 			if (healthIndicator) {
 				if (PlayerHealth.a.hm.health > 176) {
 					if (indicator.overrideSprite != indicatorImages[0]) indicator.overrideSprite = indicatorImages[0];
@@ -55,7 +55,7 @@ public class TickIndicatorAnimation : MonoBehaviour {
 			}
 			tick++;
 			if (tick > 5) tick = 0;
-			nextthink = PauseScript.a.relativeTime + thinkTime;
+			nextthink = Sys_Global.pauseRelativeTime + thinkTime;
 		}
 	}
 }

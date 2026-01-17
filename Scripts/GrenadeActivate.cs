@@ -44,8 +44,8 @@ public class GrenadeActivate : MonoBehaviour {
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 		if (!active) return;
 
 		// Plastique or other explosive device:
@@ -55,7 +55,7 @@ public class GrenadeActivate : MonoBehaviour {
 		}
 
 		// Standard grenade explode route:
-		if ((useTimer && timeFinished < PauseScript.a.relativeTime)
+		if ((useTimer && timeFinished < Sys_Global.pauseRelativeTime)
 			|| (useProx && proxSensed)) {
 
 			Explode();
@@ -68,10 +68,10 @@ public class GrenadeActivate : MonoBehaviour {
 			case 7: explodeOnContact = true; break; // Fragmentation Grenade
 			case 8: explodeOnContact = true; break; // Concussion Grenade
 			case 9: explodeOnContact = true; break; // EMP Grenade
-			case 10: timeFinished = PauseScript.a.relativeTime + Inventory.a.earthShakerTimeSetting;
+			case 10: timeFinished = Sys_Global.pauseRelativeTime + Inventory.a.earthShakerTimeSetting;
 					 useTimer = true; break;        // Earthshaker Bomb
 			case 11: useProx = true; explodeOnContact = false; break; // Land Mine
-			case 12: timeFinished = PauseScript.a.relativeTime + Inventory.a.nitroTimeSetting; 
+			case 12: timeFinished = Sys_Global.pauseRelativeTime + Inventory.a.nitroTimeSetting; 
 					 useTimer = true; break;        // Nitropack Explosive
 			case 13: explodeOnContact = true; break; // Gas Grenade
 			default: return;
@@ -100,7 +100,7 @@ public class GrenadeActivate : MonoBehaviour {
 		if (!IsNPCMine()) {
 			dd.owner = Const.a.player1Capsule;
 			PlayerHealth.a.makingNoise = true;
-			PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime + 2f;
+			PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 2f;
 		}
 		
 		Utils.ApplyImpactForceSphere(dd,transform.position,nearradius,1.0f);

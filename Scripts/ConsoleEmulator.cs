@@ -423,7 +423,7 @@ public static class ConsoleEmulator {
     }
 
     public static void CheatLoadLevel(int lev) {
-		if (PauseScript.a.MenuActive()) {
+		if (Sys_Global.menuActive) {
 			Const.sprint(Const.a.stringTable[1015]); // "Cannot load levels via cheat while on the menu!"
 			return;
 		}

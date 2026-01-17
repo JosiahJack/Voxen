@@ -19,7 +19,7 @@ public class ChargeStation : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 	
 	void Awake() {
-		nextthink = PauseScript.a.relativeTime;
+		nextthink = Sys_Global.pauseRelativeTime;
 	}
 
 	public void Use (UseData ud) {
@@ -28,7 +28,7 @@ public class ChargeStation : MonoBehaviour {
 			return;
 		}
 		
-		if (nextthink < PauseScript.a.relativeTime) {
+		if (nextthink < Sys_Global.pauseRelativeTime) {
 			if (PlayerEnergy.a.energy >= PlayerEnergy.a.maxenergy) {
 				Const.sprint(303);
 				return;
@@ -51,7 +51,7 @@ public class ChargeStation : MonoBehaviour {
 			}
 
 			Const.sprint(usedMsgLingdex);
-			if (requireReset) nextthink = PauseScript.a.relativeTime + resetTime;
+			if (requireReset) nextthink = Sys_Global.pauseRelativeTime + resetTime;
 			ud.argvalue = argvalue;
 			Const.a.UseTargets(gameObject,ud,target);
 		} else {

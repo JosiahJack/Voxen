@@ -47,7 +47,7 @@ public class GravityLift : MonoBehaviour {
 								- otherRbody.velocity.y);
 
 				if (initial
-					|| initialBurstFinished > PauseScript.a.relativeTime) {
+					|| initialBurstFinished > Sys_Global.pauseRelativeTime) {
 
 					yForce *= 2f;
 				}
@@ -67,7 +67,7 @@ public class GravityLift : MonoBehaviour {
 		if (otherRbody.velocity.y < offStrengthFactor) {
 			float yForce = ((offStrengthFactor)-otherRbody.velocity.y);
 			if (initial
-				|| initialBurstFinished > PauseScript.a.relativeTime) {
+				|| initialBurstFinished > Sys_Global.pauseRelativeTime) {
 
 				yForce *= 2f;
 			}
@@ -80,7 +80,7 @@ public class GravityLift : MonoBehaviour {
 		otherRbody = other.gameObject.GetComponent<Rigidbody>();
 		if (otherRbody == null) return; // Not a physical object.
 
-		initialBurstFinished = PauseScript.a.relativeTime + 1.0f;
+		initialBurstFinished = Sys_Global.pauseRelativeTime + 1.0f;
 		if (active) OnForce(other,true);
 		else OffForce(other,true);
 	}

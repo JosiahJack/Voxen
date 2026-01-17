@@ -211,7 +211,7 @@ public class LevelManager : MonoBehaviour {
 		// etc. etc.
 		PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true);
 		Music.a.PlayTrack(currentLevel,TrackType.Revive,MusicType.Override);
-		PlayerMovement.a.ressurectingFinished = PauseScript.a.relativeTime + 3f;
+		PlayerMovement.a.ressurectingFinished = Sys_Global.pauseRelativeTime + 3f;
 		return true;
 	}
 

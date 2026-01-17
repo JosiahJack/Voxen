@@ -49,19 +49,19 @@ public class PlayerHealth : MonoBehaviour {
 					  	   + " from PlayerHealth.Awake)");
 		}
 
-		painSoundFinished = PauseScript.a.relativeTime;
-		radSoundFinished = PauseScript.a.relativeTime;
-		radFXFinished = PauseScript.a.relativeTime;
-		noiseFinished = PauseScript.a.relativeTime;
+		painSoundFinished = Sys_Global.pauseRelativeTime;
+		radSoundFinished = Sys_Global.pauseRelativeTime;
+		radFXFinished = Sys_Global.pauseRelativeTime;
+		noiseFinished = Sys_Global.pauseRelativeTime;
 		lastHealth = hm.health;
 		radAdjust = 0f;
 		initialRadiation = 0f;
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
 
-		if (noiseFinished < PauseScript.a.relativeTime) makingNoise = false;
+		if (noiseFinished < Sys_Global.pauseRelativeTime) makingNoise = false;
 		if (hm.health <= 0f) {
 			if (!playerDead) PlayerDying();
 			else PlayerDead();
@@ -70,10 +70,10 @@ public class PlayerHealth : MonoBehaviour {
 
 		if (Utils.CheckFlags(PlayerPatch.a.patchActive, PlayerPatch.PATCH_MEDI)) {
 			if (mediPatchPulseFinished == 0) mediPatchPulseCount = 0;
-			if (mediPatchPulseFinished < PauseScript.a.relativeTime) {
+			if (mediPatchPulseFinished < Sys_Global.pauseRelativeTime) {
 				hm.HealingBed(mediPatchHealAmount,false);
 				MFDManager.a.DrawTicks(true);
-				mediPatchPulseFinished = PauseScript.a.relativeTime + (mediPatchPulseTime + (mediPatchPulseCount * 0.5f));
+				mediPatchPulseFinished = Sys_Global.pauseRelativeTime + (mediPatchPulseTime + (mediPatchPulseCount * 0.5f));
 				mediPatchPulseCount++;
 			}
 		} else {
@@ -98,35 +98,35 @@ public class PlayerHealth : MonoBehaviour {
 												 radiationAmountWarningID);
 			}
 
-			if (radFXFinished < PauseScript.a.relativeTime) {
+			if (radFXFinished < Sys_Global.pauseRelativeTime) {
 				radiationEffect.SetActive(true);
 				float minT = 0.5f;
 				if (radiated > 50f) minT = 0.25f;
-				radFXFinished = PauseScript.a.relativeTime + Random.Range(minT,1f);
+				radFXFinished = Sys_Global.pauseRelativeTime + Random.Range(minT,1f);
 			}
 		} else {
 			radiationArea = false;
 			if (radiated < 0) radiated = 0;
 		}
 
-		if (radiationBleedOffFinished < PauseScript.a.relativeTime) {
+		if (radiationBleedOffFinished < Sys_Global.pauseRelativeTime) {
 			if (!radiationArea) radiated -= radiationReductionAmount;  // Bleed off the radiation over time.
 			if (radiated < 0) radiated = 0;
-			radiationBleedOffFinished = PauseScript.a.relativeTime + radiationBleedOffTime;
+			radiationBleedOffFinished = Sys_Global.pauseRelativeTime + radiationBleedOffTime;
 			if (radiated > 0) {
 				if (!hm.god) {
 					hm.health -= radiated*radiationHealthDamageRatio; // Apply health at rate of bleedoff time.
 					MFDManager.a.DrawTicks(true);
 				}
-				if (radSoundFinished < PauseScript.a.relativeTime) {
-					radSoundFinished = PauseScript.a.relativeTime + Random.Range(1f,3f);
+				if (radSoundFinished < Sys_Global.pauseRelativeTime) {
+					radSoundFinished = Sys_Global.pauseRelativeTime + Random.Range(1f,3f);
 					Utils.PlayUIOneShotSavable(90);
 				}
 			}
 		}
 		if (lastHealth > hm.health) { // Did we lose health?
-			if (painSoundFinished < PauseScript.a.relativeTime && !(radSoundFinished < PauseScript.a.relativeTime)) {
-				painSoundFinished = PauseScript.a.relativeTime + Random.Range(0.25f,3f); // Don't spam pain sounds
+			if (painSoundFinished < Sys_Global.pauseRelativeTime && !(radSoundFinished < Sys_Global.pauseRelativeTime)) {
+				painSoundFinished = Sys_Global.pauseRelativeTime + Random.Range(0.25f,3f); // Don't spam pain sounds
 				Utils.PlayUIOneShotSavable(140);
 				PlayerHealth.a.makingNoise = true;
 			}

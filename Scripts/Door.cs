@@ -62,7 +62,7 @@ public class Door : MonoBehaviour {
 		}
 		
 		SFX = GetComponent<AudioSource>();		
-		useFinished = PauseScript.a.relativeTime;
+		useFinished = Sys_Global.pauseRelativeTime;
 		if (startOpen) {
 			stayOpen = true;
 			OpenDoor();
@@ -100,9 +100,9 @@ public class Door : MonoBehaviour {
 
 		asi = anim.GetCurrentAnimatorStateInfo(0);
 		animatorPlaybackTime = asi.normalizedTime;
-		if (useFinished >= PauseScript.a.relativeTime) return;
+		if (useFinished >= Sys_Global.pauseRelativeTime) return;
 
-		useFinished = PauseScript.a.relativeTime + useTimeDelay;	
+		useFinished = Sys_Global.pauseRelativeTime + useTimeDelay;	
 		if (requiredAccessCard == AccessCardType.None
 			|| Inventory.a.HasAccessCard(requiredAccessCard)
 			|| accessCardUsedByPlayer) {
@@ -164,7 +164,7 @@ public class Door : MonoBehaviour {
 			delayFrame = true;
 		} else if (doorOpen == DoorState.Closing) {
 			doorOpen = DoorState.Opening;
-			waitBeforeClose = PauseScript.a.relativeTime + delay;
+			waitBeforeClose = Sys_Global.pauseRelativeTime + delay;
 			anim.Play(openClipName,0,topTime - animatorPlaybackTime);
 			Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXIndex]);
 			delayFrame = true;
@@ -225,7 +225,7 @@ public class Door : MonoBehaviour {
 		if (anim == null) anim = GetComponent<Animator>();
 		if (anim != null) anim.speed = defaultSpeed;
 		doorOpen = DoorState.Opening;
-		waitBeforeClose = PauseScript.a.relativeTime + delay;
+		waitBeforeClose = Sys_Global.pauseRelativeTime + delay;
 		if (anim != null) anim.Play(openClipName,0,0f);
 		Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXIndex]);
 		SetCollisionLayer(19); // InterDebris
@@ -283,8 +283,8 @@ public class Door : MonoBehaviour {
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused()) { anim.speed = speedZero; return; }
-		if (PauseScript.a.MenuActive()) { anim.speed = speedZero; return; }
+		if (Sys_Global.gamePaused) { anim.speed = speedZero; return; }
+		if (Sys_Global.menuActive) { anim.speed = speedZero; return; }
 		if (firstUpdateAfterLoad) { SetAnimAfterLoad(); return; }
 		if (ajar) { SetAjar(); return; }
 			
@@ -303,7 +303,7 @@ public class Door : MonoBehaviour {
 			}
 		}
 
-		if (PauseScript.a.relativeTime > waitBeforeClose) {
+		if (Sys_Global.pauseRelativeTime > waitBeforeClose) {
 			if ((doorOpen == DoorState.Open) && (!stayOpen) && (!startOpen) && !delayFrame) {
 				Debug.Log("Close Door, stayOpen: " + stayOpen.ToString());
 				CloseDoor();

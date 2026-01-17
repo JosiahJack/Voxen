@@ -9,16 +9,16 @@ public class MusicTrigger : MonoBehaviour {
 	public MusicType musicType;
 
 	void Awake() {
-		tickFinished = PauseScript.a.relativeTime + 2f;
+		tickFinished = Sys_Global.pauseRelativeTime + 2f;
 	}
 
 	void OnTriggerEnter(Collider other) {
-		if (tickFinished < PauseScript.a.relativeTime) {
+		if (tickFinished < Sys_Global.pauseRelativeTime) {
 			if (other.gameObject.CompareTag("Player")) {
 				Music.a.PlayTrack(LevelManager.a.currentLevel,trackType,musicType);
 				Music.a.NotifyZone(trackType);
 			}
-			tickFinished = PauseScript.a.relativeTime + tick;
+			tickFinished = Sys_Global.pauseRelativeTime + tick;
 		}
 	}
 

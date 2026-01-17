@@ -20,12 +20,11 @@ GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .cre
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
+QuestBits questData;
 uint8_t queuedLevelToLoad = 255u;
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
 uint8_t dirtyInstances[INSTANCE_COUNT];
-GLuint instancesBuffer;
-QuestBits questData;
 float berserkFinished, berserkSeedTime, aspect3D = 1.0f, cam_pitch, cam_yaw = 90.0f, cam_roll, fogColorR, fogColorG, fogColorB, fogBaseDensityForLevel;
 float rasterPerspectiveProjection[16];
 float shadowmapsPerspectiveProjection[16];

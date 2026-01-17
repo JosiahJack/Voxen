@@ -382,7 +382,7 @@ public class Inventory : MonoBehaviour {
 
 	void Update() {
 		// Logs pause exceptions.
-		if ((PauseScript.a.Paused() || PauseScript.a.MenuActive())
+		if ((Sys_Global.gamePaused || Sys_Global.menuActive)
 			&& !logPaused) {
 			logPaused = true;
 			if (SFXSource == null) SFXSource = GetComponent<AudioSource>();
@@ -392,8 +392,8 @@ public class Inventory : MonoBehaviour {
 		}
 		//--- End Logs ---
 	
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		// Update Senaraound camera positions to match player camer height.
 		Vector3 camPos =
@@ -1368,10 +1368,10 @@ public class Inventory : MonoBehaviour {
 			hasSoft[3] = false;
 			softs[3].SetActive(false); // turn the button off now that we are out
 		}
-		if (PlayerMovement.a.turboFinished > PauseScript.a.relativeTime) {
+		if (PlayerMovement.a.turboFinished > Sys_Global.pauseRelativeTime) {
 			PlayerMovement.a.turboFinished += PlayerMovement.a.turboCyberTime; // effect stacks
 		} else {
-			PlayerMovement.a.turboFinished = PlayerMovement.a.turboCyberTime + PauseScript.a.relativeTime;
+			PlayerMovement.a.turboFinished = PlayerMovement.a.turboCyberTime + Sys_Global.pauseRelativeTime;
 		}
 	}
 

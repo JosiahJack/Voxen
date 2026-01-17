@@ -58,13 +58,13 @@ public class MinigameBotBounce : MonoBehaviour {
     private void ResetBall() {
         ball.localPosition = new Vector3(0f,-100f,0f);
         ballDir = GetNewBallDirection();
-        ballResetFinished = PauseScript.a.relativeTime + 2.5f;
+        ballResetFinished = Sys_Global.pauseRelativeTime + 2.5f;
     }
 
     void Update() {
-        if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
-        if (frameFinished >= PauseScript.a.relativeTime) return;
+        if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
+        if (frameFinished >= Sys_Global.pauseRelativeTime) return;
         if (gameOver.activeInHierarchy) return;
 
         if (numAlive <= 0) {
@@ -72,9 +72,9 @@ public class MinigameBotBounce : MonoBehaviour {
             return;
         }
 
-        frameFinished = PauseScript.a.relativeTime + (1f/30f); // 30fps, it's a potato.
+        frameFinished = Sys_Global.pauseRelativeTime + (1f/30f); // 30fps, it's a potato.
         PlayerPaddleUpdate();
-        if (ballResetFinished >= PauseScript.a.relativeTime) return;
+        if (ballResetFinished >= Sys_Global.pauseRelativeTime) return;
 
         BallUpdate();
     }

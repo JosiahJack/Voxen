@@ -22,16 +22,16 @@ public class DriftUp : MonoBehaviour {
             img.color = new Color(img.color.r,img.color.g,img.color.b,startFade);
         }
 
-        tickFinished = PauseScript.a.relativeTime;
+        tickFinished = Sys_Global.pauseRelativeTime;
     }
 
     void Update() {
-        if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
-		if (tickFinished >= PauseScript.a.relativeTime) return;
+        if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
+		if (tickFinished >= Sys_Global.pauseRelativeTime) return;
 
         float delta = (1f / 60f);
-		tickFinished = PauseScript.a.relativeTime + delta;
+		tickFinished = Sys_Global.pauseRelativeTime + delta;
 		float drift = transform.localPosition.y;
         drift += rate;
         if (drift > endY) drift = endY;

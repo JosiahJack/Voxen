@@ -55,7 +55,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 
 	void Update() {
 		if (currentlyPlaying) {
-			if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) {
+			if (Sys_Global.gamePaused || Sys_Global.menuActive) {
 				if (SFX != null) SFX.Pause();
 				justPaused = true;
 			} else {
@@ -66,7 +66,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 			}
 		}
 
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (playSoundOnParticleEmit){
 				int count = psys.particleCount;
 				if (count > numparticles && (count == burstemittcnt1 || count == burstemittcnt2)) {

@@ -72,7 +72,7 @@ public class CameraView : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.paused && !PauseScript.a.MenuActive()) {
+		if (!PauseScript.a.paused && !Sys_Global.menuActive) {
 			if (!IsVisible()) return;
 
 			if (tickFinished < Time.time) {

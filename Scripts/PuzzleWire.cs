@@ -131,14 +131,14 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (Solved) return;
 
 			if (selectedWire != -1) {
-				if (blinkTimeFinished < PauseScript.a.relativeTime) {
+				if (blinkTimeFinished < Sys_Global.pauseRelativeTime) {
 					BlinkSelectedIndicator();
 					blinkState = !blinkState;
-					blinkTimeFinished = PauseScript.a.relativeTime + blinkTime;
+					blinkTimeFinished = Sys_Global.pauseRelativeTime + blinkTime;
 				}
 			} else {
 				DisableAllSelectedIndicators();
@@ -441,7 +441,7 @@ public class PuzzleWire : MonoBehaviour {
 		DisableAllSelectedIndicators();
 		selectedWireLH = true;
 		blinkState = true;
-		blinkTimeFinished = PauseScript.a.relativeTime + blinkTime;
+		blinkTimeFinished = Sys_Global.pauseRelativeTime + blinkTime;
 		BlinkSelectedIndicator();
 		ChangeAppearance();
 		//EvaluatePuzzle();
@@ -463,7 +463,7 @@ public class PuzzleWire : MonoBehaviour {
 		DisableAllSelectedIndicators();
 		selectedWireLH = false;
 		blinkState = true;
-		blinkTimeFinished = PauseScript.a.relativeTime + blinkTime;
+		blinkTimeFinished = Sys_Global.pauseRelativeTime + blinkTime;
 		BlinkSelectedIndicator();
 		ChangeAppearance();
 		//EvaluatePuzzle();

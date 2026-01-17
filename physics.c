@@ -1,6 +1,5 @@
 // physics.cpp - Full Jolt Physics integration for Voxen
 #include "voxen.h"
-#include "types.h"
 #define PLAYER_MAX_WALK_SPEED 3.2f
 #define PLAYER_MAX_SPRINT_SPEED 8.8f
 #define PLAYER_MAX_CYBER_SPEED 5.0f
@@ -18,39 +17,42 @@
 
 float fatigue;
 
-// static uint32_t GetCollisionMask(uint8_t layer) {
-//     switch (layer) {
-//         case PhysicsLayer_Default:           return 0x217efe07u;
-//         case PhysicsLayer_TransparentFX:     return 0x7c1e07u;
-//         case PhysicsLayer_IgnoreRaycast:     return 0x7c3e07u;
-//         case PhysicsLayer_Water:             return 0x0u;
-//         case PhysicsLayer_UI:                return 0x0u;
-//         case PhysicsLayer_GunViewModel:      return 0x0u;
-//         case PhysicsLayer_Geometry:          return 0x178fc07u;
-//         case PhysicsLayer_NPC:               return 0x6f61e07u;
-//         case PhysicsLayer_PlayerBullets:     return 0x217e6607u;
-//         case PhysicsLayer_Player:            return 0x5770607u;
-//         case PhysicsLayer_Corpse:            return 0x10c4a05u;
-//         case PhysicsLayer_PhysObjects:       return 0x17e6a01u;
-//         case PhysicsLayer_Sky:               return 0x201u;
-//         case PhysicsLayer_PlayerTriggerOnly: return 0x701000u;
-//         case PhysicsLayer_Trigger:           return 0x1785c01u;
-//         case PhysicsLayer_Door:              return 0x1707c07u;
-//         case PhysicsLayer_InterDebris:       return 0xa6a07u;
-//         case PhysicsLayer_Player2:           return 0x5675e07u;
-//         case PhysicsLayer_Player3:           return 0x5575e07u;
-//         case PhysicsLayer_Player4:           return 0x5375e07u;
-//         case PhysicsLayer_NPCTrigger:        return 0x400u;
-//         case PhysicsLayer_NPCBullet:         return 0x20767a01u;
-//         case PhysicsLayer_NPCClip:           return 0x400u;
-//         case PhysicsLayer_Clip:              return 0x701400u;
-//         case PhysicsLayer_Automap:           return 0x0u;
-//         case PhysicsLayer_Culling:           return 0x0u;
-//         case PhysicsLayer_CorpseSearchable:  return 0x1000801u;
-//     }
-//     
-//     return 0;
-// }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static uint32_t GetCollisionMask(uint8_t layer) {
+    switch (layer) {
+        case PhysicsLayer_Default:           return 0x217efe07u;
+        case PhysicsLayer_TransparentFX:     return 0x7c1e07u;
+        case PhysicsLayer_IgnoreRaycast:     return 0x7c3e07u;
+        case PhysicsLayer_Water:             return 0x0u;
+        case PhysicsLayer_UI:                return 0x0u;
+        case PhysicsLayer_GunViewModel:      return 0x0u;
+        case PhysicsLayer_Geometry:          return 0x178fc07u;
+        case PhysicsLayer_NPC:               return 0x6f61e07u;
+        case PhysicsLayer_PlayerBullets:     return 0x217e6607u;
+        case PhysicsLayer_Player:            return 0x5770607u;
+        case PhysicsLayer_Corpse:            return 0x10c4a05u;
+        case PhysicsLayer_PhysObjects:       return 0x17e6a01u;
+        case PhysicsLayer_Sky:               return 0x201u;
+        case PhysicsLayer_PlayerTriggerOnly: return 0x701000u;
+        case PhysicsLayer_Trigger:           return 0x1785c01u;
+        case PhysicsLayer_Door:              return 0x1707c07u;
+        case PhysicsLayer_InterDebris:       return 0xa6a07u;
+        case PhysicsLayer_Player2:           return 0x5675e07u;
+        case PhysicsLayer_Player3:           return 0x5575e07u;
+        case PhysicsLayer_Player4:           return 0x5375e07u;
+        case PhysicsLayer_NPCTrigger:        return 0x400u;
+        case PhysicsLayer_NPCBullet:         return 0x20767a01u;
+        case PhysicsLayer_NPCClip:           return 0x400u;
+        case PhysicsLayer_Clip:              return 0x701400u;
+        case PhysicsLayer_Automap:           return 0x0u;
+        case PhysicsLayer_Culling:           return 0x0u;
+        case PhysicsLayer_CorpseSearchable:  return 0x1000801u;
+    }
+    
+    return 0;
+}
+#pragma GCC diagnostic pop
 
 float GetBasePlayerSpeed(bool running) {
     bool isSprinting = Sprint();

@@ -182,9 +182,9 @@ public class PlayerMovement : MonoBehaviour {
 		bodyState = BodyState.Standing;
 		cyberDesetup = false;
 		oldBodyState = bodyState;
-		fatigueFinished = PauseScript.a.relativeTime;
-		fatigueFinished2 = PauseScript.a.relativeTime;
-		ladderSFXFinished = PauseScript.a.relativeTime;
+		fatigueFinished = Sys_Global.pauseRelativeTime;
+		fatigueFinished2 = Sys_Global.pauseRelativeTime;
+		ladderSFXFinished = Sys_Global.pauseRelativeTime;
 		rbody = GetComponent<Rigidbody>();
 		oldVelocity = rbody.velocity;
 		capsuleCollider = GetComponent<CapsuleCollider>();
@@ -194,16 +194,16 @@ public class PlayerMovement : MonoBehaviour {
 		staminupActive = false;
 		cyberCollider = GetComponent<SphereCollider>();
 		consoleActivated = false;
-		jumpLandSoundFinished = PauseScript.a.relativeTime;
+		jumpLandSoundFinished = Sys_Global.pauseRelativeTime;
 		justJumped = false;
-		jumpSFXFinished = PauseScript.a.relativeTime;
+		jumpSFXFinished = Sys_Global.pauseRelativeTime;
 		fatigueWarned = false;
-		jumpJetEnergySuckTickFinished = PauseScript.a.relativeTime;
-		ressurectingFinished = PauseScript.a.relativeTime;
+		jumpJetEnergySuckTickFinished = Sys_Global.pauseRelativeTime;
+		ressurectingFinished = Sys_Global.pauseRelativeTime;
 		tempInt = -1;
-		doubleJumpFinished = PauseScript.a.relativeTime;
+		doubleJumpFinished = Sys_Global.pauseRelativeTime;
 		doubleJumpTicks = 0;
-		turboFinished = PauseScript.a.relativeTime;
+		turboFinished = Sys_Global.pauseRelativeTime;
 		playerHome = transform.localPosition;
 		ConsoleEmulator.lastCommand = new string[7];
 		ConsoleEmulator.consoleMemdex = consoleMemdex = 0;
@@ -212,8 +212,8 @@ public class PlayerMovement : MonoBehaviour {
 		    fpsCounter.SetActive(true);
 		}
 
-		stepFinished = PauseScript.a.relativeTime;
-		rustleFinished = PauseScript.a.relativeTime;
+		stepFinished = Sys_Global.pauseRelativeTime;
+		rustleFinished = Sys_Global.pauseRelativeTime;
 		bodyLerpGravityOffDelayFinished = 0;
 		contactsCache = new ContactPoint[16];
     }
@@ -246,8 +246,8 @@ public class PlayerMovement : MonoBehaviour {
 			return;
 		}
 
-		if (PauseScript.a.Paused()
-			|| (ressurectingFinished >= PauseScript.a.relativeTime)) {
+		if (Sys_Global.gamePaused
+			|| (ressurectingFinished >= Sys_Global.pauseRelativeTime)) {
 			return;
 		}
 		
@@ -274,7 +274,7 @@ public class PlayerMovement : MonoBehaviour {
 			CyberDestupOrNoclipMaintain();
 		} else {
 			PlayerHealth.a.makingNoise = true; // Cyber enemies more aware.
-			PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime + 0.5f;
+			PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
 		}
 
 		isSprinting = GetSprintInputState();
@@ -292,8 +292,8 @@ public class PlayerMovement : MonoBehaviour {
 		Vector2 hz = new Vector2(rbody.velocity.x, rbody.velocity.z);
 		playerSpeedHorizontalActual = hz.magnitude;
 
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) return;
-		if (ressurectingFinished > PauseScript.a.relativeTime) return;
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
+		if (ressurectingFinished > Sys_Global.pauseRelativeTime) return;
 		if (consoleActivated) return;
 
 		// Crouch/Prone by shrinking the capsule height.
@@ -388,11 +388,11 @@ public class PlayerMovement : MonoBehaviour {
 
 		if ((Mathf.Abs(relForward) + Mathf.Abs(relSideways)) == 0) return;
 
-		if (rustleFinished < PauseScript.a.relativeTime) {
+		if (rustleFinished < Sys_Global.pauseRelativeTime) {
 			rustleFinished = isSprinting
-							 ? PauseScript.a.relativeTime
+							 ? Sys_Global.pauseRelativeTime
 							   + UnityEngine.Random.Range(0.4f,0.6f)
-							 : PauseScript.a.relativeTime
+							 : Sys_Global.pauseRelativeTime
 							   + UnityEngine.Random.Range(0.8f,1.2f);
 
 			AudioClip rustle =
@@ -420,11 +420,11 @@ public class PlayerMovement : MonoBehaviour {
 		if (prefID == null) return;
 
 		// Footsteps
-		if (stepFinished < PauseScript.a.relativeTime) {
+		if (stepFinished < Sys_Global.pauseRelativeTime) {
 			stepFinished = isSprinting
-						   ? PauseScript.a.relativeTime
+						   ? Sys_Global.pauseRelativeTime
 							 + UnityEngine.Random.Range(0.2f,0.3f)
-						   : PauseScript.a.relativeTime
+						   : Sys_Global.pauseRelativeTime
 							 + UnityEngine.Random.Range(0.35f,0.65f);
 
 			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
@@ -1017,8 +1017,8 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	void ApplyGravity() {
-// 		if (gravFinished < PauseScript.a.relativeTime) {
-// 			gravFinished = PauseScript.a.relativeTime + 0.01f;
+// 		if (gravFinished < Sys_Global.pauseRelativeTime) {
+// 			gravFinished = Sys_Global.pauseRelativeTime + 0.01f;
 // 			rbody.AddRelativeForce(Vector3.down * 9.83f * 9.83f);
 // 		}
 	}
@@ -1115,10 +1115,10 @@ public class PlayerMovement : MonoBehaviour {
 			return true;
 		} else {
 			if (bodyLerpGravityOffDelayFinished == 0) {
-				bodyLerpGravityOffDelayFinished = PauseScript.a.relativeTime + 0.25f;
+				bodyLerpGravityOffDelayFinished = Sys_Global.pauseRelativeTime + 0.25f;
 			}
 
-			if (bodyLerpGravityOffDelayFinished > PauseScript.a.relativeTime) {
+			if (bodyLerpGravityOffDelayFinished > Sys_Global.pauseRelativeTime) {
 				return true;
 			}
 		}
@@ -1135,7 +1135,7 @@ public class PlayerMovement : MonoBehaviour {
 	void Jump() {
 		if (CheatNoclip && !Inventory.a.JumpJetsActive()) return;
 
-		if (doubleJumpFinished < PauseScript.a.relativeTime) {
+		if (doubleJumpFinished < Sys_Global.pauseRelativeTime) {
 			doubleJumpTicks--;
 			if (doubleJumpTicks < 0) doubleJumpTicks = 0;
 		}
@@ -1146,7 +1146,7 @@ public class PlayerMovement : MonoBehaviour {
 			if (!justJumped) {
 				if (grounded || gravliftState || Inventory.a.JumpJetsActive()) {
 					jumpTime = jumpImpulseTime;
-					doubleJumpFinished = PauseScript.a.relativeTime + Const.doubleClickTime;
+					doubleJumpFinished = Sys_Global.pauseRelativeTime + Const.doubleClickTime;
 					doubleJumpTicks++;
 					justJumped = true;
 					if (!Inventory.a.JumpJetsActive() && !Inventory.a.BoosterActive()) {
@@ -1172,7 +1172,7 @@ public class PlayerMovement : MonoBehaviour {
 											   ForceMode.Impulse);
 					
 					PlayerHealth.a.makingNoise = true;
-					PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime + 0.5f;
+					PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
 					PlayerEnergy.a.TakeEnergy(22f);
 					if (BiomonitorGraphSystem.a != null) {
 						BiomonitorGraphSystem.a.EnergyPulse(22f);
@@ -1183,7 +1183,7 @@ public class PlayerMovement : MonoBehaviour {
 					doubleJumpTicks = 0;
 
 					// Make sure we can't do it again right away.
-					doubleJumpFinished = PauseScript.a.relativeTime - 1f;
+					doubleJumpFinished = Sys_Global.pauseRelativeTime - 1f;
 				}
 			}
 		}
@@ -1215,8 +1215,8 @@ public class PlayerMovement : MonoBehaviour {
 
 				if (PlayerEnergy.a.energy >= energysuck) {
 					rbody.AddForce(jumpVel,ForceMode.Force);  // huhnh!
-					if (jumpJetEnergySuckTickFinished < PauseScript.a.relativeTime) {
-						jumpJetEnergySuckTickFinished = PauseScript.a.relativeTime + jumpJetEnergySuckTick;
+					if (jumpJetEnergySuckTickFinished < Sys_Global.pauseRelativeTime) {
+						jumpJetEnergySuckTickFinished = Sys_Global.pauseRelativeTime + jumpJetEnergySuckTick;
 						PlayerEnergy.a.TakeEnergy(energysuck);
 						if (BiomonitorGraphSystem.a != null) {
 							BiomonitorGraphSystem.a.EnergyPulse(energysuck);
@@ -1237,14 +1237,14 @@ public class PlayerMovement : MonoBehaviour {
 
 		if (justJumped && !Inventory.a.JumpJetsActive()) {
 			// Play jump sound
-			if (jumpSFXFinished < PauseScript.a.relativeTime) {
-				jumpSFXFinished = PauseScript.a.relativeTime + jumpSFXIntervalTime;
+			if (jumpSFXFinished < Sys_Global.pauseRelativeTime) {
+				jumpSFXFinished = Sys_Global.pauseRelativeTime + jumpSFXIntervalTime;
 				SFX.pitch = 1f;
 				float jumpSFXVolume = 1.0f;
 				if (fatigue > 80) jumpSFXVolume = 0.5f; // Quietly, we tired.
 				
 				PlayerHealth.a.makingNoise = true;
-				PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime + 0.5f;
+				PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
 				Physics.Raycast(transform.position, Vector3.down,
 								out tempHit,feetRayLength,
 								Const.a.layerMaskPlayerFeet);
@@ -1291,12 +1291,12 @@ public class PlayerMovement : MonoBehaviour {
 			rbody.AddRelativeForce(sidForce,upForce,forForce);
 		} else {
 			// Climbing off the ground
-			if (ladderSFXFinished < PauseScript.a.relativeTime
+			if (ladderSFXFinished < Sys_Global.pauseRelativeTime
 				&& rbody.velocity.y > ladderSpeed * 0.5f) {
 
 				SFX.pitch = (UnityEngine.Random.Range(0.8f,1.2f));
 				Utils.PlayOneShotSavable(SFX,SFXLadder,0.2f);
-				ladderSFXFinished = PauseScript.a.relativeTime
+				ladderSFXFinished = Sys_Global.pauseRelativeTime
 									+ ladderSFXIntervalTime;
 			}
 
@@ -1361,11 +1361,11 @@ public class PlayerMovement : MonoBehaviour {
 			movDir.y = 0;
 			if (floorDot > 0.9f) rbody.velocity = movDir;
 			movDir = movDir.normalized;
-			if (fatigueFinished2 < PauseScript.a.relativeTime
+			if (fatigueFinished2 < Sys_Global.pauseRelativeTime
 				&& movDir.sqrMagnitude > 0f && grounded
 				&& (relForward != 0 || relSideways != 0)) {
 
-				fatigueFinished2 = PauseScript.a.relativeTime
+				fatigueFinished2 = Sys_Global.pauseRelativeTime
 								   + fatigueWaneTickSecs;
 
 				if (!Inventory.a.BoosterActive()) {
@@ -1441,7 +1441,7 @@ public class PlayerMovement : MonoBehaviour {
 		inputtingMovement = false;
 
 		if (GetInput.a.Forward()) {
-			if (turboFinished > PauseScript.a.relativeTime) {
+			if (turboFinished > Sys_Global.pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, (cameraObject.transform.forward)).magnitude < playerSpeed * 2f)
 					rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * 2f * Time.deltaTime,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -1452,7 +1452,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if (GetInput.a.Backpedal()) {
-			if (turboFinished > PauseScript.a.relativeTime) {
+			if (turboFinished > Sys_Global.pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, (cameraObject.transform.forward * -1f)).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.forward * walkAcceleration * 1.3f * 2f * Time.deltaTime * -1f,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -1463,7 +1463,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if (GetInput.a.StrafeLeft()) {
-			if (turboFinished > PauseScript.a.relativeTime) {
+			if (turboFinished > Sys_Global.pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, (cameraObject.transform.right * -1f)).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * 2f * Time.deltaTime * -1f,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -1474,7 +1474,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 
 		if (GetInput.a.StrafeRight()) {
-			if (turboFinished > PauseScript.a.relativeTime) {
+			if (turboFinished > Sys_Global.pauseRelativeTime) {
 				if (Vector3.Project(rbody.velocity, cameraObject.transform.right).magnitude < playerSpeed * 2f)
 				rbody.AddForce(cameraObject.transform.right * walkAcceleration * 1.3f * 2f * Time.deltaTime,ForceMode.Acceleration); // double speed with turbo on
 			} else {
@@ -1532,9 +1532,9 @@ public class PlayerMovement : MonoBehaviour {
 
 		if (inCyberSpace) return;
 		if (CheatNoclip || FatigueCheat) { fatigue = 0; return; }
-		if (fatigueFinished >= PauseScript.a.relativeTime) return;
+		if (fatigueFinished >= Sys_Global.pauseRelativeTime) return;
 
-		fatigueFinished = PauseScript.a.relativeTime + fatigueWaneTickSecs;
+		fatigueFinished = Sys_Global.pauseRelativeTime + fatigueWaneTickSecs;
 		switch (bodyState) {
 			case BodyState.Standing:    fatigue -= fatigueWanePerTick; break;
 			case BodyState.Crouch:      fatigue -= fatigueWanePerTickCrouched; break;
@@ -1755,7 +1755,7 @@ public class PlayerMovement : MonoBehaviour {
 
 	// Reset grounded to false when player is mid-air
 	void OnCollisionExit (){
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			// Automatically set grounded to false to prevent ability to climb any wall (Cheat!)
 			if (!CheatWallSticky) {
 				grounded = false;
@@ -1767,7 +1767,7 @@ public class PlayerMovement : MonoBehaviour {
 
 	// Sets grounded based on normal angle of the impact point (NOTE: This is not the surface normal!)
 	void OnCollisionStay(Collision collision) {
-		if (PauseScript.a.Paused() || inCyberSpace) return;
+		if (Sys_Global.gamePaused || inCyberSpace) return;
 		
 		int contactCount = collision.contactCount;
 		float maxSlope = 0.35f;
@@ -1777,7 +1777,7 @@ public class PlayerMovement : MonoBehaviour {
 			floorAng = contactPoint.normal;
 			floorDot = Vector3.Dot(floorAng,Vector3.up);
 			if (floorDot <= 1f && floorDot >= maxSlope) {
-				if (!grounded) stepFinished = PauseScript.a.relativeTime;
+				if (!grounded) stepFinished = Sys_Global.pauseRelativeTime;
 				grounded = true;
 				return;
 			}

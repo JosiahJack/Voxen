@@ -56,7 +56,7 @@ public class ButtonSwitch : MonoBehaviour {
 			anim.keepAnimatorStateOnDisable = true;
 		}
 		if (active) {
-		    tickFinished = PauseScript.a.relativeTime + 1.5f + Random.value;
+		    tickFinished = Sys_Global.pauseRelativeTime + 1.5f + Random.value;
 		}
 		
 		awakeInitialized = true;
@@ -85,7 +85,7 @@ public class ButtonSwitch : MonoBehaviour {
 		player = ud.owner;
 		Utils.PlayOneShotSavable(SFXSource,Const.a.sounds[SFXIndex]);
 		Const.sprint(messageIndex);
-		if (delay > 0f) delayFinished = PauseScript.a.relativeTime + delay;
+		if (delay > 0f) delayFinished = Sys_Global.pauseRelativeTime + delay;
 		else UseTargets();
 	}
 
@@ -109,7 +109,7 @@ public class ButtonSwitch : MonoBehaviour {
 			if (blinkWhenActive) {
 				ToggleMaterial ();
 				if (active)
-					tickFinished = PauseScript.a.relativeTime + tickTime;
+					tickFinished = Sys_Global.pauseRelativeTime + tickTime;
 			} else {
 				ToggleMaterial ();
 			}
@@ -152,9 +152,9 @@ public class ButtonSwitch : MonoBehaviour {
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
 
-		if ((delayFinished < PauseScript.a.relativeTime)
+		if ((delayFinished < Sys_Global.pauseRelativeTime)
 		    && delayFinished != 0) {
 
 			delayFinished = 0;
@@ -164,13 +164,13 @@ public class ButtonSwitch : MonoBehaviour {
 		// blink the switch when active
 		if (blinkWhenActive) {
 			if (active) {
-				if (tickFinished < PauseScript.a.relativeTime) {
+				if (tickFinished < Sys_Global.pauseRelativeTime) {
 					if (mRenderer.isVisible) {
 						if (alternateOn) SetMaterialToAlternate();
 						else SetMaterialToNormal();
 					}
 					alternateOn = !alternateOn;
-					tickFinished = PauseScript.a.relativeTime + tickTime;
+					tickFinished = Sys_Global.pauseRelativeTime + tickTime;
 				}
 			}
 		}
@@ -243,12 +243,12 @@ public class ButtonSwitch : MonoBehaviour {
 		bs.delayFinished = Utils.LoadRelativeTimeDifferential(entries[index],"delayFinished"); index++;
 		bs.delayFinished = 0;
 // 		if (bs.delayFinished >= 0.1f) {
-// 			bs.delayFinished = Mathf.Max(Mathf.Max(bs.delayFinished,PauseScript.a.relativeTime + bs.delay),Time.time + bs.delay);
+// 			bs.delayFinished = Mathf.Max(Mathf.Max(bs.delayFinished,Sys_Global.pauseRelativeTime + bs.delay),Time.time + bs.delay);
 // 		}
 		
 		bs.tickFinished = Utils.LoadRelativeTimeDifferential(entries[index],"tickFinished"); index++;
-		if ((bs.tickFinished - PauseScript.a.relativeTime) > tickTime) {
-			bs.tickFinished = PauseScript.a.relativeTime + tickTime;
+		if ((bs.tickFinished - Sys_Global.pauseRelativeTime) > tickTime) {
+			bs.tickFinished = Sys_Global.pauseRelativeTime + tickTime;
 		}
 
 		float animTime = Utils.GetFloatFromString(entries[index],"asi.normalizedTime"); index++;

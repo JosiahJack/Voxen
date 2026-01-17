@@ -7,14 +7,14 @@ public class TouchEnergyDrain : MonoBehaviour {
 	private float tickFinished;
 
 	void Awake() {
-		tickFinished = PauseScript.a.relativeTime + UnityEngine.Random.Range(1f,2f);
+		tickFinished = Sys_Global.pauseRelativeTime + UnityEngine.Random.Range(1f,2f);
 	}
 
 	void  OnCollisionEnter (Collision col) {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
-		if (tickFinished < PauseScript.a.relativeTime) {
+		if (tickFinished < Sys_Global.pauseRelativeTime) {
 			if (col.gameObject.CompareTag("Player")) {
 				PlayerEnergy pe = col.gameObject.GetComponent<PlayerEnergy>();
 				if (pe != null) {
@@ -24,7 +24,7 @@ public class TouchEnergyDrain : MonoBehaviour {
 					}
 				}
 			}
-			tickFinished = PauseScript.a.relativeTime + tick;
+			tickFinished = Sys_Global.pauseRelativeTime + tick;
 		}
 	}
 

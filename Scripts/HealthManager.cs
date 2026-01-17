@@ -402,7 +402,7 @@ public class HealthManager : MonoBehaviour {
 					pstatic.Flash(intensityOfPainFlash);
 				}
 
-				if (dd.ownerIsNPC) justHurtByEnemy = PauseScript.a.relativeTime;
+				if (dd.ownerIsNPC) justHurtByEnemy = Sys_Global.pauseRelativeTime;
 			}
 		}
 
@@ -533,46 +533,25 @@ public class HealthManager : MonoBehaviour {
 		CreateDeathEffects(deathFX);
 	}
 
-	public void TeleportAway() {
-		if (!teleportDone) {
-			teleportDone = true;
-			Utils.Activate(teleportEffect);
-			Utils.DisableCollision(gameObject);
-
-			if (aic == null) {
-				if (transform.parent != null) {
-					aic = transform.parent.gameObject.GetComponent<AIController>();
-				}
-			}
-			
-			if (aic == null) return;
-			
-			aic.enabled = false;
-			AIAnimationController aiac = aic.visibleMeshEntity.GetComponent<AIAnimationController>();
-			if (aiac != null) aiac.enabled = false;
-			
-			Rigidbody rbod = GetComponent<Rigidbody>();
-			if (rbod == null) rbod = aic.GetComponent<Rigidbody>();
-			if (rbod != null) {
-				rbod.useGravity = false;
-				rbod.velocity = Vector3.zero;
-			}
-			Utils.Deactivate(aic.visibleMeshEntity);
-			aic.visibleMeshVisible = false;
-			UnityEngine.Debug.Log("Teleport away deactivate visibleMeshEntity");
-		}
+	void TeleportAway() {
+		if (teleportDone) return;
+        
+        teleportDone = true;
+        Utils.Activate(teleportEffect);
+        instances[i].collider = COLLIDER_TYPE_NONE; // Deactivate collisions.
+        instances[i].think = NULL;
+        instances[i].animationNum = MAX_ANIMATED_MODELS + 1;
+        instances[i].gravity = 0.0f;
+        instances[i].velocity = instances[i].angularVelocity = (Vector3){ 0.0f, 0.0f, 0.0f };
+        instances[i].modelIdx = UINT16_MAX; // Removed from rendering.
 	}
 
-	void NPCDeath() {
-		#if UNITY_EDITOR
-			if (!Application.isPlaying) return;
-		#endif
-
+	void NPCDeath(uint16_t i) {
 		if (deathDone) return; // We died the death, no 2nd deaths here.
 
 		deathDone = true; // Mark it so we only die once.
 		CreateDeathEffects(deathFX);
-		if (aic.index == 0 && !actAsCorpseOnly) Utils.PlayTempAudio(transform.position,Const.a.sounds[64]); // npc_autobomb: explosion1
+		if (NPCID == 0 && !instances[i].actAsCorpseOnly) play_wav(sounds[64], 1.0f, transform.position, true); // npc_autobomb: explosion1
 
 		if (aic == null) {
 			if (transform.parent != null) {

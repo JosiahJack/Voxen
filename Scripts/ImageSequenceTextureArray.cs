@@ -60,7 +60,7 @@ public class ImageSequenceTextureArray : MonoBehaviour {
 		if (health > 0) {
 			screenDestroyed = screenDestroyedDone = false;
 			if (lightContainer != null) lightContainer.SetActive(true);
-			tickFinished = PauseScript.a.relativeTime + tick;
+			tickFinished = Sys_Global.pauseRelativeTime + tick;
 			SetFrameIndices();
 		} else {
 			if (lightContainer != null) lightContainer.SetActive(false);
@@ -94,7 +94,7 @@ public class ImageSequenceTextureArray : MonoBehaviour {
 		if (string.IsNullOrWhiteSpace(resourceFolder)) return;
 
 		tick = frameDelay;
-		tickFinished = PauseScript.a.relativeTime + tick;
+		tickFinished = Sys_Global.pauseRelativeTime + tick;
 
 		// New method...long, but reduces overall memory load from duplicate
 		// frames and reduces startup time by over 8 seconds. :party:
@@ -839,13 +839,13 @@ public class ImageSequenceTextureArray : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (string.IsNullOrWhiteSpace(resourceFolder)) { this.enabled = false; return; }
 
 			if (mR.isVisible) {
-				if (tickFinished < PauseScript.a.relativeTime) {
+				if (tickFinished < Sys_Global.pauseRelativeTime) {
 					Think();
-					tickFinished = PauseScript.a.relativeTime + tick;
+					tickFinished = Sys_Global.pauseRelativeTime + tick;
 				}
 			}
 		}

@@ -1693,8 +1693,6 @@ int gladLoaderLoadGL(void) {
     return version;
 }
 
-
-
 void gladLoaderUnloadGL(void) {
     if (_glad_GL_loader_handle != NULL) {
         glad_close_dlopen_handle(_glad_GL_loader_handle);

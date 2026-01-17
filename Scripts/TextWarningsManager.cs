@@ -22,7 +22,7 @@ public class TextWarningsManager : MonoBehaviour {
 			warningTexts[i] = warningTextGObjects[i].GetComponent<Text>();
 			if (warningTexts[i] != null) warningTexts[i].text = System.String.Empty;
 			initialized[i] = false;
-			finishedTime[i] = PauseScript.a.relativeTime;
+			finishedTime[i] = Sys_Global.pauseRelativeTime;
 			uniqueID[i] = -1;
 		}
 	}
@@ -32,7 +32,7 @@ public class TextWarningsManager : MonoBehaviour {
 
 		for (int i=setIndex;i>=0;i--) {
 			if (uniqueID[i] == id) { setIndex = i; break;}
-			if (finishedTime[i] < PauseScript.a.relativeTime) { setIndex = i; break;}
+			if (finishedTime[i] < Sys_Global.pauseRelativeTime) { setIndex = i; break;}
 		}
 
 		if (id == 322) forcedReference = 0;
@@ -49,15 +49,15 @@ public class TextWarningsManager : MonoBehaviour {
 		else
 			if (warningLifeTimes[setIndex] < warningDefaultLifeTime) warningLifeTimes[setIndex] = warningDefaultLifeTime;
 
-		finishedTime[setIndex] = PauseScript.a.relativeTime + warningLifeTimes[setIndex];
+		finishedTime[setIndex] = Sys_Global.pauseRelativeTime + warningLifeTimes[setIndex];
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused() || PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
 
 		for (int i=0;i<warningTextGObjects.Length;i++) {
 			if (!string.IsNullOrWhiteSpace(warningTexts[i].text)) {
-				if (finishedTime[i] < PauseScript.a.relativeTime) {
+				if (finishedTime[i] < Sys_Global.pauseRelativeTime) {
 					warningTexts[i].text = System.String.Empty;
 					if (warningTextGObjects[i].activeInHierarchy) warningTextGObjects[i].SetActive(false);
 					continue;

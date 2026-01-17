@@ -108,7 +108,7 @@ public class Automap : MonoBehaviour {
 
 	void Start() {
 		automapExplored = new bool[4096];
-		automapUpdateFinished = PauseScript.a.relativeTime;
+		automapUpdateFinished = Sys_Global.pauseRelativeTime;
 		AutomapZoomAdjust();
 		icoZAdj = 0f;
 		automapCameraTransform = automapCamera.transform;
@@ -200,7 +200,7 @@ public class Automap : MonoBehaviour {
 			Utils.Activate(poolContainerAutomapMutantOverlays);
 		}
 
-// 		if (automapUpdateFinished < PauseScript.a.relativeTime) {
+// 		if (automapUpdateFinished < Sys_Global.pauseRelativeTime) {
 			Utils.EnableImage(automapBaseImage);
 			if (LevelManager.a.currentLevel >= 0) {
 				Utils.AssignImageOverride(automapBaseImage,
@@ -288,7 +288,7 @@ public class Automap : MonoBehaviour {
 				// since it updates it anyways.
 			}
 
-			if (automapUpdateFinished < PauseScript.a.relativeTime) {
+			if (automapUpdateFinished < Sys_Global.pauseRelativeTime) {
 				float radiusSquared = automapFoWRadius * automapFoWRadius;
 				Vector2 plyrPos = tempVec2b;
 				// Update explored tiles
@@ -317,9 +317,9 @@ public class Automap : MonoBehaviour {
 						}
 					//}
 				}
-				automapUpdateFinished = PauseScript.a.relativeTime + updateTime;
+				automapUpdateFinished = Sys_Global.pauseRelativeTime + updateTime;
 			}
-// 			automapUpdateFinished = PauseScript.a.relativeTime + updateTime;
+// 			automapUpdateFinished = Sys_Global.pauseRelativeTime + updateTime;
 // 		}
 
 		SetAutomapActiveState();

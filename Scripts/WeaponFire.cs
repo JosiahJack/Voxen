@@ -97,16 +97,16 @@ public class WeaponFire : MonoBehaviour {
         damageData = new DamageData();
         tempHit = new RaycastHit();
         tempVec = new Vector3(0f, 0f, 0f);
-        heatTickFinished = PauseScript.a.relativeTime + heatTickTime;
+        heatTickFinished = Sys_Global.pauseRelativeTime + heatTickTime;
 		reloadContainerHome = reloadContainer.localPosition;
 
-		// Set less than 30s before PauseScript.a.relativeTime to guarantee we
+		// Set less than 30s before Sys_Global.pauseRelativeTime to guarantee we
 		// don't immediately play action music.
-		justFired = (PauseScript.a.relativeTime - 31f);
+		justFired = (Sys_Global.pauseRelativeTime - 31f);
 
-		energySliderClickedTime = PauseScript.a.relativeTime;
+		energySliderClickedTime = Sys_Global.pauseRelativeTime;
 		playercapRbody = playerCapsule.GetComponent<Rigidbody>();
-		cyberWeaponAttackFinished = PauseScript.a.relativeTime;
+		cyberWeaponAttackFinished = Sys_Global.pauseRelativeTime;
 		wepYRot = 0f;
 		sparqSetting = 50f;
 		ionSetting = 100f;
@@ -114,8 +114,8 @@ public class WeaponFire : MonoBehaviour {
 		plasmaSetting = 40f;
 		stungunSetting = 20f;
 		reloadLerpValue = 0;
-		reloadFinished = PauseScript.a.relativeTime;
-		lerpStartTime = PauseScript.a.relativeTime;
+		reloadFinished = Sys_Global.pauseRelativeTime;
+		lerpStartTime = Sys_Global.pauseRelativeTime;
 		fogFac = 0;
     }
 
@@ -192,7 +192,7 @@ public class WeaponFire : MonoBehaviour {
     }
 
     void HeatBleedOff() {
-        if (heatTickFinished < PauseScript.a.relativeTime) {
+        if (heatTickFinished < Sys_Global.pauseRelativeTime) {
 			fogFac--;
 			if (fogFac < 0) fogFac = 0;
 			if (WeaponsHaveAnyHeat() || CurrentWeaponUsesEnergy()) {
@@ -206,7 +206,7 @@ public class WeaponFire : MonoBehaviour {
 				if (CurrentWeaponUsesEnergy()) energheatMgr.HeatBleed(Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent]); // update hud heat ticks if current weapon uses energy
 			}
 			
-            heatTickFinished = PauseScript.a.relativeTime + heatTickTime;
+            heatTickFinished = Sys_Global.pauseRelativeTime + heatTickTime;
         }
     }
 
@@ -253,8 +253,8 @@ public class WeaponFire : MonoBehaviour {
 		// Move weapon transform up/down for reload "animation" & weapon swap.
 		int i = Get16WeaponIndexFromConstIndex(WeaponCurrent.a.weaponIndex);
 		if (i < 0 || i > 15) i = 0;
-		if (reloadFinished > PauseScript.a.relativeTime) {
-			float elapsed = (PauseScript.a.relativeTime - lerpStartTime);
+		if (reloadFinished > Sys_Global.pauseRelativeTime) {
+			float elapsed = (Sys_Global.pauseRelativeTime - lerpStartTime);
 
 			// Percent towards goal time total (both halves of the action).
 			reloadLerpValue = (elapsed/(reloadFinished-lerpStartTime));//Const.a.reloadTime[i]);
@@ -284,8 +284,8 @@ public class WeaponFire : MonoBehaviour {
 	}
 
     void Update() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 
 		// Slowly cool off any weapons that have been heated from firing
 		HeatBleedOff();
@@ -329,8 +329,8 @@ public class WeaponFire : MonoBehaviour {
 
 	public void StartWeaponDip(float delay) {
 		if (delay < 0) delay = 0;
-		reloadFinished = PauseScript.a.relativeTime + delay;
-		lerpStartTime = PauseScript.a.relativeTime;
+		reloadFinished = Sys_Global.pauseRelativeTime + delay;
+		lerpStartTime = Sys_Global.pauseRelativeTime;
 	}
 
 	void RotateViewWeapon() {
@@ -352,7 +352,7 @@ public class WeaponFire : MonoBehaviour {
 			if (MouseLookScript.a.vmailActive) {
 				Inventory.a.DeactivateVMail();
 				MouseLookScript.a.vmailActive = false;
-				waitTilNextFire = PauseScript.a.relativeTime + 0.8f;
+				waitTilNextFire = Sys_Global.pauseRelativeTime + 0.8f;
 				return;
 			}
 
@@ -389,9 +389,9 @@ public class WeaponFire : MonoBehaviour {
 
 		GetWeaponData(wep16Index);
 		if (GetInput.a.Attack()
-			&& waitTilNextFire < PauseScript.a.relativeTime
-			&& (PauseScript.a.relativeTime - energySliderClickedTime) > 0.1f
-			&& reloadFinished < PauseScript.a.relativeTime) {
+			&& waitTilNextFire < Sys_Global.pauseRelativeTime
+			&& (Sys_Global.pauseRelativeTime - energySliderClickedTime) > 0.1f
+			&& reloadFinished < Sys_Global.pauseRelativeTime) {
 
 			StartCoroutine(CheckUIStateAndAttack(wep16Index));
 		}
@@ -403,12 +403,12 @@ public class WeaponFire : MonoBehaviour {
 		if (GUIState.a.isBlocking) yield break;
 		if (MouseLookScript.a.holdingObject) yield break;
 		if (MFDManager.a.mouseClickHeldOverGUI) yield break;
-		if (reloadFinished >= PauseScript.a.relativeTime) yield break;
-		if (waitTilNextFire >= PauseScript.a.relativeTime) yield break;
+		if (reloadFinished >= Sys_Global.pauseRelativeTime) yield break;
+		if (waitTilNextFire >= Sys_Global.pauseRelativeTime) yield break;
 		if (wepdex < 0 || wepdex > 15) yield break;
 		if (Automap.a.inFullMap) yield break;
 
-		justFired = PauseScript.a.relativeTime; // set justFired so that Music.cs can see it and play corresponding music in a little bit from now or keep playing action music
+		justFired = Sys_Global.pauseRelativeTime; // set justFired so that Music.cs can see it and play corresponding music in a little bit from now or keep playing action music
 		// Check weapon type and check ammo before firing
 		switch (wepdex) {
 			case 1: goto case 15;
@@ -431,7 +431,7 @@ public class WeaponFire : MonoBehaviour {
 						&& !WeaponCurrent.a.bottomless
 						&& !WeaponCurrent.a.redbull) {
 						Utils.PlayUIOneShotSavable(238); // noammo
-						waitTilNextFire = PauseScript.a.relativeTime + 0.8f;
+						waitTilNextFire = Sys_Global.pauseRelativeTime + 0.8f;
 						Const.sprint(11);
 					} else {
 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
@@ -448,7 +448,7 @@ public class WeaponFire : MonoBehaviour {
 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
 					} else {
 						Utils.PlayUIOneShotSavable(238); // noammo
-						waitTilNextFire = PauseScript.a.relativeTime + 0.8f;
+						waitTilNextFire = Sys_Global.pauseRelativeTime + 0.8f;
 					}
 				} else {
 					if (WeaponCurrent.a.currentMagazineAmount[WeaponCurrent.a.weaponCurrent] > 0
@@ -456,7 +456,7 @@ public class WeaponFire : MonoBehaviour {
 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
 					} else {
 						Utils.PlayUIOneShotSavable(238); // noammo
-						waitTilNextFire = PauseScript.a.relativeTime + 0.8f;
+						waitTilNextFire = Sys_Global.pauseRelativeTime + 0.8f;
 					}
 				}
 				break;
@@ -464,7 +464,7 @@ public class WeaponFire : MonoBehaviour {
 	}
 
 	void CheckReloadInput() {
-		if (reloadFinished >= PauseScript.a.relativeTime) return;
+		if (reloadFinished >= Sys_Global.pauseRelativeTime) return;
 		if (!GetInput.a.Reload()) return;
 
 		if (Const.a.InputQuickReloadWeapons) {
@@ -501,7 +501,7 @@ public class WeaponFire : MonoBehaviour {
 	}
 
 	void CheckAmmoChangeInput() {
-		if (reloadFinished >= PauseScript.a.relativeTime) return;
+		if (reloadFinished >= Sys_Global.pauseRelativeTime) return;
 		if (!GetInput.a.ChangeAmmoType()) return;
 
 		WeaponCurrent.a.ChangeAmmoType();
@@ -537,14 +537,14 @@ public class WeaponFire : MonoBehaviour {
 	}
 
 	public void FireCyberWeapon() {
-		if (cyberWeaponAttackFinished < PauseScript.a.relativeTime) {
+		if (cyberWeaponAttackFinished < Sys_Global.pauseRelativeTime) {
 			if (Inventory.a.isPulserNotDrill) {
 				if (Inventory.a.hasSoft[1]) {
 					// Fire pulser
 					Const.a.shotsFired++;
 					if (Inventory.a.hasSoft[1]) FireCyberBeachball(true,railgunShotForce,492);
 					Utils.PlayUIOneShotSavable(258); // wpulser
-					cyberWeaponAttackFinished = PauseScript.a.relativeTime + 0.08f;
+					cyberWeaponAttackFinished = Sys_Global.pauseRelativeTime + 0.08f;
 				}
 			} else {
 				if (Inventory.a.hasSoft[0]) {
@@ -552,7 +552,7 @@ public class WeaponFire : MonoBehaviour {
 					Const.a.shotsFired++;
 					if (Inventory.a.hasSoft[0]) FireCyberBeachball(false,plasmaShotForce,495);
 					Utils.PlayUIOneShotSavable(241); // wdrill baby drill
-					cyberWeaponAttackFinished = PauseScript.a.relativeTime + 0.5f;
+					cyberWeaponAttackFinished = Sys_Global.pauseRelativeTime + 0.5f;
 				}
 			}
 		}
@@ -588,7 +588,7 @@ public class WeaponFire : MonoBehaviour {
     // index is used to get recoil down at the bottom and pass along ref for damageData, otherwise the cases use WeaponCurrent.a.weaponIndex
     void FireWeapon(int index, bool isSilent) {
 		PlayerHealth.a.makingNoise = true;
-		PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime + 0.5f;
+		PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
 		GameObject smoke = null;
         switch (WeaponCurrent.a.weaponIndex) {
             case 36:
@@ -794,10 +794,10 @@ public class WeaponFire : MonoBehaviour {
 			|| overloadEnabled) {
 
             overloadEnabled = false;
-            waitTilNextFire = PauseScript.a.relativeTime
+            waitTilNextFire = Sys_Global.pauseRelativeTime
 							  + Const.a.delayBetweenShotsForWeapon2[index];
         } else {
-            waitTilNextFire = PauseScript.a.relativeTime
+            waitTilNextFire = Sys_Global.pauseRelativeTime
 							  + Const.a.delayBetweenShotsForWeapon[index];
         }
 
@@ -969,15 +969,15 @@ public class WeaponFire : MonoBehaviour {
 		if (!Inventory.a.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
 			tid.currentText = tranq > 0f ? Const.a.stringTable[536] : (dmgFinal == 0f ? Const.a.stringTable[511] : "");
 			tid.lifetime += tranq;
-			tid.damageTimeFinished = Mathf.Max(PauseScript.a.relativeTime + tranq,tid.damageTimeFinished + tranq);
-			tid.lifetimeFinished = PauseScript.a.relativeTime + tid.lifetime;
+			tid.damageTimeFinished = Mathf.Max(Sys_Global.pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
+			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
 		} else {
 			tid.currentText = ""; // Set by SendDamageReceive
 			tid.lifetime = 9999999f;
-			tid.lifetimeFinished = PauseScript.a.relativeTime + tid.lifetime;
+			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
 			tid.damageTime = 2.5f;
 			if (tranq > 2.5f) tid.damageTime = tranq;
-			tid.damageTimeFinished = PauseScript.a.relativeTime + tid.damageTime;
+			tid.damageTimeFinished = Sys_Global.pauseRelativeTime + tid.damageTime;
 		}
 
 		// Center on what we just shot
@@ -1217,7 +1217,7 @@ public class WeaponFire : MonoBehaviour {
 				}
 
 				PlayerHealth.a.makingNoise = true;
-				PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime+0.5f;
+				PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime+0.5f;
 			}
 			yield break;
 		}
@@ -1236,7 +1236,7 @@ public class WeaponFire : MonoBehaviour {
 		if (tempHM.isNPC && !tempHM.aic.asleep) Music.a.inCombat = true;
 		if (!silent) {
 			PlayerHealth.a.makingNoise = true;
-			PlayerHealth.a.noiseFinished = PauseScript.a.relativeTime + 0.5f;
+			PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
 			if ((tempHM.bloodType == BloodType.Red)
 				|| (tempHM.bloodType == BloodType.Yellow)
 				|| (tempHM.bloodType == BloodType.Green)) {

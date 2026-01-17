@@ -31,7 +31,7 @@ public class ForceBridge : MonoBehaviour {
 		
 		if (!initialized) {
 			if (PauseScript.a == null) tickFinished = tickTime + Random.value;
-			else tickFinished = PauseScript.a.relativeTime + tickTime + Random.value;
+			else tickFinished = Sys_Global.pauseRelativeTime + tickTime + Random.value;
 			
 			lerping = true;
 		}
@@ -68,11 +68,11 @@ public class ForceBridge : MonoBehaviour {
 	}
 
 	void FixedUpdate() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
-		if (tickFinished >= PauseScript.a.relativeTime) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
+		if (tickFinished >= Sys_Global.pauseRelativeTime) return;
 
-		tickFinished = PauseScript.a.relativeTime + tickTime;
+		tickFinished = Sys_Global.pauseRelativeTime + tickTime;
 		if (activated) {
 			Utils.Activate(segiEmitter);
 			if (lerping) {

@@ -33,7 +33,7 @@ public class PauseRigidbody : MonoBehaviour {
 
 	void OnEnable() {
 		if (rbody == null) Initialize();
-		if (PauseScript.a.MenuActive()) Pause();
+		if (Sys_Global.menuActive) Pause();
 	}
 		
 	public void Pause() {

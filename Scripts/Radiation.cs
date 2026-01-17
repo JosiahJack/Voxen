@@ -10,7 +10,7 @@ public class Radiation : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		radFinished = PauseScript.a.relativeTime + (intervalTime * 2);
+		radFinished = Sys_Global.pauseRelativeTime + (intervalTime * 2);
 	}
 
 	void OnTriggerEnter (Collider col) {
@@ -18,17 +18,17 @@ public class Radiation : MonoBehaviour {
 			if (PlayerHealth.a.hm.health > 0f) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
-				radFinished = PauseScript.a.relativeTime + (intervalTime*Random.Range(1f,1.5f));
+				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*Random.Range(1f,1.5f));
 			}
 		}
 	}
 
 	void  OnTriggerStay (Collider col) {
 		if (col.gameObject.CompareTag("Player")) {
-			if (PlayerHealth.a.hm.health > 0f && (radFinished < PauseScript.a.relativeTime)) {
+			if (PlayerHealth.a.hm.health > 0f && (radFinished < Sys_Global.pauseRelativeTime)) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
-				radFinished = PauseScript.a.relativeTime + (intervalTime*Random.Range(1f,1.5f));
+				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*Random.Range(1f,1.5f));
 			}
 		}
 	}
@@ -37,7 +37,7 @@ public class Radiation : MonoBehaviour {
 		if (col.gameObject.CompareTag("Player")) { 
 			if (PlayerHealth.a.hm.health > 0f) {
 				PlayerHealth.a.radiationArea = false;
-				radFinished = PauseScript.a.relativeTime;  // reset so re-triggering is instant
+				radFinished = Sys_Global.pauseRelativeTime;  // reset so re-triggering is instant
 			}
 		}
 	}

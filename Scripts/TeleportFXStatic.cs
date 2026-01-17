@@ -16,9 +16,9 @@ public class TeleportFXStatic : MonoBehaviour {
 	void OnEnable () {
 		cursorTexture = MouseCursor.a.cursorImage; //store correct cursor
 		MouseCursor.a.cursorImage = tempCursorTexture; //give dummy cursor to hide it
-		effectFinished = PauseScript.a.relativeTime + activeTime;
+		effectFinished = Sys_Global.pauseRelativeTime + activeTime;
 		rect = GetComponent<RectTransform>();
-		flipTime = PauseScript.a.relativeTime + intervalTime;
+		flipTime = Sys_Global.pauseRelativeTime + intervalTime;
 	}
 
 	void FlipX () {
@@ -47,10 +47,10 @@ public class TeleportFXStatic : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
-			if (effectFinished < PauseScript.a.relativeTime) Deactivate();
-			if (flipTime < PauseScript.a.relativeTime) {
-				flipTime = PauseScript.a.relativeTime + intervalTime;
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+			if (effectFinished < Sys_Global.pauseRelativeTime) Deactivate();
+			if (flipTime < Sys_Global.pauseRelativeTime) {
+				flipTime = Sys_Global.pauseRelativeTime + intervalTime;
 				randHolder = Random.Range(0f,1f);
 				if (randHolder < 0.5) {
 					FlipX();

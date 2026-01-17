@@ -26,7 +26,7 @@ public class CyberWall : MonoBehaviour {
 	}
 
 	void Update() {
-		if (!PauseScript.a.Paused() && !PauseScript.a.MenuActive()) {
+		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (tickFinished < Time.time) {
 				if (centerAlphaCurrent > centerAlphaMinimum) {
 					centerAlphaCurrent -= 0.05f;

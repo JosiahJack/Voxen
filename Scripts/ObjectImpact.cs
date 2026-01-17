@@ -20,8 +20,8 @@ public class ObjectImpact : MonoBehaviour {
 	}
 
 	void OnCollisionEnter(Collision collision) {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 		if (collision == null) return;
 
 		if (collision.relativeVelocity.sqrMagnitude > (minVolumeSpeed * minVolumeSpeed)) {

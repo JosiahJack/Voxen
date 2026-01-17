@@ -152,7 +152,7 @@ else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
-    LDFLAGS="-Wl,--gc-sections -L./External/ -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
     OBJ_DIR="./External/Linux"
     GLAD_OBJ="${OBJ_DIR}/glad/glad.o"
     BINARY_NAME="voxen"

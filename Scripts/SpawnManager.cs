@@ -22,7 +22,7 @@ public class SpawnManager : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		delayFinished = PauseScript.a.relativeTime;
+		delayFinished = Sys_Global.pauseRelativeTime;
 		if (Const.a.difficultyCombat == 1) {
 			numberToSpawn = (int) Mathf.Floor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
@@ -41,12 +41,12 @@ public class SpawnManager : MonoBehaviour {
 	public void Activate(bool alertEnemies) {
 		alertEnemiesOnAwake = alertEnemies;
 		active = true;
-		delayFinished = PauseScript.a.relativeTime;
+		delayFinished = Sys_Global.pauseRelativeTime;
 	}
 
 	void Update() {
-		if (PauseScript.a.Paused()) return;
-		if (PauseScript.a.MenuActive()) return;
+		if (Sys_Global.gamePaused) return;
+		if (Sys_Global.menuActive) return;
 		if (!active) return;
 
 		if (LevelManager.a.npcsm[LevelManager.a.currentLevel] == null) return;
@@ -68,16 +68,16 @@ public class SpawnManager : MonoBehaviour {
 		if (numberActive != count) numberActive = count;
 
 		if (numberActive >= numberToSpawn) return;
-		if (delayFinished >= PauseScript.a.relativeTime) return; // Not yet.
+		if (delayFinished >= Sys_Global.pauseRelativeTime) return; // Not yet.
 
-		delayFinished = PauseScript.a.relativeTime
+		delayFinished = Sys_Global.pauseRelativeTime
 						+ Random.Range(minDelayBetweenSpawns,
 									   maxDelayBetweenSpawns);
 
 		Spawn(index); // spawn then wait randomized amount of time
 		count++;
 		if (count >= numberToSpawn) {
-			delayFinished = PauseScript.a.relativeTime + allSpawnedResetDelay;
+			delayFinished = Sys_Global.pauseRelativeTime + allSpawnedResetDelay;
 		}
 	}
 
