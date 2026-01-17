@@ -956,35 +956,35 @@ public class Utils {
 
     public static int AIStateToInt(AIState ai_state) {
 		switch (ai_state) {
-			case AIState.Walk: return 1;
-			case AIState.Run: return 2;
-			case AIState.Attack1: return 3;
-			case AIState.Attack2: return 4;
-			case AIState.Attack3: return 5;
-			case AIState.Pain: return 6;
-			case AIState.Dying: return 7;
-			case AIState.Inspect: return 8;
-			case AIState.Interacting: return 9;
-			case AIState.Dead: return 10;
+			case AIState_Walk: return 1;
+			case AIState_Run: return 2;
+			case AIState_Attack1: return 3;
+			case AIState_Attack2: return 4;
+			case AIState_Attack3: return 5;
+			case AIState_Pain: return 6;
+			case AIState_Dying: return 7;
+			case AIState_Inspect: return 8;
+			case AIState_Interacting: return 9;
+			case AIState_Dead: return 10;
 		}
         return 0; // Idle
     }
 
     public static AIState GetAIStateFromInt(int ai_state_i) {
         switch (ai_state_i) {
-            case 0:  return AIState.Idle;
-            case 1:  return AIState.Walk;
-            case 2:  return AIState.Run;
-            case 3:  return AIState.Attack1;
-            case 4:  return AIState.Attack2;
-            case 5:  return AIState.Attack3;
-            case 6:  return AIState.Pain;
-            case 7:  return AIState.Dying;
-            case 8:  return AIState.Inspect;
-            case 9:  return AIState.Interacting;
-            case 10: return AIState.Dead;
+            case 0:  return AIState_Idle;
+            case 1:  return AIState_Walk;
+            case 2:  return AIState_Run;
+            case 3:  return AIState_Attack1;
+            case 4:  return AIState_Attack2;
+            case 5:  return AIState_Attack3;
+            case 6:  return AIState_Pain;
+            case 7:  return AIState_Dying;
+            case 8:  return AIState_Inspect;
+            case 9:  return AIState_Interacting;
+            case 10: return AIState_Dead;
         }
-        return AIState.Idle;
+        return AIState_Idle;
     }
 
 	public static AttackType GetAttackTypeFromInt(int att_type_i) {

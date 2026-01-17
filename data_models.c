@@ -144,7 +144,7 @@ void LoadModels(void) {
             if (!modelIndexUsedForCurrentLevel[parserIdx]) continue;
         #endif
         
-        modelAnimationType[i] = model_parser.entries[parserIdx].animated;
+        modelAnimationType[i] = (model_parser.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
         const char *fbx_path = model_parser.entries[parserIdx].path;
         if (modelAnimationType[i] > 0u) {
             animatedModelCount++;

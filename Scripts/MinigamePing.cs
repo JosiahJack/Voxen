@@ -46,7 +46,7 @@ public class MinigamePing : MonoBehaviour {
         playerScore = 0;
         computerScore = 0;
         servecount = 0;
-        playerServing = Random.Range(0f,1f) < 0.5f ? true : false;
+        playerServing = random_range(0f,1f) < 0.5f ? true : false;
         UpdateScoreText();
         playerPaddle.localPosition = new Vector3(0f,-100f,0f);
         computerPaddle.localPosition = new Vector3(0f,100f,0f);
@@ -61,16 +61,16 @@ public class MinigamePing : MonoBehaviour {
     }
 
     private Vector2 GetNewBallDirection() {
-        float dirX = Random.Range(-0.3f,0.3f);
+        float dirX = random_range(-0.3f,0.3f);
         float dirY = 1f;
         if (playerScore == 0 && computerScore == 0) {
-            dirY = Random.Range(0f,1f) < 0.5f ? Random.Range( 0.8f, 1.0f)
-                                              : Random.Range(-1.0f,-0.8f);
+            dirY = random_range(0f,1f) < 0.5f ? random_range( 0.8f, 1.0f)
+                                              : random_range(-1.0f,-0.8f);
         } else {
             if (playerServing) {
-                dirY = Random.Range(0.8f,1.0f);
+                dirY = random_range(0.8f,1.0f);
             } else {
-                dirY = Random.Range(-1.0f,-0.8f);
+                dirY = random_range(-1.0f,-0.8f);
             }
         }
 
@@ -223,7 +223,7 @@ public class MinigamePing : MonoBehaviour {
 
                     float add = computerVel * 0.75f;
                     if (computerVel < 0.05f) {
-                        float neg = Random.Range(0f,1f) < 0.5f ? -1f : 1f;
+                        float neg = random_range(0f,1f) < 0.5f ? -1f : 1f;
                         add = 0.2f * neg * 0.75f; // Don't get stuck with no x.
                     }
 

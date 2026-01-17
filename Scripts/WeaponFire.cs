@@ -216,7 +216,7 @@ public class WeaponFire : MonoBehaviour {
 		if (strength <= 0f) return;
 		if (PlayerMovement.a.fatigue > 80) strength = strength * 2f;
 		strength = strength * 0.25f;
-		Vector3 wepJoltPosition = new Vector3(reloadContainer.localPosition.x - (strength * 0.5f * Random.Range(-1f,1f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
+		Vector3 wepJoltPosition = new Vector3(reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1f,1f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
 		if (wepJoltPosition.x > 999f) wepJoltPosition.x = 0;
 		if (wepJoltPosition.y > 999f) wepJoltPosition.y = 0;
 		if (wepJoltPosition.z > 999f) wepJoltPosition.z = 0;
@@ -808,10 +808,10 @@ public class WeaponFire : MonoBehaviour {
 		tempHM = null;
         tempHit = new RaycastHit();
 		tempVec = MouseCursor.a.GetCursorScreenPointForRay();
-		tempVec.x += UnityEngine.Random.Range(-driftForWeapon[wep16Index],
+		tempVec.x += random_range(-driftForWeapon[wep16Index],
 											  driftForWeapon[wep16Index]);
 
-		tempVec.y += UnityEngine.Random.Range(-driftForWeapon[wep16Index],
+		tempVec.y += random_range(-driftForWeapon[wep16Index],
 											  driftForWeapon[wep16Index]);
 
         if (Physics.Raycast(playerCamera.ScreenPointToRay(tempVec),out tempHit,
@@ -864,7 +864,7 @@ public class WeaponFire : MonoBehaviour {
 			hitGO.transform);
 
 		Quaternion roll = impactMark.transform.localRotation;
-		roll *= Quaternion.Euler(0f,0f,Random.Range(0,3) * 90f);
+		roll *= Quaternion.Euler(0f,0f,random_range(0,3) * 90f);
 		impactMark.transform.localRotation = roll;
 		GameObject dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
 		impactMark.transform.parent = dynamicObjectsContainer.transform;
@@ -1088,7 +1088,7 @@ public class WeaponFire : MonoBehaviour {
 				// Using tempHit.transform instead of tempHit.collider.transform to ensure we get overall NPC parent instead of its children.
 				AIController taic = damageData.other.GetComponent<AIController>();
 				if (taic !=null) {
-					tranq = taic.Tranquilize(3f + Random.Range(0f,4f),false);
+					tranq = taic.Tranquilize(3f + random_range(0f,4f),false);
 				}
 			}
         } else {

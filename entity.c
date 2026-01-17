@@ -9,7 +9,7 @@ void InitializeEntity(Entity* entry) {
     entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
     entry->modelIndex = MODEL_IDX_MAX;
     entry->layer = 0u; // PhysicsLayer_Default
-    entry->animated = 0u;
+    flag_set(&entry->entflags, ENTFLAG_ANIMATED, false);
     entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
     entry->lodIndex  = MODEL_IDX_MAX;
     entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
@@ -21,7 +21,7 @@ void InitializeEntity(Entity* entry) {
     entry->dynamicFriction = entry->staticFriction = 0.6f;
     entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
     entry->volume = 1.0f;
-    entry->persistent = false;
+    flag_set(&entry->entflags, ENTFLAG_TEST_PERSISTENT, false);
     for (int i=0;i<MAX_CHILD_COUNT;++i) {
         entry->child[i] = UINT16_MAX;
         entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
@@ -81,15 +81,11 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
         
     instances[i].index = entIdx;
-    if (ConstIndexIsNPC(entIdx)) {
-        instances[i].layer = PhysicsLayer_NPC;
-        instances[i].idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[NPCID].timeIdleSFXMin, npcTable[NPCID].timeIdleSFXMax);
-        instances[i].attack1SoundTime = Sys_Global.pauseRelativeTime;
-    }
+//     if (ConstIndexIsNPC(entIdx)) InitializeAI(i); TODO
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[i].modelIndex = entities[entIdx].modelIndex;
     instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
-    instances[i].animated = modelAnimationType[instances[i].modelIndex];
+    flag_set(&instances[i].entflags, ENTFLAG_ANIMATED, modelAnimationType[instances[i].modelIndex] > 0u);
     instances[i].numclips = entities[entIdx].numclips;
     instances[i].animationNum = entities[entIdx].animationNum;
     #ifdef ONLY_LOAD_LEVEL_NEEDS
@@ -151,6 +147,22 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     ApplyUnityHierarchyCorrectionAtLevelLoad(i, entIdx); // TODO: Manually fix these all up to not be needed.
     dirtyInstances[i] = true;
     loadedInstances++;
+}
+
+void DeleteInstance(uint16_t i) {
+    if (i <= PLAYER2) return; // Don't delete null ent, player 1, nor player 2.
+    if (i >= loadedInstances) return; // Already gone.
+    
+    // Shift render state markers.
+    if (i <= startOfDoubleSidedInstances) --startOfDoubleSidedInstances;
+    if (i <= startOfTransparentInstances) --startOfTransparentInstances;
+    if (i <= endOfModels)                 --endOfModels;
+    if (InstanceIsNonRenderable(i))      --invalidModelIndexCount;
+    
+    // Shift entire list
+    uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
+    for (;i<endInstance;++i) instances[i] = instances[i + 1]; // Shift the list down, overwriting the entity we're deleting at starting i
+    --loadedInstances; // Shift final marker.  It's history!
 }
 
 // Name,AtkTyp1,2,3,Dmg1,2,3,Range1,2,3,Health,CybHealth,Percp,Disrp,Armr,Def,Movtyp,Yawspd,FOV,FOVAtk,FOVStartMov,DistToSeeBehind,SightRange,WalkSpd,RunSpd,AtkSpd1,2,3,AtkForce3,AtkRad3,TtPain,TbwPain,TtDead,TtActualAtk1,2,3,TbwAtk1,2,3,TEnemChg,TIdleSFXMin,TIdleSFXMax,TAtk1WaitMin,TAtk1WaitMax,TAtk1WaitChnc,TAtk2WaitMin,TAtk2WaitMax,TAtk2WaitChnc,TAtk3WaitMin,TAtk3WaitMax,TAtk3WaitChnc,ProjType1,2,3,ProjSpd1,2,3,HasLaser1,2,3,ExplodeOn3,PreActMeleCols,THunt,FlightHeight,FlightHeightIsPerc,SwitchMatOnDie,RangeHear,TTranq,Hops,NPCType,AtkProj1,2,3

@@ -629,7 +629,6 @@ void PortalCulling(void);
 
 void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
-    uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
         if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
@@ -750,7 +749,6 @@ void RenderShadowmaps(void) {
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
         uint32_t shadowmapOffsetHead = 0U;
-        uint16_t endOfModels = loadedInstances - invalidModelIndexCount;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<endOfModels;++i) {
@@ -1139,7 +1137,7 @@ static inline void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. R
     RenderInstancesBetween(startOfDoubleSidedInstances, startOfTransparentInstances, playerPos, false);
     
     glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
-    RenderInstancesBetween(startOfTransparentInstances, loadedInstances - invalidModelIndexCount, playerPos, true);
+    RenderInstancesBetween(startOfTransparentInstances, endOfModels, playerPos, true);
     
     if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);

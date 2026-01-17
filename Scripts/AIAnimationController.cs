@@ -44,15 +44,15 @@ public class AIAnimationController : MonoBehaviour {
 		else checkVisWithSMR = false;
 		
 		switch (aic.currentState) {
-			case AIState.Idle: 		clipName = "Idle";	  break;
-			case AIState.Walk:	 	clipName = "Walk"; 	  break;
-			case AIState.Run: 		clipName = "Run";	  break;
-			case AIState.Attack1: 	clipName = "Attack1"; break;
-			case AIState.Attack2: 	clipName = "Attack2"; break;
-			case AIState.Attack3: 	clipName = "Attack3"; break;
-			case AIState.Pain: 		clipName = "Pain";	break;
-			case AIState.Dying: 	clipName = "Death";	break;
-			case AIState.Dead:
+			case AIState_Idle: 		clipName = "Idle";	  break;
+			case AIState_Walk:	 	clipName = "Walk"; 	  break;
+			case AIState_Run: 		clipName = "Run";	  break;
+			case AIState_Attack1: 	clipName = "Attack1"; break;
+			case AIState_Attack2: 	clipName = "Attack2"; break;
+			case AIState_Attack3: 	clipName = "Attack3"; break;
+			case AIState_Pain: 		clipName = "Pain";	break;
+			case AIState_Dying: 	clipName = "Death";	break;
+			case AIState_Dead:
 				if (useDeadAnimForDeath) clipName = "Dead";
 				else clipName = "Death";
 
@@ -89,27 +89,27 @@ public class AIAnimationController : MonoBehaviour {
 		
 		if (firstUpdateAfterLoad) { SetAnimAfterLoad(); firstUpdateAfterLoad = false; return; }
 		
-		if (aic.asleep && aic.currentState != AIState.Dying
-			&& aic.currentState != AIState.Dead) {
+		if (aic.asleep && aic.currentState != AIState_Dying
+			&& aic.currentState != AIState_Dead) {
 			Idle();
 			return;
 		}
 		
-		if (aic.currentState == AIState.Run && aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
+		if (aic.currentState == AIState_Run && aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
 			Idle();
 			return;
 		}
 
 		switch (aic.currentState) {
-			case AIState.Idle: 		Idle(); 	break;
-			case AIState.Walk:	 	Walk(); 	break;
-			case AIState.Run: 		Run(); 		break;
-			case AIState.Attack1: 	Attack1(); 	break;
-			case AIState.Attack2: 	Attack2(); 	break;
-			case AIState.Attack3: 	Attack3(); 	break;
-			case AIState.Pain: 		Pain();		break;
-			case AIState.Dying: 	Dying(); 	break;
-			case AIState.Dead:		Dead();		break;
+			case AIState_Idle: 		Idle(); 	break;
+			case AIState_Walk:	 	Walk(); 	break;
+			case AIState_Run: 		Run(); 		break;
+			case AIState_Attack1: 	Attack1(); 	break;
+			case AIState_Attack2: 	Attack2(); 	break;
+			case AIState_Attack3: 	Attack3(); 	break;
+			case AIState_Pain: 		Pain();		break;
+			case AIState_Dying: 	Dying(); 	break;
+			case AIState_Dead:		Dead();		break;
 			default: 				Idle(); 	break;
 		}
 	}
@@ -119,7 +119,7 @@ public class AIAnimationController : MonoBehaviour {
 			if (anim.speed > 0) anim.speed = 0;
 		} else {
 			if (anim.speed != 1f) anim.speed = 1f;
-			if (UnityEngine.Random.Range(0,1f) < 0.5f) {
+			if (random_range(0,1f) < 0.5f) {
 			    anim.Play("Idle");
 			    clipName = "Idle";
 			}

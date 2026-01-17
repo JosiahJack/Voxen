@@ -36,13 +36,13 @@ public class QuestBits {
 	public bool IsolinearChipsetInstalled;
 
 	public void ResetQuestData(QuestBits qD) {
-		qD.lev1SecCode = Random.Range(0,10); // Must do repeatedly to prevent
+		qD.lev1SecCode = random_range(0,10); // Must do repeatedly to prevent
 											 // these all being the same number.
-		qD.lev2SecCode = Random.Range(0,10);
-		qD.lev3SecCode = Random.Range(0,10);
-		qD.lev4SecCode = Random.Range(0,10);
-		qD.lev5SecCode = Random.Range(0,10);
-		qD.lev6SecCode = Random.Range(0,10);
+		qD.lev2SecCode = random_range(0,10);
+		qD.lev3SecCode = random_range(0,10);
+		qD.lev4SecCode = random_range(0,10);
+		qD.lev5SecCode = random_range(0,10);
+		qD.lev6SecCode = random_range(0,10);
 		qD.RobotSpawnDeactivated = false;
 		qD.IsotopeInstalled = false;
 		qD.ShieldActivated = false;

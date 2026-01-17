@@ -71,7 +71,7 @@ public class SpawnManager : MonoBehaviour {
 		if (delayFinished >= Sys_Global.pauseRelativeTime) return; // Not yet.
 
 		delayFinished = Sys_Global.pauseRelativeTime
-						+ Random.Range(minDelayBetweenSpawns,
+						+ random_range(minDelayBetweenSpawns,
 									   maxDelayBetweenSpawns);
 
 		Spawn(index); // spawn then wait randomized amount of time
@@ -111,7 +111,7 @@ public class SpawnManager : MonoBehaviour {
 
 	Vector3 GetRandomLocation() {
 		int randpos;
-		randpos = Random.Range(0,(spawnLocations.Length-1));
+		randpos = random_range(0,(spawnLocations.Length-1));
 		Vector3 retval = spawnLocations[randpos].position;
 		if (!AreaClear(retval)) return new Vector3(0,0,0);
 		if (!AreaHidden(retval)) return new Vector3(0,0,0);

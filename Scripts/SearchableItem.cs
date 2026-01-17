@@ -23,7 +23,7 @@ public class SearchableItem : MonoBehaviour {
 			// Generate random contents once
 			int tempInt = 100;
 			for(int i=0;i<randomItem.Length;i++) {
-				tempInt = Random.Range(0,100); // generate even distribution random value from 0 to 100, e.g. 35
+				tempInt = random_range(0,100); // generate even distribution random value from 0 to 100, e.g. 35
 				if (randomItemDropChance[i] <= 0) continue; // next!
 				if (tempInt <= randomItemDropChance[i]) {
 					contents[numRandomGeneratedItems] = randomItem[i]; // ok item is now present

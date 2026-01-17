@@ -14,7 +14,7 @@ public class UseableObjectUse : MonoBehaviour {
 		// 33% chance of not spawning logic probes on Puzzle difficulty of 3
 		if (Const.a.difficultyPuzzle == 3) {
 			if (useableItemIndex == 54) {
-				if (UnityEngine.Random.Range(0,1f) < 0.33f) {
+				if (random_range(0,1f) < 0.33f) {
 					Utils.SafeDestroy(gameObject);
 				}
 			}

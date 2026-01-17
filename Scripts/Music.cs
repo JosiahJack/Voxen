@@ -504,11 +504,11 @@ public class Music : MonoBehaviour {
 				}
 			}
 			if (cyberTube) {
-				rand = UnityEngine.Random.Range(4,8);
+				rand = random_range(4,8);
 				return levelMusic[rand];
 			}
-			if (UnityEngine.Random.Range(0,1f) < 0.5f) {
-				rand = UnityEngine.Random.Range(1,5);
+			if (random_range(0,1f) < 0.5f) {
+				rand = random_range(1,5);
 				return levelMusic[rand];
 			} else {
 				return levelMusic[8];
@@ -532,10 +532,10 @@ public class Music : MonoBehaviour {
 		if (levnum == 1) {
 			if (levelEntry) return levelMusic[0];
 			if (ttype == TrackType.Combat) {
-				rand = UnityEngine.Random.Range(5,11);
+				rand = random_range(5,11);
 				return levelMusic[rand];
 			}
-			rand = UnityEngine.Random.Range(1,5);
+			rand = random_range(1,5);
 			return levelMusic[rand];
 		}
 
@@ -543,10 +543,10 @@ public class Music : MonoBehaviour {
 		if (levnum == 2 || levnum == 4) {
 			if (levelEntry) return levelMusic[0];
 			if (ttype == TrackType.Combat) {
-				rand = UnityEngine.Random.Range(8,10);
+				rand = random_range(8,10);
 				return levelMusic[rand];
 			}
-			rand = UnityEngine.Random.Range(1,8);
+			rand = random_range(1,8);
 			return levelMusic[rand];
 		}
 
@@ -554,10 +554,10 @@ public class Music : MonoBehaviour {
 		if (levnum == 0 || levnum == 5 || levnum == 7) {
 			if (levelEntry) return levelMusic[6];
 			if (ttype == TrackType.Combat) {
-				rand = UnityEngine.Random.Range(0,6);
+				rand = random_range(0,6);
 				return levelMusic[rand];
 			}
-			rand = UnityEngine.Random.Range(6,13);
+			rand = random_range(6,13);
 			return levelMusic[rand];
 		}
 
@@ -565,10 +565,10 @@ public class Music : MonoBehaviour {
 		if (levnum == 8) {
 			if (levelEntry) return levelMusic[9];
 			if (ttype == TrackType.Combat) {
-				rand = UnityEngine.Random.Range(0,6);
+				rand = random_range(0,6);
 				return levelMusic[rand];
 			}
-			rand = UnityEngine.Random.Range(6,19);
+			rand = random_range(6,19);
 			return levelMusic[rand];
 		}
 
@@ -576,10 +576,10 @@ public class Music : MonoBehaviour {
 		if (levnum == 6) {
 			if (levelEntry) return levelMusic[0];
 			if (ttype == TrackType.Combat) {
-				rand = UnityEngine.Random.Range(9,13);
+				rand = random_range(9,13);
 				return levelMusic[rand];
 			}
-			rand = UnityEngine.Random.Range(0,10);
+			rand = random_range(0,10);
 			return levelMusic[rand];
 		}
 
@@ -587,10 +587,10 @@ public class Music : MonoBehaviour {
 		if (levnum == 10 || levnum == 11 || levnum == 12) {
 			if (levelEntry) return levelMusic[19];
 			if (ttype == TrackType.Combat) {
-				rand = UnityEngine.Random.Range(0,9);
+				rand = random_range(0,9);
 				return levelMusic[rand];
 			}
-			rand = UnityEngine.Random.Range(9,24);
+			rand = random_range(9,24);
 			return levelMusic[rand];
 		}
 

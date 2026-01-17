@@ -715,13 +715,43 @@ extern NPCTable npcTable[NUM_AI_TYPES];
 #define NPCID (instances[i].index - 419)
 
 #define MAX_CHILD_COUNT 4
+#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
+#define NULLENT 0u
+#define PLAYER1 1u
+#define PLAYER2 2u
+#define START_INDEX_LEVEL_INSTANCES 3
+#define ENTFLAG_ACTIVE                  1u
+#define ENTFLAG_CARDCHUNK               2u
+#define ENTFLAG_GROUNDED                4U
+#define ENTFLAG_USEGRAVITY              8u
+#define ENTFLAG_KINEMATIC              16u
+#define ENTFLAG_RIGIDBODY              32u
+#define ENTFLAG_DOUBLESIDED            64u
+#define ENTFLAG_TRANSPARENT           128u
+#define ENTFLAG_CHANGE_TEX_ON_ACTIVE  256u
+#define ENTFLAG_BLINK_TEX_ON_ACTIVE   512U
+#define ENTFLAG_NO_SHADOWS           1024u
+#define ENTFLAG_ANIMATED             2048u
+#define ENTFLAG_ASLEEP               4096u
+#define ENTFLAG_WALK_PATH_ON_START   8192u
+#define ENTFLAG_TEST_PERSISTENT     16384u
+#define ENTFLAG_TEST_OVERRIDE_TEST  32768u
+#define ENTFLAG_TOUCHING_HURTS      65536u
+#define ENTFLAG_ACT_AS_CORPSE_ONLY 131072u
+#define ENTFLAG_DYING              262144u
+#define ENTFLAG_DEATH_BURST_DONE   524288u
+#define ENTFLAG_DEAD              1048576u
+#define ENTFLAG_TELEPORT_ON_DEATH 2097152u
+#define ENTFLAG_GO_INTO_PAIN      4194304u
+static inline void flag_enable(uint32_t *flags, uint32_t bit) { *flags |= bit; }
+static inline void flag_disable(uint32_t *flags, uint32_t bit) { *flags &= ~bit; }
+static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 typedef struct {
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     uint8_t npcIndex;
     uint32_t physics_handle;
     uint32_t entflags;
     uint16_t modelIndex;
-    uint8_t animated;
     uint16_t texIndex;
     uint16_t altTexIndex;
     uint16_t glowIndex;
@@ -769,16 +799,14 @@ typedef struct {
     Vector3    child_offset[MAX_CHILD_COUNT];
     Quaternion child_rotation[MAX_CHILD_COUNT];
     Vector3    child_scale[MAX_CHILD_COUNT];
-    bool persistent;
-    bool overrideTest;
     double timeForTranquilization;
     Vector3 sightPointOffset;
     Vector3 gunPointOffset;
     Vector3 gunPointOffset2;
     uint16_t muzzleBurst;
     uint16_t muzzleBurst2;
-    bool touchingHurts;
     void* think;
+    uint16_t enemey; // instances[] index of enemy.
     float idleTime;
     float attack1SoundTime;
     float attack2SoundTime;
@@ -788,8 +816,15 @@ typedef struct {
     float attack2Finished;
     float attack3Finished;
     float timeTillPainFinished;
+    uint8_t walkWaypointsLength;
+    Vector3 walkWaypoints[32];
     char path[128];
 } Entity;
+extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
+extern Entity instances[INSTANCE_COUNT];
+extern bool instanceIsLODArray[INSTANCE_COUNT];
+extern float modelMatrices[INSTANCE_COUNT * 16];
+extern uint8_t dirtyInstances[INSTANCE_COUNT];
 
 typedef struct {
     Entity* entries;
@@ -921,6 +956,7 @@ extern uint8_t modelAnimationType[MODEL_IDX_MAX];
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
 extern AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 void LoadModels(void);
+bool InstanceIsNonRenderable(uint16_t i);
 
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
@@ -1299,9 +1335,6 @@ static inline int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((in
 static inline int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
 static inline bool XZPairInBounds(int32_t x, int32_t z) { return (x < WORLDX && z < WORLDZ && x >= 0 && z >= 0); }
-static inline void flag_enable(uint32_t *flags, uint32_t bit) { *flags |= bit; }
-static inline void flag_disable(uint32_t *flags, uint32_t bit) { *flags &= ~bit; }
-static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 
 extern RenderSystem Sys_Render; // Added last to make use of all defines for sizes.
 
@@ -1366,30 +1399,6 @@ static inline void mul_mat4(float *out, const float *a, const float *b) { // out
     for (int32_t i = 0; i < 16; i++) out[i] = result[i]; // copy back
 }
 
-#define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
-#define NULLENT 0u
-#define PLAYER1 1u
-#define PLAYER2 2u
-#define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE        1u
-#define ENTFLAG_CARDCHUNK     2u
-#define ENTFLAG_GROUNDED      4u
-#define ENTFLAG_USEGRAVITY    8u
-#define ENTFLAG_KINEMATIC    16u
-#define ENTFLAG_RIGIDBODY    32u
-#define ENTFLAG_DOUBLESIDED  64u
-#define ENTFLAG_TRANSPARENT 128u
-#define ENTFLAG_CHANGE_TEX_ON_ACTIVE 256u
-#define ENTFLAG_BLINK_TEX_ON_ACTIVE  512U
-#define ENTFLAG_NO_SHADOWS 1024u
-
-extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-extern Entity instances[INSTANCE_COUNT];
-
-extern bool instanceIsLODArray[INSTANCE_COUNT];
-extern float modelMatrices[INSTANCE_COUNT * 16];
-extern uint8_t dirtyInstances[INSTANCE_COUNT];
-
 void ParseGameData(void);
 bool parse_data_file(DataParser *parser, const char *filename);
 
@@ -1402,6 +1411,7 @@ extern uint16_t entityCount;
 extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
+extern uint16_t endOfModels;
 void InitializeEntity(Entity* entry);
 void DualLogEntityInstance(uint16_t idx);
 void DualLogEntity(Entity ent);

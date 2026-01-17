@@ -205,7 +205,7 @@ public class PuzzleWire : MonoBehaviour {
 			}
 
 			if (!Solved) {
-				slider.value = actualValue + Random.Range(0f,shakeMultiplier);
+				slider.value = actualValue + random_range(0f,shakeMultiplier);
 				if (slider.value > 100f) {
 					slider.value = 100f;
 				}

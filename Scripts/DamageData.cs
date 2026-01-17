@@ -132,8 +132,8 @@ public class DamageData {
 				// 24% success with 2/6
 				// 10% success with 1/6
 				// chance of f/6 = 5/6|4/6|3/6|2/6|1/6 = .833|.666|.5|.333|.166
-				if ((Random.Range(0f,1f) < (crit/6))
-					&& (Random.Range(0f,1f) < 0.2f)) {
+				if ((random_range(0f,1f) < (crit/6))
+					&& (random_range(0f,1f) < 0.2f)) {
 
 					// SUCCESS! Maximum extra is 5X + 1X Damage.
 					take += crit * take;
@@ -142,7 +142,7 @@ public class DamageData {
 		}
 
 		// 4. Random Factor +/- 10% (aka 0.10 damage).
-		take *= Random.Range(0.9f,1.1f);
+		take *= random_range(0.9f,1.1f);
 
 		// 5. Apply Impact Velocity for Damage
 		//    Handled by HealthManager.

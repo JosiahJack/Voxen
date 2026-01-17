@@ -102,7 +102,7 @@ public class PlayerHealth : MonoBehaviour {
 				radiationEffect.SetActive(true);
 				float minT = 0.5f;
 				if (radiated > 50f) minT = 0.25f;
-				radFXFinished = Sys_Global.pauseRelativeTime + Random.Range(minT,1f);
+				radFXFinished = Sys_Global.pauseRelativeTime + random_range(minT,1f);
 			}
 		} else {
 			radiationArea = false;
@@ -119,14 +119,14 @@ public class PlayerHealth : MonoBehaviour {
 					MFDManager.a.DrawTicks(true);
 				}
 				if (radSoundFinished < Sys_Global.pauseRelativeTime) {
-					radSoundFinished = Sys_Global.pauseRelativeTime + Random.Range(1f,3f);
+					radSoundFinished = Sys_Global.pauseRelativeTime + random_range(1f,3f);
 					Utils.PlayUIOneShotSavable(90);
 				}
 			}
 		}
 		if (lastHealth > hm.health) { // Did we lose health?
 			if (painSoundFinished < Sys_Global.pauseRelativeTime && !(radSoundFinished < Sys_Global.pauseRelativeTime)) {
-				painSoundFinished = Sys_Global.pauseRelativeTime + Random.Range(0.25f,3f); // Don't spam pain sounds
+				painSoundFinished = Sys_Global.pauseRelativeTime + random_range(0.25f,3f); // Don't spam pain sounds
 				Utils.PlayUIOneShotSavable(140);
 				PlayerHealth.a.makingNoise = true;
 			}

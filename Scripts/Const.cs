@@ -2097,37 +2097,37 @@ CreateBlackTexture:
 				if (Const.a.questData.lev1SecCodeLocked) return;
 
 				Const.a.questData.lev1SecCodeLocked = true;
-				Const.a.questData.lev1SecCode = UnityEngine.Random.Range(0,10);
+				Const.a.questData.lev1SecCode = random_range(0,10);
 			break;
 			case 2:
 				if (Const.a.questData.lev2SecCodeLocked) return;
 
 				Const.a.questData.lev2SecCodeLocked = true;
-				Const.a.questData.lev2SecCode = UnityEngine.Random.Range(0,10);
+				Const.a.questData.lev2SecCode = random_range(0,10);
 				break;
 			case 3:
 				if (Const.a.questData.lev3SecCodeLocked) return;
 
 				Const.a.questData.lev3SecCodeLocked = true;
-				Const.a.questData.lev3SecCode = UnityEngine.Random.Range(0,10);
+				Const.a.questData.lev3SecCode = random_range(0,10);
 				break;
 			case 4:
 				if (Const.a.questData.lev4SecCodeLocked) return;
 
 				Const.a.questData.lev4SecCodeLocked = true;
-				Const.a.questData.lev4SecCode = UnityEngine.Random.Range(0,10);
+				Const.a.questData.lev4SecCode = random_range(0,10);
 				break;
 			case 5:
 				if (Const.a.questData.lev5SecCodeLocked) return;
 
 				Const.a.questData.lev5SecCodeLocked = true;
-				Const.a.questData.lev5SecCode = UnityEngine.Random.Range(0,10);
+				Const.a.questData.lev5SecCode = random_range(0,10);
 				break;
 			case 6:
 				if (Const.a.questData.lev6SecCodeLocked) return;
 
 				Const.a.questData.lev6SecCodeLocked = true;
-				Const.a.questData.lev6SecCode = UnityEngine.Random.Range(0,10);
+				Const.a.questData.lev6SecCode = random_range(0,10);
 				break;
 		}
 	}

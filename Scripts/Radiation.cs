@@ -18,7 +18,7 @@ public class Radiation : MonoBehaviour {
 			if (PlayerHealth.a.hm.health > 0f) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
-				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*Random.Range(1f,1.5f));
+				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
 			}
 		}
 	}
@@ -28,7 +28,7 @@ public class Radiation : MonoBehaviour {
 			if (PlayerHealth.a.hm.health > 0f && (radFinished < Sys_Global.pauseRelativeTime)) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
-				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*Random.Range(1f,1.5f));
+				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
 			}
 		}
 	}

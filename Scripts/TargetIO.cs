@@ -396,8 +396,10 @@ public class TargetIO : MonoBehaviour {
 		}
 
 		if (tempUD.awakeSleepingEnemy) {
-			AIController aic = GetComponent<AIController>();
-			if (aic != null) aic.AwakeFromSleep(tempUD);
+			if (ConstIndexIsNPC(instances[i].index)) {
+                instances[i].asleep = false;
+                uint16_t cables = instances[i].sleepingCables;
+                if (cables != UINT16_MAX && cables != PLAYER1 && cables != PLAYER2) DeleteInstance(cables);
 		}
 
 		if (tempUD.lockElevatorPad) {

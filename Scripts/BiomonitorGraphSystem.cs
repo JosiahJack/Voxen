@@ -89,9 +89,9 @@ public class BiomonitorGraphSystem : MonoBehaviour {
         tick1Finished = Sys_Global.pauseRelativeTime + tick1;
         tick2Finished = Sys_Global.pauseRelativeTime + tick2;
         tickFinished = Sys_Global.pauseRelativeTime + tick;
-        currentIndex0 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
-        currentIndex1 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
-        currentIndex2 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
+        currentIndex0 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex1 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex2 = (int)(graphWidth * random_range(0f,1f));
         colorsERG = new Color[graphWidth][];
         colorsCHI = new Color[graphWidth][];
         colorsECG = new Color[graphWidth][];
@@ -143,7 +143,7 @@ public class BiomonitorGraphSystem : MonoBehaviour {
 		// Chi Brain Waves
         float brainFactor = 0.15f;
         if (PlayerPatch.a.geniusFinishedTime > Sys_Global.pauseRelativeTime) {
-            brainFactor = 0.35f + UnityEngine.Random.Range(-0.3f,0.3f);
+            brainFactor = 0.35f + random_range(-0.3f,0.3f);
         }
 
         if (MFDManager.a.FPS.activeInHierarchy) {
@@ -167,7 +167,7 @@ public class BiomonitorGraphSystem : MonoBehaviour {
 
 		 // Inject variation when beating
 		if (ecgValue > beatThresh || ecgValue < (beatThresh * -1f)) {
-			ecgValue += UnityEngine.Random.Range(-beatVariation,beatVariation);
+			ecgValue += random_range(-beatVariation,beatVariation);
 		}
 
         if (tick0Finished < Sys_Global.pauseRelativeTime) {

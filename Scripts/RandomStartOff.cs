@@ -8,7 +8,7 @@ public class RandomStartOff : MonoBehaviour {
 		for (int i=objectsToToggle.Length - 1;i>=0;i--) {
 			if (objectsToToggle[i] == null) continue;
 
-			if (Random.Range(0f,1f) < chanceOn) {
+			if (random_range(0f,1f) < chanceOn) {
 				objectsToToggle[i].SetActive(true);
 			} else {
 				objectsToToggle[i].SetActive(false);

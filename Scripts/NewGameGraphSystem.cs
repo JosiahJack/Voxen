@@ -82,9 +82,9 @@ public class NewGameGraphSystem : MonoBehaviour {
         tick1Finished = Time.time + tick1;
         tick2Finished = Time.time + tick2;
         tickFinished = Time.time + tick;
-        currentIndex0 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
-        currentIndex1 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
-        currentIndex2 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
+        currentIndex0 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex1 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex2 = (int)(graphWidth * random_range(0f,1f));
         colorsERG = new Color[graphWidth][];
         colorsCHI = new Color[graphWidth][];
         colorsECG = new Color[graphWidth][];
@@ -102,9 +102,9 @@ public class NewGameGraphSystem : MonoBehaviour {
     }
 
     void OnEnable() {
-        currentIndex0 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
-        currentIndex1 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
-        currentIndex2 = (int)(graphWidth * UnityEngine.Random.Range(0f,1f));
+        currentIndex0 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex1 = (int)(graphWidth * random_range(0f,1f));
+        currentIndex2 = (int)(graphWidth * random_range(0f,1f));
     }
 
     public void IncrementERG() {
@@ -125,8 +125,8 @@ public class NewGameGraphSystem : MonoBehaviour {
     public void Update() {
 		// Energy Usage
 		ergValue = 0.35f;
-		if (UnityEngine.Random.Range(0f,1f) < 0.05f) ergValue = 0.4f;
-		else if (UnityEngine.Random.Range(0f,1f) > 0.95f) ergValue = 0.3f;
+		if (random_range(0f,1f) < 0.05f) ergValue = 0.4f;
+		else if (random_range(0f,1f) > 0.95f) ergValue = 0.3f;
 
 		// Chi Brain Waves
 		chiValue = Mathf.Sin(Time.time * beatTime * 0.15f);
@@ -139,7 +139,7 @@ public class NewGameGraphSystem : MonoBehaviour {
 
 		 // Inject variation when beating
 		if (ecgValue > beatThresh || ecgValue < (beatThresh * -1f)) {
-			ecgValue += UnityEngine.Random.Range(-beatVariation,beatVariation);
+			ecgValue += random_range(-beatVariation,beatVariation);
 		}
 
         if (tick0Finished < Time.time) {

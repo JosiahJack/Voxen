@@ -7,7 +7,7 @@ public class TouchEnergyDrain : MonoBehaviour {
 	private float tickFinished;
 
 	void Awake() {
-		tickFinished = Sys_Global.pauseRelativeTime + UnityEngine.Random.Range(1f,2f);
+		tickFinished = Sys_Global.pauseRelativeTime + random_range(1f,2f);
 	}
 
 	void  OnCollisionEnter (Collision col) {

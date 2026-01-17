@@ -894,10 +894,10 @@ public class ImageSequenceTextureArray : MonoBehaviour {
 
 		// We don't know where we are going, or when.
 		if (randomFrame) {
-			if (constArrayLookup != null) frameCounter = Random.Range(0, constArrayLookup.Length-1);
+			if (constArrayLookup != null) frameCounter = random_range(0, constArrayLookup.Length-1);
 			if (constArrayLookupGlow != null) {
 				if (frameCounter < constArrayLookupGlow.Length) frameCounterGlow = frameCounter; // Match when it makes sense.
-				else frameCounterGlow = Random.Range(0, constArrayLookupGlow.Length-1); // Otherwise randomize it.
+				else frameCounterGlow = random_range(0, constArrayLookupGlow.Length-1); // Otherwise randomize it.
 			}
 		}
 

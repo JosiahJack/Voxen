@@ -254,11 +254,11 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     entry.path[sizeof(entry.path) - 1] = '\0';
                 } else {
                          if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "persistent") == 0)        entry.persistent = parse_bool(trimmed_value, start, lineNum); // Didn't feel worthy of being considered an entflag so left separte
+                    else if (strcmp(trimmed_key, "persistent") == 0)        flag_set(&entry.entflags,ENTFLAG_TEST_PERSISTENT,parse_bool(trimmed_value, start, lineNum));
                     else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "animated") == 0)          entry.animated = parse_numberu8(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "animated") == 0)          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_bool(trimmed_value, start, lineNum));
                     else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "alttexture") == 0)           entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "alttexture") == 0)        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "altglowtexture") == 0)    entry.altGlowIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "spectexture") == 0)       entry.specIndex = parse_numberu16(trimmed_value, start, lineNum);

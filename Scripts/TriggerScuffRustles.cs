@@ -10,7 +10,7 @@ public class TriggerScuffRustles : MonoBehaviour {
         if (!(col.gameObject.CompareTag("Player"))) return;
         if (finished > Time.time) return;
 
-		finished = Time.time + Random.Range(3f,5f);
-        SFX.PlayOneShot(Const.a.sounds[clip],Random.Range(0.5f,0.75f));
+		finished = Time.time + random_range(3f,5f);
+        SFX.PlayOneShot(Const.a.sounds[clip],random_range(0.5f,0.75f));
 	}
 }

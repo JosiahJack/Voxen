@@ -51,8 +51,6 @@
 // 	[HideInInspector] public float timeTillEnemyChangeFinished; // save
 // 	[HideInInspector] public float timeTillDeadFinished; // save
 // 	[HideInInspector] public float timeTillPainFinished; // save
-// 	[HideInInspector] public AudioSource SFX;
-// 	[HideInInspector] public float normalVolume;
 // 	public float huntFinished; // save
 // 	[HideInInspector] public bool hadEnemy; // save
 // 	[HideInInspector] public Vector3 lastKnownEnemyPos; // save
@@ -100,7 +98,6 @@
 // 	public float posCheckFinished;
 // 	private const float positionCheckDelay = 2f;
 // 	private const float searchTime = 5f;
-// 	StringBuilder s1 = new StringBuilder();
 // 	Vector3 targetOffset = new Vector3(0f,0.24f,0f);
 
 float AI_Tranquilize(float amount, bool energy) {
@@ -113,57 +110,47 @@ float AI_Tranquilize(float amount, bool energy) {
 
 static inline bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
 
-void InitializeAI(uint16_t i) {
-    attack1SoundTime = Sys_Global.pauseRelativeTime;
-    attack2SoundTime = Sys_Global.pauseRelativeTime;
-    attack3SoundTime = Sys_Global.pauseRelativeTime;
-    timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
+void InitializeAIAfterLoad(uint16_t i) {
+    instances[i].layer = PhysicsLayer_NPC;
+    instances[i].idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[NPCID].timeIdleSFXMin, npcTable[NPCID].timeIdleSFXMax);
+    instances[i].attack1SoundTime = instances[i].attack2SoundTime = instances[i].attack3SoundTime = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
     SetHuntFinished();
-    attackFinished = Sys_Global.pauseRelativeTime;
-    attack2Finished = Sys_Global.pauseRelativeTime;
-    attack3Finished = Sys_Global.pauseRelativeTime;
-    timeTillPainFinished = Sys_Global.pauseRelativeTime;
-    timeTillDeadFinished = Sys_Global.pauseRelativeTime;
-    meleeDamageFinished = Sys_Global.pauseRelativeTime;
-    gracePeriodFinished = Sys_Global.pauseRelativeTime;
-    randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
-    randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
-    randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
-    tranquilizeFinished = Sys_Global.pauseRelativeTime;
-    deathBurstFinished = Sys_Global.pauseRelativeTime;
-    wanderFinished = Sys_Global.pauseRelativeTime;
-    posCheckFinished = Sys_Global.pauseRelativeTime;
-    lastPosition = transform.position;
-    timeSinceMovedEnough = 0f;
-    damageData = new DamageData();
-    damageData.ownerIsNPC = true;
-    tempHit = new RaycastHit();
-    tempVec = new Vector3(0f, 0f, 0f);
-    SFX = GetComponent<AudioSource>();
-    SFX.playOnAwake = false;
-    if (SFX.volume == 0f) SFX.volume = 1.0f;
-    normalVolume = SFX.volume;
-    if (walkWaypoints.Length > 0 && walkWaypoints[currentWaypoint] != null
-        && walkPathOnStart && !asleep) {
-        
-        currentDestination = walkWaypoints[currentWaypoint].transform.position;
-        currentState = AIState.Walk; // If waypoints are set, start walking
+    instances[i].attackFinished = Sys_Global.pauseRelativeTime;
+    instances[i].attack2Finished = Sys_Global.pauseRelativeTime;
+    instances[i].attack3Finished = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillPainFinished = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillDeadFinished = Sys_Global.pauseRelativeTime;
+    instances[i].meleeDamageFinished = Sys_Global.pauseRelativeTime;
+    instances[i].gracePeriodFinished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
+    instances[i].tranquilizeFinished = Sys_Global.pauseRelativeTime;
+    instances[i].deathBurstFinished = Sys_Global.pauseRelativeTime;
+    instances[i].wanderFinished = Sys_Global.pauseRelativeTime;
+    instances[i].posCheckFinished = Sys_Global.pauseRelativeTime;
+    instances[i].lastPosition = instances[i].position;
+    instances[i].timeSinceMovedEnough = 0.0f;
+    if (instances[i].walkWaypointsLength > 0 && instances[i].walkPathOnStart && !instances[i].asleep) {
+        instances[i].currentDestination = instances[i].walkWaypoints[instances[i].currentWaypoint];
+        instances[i].currentState = AIState_Walk; // If waypoints are set, start walking
     } else {
-        currentState = AIState.Idle; // No waypoints, stay put
+        instances[i].currentState = AIState_Idle; // No waypoints, stay put
     }
 
-    if (wandering && (UnityEngine.Random.Range(0,1f) < 0.5f)) {
-        currentState = AIState.Walk;
+    if (instances[i].wandering && (random_range(0.0f,1.0f) < 0.5f)) {
+        currentState = AIState_Walk;
     } else wandering = false;
 
     if (asleep) {
-        currentState = AIState.Idle;
+        currentState = AIState_Idle;
         Utils.Activate(sleepingCables);
     }
 
     raycastingTickFinished = tickFinished + Random.value; // Separate rand.
-    attackFinished = Sys_Global.pauseRelativeTime + 1f;
-    idealTransformForward = sightPoint.transform.forward;
+    attackFinished = Sys_Global.pauseRelativeTime + 1.0f;
+    instances[i].idealTransformForward = instances[i].forward;
     if (!IsCyberNPC()) targetID = Const.GetTargetID(index);
     else             targetID = Const.GetCyberTargetID(index);
 
@@ -174,7 +161,7 @@ void InitializeAI(uint16_t i) {
 	void AI_Face(Vector3 goalLocation) {
 		if (asleep) return;
 
-		faceVec = goalLocation - transform.position;
+		faceVec = goalLocation - instances[i].position;
 		if (!IsCyberNPC()) faceVec.y = 0f;
 		if (faceVec.x == 0f && faceVec.z == 0f && faceVec.y == 0f) return; // Avoid zero quat error.
 		if (Vector3.Dot(faceVec,Vector3.up) > 0.99f && !IsCyberNPC()) return; // Up results in no Y rotation.
@@ -235,12 +222,12 @@ void InitializeAI(uint16_t i) {
 				if (!HasHealth(enemyHM)) {
 					Debug.Log("Enemy died, forgetting and wandering");
 					if (IsCyberNPC()) {
-						currentState = AIState.Idle;
+						currentState = AIState_Idle;
 					} else {
 						// Enemy is dead, let's wander around aimlessly now
 						wandering = true;
-						wanderFinished = Sys_Global.pauseRelativeTime + UnityEngine.Random.Range(3f,8f);
-						currentState = AIState.Walk;
+						wanderFinished = Sys_Global.pauseRelativeTime + random_range(3f,8f);
+						currentState = AIState_Walk;
 					}
 					
 					enemy = null; // Forget the enemy.
@@ -283,8 +270,8 @@ void InitializeAI(uint16_t i) {
 
 
         // Rotation and Special movement that must be done every FixedUpdate
-        if (currentState != AIState.Dead) {
-            if (currentState != AIState.Idle) {
+        if (currentState != AIState_Dead) {
+            if (currentState != AIState_Idle) {
 				if (actAsTurret && enemy != null) {
 					currentDestination = enemy.transform.position;
 					currentDestination.y = enemy.transform.position.y + 0.24f;
@@ -321,30 +308,30 @@ void InitializeAI(uint16_t i) {
 			// If we haven't gone into dying and we aren't dead, do dying.
 			if (!ai_dying && !ai_dead) {
 				ai_dying = true; // No going back!
-				currentState = AIState.Dying; // Start to collapse in a heap,
+				currentState = AIState_Dying; // Start to collapse in a heap,
 											  // melt, explode, etc.
 				
-			} else if (ai_dead && currentState != AIState.Dead) {
-				currentState = AIState.Dead;
-			} else if (ai_dying && currentState != AIState.Dying) {
-				currentState = AIState.Dying;
+			} else if (ai_dead && currentState != AIState_Dead) {
+				currentState = AIState_Dead;
+			} else if (ai_dying && currentState != AIState_Dying) {
+				currentState = AIState_Dying;
 			}
 		}
 
 		switch (currentState) {
-			case AIState.Idle: 	  Idle(); 	 break;
-			case AIState.Walk:	  Walk(); 	 break;
-			case AIState.Run: 	  Run(); 	 break;
-			case AIState.Attack1: Attack1(); break;
-			case AIState.Attack2: Attack2(); break;
-			case AIState.Attack3: Attack3(); break;
-			case AIState.Pain: 	  Pain();	 break;
-			case AIState.Dying:   Dying(); 	 break;
-			case AIState.Dead: 	  Dead(); 	 break;
+			case AIState_Idle: 	  Idle(); 	 break;
+			case AIState_Walk:	  Walk(); 	 break;
+			case AIState_Run: 	  Run(); 	 break;
+			case AIState_Attack1: Attack1(); break;
+			case AIState_Attack2: Attack2(); break;
+			case AIState_Attack3: Attack3(); break;
+			case AIState_Pain: 	  Pain();	 break;
+			case AIState_Dying:   Dying(); 	 break;
+			case AIState_Dead: 	  Dead(); 	 break;
 			default: 			  Idle(); 	 break;
 		}
 
-		if (currentState == AIState.Dead || currentState == AIState.Dying) {
+		if (currentState == AIState_Dead || currentState == AIState_Dying) {
 			return; // Don't do any checks, we're dead.
 		}
 
@@ -406,7 +393,7 @@ void InitializeAI(uint16_t i) {
 		if (npcTable[index].timeBetweenPain <= 0) return false;
 
 		if (goIntoPain && timeTillPainFinished < Sys_Global.pauseRelativeTime) {
-			currentState = AIState.Pain;
+			currentState = AIState_Pain;
 			if (attacker != null) {
 				if (timeTillEnemyChangeFinished < Sys_Global.pauseRelativeTime) {
 					timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime
@@ -457,17 +444,17 @@ void InitializeAI(uint16_t i) {
 
 	void Idle() {
 		if (enemy != null && HasHealth(healthManager)) {
-			currentState = AIState.Run;
+			currentState = AIState_Run;
 			return;
 		}
 
 		if (idleTime < Sys_Global.pauseRelativeTime) {
-			if (UnityEngine.Random.Range(0,1f) < 0.5f) { // 50% Chance of idle.
+			if (random_range(0,1f) < 0.5f) { // 50% Chance of idle.
 				SFXIndex = Const.a.sfxIdle[index];
 				Utils.PlayOneShotSavable(SFX,SFXIndex);
 			}
 			idleTime = Sys_Global.pauseRelativeTime
-					   + Random.Range(Const.a.timeIdleSFXMin[index],
+					   + random_range(Const.a.timeIdleSFXMin[index],
 									  Const.a.timeIdleSFXMax[index]);
 		}
 
@@ -484,18 +471,18 @@ void InitializeAI(uint16_t i) {
 	}
 
 	Vector3 GetWanderPoint() {
-		float newX = transform.position.x + UnityEngine.Random.Range(-79f,79f);
-		float newZ = transform.position.z + UnityEngine.Random.Range(-79f,79f);
+		float newX = transform.position.x + random_range(-79f,79f);
+		float newZ = transform.position.z + random_range(-79f,79f);
 		float newY = 0f;
-		if (IsCyberNPC()) newY = transform.position.y + UnityEngine.Random.Range(-79f,79f);
+		if (IsCyberNPC()) newY = transform.position.y + random_range(-79f,79f);
 		return new Vector3(newX,newY,newZ);
 	}
 
 	void Walk() {
         if (CheckPain()) return; // Go into pain if just hurt
 		if (asleep) return;
-        if (inSight || enemy != null) { currentState = AIState.Run; return; }
-        if (actAsTurret) { currentState = AIState.Idle; return; }
+        if (inSight || enemy != null) { currentState = AIState_Run; return; }
+        if (actAsTurret) { currentState = AIState_Idle; return; }
         if (npcTable[index].moveType[index] == AIMoveType.None) return;
 		if (tranquilizeFinished >= Sys_Global.pauseRelativeTime) return;
 		if (!withinPVS && DynamicCulling.a.cullEnabled) return;
@@ -503,7 +490,7 @@ void InitializeAI(uint16_t i) {
 		float dist = Vector3.Distance(sightPoint.transform.position,currentDestination);
 		if (wandering) {
 			if (wanderFinished < Sys_Global.pauseRelativeTime || (dist < (stopDistance * 0.5f))) {
-				wanderFinished = Sys_Global.pauseRelativeTime + UnityEngine.Random.Range(3f,8f);
+				wanderFinished = Sys_Global.pauseRelativeTime + random_range(3f,8f);
 				currentDestination = GetWanderPoint();
 			}
 		}
@@ -559,7 +546,7 @@ void InitializeAI(uint16_t i) {
 
 		if (walkWaypoints.Length < 1) {
 			if (!wandering) {
-				currentState = AIState.Idle; // No wandering, just go to Idle.
+				currentState = AIState_Idle; // No wandering, just go to Idle.
 			}
 			return; // No waypoint to visit, wait for wandering timer.
 		}
@@ -568,7 +555,7 @@ void InitializeAI(uint16_t i) {
 		if (visitWaypointsRandomly) {
 			// Max is exclusive for the integer overload, no need to do
 			// (walkWaypoints.Length - 1).
-			currentWaypoint = Random.Range(0, walkWaypoints.Length);
+			currentWaypoint = random_range(0, walkWaypoints.Length);
 		} else {
 			currentWaypoint++;
 		}
@@ -579,7 +566,7 @@ void InitializeAI(uint16_t i) {
 
 			// Stop when reached end of list; out of waypoints.
 			if (dontLoopWaypoints) {
-				currentState = AIState.Idle;
+				currentState = AIState_Idle;
 				return;
 			}
 		}
@@ -644,22 +631,22 @@ void InitializeAI(uint16_t i) {
 		BrakingMovement();
 		attackFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeBetweenAttack1 + npcTable[index].timeToActualAttack1;
 		gracePeriodFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeToActualAttack1;
-		currentState = AIState.Attack1;
-		if (npcTable[index].preactivateMeleeColliders) instances[i].touchingHurts = true;
+		currentState = AIState_Attack1;
+		if (npcTable[index].preactivateMeleeColliders) flag_set(&instances[i].entflags, ENTFLAG_TOUCHING_HURTS, true);;
 	}
 
 	void StartAttack2() {
 		BrakingMovement();
 		attackFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeBetweenAttack2 + npcTable[index].timeToActualAttack2;
 		gracePeriodFinished = Sys_Global.pauseRelativeTime + Const.a.timeToActualAttack2[index];
-		currentState = AIState.Attack2;
+		currentState = AIState_Attack2;
 	}
 
 	void StartAttack3() {
 		BrakingMovement();
 		attackFinished = Sys_Global.pauseRelativeTime + npcTable[index].timeBetweenAttack3 + npcTable[index].timeToActualAttack3;
 		gracePeriodFinished = Sys_Global.pauseRelativeTime + Const.a.timeToActualAttack3[index];
-		currentState = AIState.Attack3;
+		currentState = AIState_Attack3;
 	}
 
 	void HopMove() {
@@ -766,7 +753,7 @@ void InitializeAI(uint16_t i) {
 	void Run() {
 		if (CheckPain()) return; // Go into pain just hurt
 		if (asleep) return;
-		if (enemy == null) { currentState = AIState.Idle; return; }
+		if (enemy == null) { currentState = AIState_Idle; return; }
 
 		if (tranquilizeFinished >= Sys_Global.pauseRelativeTime
 			&& !IsCyberNPC()) {
@@ -796,7 +783,7 @@ void InitializeAI(uint16_t i) {
 				enemyHM = null;
 				wandering = true; // Sometimes look like we are still searching
 				wanderFinished = Sys_Global.pauseRelativeTime + 1f;
-                currentState = AIState.Walk;
+                currentState = AIState_Walk;
             }
             return;
         }
@@ -831,7 +818,7 @@ void InitializeAI(uint16_t i) {
 				else                                 RunMove(); // <<<<<RUN
 			} else {
 				if (Const.a.difficultyCombat >= 2) {
-					if (Random.Range(0f,1f) < 0.5f) AI_Face(currentDestination);
+					if (random_range(0f,1f) < 0.5f) AI_Face(currentDestination);
 				}
 			}
 			
@@ -887,19 +874,19 @@ void InitializeAI(uint16_t i) {
 
 	// attackNum corresponds to attack used so right lookup tables can be used.
 	// attackNum of 1 = Attack1, 2 = Attack2, 3 = Attack3
-	void Transition_AttackToRun(int attackNum) {
-		instances[i].touchingHurts = false;
+	void Transition_AttackToRun(uint16_t i, int attackNum) {
+        flag_set(&instances[i].entflags, ENTFLAG_TOUCHING_HURTS, false);
 		goIntoPain = false; // Prevent doing pain immediately after attack.
-		currentState = AIState.Run; // Done with attack.
+		currentState = AIState_Run; // Done with attack.
 		if (attackNum < 1 || attackNum > 3) attackNum = 1;
 		float now = Sys_Global.pauseRelativeTime;
 		switch (attackNum) {
 			case 1: // Attack1
 				float perc1Chance = Const.a.timeAttack1WaitChance[index];
-				if (Random.Range(0f,1f) < perc1Chance) {
+				if (random_range(0f,1f) < perc1Chance) {
 					float min1 = Const.a.timeAttack1WaitMin[index];
 					float max1 = Const.a.timeAttack1WaitMax[index];
-					float wait1 = Random.Range(min1,max1);
+					float wait1 = random_range(min1,max1);
 					randomWaitForNextAttack1Finished = now + wait1;
 				} else {
 					randomWaitForNextAttack1Finished = now;
@@ -907,10 +894,10 @@ void InitializeAI(uint16_t i) {
 				break;
 			case 2: // Attack2
 				float perc2Chance = Const.a.timeAttack2WaitChance[index];
-				if (Random.Range(0f,1f) < perc2Chance) {
+				if (random_range(0f,1f) < perc2Chance) {
 					float min2 = Const.a.timeAttack2WaitMin[index];
 					float max2 = Const.a.timeAttack2WaitMax[index];
-					float wait2 = Random.Range(min2,max2);
+					float wait2 = random_range(min2,max2);
 					randomWaitForNextAttack2Finished = now + wait2;
 				} else {
 					randomWaitForNextAttack2Finished = now;
@@ -918,10 +905,10 @@ void InitializeAI(uint16_t i) {
 				break;
 			case 3: // Attack3
 				float perc3Chance = Const.a.timeAttack3WaitChance[index];
-				if (Random.Range(0f,1f) < perc3Chance) {
+				if (random_range(0f,1f) < perc3Chance) {
 					float min3 = Const.a.timeAttack3WaitMin[index];
 					float max3 = Const.a.timeAttack3WaitMax[index];
-					float wait3 = Random.Range(min3,max3);
+					float wait3 = random_range(min3,max3);
 					randomWaitForNextAttack3Finished = now + wait3;
 				} else {
 					randomWaitForNextAttack3Finished = now;
@@ -939,14 +926,14 @@ void InitializeAI(uint16_t i) {
 		float ang = Quaternion.Angle(transform.rotation,lookRot);
 		if (ang < fovMov) return true;
 		if (ang < (fovMov * 1.5f)) {
-			if (Random.Range(0f,1f) < 0.5f) return true;
+			if (random_range(0f,1f) < 0.5f) return true;
 		}
         return false;
     }
 
-	Vector3 GetAttackStartPoint(int attackNum) {
+	Vector3 GetAttackStartPoint(uint16_t i, int attackNum) {
 		if (attackNum < 1 || attackNum > 3) attackNum = 1;
-		Vector3 startPos = sightPoint.transform.position;
+		Vector3 startPos = instances[i].position;
 		switch (attackNum) {
 			case 2:
 				if (gunPoint != null) {
@@ -969,32 +956,21 @@ void InitializeAI(uint16_t i) {
 
 	// Returns unit vector pointing from starting point of attack towards enemy.
 	Vector3 GetDirectionRayToEnemy(Vector3 targPos, int attackNum) {
-		if (attackNum < 1 || attackNum > 3) attackNum = 1;
 		switch (attackNum) {
-			case 1:
-				return sightPoint.transform.forward;
-			case 2:
-				return (targPos - GetAttackStartPoint(attackNum)).normalized;
-			case 3:
-				return (targPos - GetAttackStartPoint(attackNum)).normalized;
+			case 1: return sightPoint.transform.forward;
+			case 2: return (targPos - GetAttackStartPoint(attackNum)).normalized;
+			case 3: return (targPos - GetAttackStartPoint(attackNum)).normalized;
 		}
-		return Const.a.vectorZero;
+		return sightPoint.transform.forward;
 	}
 
 	float GetRangeForAttack(int attackNum) {
-		if (attackNum < 1 || attackNum > 3) attackNum = 1;
 		float range = npcTable[index].range[index];
 		switch (attackNum) {
-			case 1:
-				range = npcTable[index].range[index];
-				break;
-			case 2:
-				range = npcTable[index].range2[index];
-				break;
-			case 3:
-				range = npcTable[index].range3[index];
-				break;
+			case 2: range = npcTable[index].range2[index]; break;
+			case 3: range = npcTable[index].range3[index]; break;
 		}
+		
 		return range;
 	}
 
@@ -1201,7 +1177,7 @@ void InitializeAI(uint16_t i) {
 		//if (IsCyberNPC()) {
 		//	if (enemy != null) {
 		//		Rigidbody rbodyEnemy = enemy.GetComponent<Rigidbody>();
-		//		if (rbodyEnemy != null && UnityEngine.Random.Range(0f,1f) < 0.5f) {
+		//		if (rbodyEnemy != null && random_range(0f,1f) < 0.5f) {
 		//			shove = shove + (rbodyEnemy.velocity * 0.2f);
 		//		}
 		//	}
@@ -1320,20 +1296,17 @@ void InitializeAI(uint16_t i) {
 
 	void Pain() {
 		if (timeTillPainFinished < Sys_Global.pauseRelativeTime) {
-			currentState = AIState.Run; // Go into run after we get hurt
+			currentState = AIState_Run; // Go into run after we get hurt
 			goIntoPain = false;
 			timeTillPainFinished = Sys_Global.pauseRelativeTime
 				+ Const.a.timeBetweenPain[index];
 		}
 	}
 
-	void DyingSetup() {
-// 		Debug.Log("NPC " + gameObject.name + " start of dying setup");
-		enemy = null; // Reset for loading from saves
-
+	void DyingSetup(uint16_t i) {
+		instances[i].enemy = 0; // Reset for loading from saves
 		if (Const.a.deathBurstTimer[index] > 0) {
-			deathBurstFinished = Sys_Global.pauseRelativeTime
-				+ Const.a.deathBurstTimer[index];
+			deathBurstFinished = Sys_Global.pauseRelativeTime + Const.a.deathBurstTimer[index];
 		} else {
 			if (!deathBurstDone) {
 				Utils.Activate(deathBurst); // Activate death effects
@@ -1341,28 +1314,26 @@ void InitializeAI(uint16_t i) {
 			}
 		}
 
-		instances[i].touchingHurts = false;
-		if (healthManager != null) {
-			if (!healthManager.actAsCorpseOnly && !healthManager.teleportOnDeath) {
-				Utils.Deactivate(healthManager.linkedOverlay.gameObject);
-				SFXIndex = Const.a.sfxDeath[index];
-				Utils.PlayOneShotSavable(SFX,SFXIndex);
-			}
+        flag_set(&instances[i].entflags, ENTFLAG_TOUCHING_HURTS, false);
+        if (!(instances[i].entflags & ENTFLAG_ACT_AS_CORPSE_ONLY) && !!(instances[i].entflags & ENTFLAG_TELEPORT_ON_DEATH)) {
+            Utils.Deactivate(healthManager.linkedOverlay.gameObject);
+            SFXIndex = Const.a.sfxDeath[index];
+            Utils.PlayOneShotSavable(SFX,SFXIndex);
+        }
 
-			if (npcTable[index].moveType[index] == AIMoveType.Fly
-				&& (!healthManager.gibOnDeath || index == 2)) { // Avian Mutant
-				if (healthManager.gibOnDeath) rbody.useGravity = false;
-				else rbody.useGravity = true; // Avian Mutant and Zero-G Mutant
-			} else {
-				if (healthManager.gibOnDeath) {
-					rbody.useGravity = false;
-				} else {
-					rbody.useGravity = true;
-					rbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-					rbody.isKinematic = true;
-				}
-			}
-		}
+        if (npcTable[index].moveType[index] == AIMoveType.Fly
+            && (!healthManager.gibOnDeath || index == 2)) { // Avian Mutant
+            if (healthManager.gibOnDeath) rbody.useGravity = false;
+            else rbody.useGravity = true; // Avian Mutant and Zero-G Mutant
+        } else {
+            if (healthManager.gibOnDeath) {
+                rbody.useGravity = false;
+            } else {
+                rbody.useGravity = true;
+                rbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+                rbody.isKinematic = true;
+            }
+        }
 
 		if (IsCyberNPC()) rbody.useGravity = false;
 		if (index == 14) {
@@ -1412,7 +1383,7 @@ void InitializeAI(uint16_t i) {
 			ai_dead = true;
 // 			Debug.Log("NPC " + gameObject.name + " has now died");
 			ai_dying = false;
-			currentState = AIState.Dead;
+			currentState = AIState_Dead;
 		}
 
 		if (DeactivatesVisibleMeshWhileDying() && visibleMeshEntity.activeSelf) {
@@ -1443,7 +1414,7 @@ void InitializeAI(uint16_t i) {
 // 			+ "false due to dead");
 		}
 
-		currentState = AIState.Dead;
+		currentState = AIState_Dead;
 		gameObject.layer = 13; // Corpse layer
 		if (searchColliderGO != null && (!healthManager.gibOnDeath
 											|| index == 2)) { // Avian Mutant

@@ -13,7 +13,7 @@ public class LogicTimer : MonoBehaviour {
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Start() {
-		intervalFinished = Sys_Global.pauseRelativeTime + (useRandomTimes ? Random.Range(randomMin,randomMax) : timeInterval);
+		intervalFinished = Sys_Global.pauseRelativeTime + (useRandomTimes ? random_range(randomMin,randomMax) : timeInterval);
 	}
 
 	void Update() {
@@ -21,7 +21,7 @@ public class LogicTimer : MonoBehaviour {
 			if (intervalFinished < Sys_Global.pauseRelativeTime) {
 				if (useRandomTimes) {
 					intervalFinished = Sys_Global.pauseRelativeTime
-									   + Random.Range(randomMin,randomMax);
+									   + random_range(randomMin,randomMax);
 				} else {
 					intervalFinished = Sys_Global.pauseRelativeTime
 									   + timeInterval;

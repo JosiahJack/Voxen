@@ -51,7 +51,7 @@ public class TeleportFXStatic : MonoBehaviour {
 			if (effectFinished < Sys_Global.pauseRelativeTime) Deactivate();
 			if (flipTime < Sys_Global.pauseRelativeTime) {
 				flipTime = Sys_Global.pauseRelativeTime + intervalTime;
-				randHolder = Random.Range(0f,1f);
+				randHolder = random_range(0f,1f);
 				if (randHolder < 0.5) {
 					FlipX();
 				} else {

@@ -379,7 +379,7 @@ public class HealthManager : MonoBehaviour {
 
 					if (take < thresh) absorb = 1f; // ah yeah! absorb. it. all.
 					if (absorb > 0) {
-						if (absorb < 1f) absorb = absorb + UnityEngine.Random.Range(-0.08f,0.08f); // +/- 8% variation - this was in the original I swear!  You could theoretically have 83% shielding max.
+						if (absorb < 1f) absorb = absorb + random_range(-0.08f,0.08f); // +/- 8% variation - this was in the original I swear!  You could theoretically have 83% shielding max.
 						if (absorb > 1f) absorb = 1f; // cap it at 100%....shouldn't really ever be here, nothing is 92% + 8%
 						take *= (1f-absorb); // shield doing it's thing
 						PlayerHealth.a.shieldEffect.SetActive(true); // Activate shield screen effect to indicate damage was absorbed, effect intensity determined by absorb amount
@@ -388,7 +388,7 @@ public class HealthManager : MonoBehaviour {
 						Const.sprint(Const.a.stringTable[208] + abs.ToString() + Const.a.stringTable[209],dd.other);  // Shield absorbs x% damage
 					}
 				}
-				if (take > 0 && ((absorb <0.4f) || Random.Range(0,1f) < 0.5f)) {
+				if (take > 0 && ((absorb <0.4f) || random_range(0,1f) < 0.5f)) {
 					Utils.PlayUIOneShotSavable(140); // Play player pain noise
 					int intensityOfPainFlash = 0; // 0 = light
 					if (take > 15f) {

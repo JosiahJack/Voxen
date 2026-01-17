@@ -21,7 +21,7 @@ public class FireWorkThang : MonoBehaviour {
 
     void OnEnable() {
         tickFinished = Sys_Global.pauseRelativeTime;
-        curScale = Random.Range(minScale,maxScale);
+        curScale = random_range(minScale,maxScale);
         if (changeFracPerSecond < 0.001f) changeFracPerSecond = 0.5f; // 2 secs
         waitAtFull = false;
         if (minScale >= maxScale) {
@@ -44,7 +44,7 @@ public class FireWorkThang : MonoBehaviour {
             curScale = minScale;
             waitAtMin = true;
             tickFinished = Sys_Global.pauseRelativeTime
-                           + Random.Range(waitTimeMinMin,waitTimeMinMax);
+                           + random_range(waitTimeMinMin,waitTimeMinMax);
         } else if (waitAtMin) {
             waitAtMin = false;
             waitAtFull = false;

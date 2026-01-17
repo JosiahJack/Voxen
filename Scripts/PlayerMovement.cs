@@ -391,15 +391,15 @@ public class PlayerMovement : MonoBehaviour {
 		if (rustleFinished < Sys_Global.pauseRelativeTime) {
 			rustleFinished = isSprinting
 							 ? Sys_Global.pauseRelativeTime
-							   + UnityEngine.Random.Range(0.4f,0.6f)
+							   + random_range(0.4f,0.6f)
 							 : Sys_Global.pauseRelativeTime
-							   + UnityEngine.Random.Range(0.8f,1.2f);
+							   + random_range(0.8f,1.2f);
 
 			AudioClip rustle =
-				Const.a.sounds[UnityEngine.Random.Range(459,465 + 1)];
+				Const.a.sounds[random_range(459,465 + 1)];
 
 			Utils.PlayOneShotSavable(SFXClothes,rustle,
-									 UnityEngine.Random.Range(0.3f,0.5f));
+									 random_range(0.3f,0.5f));
 		}
 
 		if (!grounded) return;
@@ -423,14 +423,14 @@ public class PlayerMovement : MonoBehaviour {
 		if (stepFinished < Sys_Global.pauseRelativeTime) {
 			stepFinished = isSprinting
 						   ? Sys_Global.pauseRelativeTime
-							 + UnityEngine.Random.Range(0.2f,0.3f)
+							 + random_range(0.2f,0.3f)
 						   : Sys_Global.pauseRelativeTime
-							 + UnityEngine.Random.Range(0.35f,0.65f);
+							 + random_range(0.35f,0.65f);
 
 			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
 			AudioClip stcp = FootStepSound(fstep);
 			Utils.PlayOneShotSavable(SFXFootsteps,stcp,
-									 UnityEngine.Random.Range(0.4f,0.55f));
+									 random_range(0.4f,0.55f));
 		}
 	}
 
@@ -780,29 +780,29 @@ public class PlayerMovement : MonoBehaviour {
 		switch(fstep) {
 			case FootStepType.None: return Const.a.sounds[0];
 			// + 1 because its exclusive, :eyeroll:
-			case FootStepType.Carpet:      return Const.a.sounds[UnityEngine.Random.Range(540,542 + 1)];
-			case FootStepType.Concrete:    return Const.a.sounds[UnityEngine.Random.Range(546,548 + 1)];
-			case FootStepType.GrittyCrete: return Const.a.sounds[UnityEngine.Random.Range(552,554 + 1)];
-			case FootStepType.Grass:       return Const.a.sounds[UnityEngine.Random.Range(558,560 + 1)];
-			case FootStepType.Gravel:      return Const.a.sounds[UnityEngine.Random.Range(564,566 + 1)];
-			case FootStepType.Rock:        return Const.a.sounds[UnityEngine.Random.Range(570,572 + 1)];
-			case FootStepType.Glass:       return Const.a.sounds[UnityEngine.Random.Range(576,578 + 1)];
-			case FootStepType.Marble:      return Const.a.sounds[UnityEngine.Random.Range(582,584 + 1)];
-			case FootStepType.Metal:       return Const.a.sounds[UnityEngine.Random.Range(588,590 + 1)];
-			case FootStepType.Grate:       return Const.a.sounds[UnityEngine.Random.Range(594,596 + 1)];
-			case FootStepType.Metal2:      return Const.a.sounds[UnityEngine.Random.Range(600,602 + 1)];
-			case FootStepType.Metpanel:    return Const.a.sounds[UnityEngine.Random.Range(606,608 + 1)];
-			case FootStepType.Panel:       return Const.a.sounds[UnityEngine.Random.Range(612,614 + 1)];
-			case FootStepType.Plaster:     return Const.a.sounds[UnityEngine.Random.Range(618,620 + 1)];
-			case FootStepType.Plastic:     return Const.a.sounds[UnityEngine.Random.Range(624,626 + 1)];
-			case FootStepType.Plastic2:    return Const.a.sounds[UnityEngine.Random.Range(630,632 + 1)];
-			case FootStepType.Rubber:      return Const.a.sounds[UnityEngine.Random.Range(636,638 + 1)];
-			case FootStepType.Sand:        return Const.a.sounds[UnityEngine.Random.Range(642,644 + 1)];
-			case FootStepType.Squish:      return Const.a.sounds[UnityEngine.Random.Range(648,650 + 1)];
-			case FootStepType.Vent:        return Const.a.sounds[UnityEngine.Random.Range(429,430 + 1)];
-			case FootStepType.Water:       return Const.a.sounds[UnityEngine.Random.Range(651,654 + 1)];
-			case FootStepType.Wood:        return Const.a.sounds[UnityEngine.Random.Range(661,663 + 1)];
-			case FootStepType.Wood2:       return Const.a.sounds[UnityEngine.Random.Range(667,669 + 1)];
+			case FootStepType.Carpet:      return Const.a.sounds[random_range(540,542 + 1)];
+			case FootStepType.Concrete:    return Const.a.sounds[random_range(546,548 + 1)];
+			case FootStepType.GrittyCrete: return Const.a.sounds[random_range(552,554 + 1)];
+			case FootStepType.Grass:       return Const.a.sounds[random_range(558,560 + 1)];
+			case FootStepType.Gravel:      return Const.a.sounds[random_range(564,566 + 1)];
+			case FootStepType.Rock:        return Const.a.sounds[random_range(570,572 + 1)];
+			case FootStepType.Glass:       return Const.a.sounds[random_range(576,578 + 1)];
+			case FootStepType.Marble:      return Const.a.sounds[random_range(582,584 + 1)];
+			case FootStepType.Metal:       return Const.a.sounds[random_range(588,590 + 1)];
+			case FootStepType.Grate:       return Const.a.sounds[random_range(594,596 + 1)];
+			case FootStepType.Metal2:      return Const.a.sounds[random_range(600,602 + 1)];
+			case FootStepType.Metpanel:    return Const.a.sounds[random_range(606,608 + 1)];
+			case FootStepType.Panel:       return Const.a.sounds[random_range(612,614 + 1)];
+			case FootStepType.Plaster:     return Const.a.sounds[random_range(618,620 + 1)];
+			case FootStepType.Plastic:     return Const.a.sounds[random_range(624,626 + 1)];
+			case FootStepType.Plastic2:    return Const.a.sounds[random_range(630,632 + 1)];
+			case FootStepType.Rubber:      return Const.a.sounds[random_range(636,638 + 1)];
+			case FootStepType.Sand:        return Const.a.sounds[random_range(642,644 + 1)];
+			case FootStepType.Squish:      return Const.a.sounds[random_range(648,650 + 1)];
+			case FootStepType.Vent:        return Const.a.sounds[random_range(429,430 + 1)];
+			case FootStepType.Water:       return Const.a.sounds[random_range(651,654 + 1)];
+			case FootStepType.Wood:        return Const.a.sounds[random_range(661,663 + 1)];
+			case FootStepType.Wood2:       return Const.a.sounds[random_range(667,669 + 1)];
 		}
 		
 		return Const.a.sounds[0]; // null wav fallback
@@ -812,29 +812,29 @@ public class PlayerMovement : MonoBehaviour {
 		switch(fstep) {
 			case FootStepType.None: return Const.a.sounds[0];
 			// + 1 because its exclusive, :eyeroll:
-			case FootStepType.Carpet:      return Const.a.sounds[UnityEngine.Random.Range(537,539 + 1)];
-			case FootStepType.Concrete:    return Const.a.sounds[UnityEngine.Random.Range(543,545 + 1)];
-			case FootStepType.GrittyCrete: return Const.a.sounds[UnityEngine.Random.Range(549,551 + 1)];
-			case FootStepType.Grass:       return Const.a.sounds[UnityEngine.Random.Range(555,557 + 1)];
-			case FootStepType.Gravel:      return Const.a.sounds[UnityEngine.Random.Range(561,563 + 1)];
-			case FootStepType.Rock:        return Const.a.sounds[UnityEngine.Random.Range(567,569 + 1)];
-			case FootStepType.Glass:       return Const.a.sounds[UnityEngine.Random.Range(573,575 + 1)];
-			case FootStepType.Marble:      return Const.a.sounds[UnityEngine.Random.Range(579,581 + 1)];
-			case FootStepType.Metal:       return Const.a.sounds[UnityEngine.Random.Range(585,587 + 1)];
-			case FootStepType.Grate:       return Const.a.sounds[UnityEngine.Random.Range(591,593 + 1)];
-			case FootStepType.Metal2:      return Const.a.sounds[UnityEngine.Random.Range(597,599 + 1)];
-			case FootStepType.Metpanel:    return Const.a.sounds[UnityEngine.Random.Range(603,605 + 1)];
-			case FootStepType.Panel:       return Const.a.sounds[UnityEngine.Random.Range(609,611 + 1)];
-			case FootStepType.Plaster:     return Const.a.sounds[UnityEngine.Random.Range(615,617 + 1)];
-			case FootStepType.Plastic:     return Const.a.sounds[UnityEngine.Random.Range(621,623 + 1)];
-			case FootStepType.Plastic2:    return Const.a.sounds[UnityEngine.Random.Range(627,629 + 1)];
-			case FootStepType.Rubber:      return Const.a.sounds[UnityEngine.Random.Range(633,635 + 1)];
-			case FootStepType.Sand:        return Const.a.sounds[UnityEngine.Random.Range(639,641 + 1)];
-			case FootStepType.Squish:      return Const.a.sounds[UnityEngine.Random.Range(645,647 + 1)];
-			case FootStepType.Vent:        return Const.a.sounds[UnityEngine.Random.Range(428,437 + 1)];
-			case FootStepType.Water:       return Const.a.sounds[UnityEngine.Random.Range(655,657 + 1)];
-			case FootStepType.Wood:        return Const.a.sounds[UnityEngine.Random.Range(658,660 + 1)];
-			case FootStepType.Wood2:       return Const.a.sounds[UnityEngine.Random.Range(664,666 + 1)];
+			case FootStepType.Carpet:      return Const.a.sounds[random_range(537,539 + 1)];
+			case FootStepType.Concrete:    return Const.a.sounds[random_range(543,545 + 1)];
+			case FootStepType.GrittyCrete: return Const.a.sounds[random_range(549,551 + 1)];
+			case FootStepType.Grass:       return Const.a.sounds[random_range(555,557 + 1)];
+			case FootStepType.Gravel:      return Const.a.sounds[random_range(561,563 + 1)];
+			case FootStepType.Rock:        return Const.a.sounds[random_range(567,569 + 1)];
+			case FootStepType.Glass:       return Const.a.sounds[random_range(573,575 + 1)];
+			case FootStepType.Marble:      return Const.a.sounds[random_range(579,581 + 1)];
+			case FootStepType.Metal:       return Const.a.sounds[random_range(585,587 + 1)];
+			case FootStepType.Grate:       return Const.a.sounds[random_range(591,593 + 1)];
+			case FootStepType.Metal2:      return Const.a.sounds[random_range(597,599 + 1)];
+			case FootStepType.Metpanel:    return Const.a.sounds[random_range(603,605 + 1)];
+			case FootStepType.Panel:       return Const.a.sounds[random_range(609,611 + 1)];
+			case FootStepType.Plaster:     return Const.a.sounds[random_range(615,617 + 1)];
+			case FootStepType.Plastic:     return Const.a.sounds[random_range(621,623 + 1)];
+			case FootStepType.Plastic2:    return Const.a.sounds[random_range(627,629 + 1)];
+			case FootStepType.Rubber:      return Const.a.sounds[random_range(633,635 + 1)];
+			case FootStepType.Sand:        return Const.a.sounds[random_range(639,641 + 1)];
+			case FootStepType.Squish:      return Const.a.sounds[random_range(645,647 + 1)];
+			case FootStepType.Vent:        return Const.a.sounds[random_range(428,437 + 1)];
+			case FootStepType.Water:       return Const.a.sounds[random_range(655,657 + 1)];
+			case FootStepType.Wood:        return Const.a.sounds[random_range(658,660 + 1)];
+			case FootStepType.Wood2:       return Const.a.sounds[random_range(664,666 + 1)];
 		}
 		
 		return Const.a.sounds[0]; // null wav fallback
@@ -844,29 +844,29 @@ public class PlayerMovement : MonoBehaviour {
 		switch(fstep) {
 			case FootStepType.None: return Const.a.sounds[0];
 			// + 1 because its exclusive, :eyeroll:
-			case FootStepType.Carpet:      return Const.a.sounds[UnityEngine.Random.Range(268,275 + 1)];
-			case FootStepType.Concrete:    return Const.a.sounds[UnityEngine.Random.Range(276,283 + 1)];
-			case FootStepType.GrittyCrete: return Const.a.sounds[UnityEngine.Random.Range(284,291 + 1)];
-			case FootStepType.Grass:       return Const.a.sounds[UnityEngine.Random.Range(292,299 + 1)];
-			case FootStepType.Gravel:      return Const.a.sounds[UnityEngine.Random.Range(300,307 + 1)];
-			case FootStepType.Rock:        return Const.a.sounds[UnityEngine.Random.Range(308,315 + 1)];
-			case FootStepType.Glass:       return Const.a.sounds[UnityEngine.Random.Range(316,323 + 1)];
-			case FootStepType.Marble:      return Const.a.sounds[UnityEngine.Random.Range(324,331 + 1)];
-			case FootStepType.Metal:       return Const.a.sounds[UnityEngine.Random.Range(332,339 + 1)];
-			case FootStepType.Grate:       return Const.a.sounds[UnityEngine.Random.Range(340,347 + 1)];
-			case FootStepType.Metal2:      return Const.a.sounds[UnityEngine.Random.Range(348,355 + 1)];
-			case FootStepType.Metpanel:    return Const.a.sounds[UnityEngine.Random.Range(356,363 + 1)];
-			case FootStepType.Panel:       return Const.a.sounds[UnityEngine.Random.Range(364,371 + 1)];
-			case FootStepType.Plaster:     return Const.a.sounds[UnityEngine.Random.Range(372,379 + 1)];
-			case FootStepType.Plastic:     return Const.a.sounds[UnityEngine.Random.Range(380,387 + 1)];
-			case FootStepType.Plastic2:    return Const.a.sounds[UnityEngine.Random.Range(388,395 + 1)];
-			case FootStepType.Rubber:      return Const.a.sounds[UnityEngine.Random.Range(396,403 + 1)];
-			case FootStepType.Sand:        return Const.a.sounds[UnityEngine.Random.Range(404,411 + 1)];
-			case FootStepType.Squish:      return Const.a.sounds[UnityEngine.Random.Range(412,427 + 1)];
-			case FootStepType.Vent:        return Const.a.sounds[UnityEngine.Random.Range(428,437 + 1)];
-			case FootStepType.Water:       return Const.a.sounds[UnityEngine.Random.Range(438,442 + 1)];
-			case FootStepType.Wood:        return Const.a.sounds[UnityEngine.Random.Range(443,450 + 1)];
-			case FootStepType.Wood2:       return Const.a.sounds[UnityEngine.Random.Range(451,458 + 1)];
+			case FootStepType.Carpet:      return Const.a.sounds[random_range(268,275 + 1)];
+			case FootStepType.Concrete:    return Const.a.sounds[random_range(276,283 + 1)];
+			case FootStepType.GrittyCrete: return Const.a.sounds[random_range(284,291 + 1)];
+			case FootStepType.Grass:       return Const.a.sounds[random_range(292,299 + 1)];
+			case FootStepType.Gravel:      return Const.a.sounds[random_range(300,307 + 1)];
+			case FootStepType.Rock:        return Const.a.sounds[random_range(308,315 + 1)];
+			case FootStepType.Glass:       return Const.a.sounds[random_range(316,323 + 1)];
+			case FootStepType.Marble:      return Const.a.sounds[random_range(324,331 + 1)];
+			case FootStepType.Metal:       return Const.a.sounds[random_range(332,339 + 1)];
+			case FootStepType.Grate:       return Const.a.sounds[random_range(340,347 + 1)];
+			case FootStepType.Metal2:      return Const.a.sounds[random_range(348,355 + 1)];
+			case FootStepType.Metpanel:    return Const.a.sounds[random_range(356,363 + 1)];
+			case FootStepType.Panel:       return Const.a.sounds[random_range(364,371 + 1)];
+			case FootStepType.Plaster:     return Const.a.sounds[random_range(372,379 + 1)];
+			case FootStepType.Plastic:     return Const.a.sounds[random_range(380,387 + 1)];
+			case FootStepType.Plastic2:    return Const.a.sounds[random_range(388,395 + 1)];
+			case FootStepType.Rubber:      return Const.a.sounds[random_range(396,403 + 1)];
+			case FootStepType.Sand:        return Const.a.sounds[random_range(404,411 + 1)];
+			case FootStepType.Squish:      return Const.a.sounds[random_range(412,427 + 1)];
+			case FootStepType.Vent:        return Const.a.sounds[random_range(428,437 + 1)];
+			case FootStepType.Water:       return Const.a.sounds[random_range(438,442 + 1)];
+			case FootStepType.Wood:        return Const.a.sounds[random_range(443,450 + 1)];
+			case FootStepType.Wood2:       return Const.a.sounds[random_range(451,458 + 1)];
 		}
 
 		return Const.a.sounds[0]; // null wav
@@ -1294,7 +1294,7 @@ public class PlayerMovement : MonoBehaviour {
 			if (ladderSFXFinished < Sys_Global.pauseRelativeTime
 				&& rbody.velocity.y > ladderSpeed * 0.5f) {
 
-				SFX.pitch = (UnityEngine.Random.Range(0.8f,1.2f));
+				SFX.pitch = (random_range(0.8f,1.2f));
 				Utils.PlayOneShotSavable(SFX,SFXLadder,0.2f);
 				ladderSFXFinished = Sys_Global.pauseRelativeTime
 									+ ladderSFXIntervalTime;
@@ -1396,7 +1396,7 @@ public class PlayerMovement : MonoBehaviour {
 		float velChange = Mathf.Abs((oldVelocity.y - rbody.velocity.y));
 		if (velChange >= fallDamageSpeed) {
 			DamageData dd = new DamageData ();
-			float falltake = fallDamage - UnityEngine.Random.Range(0,68f);
+			float falltake = fallDamage - random_range(0,68f);
 			if (falltake > hm.health && falltake - hm.health < 5f) falltake = hm.health - 1f; // some small saving grace
 			dd.damage = falltake; // No need for GetDamageTakeAmount since this is strictly internal to Player
 			dd.attackType = AttackType.None;

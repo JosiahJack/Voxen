@@ -49,7 +49,7 @@ public class BioMonitor : MonoBehaviour {
 		fatigue.text = tempStr.ToString();
 		tempStr.Clear();
 		float bpm = (70f +((PlayerMovement.a.fatigue/100f) * 110f));
-		bpm *= Random.Range(0.95f,1.05f);
+		bpm *= random_range(0.95f,1.05f);
 		bpm = Mathf.Floor(bpm);
 		heartRate.text = bpm.ToString();
 		if (Inventory.a.BioMonitorVersion() > 1

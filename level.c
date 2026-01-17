@@ -19,7 +19,10 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
     }
 }
 
+bool InstanceIsNonRenderable(uint16_t i) { return (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].modelIndex == UINT16_MAX); }
+
 uint16_t invalidModelIndexCount;
+uint16_t endOfModels;
 uint16_t startOfDoubleSidedInstances, startOfTransparentInstances;
 uint16_t loadedInstances;
 void SortInstances(void) { // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
@@ -31,12 +34,10 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     uint16_t* opaqueInstances      = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     uint16_t* doubleSidedInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
     uint16_t* transparentInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
-    uint16_t opaqueInstancesHead = 0, doubleSidedInstancesHead = 0, transparentInstancesHead = 0;
-    invalidModelIndexCount = 0;
-    startOfDoubleSidedInstances = startOfTransparentInstances = INSTANCE_COUNT - 1;
+    uint16_t opaqueInstancesHead = 0, doubleSidedInstancesHead = 0, transparentInstancesHead = 0; invalidModelIndexCount = 0; startOfDoubleSidedInstances = startOfTransparentInstances = INSTANCE_COUNT;
     for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
         if (instances[i].texIndex >= MAX_VALID_TEXTURE && instances[i].texIndex != MAX_VALID_TEXTURE) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
-        if (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].modelIndex == UINT16_MAX) { invalidModelIndexCount++; continue; }
+        if (InstanceIsNonRenderable(i)) { invalidModelIndexCount++; continue; }
         if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
 
         bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
@@ -57,6 +58,8 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
             modelTypeCountsOpaque[instances[i].modelIndex]++;
         }
     }
+    
+    endOfModels = loadedInstances - invalidModelIndexCount;
 
     // Compute offsets
     uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
@@ -66,7 +69,7 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsDoubleSided[i]; }
     startOfTransparentInstances = currentOffset;
     for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsTransparent[i]; }
-    if ((startOfTransparentInstances + transparentInstancesHead) > (loadedInstances - invalidModelIndexCount)) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
+    if ((startOfTransparentInstances + transparentInstancesHead) > endOfModels) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
 
     Entity* tempInstances = calloc(INSTANCE_COUNT,sizeof(Entity));
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
@@ -524,7 +527,7 @@ void LoadLevel(uint8_t curlevel) {
                 posBeforeX = instances[parent].position.x;
                 posBeforeY = instances[parent].position.y;
                 posBeforeZ = instances[parent].position.z;
-                instances[parent].overrideTest = true;
+                flag_set(&instances[parent].entflags,ENTFLAG_TEST_OVERRIDE_TEST,true);
             }
             AddInstance(entIdx, parent);
             if (overridePos) {

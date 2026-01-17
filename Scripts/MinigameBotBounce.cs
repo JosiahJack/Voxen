@@ -50,8 +50,8 @@ public class MinigameBotBounce : MonoBehaviour {
     }
 
     private Vector2 GetNewBallDirection() {
-        float dirX = Random.Range(-0.5f,0.5f);
-        float dirY = Random.Range(0.8f,1.0f);
+        float dirX = random_range(-0.5f,0.5f);
+        float dirY = random_range(0.8f,1.0f);
         return new Vector2(dirX,dirY);
     }
 

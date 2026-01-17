@@ -22,14 +22,14 @@ void InitializeAudio(void) {
 }
 
 void play_mp3(const char* path, float volume, int32_t fade_in_ms) {
-    static int32_t current_sound = 0;
-    ma_sound_uninit(&mp3_sounds[current_sound]);
-    ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &mp3_sounds[current_sound]);
+    static int32_t slot = 0;
+    ma_sound_uninit(&mp3_sounds[slot]);
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &mp3_sounds[slot]);
     if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result);  return; }
     
-    ma_sound_set_fade_in_milliseconds(&mp3_sounds[current_sound], 0.0f, volume, fade_in_ms);
-    ma_sound_start(&mp3_sounds[current_sound]);
-    current_sound = 1 - current_sound; // Toggle for crossfade
+    ma_sound_set_fade_in_milliseconds(&mp3_sounds[slot], 0.0f, volume, fade_in_ms);
+    ma_sound_start(&mp3_sounds[slot]);
+    slot = 1 - slot; // Toggle for crossfade
 }
 
 void play_wav(const char* path, float volume, Vector3 pos, bool positional) {

@@ -196,13 +196,13 @@ public class MouseLookScript : MonoBehaviour {
 
 			if (randomShakeFinished < Sys_Global.pauseRelativeTime) {
 				randomShakeFinished = Sys_Global.pauseRelativeTime
-				                      + UnityEngine.Random.Range(5f,20f);
+				                      + random_range(5f,20f);
 				ScreenShake(3f,2f);
 			}
 			
 			if (randomKlaxonFinished < Sys_Global.pauseRelativeTime) {
 				randomKlaxonFinished = Sys_Global.pauseRelativeTime
-				                       + UnityEngine.Random.Range(10f,20f);
+				                       + random_range(10f,20f);
 
 				Utils.PlayUIOneShotSavable(104); // klaxon
 			}
@@ -1017,15 +1017,15 @@ public class MouseLookScript : MonoBehaviour {
 // 				   * PlayerMovement.a.currentCrouchRatio;
 		if (shakeFinished > Sys_Global.pauseRelativeTime) {
 			headBobX = transform.localPosition.x
-					   + UnityEngine.Random.Range(shakeForce * -0.17f,
+					   + random_range(shakeForce * -0.17f,
 												  shakeForce * 0.17f);
 
 			headBobY = transform.localPosition.y
-					   + UnityEngine.Random.Range(shakeForce * -0.08f,
+					   + random_range(shakeForce * -0.08f,
 												  shakeForce * 0.08f);
 
 			headBobZ = transform.localPosition.z
-					   + UnityEngine.Random.Range(shakeForce * -0.17f,
+					   + random_range(shakeForce * -0.17f,
 												  shakeForce * 0.17f);
 		} else {
 			headBobZ = 0f;
