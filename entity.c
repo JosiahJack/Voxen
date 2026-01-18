@@ -85,7 +85,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[i].modelIndex = entities[entIdx].modelIndex;
     instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
-    flag_set(&instances[i].entflags, ENTFLAG_ANIMATED, modelAnimationType[instances[i].modelIndex] > 0u);
+    flag_set(&instances[i].entflags, ENTFLAG_ANIMATED, modelHasAnimation[instances[i].modelIndex]);
     instances[i].numclips = entities[entIdx].numclips;
     instances[i].animationNum = entities[entIdx].animationNum;
     #ifdef ONLY_LOAD_LEVEL_NEEDS

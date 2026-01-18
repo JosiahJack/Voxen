@@ -127,8 +127,8 @@ COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sectio
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
     LINKER=$CC
-    CFLAGS="-D_WIN32 $COMMON_CFLAGS"
-    LDFLAGS="-L./ -L./External/ -L./External/Windows -l:assimp-vc143-mt.dll -lgdi32 -lopengl32 -lm -l:glfw3.dll -l:libminiaudio.dll.a"
+    CFLAGS="-D_WIN32 $COMMON_CFLAGS -fno-ident -fno-asynchronous-unwind-tables -mno-stack-arg-probe"
+    LDFLAGS="-L./ -L./External/ -L./External/Windows -l:assimp-vc143-mt.dll -lopengl32 -lm -l:glfw3.dll -l:libminiaudio.dll.a -static-libgcc -flto=auto"
     OBJ_DIR="./External/Windows"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen.exe"
@@ -184,10 +184,10 @@ total_build_time=$((build_end - shader_start))
 echo "Build completed in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  wine ./"$BINARY_NAME" ;;   # or wine voxen.exe if testing on linux
-#         mac)      ./"$BINARY_NAME" ;;
-#         android)  echo "Android binary built — deploy manually to device/emulator" ;;
-        *)        ./"$BINARY_NAME" ;;   # linux
+        windows)  strip --strip-all voxen.exe; upx --ultra-brute --lzma ./voxen.exe; wine ./voxen.exe ;;   # or wine voxen.exe if testing on linux
+        mac)      ./voxen.app ;;
+        android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
+        *)        strip --strip-all voxen; ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

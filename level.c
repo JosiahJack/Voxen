@@ -569,7 +569,6 @@ void LoadLevel(uint8_t curlevel) {
                     activePortals[numActivePortals] = (Portal){ .cellA = cellE, .cellB = cellW, .portalNS = false, .open = isOpen, .dirty = true };
                 }
                 
-                if (instances[parent].index == 496) instances[parent].clip = ANIM_IDLE_CLOSED;
                 numActivePortals++;
             }
             

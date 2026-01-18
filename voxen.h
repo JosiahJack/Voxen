@@ -615,7 +615,8 @@ typedef struct {
 	GLuint debugLinesVAO;
 	GLuint debugLinesVBO;
 	GLuint blueNoiseBuffer;
-	GLuint modelBoundsID;
+    GLuint modelAnimDeltasID;
+    GLuint modelAnimDeltaOffsetsID;
 	GLuint matricesBufferID;
 	GLuint colorBufferID;
 	GLuint texturePalettesID;
@@ -633,7 +634,7 @@ typedef struct {
 	bool shadowmapsNeedUpdated;
 } RenderSystem;
 
-uint16_t useableItemsFrobIcons[94];
+extern uint16_t useableItemsFrobIcons[94];
 
 #define NUM_AI_TYPES 29
 typedef struct {
@@ -761,8 +762,9 @@ typedef struct {
     uint16_t lodIndex;
     uint8_t clip;
     uint8_t numclips;
-    uint8_t animationNum; // Global animation identifier into short table of AnimationClip's
-    uint16_t frame;
+    uint16_t animationNum; // Global animation identifier into short table of AnimationClip's
+    uint16_t frame; // 0 based index into the delta tables, 0 skips delta read and just uses raw modelIndex base pos verts with no delta applied.
+    uint16_t frames; // Total frames for the model
     int32_t cellIndex;
     uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
@@ -951,7 +953,7 @@ extern Vector3 lightsNewPosition[LIGHT_COUNT];
 extern uint16_t gameObjectCount;
 extern uint32_t modelVertexCounts[MODEL_IDX_MAX];
 extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
-extern uint8_t modelAnimationType[MODEL_IDX_MAX];
+extern bool modelHasAnimation[MODEL_IDX_MAX];
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
 extern AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];

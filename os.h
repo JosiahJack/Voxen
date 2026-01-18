@@ -22,7 +22,6 @@ typedef struct {
     #define WIN32_LEAN_AND_MEAN // Let 'er rip, tater chip
     #include <windows.h> // The things I do for my players, yeesh
     #include <direct.h>
-    #include <io.h>
     typedef HANDLE OsFileHandle;
     #define OS_INVALID_HANDLE INVALID_HANDLE_VALUE
     #define PROT_READ  0x1 // From mman.h

@@ -161,7 +161,7 @@ void ParseGameData(void) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
-bool parse_data_file(DataParser *parser, const char *filename) {
+bool parse_data_file(DataParser *parser, const char *filename) {    
     FILE *file = fopen(filename, "r");
     if (!file) { DualLogError("Cannot open %s\n", filename); return false; }
     
@@ -255,8 +255,12 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                 } else {
                          if (strcmp(trimmed_key, "index") == 0)             entry.index = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "persistent") == 0)        flag_set(&entry.entflags,ENTFLAG_TEST_PERSISTENT,parse_bool(trimmed_value, start, lineNum));
+                    
                     else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "animated") == 0)          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_bool(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "animated") == 0)          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
+                    else if (strcmp(trimmed_key, "animationNum") == 0)      entry.animationNum = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "frames") == 0)            entry.frames = parse_numberu16(trimmed_value, start, lineNum);
+
                     else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "alttexture") == 0)        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "glowtexture") == 0)       entry.glowIndex = parse_numberu16(trimmed_value, start, lineNum);
@@ -285,7 +289,6 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(trimmed_key, "frictionCombine") == 0)   entry.frictionCombine = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "bounceCombine") == 0)     entry.bounceCombine = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "numclips") == 0)          entry.numclips = parse_numberu8(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "animationNum") == 0)      entry.animationNum = parse_numberu8(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "changeMatOnActive") == 0) flag_set(&entry.entflags,ENTFLAG_CHANGE_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
                     else if (strcmp(trimmed_key, "blinkWhenActive") == 0)   flag_set(&entry.entflags,ENTFLAG_BLINK_TEX_ON_ACTIVE,parse_bool(trimmed_value, start, lineNum));
                     else if (strcmp(trimmed_key, "noshadows") == 0)         flag_set(&entry.entflags,ENTFLAG_NO_SHADOWS,parse_bool(trimmed_value, start, lineNum));

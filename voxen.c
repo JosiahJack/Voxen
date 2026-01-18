@@ -55,6 +55,7 @@ float lightIntervalSteps[LIGHT_COUNT][30];
 uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 float intervalStepisLerping[LIGHT_COUNT][30];
 bool lightCastsShadows[LIGHT_COUNT];
+uint16_t useableItemsFrobIcons[94];
 bool boosterActive;
 
 static inline void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
@@ -537,7 +538,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     Sys_Render.texturePalettesID       = SetupSSBO(&Sys_Render.texturePalettesID,       16, MAX_UNIQUE_COLORS * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
-    Sys_Render.uniqueLightListsID       = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -757,15 +758,16 @@ void RenderShadowmaps(void) {
             if (mdx >= loadedModelsMaxIndex) continue;
             if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
 
-            bool cellNotVisible = CellNotVisible(PosGetCellCoords(instances[i].position.x, instances[i].position.z)); // Cache cell indices once per mesh rather than once per light.
-            if (cellNotVisible && !(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
-                    Portal doorPortal = activePortals[instances[i].portalIndex];
-                    uint16_t cellAIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
-                    uint16_t cellBIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
-                    if (CellNotVisible(cellAIndex) && CellNotVisible(cellBIndex)) continue; // Neither cell is visible for door
-                } else continue;
-            }
+            // TODO Fix logic around portal cells preventing doors from passing the check below causing shadows to flicker off when the door closes.  Commented out the below for lighting stability.
+//             bool cellNotVisible = CellNotVisible(PosGetCellCoords(instances[i].position.x, instances[i].position.z)); // Cache cell indices once per mesh rather than once per light.
+//             if (cellNotVisible && !(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
+//                 if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
+//                     Portal doorPortal = activePortals[instances[i].portalIndex];
+//                     uint16_t cellAIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
+//                     uint16_t cellBIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
+//                     if (CellNotVisible(cellAIndex) && CellNotVisible(cellBIndex)) continue; // Neither cell is visible for door
+//                 } else continue;
+//             }
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;

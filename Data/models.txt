@@ -1045,6 +1045,9 @@ index: 697
 
 #Models/door2_000002.obj
 index: 699
+animated: 1
+animationNum: 0
+frames: 20
 #Models/door2_000003.obj
 index: 700
 #Models/door2_000004.obj
@@ -1086,6 +1089,9 @@ index: 718
 
 #Models/door1_000002.obj
 index: 719
+animated: 1
+animationNum: 1
+frames: 23
 #Models/door1_000003.obj
 index: 720
 #Models/door1_000004.obj
@@ -1133,6 +1139,9 @@ index: 741
 
 #Models/npc_humanoidmutant_000000.obj
 index: 742
+animated: 1
+animationNum: 2
+frames: 182
 #Models/npc_humanoidmutant_000001.obj
 index: 743
 #Models/npc_humanoidmutant_000002.obj
@@ -1498,6 +1507,9 @@ index: 923
 
 #Models/npc_cyborg_drone_000001.obj
 index: 924
+animated: 1
+animationNum: 3
+frames: 377
 #Models/npc_cyborg_drone_000002.obj
 index: 925
 #Models/npc_cyborg_drone_000003.obj
