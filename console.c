@@ -1,5 +1,6 @@
 // console.c - Console Emulator
 #include <ctype.h> // For tolower
+#include <string.h>
 #include <stdlib.h> // For atoi
 #include <stdio.h> // For snprintf
 #include "voxen.h"

@@ -163,3 +163,5 @@ int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c
 // finished) somewhere instead of (finished < time) which is my usual Quake
 // derived timer pattern.
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) { return parse_float(trimmed_value, initialLine, lineNum) + (float)Sys_Global.pauseRelativeTime; }
+
+size_t strlen(const char *s) { const char *p = s; while (*(p++)); return (size_t)(p - s - 1); }

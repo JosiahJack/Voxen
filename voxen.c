@@ -693,6 +693,13 @@ void RenderShadowmaps(void) {
     float bestScores[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
     Vector3 playerPos = instances[PLAYER1].position;
+    Vector3 playerFwd = instances[PLAYER1].forward;
+    static const Vector3 cornerShiftSigns[24] = { {1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, -1.0f},   {1.0f, -1.0f, 1.0f},   {1.0f, -1.0f, -1.0f},
+                                                {-1.0f, 1.0f, 1.0f},  {-1.0f, 1.0f, -1.0f},  {-1.0f, -1.0f, 1.0f},  {-1.0f, -1.0f, -1.0f},
+                                                {1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, 1.0f},   {-1.0f, 1.0f, -1.0f},
+                                                {1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, -1.0f},  {-1.0f, -1.0f, 1.0f},  {-1.0f, -1.0f, -1.0f},
+                                                {1.0f, 1.0f, 1.0f},   {1.0f, -1.0f, 1.0f},   {-1.0f, 1.0f, 1.0f},   {-1.0f, -1.0f, -1.0f},
+                                                {1.0f, 1.0f, -1.0f},  {1.0f, -1.0f, -1.0f},  {-1.0f, 1.0f, -1.0f},  {-1.0f, -1.0f, -1.0f} };
     float pfx = instances[PLAYER1].forward.x;    float pfy = instances[PLAYER1].forward.y;    float pfz = instances[PLAYER1].forward.z;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         if (!lightCastsShadows[i]) continue;
@@ -709,7 +716,7 @@ void RenderShadowmaps(void) {
         
         float dx = lightPos.x - playerPos.x;    float dy = lightPos.y - playerPos.y;    float dz = lightPos.z - playerPos.z;
         float distSqrdToPlayer = dx*dx + dy*dy + dz*dz;
-        float dotResult = (dx*pfx + dy*pfy + dz*pfz);//dot_vector3(delta, instances[PLAYER1].forward);
+        float dotResult = (dx*pfx + dy*pfy + dz*pfz);
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         
         float score = distSqrdToPlayer / vmax(intensity, 0.01f);
@@ -759,7 +766,7 @@ void RenderShadowmaps(void) {
             if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
 
             // TODO Fix logic around portal cells preventing doors from passing the check below causing shadows to flicker off when the door closes.  Commented out the below for lighting stability.
-//             bool cellNotVisible = CellNotVisible(PosGetCellCoords(instances[i].position.x, instances[i].position.z)); // Cache cell indices once per mesh rather than once per light.
+//             bool cellNotVisible = CellNotVisible(PosGetCellCoords(playerPos.x, playerPos.z)); // Cache cell indices once per mesh rather than once per light.
 //             if (cellNotVisible && !(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
 //                 if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
 //                     Portal doorPortal = activePortals[instances[i].portalIndex];
@@ -797,104 +804,22 @@ void RenderShadowmaps(void) {
 
             if (nearbyMeshCount < 1) continue;
 
-            glUniform3f(3, candidates[c].position.x, candidates[c].position.y, candidates[c].position.z);
+            glUniform3f(3, lightPos.x, lightPos.y, lightPos.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
-            bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, candidates[c].position, 0.64f); // Use some radius for floating point errors
+            bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, lightPos, 0.64f); // Use some radius for floating point errors
             uint8_t numFacesRendered = 0;
             #pragma GCC unroll 6
             for (uint8_t face = 0; face < 6; face++) {                            
                 if (!lightPositionInPlayerFrustum) { // Check if at least one of the four points of this cubemap face's frustum are within the player's frustum
                     bool faceOverlapsPlayerView = false;
-                    switch (face) {
-                        case 0: { // +X: Right
-                                Vector3 corner0 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner0,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner1 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner1,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner2 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner2,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner3 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner3,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            }
-                            break;
-                        case 1: { // -X: Left
-                                Vector3 corner4 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner4,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner5 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner5,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner6 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner6,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner7 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner7,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            }
-                            break;
-                        case 2: { // +Y: Up
-                                Vector3 corner0 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner0,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner1 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner1,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner4 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner4,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner5 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner5,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            }
-                            break;
-                        case 3: { // -Y: Down
-                                Vector3 corner2 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner2,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner3 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner3,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner6 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner6,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner7 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner7,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            }
-                            break;
-                        case 4: { // +Z: Forward
-                                Vector3 corner0 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner0,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner2 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner2,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner4 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner4,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner6 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner6,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            }
-                            break;
-                        case 5: { // -Z: Backward
-                                Vector3 corner1 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner1,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner3 = Vector3_A_plus_B(candidates[c].position, (Vector3){ effectiveRadius, -effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner3,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner5 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner5,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-
-                                Vector3 corner7 = Vector3_A_plus_B(candidates[c].position, (Vector3){ -effectiveRadius, -effectiveRadius, -effectiveRadius });
-                                if (dot_vector3(Vector3_A_minus_B(corner7,instances[PLAYER1].position), instances[PLAYER1].forward) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                            }
-                            break;
+                    Vector3 shiftBasis = (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius };
+                    int start = face * 4; int end = start + 4;
+                    for (int i = start; i < end; ++i) {
+                        Vector3 corner = (Vector3){ shiftBasis.x * cornerShiftSigns[i].x, shiftBasis.y * cornerShiftSigns[i].y, shiftBasis.z * cornerShiftSigns[i].z };
+                        if (dot_vector3(Vector3_A_minus_B(Vector3_A_plus_B(lightPos, corner), playerPos), playerFwd) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
                     }
 
-                    if (!faceOverlapsPlayerView) {
-                        if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) continue;
-                    }
+                    if (!faceOverlapsPlayerView && !SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) continue;
                 }
                 
                 glUniform1ui(2, face);
@@ -1206,7 +1131,28 @@ static void UpdateVoxelsAndInstances(void) {
     Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
     if (Sys_Render.shadowmapsNeedUpdated) CullCore(); // 1. Culling
     bool uploadInstances = false;
-    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { if (dirtyInstances[i]) { uploadInstances = true; Sys_Render.shadowmapsNeedUpdated = true; UpdateInstanceMatrix(i); } }
+    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) {
+        if (dirtyInstances[i]) {
+            if (instances[i].modelIndex >= loadedModelsMaxIndex || modelVertexCounts[instances[i].modelIndex] < 1) { dirtyInstances[i] = false; continue; } // No model or empty model
+
+            uploadInstances = true;    Sys_Render.shadowmapsNeedUpdated = true;
+            float x = instances[i].rotation.x, y = instances[i].rotation.y, z = instances[i].rotation.z, w = instances[i].rotation.w;
+            float x2 = x * x,   y2 = y * y,   z2 = z * z,   xy = x * y,   xz = x * z,   yz = y * z,   wx = w * x,   wy = w * y,   wz = w * z;
+            float sclx = instances[i].scale.x; float scly = instances[i].scale.y; float sclz = instances[i].scale.z;
+            modelMatrices[(i * 16) + 0] = (1.0f - 2.0f * (y2 + z2)) * -sclx; // Right X, Necessary -x for blender right to left handed coordinate conversion.
+            modelMatrices[(i * 16) + 1]  = (2.0f * (xy + wz)) * -sclx; // Right Y
+            modelMatrices[(i * 16) + 2]  = (2.0f * (xz - wy)) * -sclx; // Right Z
+            modelMatrices[(i * 16) + 3] = modelMatrices[(i * 16) + 7] = modelMatrices[(i * 16) + 11] = 0.0f;
+            modelMatrices[(i * 16) + 4]  = (2.0f * (xy - wz)) * scly; // Up X
+            modelMatrices[(i * 16) + 5]  = (1.0f - 2.0f * (x2 + z2)) * scly; // Up Y
+            modelMatrices[(i * 16) + 6]  = (2.0f * (yz + wx)) * scly; // Up Z
+            modelMatrices[(i * 16) + 8]  = (2.0f * (xz + wy)) * sclz; // Forward X
+            modelMatrices[(i * 16) + 9]  = (2.0f * (yz - wx)) * sclz; // Forward Y
+            modelMatrices[(i * 16) + 10] = (1.0f - 2.0f * (x2 + y2)) * sclz; // Forward Z
+            modelMatrices[(i * 16) + 12] = instances[i].position.x;   modelMatrices[(i * 16) + 13] = instances[i].position.y;   modelMatrices[(i * 16) + 14] = instances[i].position.z;
+            modelMatrices[(i * 16) + 15]= 1.0f;
+        }
+    }
     if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
 

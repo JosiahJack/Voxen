@@ -220,6 +220,8 @@ void SetUnityHierarchyOffsets(uint8_t curlevel) {
     GetLevel_NPCsSaveableInstantiated_ContainerOffsets(curlevel, &correctionNPCX, &correctionNPCY, &correctionNPCZ);
 }
 
+Quaternion axis_angle_quaternion(const Vector3 axis, float angle) { float s = vsinf(angle * 0.5f); return (Quaternion){vcosf(angle * 0.5f), s * axis.x, s * axis.y, s * axis.z}; }
+
 // Apply the Unity hierarchy nonsense, TODO: Save out level#.txt from the engine just once and then delete all this.
 void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t entIdx) {
         if (Sys_Global.levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.

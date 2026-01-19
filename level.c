@@ -339,7 +339,7 @@ void LoadLevel(uint8_t curlevel) {
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[LINE_LEN_MAX];
-    SetUnityHierarchyOffsets(curlevel);
+    SetUnityHierarchyOffsets(curlevel); // TODO: Do it in the level#.txt files once and be rid of this crap.
     while (fgets(lineSpace, LINE_LEN_MAX, file)) {
         size_t len = strlen(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
@@ -658,7 +658,6 @@ void LoadLevel(uint8_t curlevel) {
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; i++) UpdateInstanceMatrix(i);
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) dirtyInstances[i] = true;
     for (uint16_t i = 0; i < loadedLights; i++) {
         uint32_t litIdx = i * LIGHT_DATA_SIZE; // lightDirty[i] = true is already done in PortalCulling, leaving commented out here for confirmation.

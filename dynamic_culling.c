@@ -564,7 +564,7 @@ void CullInit(void) {
         }
     }
     
-    UpdatedPlayerCell();
+    (void)UpdatedPlayerCell();
     int32_t cellToCellIdx = playerCellIdx * ARRSIZE;
     int32_t numFoundVisibleCellsForPlayerStart = 0;
     for (int32_t z=0;z<WORLDZ;++z) {

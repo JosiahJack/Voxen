@@ -3,7 +3,6 @@
 // #define ONLY_LOAD_LEVEL_NEEDS
 // #define DEBUG_ENTITIES
 // #define DEBUG_ENTITY_DEFINITIONS
-#include <string.h>
 #include <stdarg.h>
 #include "./External/glad/gl.h"
 #include "./External/glfw3.h"
@@ -14,6 +13,7 @@
 #include "./External/glfw3.h"
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 
+typedef uint64_t size_t;
 typedef struct { float r,g,b,a; } Color;
 typedef struct { float x,y; } Vector2;
 typedef struct { float x,y,z; } Vector3;
@@ -1352,17 +1352,11 @@ static inline Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<
 static inline Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
 static inline float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
 static inline Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
+static inline void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
 static inline Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
 static inline float squareDistance2D(float x1, float z1, float x2, float z2) { float dx = x2 - x1; float dz = z2 - z1; return dx * dx + dz * dz; }
 static inline float squareDistance3D(float x1, float y1, float z1, float x2, float y2, float z2) { float dx = x2 - x1; float dy = y2 - y1; float dz = z2 - z1; return dx * dx + dy * dy + dz * dz; }
 uint16_t PointInSolid(Vector3 point, uint32_t layerMask);
-void normalize_vector(float* x, float* y, float* z);
-__attribute__((pure)) Vector3 mul_mat4_vector3(const float* m, Vector3 v);
-void quat_to_matrix(Quaternion* q, float* m);
-Quaternion axis_angle_quaternion(const Vector3 axis, float angle);
-void normalize_quaternion(Quaternion* q);
-Vector3 quat_rotate(Quaternion q, Vector3 v);
-void UpdateInstanceMatrix(int32_t i);
 bool EntityIsAnimated(uint16_t entIdx);
 
 static inline float quat_angle_deg(Quaternion a, Quaternion b) {
@@ -1439,3 +1433,4 @@ void cmd_shake(void);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
 void CycleToNextMonitor(GLFWwindow* window);
+size_t strlen(const char *s);
