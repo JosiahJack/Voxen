@@ -733,7 +733,7 @@ extern NPCTable npcTable[NUM_AI_TYPES];
 #define ENTFLAG_BLINK_TEX_ON_ACTIVE   512U
 #define ENTFLAG_NO_SHADOWS           1024u
 #define ENTFLAG_ANIMATED             2048u
-#define ENTFLAG_ASLEEP               4096u
+#define ENTFLAG_ASLEEP               4096u // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
 #define ENTFLAG_WALK_PATH_ON_START   8192u
 #define ENTFLAG_TEST_PERSISTENT     16384u
 #define ENTFLAG_TEST_OVERRIDE_TEST  32768u
@@ -744,15 +744,33 @@ extern NPCTable npcTable[NUM_AI_TYPES];
 #define ENTFLAG_DEAD              1048576u
 #define ENTFLAG_TELEPORT_ON_DEATH 2097152u
 #define ENTFLAG_GO_INTO_PAIN      4194304u
+#define ENTFLAG_DONT_LOOP_WAYPTS  8388608u
+#define ENTFLAG_DONT_LOOP_WAYPTS  8388608u
+#define ENTFLAG_VISIT_WAYPTS_RND 16777216u
+#define ENTFLAG_WANDERING        33554432u
+#define ENTFLAG_ACT_AS_TURRET    67108864u
+#define ENTFLAG_TARGID_ATTACHED 134217728u
+// #define ENTFLAG_ENEM_IN_SIGHT
+// #define ENTFLAG_ENEM_IN_FRONT
+// #define ENTFLAG_ENEM_IN_FOV
+// #define ENTFLAG_ENEM_IN_LOS
+// #define ENTFLAG_GO_INTO_PAIN
+// #define ENTFLAG_FIRST_SIGHTING
+// #define ENTFLAG_DYING_SETUP
+// #define ENTFLAG_HAD_ENEMY
+// #define ENTFLAG_SHOT_FIRED
+// #define ENTFLAG_DEAD_CHECKS_DONE
+// #define ENTFLAG_DEATH_BURST_DONE
+// #define ENTFLAG_HOP_DONE
 static inline void flag_enable(uint32_t *flags, uint32_t bit) { *flags |= bit; }
 static inline void flag_disable(uint32_t *flags, uint32_t bit) { *flags &= ~bit; }
 static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
-typedef struct {
+typedef /*FAT*/ struct {
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    uint8_t npcIndex;
-    uint32_t physics_handle;
     uint32_t entflags;
-    uint16_t modelIndex;
+
+	// Rendering
+	uint16_t modelIndex;
     uint16_t texIndex;
     uint16_t altTexIndex;
     uint16_t glowIndex;
@@ -760,6 +778,8 @@ typedef struct {
     uint16_t specIndex;
     uint16_t normIndex;
     uint16_t lodIndex;
+
+	// Animation
     uint8_t clip;
     uint8_t numclips;
     uint16_t animationNum; // Global animation identifier into short table of AnimationClip's
@@ -771,7 +791,10 @@ typedef struct {
     double currentFrameFinished;
     double currentFrameStartTime;
     double animSwapFinished;
-    Vector3 position;
+
+	// Physics
+	Vector3 position;
+	Vector3 lastPosition;
     Quaternion rotation;
     Vector3 scale;
     Vector3 forward;
@@ -796,11 +819,19 @@ typedef struct {
     float bounciness;
     PhysCombineType frictionCombine;
     PhysCombineType bounceCombine;
+
+	// Audio
     float volume;
+
+	// Attachment
     uint16_t   child[MAX_CHILD_COUNT];
     Vector3    child_offset[MAX_CHILD_COUNT];
     Quaternion child_rotation[MAX_CHILD_COUNT];
     Vector3    child_scale[MAX_CHILD_COUNT];
+
+	// NPC logic
+    uint8_t npcIndex;
+	AIState currentState;
     double timeForTranquilization;
     Vector3 sightPointOffset;
     Vector3 gunPointOffset;
@@ -808,19 +839,45 @@ typedef struct {
     uint16_t muzzleBurst;
     uint16_t muzzleBurst2;
     void* think;
-    uint16_t enemey; // instances[] index of enemy.
-    float idleTime;
-    float attack1SoundTime;
-    float attack2SoundTime;
-    float attack3SoundTime;
-    float timeTillEnemyChangeFinished;
-    float attackFinished;
-    float attack2Finished;
-    float attack3Finished;
-    float timeTillPainFinished;
+    uint16_t enemey;
+	float gracePeriodFinished;
+	float meleeDamageFinished;
     uint8_t walkWaypointsLength;
     Vector3 walkWaypoints[32];
+	uint16_t dyingTexture;
+	uint16_t deathTexture;
+	uint16_t deathBurst;
+	float rangeToEnemy;
+	int currentWaypoint;
+	Vector3 currentDestination;
+	float idleTime;
+	float attack1SoundTime;
+	float attack2SoundTime;
+	float attack3SoundTime;
+	float timeTillEnemyChangeFinished;
+	float timeTillDeadFinished;
+	float timeTillPainFinished;
+	float huntFinished;
+	Vector3 lastKnownEnemyPos;
+	float randomWaitForNextAttack1Finished;
+	float randomWaitForNextAttack2Finished;
+	float randomWaitForNextAttack3Finished;
+	Vector3 idealTransformForward;
+	Vector3 idealPos;
+	float attackFinished;
+	float attack2Finished;
+	float attack3Finished;
+	Vector3 targettingPosition;
+	float deathBurstFinished;
+	float tranquilizeFinished;
+	float wanderFinished;
+	float timeSinceMovedEnough;
+	float posCheckFinished;
+	char targetID[32];
+
+	// Misc
     char path[128];
+	// phew what a porker of a struct, it's been a eatin!
 } Entity;
 extern Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 extern Entity instances[INSTANCE_COUNT];
