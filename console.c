@@ -168,6 +168,33 @@ static int ParseLevelArg(const char* arg) {
     return -1; // Invalid
 }
 
+static Vector3 ressurectionLocations[13] = {
+    {-27.386f, -55.488f, 26.5941f}, // 0/R
+    {40.903f, -42.372f, -30.78f}, // 1
+    {30.67407f, -25.832f, 10.21412f}, // 2
+    {38.26813f, -15.498f, 20.37825f}, // 3
+    {-19.48f, -7.928f, 22.954f}, // 4
+    {-24.358f, 12.5956f, 31.8497f}, // 5
+    {-22.3568f, 33.7845f, -30.728f}, // 6
+    {2.228084f, 50.95243f, 7.532025f}, // 7
+    {10.068f, 58.897f, 13.973f}, // 8
+    {2.303f, 106.77f, -38.554f}, // 9
+    {-22.3568f, 33.7845f, -30.728f}, // 10
+    {-22.3568f, 33.7845f, -30.728f}, // 11
+    {-22.3568f, 33.7845f, -30.728f} // 12
+};
+
+static Vector3 cyberSpaceEntryLocations[8] = {
+    {210.68340f,   2.81200f, -24.37800f}, // 0
+    {195.42000f, -13.44000f,  33.28000f}, // 1
+    {157.16080f, -15.53000f,  47.33100f}, // 2a, if cyberport localPosition.x < -26.0f
+    {256.04160f,  -0.71600f,  62.48789f}, // 2b level 2 secondary cyberport position
+    {126.43000f,  29.56733f,  34.24000f}, // 5
+    {177.61200f,   3.29494f, 108.77250f}, // 6
+    {244.73500f,  41.99257f, -19.69500f}, // 8
+    {185.16100f,  84.50200f, -46.04246f}, // 9
+};
+
 static void cmd_loadlevel(const char* arg) {
     if (Sys_Global.menuActive) { CenterStatusPrint("%s", voxen_Text.stringTable[1015]); return; } // "Cannot load levels via cheat while on the main menu!"
 
@@ -179,6 +206,7 @@ static void cmd_loadlevel(const char* arg) {
         CenterStatusPrint("Loading level %u", level);
         queuedLevelToLoad = level;
         LoadLevel(level);
+        instances[PLAYER1].position = level == LEVEL_CYBERSPACE ? cyberSpaceEntryLocations[1] : ressurectionLocations[level];
     }
 }
 

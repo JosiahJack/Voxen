@@ -9,13 +9,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 
-static char *xstrdup(const char *s) {
-    size_t len = strlen(s) + 1;
-    char *p = malloc(len);
-    if (p) memcpy(p, s, len);
-    return p;
-}
-
 float genericTextHeightFac = 0.025f;
 float genericTextWidthFac = 0.0125f;
 float genericTextHeightFacStopD = 0.07f;
@@ -28,17 +21,8 @@ stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 float fixedNumberAdvanceWidth = 0.0f; // Global for fixed-width number spacing
 float fixedNumberAdvanceWidthStopD = 0.0f;
-
-static const char* const fallbackFontPaths[] = {
-    "./Fonts/FreeSerifBold.ttf",
-    "./Fonts/cambriab.ttf",
-    "./Fonts/NotoSansCJK-Bold.ttc"
-};
-
-static const char* const fontPaths[] = {
-    "./Fonts/SystemShockText.ttf",
-    "./Fonts/StopD.ttf"
-};
+static const char* const fallbackFontPaths[] = { "./Fonts/FreeSerifBold.ttf", "./Fonts/cambriab.ttf", "./Fonts/NotoSansCJK-Bold.ttc" };
+static const char* const fontPaths[] = { "./Fonts/SystemShockText.ttf", "./Fonts/StopD.ttf" };
 
 typedef struct {
     char *path;
@@ -110,7 +94,7 @@ float TextWidth(const char *utf8, int fontID) {
         if (fontID == FONT_STOPD) {
             if (packedIdx >= 0 && packedIdx < numPackedGlyphsStopD) advance = fontPackedCharStopD[packedIdx].xadvance;
         } else {
-            if (packedIdx >= 0 && packedIdx < numPackedGlyphs) advance = fontPackedChar[packedIdx].xadvance;   
+            if (packedIdx >= 0 && packedIdx < numPackedGlyphs) advance = fontPackedChar[packedIdx].xadvance;
         }
 
         if (prevGlyph != -1 && advance > 0.0f) { // Kerning
@@ -137,8 +121,8 @@ float TextWidth(const char *utf8, int fontID) {
 
 static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx) {
     OsFileHandle fd; int fontFileSize; fontData[fontInfoIdx] = OS_OpenAndAllocateFileBufferReadonly(path, &fd, &fontFileSize);
-    (void)stbtt_InitFont(&fontInfo[fontInfoIdx], fontData[fontInfoIdx], 0);
-    return (LoadedFont){ .path = xstrdup(path), .data = fontData[fontInfoIdx], .size = fontFileSize, .info = fontInfo[fontInfoIdx] };
+    (void)stbtt_InitFont_internal(&fontInfo[fontInfoIdx], fontData[fontInfoIdx], 0);
+    return (LoadedFont){ .path = (char*)path, .data = fontData[fontInfoIdx], .size = fontFileSize, .info = fontInfo[fontInfoIdx] };
 }
 
 static int GetGlyphAndFont(uint32_t codepoint, stbtt_fontinfo **outFont, uint8_t fontID) {
@@ -171,11 +155,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
 
     const uint8_t *p = map;
     int32_t file_expected = *(int32_t*)p; p += 4;
-    if (file_expected != expected_glyphs) {
-        DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs);
-        OS_DeallocateRAM(map, fontFileSize);
-        return false;
-    }
+    if (file_expected != expected_glyphs) { DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs); OS_DeallocateRAM(map, fontFileSize); return false; }
 
     uint64_t file_stamp_on_disk;
     memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
@@ -183,9 +163,9 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (file_stamp_on_disk != file_stamp) { OS_DeallocateRAM(map, fontFileSize); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
 
     uint32_t actual_packed = *(uint32_t*)p; p += 4;
-    float fixed_advance = *(float*)p; p += 4;
     if (actual_packed > MAX_GLYPHS) { OS_DeallocateRAM(map, fontFileSize); return false; }
 
+    float fixed_advance = *(float*)p;       p += 4;
     memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
     *out_num = (int32_t)actual_packed;
     *out_fixed_advance = fixed_advance;
@@ -193,7 +173,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     glCreateTextures(GL_TEXTURE_2D, 1, out_tex);
     glTextureStorage2D(*out_tex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
     glTextureSubImage2D(*out_tex, 0, 0, 0, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, GL_RED, GL_UNSIGNED_BYTE, p);
-    glFinish();
+    glFinish(); // Ensure transfer finishes prior to dealloc.
     OS_DeallocateRAM(map, fontFileSize);
     glTextureParameteri(*out_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(*out_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -208,8 +188,8 @@ void InitFontAtlasses(void) {
     OsFileHandle fd1; int sz1; fontData[0] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[0], &fd1, &sz1);
     OsFileHandle fd2; int sz2; fontData[1] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[1], &fd2, &sz2);
     if (fd1 == OS_INVALID_HANDLE || fd2 == OS_INVALID_HANDLE || sz1 <= 0 || sz2 <= 0 || fontData[0] == NULL || fontData[1] == NULL) { DualLogError("Could not open fonts\n"); OS_Exit(1); }
-    if (!stbtt_InitFont(&fontInfo[0], fontData[0], 0)) { DualLogError("%s font init failed\n", fontPaths[0]); OS_Exit(1); }
-    if (!stbtt_InitFont(&fontInfo[1], fontData[1], 0)) { DualLogError("%s font init failed\n", fontPaths[1]); OS_Exit(1); }
+    if (!stbtt_InitFont_internal(&fontInfo[0], fontData[0], 0)) { DualLogError("%s font init failed\n", fontPaths[0]); OS_Exit(1); }
+    if (!stbtt_InitFont_internal(&fontInfo[1], fontData[1], 0)) { DualLogError("%s font init failed\n", fontPaths[1]); OS_Exit(1); }
 
     // Check if either the primary font or secondary font .vfnt cache file is out of date prompting an atlas rebuild.
     FileFingerprint fp1, fp2;
@@ -256,7 +236,6 @@ void InitFontAtlasses(void) {
         }
     }
     
-    free(pc.nodes);
     free(pc.pack_info);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTex);
     glTextureStorage2D(fontAtlasTex, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);
@@ -299,7 +278,6 @@ void InitFontAtlasses(void) {
         }
     }
     
-    free(pc2.nodes);
     free(pc2.pack_info);
     glCreateTextures(GL_TEXTURE_2D, 1, &fontAtlasTexStopD);
     glTextureStorage2D(fontAtlasTexStopD, 1, GL_R8, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE);

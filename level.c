@@ -60,16 +60,14 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
     }
     
     endOfModels = loadedInstances - invalidModelIndexCount;
-
-    // Compute offsets
-    uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES;
+    uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES; // Compute offsets
     uint16_t i = 0;
     for (; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsOpaque[i]; }
     startOfDoubleSidedInstances = currentOffset;
     for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsDoubleSided[i]; }
     startOfTransparentInstances = currentOffset;
     for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsTransparent[i]; }
-    if ((startOfTransparentInstances + transparentInstancesHead) > endOfModels) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, loadedInstances - invalidModelIndexCount); OS_Exit(1); }
+    if ((startOfTransparentInstances + transparentInstancesHead) > endOfModels) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, endOfModels); OS_Exit(1); }
 
     Entity* tempInstances = calloc(INSTANCE_COUNT,sizeof(Entity));
     memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
@@ -274,9 +272,7 @@ void LoadLevel(uint8_t curlevel) {
     DebugRAM("start of LoadLevel");
     Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
-    if (curlevel == LEVEL_CYBERSPACE) RenderLoadingProgress(100,"Loading cyberspace...");
-    else RenderLoadingProgress(100,"Loading level...");
-
+    RenderLoadingProgress(100,"Loading level...");
     if (!Sys_Global.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     Sys_Global.levelCurrentlyLoading = true;
     Sys_Global.currentLevel = curlevel;
@@ -591,6 +587,26 @@ void LoadLevel(uint8_t curlevel) {
     }
     
     fclose(file);
+
+    // Add instances for shield generators
+    if (curlevel == 1 || curlevel == 2 || curlevel == 5 || curlevel == 6 || curlevel == 7) {
+        AddInstance(754, instanceIdx);
+        instances[instanceIdx].position = (Vector3){ -51.30664f, -47.42f, 56.42651f };
+        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 45
+        instanceIdx++;
+        AddInstance(754, instanceIdx);
+        instances[instanceIdx].position = (Vector3){ 71.5f, -47.42f, -66.6f };
+        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 45
+        instanceIdx++;
+        AddInstance(754, instanceIdx);
+        instances[instanceIdx].position = (Vector3){ -51.306650f, -47.42f, -66.66652f };
+        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 0 -45
+        instanceIdx++;
+        AddInstance(754, instanceIdx);
+        instances[instanceIdx].position = (Vector3){ 71.78664f, -47.42f, 56.42651f };
+        instances[instanceIdx].rotation = (Quaternion){ 0.0f, 0.0f, 0.0f, 1.0f }; // -90 180 -45
+        instanceIdx++;
+    }
     
     // Set Fog
     switch(curlevel) {
@@ -614,6 +630,7 @@ void LoadLevel(uint8_t curlevel) {
     SetFog();
     DualLog("Loaded %d entities, %u static lights, %u doors for Level %d... took %f secs\n", loadedInstances, loadedLights, numActivePortals, curlevel, get_time() - start_time);
     DebugRAM("end of LoadLevel instances");
+    RenderLoadingProgress(110,"Loading models...");
     LoadModels();
     // Set Physics
     for (int i=0;i<ARRSIZE;++i) { gridCellFloorHeight[i] = -FLT_MAX; gridCellCeilingHeight[i] = FLT_MAX;}
@@ -653,6 +670,7 @@ void LoadLevel(uint8_t curlevel) {
         if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
     }
 
+    RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");

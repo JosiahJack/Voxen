@@ -5303,10 +5303,14 @@ texture: 148
 index: 752
 model: 61
 texture: 149
-
 #npc_sec3_bot
 index: 753
 model: 681
 texture: 553
+#prop_shieldgenerator
+index: 754
+model: 143
+texture: 316
 #player
 index: 767
+

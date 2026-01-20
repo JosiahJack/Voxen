@@ -93,7 +93,7 @@ void LoadModel(uint16_t i, uint16_t animNum, uint16_t numFrames, uint16_t numFra
 
     uint32_t vertexCount = 0, triCount = 0;
     for (uint32_t m = 0; m < scene->mNumMeshes; ++m) { vertexCount += scene->mMeshes[m]->mNumVertices;  triCount += scene->mMeshes[m]->mNumFaces; }
-    if (numFramesRemaining > 0u && numFramesRemaining != numFrames && animNum != UINT16_MAX) { // Parse into animation deltas table for this model, don't treate like a normal model.
+    if (numFramesRemaining > 0u && numFramesRemaining != numFrames && animNum != UINT16_MAX && false) { // Parse into animation deltas table for this model, don't treate like a normal model.
         uint32_t vertexIndex = 0;
         deltaOffsets[animNum] = currentAnimOffsetHead;
         for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
@@ -179,7 +179,7 @@ void LoadModel(uint16_t i, uint16_t animNum, uint16_t numFrames, uint16_t numFra
 }
 
 void LoadVMDL(uint16_t i, uint16_t animNum, uint16_t numFrames, uint16_t numFramesRemaining, float* cached_verts, uint32_t cached_vcnt, uint32_t* cached_idx, uint32_t cached_icnt, void* mmap_map, size_t mmap_size) {
-    if (numFramesRemaining > 0u && numFramesRemaining != numFrames && animNum != UINT16_MAX) { // Parse into animation deltas table for this model, don't treate like a normal model.
+    if (numFramesRemaining > 0u && numFramesRemaining != numFrames && animNum != UINT16_MAX && false) { // Parse into animation deltas table for this model, don't treate like a normal model.
         uint32_t vertexIndex = 0;
         deltaOffsets[animNum] = currentAnimOffsetHead;
         for (uint32_t v = 0; v < cached_vcnt; ++v) { // Identical order expected for all .obj files in animation sequence so this should be safe.

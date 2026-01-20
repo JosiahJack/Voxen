@@ -23,17 +23,7 @@ public class LevelManager : MonoBehaviour {
 	public Transform[] ressurectionLocation;
 	public bool[] ressurectionActive;
 	public Door[] ressurectionBayDoor;
-	public GameObject sky;
-	public GameObject sun;
-	public GameObject sunSprite;
 	public bool superoverride = false;
-	public GameObject saturn;
-	public GameObject exterior;
-	public GameObject exterior_shield;
-	public MeshRenderer skyMR;
-	public bool[] showSkyForLevel;
-	public bool[] showExteriorForLevel;
-	public bool[] showSaturnForLevel;
 	public NPCSubManager[] npcsm;
 	public Level[] levelScripts;
 	public GameObject[] geometryContainers;
@@ -76,7 +66,6 @@ public class LevelManager : MonoBehaviour {
 		if (sky == null) Debug.Log("BUG: LevelManager missing manually assigned reference for sky.");
 		else sky.SetActive(true);
 
-		SetSkyVisible(1);
 		if (ressurectionBayDoor.Length != 8) Debug.Log("BUG: LevelManager ressurectionBayDoor array length not equal to 8.");
 		Time.timeScale = Const.defaultTimeScale;
 		levelDataLoaded = new bool[14];
@@ -147,25 +136,6 @@ public class LevelManager : MonoBehaviour {
 				DynamicObjectsSavestrings[i].Add(readFileList[j]);
 			}
 		}
-	}
-	
-	public void SetSkyVisible(int on) {
-		// 0 = Sunlight only
-		// 1 = Sky + Sun + exterior + saturn
-		// -1 = Nothin much
-		skyMR.enabled = (on > 0 && showSkyForLevel[currentLevel]);
-		saturn.SetActive(on > 0 && showSaturnForLevel[currentLevel]);
-		exterior.SetActive(on > 0 && showExteriorForLevel[currentLevel]);
-		if (on == 1) Debug.Log("SkyVisible passed a 1, sky + sunlight");
-		if (on == 0) Debug.Log("SkyVisible passed a 0, sunlight only");
-		if (on == -1) Debug.Log("SkyVisible passed a -1, nope");
-		sun.SetActive(Const.a.GraphicsShadowMode >= 1 && on >= 0); // on == 0 is for Sunlight only!
-		sunSprite.SetActive(on > 0 && showSaturnForLevel[currentLevel]);
-		if (Const.a == null) return;
-		if (Const.a.questData == null) return;
-		
-		exterior_shield.SetActive(on > 0 && showExteriorForLevel[currentLevel]
-								  && Const.a.questData.ShieldActivated);
 	}
 
 	public void CyborgConversionToggleForCurrentLevel() {
@@ -324,7 +294,6 @@ public class LevelManager : MonoBehaviour {
 		Automap.a.automapBaseImage.overrideSprite = Automap.a.automapsBaseImages[currentLevel];
 		Const.a.ClearActiveAutomapOverlays(); // After other levels turned off.
 		Const.a.ResetPauseLists();
-		SetSkyVisible(1);
 		Config.SetLanguage(); // Update all translatable text.
 		Const.a.ClearPrefabs();
 		System.GC.Collect();
@@ -728,18 +697,6 @@ public class LevelManager : MonoBehaviour {
 
 		DynamicObjectsSavestrings[curlevel].Clear();
 	}
-	
-// 	private Vector2[] GetUVMappedToSubspace(Mesh mesh, Rect uvSpace) {
-// 		UnityEngine.Debug.Log("uvSpace: " + uvSpace.ToString());
-// 		Vector2[] uvsIn = mesh.uv;
-// 		Vector2[] newUVs = new Vector2[uvsIn.Length];			
-// 		for (int u=0;u<uvsIn.Length;u++) {
-// 			newUVs[u].x = (uvsIn[u].x * uvSpace.width) + uvSpace.xMin;
-// 			newUVs[u].y = (uvsIn[u].y * uvSpace.height) + uvSpace.yMin;
-// 		}
-// 		
-// 		return newUVs;
-// 	}
 
 	public void CheatLoadLevel(int ind) {
 		if (ind == 10) {
@@ -751,34 +708,6 @@ public class LevelManager : MonoBehaviour {
 		} else {
 			LoadLevel(ind,ressurectionLocation[ind].position);
 		}
-	}
-
-	public static string Save(GameObject go) {
-		int i=0;
-		LevelManager lvm = go.GetComponent<LevelManager>();
-		s1.Clear();
-		s1.Append(Utils.UintToString(LevelManager.a.currentLevel,"currentLevel"));
-		s1.Append(Utils.splitChar);
-		for (i=0;i<14;i++) { s1.Append(Utils.UintToString(LevelManager.a.levelSecurity[i],"levelSecurity["+i.ToString()+"]")); s1.Append(Utils.splitChar); }
-		for (i=0;i<14;i++) { s1.Append(Utils.UintToString(LevelManager.a.levelCameraDestroyedCount[i],"levelCameraDestroyedCount["+i.ToString()+"]")); s1.Append(Utils.splitChar); }
-		for (i=0;i<14;i++) { s1.Append(Utils.UintToString(LevelManager.a.levelSmallNodeDestroyedCount[i],"levelSmallNodeDestroyedCount["+i.ToString()+"]")); s1.Append(Utils.splitChar); }
-		for (i=0;i<14;i++) { s1.Append(Utils.UintToString(LevelManager.a.levelLargeNodeDestroyedCount[i],"levelLargeNodeDestroyedCount["+i.ToString()+"]")); s1.Append(Utils.splitChar); }
-		for (i=0;i<13;i++) { s1.Append(Utils.BoolToString(LevelManager.a.ressurectionActive[i],"ressurectionActive["+i.ToString()+"]")); s1.Append(Utils.splitChar); }
-		s1.Append(Utils.BoolToString(LevelManager.a.ressurectionActive[13],"ressurectionActive[13]"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		LevelManager lvm = go.GetComponent<LevelManager>();
-		int i = 0;
-		int levelNum = Utils.GetIntFromString(entries[index],"currentLevel"); index++;
-		LevelManager.a.LoadLevelFromSave(levelNum);
-		for (i=0;i<14;i++) { LevelManager.a.levelSecurity[i] = Utils.GetIntFromString(entries[index],"levelSecurity[" + i.ToString() + "]"); index++; }
-		for (i=0;i<14;i++) { LevelManager.a.levelCameraDestroyedCount[i] = Utils.GetIntFromString(entries[index],"levelCameraDestroyedCount[" + i.ToString() + "]"); index++; }
-		for (i=0;i<14;i++) { LevelManager.a.levelSmallNodeDestroyedCount[i] = Utils.GetIntFromString(entries[index],"levelSmallNodeDestroyedCount[" + i.ToString() + "]"); index++; }
-		for (i=0;i<14;i++) { LevelManager.a.levelLargeNodeDestroyedCount[i] = Utils.GetIntFromString(entries[index],"levelLargeNodeDestroyedCount[" + i.ToString() + "]"); index++; }
-		for (i=0;i<14;i++) { LevelManager.a.ressurectionActive[i] = Utils.GetBoolFromString(entries[index],"ressurectionActive[" + i.ToString() + "]"); index++; }
-		return index;
 	}
 	
 	void OnDestroy() {

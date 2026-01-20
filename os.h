@@ -161,7 +161,7 @@ static inline void* OS_AllocateFileBackedRAMReadonly(size_t size, OsFileHandle f
 
 static inline void* OS_OpenAndAllocateFileBufferReadonly(const char* filePath, OsFileHandle* fileDescriptor, int* size) {
     *fileDescriptor = OS_OpenReadonly(filePath);
-    if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; return NULL; }
+    if (*fileDescriptor == OS_INVALID_HANDLE) { *size = 0; return NULL; } // NULL not exit, since this is the path for re-importing instead of using the cache files.
     
     *size = (int)OS_FileSize(*fileDescriptor);
     if (*size <= 0) { DualLogWarn("Warning: File %s is empty, skipping allocation.\n", filePath); OS_Close(*fileDescriptor); return NULL; }
