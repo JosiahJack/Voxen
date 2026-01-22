@@ -1922,28 +1922,28 @@ index: 1128
 index: 1129
 #Models/npc_cyborg_drone_000207.obj
 index: 1130
-#Models/npc_cyborg_drone_000208.obj
-index: 1131
-#Models/npc_cyborg_drone_000209.obj
-index: 1132
-#Models/npc_cyborg_drone_000210.obj
-index: 1133
-#Models/npc_cyborg_drone_000211.obj
-index: 1134
-#Models/npc_cyborg_drone_000212.obj
-index: 1135
-#Models/npc_cyborg_drone_000213.obj
-index: 1136
-#Models/npc_cyborg_drone_000214.obj
-index: 1137
-#Models/npc_cyborg_drone_000215.obj
-index: 1138
-#Models/npc_cyborg_drone_000216.obj
-index: 1139
-#Models/npc_cyborg_drone_000217.obj
-index: 1140
-#Models/npc_cyborg_drone_000218.obj
-index: 1141
+// #Models/npc_cyborg_drone_000208.obj
+// index: 1131
+// #Models/npc_cyborg_drone_000209.obj
+// index: 1132
+// #Models/npc_cyborg_drone_000210.obj
+// index: 1133
+// #Models/npc_cyborg_drone_000211.obj
+// index: 1134
+// #Models/npc_cyborg_drone_000212.obj
+// index: 1135
+// #Models/npc_cyborg_drone_000213.obj
+// index: 1136
+// #Models/npc_cyborg_drone_000214.obj
+// index: 1137
+// #Models/npc_cyborg_drone_000215.obj
+// index: 1138
+// #Models/npc_cyborg_drone_000216.obj
+// index: 1139
+// #Models/npc_cyborg_drone_000217.obj
+// index: 1140
+// #Models/npc_cyborg_drone_000218.obj
+// index: 1141
 #Models/npc_cyborg_drone_000219.obj
 index: 1142
 #Models/npc_cyborg_drone_000220.obj
@@ -1986,30 +1986,30 @@ index: 1160
 index: 1161
 #Models/npc_cyborg_drone_000239.obj
 index: 1162
-#Models/npc_cyborg_drone_000240.obj
-index: 1163
-#Models/npc_cyborg_drone_000241.obj
-index: 1164
-#Models/npc_cyborg_drone_000242.obj
-index: 1165
-#Models/npc_cyborg_drone_000243.obj
-index: 1166
-#Models/npc_cyborg_drone_000244.obj
-index: 1167
-#Models/npc_cyborg_drone_000245.obj
-index: 1168
-#Models/npc_cyborg_drone_000246.obj
-index: 1169
-#Models/npc_cyborg_drone_000247.obj
-index: 1170
-#Models/npc_cyborg_drone_000248.obj
-index: 1171
-#Models/npc_cyborg_drone_000249.obj
-index: 1172
-#Models/npc_cyborg_drone_000250.obj
-index: 1173
-#Models/npc_cyborg_drone_000251.obj
-index: 1174
+// #Models/npc_cyborg_drone_000240.obj
+// index: 1163
+// #Models/npc_cyborg_drone_000241.obj
+// index: 1164
+// #Models/npc_cyborg_drone_000242.obj
+// index: 1165
+// #Models/npc_cyborg_drone_000243.obj
+// index: 1166
+// #Models/npc_cyborg_drone_000244.obj
+// index: 1167
+// #Models/npc_cyborg_drone_000245.obj
+// index: 1168
+// #Models/npc_cyborg_drone_000246.obj
+// index: 1169
+// #Models/npc_cyborg_drone_000247.obj
+// index: 1170
+// #Models/npc_cyborg_drone_000248.obj
+// index: 1171
+// #Models/npc_cyborg_drone_000249.obj
+// index: 1172
+// #Models/npc_cyborg_drone_000250.obj
+// index: 1173
+// #Models/npc_cyborg_drone_000251.obj
+// index: 1174
 #Models/npc_cyborg_drone_000252.obj
 index: 1175
 #Models/npc_cyborg_drone_000253.obj
@@ -2122,32 +2122,32 @@ index: 1228
 index: 1229
 #Models/npc_cyborg_drone_000307.obj
 index: 1230
-#Models/npc_cyborg_drone_000308.obj
-index: 1231
-#Models/npc_cyborg_drone_000309.obj
-index: 1232
-#Models/npc_cyborg_drone_000310.obj
-index: 1233
-#Models/npc_cyborg_drone_000311.obj
-index: 1234
-#Models/npc_cyborg_drone_000312.obj
-index: 1235
-#Models/npc_cyborg_drone_000313.obj
-index: 1236
-#Models/npc_cyborg_drone_000314.obj
-index: 1237
-#Models/npc_cyborg_drone_000315.obj
-index: 1238
-#Models/npc_cyborg_drone_000316.obj
-index: 1239
-#Models/npc_cyborg_drone_000317.obj
-index: 1240
-#Models/npc_cyborg_drone_000318.obj
-index: 1241
-#Models/npc_cyborg_drone_000319.obj
-index: 1242
-#Models/npc_cyborg_drone_000320.obj
-index: 1243
+// #Models/npc_cyborg_drone_000308.obj
+// index: 1231
+// #Models/npc_cyborg_drone_000309.obj
+// index: 1232
+// #Models/npc_cyborg_drone_000310.obj
+// index: 1233
+// #Models/npc_cyborg_drone_000311.obj
+// index: 1234
+// #Models/npc_cyborg_drone_000312.obj
+// index: 1235
+// #Models/npc_cyborg_drone_000313.obj
+// index: 1236
+// #Models/npc_cyborg_drone_000314.obj
+// index: 1237
+// #Models/npc_cyborg_drone_000315.obj
+// index: 1238
+// #Models/npc_cyborg_drone_000316.obj
+// index: 1239
+// #Models/npc_cyborg_drone_000317.obj
+// index: 1240
+// #Models/npc_cyborg_drone_000318.obj
+// index: 1241
+// #Models/npc_cyborg_drone_000319.obj
+// index: 1242
+// #Models/npc_cyborg_drone_000320.obj
+// index: 1243
 #Models/npc_cyborg_drone_000321.obj
 index: 1244
 #Models/npc_cyborg_drone_000322.obj
@@ -2265,6 +2265,9 @@ index: 1300
 
 #Models/door4_000001.obj
 index: 1301
+animated: 1
+animationNum: 4
+frames: 97
 #Models/door4_000002.obj
 index: 1302
 #Models/door4_000003.obj
@@ -2460,6 +2463,9 @@ index: 1397
 
 #Models/door3_000001.obj
 index: 1398
+animated: 1
+animationNum: 5
+frames: 46
 #Models/door3_000002.obj
 index: 1399
 #Models/door3_000003.obj
@@ -2553,6 +2559,9 @@ index: 1443
 
 #Models/xdoor1_000001.obj
 index: 1444
+animated: 1
+animationNum: 6
+frames: 66
 #Models/xdoor1_000002.obj
 index: 1445
 #Models/xdoor1_000003.obj
@@ -2686,6 +2695,9 @@ index: 1509
 
 #Models/xdoor2_000001.obj
 index: 1510
+animated: 1
+animationNum: 7
+frames: 50
 #Models/xdoor2_000002.obj
 index: 1511
 #Models/xdoor2_000003.obj
@@ -2787,6 +2799,9 @@ index: 1559
 
 #Models/door10_000001.obj
 index: 1560
+animated: 1
+animationNum: 8
+frames: 52
 #Models/door10_000002.obj
 index: 1561
 #Models/door10_000003.obj
@@ -2892,6 +2907,9 @@ index: 1611
 
 #Models/door5_000001.obj
 index: 1612
+animated: 1
+animationNum: 9
+frames: 40
 #Models/door5_000002.obj
 index: 1613
 #Models/door5_000003.obj
@@ -2973,6 +2991,9 @@ index: 1651
 
 #Models/door6_000001.obj
 index: 1652
+animated: 1
+animationNum: 10
+frames: 47
 #Models/door6_000002.obj
 index: 1653
 #Models/door6_000003.obj
@@ -3068,6 +3089,9 @@ index: 1698
 
 #Models/door7_000001.obj
 index: 1699
+animated: 1
+animationNum: 11
+frames: 43
 #Models/door7_000002.obj
 index: 1700
 #Models/door7_000003.obj
@@ -3155,6 +3179,9 @@ index: 1741
 
 #Models/door8_000001.obj
 index: 1742
+animated: 1
+animationNum: 12
+frames: 50
 #Models/door8_000002.obj
 index: 1743
 #Models/door8_000003.obj
@@ -3256,6 +3283,9 @@ index: 1791
 
 #Models/door9_000001.obj
 index: 1792
+animated: 1
+animationNum: 13
+frames: 53
 #Models/door9_000002.obj
 index: 1793
 #Models/door9_000003.obj
@@ -3363,6 +3393,9 @@ index: 1844
 
 #Models/door_elevator1_000001.obj
 index: 1845
+animated: 1
+animationNum: 14
+frames: 42
 #Models/door_elevator1_000002.obj
 index: 1846
 #Models/door_elevator1_000003.obj
@@ -3448,6 +3481,9 @@ index: 1886
 
 #Models/door_elevator2_000001.obj
 index: 1887
+animated: 1
+animationNum: 15
+frames: 42
 #Models/door_elevator2_000002.obj
 index: 1888
 #Models/door_elevator2_000003.obj
@@ -3533,6 +3569,9 @@ index: 1928
 
 #Models/door_elevator3_000001.obj
 index: 1929
+animated: 1
+animationNum: 16
+frames: 44
 #Models/door_elevator3_000002.obj
 index: 1930
 #Models/door_elevator3_000003.obj
@@ -3622,6 +3661,9 @@ index: 1972
 
 #Models/door_elevator4_000001.obj
 index: 1973
+animated: 1
+animationNum: 17
+frames: 63
 #Models/door_elevator4_000002.obj
 index: 1974
 #Models/door_elevator4_000003.obj
@@ -3749,6 +3791,9 @@ index: 2035
 
 #Models/door_wall1_000001.obj
 index: 2036
+animated: 1
+animationNum: 18
+frames: 42
 #Models/door_wall1_000002.obj
 index: 2037
 #Models/door_wall1_000003.obj
@@ -3834,6 +3879,9 @@ index: 2077
 
 #Models/door_wall2_000001.obj
 index: 2078
+animated: 1
+animationNum: 19
+frames: 42
 #Models/door_wall2_000002.obj
 index: 2079
 #Models/door_wall2_000003.obj
@@ -3919,6 +3967,9 @@ index: 2119
 
 #Models/door_wall3_000001.obj
 index: 2120
+animated: 1
+animationNum: 20
+frames: 34
 #Models/door_wall3_000002.obj
 index: 2121
 #Models/door_wall3_000003.obj
@@ -3988,6 +4039,9 @@ index: 2153
 
 #Models/eng_wallpump_000001.obj
 index: 2154
+animated: 1
+animationNum: 21
+frames: 47
 #Models/eng_wallpump_000002.obj
 index: 2155
 #Models/eng_wallpump_000003.obj
@@ -4083,6 +4137,9 @@ index: 2200
 
 #Models/flight_fanwall_000001.obj
 index: 2201
+animated: 1
+animationNum: 22
+frames: 50
 #Models/flight_fanwall_000002.obj
 index: 2202
 #Models/flight_fanwall_000003.obj
@@ -4184,6 +4241,9 @@ index: 2250
 
 #Models/npc_bot_cortex_reaver_000001.obj
 index: 2251
+animated: 1
+animationNum: 23
+frames: 106
 #Models/npc_bot_cortex_reaver_000002.obj
 index: 2252
 #Models/npc_bot_cortex_reaver_000003.obj
@@ -4397,6 +4457,9 @@ index: 2356
 
 #Models/npc_cyborgassassin_000001.obj
 index: 2357
+animated: 1
+animationNum: 24
+frames: 279
 #Models/npc_cyborgassassin_000002.obj
 index: 2358
 #Models/npc_cyborgassassin_000003.obj
@@ -4956,6 +5019,9 @@ index: 2635
 
 #Models/npc_cyborg_diego_000001.obj
 index: 2636
+animated: 1
+animationNum: 25
+frames: 434
 #Models/npc_cyborg_diego_000002.obj
 index: 2637
 #Models/npc_cyborg_diego_000003.obj
@@ -5825,6 +5891,9 @@ index: 3069
 
 #Models/npc_cyborg_elite_000001.obj
 index: 3070
+animated: 1
+animationNum: 26
+frames: 450
 #Models/npc_cyborg_elite_000002.obj
 index: 3071
 #Models/npc_cyborg_elite_000003.obj
@@ -6726,6 +6795,9 @@ index: 3519
 
 #Models/npc_cyborg_enforcer_000001.obj
 index: 3520
+animated: 1
+animationNum: 27
+frames: 439
 #Models/npc_cyborg_enforcer_000002.obj
 index: 3521
 #Models/npc_cyborg_enforcer_000003.obj
@@ -7605,6 +7677,9 @@ index: 3958
 
 #Models/npc_cyborgwarrior_000001.obj
 index: 3959
+animated: 1
+animationNum: 28
+frames: 222
 #Models/npc_cyborgwarrior_000002.obj
 index: 3960
 #Models/npc_cyborgwarrior_000003.obj
@@ -8050,6 +8125,9 @@ index: 4180
 
 #Models/npc_execbot_000001.obj
 index: 4181
+animated: 1
+animationNum: 29
+frames: 132
 #Models/npc_execbot_000002.obj
 index: 4182
 #Models/npc_execbot_000003.obj
@@ -8315,6 +8393,9 @@ index: 4312
 
 #Models/npc_flierbot_000001.obj
 index: 4313
+animated: 1
+animationNum: 30
+frames: 122
 #Models/npc_flierbot_000002.obj
 index: 4314
 #Models/npc_flierbot_000003.obj
@@ -8560,6 +8641,9 @@ index: 4434
 
 #Models/npc_gortiger_000001.obj
 index: 4435
+animated: 1
+animationNum: 31
+frames: 180
 #Models/npc_gortiger_000002.obj
 index: 4436
 #Models/npc_gortiger_000003.obj
@@ -8921,6 +9005,9 @@ index: 4614
 
 #Models/npc_hopper_000001.obj
 index: 4615
+animated: 1
+animationNum: 32
+frames: 249
 #Models/npc_hopper_000002.obj
 index: 4616
 #Models/npc_hopper_000003.obj
@@ -9420,6 +9507,9 @@ index: 4863
 
 #Models/npc_invisomut_000001.obj
 index: 4864
+animated: 1
+animationNum: 33
+frames: 103
 #Models/npc_invisomut_000002.obj
 index: 4865
 #Models/npc_invisomut_000003.obj
@@ -9627,6 +9717,9 @@ index: 4966
 
 #Models/npc_maintenancebot_000001.obj
 index: 4967
+animated: 1
+animationNum: 34
+frames: 170
 #Models/npc_maintenancebot_000002.obj
 index: 4968
 #Models/npc_maintenancebot_000003.obj
@@ -9968,6 +10061,9 @@ index: 5136
 
 #Models/npc_mutant_avian_000001.obj
 index: 5137
+animated: 1
+animationNum: 35
+frames: 120
 #Models/npc_mutant_avian_000002.obj
 index: 5138
 #Models/npc_mutant_avian_000003.obj
@@ -10209,6 +10305,9 @@ index: 5256
 
 #Models/npc_plantmutant_000001.obj
 index: 5257
+animated: 1
+animationNum: 36
+frames: 240
 #Models/npc_plantmutant_000002.obj
 index: 5258
 #Models/npc_plantmutant_000003.obj
@@ -10690,6 +10789,9 @@ index: 5496
 
 #Models/npc_repairbot_000001.obj
 index: 5497
+animated: 1
+animationNum: 37
+frames: 149
 #Models/npc_repairbot_000002.obj
 index: 5498
 #Models/npc_repairbot_000003.obj
@@ -10989,6 +11091,9 @@ index: 5645
 
 #Models/npc_sec1bot_000001.obj
 index: 5646
+animated: 1
+animationNum: 38
+frames: 96
 #Models/npc_sec1bot_000002.obj
 index: 5647
 #Models/npc_sec1bot_000003.obj
@@ -11182,6 +11287,9 @@ index: 5741
 
 #Models/npc_sec2bot_000001.obj
 index: 5742
+animated: 1
+animationNum: 39
+frames: 76
 #Models/npc_sec2bot_000002.obj
 index: 5743
 #Models/npc_sec2bot_000003.obj
@@ -11335,6 +11443,9 @@ index: 5817
 
 #Models/npc_servbot_000001.obj
 index: 5818
+animated: 1
+animationNum: 40
+frames: 85
 #Models/npc_servbot_000002.obj
 index: 5819
 #Models/npc_servbot_000003.obj
@@ -11506,6 +11617,9 @@ index: 5902
 
 #Models/npc_virusmutant_000001.obj
 index: 5903
+animated: 1
+animationNum: 41
+frames: 226
 #Models/npc_virusmutant_000002.obj
 index: 5904
 #Models/npc_virusmutant_000003.obj
@@ -11959,6 +12073,9 @@ index: 6128
 
 #Models/npc_zerogmut_000001.obj
 index: 6129
+animated: 1
+animationNum: 42
+frames: 157
 #Models/npc_zerogmut_000002.obj
 index: 6130
 #Models/npc_zerogmut_000003.obj
@@ -12274,6 +12391,9 @@ index: 6285
 
 #Models/puzzlepanel1_000001.obj
 index: 6286
+animated: 1
+animationNum: 43
+frames: 43
 #Models/puzzlepanel1_000002.obj
 index: 6287
 #Models/puzzlepanel1_000003.obj
@@ -12361,6 +12481,9 @@ index: 6328
 
 #Models/puzzlepanel2_000000.obj
 index: 6329
+animated: 1
+animationNum: 44
+frames: 31
 #Models/puzzlepanel2_000001.obj
 index: 6330
 #Models/puzzlepanel2_000002.obj
@@ -12424,6 +12547,9 @@ index: 6359
 
 #Models/puzzlepanel3_000000.obj
 index: 6360
+animated: 1
+animationNum: 45
+frames: 19
 #Models/puzzlepanel3_000001.obj
 index: 6361
 #Models/puzzlepanel3_000002.obj
@@ -12463,6 +12589,9 @@ index: 6378
 
 #Models/sparkingwire_000001.obj
 index: 6379
+animated: 1
+animationNum: 46
+frames: 100
 #Models/sparkingwire_000002.obj
 index: 6380
 #Models/sparkingwire_000003.obj
@@ -12664,6 +12793,9 @@ index: 6478
 
 #Models/switch4_000001.obj
 index: 6479
+animated: 1
+animationNum: 47
+frames: 7
 #Models/switch4_000002.obj
 index: 6480
 #Models/switch4_000003.obj
@@ -12679,6 +12811,9 @@ index: 6485
 
 #Models/switch5_000001.obj
 index: 6486
+animated: 1
+animationNum: 48
+frames: 12
 #Models/switch5_000002.obj
 index: 6487
 #Models/switch5_000003.obj
@@ -12704,6 +12839,9 @@ index: 6497
 
 #Models/v_pipe_000001.obj
 index: 6498
+animated: 1
+animationNum: 49
+frames: 25
 #Models/v_pipe_000002.obj
 index: 6499
 #Models/v_pipe_000003.obj
@@ -12755,6 +12893,9 @@ index: 6522
 
 #Models/v_rapier_000001.obj
 index: 6523
+animated: 1
+animationNum: 50
+frames: 23
 #Models/v_rapier_000002.obj
 index: 6524
 #Models/v_rapier_000003.obj
@@ -12802,6 +12943,9 @@ index: 6545
 
 #Models/npc_mutant_cyborg_000001.obj
 index: 6546
+animated: 1
+animationNum: 51
+frames: 258
 #Models/npc_mutant_cyborg_000002.obj
 index: 6547
 #Models/npc_mutant_cyborg_000003.obj

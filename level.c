@@ -91,36 +91,40 @@ void SortInstances(void) { // Reorder instances such that each type is grouped o
 
 void SetAnimationTables(void) {
     // doorB (door2)
-    modelAnimationClips[0][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 2, .frameEnd = 21, .frameStartModelIndex = 699, .frameEndModelIndex = 718, .speed = 1.0f, .framerate = 24u };
-    modelAnimationClips[0][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2, .frameEnd = 2, .frameStartModelIndex = 699, .frameEndModelIndex = 698, .speed = 1.0f, .framerate = 24u };
-    modelAnimationClips[0][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 11, .frameStartModelIndex = 699, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[0][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2,  .frameEnd = 2,  .frameStartModelIndex = 699, .frameEndModelIndex = 698, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[0][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2,  .frameEnd = 11, .frameStartModelIndex = 699, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[0][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 11, .frameEnd = 11, .frameStartModelIndex = 708, .frameEndModelIndex = 708, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[0][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 12, .frameEnd = 21, .frameStartModelIndex = 709, .frameEndModelIndex = 718, .speed = 1.0f, .framerate = 24u };
     
     // doorA (door1)
-    modelAnimationClips[1][ANIM_LOOP_ALL]    = (AnimationClip){ .frameStart = 2, .frameEnd = 24, .frameStartModelIndex = 719, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
-    modelAnimationClips[1][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2, .frameEnd = 2, .frameStartModelIndex = 719, .frameEndModelIndex = 719, .speed = 1.0f, .framerate = 24u };
-    modelAnimationClips[1][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2, .frameEnd = 12, .frameStartModelIndex = 719, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[1][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 2,  .frameEnd = 2,  .frameStartModelIndex = 719, .frameEndModelIndex = 719, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[1][ANIM_OPENING]     = (AnimationClip){ .frameStart = 2,  .frameEnd = 12, .frameStartModelIndex = 719, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[1][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 12, .frameEnd = 12, .frameStartModelIndex = 729, .frameEndModelIndex = 729, .speed = 1.0f, .framerate = 24u };
     modelAnimationClips[1][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 14, .frameEnd = 24, .frameStartModelIndex = 731, .frameEndModelIndex = 741, .speed = 1.0f, .framerate = 24u };
 
     // npc_humanoid_mutant
-    modelAnimationClips[2][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 0, .frameEnd = 182, .frameStartModelIndex = 742, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_IDLE]     = (AnimationClip){ .frameStart = 0, .frameEnd = 38, .frameStartModelIndex = 742, .frameEndModelIndex = 780, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_WALK] = (AnimationClip){ .frameStart = 49, .frameEnd = 99, .frameStartModelIndex = 791, .frameEndModelIndex = 841, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_RUN] = (AnimationClip){ .frameStart = 49, .frameEnd = 99, .frameStartModelIndex = 791, .frameEndModelIndex = 841, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_ATTACK1] = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_ATTACK2] = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_ATTACK3] = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_PAIN] = (AnimationClip){ .frameStart = 138, .frameEnd = 151, .frameStartModelIndex = 880, .frameEndModelIndex = 893, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_DYING] = (AnimationClip){ .frameStart = 152, .frameEnd = 181, .frameStartModelIndex = 894, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
-    modelAnimationClips[2][ANIM_DEAD] = (AnimationClip){ .frameStart = 181, .frameEnd = 181, .frameStartModelIndex = 923, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_IDLE]     = (AnimationClip){ .frameStart = 0,   .frameEnd = 38,  .frameStartModelIndex = 742, .frameEndModelIndex = 780, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_WALK]     = (AnimationClip){ .frameStart = 49,  .frameEnd = 99,  .frameStartModelIndex = 791, .frameEndModelIndex = 841, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_RUN]      = (AnimationClip){ .frameStart = 49,  .frameEnd = 99,  .frameStartModelIndex = 791, .frameEndModelIndex = 841, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_ATTACK1]  = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_ATTACK2]  = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_ATTACK3]  = (AnimationClip){ .frameStart = 111, .frameEnd = 137, .frameStartModelIndex = 853, .frameEndModelIndex = 879, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_PAIN]     = (AnimationClip){ .frameStart = 138, .frameEnd = 151, .frameStartModelIndex = 880, .frameEndModelIndex = 893, .speed = 1.0f, .framerate = 30u };
+    modelAnimationClips[2][ANIM_DYING]    = (AnimationClip){ .frameStart = 152, .frameEnd = 181, .frameStartModelIndex = 894, .frameEndModelIndex = 923, .speed = 1.0f, .framerate = 30u };
 
     // npc_cyborg_drone
-    modelAnimationClips[3][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 0, .frameEnd = 376, .frameStartModelIndex = 924, .frameEndModelIndex = 1300, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[3][ANIM_IDLE]     = (AnimationClip){ .frameStart = 1,   .frameEnd = 207, .frameStartModelIndex = 924, .frameEndModelIndex = 1142, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[3][ANIM_ATTACK1]  = (AnimationClip){ .frameStart = 219, .frameEnd = 239, .frameStartModelIndex = 1143, .frameEndModelIndex = 1163, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[3][ANIM_WALK]     = (AnimationClip){ .frameStart = 252, .frameEnd = 308, .frameStartModelIndex = 1176, .frameEndModelIndex = 1232, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[3][ANIM_PAIN]     = (AnimationClip){ .frameStart = 321, .frameEnd = 330, .frameStartModelIndex = 1245, .frameEndModelIndex = 1254, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[3][ANIM_PAIN2]    = (AnimationClip){ .frameStart = 331, .frameEnd = 344, .frameStartModelIndex = 1255, .frameEndModelIndex = 1268, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[3][ANIM_DYING]    = (AnimationClip){ .frameStart = 345, .frameEnd = 369, .frameStartModelIndex = 1269, .frameEndModelIndex = 1293, .speed = 1.0f, .framerate = 24u };
 
     // doorD (door4, bulkhead 1)
-    modelAnimationClips[4][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 1, .frameEnd = 97, .frameStartModelIndex = 1301, .frameEndModelIndex = 1397, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[4][ANIM_IDLE_CLOSED] = (AnimationClip){ .frameStart = 1, .frameEnd = 1, .frameStartModelIndex = 1301, .frameEndModelIndex = 1301, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[4][ANIM_OPENING]     = (AnimationClip){ .frameStart = 1, .frameEnd = 44, .frameStartModelIndex = 1301, .frameEndModelIndex = 1344, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[4][ANIM_IDLE_OPEN]   = (AnimationClip){ .frameStart = 44, .frameEnd = 44, .frameStartModelIndex = 1344, .frameEndModelIndex = 1344, .speed = 1.0f, .framerate = 24u };
+    modelAnimationClips[4][ANIM_CLOSING]     = (AnimationClip){ .frameStart = 45, .frameEnd = 97, .frameStartModelIndex = 1345, .frameEndModelIndex = 1397, .speed = 1.0f, .framerate = 24u };
 
     // doorC (door3)
     modelAnimationClips[5][ANIM_LOOP_ALL] = (AnimationClip){ .frameStart = 1, .frameEnd = 46, .frameStartModelIndex = 1398, .frameEndModelIndex = 1443, .speed = 1.0f, .framerate = 24u };

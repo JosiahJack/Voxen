@@ -427,7 +427,6 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SRGB_CAPABLE, 0);
     glfwWindowHint(GLFW_RESIZABLE, 1);
     LoadConfig(); // Get settings before setting window size.
@@ -644,7 +643,7 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
     float offsetY = cursorPosition_y - (Sys_Settings.ScreenHeight * 0.5f);
     float ndcX = offsetX / (Sys_Settings.ScreenWidth * 0.5f);
     float ndcY = -offsetY / (Sys_Settings.ScreenHeight * 0.5f);  // flip Y
-    float tanFov = tanf((float)Sys_Settings.FOV * 0.5f * PI / 180.0f);
+    float tanFov = vtan((float)Sys_Settings.FOV * 0.5f * PI / 180.0f);
     Vector3 view = (Vector3){ ndcX * tanFov * aspect3D, ndcY * tanFov, -1.0f };
     view = normalize_vector3(view);
     Vector3 flipForward = (Vector3){ -forward.x, -forward.y, -forward.z};

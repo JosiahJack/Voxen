@@ -947,20 +947,20 @@ void DualLogError(const char* fmt, ...);
 
 #define ANIM_LOOP_ALL    0
 
-#define ANIM_IDLE_CLOSED 1
-#define ANIM_OPENING     2
-#define ANIM_IDLE_OPEN   3
-#define ANIM_CLOSING     4
+#define ANIM_IDLE_CLOSED 0
+#define ANIM_OPENING     1
+#define ANIM_IDLE_OPEN   2
+#define ANIM_CLOSING     3
 
-#define ANIM_IDLE    1
-#define ANIM_WALK    2
-#define ANIM_RUN     3
-#define ANIM_ATTACK1 4
-#define ANIM_ATTACK2 5
-#define ANIM_ATTACK3 6
-#define ANIM_PAIN    7
+#define ANIM_IDLE    0
+#define ANIM_WALK    1
+#define ANIM_RUN     2
+#define ANIM_ATTACK1 3
+#define ANIM_ATTACK2 4
+#define ANIM_ATTACK3 5
+#define ANIM_PAIN    6
+#define ANIM_PAIN2   7
 #define ANIM_DYING   8
-#define ANIM_DEAD    9
 
 extern GlobalContext Sys_Global;
 extern QuestBits questData;
