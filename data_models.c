@@ -7,16 +7,198 @@ uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 bool modelHasAnimation[MODEL_IDX_MAX] = {0}; // 1kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
 uint16_t loadedModelsMaxIndex = 0;
-AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
-GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
+const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL] = {
+    // speed, frameStart, frameEnd, frameStartModelIndex, frameEndModelIndex, framerate
+    [0] = { // doorB (door2)
+        [ANIM_IDLE_CLOSED] = { 1.0f,  2,  2, 699, 698, 24 },
+        [ANIM_OPENING]     = { 1.0f,  2, 11, 699, 708, 24 },
+        [ANIM_IDLE_OPEN]   = { 1.0f, 11, 11, 708, 708, 24 },
+        [ANIM_CLOSING]     = { 1.0f, 12, 21, 709, 718, 24 }
+    },
+    [1] = { // doorA (door1)
+        [ANIM_IDLE_CLOSED] = { 1.0f, 2,  2,  719, 719, 24 },
+        [ANIM_OPENING]     = { 1.0f, 2,  12, 719, 729, 24 },
+        [ANIM_IDLE_OPEN]   = { 1.0f, 12, 12, 729, 729, 24 },
+        [ANIM_CLOSING]     = { 1.0f, 14, 24, 731, 741, 24 }
+    },
+    [2] = { // npc_humanoid_mutant
+        [ANIM_IDLE]        = { 1.0f,   0,  37, 742, 779, 30 },
+        [ANIM_WALK]        = { 1.0f,  50,  99, 792, 841, 30 },
+        [ANIM_RUN]         = { 1.0f,  50,  99, 792, 841, 30 },
+        [ANIM_ATTACK1]     = { 1.0f, 111, 136, 853, 878, 30 },
+        [ANIM_PAIN]        = { 1.0f, 138, 150, 880, 892, 30 },
+        [ANIM_DYING]       = { 1.0f, 153, 176, 895, 918, 30 }
+    },
+    [3] = { // npc_cyborg_drone
+        [ANIM_IDLE]        = { 1.0f,   1, 207, 924,  1142, 24 },
+        [ANIM_ATTACK1]     = { 1.0f, 219, 239, 1143, 1163, 24 },
+        [ANIM_WALK]        = { 1.0f, 252, 308, 1176, 1232, 24 },
+        [ANIM_PAIN]        = { 1.0f, 321, 330, 1245, 1254, 24 },
+        [ANIM_PAIN2]       = { 1.0f, 331, 344, 1255, 1268, 24 },
+        [ANIM_DYING]       = { 1.0f, 345, 369, 1269, 1293, 24 }
+    },
 
-static void make_vmdl_path(const char *fbx_path, char *out, size_t outsz) {
-    strncpy(out, fbx_path, outsz - 1);
-    out[outsz - 1] = '\0';
-    char *ext = strrchr(out, '.');
-    if (ext && strcmp(ext, ".fbx") == 0) strncpy(ext, ".vmdl", outsz - (size_t)(ext - out) - 1);
-    else if (strlen(out) + 5 < outsz) strcat(out, ".vmdl");
-}
+    // [4] doorD (door4, bulkhead 1)
+    [4] = {
+        [ANIM_IDLE_CLOSED] = { 1.0f,  2,  2, 1302, 1302, 24 },
+        [ANIM_OPENING]     = { 1.0f,  2, 44, 1302, 1344, 24 },
+        [ANIM_IDLE_OPEN]   = { 1.0f, 44, 44, 1344, 1344, 24 },
+        [ANIM_CLOSING]     = { 1.0f, 46, 96, 1346, 1396, 24 }
+    },
+    [5] = { // doorC (door3)
+        [ANIM_IDLE_CLOSED] = { 1.0f,  2,  2, 1399, 1399, 24 },
+        [ANIM_OPENING]     = { 1.0f,  2, 25, 1399, 1422, 24 },
+        [ANIM_IDLE_OPEN]   = { 1.0f, 25, 25, 1422, 1422, 24 },
+        [ANIM_CLOSING]     = { 1.0f, 27, 44, 1424, 1441, 24 }
+    },
+    [6] = { // doorK (xdoor1)
+        [ANIM_IDLE_CLOSED] = { 1.0f,  1,  1, 1444, 1509, 24 },
+        [ANIM_OPENING]     = { 1.0f,  1, 30, 1444, 1474, 24 },
+        [ANIM_IDLE_OPEN]   = { 1.0f, 30, 30, 1474, 1474, 24 },
+        [ANIM_CLOSING]     = { 1.0f, 32, 66, 1474, 1508, 24 }
+    },
+    [7] = { // doorJ (xdoor2)
+        [ANIM_IDLE_CLOSED] = { 1.0f,  3,  3, 1512, 1512, 24 },
+        [ANIM_OPENING]     = { 1.0f,  3, 24, 1512, 1533, 24 },
+        [ANIM_IDLE_OPEN]   = { 1.0f, 30, 30, 1533, 1533, 24 },
+        [ANIM_CLOSING]     = { 1.0f, 27, 49, 1536, 1558, 24 }
+    },
+    [8] = { // doorL (door10)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 52,  1560, 1611, 24 }
+    },
+    [9] = { // doorE (door5)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 40,  1612, 1651, 24 }
+    },
+    [10] = { // doorF (door6)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 47,  1652, 1698, 24 }
+    },
+    [11] = { // doorG (door7)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 43,  1699, 1741, 24 }
+    },
+    [12] = { // doorH (door8)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 50,  1742, 1791, 24 }
+    },
+    [13] = { // doorI (door9)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 53,  1792, 1844, 24 }
+    },
+    [14] = { // door_elevator1
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  1845, 1886, 24 }
+    },
+    [15] = { // door_elevator2
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  1887, 1928, 24 }
+    },
+    [16] = { // door_elevator3
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 44,  1929, 1972, 24 }
+    },
+    [17] = { // door_elevator4
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 63,  1973, 2035, 24 }
+    },
+    [18] = { // door_secret2 (door_wall1)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  2036, 2077, 24 }
+    },
+    [19] = { // door_secret1 (door_wall2)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  2078, 2119, 24 }
+    },
+    [20] = { // door_secret3 (door_wall3)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 34,  2120, 2153, 24 }
+    },
+    [21] = { // chunk_eng2_6 (eng_wallpump)
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 47,  2154, 2200, 24 }
+    },
+    [22] = { // flight_fanwall
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 50,  2201, 2250, 24 }
+    },
+    [23] = { // npc_bot_cortex_reaver
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 105, 2251, 2356, 24 }
+    },
+    [24] = { // npc_cyborgassassin
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 278, 2357, 2635, 24 }
+    },
+    [25] = { // npc_cyborg_diego
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 433, 2636, 3069, 30 }
+    },
+    [26] = { // npc_cyborg_elite
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 449, 3070, 3519, 30 }
+    },
+    [27] = { // npc_cyborg_enforcer
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 438, 3520, 3958, 24 }
+    },
+    [28] = { // npc_cyborgwarrior
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 221, 3959, 4180, 24 }
+    },
+    [29] = { // npc_execbot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 131, 4181, 4312, 24 }
+    },
+    [30] = { // npc_flierbot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 121, 4313, 4434, 24 }
+    },
+    [31] = { // npc_gortiger
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 179, 4435, 4614, 24 }
+    },
+    [32] = { // npc_hopper
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 248, 4615, 4863, 24 }
+    },
+    [33] = { // npc_invisomut
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 102, 4864, 4966, 24 }
+    },
+    [34] = { // npc_maintenancebot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 169, 4967, 5136, 24 }
+    },
+    [35] = { // npc_mutant_avian
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 119, 5137, 5256, 15 }
+    },
+    [36] = { // npc_plantmutant
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 239, 5257, 5496, 24 }
+    },
+    [37] = { // npc_repairbot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 148, 5497, 5645, 24 }
+    },
+    [38] = { // npc_sec1bot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 95,  5646, 5741, 24 }
+    },
+    [39] = { // npc_sec2bot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 75,  5742, 5817, 24 }
+    },
+    [40] = { // npc_servbot
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 84,  5818, 5902, 24 }
+    },
+    [41] = { // npc_virusmutant
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 225, 5903, 6128, 24 }
+    },
+    [42] = { // npc_zerogmut
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 156, 6129, 6285, 24 }
+    },
+    [43] = { // puzzlepanel1
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 43,  6286, 6328, 24 }
+    },
+    [44] = { // puzzlepanel2 (starts at 000000)
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 30,  6329, 6359, 24 }
+    },
+    [45] = { // puzzlepanel3 (starts at 000000)
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 18,  6360, 6378, 24 }
+    },
+    [46] = { // sparkingwire
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 100, 6379, 6478, 24 }
+    },
+    [47] = { // switch4
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 7,   6479, 6485, 24 }
+    },
+    [48] = { // switch5
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 12,  6486, 6497, 24 }
+    },
+    [49] = { // v_pipe
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 25,  6498, 6522, 24 }
+    },
+    [50] = { // v_rapier
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 23,  6523, 6545, 24 }
+    },
+    [51] = { // npc_mutant_cyborg
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 258, 6546, 6803, 24 }
+    }
+};
+
+GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
+struct aiPropertyStore* props;
 
 static bool load_vmdl(const char *vmdl_path, uint64_t fbx_stamp, float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
     OsFileHandle fd; int st_size; uint8_t* map = OS_OpenAndAllocateFileBufferReadonly(vmdl_path, &fd, &st_size);
@@ -61,33 +243,12 @@ static void write_vmdl(const char *vmdl_path, const uint64_t fbx_stamp, const fl
     OS_Close(fd);
 }
 
-typedef struct {
-    void* ptr;
-    size_t size;
-} MMapEntry;
-
+typedef struct { void* ptr; size_t size; } MMapEntry;
 MMapEntry mmap_cleanup[MODEL_IDX_MAX];
 int mmap_cleanup_count = 0;
+void cleanup_all_mmaps(void) { for (int i = 0; i < mmap_cleanup_count; i++) OS_DeallocateRAM(mmap_cleanup[i].ptr, mmap_cleanup[i].size); }
 
-void add_mmap_cleanup(void* ptr, size_t size) {
-    mmap_cleanup[mmap_cleanup_count].ptr = ptr;
-    mmap_cleanup[mmap_cleanup_count].size = size;
-    mmap_cleanup_count++;
-}
-
-void cleanup_all_mmaps(void) {
-    for (int i = 0; i < mmap_cleanup_count; i++) OS_DeallocateRAM(mmap_cleanup[i].ptr, mmap_cleanup[i].size);
-}
-
-uint16_t GetHalfFloatAsU16(float base, float offsetted) { return (uint16_t)(vmax(vmin(((offsetted - base) * 1000.0f) + 32768.0f,65535.0f),0.0f) + 0.5f); } // Scale of 1000 gives ±32.767 units range
-
-// float deltaAnimationBasePositions[MAX_ANIMATED_MODELS][50000 * 3];
-// uint16_t deltaAnimationTables[MAX_ANIMATED_MODELS * 50000 * 3]; // Probably overkill, but maybe not, half are NPCs.
-// uint32_t deltaOffsets[MAX_ANIMATED_MODELS];
-uint32_t currentAnimOffsetHead;
-struct aiPropertyStore* props;
-
-void LoadModel(bool fromCache, uint16_t i, /*uint16_t animNum, uint16_t numFrames, uint16_t numFramesRemaining,*/ const char* fbx_path, const char* vmdl_path, uint64_t fbx_stamp, float* cached_verts, uint32_t cached_vcnt, uint32_t* cached_idx, uint32_t cached_icnt, void* mmap_map, size_t mmap_size) {
+void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmdl_path, uint64_t fbx_stamp, float* cached_verts, uint32_t cached_vcnt, uint32_t* cached_idx, uint32_t cached_icnt, void* mmap_map, size_t mmap_size) {
     const struct aiScene* scene = NULL;
     if (!fromCache) {
         DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
@@ -95,54 +256,16 @@ void LoadModel(bool fromCache, uint16_t i, /*uint16_t animNum, uint16_t numFrame
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); return; }
     } // else use existing .vmdl binary RAM blob (aka a cache hit was successful)
 
-//     if (numFramesRemaining > 0u && numFramesRemaining != numFrames && animNum != UINT16_MAX) { // Parse into animation deltas table for this model, don't treate like a normal model.
-//         uint32_t vertexIndex = 0;
-//         deltaOffsets[animNum] = currentAnimOffsetHead;
-//         if (fromCache) {
-//             if (cached_vcnt > 5000) DualLogWarn("Attempting to load %s with %u verts!\n", vmdl_path, cached_vcnt);
-//             for (uint32_t v = 0; v < cached_vcnt; ++v) { // Identical order expected for all .obj files in animation sequence so this should be safe.
-//                 float x = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 0];
-//                 float y = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 1];
-//                 float z = cached_verts[v*VERTEX_ATTRIBUTES_COUNT + 2];
-//                 deltaAnimationTables[currentAnimOffsetHead + vertexIndex++] = GetHalfFloatAsU16(deltaAnimationBasePositions[animNum][(v * 3) + 0], x);
-//                 deltaAnimationTables[currentAnimOffsetHead + vertexIndex++] = GetHalfFloatAsU16(deltaAnimationBasePositions[animNum][(v * 3) + 1], y);
-//                 deltaAnimationTables[currentAnimOffsetHead + vertexIndex++] = GetHalfFloatAsU16(deltaAnimationBasePositions[animNum][(v * 3) + 2], z);
-//             }
-//             
-//             // Disregard bounds changes from animations, radii are padded in main render loop anyway and it's such a minor thing I'm not going to worry about it.
-//             currentAnimOffsetHead+=cached_vcnt;
-//         } else {
-//             for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
-//                 struct aiMesh *mesh = scene->mMeshes[m];
-//                 for (uint32_t vert = 0; vert < mesh->mNumVertices; ++vert) {
-//                     deltaAnimationTables[currentAnimOffsetHead + vertexIndex++] = GetHalfFloatAsU16(deltaAnimationBasePositions[animNum][(vert * 3) + 0], mesh->mVertices[vert].x);
-//                     deltaAnimationTables[currentAnimOffsetHead + vertexIndex++] = GetHalfFloatAsU16(deltaAnimationBasePositions[animNum][(vert * 3) + 1], mesh->mVertices[vert].y);
-//                     deltaAnimationTables[currentAnimOffsetHead + vertexIndex++] = GetHalfFloatAsU16(deltaAnimationBasePositions[animNum][(vert * 3) + 2], mesh->mVertices[vert].z);
-//                 }
-//                 
-//                 // Disregard bounds changes from animations, radii are padded in main render loop anyway and it's such a minor thing I'm not going to worry about it.
-//                 currentAnimOffsetHead += mesh->mNumVertices;
-//             }
-//             
-//             aiReleaseImport(scene);
-//         }
-//         return;
-//     }
-    
     uint32_t vertexCount = 0, triCount = 0;
-    if (fromCache) {
-        vertexCount = cached_vcnt; triCount = cached_icnt;
-    } else {
-        for (uint32_t m = 0; m < scene->mNumMeshes; ++m) { vertexCount += scene->mMeshes[m]->mNumVertices;  triCount += scene->mMeshes[m]->mNumFaces; }
-    }
+    if (fromCache) { vertexCount = cached_vcnt; triCount = cached_icnt;
+    } else {  for (uint32_t m = 0; m < scene->mNumMeshes; ++m) { vertexCount += scene->mMeshes[m]->mNumVertices;  triCount += scene->mMeshes[m]->mNumFaces; }  }
     
     modelVertexCounts[i]   = vertexCount;
     modelTriangleCounts[i] = triCount;
     modelVertices[i]  = fromCache ? (float*)cached_verts : OS_AllocateRAM(NULL, vertexCount * VERTEX_ATTRIBUTES_COUNT * sizeof(float), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     modelTriangles[i] =  fromCache ? (uint32_t*)cached_idx : OS_AllocateRAM(NULL, triCount * 3 * sizeof(uint32_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     uint32_t vertexIndex = 0, triangleIndex = 0, globalVertexOffset = 0;
-    float minx = 1E9f, miny = 1E9f, minz = 1E9f;
-    float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
+    float minx = 1E9f, miny = 1E9f, minz = 1E9f; float maxx = -1E9f, maxy = -1E9f, maxz = -1E9f;
     if (fromCache) {
         for (uint32_t vert = 0; vert < cached_vcnt; ++vert) {
             float x = cached_verts[(vert * VERTEX_ATTRIBUTES_COUNT) + 0];
@@ -151,53 +274,26 @@ void LoadModel(bool fromCache, uint16_t i, /*uint16_t animNum, uint16_t numFrame
             minx = vmin(minx, x); maxx = vmax(maxx, x);
             miny = vmin(miny, y); maxy = vmax(maxy, y);
             minz = vmin(minz, z); maxz = vmax(maxz, z);
-//             if (numFramesRemaining > 0u && animNum != UINT16_MAX) { // First animation, get base pose
-//                 if (vert > 10000) { DualLogWarn("Animated mesh %s has more than 5000 verts!\n", fbx_path); continue; }
-//                 
-//                 deltaAnimationBasePositions[animNum][(vert * 3) + 0] = x;
-//                 deltaAnimationBasePositions[animNum][(vert * 3) + 1] = y;
-//                 deltaAnimationBasePositions[animNum][(vert * 3) + 2] = z;
-//             }
         }
     } else {
         for (uint32_t m = 0; m < scene->mNumMeshes; ++m) {
             struct aiMesh *mesh = scene->mMeshes[m];
             for (uint32_t vert = 0; vert < mesh->mNumVertices; ++vert) {
-                modelVertices[i][vertexIndex++] = mesh->mVertices[vert].x;
-                modelVertices[i][vertexIndex++] = mesh->mVertices[vert].y;
-                modelVertices[i][vertexIndex++] = mesh->mVertices[vert].z;
-//                 if (numFramesRemaining > 0u && animNum != UINT16_MAX) { // First animation, get base pose
-//                     if (vert > 10000) { DualLogWarn("Animated mesh %s has more than 5000 verts!\n", fbx_path); continue; }
-//                     
-//                     deltaAnimationBasePositions[animNum][(vert * 3) + 0] = mesh->mVertices[vert].x;
-//                     deltaAnimationBasePositions[animNum][(vert * 3) + 1] = mesh->mVertices[vert].y;
-//                     deltaAnimationBasePositions[animNum][(vert * 3) + 2] = mesh->mVertices[vert].z;
-//                 }
-                modelVertices[i][vertexIndex++] = mesh->mNormals[vert].x;
-                modelVertices[i][vertexIndex++] = mesh->mNormals[vert].y;
-                modelVertices[i][vertexIndex++] = mesh->mNormals[vert].z;
+                modelVertices[i][vertexIndex++] = mesh->mVertices[vert].x; modelVertices[i][vertexIndex++] = mesh->mVertices[vert].y; modelVertices[i][vertexIndex++] = mesh->mVertices[vert].z;
+                modelVertices[i][vertexIndex++] = mesh->mNormals[vert].x; modelVertices[i][vertexIndex++] = mesh->mNormals[vert].y;  modelVertices[i][vertexIndex++] = mesh->mNormals[vert].z;
                 float u = (mesh->mTextureCoords[0] && mesh->mNumUVComponents[0] > 0) ? mesh->mTextureCoords[0][vert].x : 0.0f;
                 float v = (mesh->mTextureCoords[0] && mesh->mNumUVComponents[0] > 0) ? mesh->mTextureCoords[0][vert].y : 0.0f;
-                modelVertices[i][vertexIndex++] = u;
-                modelVertices[i][vertexIndex++] = v;
-                minx = vmin(minx, mesh->mVertices[vert].x);
-                maxx = vmax(maxx, mesh->mVertices[vert].x);
-                miny = vmin(miny, mesh->mVertices[vert].y);
-                maxy = vmax(maxy, mesh->mVertices[vert].y);
-                minz = vmin(minz, mesh->mVertices[vert].z);
-                maxz = vmax(maxz, mesh->mVertices[vert].z);
+                modelVertices[i][vertexIndex++] = u; modelVertices[i][vertexIndex++] = v;
+                minx = vmin(minx, mesh->mVertices[vert].x); maxx = vmax(maxx, mesh->mVertices[vert].x);
+                miny = vmin(miny, mesh->mVertices[vert].y); maxy = vmax(maxy, mesh->mVertices[vert].y);
+                minz = vmin(minz, mesh->mVertices[vert].z); maxz = vmax(maxz, mesh->mVertices[vert].z);
             }
 
             for (uint32_t f = 0; f < mesh->mNumFaces; ++f) {
-                struct aiFace *face = &mesh->mFaces[f];
-                if (face->mNumIndices != 3) { DualLogError("Non-tri face in %s\n", fbx_path); continue; }
+                struct aiFace *face = &mesh->mFaces[f]; if (face->mNumIndices != 3) { DualLogError("Non-tri face in %s\n", fbx_path); continue; }
                 
-                uint32_t a = face->mIndices[0] + globalVertexOffset;
-                uint32_t b = face->mIndices[1] + globalVertexOffset;
-                uint32_t c = face->mIndices[2] + globalVertexOffset;
-                modelTriangles[i][triangleIndex++] = a;
-                modelTriangles[i][triangleIndex++] = b;
-                modelTriangles[i][triangleIndex++] = c;
+                uint32_t a = face->mIndices[0] + globalVertexOffset; uint32_t b = face->mIndices[1] + globalVertexOffset; uint32_t c = face->mIndices[2] + globalVertexOffset;
+                modelTriangles[i][triangleIndex++] = a; modelTriangles[i][triangleIndex++] = b; modelTriangles[i][triangleIndex++] = c;
             }
             
             globalVertexOffset += mesh->mNumVertices;
@@ -215,8 +311,7 @@ void LoadModel(bool fromCache, uint16_t i, /*uint16_t animNum, uint16_t numFrame
     r = vmax(r, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
     r = vmax(r, maxx);       r = vmax(r, maxy);       r = vmax(r, maxz);
     modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
-    if (fromCache) {
-        add_mmap_cleanup(mmap_map, mmap_size);  // defer munmap
+    if (fromCache) { mmap_cleanup[mmap_cleanup_count].ptr = mmap_map; mmap_cleanup[mmap_cleanup_count].size = mmap_size; mmap_cleanup_count++;
     } else {
         write_vmdl(vmdl_path, fbx_stamp, modelVertices[i], vertexCount, modelTriangles[i], triCount);
         aiReleaseImport(scene);
@@ -290,14 +385,14 @@ void LoadModels(void) {
         numFrames = model_parser.entries[parserIdx].frames;
         const char *fbx_path = model_parser.entries[parserIdx].path;
         if (modelHasAnimation[i] && numFramesRemaining <= 0u) { 
-            numFramesRemaining = numFrames;
-//             animNum = model_parser.entries[parserIdx].animationNum;
-            animatedModelCount++;
+            numFramesRemaining = numFrames; animatedModelCount++; //DualLog("Loading animated model %s with %u frames\n", fbx_path, numFramesRemaining);
         }
         if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); OS_Exit(1); }
 
-        char vmdl_path[512];
-        make_vmdl_path(fbx_path, vmdl_path, sizeof(vmdl_path));
+        char vmdl_path[256];
+        size_t fbx_path_sz = strlen(fbx_path);
+        strncpy(vmdl_path, fbx_path, fbx_path_sz - 3); // Chop off "fbx" or "obj" and then manually add "vmdl" terminating with \0 within the temp buffer.
+        vmdl_path[fbx_path_sz - 3] = 'v'; vmdl_path[fbx_path_sz - 2] = 'm'; vmdl_path[fbx_path_sz - 1] = 'd'; vmdl_path[fbx_path_sz] = 'l'; vmdl_path[fbx_path_sz + 1] = '\0';
         if (!vmdl_path[0] || strcmp(vmdl_path, ".vmdl") == 0 || vmdl_path[0] == '.') { DualLogError("Invalid vmdl_path for %s: '%s'\n", fbx_path, vmdl_path); OS_Exit(1); }
 
         FileFingerprint fp;
@@ -306,11 +401,8 @@ void LoadModels(void) {
         uint64_t fbx_stamp = OS_GetFilestamp(&fp);
         float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;
         bool cache_hit = load_vmdl(vmdl_path, fbx_stamp, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
-        LoadModel(cache_hit, i, /*animNum, numFramesRemaining, numFrames,*/ fbx_path, vmdl_path, fbx_stamp, cached_verts, cached_vcnt, cached_idx, cached_icnt, mmap_map, mmap_size);        
-        if (numFramesRemaining > 0u) {
-            --numFramesRemaining;
-//             if (numFramesRemaining <= 0u) animNum = UINT16_MAX;
-        }
+        LoadModel(cache_hit, i, fbx_path, vmdl_path, fbx_stamp, cached_verts, cached_vcnt, cached_idx, cached_icnt, mmap_map, mmap_size);        
+        if (numFramesRemaining > 0u) --numFramesRemaining;
     }
 
     DebugRAM("after model load loop");
@@ -331,7 +423,6 @@ void LoadModels(void) {
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
-
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
@@ -346,9 +437,7 @@ void LoadModels(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glFlush();
     glFinish();
-    DualLog(" total vertices: %u, total tris: %u, animated models %u, %u final anim offset, took %f secs\n", totalVertices, totalTris, animatedModelCount, currentAnimOffsetHead, get_time() - start_time);
-//     Sys_Render.modelAnimDeltasID       = SetupSSBO(&Sys_Render.modelAnimDeltasID,        2, currentAnimOffsetHead * 3 * sizeof(uint16_t), deltaAnimationTables, GL_STATIC_DRAW);
-//     Sys_Render.modelAnimDeltaOffsetsID = SetupSSBO(&Sys_Render.modelAnimDeltaOffsetsID,  3, MAX_ANIMATED_MODELS * sizeof(uint32_t), deltaOffsets, GL_STATIC_DRAW);
+    DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
     cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
     DebugRAM("After Load Models");
 }

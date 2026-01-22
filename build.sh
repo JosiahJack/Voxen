@@ -184,10 +184,10 @@ total_build_time=$((build_end - shader_start))
 echo "Build completed in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  strip --strip-all voxen.exe; upx --lzma ./voxen.exe; wine ./voxen.exe ;;   # or wine voxen.exe if testing on linux
+        windows)  strip --strip-all voxen.exe; upx --best --lzma ./voxen.exe; wine ./voxen.exe ;;   # or wine voxen.exe if testing on linux
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
-        *)        strip --strip-all voxen; upx --lzma ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all voxen; upx --best --lzma ./voxen; ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.
 fi

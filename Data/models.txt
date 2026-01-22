@@ -1141,7 +1141,7 @@ index: 741
 index: 742
 animated: 1
 animationNum: 2
-frames: 182
+frames: 151
 #Models/npc_humanoidmutant_000001.obj
 index: 743
 #Models/npc_humanoidmutant_000002.obj
@@ -1216,30 +1216,30 @@ index: 777
 index: 778
 #Models/npc_humanoidmutant_000037.obj
 index: 779
-#Models/npc_humanoidmutant_000038.obj
-index: 780
-#Models/npc_humanoidmutant_000039.obj
-index: 781
-#Models/npc_humanoidmutant_000040.obj
-index: 782
-#Models/npc_humanoidmutant_000041.obj
-index: 783
-#Models/npc_humanoidmutant_000042.obj
-index: 784
-#Models/npc_humanoidmutant_000043.obj
-index: 785
-#Models/npc_humanoidmutant_000044.obj
-index: 786
-#Models/npc_humanoidmutant_000045.obj
-index: 787
-#Models/npc_humanoidmutant_000046.obj
-index: 788
-#Models/npc_humanoidmutant_000047.obj
-index: 789
-#Models/npc_humanoidmutant_000048.obj
-index: 790
-#Models/npc_humanoidmutant_000049.obj
-index: 791
+// #Models/npc_humanoidmutant_000038.obj
+// index: 780
+// #Models/npc_humanoidmutant_000039.obj
+// index: 781
+// #Models/npc_humanoidmutant_000040.obj
+// index: 782
+// #Models/npc_humanoidmutant_000041.obj
+// index: 783
+// #Models/npc_humanoidmutant_000042.obj
+// index: 784
+// #Models/npc_humanoidmutant_000043.obj
+// index: 785
+// #Models/npc_humanoidmutant_000044.obj
+// index: 786
+// #Models/npc_humanoidmutant_000045.obj
+// index: 787
+// #Models/npc_humanoidmutant_000046.obj
+// index: 788
+// #Models/npc_humanoidmutant_000047.obj
+// index: 789
+// #Models/npc_humanoidmutant_000048.obj
+// index: 790
+// #Models/npc_humanoidmutant_000049.obj
+// index: 791
 #Models/npc_humanoidmutant_000050.obj
 index: 792
 #Models/npc_humanoidmutant_000051.obj
@@ -1340,28 +1340,28 @@ index: 839
 index: 840
 #Models/npc_humanoidmutant_000099.obj
 index: 841
-#Models/npc_humanoidmutant_000100.obj
-index: 842
-#Models/npc_humanoidmutant_000101.obj
-index: 843
-#Models/npc_humanoidmutant_000102.obj
-index: 844
-#Models/npc_humanoidmutant_000103.obj
-index: 845
-#Models/npc_humanoidmutant_000104.obj
-index: 846
-#Models/npc_humanoidmutant_000105.obj
-index: 847
-#Models/npc_humanoidmutant_000106.obj
-index: 848
-#Models/npc_humanoidmutant_000107.obj
-index: 849
-#Models/npc_humanoidmutant_000108.obj
-index: 850
-#Models/npc_humanoidmutant_000109.obj
-index: 851
-#Models/npc_humanoidmutant_000110.obj
-index: 852
+// #Models/npc_humanoidmutant_000100.obj
+// index: 842
+// #Models/npc_humanoidmutant_000101.obj
+// index: 843
+// #Models/npc_humanoidmutant_000102.obj
+// index: 844
+// #Models/npc_humanoidmutant_000103.obj
+// index: 845
+// #Models/npc_humanoidmutant_000104.obj
+// index: 846
+// #Models/npc_humanoidmutant_000105.obj
+// index: 847
+// #Models/npc_humanoidmutant_000106.obj
+// index: 848
+// #Models/npc_humanoidmutant_000107.obj
+// index: 849
+// #Models/npc_humanoidmutant_000108.obj
+// index: 850
+// #Models/npc_humanoidmutant_000109.obj
+// index: 851
+// #Models/npc_humanoidmutant_000110.obj
+// index: 852
 #Models/npc_humanoidmutant_000111.obj
 index: 853
 #Models/npc_humanoidmutant_000112.obj
@@ -1414,8 +1414,8 @@ index: 876
 index: 877
 #Models/npc_humanoidmutant_000136.obj
 index: 878
-#Models/npc_humanoidmutant_000137.obj
-index: 879
+// #Models/npc_humanoidmutant_000137.obj
+// index: 879
 #Models/npc_humanoidmutant_000138.obj
 index: 880
 #Models/npc_humanoidmutant_000139.obj
@@ -1442,10 +1442,10 @@ index: 890
 index: 891
 #Models/npc_humanoidmutant_000150.obj
 index: 892
-#Models/npc_humanoidmutant_000151.obj
-index: 893
-#Models/npc_humanoidmutant_000152.obj
-index: 894
+// #Models/npc_humanoidmutant_000151.obj
+// index: 893
+// #Models/npc_humanoidmutant_000152.obj
+// index: 894
 #Models/npc_humanoidmutant_000153.obj
 index: 895
 #Models/npc_humanoidmutant_000154.obj
@@ -1494,22 +1494,22 @@ index: 916
 index: 917
 #Models/npc_humanoidmutant_000176.obj
 index: 918
-#Models/npc_humanoidmutant_000177.obj
-index: 919
-#Models/npc_humanoidmutant_000178.obj
-index: 920
-#Models/npc_humanoidmutant_000179.obj
-index: 921
-#Models/npc_humanoidmutant_000180.obj
-index: 922
-#Models/npc_humanoidmutant_000181.obj
-index: 923
+// #Models/npc_humanoidmutant_000177.obj
+// index: 919
+// #Models/npc_humanoidmutant_000178.obj
+// index: 920
+// #Models/npc_humanoidmutant_000179.obj
+// index: 921
+// #Models/npc_humanoidmutant_000180.obj
+// index: 922
+// #Models/npc_humanoidmutant_000181.obj
+// index: 923
 
 #Models/npc_cyborg_drone_000001.obj
 index: 924
 animated: 1
 animationNum: 3
-frames: 377
+frames: 341
 #Models/npc_cyborg_drone_000002.obj
 index: 925
 #Models/npc_cyborg_drone_000003.obj
@@ -2263,13 +2263,13 @@ index: 1299
 #Models/npc_cyborg_drone_000377.obj
 index: 1300
 
-#Models/door4_000001.obj
-index: 1301
-animated: 1
-animationNum: 4
-frames: 97
+// #Models/door4_000001.obj
+// index: 1301
 #Models/door4_000002.obj
 index: 1302
+animated: 1
+animationNum: 4
+frames: 94
 #Models/door4_000003.obj
 index: 1303
 #Models/door4_000004.obj
@@ -2354,8 +2354,8 @@ index: 1342
 index: 1343
 #Models/door4_000044.obj
 index: 1344
-#Models/door4_000045.obj
-index: 1345
+// #Models/door4_000045.obj
+// index: 1345
 #Models/door4_000046.obj
 index: 1346
 #Models/door4_000047.obj
@@ -2458,16 +2458,16 @@ index: 1394
 index: 1395
 #Models/door4_000096.obj
 index: 1396
-#Models/door4_000097.obj
-index: 1397
+// #Models/door4_000097.obj
+// index: 1397
 
-#Models/door3_000001.obj
-index: 1398
-animated: 1
-animationNum: 5
-frames: 46
+// #Models/door3_000001.obj
+// index: 1398
 #Models/door3_000002.obj
 index: 1399
+animated: 1
+animationNum: 5
+frames: 42
 #Models/door3_000003.obj
 index: 1400
 #Models/door3_000004.obj
@@ -2514,8 +2514,8 @@ index: 1420
 index: 1421
 #Models/door3_000025.obj
 index: 1422
-#Models/door3_000026.obj
-index: 1423
+// #Models/door3_000026.obj
+// index: 1423
 #Models/door3_000027.obj
 index: 1424
 #Models/door3_000028.obj
@@ -2552,10 +2552,10 @@ index: 1439
 index: 1440
 #Models/door3_000044.obj
 index: 1441
-#Models/door3_000045.obj
-index: 1442
-#Models/door3_000046.obj
-index: 1443
+// #Models/door3_000045.obj
+// index: 1442
+// #Models/door3_000046.obj
+// index: 1443
 
 #Models/xdoor1_000001.obj
 index: 1444
@@ -2693,15 +2693,15 @@ index: 1508
 #Models/xdoor1_000066.obj
 index: 1509
 
-#Models/xdoor2_000001.obj
-index: 1510
-animated: 1
-animationNum: 7
-frames: 50
-#Models/xdoor2_000002.obj
-index: 1511
+// #Models/xdoor2_000001.obj
+// index: 1510
+// #Models/xdoor2_000002.obj
+// index: 1511
 #Models/xdoor2_000003.obj
 index: 1512
+animated: 1
+animationNum: 7
+frames: 45
 #Models/xdoor2_000004.obj
 index: 1513
 #Models/xdoor2_000005.obj
@@ -2744,10 +2744,10 @@ index: 1531
 index: 1532
 #Models/xdoor2_000024.obj
 index: 1533
-#Models/xdoor2_000025.obj
-index: 1534
-#Models/xdoor2_000026.obj
-index: 1535
+// #Models/xdoor2_000025.obj
+// index: 1534
+// #Models/xdoor2_000026.obj
+// index: 1535
 #Models/xdoor2_000027.obj
 index: 1536
 #Models/xdoor2_000028.obj
@@ -2794,8 +2794,8 @@ index: 1556
 index: 1557
 #Models/xdoor2_000049.obj
 index: 1558
-#Models/xdoor2_000050.obj
-index: 1559
+// #Models/xdoor2_000050.obj
+// index: 1559
 
 #Models/door10_000001.obj
 index: 1560

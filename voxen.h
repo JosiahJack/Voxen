@@ -95,11 +95,7 @@ typedef struct {
 	uint8_t SSR_RES;
 } SettingsSystem;
 
-typedef struct {
-    bool down;
-    bool pressed;
-    bool released;
-} KeyState;
+typedef struct { bool down; bool pressed; bool released; } KeyState;
 
 #define MAX_KEYS 512
 #define MAX_MOUSE_BUTTONS 8
@@ -193,20 +189,8 @@ typedef struct {
     uint8_t type;
 } Event;
 
-typedef struct {
-    Vector3 mins;
-    Vector3 maxs;
-    uint8_t type;
-} Trigger;
-
-typedef struct {
-	Vector3 normal;
-    float d;
-} FrustumPlane;
-
-typedef struct {
-	uint16_t x,z;
-} PortalCell;
+typedef struct { Vector3 normal; float d; } FrustumPlane;
+typedef struct { uint16_t x,z; } PortalCell;
 
 typedef struct {
     PortalCell cellA;    // one side (usually the cell the door happened to just barely floating point rounding error start in)
@@ -216,14 +200,7 @@ typedef struct {
     bool     dirty;
 } Portal;
 
-typedef struct {
-	float speed;
-	uint16_t frameStart;
-	uint16_t frameEnd;
-	uint16_t frameStartModelIndex;
-	uint16_t frameEndModelIndex;
-	uint8_t framerate;
-} AnimationClip;
+typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint16_t frameEndModelIndex; uint8_t framerate; } AnimationClip;
 
 typedef struct {
     Vector3 point;
@@ -1013,7 +990,7 @@ extern uint32_t modelTriangleCounts[MODEL_IDX_MAX];
 extern bool modelHasAnimation[MODEL_IDX_MAX];
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
-extern AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
+extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
 void LoadModels(void);
 bool InstanceIsNonRenderable(uint16_t i);
 
