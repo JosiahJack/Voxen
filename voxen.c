@@ -1208,6 +1208,7 @@ static void UpdateVoxelsAndInstances(void) {
     if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
 
+#define ARG_IS(s, l) (argc >= 2 && (strcmp(argv[1], s) == 0 || strcmp(argv[1], l) == 0))
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
@@ -1216,28 +1217,14 @@ int32_t main(int32_t argc, char* argv[]) {
     #ifdef WINDOWS
         SetDllDirectory("External\\Windows");
     #endif
-    if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { DualLog("-----------------------------------------------------------\n%s\nby W. Josiah Jack\nMIT-0 licensed\n", EngineName); return 0; }
-    if ((argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))) {
-        DualLog("%s\n-------------------------------------------------------------\n", EngineName);
-        DualLog("   This is a game engine designed for optimized focused usage\n");
-        DualLog("   of OpenGL, making heavy use of GPU Driven rendering\n");
-        DualLog("   techniques, a unified event system for debugging and log\n");
-        DualLog("   playback, full mod support loading all data from external\n");
-        DualLog("   files and using definition files for what to do with the\n");
-        DualLog("   data.\n\n");
-        DualLog("   This project aims to have minimal overhead, profiling,\n");
-        DualLog("   traceability, robustness, and low level control.\n\n\n");
-        DualLog("Valid arguments:\n");
-        DualLog(" < none >\n    Runs the engine as normal, loading data from \n    neighbor directories (./Textures, ./Models, etc.)\n\n");
-        DualLog("-v, --version\n    Prints version information\n\n");
-        DualLog("play <file>\n    Plays back recorded log from current directory\n\n");
-        DualLog("record <file>\n    Records all engine events to designated log\n    as a .dem file\n\n");
-        DualLog("dump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n    file name with extension\n\n");
-        DualLog("-h, --help\n    Provides this help text.  Neat!\n-----------------------------------------------------------\n");
-        return 0;
-    }
-
-    if (argc == 3 && strcmp(argv[1], "dump") == 0) { DualLog("Converting log to plaintext: %s ...", argv[2]); JournalDump(argv[2]); DualLog("DONE!\n"); return 0; }
+    if (ARG_IS("-v", "--version")) { DualLog("-----------------------------------------------------------\n%s\nby W. Josiah Jack\nMIT-0 licensed\n", EngineName); OS_Exit(0); }
+    if (ARG_IS("-h", "--help")) { DualLog("%s\n-------------------------------------------------------------\n   This is a game engine designed for optimized focused usage\n   of OpenGL, making heavy use of GPU Driven rendering\n"
+                                          "   techniques, a unified event system for debugging and log\n   playback, full mod support loading all data from external\n   files and using definition files for what to do with the\n   data.\n\n"
+                                          "   This project aims to have minimal overhead, profiling,\n   traceability, robustness, and low level control.\n\n\nValid arguments:\n < none >\n    Runs the engine as normal, loading data from \n"
+                                          "    neighbor directories (./Textures, ./Models, etc.)\n\n-v, --version\n    Prints version information\n\nplay <file>\n    Plays back recorded log from current directory\n\nrecord <file>\n"
+                                          "    Records all engine events to designated log\n    as a .dem file\n\ndump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n"
+                                          "    file name with extension\n\n-h, --help\n    Provides this help text.  Neat!\n-----------------------------------------------------------\n", EngineName); OS_Exit(0); }
+    if (argc == 3 && strcmp(argv[1], "dump") == 0) { DualLog("Converting log to plaintext: %s ...", argv[2]); JournalDump(argv[2]); DualLog("DONE!\n"); OS_Exit(0); }
 
     InitializeEnvironment(argc,argv[1],argv[2]);
     DebugRAM("prior to game loop");
@@ -1256,7 +1243,7 @@ int32_t main(int32_t argc, char* argv[]) {
     
         // Update Events, calls Physics()
         glfwPollEvents();
-        ProcessInput(); // Calls ApplyPlayerMovements()
+        ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
         InputClearRisingAndFallingEdges();        
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
@@ -1273,7 +1260,6 @@ int32_t main(int32_t argc, char* argv[]) {
         }
 
         if (EventQueueProcess()) OS_Exit(1); // Do everything
-            
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) { // Update Gameplay
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
