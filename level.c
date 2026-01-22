@@ -506,8 +506,6 @@ void LoadLevel(uint8_t curlevel) {
         lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
         lightInPVS[i] = false;
     }
-    memset(voxelLightLists, 0, VOXEL_COUNT * 24 * sizeof(uint32_t));
-    memset(voxelLightListCounts,0, VOXEL_COUNT * sizeof(uint32_t));
     memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
     DualLog("LoadLevel completed!\n");

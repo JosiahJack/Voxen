@@ -1226,8 +1226,6 @@ void SetFog(void);
 extern bool lightDirty[LIGHT_COUNT];
 #define VOXEL_COUNT 262144 // 64 * 64 * 8 * 8
 #define VOXEL_LIGHT_IDX_CLEAR_VALUE 0xFFFFFFFFu
-extern uint32_t voxelLightLists[VOXEL_COUNT * 24];
-extern uint32_t voxelLightListCounts[VOXEL_COUNT];
 #define CURSOR_SCREEN_PERCENTAGE 0.02f
 extern int32_t cursorPosition_x, cursorPosition_y;
 extern float cam_yaw, cam_pitch, cam_roll;

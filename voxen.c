@@ -129,11 +129,8 @@ Quaternion cubemapOrientationQuaternion[6] = {
     {0.0f, 1.0f, 0.0f, 0.0f}                   // -Z: Backward
 };
 
-uint32_t voxelLightLists[VOXEL_COUNT * 24];
-uint32_t voxelLightListCounts[VOXEL_COUNT];
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
-
 bool UpdateLights(bool* voxelsNeedUpdated) {
     if (Sys_Global.gamePaused || Sys_Global.menuActive) return false;
     
@@ -1216,6 +1213,9 @@ int32_t main(int32_t argc, char* argv[]) {
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
     OpenConsoleLogFile();
     DebugRAM("program start");
+    #ifdef WINDOWS
+        SetDllDirectory("External\\Windows");
+    #endif
     if (argc >= 2 && (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0)) { DualLog("-----------------------------------------------------------\n%s\nby W. Josiah Jack\nMIT-0 licensed\n", EngineName); return 0; }
     if ((argc >= 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))) {
         DualLog("%s\n-------------------------------------------------------------\n", EngineName);
