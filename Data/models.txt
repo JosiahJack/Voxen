@@ -1047,7 +1047,6 @@ index: 697
 index: 699
 animated: 1
 animationNum: 0
-frames: 20
 #Models/door2_000003.obj
 index: 700
 #Models/door2_000004.obj
@@ -1091,7 +1090,6 @@ index: 718
 index: 719
 animated: 1
 animationNum: 1
-frames: 23
 #Models/door1_000003.obj
 index: 720
 #Models/door1_000004.obj
@@ -1141,7 +1139,6 @@ index: 741
 index: 742
 animated: 1
 animationNum: 2
-frames: 151
 #Models/npc_humanoidmutant_000001.obj
 index: 743
 #Models/npc_humanoidmutant_000002.obj
@@ -1216,3034 +1213,2743 @@ index: 777
 index: 778
 #Models/npc_humanoidmutant_000037.obj
 index: 779
-// #Models/npc_humanoidmutant_000038.obj
-// index: 780
-// #Models/npc_humanoidmutant_000039.obj
-// index: 781
-// #Models/npc_humanoidmutant_000040.obj
-// index: 782
-// #Models/npc_humanoidmutant_000041.obj
-// index: 783
-// #Models/npc_humanoidmutant_000042.obj
-// index: 784
-// #Models/npc_humanoidmutant_000043.obj
-// index: 785
-// #Models/npc_humanoidmutant_000044.obj
-// index: 786
-// #Models/npc_humanoidmutant_000045.obj
-// index: 787
-// #Models/npc_humanoidmutant_000046.obj
-// index: 788
-// #Models/npc_humanoidmutant_000047.obj
-// index: 789
-// #Models/npc_humanoidmutant_000048.obj
-// index: 790
-// #Models/npc_humanoidmutant_000049.obj
-// index: 791
 #Models/npc_humanoidmutant_000050.obj
-index: 792
+index: 780
 #Models/npc_humanoidmutant_000051.obj
-index: 793
+index: 781
 #Models/npc_humanoidmutant_000052.obj
-index: 794
+index: 782
 #Models/npc_humanoidmutant_000053.obj
-index: 795
+index: 783
 #Models/npc_humanoidmutant_000054.obj
-index: 796
+index: 784
 #Models/npc_humanoidmutant_000055.obj
-index: 797
+index: 785
 #Models/npc_humanoidmutant_000056.obj
-index: 798
+index: 786
 #Models/npc_humanoidmutant_000057.obj
-index: 799
+index: 787
 #Models/npc_humanoidmutant_000058.obj
-index: 800
+index: 788
 #Models/npc_humanoidmutant_000059.obj
-index: 801
+index: 789
 #Models/npc_humanoidmutant_000060.obj
-index: 802
+index: 790
 #Models/npc_humanoidmutant_000061.obj
-index: 803
+index: 791
 #Models/npc_humanoidmutant_000062.obj
-index: 804
+index: 792
 #Models/npc_humanoidmutant_000063.obj
-index: 805
+index: 793
 #Models/npc_humanoidmutant_000064.obj
-index: 806
+index: 794
 #Models/npc_humanoidmutant_000065.obj
-index: 807
+index: 795
 #Models/npc_humanoidmutant_000066.obj
-index: 808
+index: 796
 #Models/npc_humanoidmutant_000067.obj
-index: 809
+index: 797
 #Models/npc_humanoidmutant_000068.obj
-index: 810
+index: 798
 #Models/npc_humanoidmutant_000069.obj
-index: 811
+index: 799
 #Models/npc_humanoidmutant_000070.obj
-index: 812
+index: 800
 #Models/npc_humanoidmutant_000071.obj
-index: 813
+index: 801
 #Models/npc_humanoidmutant_000072.obj
-index: 814
+index: 802
 #Models/npc_humanoidmutant_000073.obj
-index: 815
+index: 803
 #Models/npc_humanoidmutant_000074.obj
-index: 816
+index: 804
 #Models/npc_humanoidmutant_000075.obj
-index: 817
+index: 805
 #Models/npc_humanoidmutant_000076.obj
-index: 818
+index: 806
 #Models/npc_humanoidmutant_000077.obj
-index: 819
+index: 807
 #Models/npc_humanoidmutant_000078.obj
-index: 820
+index: 808
 #Models/npc_humanoidmutant_000079.obj
-index: 821
+index: 809
 #Models/npc_humanoidmutant_000080.obj
-index: 822
+index: 810
 #Models/npc_humanoidmutant_000081.obj
-index: 823
+index: 811
 #Models/npc_humanoidmutant_000082.obj
-index: 824
+index: 812
 #Models/npc_humanoidmutant_000083.obj
-index: 825
+index: 813
 #Models/npc_humanoidmutant_000084.obj
-index: 826
+index: 814
 #Models/npc_humanoidmutant_000085.obj
-index: 827
+index: 815
 #Models/npc_humanoidmutant_000086.obj
-index: 828
+index: 816
 #Models/npc_humanoidmutant_000087.obj
-index: 829
+index: 817
 #Models/npc_humanoidmutant_000088.obj
-index: 830
+index: 818
 #Models/npc_humanoidmutant_000089.obj
-index: 831
+index: 819
 #Models/npc_humanoidmutant_000090.obj
-index: 832
+index: 820
 #Models/npc_humanoidmutant_000091.obj
-index: 833
+index: 821
 #Models/npc_humanoidmutant_000092.obj
-index: 834
+index: 822
 #Models/npc_humanoidmutant_000093.obj
-index: 835
+index: 823
 #Models/npc_humanoidmutant_000094.obj
-index: 836
+index: 824
 #Models/npc_humanoidmutant_000095.obj
-index: 837
+index: 825
 #Models/npc_humanoidmutant_000096.obj
-index: 838
+index: 826
 #Models/npc_humanoidmutant_000097.obj
-index: 839
+index: 827
 #Models/npc_humanoidmutant_000098.obj
-index: 840
+index: 828
 #Models/npc_humanoidmutant_000099.obj
-index: 841
-// #Models/npc_humanoidmutant_000100.obj
-// index: 842
-// #Models/npc_humanoidmutant_000101.obj
-// index: 843
-// #Models/npc_humanoidmutant_000102.obj
-// index: 844
-// #Models/npc_humanoidmutant_000103.obj
-// index: 845
-// #Models/npc_humanoidmutant_000104.obj
-// index: 846
-// #Models/npc_humanoidmutant_000105.obj
-// index: 847
-// #Models/npc_humanoidmutant_000106.obj
-// index: 848
-// #Models/npc_humanoidmutant_000107.obj
-// index: 849
-// #Models/npc_humanoidmutant_000108.obj
-// index: 850
-// #Models/npc_humanoidmutant_000109.obj
-// index: 851
-// #Models/npc_humanoidmutant_000110.obj
-// index: 852
+index: 829
 #Models/npc_humanoidmutant_000111.obj
-index: 853
+index: 830
 #Models/npc_humanoidmutant_000112.obj
-index: 854
+index: 831
 #Models/npc_humanoidmutant_000113.obj
-index: 855
+index: 832
 #Models/npc_humanoidmutant_000114.obj
-index: 856
+index: 833
 #Models/npc_humanoidmutant_000115.obj
-index: 857
+index: 834
 #Models/npc_humanoidmutant_000116.obj
-index: 858
+index: 835
 #Models/npc_humanoidmutant_000117.obj
-index: 859
+index: 836
 #Models/npc_humanoidmutant_000118.obj
-index: 860
+index: 837
 #Models/npc_humanoidmutant_000119.obj
-index: 861
+index: 838
 #Models/npc_humanoidmutant_000120.obj
-index: 862
+index: 839
 #Models/npc_humanoidmutant_000121.obj
-index: 863
+index: 840
 #Models/npc_humanoidmutant_000122.obj
-index: 864
+index: 841
 #Models/npc_humanoidmutant_000123.obj
-index: 865
+index: 842
 #Models/npc_humanoidmutant_000124.obj
-index: 866
+index: 843
 #Models/npc_humanoidmutant_000125.obj
-index: 867
+index: 844
 #Models/npc_humanoidmutant_000126.obj
-index: 868
+index: 845
 #Models/npc_humanoidmutant_000127.obj
-index: 869
+index: 846
 #Models/npc_humanoidmutant_000128.obj
-index: 870
+index: 847
 #Models/npc_humanoidmutant_000129.obj
-index: 871
+index: 848
 #Models/npc_humanoidmutant_000130.obj
-index: 872
+index: 849
 #Models/npc_humanoidmutant_000131.obj
-index: 873
+index: 850
 #Models/npc_humanoidmutant_000132.obj
-index: 874
+index: 851
 #Models/npc_humanoidmutant_000133.obj
-index: 875
+index: 852
 #Models/npc_humanoidmutant_000134.obj
-index: 876
+index: 853
 #Models/npc_humanoidmutant_000135.obj
-index: 877
+index: 854
 #Models/npc_humanoidmutant_000136.obj
-index: 878
-// #Models/npc_humanoidmutant_000137.obj
-// index: 879
+index: 855
 #Models/npc_humanoidmutant_000138.obj
-index: 880
+index: 856
 #Models/npc_humanoidmutant_000139.obj
-index: 881
+index: 857
 #Models/npc_humanoidmutant_000140.obj
-index: 882
+index: 858
 #Models/npc_humanoidmutant_000141.obj
-index: 883
+index: 859
 #Models/npc_humanoidmutant_000142.obj
-index: 884
+index: 860
 #Models/npc_humanoidmutant_000143.obj
-index: 885
+index: 861
 #Models/npc_humanoidmutant_000144.obj
-index: 886
+index: 862
 #Models/npc_humanoidmutant_000145.obj
-index: 887
+index: 863
 #Models/npc_humanoidmutant_000146.obj
-index: 888
+index: 864
 #Models/npc_humanoidmutant_000147.obj
-index: 889
+index: 865
 #Models/npc_humanoidmutant_000148.obj
-index: 890
+index: 866
 #Models/npc_humanoidmutant_000149.obj
-index: 891
+index: 867
 #Models/npc_humanoidmutant_000150.obj
-index: 892
-// #Models/npc_humanoidmutant_000151.obj
-// index: 893
-// #Models/npc_humanoidmutant_000152.obj
-// index: 894
+index: 868
 #Models/npc_humanoidmutant_000153.obj
-index: 895
+index: 869
 #Models/npc_humanoidmutant_000154.obj
-index: 896
+index: 870
 #Models/npc_humanoidmutant_000155.obj
-index: 897
+index: 871
 #Models/npc_humanoidmutant_000156.obj
-index: 898
+index: 872
 #Models/npc_humanoidmutant_000157.obj
-index: 899
+index: 873
 #Models/npc_humanoidmutant_000158.obj
-index: 900
+index: 874
 #Models/npc_humanoidmutant_000159.obj
-index: 901
+index: 875
 #Models/npc_humanoidmutant_000160.obj
-index: 902
+index: 876
 #Models/npc_humanoidmutant_000161.obj
-index: 903
+index: 877
 #Models/npc_humanoidmutant_000162.obj
-index: 904
+index: 878
 #Models/npc_humanoidmutant_000163.obj
-index: 905
+index: 879
 #Models/npc_humanoidmutant_000164.obj
-index: 906
+index: 880
 #Models/npc_humanoidmutant_000165.obj
-index: 907
+index: 881
 #Models/npc_humanoidmutant_000166.obj
-index: 908
+index: 882
 #Models/npc_humanoidmutant_000167.obj
-index: 909
+index: 883
 #Models/npc_humanoidmutant_000168.obj
-index: 910
+index: 884
 #Models/npc_humanoidmutant_000169.obj
-index: 911
+index: 885
 #Models/npc_humanoidmutant_000170.obj
-index: 912
+index: 886
 #Models/npc_humanoidmutant_000171.obj
-index: 913
+index: 887
 #Models/npc_humanoidmutant_000172.obj
-index: 914
+index: 888
 #Models/npc_humanoidmutant_000173.obj
-index: 915
+index: 889
 #Models/npc_humanoidmutant_000174.obj
-index: 916
+index: 890
 #Models/npc_humanoidmutant_000175.obj
-index: 917
+index: 891
 #Models/npc_humanoidmutant_000176.obj
-index: 918
-// #Models/npc_humanoidmutant_000177.obj
-// index: 919
-// #Models/npc_humanoidmutant_000178.obj
-// index: 920
-// #Models/npc_humanoidmutant_000179.obj
-// index: 921
-// #Models/npc_humanoidmutant_000180.obj
-// index: 922
-// #Models/npc_humanoidmutant_000181.obj
-// index: 923
+index: 892
 
 #Models/npc_cyborg_drone_000001.obj
-index: 924
+index: 893
 animated: 1
 animationNum: 3
-frames: 341
 #Models/npc_cyborg_drone_000002.obj
-index: 925
+index: 894
 #Models/npc_cyborg_drone_000003.obj
-index: 926
+index: 895
 #Models/npc_cyborg_drone_000004.obj
-index: 927
+index: 896
 #Models/npc_cyborg_drone_000005.obj
-index: 928
+index: 897
 #Models/npc_cyborg_drone_000006.obj
-index: 929
+index: 898
 #Models/npc_cyborg_drone_000007.obj
-index: 930
+index: 899
 #Models/npc_cyborg_drone_000008.obj
-index: 931
+index: 900
 #Models/npc_cyborg_drone_000009.obj
-index: 932
+index: 901
 #Models/npc_cyborg_drone_000010.obj
-index: 933
+index: 902
 #Models/npc_cyborg_drone_000011.obj
-index: 934
+index: 903
 #Models/npc_cyborg_drone_000012.obj
-index: 935
+index: 904
 #Models/npc_cyborg_drone_000013.obj
-index: 936
+index: 905
 #Models/npc_cyborg_drone_000014.obj
-index: 937
+index: 906
 #Models/npc_cyborg_drone_000015.obj
-index: 938
+index: 907
 #Models/npc_cyborg_drone_000016.obj
-index: 939
+index: 908
 #Models/npc_cyborg_drone_000017.obj
-index: 940
+index: 909
 #Models/npc_cyborg_drone_000018.obj
-index: 941
+index: 910
 #Models/npc_cyborg_drone_000019.obj
-index: 942
+index: 911
 #Models/npc_cyborg_drone_000020.obj
-index: 943
+index: 912
 #Models/npc_cyborg_drone_000021.obj
-index: 944
+index: 913
 #Models/npc_cyborg_drone_000022.obj
-index: 945
+index: 914
 #Models/npc_cyborg_drone_000023.obj
-index: 946
+index: 915
 #Models/npc_cyborg_drone_000024.obj
-index: 947
+index: 916
 #Models/npc_cyborg_drone_000025.obj
-index: 948
+index: 917
 #Models/npc_cyborg_drone_000026.obj
-index: 949
+index: 918
 #Models/npc_cyborg_drone_000027.obj
-index: 950
+index: 919
 #Models/npc_cyborg_drone_000028.obj
-index: 951
+index: 920
 #Models/npc_cyborg_drone_000029.obj
-index: 952
+index: 921
 #Models/npc_cyborg_drone_000030.obj
-index: 953
+index: 922
 #Models/npc_cyborg_drone_000031.obj
-index: 954
+index: 923
 #Models/npc_cyborg_drone_000032.obj
-index: 955
+index: 924
 #Models/npc_cyborg_drone_000033.obj
-index: 956
+index: 925
 #Models/npc_cyborg_drone_000034.obj
-index: 957
+index: 926
 #Models/npc_cyborg_drone_000035.obj
-index: 958
+index: 927
 #Models/npc_cyborg_drone_000036.obj
-index: 959
+index: 928
 #Models/npc_cyborg_drone_000037.obj
-index: 960
+index: 929
 #Models/npc_cyborg_drone_000038.obj
-index: 961
+index: 930
 #Models/npc_cyborg_drone_000039.obj
-index: 962
+index: 931
 #Models/npc_cyborg_drone_000040.obj
-index: 963
+index: 932
 #Models/npc_cyborg_drone_000041.obj
-index: 964
+index: 933
 #Models/npc_cyborg_drone_000042.obj
-index: 965
+index: 934
 #Models/npc_cyborg_drone_000043.obj
-index: 966
+index: 935
 #Models/npc_cyborg_drone_000044.obj
-index: 967
+index: 936
 #Models/npc_cyborg_drone_000045.obj
-index: 968
+index: 937
 #Models/npc_cyborg_drone_000046.obj
-index: 969
+index: 938
 #Models/npc_cyborg_drone_000047.obj
-index: 970
+index: 939
 #Models/npc_cyborg_drone_000048.obj
-index: 971
+index: 940
 #Models/npc_cyborg_drone_000049.obj
-index: 972
+index: 941
 #Models/npc_cyborg_drone_000050.obj
-index: 973
+index: 942
 #Models/npc_cyborg_drone_000051.obj
-index: 974
+index: 943
 #Models/npc_cyborg_drone_000052.obj
-index: 975
+index: 944
 #Models/npc_cyborg_drone_000053.obj
-index: 976
+index: 945
 #Models/npc_cyborg_drone_000054.obj
-index: 977
+index: 946
 #Models/npc_cyborg_drone_000055.obj
-index: 978
+index: 947
 #Models/npc_cyborg_drone_000056.obj
-index: 979
+index: 948
 #Models/npc_cyborg_drone_000057.obj
-index: 980
+index: 949
 #Models/npc_cyborg_drone_000058.obj
-index: 981
+index: 950
 #Models/npc_cyborg_drone_000059.obj
-index: 982
+index: 951
 #Models/npc_cyborg_drone_000060.obj
-index: 983
+index: 952
 #Models/npc_cyborg_drone_000061.obj
-index: 984
+index: 953
 #Models/npc_cyborg_drone_000062.obj
-index: 985
+index: 954
 #Models/npc_cyborg_drone_000063.obj
-index: 986
+index: 955
 #Models/npc_cyborg_drone_000064.obj
-index: 987
+index: 956
 #Models/npc_cyborg_drone_000065.obj
-index: 988
+index: 957
 #Models/npc_cyborg_drone_000066.obj
-index: 989
+index: 958
 #Models/npc_cyborg_drone_000067.obj
-index: 990
+index: 959
 #Models/npc_cyborg_drone_000068.obj
-index: 991
+index: 960
 #Models/npc_cyborg_drone_000069.obj
-index: 992
+index: 961
 #Models/npc_cyborg_drone_000070.obj
-index: 993
+index: 962
 #Models/npc_cyborg_drone_000071.obj
-index: 994
+index: 963
 #Models/npc_cyborg_drone_000072.obj
-index: 995
+index: 964
 #Models/npc_cyborg_drone_000073.obj
-index: 996
+index: 965
 #Models/npc_cyborg_drone_000074.obj
-index: 997
+index: 966
 #Models/npc_cyborg_drone_000075.obj
-index: 998
+index: 967
 #Models/npc_cyborg_drone_000076.obj
-index: 999
+index: 968
 #Models/npc_cyborg_drone_000077.obj
-index: 1000
+index: 969
 #Models/npc_cyborg_drone_000078.obj
-index: 1001
+index: 970
 #Models/npc_cyborg_drone_000079.obj
-index: 1002
+index: 971
 #Models/npc_cyborg_drone_000080.obj
-index: 1003
+index: 972
 #Models/npc_cyborg_drone_000081.obj
-index: 1004
+index: 973
 #Models/npc_cyborg_drone_000082.obj
-index: 1005
+index: 974
 #Models/npc_cyborg_drone_000083.obj
-index: 1006
+index: 975
 #Models/npc_cyborg_drone_000084.obj
-index: 1007
+index: 976
 #Models/npc_cyborg_drone_000085.obj
-index: 1008
+index: 977
 #Models/npc_cyborg_drone_000086.obj
-index: 1009
+index: 978
 #Models/npc_cyborg_drone_000087.obj
-index: 1010
+index: 979
 #Models/npc_cyborg_drone_000088.obj
-index: 1011
+index: 980
 #Models/npc_cyborg_drone_000089.obj
-index: 1012
+index: 981
 #Models/npc_cyborg_drone_000090.obj
-index: 1013
+index: 982
 #Models/npc_cyborg_drone_000091.obj
-index: 1014
+index: 983
 #Models/npc_cyborg_drone_000092.obj
-index: 1015
+index: 984
 #Models/npc_cyborg_drone_000093.obj
-index: 1016
+index: 985
 #Models/npc_cyborg_drone_000094.obj
-index: 1017
+index: 986
 #Models/npc_cyborg_drone_000095.obj
-index: 1018
+index: 987
 #Models/npc_cyborg_drone_000096.obj
-index: 1019
+index: 988
 #Models/npc_cyborg_drone_000097.obj
-index: 1020
+index: 989
 #Models/npc_cyborg_drone_000098.obj
-index: 1021
+index: 990
 #Models/npc_cyborg_drone_000099.obj
-index: 1022
+index: 991
 #Models/npc_cyborg_drone_000100.obj
-index: 1023
+index: 992
 #Models/npc_cyborg_drone_000101.obj
-index: 1024
+index: 993
 #Models/npc_cyborg_drone_000102.obj
-index: 1025
+index: 994
 #Models/npc_cyborg_drone_000103.obj
-index: 1026
+index: 995
 #Models/npc_cyborg_drone_000104.obj
-index: 1027
+index: 996
 #Models/npc_cyborg_drone_000105.obj
-index: 1028
+index: 997
 #Models/npc_cyborg_drone_000106.obj
-index: 1029
+index: 998
 #Models/npc_cyborg_drone_000107.obj
-index: 1030
+index: 999
 #Models/npc_cyborg_drone_000108.obj
-index: 1031
+index: 1000
 #Models/npc_cyborg_drone_000109.obj
-index: 1032
+index: 1001
 #Models/npc_cyborg_drone_000110.obj
-index: 1033
+index: 1002
 #Models/npc_cyborg_drone_000111.obj
-index: 1034
+index: 1003
 #Models/npc_cyborg_drone_000112.obj
-index: 1035
+index: 1004
 #Models/npc_cyborg_drone_000113.obj
-index: 1036
+index: 1005
 #Models/npc_cyborg_drone_000114.obj
-index: 1037
+index: 1006
 #Models/npc_cyborg_drone_000115.obj
-index: 1038
+index: 1007
 #Models/npc_cyborg_drone_000116.obj
-index: 1039
+index: 1008
 #Models/npc_cyborg_drone_000117.obj
-index: 1040
+index: 1009
 #Models/npc_cyborg_drone_000118.obj
-index: 1041
+index: 1010
 #Models/npc_cyborg_drone_000119.obj
-index: 1042
+index: 1011
 #Models/npc_cyborg_drone_000120.obj
-index: 1043
+index: 1012
 #Models/npc_cyborg_drone_000121.obj
-index: 1044
+index: 1013
 #Models/npc_cyborg_drone_000122.obj
-index: 1045
+index: 1014
 #Models/npc_cyborg_drone_000123.obj
-index: 1046
+index: 1015
 #Models/npc_cyborg_drone_000124.obj
-index: 1047
+index: 1016
 #Models/npc_cyborg_drone_000125.obj
-index: 1048
+index: 1017
 #Models/npc_cyborg_drone_000126.obj
-index: 1049
+index: 1018
 #Models/npc_cyborg_drone_000127.obj
-index: 1050
+index: 1019
 #Models/npc_cyborg_drone_000128.obj
-index: 1051
+index: 1020
 #Models/npc_cyborg_drone_000129.obj
-index: 1052
+index: 1021
 #Models/npc_cyborg_drone_000130.obj
-index: 1053
+index: 1022
 #Models/npc_cyborg_drone_000131.obj
-index: 1054
+index: 1023
 #Models/npc_cyborg_drone_000132.obj
-index: 1055
+index: 1024
 #Models/npc_cyborg_drone_000133.obj
-index: 1056
+index: 1025
 #Models/npc_cyborg_drone_000134.obj
-index: 1057
+index: 1026
 #Models/npc_cyborg_drone_000135.obj
-index: 1058
+index: 1027
 #Models/npc_cyborg_drone_000136.obj
-index: 1059
+index: 1028
 #Models/npc_cyborg_drone_000137.obj
-index: 1060
+index: 1029
 #Models/npc_cyborg_drone_000138.obj
-index: 1061
+index: 1030
 #Models/npc_cyborg_drone_000139.obj
-index: 1062
+index: 1031
 #Models/npc_cyborg_drone_000140.obj
-index: 1063
+index: 1032
 #Models/npc_cyborg_drone_000141.obj
-index: 1064
+index: 1033
 #Models/npc_cyborg_drone_000142.obj
-index: 1065
+index: 1034
 #Models/npc_cyborg_drone_000143.obj
-index: 1066
+index: 1035
 #Models/npc_cyborg_drone_000144.obj
-index: 1067
+index: 1036
 #Models/npc_cyborg_drone_000145.obj
-index: 1068
+index: 1037
 #Models/npc_cyborg_drone_000146.obj
-index: 1069
+index: 1038
 #Models/npc_cyborg_drone_000147.obj
-index: 1070
+index: 1039
 #Models/npc_cyborg_drone_000148.obj
-index: 1071
+index: 1040
 #Models/npc_cyborg_drone_000149.obj
-index: 1072
+index: 1041
 #Models/npc_cyborg_drone_000150.obj
-index: 1073
+index: 1042
 #Models/npc_cyborg_drone_000151.obj
-index: 1074
+index: 1043
 #Models/npc_cyborg_drone_000152.obj
-index: 1075
+index: 1044
 #Models/npc_cyborg_drone_000153.obj
-index: 1076
+index: 1045
 #Models/npc_cyborg_drone_000154.obj
-index: 1077
+index: 1046
 #Models/npc_cyborg_drone_000155.obj
-index: 1078
+index: 1047
 #Models/npc_cyborg_drone_000156.obj
-index: 1079
+index: 1048
 #Models/npc_cyborg_drone_000157.obj
-index: 1080
+index: 1049
 #Models/npc_cyborg_drone_000158.obj
-index: 1081
+index: 1050
 #Models/npc_cyborg_drone_000159.obj
-index: 1082
+index: 1051
 #Models/npc_cyborg_drone_000160.obj
-index: 1083
+index: 1052
 #Models/npc_cyborg_drone_000161.obj
-index: 1084
+index: 1053
 #Models/npc_cyborg_drone_000162.obj
-index: 1085
+index: 1054
 #Models/npc_cyborg_drone_000163.obj
-index: 1086
+index: 1055
 #Models/npc_cyborg_drone_000164.obj
-index: 1087
+index: 1056
 #Models/npc_cyborg_drone_000165.obj
-index: 1088
+index: 1057
 #Models/npc_cyborg_drone_000166.obj
-index: 1089
+index: 1058
 #Models/npc_cyborg_drone_000167.obj
-index: 1090
+index: 1059
 #Models/npc_cyborg_drone_000168.obj
-index: 1091
+index: 1060
 #Models/npc_cyborg_drone_000169.obj
-index: 1092
+index: 1061
 #Models/npc_cyborg_drone_000170.obj
-index: 1093
+index: 1062
 #Models/npc_cyborg_drone_000171.obj
-index: 1094
+index: 1063
 #Models/npc_cyborg_drone_000172.obj
-index: 1095
+index: 1064
 #Models/npc_cyborg_drone_000173.obj
-index: 1096
+index: 1065
 #Models/npc_cyborg_drone_000174.obj
-index: 1097
+index: 1066
 #Models/npc_cyborg_drone_000175.obj
-index: 1098
+index: 1067
 #Models/npc_cyborg_drone_000176.obj
-index: 1099
+index: 1068
 #Models/npc_cyborg_drone_000177.obj
-index: 1100
+index: 1069
 #Models/npc_cyborg_drone_000178.obj
-index: 1101
+index: 1070
 #Models/npc_cyborg_drone_000179.obj
-index: 1102
+index: 1071
 #Models/npc_cyborg_drone_000180.obj
-index: 1103
+index: 1072
 #Models/npc_cyborg_drone_000181.obj
-index: 1104
+index: 1073
 #Models/npc_cyborg_drone_000182.obj
-index: 1105
+index: 1074
 #Models/npc_cyborg_drone_000183.obj
-index: 1106
+index: 1075
 #Models/npc_cyborg_drone_000184.obj
-index: 1107
+index: 1076
 #Models/npc_cyborg_drone_000185.obj
-index: 1108
+index: 1077
 #Models/npc_cyborg_drone_000186.obj
-index: 1109
+index: 1078
 #Models/npc_cyborg_drone_000187.obj
-index: 1110
+index: 1079
 #Models/npc_cyborg_drone_000188.obj
-index: 1111
+index: 1080
 #Models/npc_cyborg_drone_000189.obj
-index: 1112
+index: 1081
 #Models/npc_cyborg_drone_000190.obj
-index: 1113
+index: 1082
 #Models/npc_cyborg_drone_000191.obj
-index: 1114
+index: 1083
 #Models/npc_cyborg_drone_000192.obj
-index: 1115
+index: 1084
 #Models/npc_cyborg_drone_000193.obj
-index: 1116
+index: 1085
 #Models/npc_cyborg_drone_000194.obj
-index: 1117
+index: 1086
 #Models/npc_cyborg_drone_000195.obj
-index: 1118
+index: 1087
 #Models/npc_cyborg_drone_000196.obj
-index: 1119
+index: 1088
 #Models/npc_cyborg_drone_000197.obj
-index: 1120
+index: 1089
 #Models/npc_cyborg_drone_000198.obj
-index: 1121
+index: 1090
 #Models/npc_cyborg_drone_000199.obj
-index: 1122
+index: 1091
 #Models/npc_cyborg_drone_000200.obj
-index: 1123
+index: 1092
 #Models/npc_cyborg_drone_000201.obj
-index: 1124
+index: 1093
 #Models/npc_cyborg_drone_000202.obj
-index: 1125
+index: 1094
 #Models/npc_cyborg_drone_000203.obj
-index: 1126
+index: 1095
 #Models/npc_cyborg_drone_000204.obj
-index: 1127
+index: 1096
 #Models/npc_cyborg_drone_000205.obj
-index: 1128
+index: 1097
 #Models/npc_cyborg_drone_000206.obj
-index: 1129
+index: 1098
 #Models/npc_cyborg_drone_000207.obj
-index: 1130
-// #Models/npc_cyborg_drone_000208.obj
-// index: 1131
-// #Models/npc_cyborg_drone_000209.obj
-// index: 1132
-// #Models/npc_cyborg_drone_000210.obj
-// index: 1133
-// #Models/npc_cyborg_drone_000211.obj
-// index: 1134
-// #Models/npc_cyborg_drone_000212.obj
-// index: 1135
-// #Models/npc_cyborg_drone_000213.obj
-// index: 1136
-// #Models/npc_cyborg_drone_000214.obj
-// index: 1137
-// #Models/npc_cyborg_drone_000215.obj
-// index: 1138
-// #Models/npc_cyborg_drone_000216.obj
-// index: 1139
-// #Models/npc_cyborg_drone_000217.obj
-// index: 1140
-// #Models/npc_cyborg_drone_000218.obj
-// index: 1141
+index: 1099
 #Models/npc_cyborg_drone_000219.obj
-index: 1142
+index: 1100
 #Models/npc_cyborg_drone_000220.obj
-index: 1143
+index: 1101
 #Models/npc_cyborg_drone_000221.obj
-index: 1144
+index: 1102
 #Models/npc_cyborg_drone_000222.obj
-index: 1145
+index: 1103
 #Models/npc_cyborg_drone_000223.obj
-index: 1146
+index: 1104
 #Models/npc_cyborg_drone_000224.obj
-index: 1147
+index: 1105
 #Models/npc_cyborg_drone_000225.obj
-index: 1148
+index: 1106
 #Models/npc_cyborg_drone_000226.obj
-index: 1149
+index: 1107
 #Models/npc_cyborg_drone_000227.obj
-index: 1150
+index: 1108
 #Models/npc_cyborg_drone_000228.obj
-index: 1151
+index: 1109
 #Models/npc_cyborg_drone_000229.obj
-index: 1152
+index: 1110
 #Models/npc_cyborg_drone_000230.obj
-index: 1153
+index: 1111
 #Models/npc_cyborg_drone_000231.obj
-index: 1154
+index: 1112
 #Models/npc_cyborg_drone_000232.obj
-index: 1155
+index: 1113
 #Models/npc_cyborg_drone_000233.obj
-index: 1156
+index: 1114
 #Models/npc_cyborg_drone_000234.obj
-index: 1157
+index: 1115
 #Models/npc_cyborg_drone_000235.obj
-index: 1158
+index: 1116
 #Models/npc_cyborg_drone_000236.obj
-index: 1159
+index: 1117
 #Models/npc_cyborg_drone_000237.obj
-index: 1160
+index: 1118
 #Models/npc_cyborg_drone_000238.obj
-index: 1161
+index: 1119
 #Models/npc_cyborg_drone_000239.obj
-index: 1162
-// #Models/npc_cyborg_drone_000240.obj
-// index: 1163
-// #Models/npc_cyborg_drone_000241.obj
-// index: 1164
-// #Models/npc_cyborg_drone_000242.obj
-// index: 1165
-// #Models/npc_cyborg_drone_000243.obj
-// index: 1166
-// #Models/npc_cyborg_drone_000244.obj
-// index: 1167
-// #Models/npc_cyborg_drone_000245.obj
-// index: 1168
-// #Models/npc_cyborg_drone_000246.obj
-// index: 1169
-// #Models/npc_cyborg_drone_000247.obj
-// index: 1170
-// #Models/npc_cyborg_drone_000248.obj
-// index: 1171
-// #Models/npc_cyborg_drone_000249.obj
-// index: 1172
-// #Models/npc_cyborg_drone_000250.obj
-// index: 1173
-// #Models/npc_cyborg_drone_000251.obj
-// index: 1174
+index: 1120
 #Models/npc_cyborg_drone_000252.obj
-index: 1175
+index: 1121
 #Models/npc_cyborg_drone_000253.obj
-index: 1176
+index: 1122
 #Models/npc_cyborg_drone_000254.obj
-index: 1177
+index: 1123
 #Models/npc_cyborg_drone_000255.obj
-index: 1178
+index: 1124
 #Models/npc_cyborg_drone_000256.obj
-index: 1179
+index: 1125
 #Models/npc_cyborg_drone_000257.obj
-index: 1180
+index: 1126
 #Models/npc_cyborg_drone_000258.obj
-index: 1181
+index: 1127
 #Models/npc_cyborg_drone_000259.obj
-index: 1182
+index: 1128
 #Models/npc_cyborg_drone_000260.obj
-index: 1183
+index: 1129
 #Models/npc_cyborg_drone_000261.obj
-index: 1184
+index: 1130
 #Models/npc_cyborg_drone_000262.obj
-index: 1185
+index: 1131
 #Models/npc_cyborg_drone_000263.obj
-index: 1186
+index: 1132
 #Models/npc_cyborg_drone_000264.obj
-index: 1187
+index: 1133
 #Models/npc_cyborg_drone_000265.obj
-index: 1188
+index: 1134
 #Models/npc_cyborg_drone_000266.obj
-index: 1189
+index: 1135
 #Models/npc_cyborg_drone_000267.obj
-index: 1190
+index: 1136
 #Models/npc_cyborg_drone_000268.obj
-index: 1191
+index: 1137
 #Models/npc_cyborg_drone_000269.obj
-index: 1192
+index: 1138
 #Models/npc_cyborg_drone_000270.obj
-index: 1193
+index: 1139
 #Models/npc_cyborg_drone_000271.obj
-index: 1194
+index: 1140
 #Models/npc_cyborg_drone_000272.obj
-index: 1195
+index: 1141
 #Models/npc_cyborg_drone_000273.obj
-index: 1196
+index: 1142
 #Models/npc_cyborg_drone_000274.obj
-index: 1197
+index: 1143
 #Models/npc_cyborg_drone_000275.obj
-index: 1198
+index: 1144
 #Models/npc_cyborg_drone_000276.obj
-index: 1199
+index: 1145
 #Models/npc_cyborg_drone_000277.obj
-index: 1200
+index: 1146
 #Models/npc_cyborg_drone_000278.obj
-index: 1201
+index: 1147
 #Models/npc_cyborg_drone_000279.obj
-index: 1202
+index: 1148
 #Models/npc_cyborg_drone_000280.obj
-index: 1203
+index: 1149
 #Models/npc_cyborg_drone_000281.obj
-index: 1204
+index: 1150
 #Models/npc_cyborg_drone_000282.obj
-index: 1205
+index: 1151
 #Models/npc_cyborg_drone_000283.obj
-index: 1206
+index: 1152
 #Models/npc_cyborg_drone_000284.obj
-index: 1207
+index: 1153
 #Models/npc_cyborg_drone_000285.obj
-index: 1208
+index: 1154
 #Models/npc_cyborg_drone_000286.obj
-index: 1209
+index: 1155
 #Models/npc_cyborg_drone_000287.obj
-index: 1210
+index: 1156
 #Models/npc_cyborg_drone_000288.obj
-index: 1211
+index: 1157
 #Models/npc_cyborg_drone_000289.obj
-index: 1212
+index: 1158
 #Models/npc_cyborg_drone_000290.obj
-index: 1213
+index: 1159
 #Models/npc_cyborg_drone_000291.obj
-index: 1214
+index: 1160
 #Models/npc_cyborg_drone_000292.obj
-index: 1215
+index: 1161
 #Models/npc_cyborg_drone_000293.obj
-index: 1216
+index: 1162
 #Models/npc_cyborg_drone_000294.obj
-index: 1217
+index: 1163
 #Models/npc_cyborg_drone_000295.obj
-index: 1218
+index: 1164
 #Models/npc_cyborg_drone_000296.obj
-index: 1219
+index: 1165
 #Models/npc_cyborg_drone_000297.obj
-index: 1220
+index: 1166
 #Models/npc_cyborg_drone_000298.obj
-index: 1221
+index: 1167
 #Models/npc_cyborg_drone_000299.obj
-index: 1222
+index: 1168
 #Models/npc_cyborg_drone_000300.obj
-index: 1223
+index: 1169
 #Models/npc_cyborg_drone_000301.obj
-index: 1224
+index: 1170
 #Models/npc_cyborg_drone_000302.obj
-index: 1225
+index: 1171
 #Models/npc_cyborg_drone_000303.obj
-index: 1226
+index: 1172
 #Models/npc_cyborg_drone_000304.obj
-index: 1227
+index: 1173
 #Models/npc_cyborg_drone_000305.obj
-index: 1228
+index: 1174
 #Models/npc_cyborg_drone_000306.obj
-index: 1229
+index: 1175
 #Models/npc_cyborg_drone_000307.obj
-index: 1230
-// #Models/npc_cyborg_drone_000308.obj
-// index: 1231
-// #Models/npc_cyborg_drone_000309.obj
-// index: 1232
-// #Models/npc_cyborg_drone_000310.obj
-// index: 1233
-// #Models/npc_cyborg_drone_000311.obj
-// index: 1234
-// #Models/npc_cyborg_drone_000312.obj
-// index: 1235
-// #Models/npc_cyborg_drone_000313.obj
-// index: 1236
-// #Models/npc_cyborg_drone_000314.obj
-// index: 1237
-// #Models/npc_cyborg_drone_000315.obj
-// index: 1238
-// #Models/npc_cyborg_drone_000316.obj
-// index: 1239
-// #Models/npc_cyborg_drone_000317.obj
-// index: 1240
-// #Models/npc_cyborg_drone_000318.obj
-// index: 1241
-// #Models/npc_cyborg_drone_000319.obj
-// index: 1242
-// #Models/npc_cyborg_drone_000320.obj
-// index: 1243
+index: 1176
 #Models/npc_cyborg_drone_000321.obj
-index: 1244
+index: 1177
 #Models/npc_cyborg_drone_000322.obj
-index: 1245
+index: 1178
 #Models/npc_cyborg_drone_000323.obj
-index: 1246
+index: 1179
 #Models/npc_cyborg_drone_000324.obj
-index: 1247
+index: 1180
 #Models/npc_cyborg_drone_000325.obj
-index: 1248
+index: 1181
 #Models/npc_cyborg_drone_000326.obj
-index: 1249
+index: 1182
 #Models/npc_cyborg_drone_000327.obj
-index: 1250
+index: 1183
 #Models/npc_cyborg_drone_000328.obj
-index: 1251
+index: 1184
 #Models/npc_cyborg_drone_000329.obj
-index: 1252
+index: 1185
 #Models/npc_cyborg_drone_000330.obj
-index: 1253
+index: 1186
 #Models/npc_cyborg_drone_000331.obj
-index: 1254
+index: 1187
 #Models/npc_cyborg_drone_000332.obj
-index: 1255
+index: 1188
 #Models/npc_cyborg_drone_000333.obj
-index: 1256
+index: 1189
 #Models/npc_cyborg_drone_000334.obj
-index: 1257
+index: 1190
 #Models/npc_cyborg_drone_000335.obj
-index: 1258
+index: 1191
 #Models/npc_cyborg_drone_000336.obj
-index: 1259
+index: 1192
 #Models/npc_cyborg_drone_000337.obj
-index: 1260
+index: 1193
 #Models/npc_cyborg_drone_000338.obj
-index: 1261
+index: 1194
 #Models/npc_cyborg_drone_000339.obj
-index: 1262
+index: 1195
 #Models/npc_cyborg_drone_000340.obj
-index: 1263
+index: 1196
 #Models/npc_cyborg_drone_000341.obj
-index: 1264
+index: 1197
 #Models/npc_cyborg_drone_000342.obj
-index: 1265
+index: 1198
 #Models/npc_cyborg_drone_000343.obj
-index: 1266
+index: 1199
 #Models/npc_cyborg_drone_000344.obj
-index: 1267
+index: 1200
 #Models/npc_cyborg_drone_000345.obj
-index: 1268
+index: 1201
 #Models/npc_cyborg_drone_000346.obj
-index: 1269
+index: 1202
 #Models/npc_cyborg_drone_000347.obj
-index: 1270
+index: 1203
 #Models/npc_cyborg_drone_000348.obj
-index: 1271
+index: 1204
 #Models/npc_cyborg_drone_000349.obj
-index: 1272
+index: 1205
 #Models/npc_cyborg_drone_000350.obj
-index: 1273
+index: 1206
 #Models/npc_cyborg_drone_000351.obj
-index: 1274
+index: 1207
 #Models/npc_cyborg_drone_000352.obj
-index: 1275
+index: 1208
 #Models/npc_cyborg_drone_000353.obj
-index: 1276
+index: 1209
 #Models/npc_cyborg_drone_000354.obj
-index: 1277
+index: 1210
 #Models/npc_cyborg_drone_000355.obj
-index: 1278
+index: 1211
 #Models/npc_cyborg_drone_000356.obj
-index: 1279
+index: 1212
 #Models/npc_cyborg_drone_000357.obj
-index: 1280
+index: 1213
 #Models/npc_cyborg_drone_000358.obj
-index: 1281
+index: 1214
 #Models/npc_cyborg_drone_000359.obj
-index: 1282
+index: 1215
 #Models/npc_cyborg_drone_000360.obj
-index: 1283
+index: 1216
 #Models/npc_cyborg_drone_000361.obj
-index: 1284
+index: 1217
 #Models/npc_cyborg_drone_000362.obj
-index: 1285
+index: 1218
 #Models/npc_cyborg_drone_000363.obj
-index: 1286
+index: 1219
 #Models/npc_cyborg_drone_000364.obj
-index: 1287
+index: 1220
 #Models/npc_cyborg_drone_000365.obj
-index: 1288
+index: 1221
 #Models/npc_cyborg_drone_000366.obj
-index: 1289
+index: 1222
 #Models/npc_cyborg_drone_000367.obj
-index: 1290
+index: 1223
 #Models/npc_cyborg_drone_000368.obj
-index: 1291
+index: 1224
 #Models/npc_cyborg_drone_000369.obj
-index: 1292
+index: 1225
 #Models/npc_cyborg_drone_000370.obj
-index: 1293
+index: 1226
 #Models/npc_cyborg_drone_000371.obj
-index: 1294
+index: 1227
 #Models/npc_cyborg_drone_000372.obj
-index: 1295
+index: 1228
 #Models/npc_cyborg_drone_000373.obj
-index: 1296
+index: 1229
 #Models/npc_cyborg_drone_000374.obj
-index: 1297
+index: 1230
 #Models/npc_cyborg_drone_000375.obj
-index: 1298
+index: 1231
 #Models/npc_cyborg_drone_000376.obj
-index: 1299
+index: 1232
 #Models/npc_cyborg_drone_000377.obj
-index: 1300
+index: 1233
 
-// #Models/door4_000001.obj
-// index: 1301
 #Models/door4_000002.obj
-index: 1302
+index: 1234
 animated: 1
 animationNum: 4
-frames: 94
 #Models/door4_000003.obj
-index: 1303
+index: 1235
 #Models/door4_000004.obj
-index: 1304
+index: 1236
 #Models/door4_000005.obj
-index: 1305
+index: 1237
 #Models/door4_000006.obj
-index: 1306
+index: 1238
 #Models/door4_000007.obj
-index: 1307
+index: 1239
 #Models/door4_000008.obj
-index: 1308
+index: 1240
 #Models/door4_000009.obj
-index: 1309
+index: 1241
 #Models/door4_000010.obj
-index: 1310
+index: 1242
 #Models/door4_000011.obj
-index: 1311
+index: 1243
 #Models/door4_000012.obj
-index: 1312
+index: 1244
 #Models/door4_000013.obj
-index: 1313
+index: 1245
 #Models/door4_000014.obj
-index: 1314
+index: 1246
 #Models/door4_000015.obj
-index: 1315
+index: 1247
 #Models/door4_000016.obj
-index: 1316
+index: 1248
 #Models/door4_000017.obj
-index: 1317
+index: 1249
 #Models/door4_000018.obj
-index: 1318
+index: 1250
 #Models/door4_000019.obj
-index: 1319
+index: 1251
 #Models/door4_000020.obj
-index: 1320
+index: 1252
 #Models/door4_000021.obj
-index: 1321
+index: 1253
 #Models/door4_000022.obj
-index: 1322
+index: 1254
 #Models/door4_000023.obj
-index: 1323
+index: 1255
 #Models/door4_000024.obj
-index: 1324
+index: 1256
 #Models/door4_000025.obj
-index: 1325
+index: 1257
 #Models/door4_000026.obj
-index: 1326
+index: 1258
 #Models/door4_000027.obj
-index: 1327
+index: 1259
 #Models/door4_000028.obj
-index: 1328
+index: 1260
 #Models/door4_000029.obj
-index: 1329
+index: 1261
 #Models/door4_000030.obj
-index: 1330
+index: 1262
 #Models/door4_000031.obj
-index: 1331
+index: 1263
 #Models/door4_000032.obj
-index: 1332
+index: 1264
 #Models/door4_000033.obj
-index: 1333
+index: 1265
 #Models/door4_000034.obj
-index: 1334
+index: 1266
 #Models/door4_000035.obj
-index: 1335
+index: 1267
 #Models/door4_000036.obj
-index: 1336
+index: 1268
 #Models/door4_000037.obj
-index: 1337
+index: 1269
 #Models/door4_000038.obj
-index: 1338
+index: 1270
 #Models/door4_000039.obj
-index: 1339
+index: 1271
 #Models/door4_000040.obj
-index: 1340
+index: 1272
 #Models/door4_000041.obj
-index: 1341
+index: 1273
 #Models/door4_000042.obj
-index: 1342
+index: 1274
 #Models/door4_000043.obj
-index: 1343
+index: 1275
 #Models/door4_000044.obj
-index: 1344
-// #Models/door4_000045.obj
-// index: 1345
+index: 1276
 #Models/door4_000046.obj
-index: 1346
+index: 1277
 #Models/door4_000047.obj
-index: 1347
+index: 1278
 #Models/door4_000048.obj
-index: 1348
+index: 1279
 #Models/door4_000049.obj
-index: 1349
+index: 1280
 #Models/door4_000050.obj
-index: 1350
+index: 1281
 #Models/door4_000051.obj
-index: 1351
+index: 1282
 #Models/door4_000052.obj
-index: 1352
+index: 1283
 #Models/door4_000053.obj
-index: 1353
+index: 1284
 #Models/door4_000054.obj
-index: 1354
+index: 1285
 #Models/door4_000055.obj
-index: 1355
+index: 1286
 #Models/door4_000056.obj
-index: 1356
+index: 1287
 #Models/door4_000057.obj
-index: 1357
+index: 1288
 #Models/door4_000058.obj
-index: 1358
+index: 1289
 #Models/door4_000059.obj
-index: 1359
+index: 1290
 #Models/door4_000060.obj
-index: 1360
+index: 1291
 #Models/door4_000061.obj
-index: 1361
+index: 1292
 #Models/door4_000062.obj
-index: 1362
+index: 1293
 #Models/door4_000063.obj
-index: 1363
+index: 1294
 #Models/door4_000064.obj
-index: 1364
+index: 1295
 #Models/door4_000065.obj
-index: 1365
+index: 1296
 #Models/door4_000066.obj
-index: 1366
+index: 1297
 #Models/door4_000067.obj
-index: 1367
+index: 1298
 #Models/door4_000068.obj
-index: 1368
+index: 1299
 #Models/door4_000069.obj
-index: 1369
+index: 1300
 #Models/door4_000070.obj
-index: 1370
+index: 1301
 #Models/door4_000071.obj
-index: 1371
+index: 1302
 #Models/door4_000072.obj
-index: 1372
+index: 1303
 #Models/door4_000073.obj
-index: 1373
+index: 1304
 #Models/door4_000074.obj
-index: 1374
+index: 1305
 #Models/door4_000075.obj
-index: 1375
+index: 1306
 #Models/door4_000076.obj
-index: 1376
+index: 1307
 #Models/door4_000077.obj
-index: 1377
+index: 1308
 #Models/door4_000078.obj
-index: 1378
+index: 1309
 #Models/door4_000079.obj
-index: 1379
+index: 1310
 #Models/door4_000080.obj
-index: 1380
+index: 1311
 #Models/door4_000081.obj
-index: 1381
+index: 1312
 #Models/door4_000082.obj
-index: 1382
+index: 1313
 #Models/door4_000083.obj
-index: 1383
+index: 1314
 #Models/door4_000084.obj
-index: 1384
+index: 1315
 #Models/door4_000085.obj
-index: 1385
+index: 1316
 #Models/door4_000086.obj
-index: 1386
+index: 1317
 #Models/door4_000087.obj
-index: 1387
+index: 1318
 #Models/door4_000088.obj
-index: 1388
+index: 1319
 #Models/door4_000089.obj
-index: 1389
+index: 1320
 #Models/door4_000090.obj
-index: 1390
+index: 1321
 #Models/door4_000091.obj
-index: 1391
+index: 1322
 #Models/door4_000092.obj
-index: 1392
+index: 1323
 #Models/door4_000093.obj
-index: 1393
+index: 1324
 #Models/door4_000094.obj
-index: 1394
+index: 1325
 #Models/door4_000095.obj
-index: 1395
+index: 1326
 #Models/door4_000096.obj
-index: 1396
-// #Models/door4_000097.obj
-// index: 1397
+index: 1327
 
-// #Models/door3_000001.obj
-// index: 1398
 #Models/door3_000002.obj
-index: 1399
+index: 1328
 animated: 1
 animationNum: 5
-frames: 42
 #Models/door3_000003.obj
-index: 1400
+index: 1329
 #Models/door3_000004.obj
-index: 1401
+index: 1330
 #Models/door3_000005.obj
-index: 1402
+index: 1331
 #Models/door3_000006.obj
-index: 1403
+index: 1332
 #Models/door3_000007.obj
-index: 1404
+index: 1333
 #Models/door3_000008.obj
-index: 1405
+index: 1334
 #Models/door3_000009.obj
-index: 1406
+index: 1335
 #Models/door3_000010.obj
-index: 1407
+index: 1336
 #Models/door3_000011.obj
-index: 1408
+index: 1337
 #Models/door3_000012.obj
-index: 1409
+index: 1338
 #Models/door3_000013.obj
-index: 1410
+index: 1339
 #Models/door3_000014.obj
-index: 1411
+index: 1340
 #Models/door3_000015.obj
-index: 1412
+index: 1341
 #Models/door3_000016.obj
-index: 1413
+index: 1342
 #Models/door3_000017.obj
-index: 1414
+index: 1343
 #Models/door3_000018.obj
-index: 1415
+index: 1344
 #Models/door3_000019.obj
-index: 1416
+index: 1345
 #Models/door3_000020.obj
-index: 1417
+index: 1346
 #Models/door3_000021.obj
-index: 1418
+index: 1347
 #Models/door3_000022.obj
-index: 1419
+index: 1348
 #Models/door3_000023.obj
-index: 1420
+index: 1349
 #Models/door3_000024.obj
-index: 1421
+index: 1350
 #Models/door3_000025.obj
-index: 1422
-// #Models/door3_000026.obj
-// index: 1423
+index: 1351
 #Models/door3_000027.obj
-index: 1424
+index: 1352
 #Models/door3_000028.obj
-index: 1425
+index: 1353
 #Models/door3_000029.obj
-index: 1426
+index: 1354
 #Models/door3_000030.obj
-index: 1427
+index: 1355
 #Models/door3_000031.obj
-index: 1428
+index: 1356
 #Models/door3_000032.obj
-index: 1429
+index: 1357
 #Models/door3_000033.obj
-index: 1430
+index: 1358
 #Models/door3_000034.obj
-index: 1431
+index: 1359
 #Models/door3_000035.obj
-index: 1432
+index: 1360
 #Models/door3_000036.obj
-index: 1433
+index: 1361
 #Models/door3_000037.obj
-index: 1434
+index: 1362
 #Models/door3_000038.obj
-index: 1435
+index: 1363
 #Models/door3_000039.obj
-index: 1436
+index: 1364
 #Models/door3_000040.obj
-index: 1437
+index: 1365
 #Models/door3_000041.obj
-index: 1438
+index: 1366
 #Models/door3_000042.obj
-index: 1439
+index: 1367
 #Models/door3_000043.obj
-index: 1440
+index: 1368
 #Models/door3_000044.obj
-index: 1441
-// #Models/door3_000045.obj
-// index: 1442
-// #Models/door3_000046.obj
-// index: 1443
+index: 1369
 
 #Models/xdoor1_000001.obj
 index: 1444
 animated: 1
 animationNum: 6
-frames: 66
+#Models/xdoor1_000001.obj
+index: 1370
 #Models/xdoor1_000002.obj
-index: 1445
+index: 1371
 #Models/xdoor1_000003.obj
-index: 1446
+index: 1372
 #Models/xdoor1_000004.obj
-index: 1447
+index: 1373
 #Models/xdoor1_000005.obj
-index: 1448
+index: 1374
 #Models/xdoor1_000006.obj
-index: 1449
+index: 1375
 #Models/xdoor1_000007.obj
-index: 1450
+index: 1376
 #Models/xdoor1_000008.obj
-index: 1451
+index: 1377
 #Models/xdoor1_000009.obj
-index: 1452
+index: 1378
 #Models/xdoor1_000010.obj
-index: 1453
+index: 1379
 #Models/xdoor1_000011.obj
-index: 1454
+index: 1380
 #Models/xdoor1_000012.obj
-index: 1455
+index: 1381
 #Models/xdoor1_000013.obj
-index: 1456
+index: 1382
 #Models/xdoor1_000014.obj
-index: 1457
+index: 1383
 #Models/xdoor1_000015.obj
-index: 1458
+index: 1384
 #Models/xdoor1_000016.obj
-index: 1459
+index: 1385
 #Models/xdoor1_000017.obj
-index: 1460
+index: 1386
 #Models/xdoor1_000018.obj
-index: 1461
+index: 1387
 #Models/xdoor1_000019.obj
-index: 1462
+index: 1388
 #Models/xdoor1_000020.obj
-index: 1463
+index: 1389
 #Models/xdoor1_000021.obj
-index: 1464
+index: 1390
 #Models/xdoor1_000022.obj
-index: 1465
+index: 1391
 #Models/xdoor1_000023.obj
-index: 1466
+index: 1392
 #Models/xdoor1_000024.obj
-index: 1467
+index: 1393
 #Models/xdoor1_000025.obj
-index: 1468
+index: 1394
 #Models/xdoor1_000026.obj
-index: 1469
+index: 1395
 #Models/xdoor1_000027.obj
-index: 1470
+index: 1396
 #Models/xdoor1_000028.obj
-index: 1471
+index: 1397
 #Models/xdoor1_000029.obj
-index: 1472
+index: 1398
 #Models/xdoor1_000030.obj
-index: 1473
-#Models/xdoor1_000031.obj
-index: 1474
+index: 1399
 #Models/xdoor1_000032.obj
-index: 1475
+index: 1400
 #Models/xdoor1_000033.obj
-index: 1476
+index: 1401
 #Models/xdoor1_000034.obj
-index: 1477
+index: 1402
 #Models/xdoor1_000035.obj
-index: 1478
+index: 1403
 #Models/xdoor1_000036.obj
-index: 1479
+index: 1404
 #Models/xdoor1_000037.obj
-index: 1480
+index: 1405
 #Models/xdoor1_000038.obj
-index: 1481
+index: 1406
 #Models/xdoor1_000039.obj
-index: 1482
+index: 1407
 #Models/xdoor1_000040.obj
-index: 1483
+index: 1408
 #Models/xdoor1_000041.obj
-index: 1484
+index: 1409
 #Models/xdoor1_000042.obj
-index: 1485
+index: 1410
 #Models/xdoor1_000043.obj
-index: 1486
+index: 1411
 #Models/xdoor1_000044.obj
-index: 1487
+index: 1412
 #Models/xdoor1_000045.obj
-index: 1488
+index: 1413
 #Models/xdoor1_000046.obj
-index: 1489
+index: 1414
 #Models/xdoor1_000047.obj
-index: 1490
+index: 1415
 #Models/xdoor1_000048.obj
-index: 1491
+index: 1416
 #Models/xdoor1_000049.obj
-index: 1492
+index: 1417
 #Models/xdoor1_000050.obj
-index: 1493
+index: 1418
 #Models/xdoor1_000051.obj
-index: 1494
+index: 1419
 #Models/xdoor1_000052.obj
-index: 1495
+index: 1420
 #Models/xdoor1_000053.obj
-index: 1496
+index: 1421
 #Models/xdoor1_000054.obj
-index: 1497
+index: 1422
 #Models/xdoor1_000055.obj
-index: 1498
+index: 1423
 #Models/xdoor1_000056.obj
-index: 1499
+index: 1424
 #Models/xdoor1_000057.obj
-index: 1500
+index: 1425
 #Models/xdoor1_000058.obj
-index: 1501
+index: 1426
 #Models/xdoor1_000059.obj
-index: 1502
+index: 1427
 #Models/xdoor1_000060.obj
-index: 1503
+index: 1428
 #Models/xdoor1_000061.obj
-index: 1504
+index: 1429
 #Models/xdoor1_000062.obj
-index: 1505
+index: 1430
 #Models/xdoor1_000063.obj
-index: 1506
+index: 1431
 #Models/xdoor1_000064.obj
-index: 1507
+index: 1432
 #Models/xdoor1_000065.obj
-index: 1508
+index: 1433
 #Models/xdoor1_000066.obj
-index: 1509
+index: 1434
 
-// #Models/xdoor2_000001.obj
-// index: 1510
-// #Models/xdoor2_000002.obj
-// index: 1511
 #Models/xdoor2_000003.obj
-index: 1512
+index: 1435
 animated: 1
 animationNum: 7
-frames: 45
 #Models/xdoor2_000004.obj
-index: 1513
+index: 1436
 #Models/xdoor2_000005.obj
-index: 1514
+index: 1437
 #Models/xdoor2_000006.obj
-index: 1515
+index: 1438
 #Models/xdoor2_000007.obj
-index: 1516
+index: 1439
 #Models/xdoor2_000008.obj
-index: 1517
+index: 1440
 #Models/xdoor2_000009.obj
-index: 1518
+index: 1441
 #Models/xdoor2_000010.obj
-index: 1519
+index: 1442
 #Models/xdoor2_000011.obj
-index: 1520
+index: 1443
 #Models/xdoor2_000012.obj
-index: 1521
+index: 1444
 #Models/xdoor2_000013.obj
-index: 1522
+index: 1445
 #Models/xdoor2_000014.obj
-index: 1523
+index: 1446
 #Models/xdoor2_000015.obj
-index: 1524
+index: 1447
 #Models/xdoor2_000016.obj
-index: 1525
+index: 1448
 #Models/xdoor2_000017.obj
-index: 1526
+index: 1449
 #Models/xdoor2_000018.obj
-index: 1527
+index: 1450
 #Models/xdoor2_000019.obj
-index: 1528
+index: 1451
 #Models/xdoor2_000020.obj
-index: 1529
+index: 1452
 #Models/xdoor2_000021.obj
-index: 1530
+index: 1453
 #Models/xdoor2_000022.obj
-index: 1531
+index: 1454
 #Models/xdoor2_000023.obj
-index: 1532
+index: 1455
 #Models/xdoor2_000024.obj
-index: 1533
-// #Models/xdoor2_000025.obj
-// index: 1534
-// #Models/xdoor2_000026.obj
-// index: 1535
+index: 1456
+#Models/xdoor2_000026.obj
+index: 1457
 #Models/xdoor2_000027.obj
-index: 1536
+index: 1458
 #Models/xdoor2_000028.obj
-index: 1537
+index: 1459
 #Models/xdoor2_000029.obj
-index: 1538
+index: 1460
 #Models/xdoor2_000030.obj
-index: 1539
+index: 1461
 #Models/xdoor2_000031.obj
-index: 1540
+index: 1462
 #Models/xdoor2_000032.obj
-index: 1541
+index: 1463
 #Models/xdoor2_000033.obj
-index: 1542
+index: 1464
 #Models/xdoor2_000034.obj
-index: 1543
+index: 1465
 #Models/xdoor2_000035.obj
-index: 1544
+index: 1466
 #Models/xdoor2_000036.obj
-index: 1545
+index: 1467
 #Models/xdoor2_000037.obj
-index: 1546
+index: 1468
 #Models/xdoor2_000038.obj
-index: 1547
+index: 1469
 #Models/xdoor2_000039.obj
-index: 1548
+index: 1470
 #Models/xdoor2_000040.obj
-index: 1549
+index: 1471
 #Models/xdoor2_000041.obj
-index: 1550
+index: 1472
 #Models/xdoor2_000042.obj
-index: 1551
+index: 1473
 #Models/xdoor2_000043.obj
-index: 1552
+index: 1474
 #Models/xdoor2_000044.obj
-index: 1553
+index: 1475
 #Models/xdoor2_000045.obj
-index: 1554
+index: 1476
 #Models/xdoor2_000046.obj
-index: 1555
+index: 1477
 #Models/xdoor2_000047.obj
-index: 1556
+index: 1478
 #Models/xdoor2_000048.obj
-index: 1557
+index: 1479
 #Models/xdoor2_000049.obj
-index: 1558
-// #Models/xdoor2_000050.obj
-// index: 1559
+index: 1480
 
-#Models/door10_000001.obj
-index: 1560
+#Models/door10_000003.obj
+index: 1481
 animated: 1
 animationNum: 8
-frames: 52
-#Models/door10_000002.obj
-index: 1561
-#Models/door10_000003.obj
-index: 1562
 #Models/door10_000004.obj
-index: 1563
+index: 1482
 #Models/door10_000005.obj
-index: 1564
+index: 1483
 #Models/door10_000006.obj
-index: 1565
+index: 1484
 #Models/door10_000007.obj
-index: 1566
+index: 1485
 #Models/door10_000008.obj
-index: 1567
+index: 1486
 #Models/door10_000009.obj
-index: 1568
+index: 1487
 #Models/door10_000010.obj
-index: 1569
+index: 1488
 #Models/door10_000011.obj
-index: 1570
+index: 1489
 #Models/door10_000012.obj
-index: 1571
+index: 1490
 #Models/door10_000013.obj
-index: 1572
+index: 1491
 #Models/door10_000014.obj
-index: 1573
+index: 1492
 #Models/door10_000015.obj
-index: 1574
+index: 1493
 #Models/door10_000016.obj
-index: 1575
+index: 1494
 #Models/door10_000017.obj
-index: 1576
+index: 1495
 #Models/door10_000018.obj
-index: 1577
+index: 1496
 #Models/door10_000019.obj
-index: 1578
+index: 1497
 #Models/door10_000020.obj
-index: 1579
+index: 1498
 #Models/door10_000021.obj
-index: 1580
+index: 1499
 #Models/door10_000022.obj
-index: 1581
+index: 1500
 #Models/door10_000023.obj
-index: 1582
+index: 1501
 #Models/door10_000024.obj
-index: 1583
+index: 1502
 #Models/door10_000025.obj
-index: 1584
+index: 1503
 #Models/door10_000026.obj
-index: 1585
+index: 1504
 #Models/door10_000027.obj
-index: 1586
-#Models/door10_000028.obj
-index: 1587
-#Models/door10_000029.obj
-index: 1588
+index: 1505
 #Models/door10_000030.obj
-index: 1589
+index: 1506
 #Models/door10_000031.obj
-index: 1590
+index: 1507
 #Models/door10_000032.obj
-index: 1591
+index: 1508
 #Models/door10_000033.obj
-index: 1592
+index: 1509
 #Models/door10_000034.obj
-index: 1593
+index: 1510
 #Models/door10_000035.obj
-index: 1594
+index: 1511
 #Models/door10_000036.obj
-index: 1595
+index: 1512
 #Models/door10_000037.obj
-index: 1596
+index: 1513
 #Models/door10_000038.obj
-index: 1597
+index: 1514
 #Models/door10_000039.obj
-index: 1598
+index: 1515
 #Models/door10_000040.obj
-index: 1599
+index: 1516
 #Models/door10_000041.obj
-index: 1600
+index: 1517
 #Models/door10_000042.obj
-index: 1601
+index: 1518
 #Models/door10_000043.obj
-index: 1602
+index: 1519
 #Models/door10_000044.obj
-index: 1603
+index: 1520
 #Models/door10_000045.obj
-index: 1604
+index: 1521
 #Models/door10_000046.obj
-index: 1605
+index: 1522
 #Models/door10_000047.obj
-index: 1606
+index: 1523
 #Models/door10_000048.obj
-index: 1607
+index: 1524
 #Models/door10_000049.obj
-index: 1608
+index: 1525
 #Models/door10_000050.obj
-index: 1609
+index: 1526
 #Models/door10_000051.obj
-index: 1610
-#Models/door10_000052.obj
-index: 1611
+index: 1527
 
-#Models/door5_000001.obj
-index: 1612
+#Models/door5_000003.obj
+index: 1528
 animated: 1
 animationNum: 9
-frames: 40
-#Models/door5_000002.obj
-index: 1613
-#Models/door5_000003.obj
-index: 1614
 #Models/door5_000004.obj
-index: 1615
+index: 1529
 #Models/door5_000005.obj
-index: 1616
+index: 1530
 #Models/door5_000006.obj
-index: 1617
+index: 1531
 #Models/door5_000007.obj
-index: 1618
+index: 1532
 #Models/door5_000008.obj
-index: 1619
+index: 1533
 #Models/door5_000009.obj
-index: 1620
+index: 1534
 #Models/door5_000010.obj
-index: 1621
+index: 1535
 #Models/door5_000011.obj
-index: 1622
+index: 1536
 #Models/door5_000012.obj
-index: 1623
+index: 1537
 #Models/door5_000013.obj
-index: 1624
+index: 1538
 #Models/door5_000014.obj
-index: 1625
+index: 1539
 #Models/door5_000015.obj
-index: 1626
-#Models/door5_000016.obj
-index: 1627
-#Models/door5_000017.obj
-index: 1628
-#Models/door5_000018.obj
-index: 1629
-#Models/door5_000019.obj
-index: 1630
-#Models/door5_000020.obj
-index: 1631
-#Models/door5_000021.obj
-index: 1632
-#Models/door5_000022.obj
-index: 1633
-#Models/door5_000023.obj
-index: 1634
-#Models/door5_000024.obj
-index: 1635
-#Models/door5_000025.obj
-index: 1636
-#Models/door5_000026.obj
-index: 1637
-#Models/door5_000027.obj
-index: 1638
+index: 1540
 #Models/door5_000028.obj
-index: 1639
+index: 1541
 #Models/door5_000029.obj
-index: 1640
+index: 1542
 #Models/door5_000030.obj
-index: 1641
+index: 1543
 #Models/door5_000031.obj
-index: 1642
+index: 1544
 #Models/door5_000032.obj
-index: 1643
+index: 1545
 #Models/door5_000033.obj
-index: 1644
+index: 1546
 #Models/door5_000034.obj
-index: 1645
+index: 1547
 #Models/door5_000035.obj
-index: 1646
+index: 1548
 #Models/door5_000036.obj
-index: 1647
+index: 1549
 #Models/door5_000037.obj
-index: 1648
+index: 1550
 #Models/door5_000038.obj
-index: 1649
+index: 1551
 #Models/door5_000039.obj
-index: 1650
-#Models/door5_000040.obj
-index: 1651
+index: 1552
 
-#Models/door6_000001.obj
-index: 1652
+#Models/door6_000002.obj
+index: 1553
 animated: 1
 animationNum: 10
-frames: 47
-#Models/door6_000002.obj
-index: 1653
 #Models/door6_000003.obj
-index: 1654
+index: 1554
 #Models/door6_000004.obj
-index: 1655
+index: 1555
 #Models/door6_000005.obj
-index: 1656
+index: 1556
 #Models/door6_000006.obj
-index: 1657
+index: 1557
 #Models/door6_000007.obj
-index: 1658
+index: 1558
 #Models/door6_000008.obj
-index: 1659
+index: 1559
 #Models/door6_000009.obj
-index: 1660
+index: 1560
 #Models/door6_000010.obj
-index: 1661
+index: 1561
 #Models/door6_000011.obj
-index: 1662
+index: 1562
 #Models/door6_000012.obj
-index: 1663
+index: 1563
 #Models/door6_000013.obj
-index: 1664
+index: 1564
 #Models/door6_000014.obj
-index: 1665
+index: 1565
 #Models/door6_000015.obj
-index: 1666
+index: 1566
 #Models/door6_000016.obj
-index: 1667
+index: 1567
 #Models/door6_000017.obj
-index: 1668
+index: 1568
 #Models/door6_000018.obj
-index: 1669
+index: 1569
 #Models/door6_000019.obj
-index: 1670
+index: 1570
 #Models/door6_000020.obj
-index: 1671
+index: 1571
 #Models/door6_000021.obj
-index: 1672
+index: 1572
 #Models/door6_000022.obj
-index: 1673
+index: 1573
 #Models/door6_000023.obj
-index: 1674
-#Models/door6_000024.obj
-index: 1675
-#Models/door6_000025.obj
-index: 1676
-#Models/door6_000026.obj
-index: 1677
+index: 1574
 #Models/door6_000027.obj
-index: 1678
+index: 1575
 #Models/door6_000028.obj
-index: 1679
+index: 1576
 #Models/door6_000029.obj
-index: 1680
+index: 1577
 #Models/door6_000030.obj
-index: 1681
+index: 1578
 #Models/door6_000031.obj
-index: 1682
+index: 1579
 #Models/door6_000032.obj
-index: 1683
+index: 1580
 #Models/door6_000033.obj
-index: 1684
+index: 1581
 #Models/door6_000034.obj
-index: 1685
+index: 1582
 #Models/door6_000035.obj
-index: 1686
+index: 1583
 #Models/door6_000036.obj
-index: 1687
+index: 1584
 #Models/door6_000037.obj
-index: 1688
+index: 1585
 #Models/door6_000038.obj
-index: 1689
+index: 1586
 #Models/door6_000039.obj
-index: 1690
+index: 1587
 #Models/door6_000040.obj
-index: 1691
+index: 1588
 #Models/door6_000041.obj
-index: 1692
+index: 1589
 #Models/door6_000042.obj
-index: 1693
+index: 1590
 #Models/door6_000043.obj
-index: 1694
+index: 1591
 #Models/door6_000044.obj
-index: 1695
+index: 1592
 #Models/door6_000045.obj
-index: 1696
-#Models/door6_000046.obj
-index: 1697
-#Models/door6_000047.obj
-index: 1698
+index: 1593
 
-#Models/door7_000001.obj
-index: 1699
+#Models/door7_000003.obj
+index: 1594
 animated: 1
 animationNum: 11
-frames: 43
-#Models/door7_000002.obj
-index: 1700
-#Models/door7_000003.obj
-index: 1701
 #Models/door7_000004.obj
-index: 1702
+index: 1595
 #Models/door7_000005.obj
-index: 1703
+index: 1596
 #Models/door7_000006.obj
-index: 1704
+index: 1597
 #Models/door7_000007.obj
-index: 1705
+index: 1598
 #Models/door7_000008.obj
-index: 1706
+index: 1599
 #Models/door7_000009.obj
-index: 1707
+index: 1600
 #Models/door7_000010.obj
-index: 1708
+index: 1601
 #Models/door7_000011.obj
-index: 1709
+index: 1602
 #Models/door7_000012.obj
-index: 1710
+index: 1603
 #Models/door7_000013.obj
-index: 1711
+index: 1604
 #Models/door7_000014.obj
-index: 1712
+index: 1605
 #Models/door7_000015.obj
-index: 1713
+index: 1606
 #Models/door7_000016.obj
-index: 1714
+index: 1607
 #Models/door7_000017.obj
-index: 1715
+index: 1608
 #Models/door7_000018.obj
-index: 1716
+index: 1609
 #Models/door7_000019.obj
-index: 1717
+index: 1610
 #Models/door7_000020.obj
-index: 1718
+index: 1611
 #Models/door7_000021.obj
-index: 1719
+index: 1612
 #Models/door7_000022.obj
-index: 1720
-#Models/door7_000023.obj
-index: 1721
-#Models/door7_000024.obj
-index: 1722
+index: 1613
 #Models/door7_000025.obj
-index: 1723
+index: 1614
 #Models/door7_000026.obj
-index: 1724
+index: 1615
 #Models/door7_000027.obj
-index: 1725
+index: 1616
 #Models/door7_000028.obj
-index: 1726
+index: 1617
 #Models/door7_000029.obj
-index: 1727
+index: 1618
 #Models/door7_000030.obj
-index: 1728
+index: 1619
 #Models/door7_000031.obj
-index: 1729
+index: 1620
 #Models/door7_000032.obj
-index: 1730
+index: 1621
 #Models/door7_000033.obj
-index: 1731
+index: 1622
 #Models/door7_000034.obj
-index: 1732
+index: 1623
 #Models/door7_000035.obj
-index: 1733
+index: 1624
 #Models/door7_000036.obj
-index: 1734
+index: 1625
 #Models/door7_000037.obj
-index: 1735
+index: 1626
 #Models/door7_000038.obj
-index: 1736
+index: 1627
 #Models/door7_000039.obj
-index: 1737
+index: 1628
 #Models/door7_000040.obj
-index: 1738
+index: 1629
 #Models/door7_000041.obj
-index: 1739
+index: 1630
 #Models/door7_000042.obj
-index: 1740
-#Models/door7_000043.obj
-index: 1741
+index: 1631
 
-#Models/door8_000001.obj
-index: 1742
+#Models/door8_000002.obj
+index: 1632
 animated: 1
 animationNum: 12
-frames: 50
-#Models/door8_000002.obj
-index: 1743
 #Models/door8_000003.obj
-index: 1744
+index: 1633
 #Models/door8_000004.obj
-index: 1745
+index: 1634
 #Models/door8_000005.obj
-index: 1746
+index: 1635
 #Models/door8_000006.obj
-index: 1747
+index: 1636
 #Models/door8_000007.obj
-index: 1748
+index: 1637
 #Models/door8_000008.obj
-index: 1749
+index: 1638
 #Models/door8_000009.obj
-index: 1750
+index: 1639
 #Models/door8_000010.obj
-index: 1751
+index: 1640
 #Models/door8_000011.obj
-index: 1752
+index: 1641
 #Models/door8_000012.obj
-index: 1753
+index: 1642
 #Models/door8_000013.obj
-index: 1754
+index: 1643
 #Models/door8_000014.obj
-index: 1755
+index: 1644
 #Models/door8_000015.obj
-index: 1756
+index: 1645
 #Models/door8_000016.obj
-index: 1757
+index: 1646
 #Models/door8_000017.obj
-index: 1758
+index: 1647
 #Models/door8_000018.obj
-index: 1759
+index: 1648
 #Models/door8_000019.obj
-index: 1760
+index: 1649
 #Models/door8_000020.obj
-index: 1761
+index: 1650
 #Models/door8_000021.obj
-index: 1762
+index: 1651
 #Models/door8_000022.obj
-index: 1763
+index: 1652
 #Models/door8_000023.obj
-index: 1764
+index: 1653
 #Models/door8_000024.obj
-index: 1765
+index: 1654
 #Models/door8_000025.obj
-index: 1766
-#Models/door8_000026.obj
-index: 1767
+index: 1655
 #Models/door8_000027.obj
-index: 1768
+index: 1656
 #Models/door8_000028.obj
-index: 1769
+index: 1657
 #Models/door8_000029.obj
-index: 1770
+index: 1658
 #Models/door8_000030.obj
-index: 1771
+index: 1659
 #Models/door8_000031.obj
-index: 1772
+index: 1660
 #Models/door8_000032.obj
-index: 1773
+index: 1661
 #Models/door8_000033.obj
-index: 1774
+index: 1662
 #Models/door8_000034.obj
-index: 1775
+index: 1663
 #Models/door8_000035.obj
-index: 1776
+index: 1664
 #Models/door8_000036.obj
-index: 1777
+index: 1665
 #Models/door8_000037.obj
-index: 1778
+index: 1666
 #Models/door8_000038.obj
-index: 1779
+index: 1667
 #Models/door8_000039.obj
-index: 1780
+index: 1668
 #Models/door8_000040.obj
-index: 1781
+index: 1669
 #Models/door8_000041.obj
-index: 1782
+index: 1670
 #Models/door8_000042.obj
-index: 1783
+index: 1671
 #Models/door8_000043.obj
-index: 1784
+index: 1672
 #Models/door8_000044.obj
-index: 1785
+index: 1673
 #Models/door8_000045.obj
-index: 1786
+index: 1674
 #Models/door8_000046.obj
-index: 1787
+index: 1675
 #Models/door8_000047.obj
-index: 1788
+index: 1676
 #Models/door8_000048.obj
-index: 1789
+index: 1677
 #Models/door8_000049.obj
-index: 1790
-#Models/door8_000050.obj
-index: 1791
+index: 1678
 
-#Models/door9_000001.obj
-index: 1792
-animated: 1
-animationNum: 13
-frames: 53
 #Models/door9_000002.obj
 index: 1793
+animated: 1
+animationNum: 13
 #Models/door9_000003.obj
-index: 1794
+index: 1670
 #Models/door9_000004.obj
-index: 1795
+index: 1671
 #Models/door9_000005.obj
-index: 1796
+index: 1672
 #Models/door9_000006.obj
-index: 1797
+index: 1673
 #Models/door9_000007.obj
-index: 1798
+index: 1674
 #Models/door9_000008.obj
-index: 1799
+index: 1675
 #Models/door9_000009.obj
-index: 1800
+index: 1676
 #Models/door9_000010.obj
-index: 1801
+index: 1677
 #Models/door9_000011.obj
-index: 1802
+index: 1678
 #Models/door9_000012.obj
-index: 1803
+index: 1679
 #Models/door9_000013.obj
-index: 1804
+index: 1680
 #Models/door9_000014.obj
-index: 1805
+index: 1681
 #Models/door9_000015.obj
-index: 1806
+index: 1682
 #Models/door9_000016.obj
-index: 1807
+index: 1683
 #Models/door9_000017.obj
-index: 1808
+index: 1684
 #Models/door9_000018.obj
-index: 1809
+index: 1685
 #Models/door9_000019.obj
-index: 1810
+index: 1686
 #Models/door9_000020.obj
-index: 1811
+index: 1687
 #Models/door9_000021.obj
-index: 1812
+index: 1688
 #Models/door9_000022.obj
-index: 1813
+index: 1689
 #Models/door9_000023.obj
-index: 1814
+index: 1690
 #Models/door9_000024.obj
-index: 1815
-#Models/door9_000025.obj
-index: 1816
+index: 1691
 #Models/door9_000026.obj
-index: 1817
+index: 1692
 #Models/door9_000027.obj
-index: 1818
+index: 1693
 #Models/door9_000028.obj
-index: 1819
+index: 1694
 #Models/door9_000029.obj
-index: 1820
+index: 1695
 #Models/door9_000030.obj
-index: 1821
+index: 1696
 #Models/door9_000031.obj
-index: 1822
+index: 1697
 #Models/door9_000032.obj
-index: 1823
+index: 1698
 #Models/door9_000033.obj
-index: 1824
+index: 1699
 #Models/door9_000034.obj
-index: 1825
+index: 1700
 #Models/door9_000035.obj
-index: 1826
+index: 1701
 #Models/door9_000036.obj
-index: 1827
+index: 1702
 #Models/door9_000037.obj
-index: 1828
+index: 1703
 #Models/door9_000038.obj
-index: 1829
+index: 1704
 #Models/door9_000039.obj
-index: 1830
+index: 1705
 #Models/door9_000040.obj
-index: 1831
+index: 1706
 #Models/door9_000041.obj
-index: 1832
+index: 1707
 #Models/door9_000042.obj
-index: 1833
+index: 1708
 #Models/door9_000043.obj
-index: 1834
+index: 1709
 #Models/door9_000044.obj
-index: 1835
+index: 1710
 #Models/door9_000045.obj
-index: 1836
+index: 1711
 #Models/door9_000046.obj
-index: 1837
+index: 1712
 #Models/door9_000047.obj
-index: 1838
+index: 1713
 #Models/door9_000048.obj
-index: 1839
+index: 1714
 #Models/door9_000049.obj
-index: 1840
+index: 1715
 #Models/door9_000050.obj
-index: 1841
+index: 1716
 #Models/door9_000051.obj
-index: 1842
+index: 1717
 #Models/door9_000052.obj
-index: 1843
-#Models/door9_000053.obj
-index: 1844
+index: 1718
 
-#Models/door_elevator1_000001.obj
-index: 1845
+#Models/door_elevator1_000002.obj
+index: 1719
 animated: 1
 animationNum: 14
-frames: 42
-#Models/door_elevator1_000002.obj
-index: 1846
 #Models/door_elevator1_000003.obj
-index: 1847
+index: 1720
 #Models/door_elevator1_000004.obj
-index: 1848
+index: 1721
 #Models/door_elevator1_000005.obj
-index: 1849
+index: 1722
 #Models/door_elevator1_000006.obj
-index: 1850
+index: 1723
 #Models/door_elevator1_000007.obj
-index: 1851
+index: 1724
 #Models/door_elevator1_000008.obj
-index: 1852
+index: 1725
 #Models/door_elevator1_000009.obj
-index: 1853
+index: 1726
 #Models/door_elevator1_000010.obj
-index: 1854
+index: 1727
 #Models/door_elevator1_000011.obj
-index: 1855
+index: 1728
 #Models/door_elevator1_000012.obj
-index: 1856
+index: 1729
 #Models/door_elevator1_000013.obj
-index: 1857
+index: 1730
 #Models/door_elevator1_000014.obj
-index: 1858
+index: 1731
 #Models/door_elevator1_000015.obj
-index: 1859
+index: 1732
 #Models/door_elevator1_000016.obj
-index: 1860
+index: 1733
 #Models/door_elevator1_000017.obj
-index: 1861
+index: 1734
 #Models/door_elevator1_000018.obj
-index: 1862
+index: 1735
 #Models/door_elevator1_000019.obj
-index: 1863
+index: 1736
 #Models/door_elevator1_000020.obj
-index: 1864
-#Models/door_elevator1_000021.obj
-index: 1865
+index: 1737
 #Models/door_elevator1_000022.obj
-index: 1866
+index: 1738
 #Models/door_elevator1_000023.obj
-index: 1867
+index: 1739
 #Models/door_elevator1_000024.obj
-index: 1868
+index: 1740
 #Models/door_elevator1_000025.obj
-index: 1869
+index: 1741
 #Models/door_elevator1_000026.obj
-index: 1870
+index: 1742
 #Models/door_elevator1_000027.obj
-index: 1871
+index: 1743
 #Models/door_elevator1_000028.obj
-index: 1872
+index: 1744
 #Models/door_elevator1_000029.obj
-index: 1873
+index: 1745
 #Models/door_elevator1_000030.obj
-index: 1874
+index: 1746
 #Models/door_elevator1_000031.obj
-index: 1875
+index: 1747
 #Models/door_elevator1_000032.obj
-index: 1876
+index: 1748
 #Models/door_elevator1_000033.obj
-index: 1877
+index: 1749
 #Models/door_elevator1_000034.obj
-index: 1878
+index: 1750
 #Models/door_elevator1_000035.obj
-index: 1879
+index: 1751
 #Models/door_elevator1_000036.obj
-index: 1880
+index: 1752
 #Models/door_elevator1_000037.obj
-index: 1881
+index: 1753
 #Models/door_elevator1_000038.obj
-index: 1882
+index: 1754
 #Models/door_elevator1_000039.obj
-index: 1883
+index: 1755
 #Models/door_elevator1_000040.obj
-index: 1884
+index: 1756
 #Models/door_elevator1_000041.obj
-index: 1885
-#Models/door_elevator1_000042.obj
-index: 1886
+index: 1757
 
-#Models/door_elevator2_000001.obj
-index: 1887
+#Models/door_elevator2_000002.obj
+index: 1758
 animated: 1
 animationNum: 15
-frames: 42
-#Models/door_elevator2_000002.obj
-index: 1888
 #Models/door_elevator2_000003.obj
-index: 1889
+index: 1759
 #Models/door_elevator2_000004.obj
-index: 1890
+index: 1760
 #Models/door_elevator2_000005.obj
-index: 1891
+index: 1761
 #Models/door_elevator2_000006.obj
-index: 1892
+index: 1762
 #Models/door_elevator2_000007.obj
-index: 1893
+index: 1763
 #Models/door_elevator2_000008.obj
-index: 1894
+index: 1764
 #Models/door_elevator2_000009.obj
-index: 1895
+index: 1765
 #Models/door_elevator2_000010.obj
-index: 1896
+index: 1766
 #Models/door_elevator2_000011.obj
-index: 1897
+index: 1767
 #Models/door_elevator2_000012.obj
-index: 1898
+index: 1768
 #Models/door_elevator2_000013.obj
-index: 1899
+index: 1769
 #Models/door_elevator2_000014.obj
-index: 1900
+index: 1770
 #Models/door_elevator2_000015.obj
-index: 1901
+index: 1771
 #Models/door_elevator2_000016.obj
-index: 1902
+index: 1772
 #Models/door_elevator2_000017.obj
-index: 1903
+index: 1773
 #Models/door_elevator2_000018.obj
-index: 1904
+index: 1774
 #Models/door_elevator2_000019.obj
-index: 1905
+index: 1775
 #Models/door_elevator2_000020.obj
-index: 1906
+index: 1776
 #Models/door_elevator2_000021.obj
-index: 1907
-#Models/door_elevator2_000022.obj
-index: 1908
+index: 1777
 #Models/door_elevator2_000023.obj
-index: 1909
+index: 1778
 #Models/door_elevator2_000024.obj
-index: 1910
+index: 1779
 #Models/door_elevator2_000025.obj
-index: 1911
+index: 1780
 #Models/door_elevator2_000026.obj
-index: 1912
+index: 1781
 #Models/door_elevator2_000027.obj
-index: 1913
+index: 1782
 #Models/door_elevator2_000028.obj
-index: 1914
+index: 1783
 #Models/door_elevator2_000029.obj
-index: 1915
+index: 1784
 #Models/door_elevator2_000030.obj
-index: 1916
+index: 1785
 #Models/door_elevator2_000031.obj
-index: 1917
+index: 1786
 #Models/door_elevator2_000032.obj
-index: 1918
+index: 1787
 #Models/door_elevator2_000033.obj
-index: 1919
+index: 1788
 #Models/door_elevator2_000034.obj
-index: 1920
+index: 1789
 #Models/door_elevator2_000035.obj
-index: 1921
+index: 1790
 #Models/door_elevator2_000036.obj
-index: 1922
+index: 1791
 #Models/door_elevator2_000037.obj
-index: 1923
+index: 1792
 #Models/door_elevator2_000038.obj
-index: 1924
+index: 1793
 #Models/door_elevator2_000039.obj
-index: 1925
+index: 1794
 #Models/door_elevator2_000040.obj
-index: 1926
+index: 1795
 #Models/door_elevator2_000041.obj
-index: 1927
-#Models/door_elevator2_000042.obj
-index: 1928
+index: 1796
 
-#Models/door_elevator3_000001.obj
-index: 1929
+#Models/door_elevator3_000002.obj
+index: 1797
 animated: 1
 animationNum: 16
-frames: 44
-#Models/door_elevator3_000002.obj
-index: 1930
 #Models/door_elevator3_000003.obj
-index: 1931
+index: 1798
 #Models/door_elevator3_000004.obj
-index: 1932
+index: 1799
 #Models/door_elevator3_000005.obj
-index: 1933
+index: 1800
 #Models/door_elevator3_000006.obj
-index: 1934
+index: 1801
 #Models/door_elevator3_000007.obj
-index: 1935
+index: 1802
 #Models/door_elevator3_000008.obj
-index: 1936
+index: 1803
 #Models/door_elevator3_000009.obj
-index: 1937
+index: 1804
 #Models/door_elevator3_000010.obj
-index: 1938
+index: 1805
 #Models/door_elevator3_000011.obj
-index: 1939
+index: 1806
 #Models/door_elevator3_000012.obj
-index: 1940
+index: 1807
 #Models/door_elevator3_000013.obj
-index: 1941
+index: 1808
 #Models/door_elevator3_000014.obj
-index: 1942
+index: 1809
 #Models/door_elevator3_000015.obj
-index: 1943
+index: 1810
 #Models/door_elevator3_000016.obj
-index: 1944
+index: 1811
 #Models/door_elevator3_000017.obj
-index: 1945
+index: 1812
 #Models/door_elevator3_000018.obj
-index: 1946
+index: 1813
 #Models/door_elevator3_000019.obj
-index: 1947
+index: 1814
 #Models/door_elevator3_000020.obj
-index: 1948
+index: 1815
 #Models/door_elevator3_000021.obj
-index: 1949
+index: 1816
 #Models/door_elevator3_000022.obj
-index: 1950
-#Models/door_elevator3_000023.obj
-index: 1951
+index: 1817
 #Models/door_elevator3_000024.obj
-index: 1952
+index: 1818
 #Models/door_elevator3_000025.obj
-index: 1953
+index: 1819
 #Models/door_elevator3_000026.obj
-index: 1954
+index: 1820
 #Models/door_elevator3_000027.obj
-index: 1955
+index: 1821
 #Models/door_elevator3_000028.obj
-index: 1956
+index: 1822
 #Models/door_elevator3_000029.obj
-index: 1957
+index: 1823
 #Models/door_elevator3_000030.obj
-index: 1958
+index: 1824
 #Models/door_elevator3_000031.obj
-index: 1959
+index: 1825
 #Models/door_elevator3_000032.obj
-index: 1960
+index: 1826
 #Models/door_elevator3_000033.obj
-index: 1961
+index: 1827
 #Models/door_elevator3_000034.obj
-index: 1962
+index: 1828
 #Models/door_elevator3_000035.obj
-index: 1963
+index: 1829
 #Models/door_elevator3_000036.obj
-index: 1964
+index: 1830
 #Models/door_elevator3_000037.obj
-index: 1965
+index: 1831
 #Models/door_elevator3_000038.obj
-index: 1966
+index: 1832
 #Models/door_elevator3_000039.obj
-index: 1967
+index: 1833
 #Models/door_elevator3_000040.obj
-index: 1968
+index: 1834
 #Models/door_elevator3_000041.obj
-index: 1969
+index: 1835
 #Models/door_elevator3_000042.obj
-index: 1970
+index: 1836
 #Models/door_elevator3_000043.obj
-index: 1971
-#Models/door_elevator3_000044.obj
-index: 1972
+index: 1837
 
-#Models/door_elevator4_000001.obj
-index: 1973
+#Models/door_elevator4_000002.obj
+index: 1838
 animated: 1
 animationNum: 17
-frames: 63
-#Models/door_elevator4_000002.obj
-index: 1974
 #Models/door_elevator4_000003.obj
-index: 1975
+index: 1839
 #Models/door_elevator4_000004.obj
-index: 1976
+index: 1840
 #Models/door_elevator4_000005.obj
-index: 1977
+index: 1841
 #Models/door_elevator4_000006.obj
-index: 1978
+index: 1842
 #Models/door_elevator4_000007.obj
-index: 1979
+index: 1843
 #Models/door_elevator4_000008.obj
-index: 1980
+index: 1844
 #Models/door_elevator4_000009.obj
-index: 1981
+index: 1845
 #Models/door_elevator4_000010.obj
-index: 1982
+index: 1846
 #Models/door_elevator4_000011.obj
-index: 1983
+index: 1847
 #Models/door_elevator4_000012.obj
-index: 1984
+index: 1848
 #Models/door_elevator4_000013.obj
-index: 1985
+index: 1849
 #Models/door_elevator4_000014.obj
-index: 1986
+index: 1850
 #Models/door_elevator4_000015.obj
-index: 1987
+index: 1851
 #Models/door_elevator4_000016.obj
-index: 1988
+index: 1852
 #Models/door_elevator4_000017.obj
-index: 1989
+index: 1853
 #Models/door_elevator4_000018.obj
-index: 1990
+index: 1854
 #Models/door_elevator4_000019.obj
-index: 1991
+index: 1855
 #Models/door_elevator4_000020.obj
-index: 1992
+index: 1856
 #Models/door_elevator4_000021.obj
-index: 1993
+index: 1857
 #Models/door_elevator4_000022.obj
-index: 1994
+index: 1858
 #Models/door_elevator4_000023.obj
-index: 1995
+index: 1859
 #Models/door_elevator4_000024.obj
-index: 1996
+index: 1860
 #Models/door_elevator4_000025.obj
-index: 1997
+index: 1861
 #Models/door_elevator4_000026.obj
-index: 1998
+index: 1862
 #Models/door_elevator4_000027.obj
-index: 1999
+index: 1863
 #Models/door_elevator4_000028.obj
-index: 2000
+index: 1864
 #Models/door_elevator4_000029.obj
-index: 2001
+index: 1865
 #Models/door_elevator4_000030.obj
-index: 2002
+index: 1866
 #Models/door_elevator4_000031.obj
-index: 2003
+index: 1867
 #Models/door_elevator4_000032.obj
-index: 2004
-#Models/door_elevator4_000033.obj
-index: 2005
+index: 1868
 #Models/door_elevator4_000034.obj
-index: 2006
+index: 1869
 #Models/door_elevator4_000035.obj
-index: 2007
+index: 1870
 #Models/door_elevator4_000036.obj
-index: 2008
+index: 1871
 #Models/door_elevator4_000037.obj
-index: 2009
+index: 1872
 #Models/door_elevator4_000038.obj
-index: 2010
+index: 1873
 #Models/door_elevator4_000039.obj
-index: 2011
+index: 1874
 #Models/door_elevator4_000040.obj
-index: 2012
+index: 1875
 #Models/door_elevator4_000041.obj
-index: 2013
+index: 1876
 #Models/door_elevator4_000042.obj
-index: 2014
+index: 1877
 #Models/door_elevator4_000043.obj
-index: 2015
+index: 1878
 #Models/door_elevator4_000044.obj
-index: 2016
+index: 1879
 #Models/door_elevator4_000045.obj
-index: 2017
+index: 1880
 #Models/door_elevator4_000046.obj
-index: 2018
+index: 1881
 #Models/door_elevator4_000047.obj
-index: 2019
+index: 1882
 #Models/door_elevator4_000048.obj
-index: 2020
+index: 1883
 #Models/door_elevator4_000049.obj
-index: 2021
+index: 1884
 #Models/door_elevator4_000050.obj
-index: 2022
+index: 1885
 #Models/door_elevator4_000051.obj
-index: 2023
+index: 1886
 #Models/door_elevator4_000052.obj
-index: 2024
+index: 1887
 #Models/door_elevator4_000053.obj
-index: 2025
+index: 1888
 #Models/door_elevator4_000054.obj
-index: 2026
+index: 1889
 #Models/door_elevator4_000055.obj
-index: 2027
+index: 1890
 #Models/door_elevator4_000056.obj
-index: 2028
+index: 1891
 #Models/door_elevator4_000057.obj
-index: 2029
+index: 1892
 #Models/door_elevator4_000058.obj
-index: 2030
+index: 1893
 #Models/door_elevator4_000059.obj
-index: 2031
+index: 1894
 #Models/door_elevator4_000060.obj
-index: 2032
+index: 1895
 #Models/door_elevator4_000061.obj
-index: 2033
+index: 1896
 #Models/door_elevator4_000062.obj
-index: 2034
-#Models/door_elevator4_000063.obj
-index: 2035
+index: 1897
 
-#Models/door_wall1_000001.obj
-index: 2036
+#Models/door_wall1_000002.obj
+index: 1898
 animated: 1
 animationNum: 18
-frames: 42
-#Models/door_wall1_000002.obj
-index: 2037
 #Models/door_wall1_000003.obj
-index: 2038
+index: 1899
 #Models/door_wall1_000004.obj
-index: 2039
+index: 1900
 #Models/door_wall1_000005.obj
-index: 2040
+index: 1901
 #Models/door_wall1_000006.obj
-index: 2041
+index: 1902
 #Models/door_wall1_000007.obj
-index: 2042
+index: 1903
 #Models/door_wall1_000008.obj
-index: 2043
+index: 1904
 #Models/door_wall1_000009.obj
-index: 2044
+index: 1905
 #Models/door_wall1_000010.obj
-index: 2045
+index: 1906
 #Models/door_wall1_000011.obj
-index: 2046
+index: 1907
 #Models/door_wall1_000012.obj
-index: 2047
+index: 1908
 #Models/door_wall1_000013.obj
-index: 2048
+index: 1909
 #Models/door_wall1_000014.obj
-index: 2049
+index: 1910
 #Models/door_wall1_000015.obj
-index: 2050
+index: 1911
 #Models/door_wall1_000016.obj
-index: 2051
+index: 1912
 #Models/door_wall1_000017.obj
-index: 2052
+index: 1913
 #Models/door_wall1_000018.obj
-index: 2053
+index: 1914
 #Models/door_wall1_000019.obj
-index: 2054
+index: 1915
 #Models/door_wall1_000020.obj
-index: 2055
+index: 1916
 #Models/door_wall1_000021.obj
-index: 2056
-#Models/door_wall1_000022.obj
-index: 2057
+index: 1917
 #Models/door_wall1_000023.obj
-index: 2058
+index: 1918
 #Models/door_wall1_000024.obj
-index: 2059
+index: 1919
 #Models/door_wall1_000025.obj
-index: 2060
+index: 1920
 #Models/door_wall1_000026.obj
-index: 2061
+index: 1921
 #Models/door_wall1_000027.obj
-index: 2062
+index: 1922
 #Models/door_wall1_000028.obj
-index: 2063
+index: 1923
 #Models/door_wall1_000029.obj
-index: 2064
+index: 1924
 #Models/door_wall1_000030.obj
-index: 2065
+index: 1925
 #Models/door_wall1_000031.obj
-index: 2066
+index: 1926
 #Models/door_wall1_000032.obj
-index: 2067
+index: 1927
 #Models/door_wall1_000033.obj
-index: 2068
+index: 1928
 #Models/door_wall1_000034.obj
-index: 2069
+index: 1929
 #Models/door_wall1_000035.obj
-index: 2070
+index: 1930
 #Models/door_wall1_000036.obj
-index: 2071
+index: 1931
 #Models/door_wall1_000037.obj
-index: 2072
+index: 1932
 #Models/door_wall1_000038.obj
-index: 2073
+index: 1933
 #Models/door_wall1_000039.obj
-index: 2074
+index: 1934
 #Models/door_wall1_000040.obj
-index: 2075
+index: 1935
 #Models/door_wall1_000041.obj
-index: 2076
-#Models/door_wall1_000042.obj
-index: 2077
+index: 1936
 
-#Models/door_wall2_000001.obj
-index: 2078
+#Models/door_wall2_000002.obj
+index: 1937
 animated: 1
 animationNum: 19
-frames: 42
-#Models/door_wall2_000002.obj
-index: 2079
 #Models/door_wall2_000003.obj
-index: 2080
+index: 1938
 #Models/door_wall2_000004.obj
-index: 2081
+index: 1939
 #Models/door_wall2_000005.obj
-index: 2082
+index: 1940
 #Models/door_wall2_000006.obj
-index: 2083
+index: 1941
 #Models/door_wall2_000007.obj
-index: 2084
+index: 1942
 #Models/door_wall2_000008.obj
-index: 2085
+index: 1943
 #Models/door_wall2_000009.obj
-index: 2086
+index: 1944
 #Models/door_wall2_000010.obj
-index: 2087
+index: 1945
 #Models/door_wall2_000011.obj
-index: 2088
+index: 1946
 #Models/door_wall2_000012.obj
-index: 2089
+index: 1947
 #Models/door_wall2_000013.obj
-index: 2090
+index: 1948
 #Models/door_wall2_000014.obj
-index: 2091
+index: 1949
 #Models/door_wall2_000015.obj
-index: 2092
+index: 1950
 #Models/door_wall2_000016.obj
-index: 2093
+index: 1951
 #Models/door_wall2_000017.obj
-index: 2094
+index: 1952
 #Models/door_wall2_000018.obj
-index: 2095
+index: 1953
 #Models/door_wall2_000019.obj
-index: 2096
+index: 1954
 #Models/door_wall2_000020.obj
-index: 2097
+index: 1955
 #Models/door_wall2_000021.obj
-index: 2098
-#Models/door_wall2_000022.obj
-index: 2099
+index: 1956
 #Models/door_wall2_000023.obj
-index: 2100
+index: 1957
 #Models/door_wall2_000024.obj
-index: 2101
+index: 1958
 #Models/door_wall2_000025.obj
-index: 2102
+index: 1959
 #Models/door_wall2_000026.obj
-index: 2103
+index: 1960
 #Models/door_wall2_000027.obj
-index: 2104
+index: 1961
 #Models/door_wall2_000028.obj
-index: 2105
+index: 1962
 #Models/door_wall2_000029.obj
-index: 2106
+index: 1963
 #Models/door_wall2_000030.obj
-index: 2107
+index: 1964
 #Models/door_wall2_000031.obj
-index: 2108
+index: 1965
 #Models/door_wall2_000032.obj
-index: 2109
+index: 1966
 #Models/door_wall2_000033.obj
-index: 2110
+index: 1967
 #Models/door_wall2_000034.obj
-index: 2111
+index: 1968
 #Models/door_wall2_000035.obj
-index: 2112
+index: 1969
 #Models/door_wall2_000036.obj
-index: 2113
+index: 1970
 #Models/door_wall2_000037.obj
-index: 2114
+index: 1971
 #Models/door_wall2_000038.obj
-index: 2115
+index: 1972
 #Models/door_wall2_000039.obj
-index: 2116
+index: 1973
 #Models/door_wall2_000040.obj
-index: 2117
+index: 1974
 #Models/door_wall2_000041.obj
-index: 2118
-#Models/door_wall2_000042.obj
-index: 2119
+index: 1975
 
-#Models/door_wall3_000001.obj
-index: 2120
+#Models/door_wall3_000002.obj
+index: 1976
 animated: 1
 animationNum: 20
-frames: 34
-#Models/door_wall3_000002.obj
-index: 2121
 #Models/door_wall3_000003.obj
-index: 2122
+index: 1977
 #Models/door_wall3_000004.obj
-index: 2123
+index: 1978
 #Models/door_wall3_000005.obj
-index: 2124
+index: 1979
 #Models/door_wall3_000006.obj
-index: 2125
+index: 1980
 #Models/door_wall3_000007.obj
-index: 2126
+index: 1981
 #Models/door_wall3_000008.obj
-index: 2127
+index: 1982
 #Models/door_wall3_000009.obj
-index: 2128
+index: 1983
 #Models/door_wall3_000010.obj
-index: 2129
+index: 1984
 #Models/door_wall3_000011.obj
-index: 2130
+index: 1985
 #Models/door_wall3_000012.obj
-index: 2131
+index: 1986
 #Models/door_wall3_000013.obj
-index: 2132
+index: 1987
 #Models/door_wall3_000014.obj
-index: 2133
+index: 1988
 #Models/door_wall3_000015.obj
-index: 2134
+index: 1989
 #Models/door_wall3_000016.obj
-index: 2135
+index: 1990
 #Models/door_wall3_000017.obj
-index: 2136
-#Models/door_wall3_000018.obj
-index: 2137
+index: 1991
 #Models/door_wall3_000019.obj
-index: 2138
+index: 1992
 #Models/door_wall3_000020.obj
-index: 2139
+index: 1993
 #Models/door_wall3_000021.obj
-index: 2140
+index: 1994
 #Models/door_wall3_000022.obj
-index: 2141
+index: 1995
 #Models/door_wall3_000023.obj
-index: 2142
+index: 1996
 #Models/door_wall3_000024.obj
-index: 2143
+index: 1997
 #Models/door_wall3_000025.obj
-index: 2144
+index: 1998
 #Models/door_wall3_000026.obj
-index: 2145
+index: 1999
 #Models/door_wall3_000027.obj
-index: 2146
+index: 2000
 #Models/door_wall3_000028.obj
-index: 2147
+index: 2001
 #Models/door_wall3_000029.obj
-index: 2148
+index: 2002
 #Models/door_wall3_000030.obj
-index: 2149
+index: 2003
 #Models/door_wall3_000031.obj
-index: 2150
+index: 2004
 #Models/door_wall3_000032.obj
-index: 2151
+index: 2005
 #Models/door_wall3_000033.obj
-index: 2152
-#Models/door_wall3_000034.obj
-index: 2153
+index: 2006
 
 #Models/eng_wallpump_000001.obj
-index: 2154
+index: 2007
 animated: 1
 animationNum: 21
-frames: 47
 #Models/eng_wallpump_000002.obj
-index: 2155
+index: 2008
 #Models/eng_wallpump_000003.obj
-index: 2156
+index: 2009
 #Models/eng_wallpump_000004.obj
-index: 2157
+index: 2010
 #Models/eng_wallpump_000005.obj
-index: 2158
+index: 2011
 #Models/eng_wallpump_000006.obj
-index: 2159
+index: 2012
 #Models/eng_wallpump_000007.obj
-index: 2160
+index: 2013
 #Models/eng_wallpump_000008.obj
-index: 2161
+index: 2014
 #Models/eng_wallpump_000009.obj
-index: 2162
+index: 2015
 #Models/eng_wallpump_000010.obj
-index: 2163
+index: 2016
 #Models/eng_wallpump_000011.obj
-index: 2164
+index: 2017
 #Models/eng_wallpump_000012.obj
-index: 2165
+index: 2018
 #Models/eng_wallpump_000013.obj
-index: 2166
+index: 2019
 #Models/eng_wallpump_000014.obj
-index: 2167
+index: 2020
 #Models/eng_wallpump_000015.obj
-index: 2168
+index: 2021
 #Models/eng_wallpump_000016.obj
-index: 2169
+index: 2022
 #Models/eng_wallpump_000017.obj
-index: 2170
+index: 2023
 #Models/eng_wallpump_000018.obj
-index: 2171
+index: 2024
 #Models/eng_wallpump_000019.obj
-index: 2172
+index: 2025
 #Models/eng_wallpump_000020.obj
-index: 2173
+index: 2026
 #Models/eng_wallpump_000021.obj
-index: 2174
+index: 2027
 #Models/eng_wallpump_000022.obj
-index: 2175
+index: 2028
 #Models/eng_wallpump_000023.obj
-index: 2176
+index: 2029
 #Models/eng_wallpump_000024.obj
-index: 2177
+index: 2030
 #Models/eng_wallpump_000025.obj
-index: 2178
+index: 2031
 #Models/eng_wallpump_000026.obj
-index: 2179
+index: 2032
 #Models/eng_wallpump_000027.obj
-index: 2180
+index: 2033
 #Models/eng_wallpump_000028.obj
-index: 2181
+index: 2034
 #Models/eng_wallpump_000029.obj
-index: 2182
+index: 2035
 #Models/eng_wallpump_000030.obj
-index: 2183
+index: 2036
 #Models/eng_wallpump_000031.obj
-index: 2184
+index: 2037
 #Models/eng_wallpump_000032.obj
-index: 2185
+index: 2038
 #Models/eng_wallpump_000033.obj
-index: 2186
+index: 2039
 #Models/eng_wallpump_000034.obj
-index: 2187
+index: 2040
 #Models/eng_wallpump_000035.obj
-index: 2188
+index: 2041
 #Models/eng_wallpump_000036.obj
-index: 2189
+index: 2042
 #Models/eng_wallpump_000037.obj
-index: 2190
+index: 2043
 #Models/eng_wallpump_000038.obj
-index: 2191
+index: 2044
 #Models/eng_wallpump_000039.obj
-index: 2192
+index: 2045
 #Models/eng_wallpump_000040.obj
-index: 2193
+index: 2046
 #Models/eng_wallpump_000041.obj
-index: 2194
+index: 2047
 #Models/eng_wallpump_000042.obj
-index: 2195
+index: 2048
 #Models/eng_wallpump_000043.obj
-index: 2196
+index: 2049
 #Models/eng_wallpump_000044.obj
-index: 2197
+index: 2050
 #Models/eng_wallpump_000045.obj
-index: 2198
+index: 2051
 #Models/eng_wallpump_000046.obj
-index: 2199
+index: 2052
 #Models/eng_wallpump_000047.obj
-index: 2200
+index: 2053
+
 
 #Models/flight_fanwall_000001.obj
-index: 2201
+index: 2054
 animated: 1
 animationNum: 22
-frames: 50
 #Models/flight_fanwall_000002.obj
-index: 2202
+index: 2055
 #Models/flight_fanwall_000003.obj
-index: 2203
+index: 2056
 #Models/flight_fanwall_000004.obj
-index: 2204
+index: 2057
 #Models/flight_fanwall_000005.obj
-index: 2205
+index: 2058
 #Models/flight_fanwall_000006.obj
-index: 2206
+index: 2059
 #Models/flight_fanwall_000007.obj
-index: 2207
+index: 2060
 #Models/flight_fanwall_000008.obj
-index: 2208
+index: 2061
 #Models/flight_fanwall_000009.obj
-index: 2209
+index: 2062
 #Models/flight_fanwall_000010.obj
-index: 2210
+index: 2063
 #Models/flight_fanwall_000011.obj
-index: 2211
+index: 2064
 #Models/flight_fanwall_000012.obj
-index: 2212
+index: 2065
 #Models/flight_fanwall_000013.obj
-index: 2213
+index: 2066
 #Models/flight_fanwall_000014.obj
-index: 2214
+index: 2067
 #Models/flight_fanwall_000015.obj
-index: 2215
+index: 2068
 #Models/flight_fanwall_000016.obj
-index: 2216
+index: 2069
 #Models/flight_fanwall_000017.obj
-index: 2217
+index: 2070
 #Models/flight_fanwall_000018.obj
-index: 2218
+index: 2071
 #Models/flight_fanwall_000019.obj
-index: 2219
+index: 2072
 #Models/flight_fanwall_000020.obj
-index: 2220
+index: 2073
 #Models/flight_fanwall_000021.obj
-index: 2221
+index: 2074
 #Models/flight_fanwall_000022.obj
-index: 2222
+index: 2075
 #Models/flight_fanwall_000023.obj
-index: 2223
+index: 2076
 #Models/flight_fanwall_000024.obj
-index: 2224
+index: 2077
 #Models/flight_fanwall_000025.obj
-index: 2225
+index: 2078
 #Models/flight_fanwall_000026.obj
-index: 2226
+index: 2079
 #Models/flight_fanwall_000027.obj
-index: 2227
+index: 2080
 #Models/flight_fanwall_000028.obj
-index: 2228
+index: 2081
 #Models/flight_fanwall_000029.obj
-index: 2229
+index: 2082
 #Models/flight_fanwall_000030.obj
-index: 2230
+index: 2083
 #Models/flight_fanwall_000031.obj
-index: 2231
+index: 2084
 #Models/flight_fanwall_000032.obj
-index: 2232
+index: 2085
 #Models/flight_fanwall_000033.obj
-index: 2233
+index: 2086
 #Models/flight_fanwall_000034.obj
-index: 2234
+index: 2087
 #Models/flight_fanwall_000035.obj
-index: 2235
+index: 2088
 #Models/flight_fanwall_000036.obj
-index: 2236
+index: 2089
 #Models/flight_fanwall_000037.obj
-index: 2237
+index: 2090
 #Models/flight_fanwall_000038.obj
-index: 2238
+index: 2091
 #Models/flight_fanwall_000039.obj
-index: 2239
+index: 2092
 #Models/flight_fanwall_000040.obj
-index: 2240
+index: 2093
 #Models/flight_fanwall_000041.obj
-index: 2241
+index: 2094
 #Models/flight_fanwall_000042.obj
-index: 2242
+index: 2095
 #Models/flight_fanwall_000043.obj
-index: 2243
+index: 2096
 #Models/flight_fanwall_000044.obj
-index: 2244
+index: 2097
 #Models/flight_fanwall_000045.obj
-index: 2245
+index: 2098
 #Models/flight_fanwall_000046.obj
-index: 2246
+index: 2099
 #Models/flight_fanwall_000047.obj
-index: 2247
+index: 2100
 #Models/flight_fanwall_000048.obj
-index: 2248
+index: 2101
 #Models/flight_fanwall_000049.obj
-index: 2249
+index: 2102
 #Models/flight_fanwall_000050.obj
-index: 2250
+index: 2103
+
 
 #Models/npc_bot_cortex_reaver_000001.obj
 index: 2251
 animated: 1
 animationNum: 23
-frames: 106
 #Models/npc_bot_cortex_reaver_000002.obj
 index: 2252
 #Models/npc_bot_cortex_reaver_000003.obj
@@ -4459,7 +4165,6 @@ index: 2356
 index: 2357
 animated: 1
 animationNum: 24
-frames: 279
 #Models/npc_cyborgassassin_000002.obj
 index: 2358
 #Models/npc_cyborgassassin_000003.obj
@@ -5021,7 +4726,6 @@ index: 2635
 index: 2636
 animated: 1
 animationNum: 25
-frames: 434
 #Models/npc_cyborg_diego_000002.obj
 index: 2637
 #Models/npc_cyborg_diego_000003.obj
@@ -5893,7 +5597,6 @@ index: 3069
 index: 3070
 animated: 1
 animationNum: 26
-frames: 450
 #Models/npc_cyborg_elite_000002.obj
 index: 3071
 #Models/npc_cyborg_elite_000003.obj
@@ -6797,7 +6500,6 @@ index: 3519
 index: 3520
 animated: 1
 animationNum: 27
-frames: 439
 #Models/npc_cyborg_enforcer_000002.obj
 index: 3521
 #Models/npc_cyborg_enforcer_000003.obj
@@ -7679,7 +7381,6 @@ index: 3958
 index: 3959
 animated: 1
 animationNum: 28
-frames: 222
 #Models/npc_cyborgwarrior_000002.obj
 index: 3960
 #Models/npc_cyborgwarrior_000003.obj
@@ -8127,7 +7828,6 @@ index: 4180
 index: 4181
 animated: 1
 animationNum: 29
-frames: 132
 #Models/npc_execbot_000002.obj
 index: 4182
 #Models/npc_execbot_000003.obj
@@ -8395,7 +8095,6 @@ index: 4312
 index: 4313
 animated: 1
 animationNum: 30
-frames: 122
 #Models/npc_flierbot_000002.obj
 index: 4314
 #Models/npc_flierbot_000003.obj
@@ -8643,7 +8342,6 @@ index: 4434
 index: 4435
 animated: 1
 animationNum: 31
-frames: 180
 #Models/npc_gortiger_000002.obj
 index: 4436
 #Models/npc_gortiger_000003.obj
@@ -9007,7 +8705,6 @@ index: 4614
 index: 4615
 animated: 1
 animationNum: 32
-frames: 249
 #Models/npc_hopper_000002.obj
 index: 4616
 #Models/npc_hopper_000003.obj
@@ -9509,7 +9206,6 @@ index: 4863
 index: 4864
 animated: 1
 animationNum: 33
-frames: 103
 #Models/npc_invisomut_000002.obj
 index: 4865
 #Models/npc_invisomut_000003.obj
@@ -9719,7 +9415,6 @@ index: 4966
 index: 4967
 animated: 1
 animationNum: 34
-frames: 170
 #Models/npc_maintenancebot_000002.obj
 index: 4968
 #Models/npc_maintenancebot_000003.obj
@@ -10063,7 +9758,6 @@ index: 5136
 index: 5137
 animated: 1
 animationNum: 35
-frames: 120
 #Models/npc_mutant_avian_000002.obj
 index: 5138
 #Models/npc_mutant_avian_000003.obj
@@ -10307,7 +10001,6 @@ index: 5256
 index: 5257
 animated: 1
 animationNum: 36
-frames: 240
 #Models/npc_plantmutant_000002.obj
 index: 5258
 #Models/npc_plantmutant_000003.obj
@@ -10791,7 +10484,6 @@ index: 5496
 index: 5497
 animated: 1
 animationNum: 37
-frames: 149
 #Models/npc_repairbot_000002.obj
 index: 5498
 #Models/npc_repairbot_000003.obj
@@ -11093,7 +10785,6 @@ index: 5645
 index: 5646
 animated: 1
 animationNum: 38
-frames: 96
 #Models/npc_sec1bot_000002.obj
 index: 5647
 #Models/npc_sec1bot_000003.obj
@@ -11289,7 +10980,6 @@ index: 5741
 index: 5742
 animated: 1
 animationNum: 39
-frames: 76
 #Models/npc_sec2bot_000002.obj
 index: 5743
 #Models/npc_sec2bot_000003.obj
@@ -11445,7 +11135,6 @@ index: 5817
 index: 5818
 animated: 1
 animationNum: 40
-frames: 85
 #Models/npc_servbot_000002.obj
 index: 5819
 #Models/npc_servbot_000003.obj
@@ -11619,7 +11308,6 @@ index: 5902
 index: 5903
 animated: 1
 animationNum: 41
-frames: 226
 #Models/npc_virusmutant_000002.obj
 index: 5904
 #Models/npc_virusmutant_000003.obj
@@ -12075,7 +11763,6 @@ index: 6128
 index: 6129
 animated: 1
 animationNum: 42
-frames: 157
 #Models/npc_zerogmut_000002.obj
 index: 6130
 #Models/npc_zerogmut_000003.obj
@@ -12393,7 +12080,6 @@ index: 6285
 index: 6286
 animated: 1
 animationNum: 43
-frames: 43
 #Models/puzzlepanel1_000002.obj
 index: 6287
 #Models/puzzlepanel1_000003.obj
@@ -12483,7 +12169,6 @@ index: 6328
 index: 6329
 animated: 1
 animationNum: 44
-frames: 31
 #Models/puzzlepanel2_000001.obj
 index: 6330
 #Models/puzzlepanel2_000002.obj
@@ -12549,7 +12234,6 @@ index: 6359
 index: 6360
 animated: 1
 animationNum: 45
-frames: 19
 #Models/puzzlepanel3_000001.obj
 index: 6361
 #Models/puzzlepanel3_000002.obj
@@ -12591,7 +12275,6 @@ index: 6378
 index: 6379
 animated: 1
 animationNum: 46
-frames: 100
 #Models/sparkingwire_000002.obj
 index: 6380
 #Models/sparkingwire_000003.obj
@@ -12795,7 +12478,6 @@ index: 6478
 index: 6479
 animated: 1
 animationNum: 47
-frames: 7
 #Models/switch4_000002.obj
 index: 6480
 #Models/switch4_000003.obj
@@ -12813,7 +12495,6 @@ index: 6485
 index: 6486
 animated: 1
 animationNum: 48
-frames: 12
 #Models/switch5_000002.obj
 index: 6487
 #Models/switch5_000003.obj
@@ -12841,7 +12522,6 @@ index: 6497
 index: 6498
 animated: 1
 animationNum: 49
-frames: 25
 #Models/v_pipe_000002.obj
 index: 6499
 #Models/v_pipe_000003.obj
@@ -12895,7 +12575,6 @@ index: 6522
 index: 6523
 animated: 1
 animationNum: 50
-frames: 23
 #Models/v_rapier_000002.obj
 index: 6524
 #Models/v_rapier_000003.obj
@@ -12945,7 +12624,6 @@ index: 6545
 index: 6546
 animated: 1
 animationNum: 51
-frames: 258
 #Models/npc_mutant_cyborg_000002.obj
 index: 6547
 #Models/npc_mutant_cyborg_000003.obj

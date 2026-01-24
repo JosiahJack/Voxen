@@ -215,7 +215,7 @@ Quaternion axis_angle_quaternion(const Vector3 axis, float angle) { float s = vs
 
 // Apply the Unity hierarchy nonsense, TODO: Save out level#.txt from the engine just once and then delete all this.
 void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t entIdx) {
-        if (Sys_Global.levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
+    if (Sys_Global.levelCurrentlyLoading && entIdx != 755 && entIdx != 590) { // Adjusted for in the level data directly, no correction.
         instances[instanceIdx].position.x += correctionX;   
         instances[instanceIdx].position.y += correctionY;
         instances[instanceIdx].position.z += correctionZ;
@@ -242,6 +242,11 @@ void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t ent
             instances[instanceIdx].position.y += correctionDynamicsY;
             instances[instanceIdx].position.z += correctionDynamicsZ;
         } 
+    }
+    
+    if (entIdx == 79) {
+        Vector3 axis = (Vector3){1.0f, 0.0f, 0.0f}; // X-axis
+        instances[instanceIdx].rotation = axis_angle_quaternion(axis, deg2rad(90.0f));
     }
 }
 

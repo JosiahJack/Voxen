@@ -271,6 +271,7 @@ index: 39
 model: 111
 cardchunk: 1
 texture: 273
+glowtexture: 251
 #chunk_eng1_9d
 index: 40
 model: 110
@@ -338,7 +339,8 @@ texture: 285
 #chunk_eng2_6
 index: 53
 model: 0
-texture: 1252
+texture: 141
+glowtexture: 142
 numclips: 1
 animationNum: 21
 // eng_wallpump, animated, not a card chunk
@@ -482,6 +484,7 @@ numclips: 1
 animationNum: 22
 cardchunk: 1
 texture: 96
+glowtexture: 192
 #chunk_flight1_1
 index: 80
 model: 146

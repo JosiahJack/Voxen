@@ -200,7 +200,7 @@ typedef struct {
     bool     dirty;
 } Portal;
 
-typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint16_t frameEndModelIndex; uint8_t framerate; } AnimationClip;
+typedef struct { float speed; uint16_t frameStart; uint16_t frameEnd; uint16_t frameStartModelIndex; uint8_t framerate; } AnimationClip;
 
 typedef struct {
     Vector3 point;
@@ -566,7 +566,7 @@ static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 //static const uint8_t PhysicsLayer_               = 30;
 static const uint8_t PhysicsLayer_NULL             = 31;
 
-#define MODEL_IDX_MAX 7168
+#define MODEL_IDX_MAX 6805
 typedef struct {
 	GLuint inputImageID;
 	GLuint inputDepthID;
@@ -761,7 +761,6 @@ typedef /*FAT*/ struct {
     uint8_t numclips;
     uint16_t animationNum; // Global animation identifier into short table of AnimationClip's
     uint16_t frame; // 0 based index into the delta tables, 0 skips delta read and just uses raw modelIndex base pos verts with no delta applied.
-    uint16_t frames; // Total frames for the model
     int32_t cellIndex;
     uint8_t portalIndex; // If this is a door, index into portal array for toggling state.
     DoorState doorState;
@@ -1431,7 +1430,7 @@ static inline void mul_mat4(float *out, const float *a, const float *b) { // out
 }
 
 void ParseGameData(void);
-bool parse_data_file(DataParser *parser, const char *filename);
+bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
 
 extern uint16_t invalidModelIndexCount;
 #ifdef ONLY_LOAD_LEVEL_NEEDS

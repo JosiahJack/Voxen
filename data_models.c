@@ -1,5 +1,4 @@
 // data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
-DataParser model_parser;
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
@@ -7,193 +6,116 @@ uint32_t modelTriangleCounts[MODEL_IDX_MAX] = {0}; // 4kb
 bool modelHasAnimation[MODEL_IDX_MAX] = {0}; // 1kb
 float modelBounds[MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT] = {0}; // 1024 * 7 * 4 = 28.6kb
 uint16_t loadedModelsMaxIndex = 0;
-const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL] = {
-    // speed, frameStart, frameEnd, frameStartModelIndex, frameEndModelIndex, framerate
-    [0] = { // doorB (door2)
-        [ANIM_IDLE_CLOSED] = { 1.0f,  2,  2, 699, 698, 24 },
-        [ANIM_OPENING]     = { 1.0f,  2, 11, 699, 708, 24 },
-        [ANIM_IDLE_OPEN]   = { 1.0f, 11, 11, 708, 708, 24 },
-        [ANIM_CLOSING]     = { 1.0f, 12, 21, 709, 718, 24 }
-    },
-    [1] = { // doorA (door1)
-        [ANIM_IDLE_CLOSED] = { 1.0f, 2,  2,  719, 719, 24 },
-        [ANIM_OPENING]     = { 1.0f, 2,  12, 719, 729, 24 },
-        [ANIM_IDLE_OPEN]   = { 1.0f, 12, 12, 729, 729, 24 },
-        [ANIM_CLOSING]     = { 1.0f, 14, 24, 731, 741, 24 }
-    },
-    [2] = { // npc_humanoid_mutant
-        [ANIM_IDLE]        = { 1.0f,   0,  37, 742, 779, 30 },
-        [ANIM_WALK]        = { 1.0f,  50,  99, 792, 841, 30 },
-        [ANIM_RUN]         = { 1.0f,  50,  99, 792, 841, 30 },
-        [ANIM_ATTACK1]     = { 1.0f, 111, 136, 853, 878, 30 },
-        [ANIM_PAIN]        = { 1.0f, 138, 150, 880, 892, 30 },
-        [ANIM_DYING]       = { 1.0f, 153, 176, 895, 918, 30 }
-    },
-    [3] = { // npc_cyborg_drone
-        [ANIM_IDLE]        = { 1.0f,   1, 207, 924,  1142, 24 },
-        [ANIM_ATTACK1]     = { 1.0f, 219, 239, 1143, 1163, 24 },
-        [ANIM_WALK]        = { 1.0f, 252, 308, 1176, 1232, 24 },
-        [ANIM_PAIN]        = { 1.0f, 321, 330, 1245, 1254, 24 },
-        [ANIM_PAIN2]       = { 1.0f, 331, 344, 1255, 1268, 24 },
-        [ANIM_DYING]       = { 1.0f, 345, 369, 1269, 1293, 24 }
-    },
-
-    // [4] doorD (door4, bulkhead 1)
-    [4] = {
-        [ANIM_IDLE_CLOSED] = { 1.0f,  2,  2, 1302, 1302, 24 },
-        [ANIM_OPENING]     = { 1.0f,  2, 44, 1302, 1344, 24 },
-        [ANIM_IDLE_OPEN]   = { 1.0f, 44, 44, 1344, 1344, 24 },
-        [ANIM_CLOSING]     = { 1.0f, 46, 96, 1346, 1396, 24 }
-    },
-    [5] = { // doorC (door3)
-        [ANIM_IDLE_CLOSED] = { 1.0f,  2,  2, 1399, 1399, 24 },
-        [ANIM_OPENING]     = { 1.0f,  2, 25, 1399, 1422, 24 },
-        [ANIM_IDLE_OPEN]   = { 1.0f, 25, 25, 1422, 1422, 24 },
-        [ANIM_CLOSING]     = { 1.0f, 27, 44, 1424, 1441, 24 }
-    },
-    [6] = { // doorK (xdoor1)
-        [ANIM_IDLE_CLOSED] = { 1.0f,  1,  1, 1444, 1509, 24 },
-        [ANIM_OPENING]     = { 1.0f,  1, 30, 1444, 1474, 24 },
-        [ANIM_IDLE_OPEN]   = { 1.0f, 30, 30, 1474, 1474, 24 },
-        [ANIM_CLOSING]     = { 1.0f, 32, 66, 1474, 1508, 24 }
-    },
-    [7] = { // doorJ (xdoor2)
-        [ANIM_IDLE_CLOSED] = { 1.0f,  3,  3, 1512, 1512, 24 },
-        [ANIM_OPENING]     = { 1.0f,  3, 24, 1512, 1533, 24 },
-        [ANIM_IDLE_OPEN]   = { 1.0f, 30, 30, 1533, 1533, 24 },
-        [ANIM_CLOSING]     = { 1.0f, 27, 49, 1536, 1558, 24 }
-    },
-    [8] = { // doorL (door10)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 52,  1560, 1611, 24 }
-    },
-    [9] = { // doorE (door5)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 40,  1612, 1651, 24 }
-    },
-    [10] = { // doorF (door6)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 47,  1652, 1698, 24 }
-    },
-    [11] = { // doorG (door7)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 43,  1699, 1741, 24 }
-    },
-    [12] = { // doorH (door8)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 50,  1742, 1791, 24 }
-    },
-    [13] = { // doorI (door9)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 53,  1792, 1844, 24 }
-    },
-    [14] = { // door_elevator1
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  1845, 1886, 24 }
-    },
-    [15] = { // door_elevator2
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  1887, 1928, 24 }
-    },
-    [16] = { // door_elevator3
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 44,  1929, 1972, 24 }
-    },
-    [17] = { // door_elevator4
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 63,  1973, 2035, 24 }
-    },
-    [18] = { // door_secret2 (door_wall1)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  2036, 2077, 24 }
-    },
-    [19] = { // door_secret1 (door_wall2)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 42,  2078, 2119, 24 }
-    },
-    [20] = { // door_secret3 (door_wall3)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 34,  2120, 2153, 24 }
-    },
-    [21] = { // chunk_eng2_6 (eng_wallpump)
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 47,  2154, 2200, 24 }
-    },
-    [22] = { // flight_fanwall
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 50,  2201, 2250, 24 }
-    },
+const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL] = { // speed, frameStart, frameEnd, frameStartModelIndex, framerate
+    [0] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 699, 24 }, [ANIM_OPENING] = { 1.0f, 2, 11, 699, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 11, 11, 708, 24 }, [ANIM_CLOSING] = { 1.0f, 12, 21, 709, 24 } }, // doorB (door2)
+    [1] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 719, 24 }, [ANIM_OPENING] = { 1.0f, 2, 12, 719, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 12, 12, 729, 24 }, [ANIM_CLOSING] = { 1.0f, 14, 24, 731, 24 } }, // doorA (door1)
+    [2] = { [ANIM_IDLE] = { 1.0f, 0, 37, 742, 30 }, [ANIM_WALK] = { 1.0f, 50, 99, 780, 30 }, [ANIM_RUN] = { 1.1f, 50, 99, 792, 30 }, [ANIM_ATTACK1] = { 0.75f, 111, 136, 830, 30 }, [ANIM_PAIN] = { 0.5f, 138, 150, 856, 30 }, [ANIM_DYING] = { 0.75f, 153, 176, 869, 30 } }, // npc_humanoid_mutant
+    [3] = { [ANIM_IDLE] = { 1.0f, 1, 207, 893, 24 }, [ANIM_ATTACK1] = { 1.0f, 219, 239, 1100, 24 }, [ANIM_WALK] = { 1.0f, 252, 308, 1121, 24 }, [ANIM_RUN] = { 1.0f, 252, 308, 1121, 24 }, [ANIM_PAIN] = { 1.0f, 321, 330, 1177, 24 }, [ANIM_PAIN2] = { 1.0f, 331, 344, 1187, 24 }, [ANIM_DYING] = { 1.0f, 345, 369, 1201, 24 } }, // npc_cyborg_drone 
+    [4] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1234, 24 }, [ANIM_OPENING] = { 1.5f, 2, 44, 1234, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 44, 44, 1276, 24 }, [ANIM_CLOSING] = { 1.75f, 46, 96, 1277, 24 } }, // doorD (door4, bulkhead 1)
+    [5] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1328, 24 }, [ANIM_OPENING] = { 1.0f, 2, 25, 1328, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 25, 25, 1351, 24 }, [ANIM_CLOSING] = { 1.0f, 27, 44, 1352, 24 } }, // doorC (door3)
+    [6] = { [ANIM_IDLE_CLOSED] = { 1.0f, 1, 1, 1444, 24 }, [ANIM_OPENING] = { 1.2f, 1, 30, 1444, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 30, 30, 1399, 24 }, [ANIM_CLOSING] = { 1.2f, 32, 66, 1400, 24 } }, // doorK (xdoor1)
+    [7] = { [ANIM_IDLE_CLOSED] = { 1.0f, 3, 3, 1435, 24 }, [ANIM_OPENING] = { 1.2f, 3, 24, 1435, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 26, 26, 1457, 24 }, [ANIM_CLOSING] = { 1.2f, 27, 49, 1458, 24 } }, // doorJ (xdoor2)
+    [8] = { [ANIM_IDLE_CLOSED] = { 1.0f, 3, 3, 1481, 24 }, [ANIM_OPENING] = { 1.2f, 3, 27, 1481, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 27, 27, 1505, 24 }, [ANIM_CLOSING] = { 1.2f, 30, 51, 1506, 24 } }, // doorL (door10)
+    [9] = { [ANIM_IDLE_CLOSED] = { 1.0f, 3, 3, 1528, 24 }, [ANIM_OPENING] = { 1.0f, 3, 15, 1528, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 28, 28, 1541, 24 }, [ANIM_CLOSING] = { 1.0f, 28, 39, 1541, 24 } }, // doorE (door5)
+    [10] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1553, 24 }, [ANIM_OPENING] = { 1.0f, 2, 23, 1553, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 23, 23, 1574, 24 }, [ANIM_CLOSING] = { 1.0f, 27, 45, 1541, 24 } }, // doorF (door6)
+    [11] = { [ANIM_IDLE_CLOSED] = { 1.0f, 3, 3, 1594, 24 }, [ANIM_OPENING] = { 1.0f, 3, 22, 1594, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 22, 22, 1613, 24 }, [ANIM_CLOSING] = { 1.0f, 25, 42, 1614, 24 } }, // doorG (door7)
+    [12] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1632, 24 }, [ANIM_OPENING] = { 1.0f, 2, 25, 1632, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 25, 25, 1655, 24 }, [ANIM_CLOSING] = { 1.0f, 27, 49, 1656, 24 } }, // doorH (door8)
+    [13] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1679, 24 }, [ANIM_OPENING] = { 1.0f, 2, 24, 1679, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 24, 24, 1691, 24 }, [ANIM_CLOSING] = { 1.0f, 26, 52, 1692, 24 } }, // doorI (door9)
+    [14] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1719, 24 }, [ANIM_OPENING] = { 1.0f, 2, 20, 1719, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 20, 20, 1737, 24 }, [ANIM_CLOSING] = { 1.0f, 22, 41, 1738, 24 } }, // door_elevator1
+    [15] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1758, 24 }, [ANIM_OPENING] = { 1.5f, 2, 21, 1758, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 21, 21, 1777, 24 }, [ANIM_CLOSING] = { 1.5f, 23, 41, 1778, 24 } }, // door_elevator2
+    [16] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1797, 24 }, [ANIM_OPENING] = { 1.0f, 2, 22, 1797, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 22, 22, 1817, 24 }, [ANIM_CLOSING] = { 1.0f, 24, 43, 1818, 24 } }, // door_elevator3
+    [17] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1838, 24 }, [ANIM_OPENING] = { 2.0f, 2, 32, 1838, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 32, 32, 1868, 24 }, [ANIM_CLOSING] = { 2.0f, 34, 62, 1869, 24 } }, // door_elevator4
+    [18] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1898, 24 }, [ANIM_OPENING] = { 1.0f, 2, 21, 1898, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 21, 21, 1917, 24 }, [ANIM_CLOSING] = { 1.0f, 23, 41, 1918, 24 } }, // door_secret2 (door_wall1)
+    [19] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1937, 24 }, [ANIM_OPENING] = { 1.0f, 2, 21, 1937, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 21, 21, 1956, 24 }, [ANIM_CLOSING] = { 1.0f, 23, 41, 1957, 24 } }, // door_secret1 (door_wall2)
+    [20] = { [ANIM_IDLE_CLOSED] = { 1.0f, 2, 2, 1976, 24 }, [ANIM_OPENING] = { 1.0f, 2, 17, 1976, 24 }, [ANIM_IDLE_OPEN] = { 1.0f, 17, 17, 1991, 24 }, [ANIM_CLOSING] = { 1.0f, 19, 33, 1992, 24 } }, // door_secret3 (door_wall3)
+    [21] = { [ANIM_LOOP_ALL]    = { 1.0f, 1, 47, 2007, 24 } }, // chunk_eng2_6 (eng_wallpump)
+    [22] = { [ANIM_LOOP_ALL]    = { 1.0f, 1, 50, 2054, 24 } }, // flight_fanwall
     [23] = { // npc_bot_cortex_reaver
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 105, 2251, 2356, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 105, 2251, 24 }
     },
     [24] = { // npc_cyborgassassin
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 278, 2357, 2635, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 278, 2357, 24 }
     },
     [25] = { // npc_cyborg_diego
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 433, 2636, 3069, 30 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 433, 2636, 30 }
     },
     [26] = { // npc_cyborg_elite
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 449, 3070, 3519, 30 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 449, 3070, 30 }
     },
     [27] = { // npc_cyborg_enforcer
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 438, 3520, 3958, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 438, 3520, 24 }
     },
     [28] = { // npc_cyborgwarrior
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 221, 3959, 4180, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 221, 3959, 24 }
     },
     [29] = { // npc_execbot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 131, 4181, 4312, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 131, 4181, 24 }
     },
     [30] = { // npc_flierbot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 121, 4313, 4434, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 121, 4313, 24 }
     },
     [31] = { // npc_gortiger
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 179, 4435, 4614, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 179, 4435, 24 }
     },
     [32] = { // npc_hopper
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 248, 4615, 4863, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 248, 4615, 24 }
     },
     [33] = { // npc_invisomut
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 102, 4864, 4966, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 102, 4864, 24 }
     },
     [34] = { // npc_maintenancebot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 169, 4967, 5136, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 169, 4967, 24 }
     },
     [35] = { // npc_mutant_avian
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 119, 5137, 5256, 15 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 119, 5137, 15 }
     },
     [36] = { // npc_plantmutant
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 239, 5257, 5496, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 239, 5257, 24 }
     },
     [37] = { // npc_repairbot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 148, 5497, 5645, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 148, 5497, 24 }
     },
     [38] = { // npc_sec1bot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 95,  5646, 5741, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 95,  5646, 24 }
     },
     [39] = { // npc_sec2bot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 75,  5742, 5817, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 75,  5742, 24 }
     },
     [40] = { // npc_servbot
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 84,  5818, 5902, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 84,  5818, 24 }
     },
     [41] = { // npc_virusmutant
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 225, 5903, 6128, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 225, 5903, 24 }
     },
     [42] = { // npc_zerogmut
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 156, 6129, 6285, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 156, 6129, 24 }
     },
     [43] = { // puzzlepanel1
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 43,  6286, 6328, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 43,  6286, 24 }
     },
     [44] = { // puzzlepanel2 (starts at 000000)
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 30,  6329, 6359, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 30,  6329, 24 }
     },
     [45] = { // puzzlepanel3 (starts at 000000)
-        [ANIM_LOOP_ALL]    = { 1.0f, 0, 18,  6360, 6378, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 0, 18,  6360, 24 }
     },
     [46] = { // sparkingwire
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 100, 6379, 6478, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 100, 6379, 24 }
     },
     [47] = { // switch4
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 7,   6479, 6485, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 7,   6479, 24 }
     },
     [48] = { // switch5
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 12,  6486, 6497, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 12,  6486, 24 }
     },
     [49] = { // v_pipe
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 25,  6498, 6522, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 25,  6498, 24 }
     },
     [50] = { // v_rapier
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 23,  6523, 6545, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 23,  6523, 24 }
     },
     [51] = { // npc_mutant_cyborg
-        [ANIM_LOOP_ALL]    = { 1.0f, 1, 258, 6546, 6803, 24 }
+        [ANIM_LOOP_ALL]    = { 1.0f, 1, 258, 6546, 24 }
     }
 };
 
@@ -334,8 +256,8 @@ void LoadModels(void) {
         #endif
     }
     
-    uint16_t animatedModelCount = 0u, numFramesRemaining = 0u, /*animNum = UINT16_MAX,*/ numFrames = 0;
-    if (!parse_data_file(&model_parser, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
+    DataParser model_parser;
+    if (!parse_data_file(&model_parser, MODEL_IDX_MAX, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
     int32_t maxIndex = -1;
     for (uint32_t k = 0; k < model_parser.count; k++) {
@@ -351,8 +273,8 @@ void LoadModels(void) {
         DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
     #endif
     
-    modelVertices       = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
-    modelTriangles      = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    modelVertices  = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*),    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
+    modelTriangles = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     DebugRAM("after main OS_AllocateRAM block");
     size_t indexToParser_size = loadedModelsMaxIndex * sizeof(int32_t);
     int32_t* indexToParser = OS_AllocateRAM(NULL, indexToParser_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
@@ -382,11 +304,7 @@ void LoadModels(void) {
         #endif
         
         modelHasAnimation[i] = (model_parser.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
-        numFrames = model_parser.entries[parserIdx].frames;
         const char *fbx_path = model_parser.entries[parserIdx].path;
-        if (modelHasAnimation[i] && numFramesRemaining <= 0u) { 
-            numFramesRemaining = numFrames; animatedModelCount++; //DualLog("Loading animated model %s with %u frames\n", fbx_path, numFramesRemaining);
-        }
         if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); OS_Exit(1); }
 
         char vmdl_path[256];
@@ -402,7 +320,6 @@ void LoadModels(void) {
         float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;
         bool cache_hit = load_vmdl(vmdl_path, fbx_stamp, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
         LoadModel(cache_hit, i, fbx_path, vmdl_path, fbx_stamp, cached_verts, cached_vcnt, cached_idx, cached_icnt, mmap_map, mmap_size);        
-        if (numFramesRemaining > 0u) --numFramesRemaining;
     }
 
     DebugRAM("after model load loop");
@@ -428,16 +345,18 @@ void LoadModels(void) {
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
         memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
-        glFlush(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier
-        glFinish();
+        glFlush(); glFinish(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier
     }
     
     DebugRAM("after to model to gpu transfer");
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    glFlush();
-    glFinish();
-    DualLog(" total vertices: %u, total tris: %u, animated models %u, took %f secs\n", totalVertices, totalTris, animatedModelCount, get_time() - start_time);
+    glFlush(); glFinish();
+    free(model_parser.entries);
+    DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
     cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
+    #ifndef WINDOWS
+        malloc_trim(0);
+    #endif
     DebugRAM("After Load Models");
 }

@@ -315,7 +315,10 @@ index: 138
 index: 139
 #Textures/UI/bloodfont/y.png
 index: 140
-
+#Textures/eng_wallpump.png
+index: 141
+#Textures/eng_wallpump_glow.png
+index: 142
 #Textures/crate2_1.png
 index: 143
 #Textures/crate2_2.png
@@ -456,7 +459,8 @@ index: 190
 #Textures/door1_6.png
 index: 191
 transparent: 1
-
+#Textures/fan1_glow.png
+index: 192
 #Textures/door1_7.png
 index: 193
 #Textures/door7_lamp_glow.png
@@ -587,7 +591,8 @@ index: 247
 index: 249
 #Textures/elev3_dn.png
 index: 250
-
+#Textures/eng1_9_glow.png
+index: 251
 #Textures/EnemShot2.png
 index: 252
 transparent: 1
@@ -2248,8 +2253,6 @@ index: 1117
 #Textures/sequences/broken_clock02.png
 index: 1118
 
-#Textures/sequences/engpump_03_glow.png
-index: 1122
 #Textures/sequences/engscreen1_04.png
 index: 1123
 #Textures/sequences/g_energmine_00.png
@@ -2509,8 +2512,6 @@ index: 1250
 #Textures/deb_warecasing.png
 index: 1251
 
-#Textures/sequences/engpump_03.png
-index: 1253
 #Textures/med2_1_spec.png
 index: 1254
 #Textures/med1_1_norm.png

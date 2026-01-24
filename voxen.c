@@ -571,53 +571,35 @@ void PortalCulling(void);
 void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
-        if (instances[i].animationNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
+        uint16_t animNum = instances[i].animationNum;
+        if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         if (instances[i].numclips == 0) continue; // Invalid animation clip index
+        if (!EntityIsAnimated(instances[i].index)) continue;
         
-        if (EntityIsAnimated(instances[i].index)) {
-            AnimationClip currentClip = modelAnimationClips[instances[i].animationNum][instances[i].clip];
-            if (instances[i].currentFrameFinished < Sys_Global.current_time) {
-                instances[i].currentFrameFinished = Sys_Global.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-                instances[i].frame++;
-                if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-                else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+        AnimationClip currentClip = modelAnimationClips[animNum][instances[i].clip];
+        if (instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
+        
+        instances[i].currentFrameFinished = Sys_Global.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+        instances[i].frame++;
+        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
 
-                instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-                dirtyInstances[i] = true;
-                if (EntityIndexIsPortalBlockingDoor(instances[i].index)) {
-                    uint8_t portalIdx = instances[i].portalIndex;
-                    if (portalIdx < MAX_PORTALS) {
-                        uint16_t closedModelIndex = 719;
-                        switch(instances[i].index) { // TODO Make this data driven from entities.txt on each, or models.txt
-                            case 496: closedModelIndex =  719; break; // doorA
-                            case 497: closedModelIndex =  699; break; // doorB
-                            case 498: closedModelIndex = 1398; break; // doorC
-                            case 499: closedModelIndex = 1301; break; // doorD
-                            case 500: closedModelIndex = 1612; break; // doorE
-                            case 501: closedModelIndex = 1652; break; // doorF
-                            case 503: closedModelIndex = 1742; break; // doorH
-                            case 504: closedModelIndex = 1792; break; // doorI
-                            case 508: closedModelIndex = 1845; break; // door_elevator1
-                            case 509: closedModelIndex = 1887; break; // door_elevator2
-                            case 510: closedModelIndex = 1929; break; // door_elevator3
-                            case 511: closedModelIndex = 1973; break; // door_elevator4
-                            case 512: closedModelIndex = 2078; break; // door_secret1
-                            case 513: closedModelIndex = 2036; break; // door_secret2
-                            case 514: closedModelIndex = 2120; break; // door_secret3
-                        }
-                    
-                        bool currentState = activePortals[portalIdx].open;
-                        if (instances[i].modelIndex == closedModelIndex && currentState) {
-                            activePortals[portalIdx].open = false;
-                            activePortals[portalIdx].dirty = true;
-                            portalsNeedUpdated = true;
-                        } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
-                            activePortals[portalIdx].open = true;
-                            activePortals[portalIdx].dirty = true;
-                            portalsNeedUpdated = true;
-                        }
-                    }
+        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+        dirtyInstances[i] = true;
+        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) {
+            uint8_t portalIdx = instances[i].portalIndex;
+            if (portalIdx < MAX_PORTALS) {
+                uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
+                bool currentState = activePortals[portalIdx].open;
+                if (instances[i].modelIndex == closedModelIndex && currentState) {
+                    activePortals[portalIdx].open = false;
+                    activePortals[portalIdx].dirty = true;
+                    portalsNeedUpdated = true;
+                } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
+                    activePortals[portalIdx].open = true;
+                    activePortals[portalIdx].dirty = true;
+                    portalsNeedUpdated = true;
                 }
             }
         }

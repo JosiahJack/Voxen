@@ -161,13 +161,11 @@ void ParseGameData(void) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
-bool parse_data_file(DataParser *parser, const char *filename) {    
-    FILE *file = fopen(filename, "r");
-    if (!file) { DualLogError("Cannot open %s\n", filename); return false; }
+bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename) {    
+    FILE *file = fopen(filename, "r"); if (!file) { DualLogError("Cannot open %s\n", filename); return false; }
     
     char line[1024];
-    uint32_t lineNum = 0;
-    uint32_t max_index = 0;
+    uint32_t lineNum = 0, max_index = 0;
     while (fgets(line, sizeof(line), file)) { // First pass: count entries and find max index
         lineNum++;        
         char *start = line;
@@ -187,20 +185,17 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     }
 
     if (max_index == 0) { DualLogWarn("No entries found in %s\n", filename); fclose(file); return true; }
+    if (max_index >= maxSize) { DualLogWarn("Too large of index found in %s, %u exceeds limit %u\n", filename, max_index, maxSize); fclose(file); return true; }
 
     uint32_t entry_count = max_index + 1;
-    if (entry_count > parser->capacity) {
-        Entity *new_entries = realloc(parser->entries, entry_count * sizeof(Entity));  
-        parser->entries = new_entries;
-        for (uint32_t i = parser->capacity; i < entry_count; ++i) InitializeEntity(&parser->entries[i]);
-        parser->capacity = entry_count;
-    }
-    
+    Entity *new_entries = malloc(entry_count * sizeof(Entity));  
+    parser->entries = new_entries;
+    for (uint32_t i = parser->capacity; i < entry_count; ++i) InitializeEntity(&parser->entries[i]);
+    parser->capacity = entry_count;
     parser->count = entry_count;
     rewind(file);
     Entity entry;
     InitializeEntity(&entry);
-    int32_t entries_stored = 0;
     lineNum = 0;
     int32_t currentChild = -1;
     while (fgets(line, sizeof(line), file)) {
@@ -214,14 +209,8 @@ bool parse_data_file(DataParser *parser, const char *filename) {
         if (*start == '\0') continue; // Skip empty line
         if (start[0] == '/' && start[1] == '/') continue; // Skip comment(ed out) line
 
-        if (*start == '#' && *(start + 1) != '#') {
-            // Store previous entry if valid
-            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
-                parser->entries[entry.index] = entry;
-                entries_stored++;
-            }
-            
-            // Start new entry
+        if (*start == '#') {
+            if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
             InitializeEntity(&entry);
             strncpy(entry.path, start + 1, sizeof(entry.path) - 1);
             entry.path[sizeof(entry.path) - 1] = '\0';
@@ -257,9 +246,8 @@ bool parse_data_file(DataParser *parser, const char *filename) {
                     else if (strcmp(trimmed_key, "persistent") == 0)        flag_set(&entry.entflags,ENTFLAG_TEST_PERSISTENT,parse_bool(trimmed_value, start, lineNum));
                     
                     else if (strcmp(trimmed_key, "model") == 0)             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "animated") == 0)          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
                     else if (strcmp(trimmed_key, "animationNum") == 0)      entry.animationNum = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (strcmp(trimmed_key, "frames") == 0)            entry.frames = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (strcmp(trimmed_key, "animated") == 0)          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
 
                     else if (strcmp(trimmed_key, "texture") == 0)           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);
                     else if (strcmp(trimmed_key, "alttexture") == 0)        entry.altTexIndex = parse_numberu16(trimmed_value, start, lineNum);
@@ -309,11 +297,7 @@ bool parse_data_file(DataParser *parser, const char *filename) {
     }
 
     // Store last entry
-    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) {
-        parser->entries[entry.index] = entry;
-        entries_stored++;
-    }
-
+    if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
     fclose(file);
     return true;
 }

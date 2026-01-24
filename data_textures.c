@@ -1,5 +1,4 @@
 // data_textures.c - Load textures from raw .png files on disk
-DataParser texture_parser;
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
 uint16_t loadedTexturesMaxIndex;
@@ -19,7 +18,8 @@ void LoadTextures(void) {
     }
 
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
-    if (!parse_data_file(&texture_parser, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
+    DataParser texture_parser;
+    if (!parse_data_file(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
     
     stbi__arena_init();
     int32_t maxIndex = -1;
@@ -143,8 +143,12 @@ void LoadTextures(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
+    free(texture_parser.entries);
     OS_DeallocateRAM(arena, arena_size); arena = NULL;
-    OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL; 
+    OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
+    #ifndef WINDOWS
+        malloc_trim(0);
+    #endif
     double end_time = get_time();
     DualLog(" took %.6f secs\n", end_time - start_time);
     DebugRAM("After LoadTextures and after deallocation of LoadTextures arena and stbi arena");

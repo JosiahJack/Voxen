@@ -33,11 +33,11 @@ void InitializeEntity(Entity* entry) {
 
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 uint16_t entityCount; // Number of entities loaded
-DataParser entity_parser;
 void LoadEntities(void) {
     double start_time = get_time();
     entityCount = 0;
-    if (!parse_data_file(&entity_parser, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
+    DataParser entity_parser;
+    if (!parse_data_file(&entity_parser, MAX_ENTITIES, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
     
     entityCount = (uint16_t)entity_parser.count;
     DualLog("Loading  %d entities...", entityCount);
@@ -60,6 +60,10 @@ void LoadEntities(void) {
         }
     }
 
+    free(entity_parser.entries);
+    #ifndef WINDOWS
+        malloc_trim(0);
+    #endif
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("after loading all entities");
 }
@@ -96,7 +100,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
             uint16_t animNum = entities[entIdx].animationNum;
             for (int c=0;c<numClips;++c) {
                 uint16_t startMindex = modelAnimationClips[animNum][c].frameStartModelIndex;
-                uint16_t endMindex = modelAnimationClips[animNum][c].frameEndModelIndex;
+                uint16_t endMindex = (modelAnimationClips[animNum][c].frameEnd - modelAnimationClips[animNum][c].frameStart) + startMindex;
                 for (int mindex=startMindex;mindex<=endMindex;++mindex) modelIndexUsedForCurrentLevel[mindex] = true;
             }
         }
