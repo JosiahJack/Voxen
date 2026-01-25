@@ -72,6 +72,7 @@ __attribute__((pure)) bool isDoubleSided(uint32_t texIndexToCheck) {
     if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
     return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
 }
+
 __attribute__((pure)) bool isTransparent(uint32_t texIndexToCheck) {
     if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
     return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
@@ -148,24 +149,19 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
         instances[i].child_scale[c] = isCardChunk ? entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
     }
     
-    ApplyUnityHierarchyCorrectionAtLevelLoad(i, entIdx); // TODO: Manually fix these all up to not be needed.
     dirtyInstances[i] = true;
     loadedInstances++;
 }
 
 void DeleteInstance(uint16_t i) {
-    if (i <= PLAYER2) return; // Don't delete null ent, player 1, nor player 2.
-    if (i >= loadedInstances) return; // Already gone.
+    if (i <= PLAYER2 || i >= loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
-    // Shift render state markers.
-    if (i <= startOfDoubleSidedInstances) --startOfDoubleSidedInstances;
+    if (i <= startOfDoubleSidedInstances) --startOfDoubleSidedInstances; // Shift render state markers.
     if (i <= startOfTransparentInstances) --startOfTransparentInstances;
     if (i <= endOfModels)                 --endOfModels;
     if (InstanceIsNonRenderable(i))      --invalidModelIndexCount;
-    
-    // Shift entire list
     uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
-    for (;i<endInstance;++i) instances[i] = instances[i + 1]; // Shift the list down, overwriting the entity we're deleting at starting i
+    for (;i<endInstance;++i) instances[i] = instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
     --loadedInstances; // Shift final marker.  It's history!
 }
 
@@ -201,10 +197,6 @@ NPCTable npcTable[NUM_AI_TYPES] = {
  { "CYBER CORTEX REAVER"   ,0,7,0,  0, 45,  0, 0,20,0,0,80,1,0.1,0,1,4,80,240,50,15,20.48,25.6,4,4,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.2,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 },
  { "SHODAN"                ,0,7,0,  0, 55,  0, 0,20,0,0,500,2,0,0,1,4,360,280,280,15,20.48,25.6,0,0,0,0,0,0,0,0.1,0,0.5,0,0,0,0,0.05,0,2,998,999,0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0,500,0.75,0,0,10,0,0,6,0,494,0 }
 };
-//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-//TARGET ID: Type-LevelNum(0#)EnemyNum(###),,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-//Example: Mutant-06003,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-//EXCEPTIONS: Cyborg-00001 is Edward Diego,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 
 //                             NPC Sounds       0,   1,   2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28
 int sfxIdle[NUM_AI_TYPES] =           {  -1,  -1,  -1, -1, 58, -1, 59, -1, 59, 52, -1, -1, -1, -1, -1, -1,121, -1, -1, -1,121,118, -1, -1, -1, -1, -1, -1, -1};

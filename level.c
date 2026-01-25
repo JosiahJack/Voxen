@@ -159,7 +159,6 @@ void LoadLevel(uint8_t curlevel) {
     char* line = &lineSpace[0];
     char firstKeyCheck[11];
     char initialLine[LINE_LEN_MAX];
-    SetUnityHierarchyOffsets(curlevel); // TODO: Do it in the level#.txt files once and be rid of this crap.
     while (fgets(lineSpace, LINE_LEN_MAX, file)) {
         size_t len = strlen(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
@@ -209,9 +208,9 @@ void LoadLevel(uint8_t curlevel) {
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
             if (isLight) {
-                     if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum) + correctionX;
-                else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum) + correctionY;
-                else if (strcmp(trimmed_key, "localPosition.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum) + correctionZ;
+                     if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "localPosition.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localRotation.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);
@@ -299,7 +298,6 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "maxIntensity") == 0)    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
             } else {
                      if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "overridePosition") == 0) overridePos  = parse_bool(trimmed_value, initialLine, lineNum) + correctionZ;
                 else if (strcmp(trimmed_key, "localPosition.x") == 0) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.y") == 0) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localPosition.z") == 0) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
@@ -324,9 +322,6 @@ void LoadLevel(uint8_t curlevel) {
                 if (lightMinIntensity[lightsIdx] < 0.01f) lightMinIntensity[lightsIdx] = 0.01f;
                 lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[lightsIdx];
                 lightLerpUp[lightsIdx] = true;
-                lights[litIdx + LIGHT_DATA_OFFSET_POSX] += correctionLightX;
-                lights[litIdx + LIGHT_DATA_OFFSET_POSY] += correctionLightY;
-                lights[litIdx + LIGHT_DATA_OFFSET_POSZ] += correctionLightZ;
             }
 
             if (lightMaxIntensity[lightsIdx] < 0.16f || lights[litIdx + LIGHT_DATA_OFFSET_RANGE] < 0.32f) { lightsIdx--; loadedLights--; }
