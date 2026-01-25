@@ -6721,718 +6721,600 @@ index: 3480
 index: 3481
 
 #Models/npc_cyborgwarrior_000001.obj
-index: 3959
+index: 3482
 animated: 1
 animationNum: 28
 #Models/npc_cyborgwarrior_000002.obj
-index: 3960
+index: 3483
 #Models/npc_cyborgwarrior_000003.obj
-index: 3961
+index: 3484
 #Models/npc_cyborgwarrior_000004.obj
-index: 3962
+index: 3485
 #Models/npc_cyborgwarrior_000005.obj
-index: 3963
+index: 3486
 #Models/npc_cyborgwarrior_000006.obj
-index: 3964
+index: 3487
 #Models/npc_cyborgwarrior_000007.obj
-index: 3965
+index: 3488
 #Models/npc_cyborgwarrior_000008.obj
-index: 3966
+index: 3489
 #Models/npc_cyborgwarrior_000009.obj
-index: 3967
+index: 3490
 #Models/npc_cyborgwarrior_000010.obj
-index: 3968
+index: 3491
 #Models/npc_cyborgwarrior_000011.obj
-index: 3969
+index: 3492
 #Models/npc_cyborgwarrior_000012.obj
-index: 3970
+index: 3493
 #Models/npc_cyborgwarrior_000013.obj
-index: 3971
+index: 3494
 #Models/npc_cyborgwarrior_000014.obj
-index: 3972
+index: 3495
 #Models/npc_cyborgwarrior_000015.obj
-index: 3973
+index: 3496
 #Models/npc_cyborgwarrior_000016.obj
-index: 3974
+index: 3497
 #Models/npc_cyborgwarrior_000017.obj
-index: 3975
+index: 3498
 #Models/npc_cyborgwarrior_000018.obj
-index: 3976
+index: 3499
 #Models/npc_cyborgwarrior_000019.obj
-index: 3977
+index: 3500
 #Models/npc_cyborgwarrior_000020.obj
-index: 3978
+index: 3501
 #Models/npc_cyborgwarrior_000021.obj
-index: 3979
+index: 3502
 #Models/npc_cyborgwarrior_000022.obj
-index: 3980
+index: 3503
 #Models/npc_cyborgwarrior_000023.obj
-index: 3981
+index: 3504
 #Models/npc_cyborgwarrior_000024.obj
-index: 3982
+index: 3505
 #Models/npc_cyborgwarrior_000025.obj
-index: 3983
+index: 3506
 #Models/npc_cyborgwarrior_000026.obj
-index: 3984
+index: 3507
 #Models/npc_cyborgwarrior_000027.obj
-index: 3985
+index: 3508
 #Models/npc_cyborgwarrior_000028.obj
-index: 3986
+index: 3509
 #Models/npc_cyborgwarrior_000029.obj
-index: 3987
+index: 3510
 #Models/npc_cyborgwarrior_000030.obj
-index: 3988
+index: 3511
 #Models/npc_cyborgwarrior_000031.obj
-index: 3989
+index: 3512
 #Models/npc_cyborgwarrior_000032.obj
-index: 3990
+index: 3513
 #Models/npc_cyborgwarrior_000033.obj
-index: 3991
+index: 3514
 #Models/npc_cyborgwarrior_000034.obj
-index: 3992
+index: 3515
 #Models/npc_cyborgwarrior_000035.obj
-index: 3993
+index: 3516
 #Models/npc_cyborgwarrior_000036.obj
-index: 3994
+index: 3517
 #Models/npc_cyborgwarrior_000037.obj
-index: 3995
+index: 3518
 #Models/npc_cyborgwarrior_000038.obj
-index: 3996
+index: 3519
 #Models/npc_cyborgwarrior_000039.obj
-index: 3997
+index: 3520
 #Models/npc_cyborgwarrior_000040.obj
-index: 3998
+index: 3521
 #Models/npc_cyborgwarrior_000041.obj
-index: 3999
+index: 3522
 #Models/npc_cyborgwarrior_000042.obj
-index: 4000
+index: 3523
 #Models/npc_cyborgwarrior_000043.obj
-index: 4001
+index: 3524
 #Models/npc_cyborgwarrior_000044.obj
-index: 4002
+index: 3525
 #Models/npc_cyborgwarrior_000045.obj
-index: 4003
+index: 3526
 #Models/npc_cyborgwarrior_000046.obj
-index: 4004
+index: 3527
 #Models/npc_cyborgwarrior_000047.obj
-index: 4005
+index: 3528
 #Models/npc_cyborgwarrior_000048.obj
-index: 4006
+index: 3529
 #Models/npc_cyborgwarrior_000049.obj
-index: 4007
+index: 3530
 #Models/npc_cyborgwarrior_000050.obj
-index: 4008
+index: 3531
 #Models/npc_cyborgwarrior_000051.obj
-index: 4009
+index: 3532
 #Models/npc_cyborgwarrior_000052.obj
-index: 4010
+index: 3533
 #Models/npc_cyborgwarrior_000053.obj
-index: 4011
+index: 3534
 #Models/npc_cyborgwarrior_000054.obj
-index: 4012
+index: 3535
 #Models/npc_cyborgwarrior_000055.obj
-index: 4013
+index: 3536
 #Models/npc_cyborgwarrior_000056.obj
-index: 4014
+index: 3537
 #Models/npc_cyborgwarrior_000057.obj
-index: 4015
+index: 3538
 #Models/npc_cyborgwarrior_000058.obj
-index: 4016
+index: 3539
 #Models/npc_cyborgwarrior_000059.obj
-index: 4017
+index: 3540
 #Models/npc_cyborgwarrior_000060.obj
-index: 4018
+index: 3541
 #Models/npc_cyborgwarrior_000061.obj
-index: 4019
+index: 3542
 #Models/npc_cyborgwarrior_000062.obj
-index: 4020
+index: 3543
 #Models/npc_cyborgwarrior_000063.obj
-index: 4021
+index: 3544
 #Models/npc_cyborgwarrior_000064.obj
-index: 4022
+index: 3545
 #Models/npc_cyborgwarrior_000065.obj
-index: 4023
+index: 3546
 #Models/npc_cyborgwarrior_000066.obj
-index: 4024
-#Models/npc_cyborgwarrior_000067.obj
-index: 4025
+index: 3547
 #Models/npc_cyborgwarrior_000068.obj
-index: 4026
+index: 3548
 #Models/npc_cyborgwarrior_000069.obj
-index: 4027
+index: 3549
 #Models/npc_cyborgwarrior_000070.obj
-index: 4028
+index: 3550
 #Models/npc_cyborgwarrior_000071.obj
-index: 4029
+index: 3551
 #Models/npc_cyborgwarrior_000072.obj
-index: 4030
+index: 3552
 #Models/npc_cyborgwarrior_000073.obj
-index: 4031
+index: 3553
 #Models/npc_cyborgwarrior_000074.obj
-index: 4032
+index: 3554
 #Models/npc_cyborgwarrior_000075.obj
-index: 4033
+index: 3555
 #Models/npc_cyborgwarrior_000076.obj
-index: 4034
+index: 3556
 #Models/npc_cyborgwarrior_000077.obj
-index: 4035
+index: 3557
 #Models/npc_cyborgwarrior_000078.obj
-index: 4036
+index: 3558
 #Models/npc_cyborgwarrior_000079.obj
-index: 4037
+index: 3559
 #Models/npc_cyborgwarrior_000080.obj
-index: 4038
-#Models/npc_cyborgwarrior_000081.obj
-index: 4039
+index: 3560
 #Models/npc_cyborgwarrior_000082.obj
-index: 4040
+index: 3561
 #Models/npc_cyborgwarrior_000083.obj
-index: 4041
+index: 3562
 #Models/npc_cyborgwarrior_000084.obj
-index: 4042
+index: 3563
 #Models/npc_cyborgwarrior_000085.obj
-index: 4043
+index: 3564
 #Models/npc_cyborgwarrior_000086.obj
-index: 4044
+index: 3565
 #Models/npc_cyborgwarrior_000087.obj
-index: 4045
+index: 3566
 #Models/npc_cyborgwarrior_000088.obj
-index: 4046
+index: 3567
 #Models/npc_cyborgwarrior_000089.obj
-index: 4047
+index: 3568
 #Models/npc_cyborgwarrior_000090.obj
-index: 4048
+index: 3569
 #Models/npc_cyborgwarrior_000091.obj
-index: 4049
+index: 3570
 #Models/npc_cyborgwarrior_000092.obj
-index: 4050
+index: 3571
 #Models/npc_cyborgwarrior_000093.obj
-index: 4051
+index: 3572
 #Models/npc_cyborgwarrior_000094.obj
-index: 4052
+index: 3573
 #Models/npc_cyborgwarrior_000095.obj
-index: 4053
+index: 3574
 #Models/npc_cyborgwarrior_000096.obj
-index: 4054
+index: 3575
 #Models/npc_cyborgwarrior_000097.obj
-index: 4055
+index: 3576
 #Models/npc_cyborgwarrior_000098.obj
-index: 4056
+index: 3577
 #Models/npc_cyborgwarrior_000099.obj
-index: 4057
+index: 3578
 #Models/npc_cyborgwarrior_000100.obj
-index: 4058
+index: 3579
 #Models/npc_cyborgwarrior_000101.obj
-index: 4059
-#Models/npc_cyborgwarrior_000102.obj
-index: 4060
+index: 3580
 #Models/npc_cyborgwarrior_000103.obj
-index: 4061
+index: 3581
 #Models/npc_cyborgwarrior_000104.obj
-index: 4062
+index: 3582
 #Models/npc_cyborgwarrior_000105.obj
-index: 4063
+index: 3583
 #Models/npc_cyborgwarrior_000106.obj
-index: 4064
+index: 3584
 #Models/npc_cyborgwarrior_000107.obj
-index: 4065
+index: 3585
 #Models/npc_cyborgwarrior_000108.obj
-index: 4066
+index: 3586
 #Models/npc_cyborgwarrior_000109.obj
-index: 4067
+index: 3587
 #Models/npc_cyborgwarrior_000110.obj
-index: 4068
+index: 3588
 #Models/npc_cyborgwarrior_000111.obj
-index: 4069
+index: 3589
 #Models/npc_cyborgwarrior_000112.obj
-index: 4070
+index: 3590
 #Models/npc_cyborgwarrior_000113.obj
-index: 4071
+index: 3591
 #Models/npc_cyborgwarrior_000114.obj
-index: 4072
-#Models/npc_cyborgwarrior_000115.obj
-index: 4073
-#Models/npc_cyborgwarrior_000116.obj
-index: 4074
-#Models/npc_cyborgwarrior_000117.obj
-index: 4075
-#Models/npc_cyborgwarrior_000118.obj
-index: 4076
-#Models/npc_cyborgwarrior_000119.obj
-index: 4077
-#Models/npc_cyborgwarrior_000120.obj
-index: 4078
-#Models/npc_cyborgwarrior_000121.obj
-index: 4079
+index: 3592
 #Models/npc_cyborgwarrior_000122.obj
-index: 4080
+index: 3593
 #Models/npc_cyborgwarrior_000123.obj
-index: 4081
+index: 3594
 #Models/npc_cyborgwarrior_000124.obj
-index: 4082
+index: 3595
 #Models/npc_cyborgwarrior_000125.obj
-index: 4083
+index: 3596
 #Models/npc_cyborgwarrior_000126.obj
-index: 4084
+index: 3597
 #Models/npc_cyborgwarrior_000127.obj
-index: 4085
+index: 3598
 #Models/npc_cyborgwarrior_000128.obj
-index: 4086
+index: 3599
 #Models/npc_cyborgwarrior_000129.obj
-index: 4087
+index: 3600
 #Models/npc_cyborgwarrior_000130.obj
-index: 4088
+index: 3601
 #Models/npc_cyborgwarrior_000131.obj
-index: 4089
+index: 3602
 #Models/npc_cyborgwarrior_000132.obj
-index: 4090
+index: 3603
 #Models/npc_cyborgwarrior_000133.obj
-index: 4091
+index: 3604
 #Models/npc_cyborgwarrior_000134.obj
-index: 4092
+index: 3605
 #Models/npc_cyborgwarrior_000135.obj
-index: 4093
+index: 3606
 #Models/npc_cyborgwarrior_000136.obj
-index: 4094
+index: 3607
 #Models/npc_cyborgwarrior_000137.obj
-index: 4095
+index: 3608
 #Models/npc_cyborgwarrior_000138.obj
-index: 4096
+index: 3609
 #Models/npc_cyborgwarrior_000139.obj
-index: 4097
+index: 3610
 #Models/npc_cyborgwarrior_000140.obj
-index: 4098
+index: 3611
 #Models/npc_cyborgwarrior_000141.obj
-index: 4099
+index: 3612
 #Models/npc_cyborgwarrior_000142.obj
-index: 4100
+index: 3613
 #Models/npc_cyborgwarrior_000143.obj
-index: 4101
+index: 3614
 #Models/npc_cyborgwarrior_000144.obj
-index: 4102
+index: 3615
 #Models/npc_cyborgwarrior_000145.obj
-index: 4103
+index: 3616
 #Models/npc_cyborgwarrior_000146.obj
-index: 4104
+index: 3617
 #Models/npc_cyborgwarrior_000147.obj
-index: 4105
+index: 3618
 #Models/npc_cyborgwarrior_000148.obj
-index: 4106
+index: 3619
 #Models/npc_cyborgwarrior_000149.obj
-index: 4107
+index: 3620
 #Models/npc_cyborgwarrior_000150.obj
-index: 4108
+index: 3621
 #Models/npc_cyborgwarrior_000151.obj
-index: 4109
+index: 3622
 #Models/npc_cyborgwarrior_000152.obj
-index: 4110
+index: 3623
 #Models/npc_cyborgwarrior_000153.obj
-index: 4111
+index: 3624
 #Models/npc_cyborgwarrior_000154.obj
-index: 4112
+index: 3625
 #Models/npc_cyborgwarrior_000155.obj
-index: 4113
+index: 3626
 #Models/npc_cyborgwarrior_000156.obj
-index: 4114
+index: 3627
 #Models/npc_cyborgwarrior_000157.obj
-index: 4115
-#Models/npc_cyborgwarrior_000158.obj
-index: 4116
-#Models/npc_cyborgwarrior_000159.obj
-index: 4117
-#Models/npc_cyborgwarrior_000160.obj
-index: 4118
-#Models/npc_cyborgwarrior_000161.obj
-index: 4119
-#Models/npc_cyborgwarrior_000162.obj
-index: 4120
-#Models/npc_cyborgwarrior_000163.obj
-index: 4121
-#Models/npc_cyborgwarrior_000164.obj
-index: 4122
-#Models/npc_cyborgwarrior_000165.obj
-index: 4123
-#Models/npc_cyborgwarrior_000166.obj
-index: 4124
-#Models/npc_cyborgwarrior_000167.obj
-index: 4125
-#Models/npc_cyborgwarrior_000168.obj
-index: 4126
+index: 3628
 #Models/npc_cyborgwarrior_000169.obj
-index: 4127
+index: 3629
 #Models/npc_cyborgwarrior_000170.obj
-index: 4128
+index: 3630
 #Models/npc_cyborgwarrior_000171.obj
-index: 4129
+index: 3631
 #Models/npc_cyborgwarrior_000172.obj
-index: 4130
+index: 3632
 #Models/npc_cyborgwarrior_000173.obj
-index: 4131
+index: 3633
 #Models/npc_cyborgwarrior_000174.obj
-index: 4132
+index: 3634
 #Models/npc_cyborgwarrior_000175.obj
-index: 4133
+index: 3635
 #Models/npc_cyborgwarrior_000176.obj
-index: 4134
+index: 3636
 #Models/npc_cyborgwarrior_000177.obj
-index: 4135
+index: 3637
 #Models/npc_cyborgwarrior_000178.obj
-index: 4136
+index: 3638
 #Models/npc_cyborgwarrior_000179.obj
-index: 4137
+index: 3639
 #Models/npc_cyborgwarrior_000180.obj
-index: 4138
+index: 3640
 #Models/npc_cyborgwarrior_000181.obj
-index: 4139
+index: 3641
 #Models/npc_cyborgwarrior_000182.obj
-index: 4140
+index: 3642
 #Models/npc_cyborgwarrior_000183.obj
-index: 4141
+index: 3643
 #Models/npc_cyborgwarrior_000184.obj
-index: 4142
+index: 3644
 #Models/npc_cyborgwarrior_000185.obj
-index: 4143
+index: 3645
 #Models/npc_cyborgwarrior_000186.obj
-index: 4144
+index: 3646
 #Models/npc_cyborgwarrior_000187.obj
-index: 4145
+index: 3647
 #Models/npc_cyborgwarrior_000188.obj
-index: 4146
+index: 3648
 #Models/npc_cyborgwarrior_000189.obj
-index: 4147
+index: 3649
 #Models/npc_cyborgwarrior_000190.obj
-index: 4148
+index: 3650
 #Models/npc_cyborgwarrior_000191.obj
-index: 4149
+index: 3651
 #Models/npc_cyborgwarrior_000192.obj
-index: 4150
+index: 3652
 #Models/npc_cyborgwarrior_000193.obj
-index: 4151
+index: 3653
 #Models/npc_cyborgwarrior_000194.obj
-index: 4152
+index: 3654
 #Models/npc_cyborgwarrior_000195.obj
-index: 4153
+index: 3655
 #Models/npc_cyborgwarrior_000196.obj
-index: 4154
+index: 3656
 #Models/npc_cyborgwarrior_000197.obj
-index: 4155
+index: 3657
 #Models/npc_cyborgwarrior_000198.obj
-index: 4156
+index: 3658
 #Models/npc_cyborgwarrior_000199.obj
-index: 4157
+index: 3659
 #Models/npc_cyborgwarrior_000200.obj
-index: 4158
+index: 3660
 #Models/npc_cyborgwarrior_000201.obj
-index: 4159
+index: 3661
 #Models/npc_cyborgwarrior_000202.obj
-index: 4160
+index: 3662
 #Models/npc_cyborgwarrior_000203.obj
-index: 4161
+index: 3663
 #Models/npc_cyborgwarrior_000204.obj
-index: 4162
+index: 3664
 #Models/npc_cyborgwarrior_000205.obj
-index: 4163
+index: 3665
 #Models/npc_cyborgwarrior_000206.obj
-index: 4164
+index: 3666
 #Models/npc_cyborgwarrior_000207.obj
-index: 4165
+index: 3667
 #Models/npc_cyborgwarrior_000208.obj
-index: 4166
+index: 3668
 #Models/npc_cyborgwarrior_000209.obj
-index: 4167
+index: 3669
 #Models/npc_cyborgwarrior_000210.obj
-index: 4168
+index: 3670
 #Models/npc_cyborgwarrior_000211.obj
-index: 4169
+index: 3671
 #Models/npc_cyborgwarrior_000212.obj
-index: 4170
+index: 3672
 #Models/npc_cyborgwarrior_000213.obj
-index: 4171
+index: 3673
 #Models/npc_cyborgwarrior_000214.obj
-index: 4172
+index: 3674
 #Models/npc_cyborgwarrior_000215.obj
-index: 4173
+index: 3675
 #Models/npc_cyborgwarrior_000216.obj
-index: 4174
+index: 3676
 #Models/npc_cyborgwarrior_000217.obj
-index: 4175
-#Models/npc_cyborgwarrior_000218.obj
-index: 4176
-#Models/npc_cyborgwarrior_000219.obj
-index: 4177
-#Models/npc_cyborgwarrior_000220.obj
-index: 4178
-#Models/npc_cyborgwarrior_000221.obj
-index: 4179
-#Models/npc_cyborgwarrior_000222.obj
-index: 4180
+index: 3677
 
-#Models/npc_execbot_000001.obj
-index: 4181
+#Models/npc_execbot_000003.obj
+index: 3678
 animated: 1
 animationNum: 29
-#Models/npc_execbot_000002.obj
-index: 4182
-#Models/npc_execbot_000003.obj
-index: 4183
-#Models/npc_execbot_000004.obj
-index: 4184
-#Models/npc_execbot_000005.obj
-index: 4185
-#Models/npc_execbot_000006.obj
-index: 4186
-#Models/npc_execbot_000007.obj
-index: 4187
-#Models/npc_execbot_000008.obj
-index: 4188
-#Models/npc_execbot_000009.obj
-index: 4189
-#Models/npc_execbot_000010.obj
-index: 4190
-#Models/npc_execbot_000011.obj
-index: 4191
-#Models/npc_execbot_000012.obj
-index: 4192
-#Models/npc_execbot_000013.obj
-index: 4193
-#Models/npc_execbot_000014.obj
-index: 4194
 #Models/npc_execbot_000015.obj
-index: 4195
+index: 3679
 #Models/npc_execbot_000016.obj
-index: 4196
+index: 3680
 #Models/npc_execbot_000017.obj
-index: 4197
+index: 3681
 #Models/npc_execbot_000018.obj
-index: 4198
+index: 3682
 #Models/npc_execbot_000019.obj
-index: 4199
+index: 3683
 #Models/npc_execbot_000020.obj
-index: 4200
+index: 3684
 #Models/npc_execbot_000021.obj
-index: 4201
+index: 3685
 #Models/npc_execbot_000022.obj
-index: 4202
+index: 3686
 #Models/npc_execbot_000023.obj
-index: 4203
+index: 3687
 #Models/npc_execbot_000024.obj
-index: 4204
+index: 3688
 #Models/npc_execbot_000025.obj
-index: 4205
+index: 3689
 #Models/npc_execbot_000026.obj
-index: 4206
+index: 3690
 #Models/npc_execbot_000027.obj
-index: 4207
+index: 3691
 #Models/npc_execbot_000028.obj
-index: 4208
+index: 3692
 #Models/npc_execbot_000029.obj
-index: 4209
+index: 3693
 #Models/npc_execbot_000030.obj
-index: 4210
+index: 3694
 #Models/npc_execbot_000031.obj
-index: 4211
+index: 3695
 #Models/npc_execbot_000032.obj
-index: 4212
+index: 3696
 #Models/npc_execbot_000033.obj
-index: 4213
+index: 3697
 #Models/npc_execbot_000034.obj
-index: 4214
+index: 3698
 #Models/npc_execbot_000035.obj
-index: 4215
+index: 3699
 #Models/npc_execbot_000036.obj
-index: 4216
+index: 3700
 #Models/npc_execbot_000037.obj
-index: 4217
+index: 3701
 #Models/npc_execbot_000038.obj
-index: 4218
+index: 3702
 #Models/npc_execbot_000039.obj
-index: 4219
+index: 3703
 #Models/npc_execbot_000040.obj
-index: 4220
+index: 3704
 #Models/npc_execbot_000041.obj
-index: 4221
+index: 3705
 #Models/npc_execbot_000042.obj
-index: 4222
+index: 3706
 #Models/npc_execbot_000043.obj
-index: 4223
+index: 3707
 #Models/npc_execbot_000044.obj
-index: 4224
+index: 3708
 #Models/npc_execbot_000045.obj
-index: 4225
+index: 3709
 #Models/npc_execbot_000046.obj
-index: 4226
+index: 3710
 #Models/npc_execbot_000047.obj
-index: 4227
+index: 3711
 #Models/npc_execbot_000048.obj
-index: 4228
+index: 3712
 #Models/npc_execbot_000049.obj
-index: 4229
+index: 3713
 #Models/npc_execbot_000050.obj
-index: 4230
+index: 3714
 #Models/npc_execbot_000051.obj
-index: 4231
+index: 3715
 #Models/npc_execbot_000052.obj
-index: 4232
+index: 3716
 #Models/npc_execbot_000053.obj
-index: 4233
+index: 3717
 #Models/npc_execbot_000054.obj
-index: 4234
+index: 3718
 #Models/npc_execbot_000055.obj
-index: 4235
+index: 3719
 #Models/npc_execbot_000056.obj
-index: 4236
+index: 3720
 #Models/npc_execbot_000057.obj
-index: 4237
+index: 3721
 #Models/npc_execbot_000058.obj
-index: 4238
+index: 3722
 #Models/npc_execbot_000059.obj
-index: 4239
+index: 3723
 #Models/npc_execbot_000060.obj
-index: 4240
+index: 3724
 #Models/npc_execbot_000061.obj
-index: 4241
+index: 3725
 #Models/npc_execbot_000062.obj
-index: 4242
+index: 3726
 #Models/npc_execbot_000063.obj
-index: 4243
+index: 3727
 #Models/npc_execbot_000064.obj
-index: 4244
+index: 3728
 #Models/npc_execbot_000065.obj
-index: 4245
+index: 3729
 #Models/npc_execbot_000066.obj
-index: 4246
+index: 3730
 #Models/npc_execbot_000067.obj
-index: 4247
+index: 3731
 #Models/npc_execbot_000068.obj
-index: 4248
-#Models/npc_execbot_000069.obj
-index: 4249
-#Models/npc_execbot_000070.obj
-index: 4250
-#Models/npc_execbot_000071.obj
-index: 4251
-#Models/npc_execbot_000072.obj
-index: 4252
-#Models/npc_execbot_000073.obj
-index: 4253
-#Models/npc_execbot_000074.obj
-index: 4254
-#Models/npc_execbot_000075.obj
-index: 4255
-#Models/npc_execbot_000076.obj
-index: 4256
-#Models/npc_execbot_000077.obj
-index: 4257
-#Models/npc_execbot_000078.obj
-index: 4258
-#Models/npc_execbot_000079.obj
-index: 4259
-#Models/npc_execbot_000080.obj
-index: 4260
-#Models/npc_execbot_000081.obj
-index: 4261
+index: 3732
 #Models/npc_execbot_000082.obj
-index: 4262
+index: 3732
 #Models/npc_execbot_000083.obj
-index: 4263
+index: 3733
 #Models/npc_execbot_000084.obj
-index: 4264
+index: 3734
 #Models/npc_execbot_000085.obj
-index: 4265
+index: 3735
 #Models/npc_execbot_000086.obj
-index: 4266
+index: 3736
 #Models/npc_execbot_000087.obj
-index: 4267
+index: 3737
 #Models/npc_execbot_000088.obj
-index: 4268
+index: 3738
 #Models/npc_execbot_000089.obj
-index: 4269
+index: 3739
 #Models/npc_execbot_000090.obj
-index: 4270
+index: 3740
 #Models/npc_execbot_000091.obj
-index: 4271
+index: 3741
 #Models/npc_execbot_000092.obj
-index: 4272
-#Models/npc_execbot_000093.obj
-index: 4273
+index: 3742
 #Models/npc_execbot_000094.obj
-index: 4274
+index: 3743
 #Models/npc_execbot_000095.obj
-index: 4275
+index: 3744
 #Models/npc_execbot_000096.obj
-index: 4276
+index: 3745
 #Models/npc_execbot_000097.obj
-index: 4277
+index: 3746
 #Models/npc_execbot_000098.obj
-index: 4278
+index: 3747
 #Models/npc_execbot_000099.obj
-index: 4279
+index: 3748
 #Models/npc_execbot_000100.obj
-index: 4280
+index: 3749
 #Models/npc_execbot_000101.obj
-index: 4281
+index: 3750
 #Models/npc_execbot_000102.obj
-index: 4282
+index: 3751
 #Models/npc_execbot_000103.obj
-index: 4283
+index: 3752
 #Models/npc_execbot_000104.obj
-index: 4284
+index: 3753
 #Models/npc_execbot_000105.obj
-index: 4285
+index: 3754
 #Models/npc_execbot_000106.obj
-index: 4286
+index: 3755
 #Models/npc_execbot_000107.obj
-index: 4287
+index: 3756
 #Models/npc_execbot_000108.obj
-index: 4288
+index: 3757
 #Models/npc_execbot_000109.obj
-index: 4289
+index: 3758
 #Models/npc_execbot_000110.obj
-index: 4290
+index: 3759
 #Models/npc_execbot_000111.obj
-index: 4291
+index: 3760
 #Models/npc_execbot_000112.obj
-index: 4292
+index: 3761
 #Models/npc_execbot_000113.obj
-index: 4293
+index: 3762
 #Models/npc_execbot_000114.obj
-index: 4294
+index: 3763
 #Models/npc_execbot_000115.obj
-index: 4295
+index: 3764
 #Models/npc_execbot_000116.obj
-index: 4296
+index: 3765
 #Models/npc_execbot_000117.obj
-index: 4297
-#Models/npc_execbot_000118.obj
-index: 4298
+index: 3766
 #Models/npc_execbot_000119.obj
-index: 4299
+index: 3767
 #Models/npc_execbot_000120.obj
-index: 4300
+index: 3768
 #Models/npc_execbot_000121.obj
-index: 4301
+index: 3769
 #Models/npc_execbot_000122.obj
-index: 4302
+index: 3770
 #Models/npc_execbot_000123.obj
-index: 4303
+index: 3771
 #Models/npc_execbot_000124.obj
-index: 4304
+index: 3772
 #Models/npc_execbot_000125.obj
-index: 4305
+index: 3773
 #Models/npc_execbot_000126.obj
-index: 4306
+index: 3774
 #Models/npc_execbot_000127.obj
-index: 4307
-#Models/npc_execbot_000128.obj
-index: 4308
-#Models/npc_execbot_000129.obj
-index: 4309
-#Models/npc_execbot_000130.obj
-index: 4310
-#Models/npc_execbot_000131.obj
-index: 4311
-#Models/npc_execbot_000132.obj
-index: 4312
+index: 3775
 
 #Models/npc_flierbot_000001.obj
 index: 4313

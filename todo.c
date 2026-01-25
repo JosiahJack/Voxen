@@ -1,5 +1,4 @@
 // todo.c - TODO stuff.  Someday this file will be deleted.  Meanwhile any stubs will go here and anything stupid.
-// TODO: Figure out how to handle info_ressurection_points that needed to live outside the levels:
 // TODO: Multiview renders for sensaround
 // TODO: Proper physics
 // TODO: Particle system
