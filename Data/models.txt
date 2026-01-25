@@ -5954,885 +5954,771 @@ index: 3098
 index: 3099
 
 #Models/npc_cyborg_enforcer_000001.obj
-index: 3520
+index: 3100
 animated: 1
 animationNum: 27
 #Models/npc_cyborg_enforcer_000002.obj
-index: 3521
+index: 3101
 #Models/npc_cyborg_enforcer_000003.obj
-index: 3522
+index: 3102
 #Models/npc_cyborg_enforcer_000004.obj
-index: 3523
+index: 3103
 #Models/npc_cyborg_enforcer_000005.obj
-index: 3524
+index: 3104
 #Models/npc_cyborg_enforcer_000006.obj
-index: 3525
+index: 3105
 #Models/npc_cyborg_enforcer_000007.obj
-index: 3526
+index: 3106
 #Models/npc_cyborg_enforcer_000008.obj
-index: 3527
+index: 3107
 #Models/npc_cyborg_enforcer_000009.obj
-index: 3528
+index: 3108
 #Models/npc_cyborg_enforcer_000010.obj
-index: 3529
+index: 3109
 #Models/npc_cyborg_enforcer_000011.obj
-index: 3530
+index: 3110
 #Models/npc_cyborg_enforcer_000012.obj
-index: 3531
+index: 3111
 #Models/npc_cyborg_enforcer_000013.obj
-index: 3532
+index: 3112
 #Models/npc_cyborg_enforcer_000014.obj
-index: 3533
+index: 3113
 #Models/npc_cyborg_enforcer_000015.obj
-index: 3534
+index: 3114
 #Models/npc_cyborg_enforcer_000016.obj
-index: 3535
+index: 3115
 #Models/npc_cyborg_enforcer_000017.obj
-index: 3536
+index: 3116
 #Models/npc_cyborg_enforcer_000018.obj
-index: 3537
+index: 3117
 #Models/npc_cyborg_enforcer_000019.obj
-index: 3538
+index: 3118
 #Models/npc_cyborg_enforcer_000020.obj
-index: 3539
+index: 3119
 #Models/npc_cyborg_enforcer_000021.obj
-index: 3540
+index: 3120
 #Models/npc_cyborg_enforcer_000022.obj
-index: 3541
+index: 3121
 #Models/npc_cyborg_enforcer_000023.obj
-index: 3542
+index: 3122
 #Models/npc_cyborg_enforcer_000024.obj
-index: 3543
+index: 3123
 #Models/npc_cyborg_enforcer_000025.obj
-index: 3544
+index: 3124
 #Models/npc_cyborg_enforcer_000026.obj
-index: 3545
+index: 3125
 #Models/npc_cyborg_enforcer_000027.obj
-index: 3546
+index: 3126
 #Models/npc_cyborg_enforcer_000028.obj
-index: 3547
+index: 3127
 #Models/npc_cyborg_enforcer_000029.obj
-index: 3548
+index: 3128
 #Models/npc_cyborg_enforcer_000030.obj
-index: 3549
+index: 3129
 #Models/npc_cyborg_enforcer_000031.obj
-index: 3550
+index: 3130
 #Models/npc_cyborg_enforcer_000032.obj
-index: 3551
+index: 3131
 #Models/npc_cyborg_enforcer_000033.obj
-index: 3552
+index: 3132
 #Models/npc_cyborg_enforcer_000034.obj
-index: 3553
+index: 3133
 #Models/npc_cyborg_enforcer_000035.obj
-index: 3554
+index: 3134
 #Models/npc_cyborg_enforcer_000036.obj
-index: 3555
+index: 3135
 #Models/npc_cyborg_enforcer_000037.obj
-index: 3556
+index: 3136
 #Models/npc_cyborg_enforcer_000038.obj
-index: 3557
+index: 3137
 #Models/npc_cyborg_enforcer_000039.obj
-index: 3558
+index: 3138
 #Models/npc_cyborg_enforcer_000040.obj
-index: 3559
+index: 3139
 #Models/npc_cyborg_enforcer_000041.obj
-index: 3560
+index: 3140
 #Models/npc_cyborg_enforcer_000042.obj
-index: 3561
+index: 3141
 #Models/npc_cyborg_enforcer_000043.obj
-index: 3562
+index: 3142
 #Models/npc_cyborg_enforcer_000044.obj
-index: 3563
+index: 3143
 #Models/npc_cyborg_enforcer_000045.obj
-index: 3564
+index: 3144
 #Models/npc_cyborg_enforcer_000046.obj
-index: 3565
+index: 3145
 #Models/npc_cyborg_enforcer_000047.obj
-index: 3566
+index: 3146
 #Models/npc_cyborg_enforcer_000048.obj
-index: 3567
+index: 3147
 #Models/npc_cyborg_enforcer_000049.obj
-index: 3568
+index: 3148
 #Models/npc_cyborg_enforcer_000050.obj
-index: 3569
+index: 3149
 #Models/npc_cyborg_enforcer_000051.obj
-index: 3570
+index: 3150
 #Models/npc_cyborg_enforcer_000052.obj
-index: 3571
+index: 3151
 #Models/npc_cyborg_enforcer_000053.obj
-index: 3572
+index: 3152
 #Models/npc_cyborg_enforcer_000054.obj
-index: 3573
+index: 3153
 #Models/npc_cyborg_enforcer_000055.obj
-index: 3574
+index: 3154
 #Models/npc_cyborg_enforcer_000056.obj
-index: 3575
+index: 3155
 #Models/npc_cyborg_enforcer_000057.obj
-index: 3576
+index: 3156
 #Models/npc_cyborg_enforcer_000058.obj
-index: 3577
+index: 3157
 #Models/npc_cyborg_enforcer_000059.obj
-index: 3578
+index: 3158
 #Models/npc_cyborg_enforcer_000060.obj
-index: 3579
+index: 3159
 #Models/npc_cyborg_enforcer_000061.obj
-index: 3580
+index: 3160
 #Models/npc_cyborg_enforcer_000062.obj
-index: 3581
+index: 3161
 #Models/npc_cyborg_enforcer_000063.obj
-index: 3582
+index: 3162
 #Models/npc_cyborg_enforcer_000064.obj
-index: 3583
+index: 3163
 #Models/npc_cyborg_enforcer_000065.obj
-index: 3584
+index: 3164
 #Models/npc_cyborg_enforcer_000066.obj
-index: 3585
+index: 3165
 #Models/npc_cyborg_enforcer_000067.obj
-index: 3586
+index: 3166
 #Models/npc_cyborg_enforcer_000068.obj
-index: 3587
+index: 3167
 #Models/npc_cyborg_enforcer_000069.obj
-index: 3588
+index: 3168
 #Models/npc_cyborg_enforcer_000070.obj
-index: 3589
+index: 3169
 #Models/npc_cyborg_enforcer_000071.obj
-index: 3590
+index: 3170
 #Models/npc_cyborg_enforcer_000072.obj
-index: 3591
+index: 3171
 #Models/npc_cyborg_enforcer_000073.obj
-index: 3592
+index: 3172
 #Models/npc_cyborg_enforcer_000074.obj
-index: 3593
+index: 3173
 #Models/npc_cyborg_enforcer_000075.obj
-index: 3594
+index: 3174
 #Models/npc_cyborg_enforcer_000076.obj
-index: 3595
+index: 3175
 #Models/npc_cyborg_enforcer_000077.obj
-index: 3596
+index: 3176
 #Models/npc_cyborg_enforcer_000078.obj
-index: 3597
+index: 3177
 #Models/npc_cyborg_enforcer_000079.obj
-index: 3598
+index: 3178
 #Models/npc_cyborg_enforcer_000080.obj
-index: 3599
+index: 3179
 #Models/npc_cyborg_enforcer_000081.obj
-index: 3600
+index: 3180
 #Models/npc_cyborg_enforcer_000082.obj
-index: 3601
+index: 3181
 #Models/npc_cyborg_enforcer_000083.obj
-index: 3602
+index: 3182
 #Models/npc_cyborg_enforcer_000084.obj
-index: 3603
+index: 3183
 #Models/npc_cyborg_enforcer_000085.obj
-index: 3604
+index: 3184
 #Models/npc_cyborg_enforcer_000086.obj
-index: 3605
+index: 3185
 #Models/npc_cyborg_enforcer_000087.obj
-index: 3606
+index: 3186
 #Models/npc_cyborg_enforcer_000088.obj
-index: 3607
+index: 3187
 #Models/npc_cyborg_enforcer_000089.obj
-index: 3608
+index: 3188
 #Models/npc_cyborg_enforcer_000090.obj
-index: 3609
+index: 3189
 #Models/npc_cyborg_enforcer_000091.obj
-index: 3610
+index: 3190
 #Models/npc_cyborg_enforcer_000092.obj
-index: 3611
+index: 3191
 #Models/npc_cyborg_enforcer_000093.obj
-index: 3612
+index: 3192
 #Models/npc_cyborg_enforcer_000094.obj
-index: 3613
+index: 3193
 #Models/npc_cyborg_enforcer_000095.obj
-index: 3614
+index: 3194
 #Models/npc_cyborg_enforcer_000096.obj
-index: 3615
+index: 3195
 #Models/npc_cyborg_enforcer_000097.obj
-index: 3616
+index: 3196
 #Models/npc_cyborg_enforcer_000098.obj
-index: 3617
+index: 3197
 #Models/npc_cyborg_enforcer_000099.obj
-index: 3618
+index: 3198
 #Models/npc_cyborg_enforcer_000100.obj
-index: 3619
+index: 3199
 #Models/npc_cyborg_enforcer_000101.obj
-index: 3620
+index: 3200
 #Models/npc_cyborg_enforcer_000102.obj
-index: 3621
+index: 3201
 #Models/npc_cyborg_enforcer_000103.obj
-index: 3622
+index: 3202
 #Models/npc_cyborg_enforcer_000104.obj
-index: 3623
+index: 3203
 #Models/npc_cyborg_enforcer_000105.obj
-index: 3624
+index: 3204
 #Models/npc_cyborg_enforcer_000106.obj
-index: 3625
+index: 3205
 #Models/npc_cyborg_enforcer_000107.obj
-index: 3626
+index: 3206
 #Models/npc_cyborg_enforcer_000108.obj
-index: 3627
+index: 3207
 #Models/npc_cyborg_enforcer_000109.obj
-index: 3628
+index: 3208
 #Models/npc_cyborg_enforcer_000110.obj
-index: 3629
+index: 3209
 #Models/npc_cyborg_enforcer_000111.obj
-index: 3630
+index: 3210
 #Models/npc_cyborg_enforcer_000112.obj
-index: 3631
+index: 3211
 #Models/npc_cyborg_enforcer_000113.obj
-index: 3632
+index: 3212
 #Models/npc_cyborg_enforcer_000114.obj
-index: 3633
+index: 3213
 #Models/npc_cyborg_enforcer_000115.obj
-index: 3634
+index: 3214
 #Models/npc_cyborg_enforcer_000116.obj
-index: 3635
+index: 3215
 #Models/npc_cyborg_enforcer_000117.obj
-index: 3636
+index: 3216
 #Models/npc_cyborg_enforcer_000118.obj
-index: 3637
+index: 3217
 #Models/npc_cyborg_enforcer_000119.obj
-index: 3638
+index: 3218
 #Models/npc_cyborg_enforcer_000120.obj
-index: 3639
+index: 3219
 #Models/npc_cyborg_enforcer_000121.obj
-index: 3640
+index: 3220
 #Models/npc_cyborg_enforcer_000122.obj
-index: 3641
+index: 3221
 #Models/npc_cyborg_enforcer_000123.obj
-index: 3642
+index: 3222
 #Models/npc_cyborg_enforcer_000124.obj
-index: 3643
+index: 3223
 #Models/npc_cyborg_enforcer_000125.obj
-index: 3644
+index: 3224
 #Models/npc_cyborg_enforcer_000126.obj
-index: 3645
+index: 3225
 #Models/npc_cyborg_enforcer_000127.obj
-index: 3646
+index: 3226
 #Models/npc_cyborg_enforcer_000128.obj
-index: 3647
+index: 3227
 #Models/npc_cyborg_enforcer_000129.obj
-index: 3648
+index: 3228
 #Models/npc_cyborg_enforcer_000130.obj
-index: 3649
+index: 3229
 #Models/npc_cyborg_enforcer_000131.obj
-index: 3650
+index: 3230
 #Models/npc_cyborg_enforcer_000132.obj
-index: 3651
+index: 3231
 #Models/npc_cyborg_enforcer_000133.obj
-index: 3652
+index: 3232
 #Models/npc_cyborg_enforcer_000134.obj
-index: 3653
+index: 3233
 #Models/npc_cyborg_enforcer_000135.obj
-index: 3654
+index: 3234
 #Models/npc_cyborg_enforcer_000136.obj
-index: 3655
+index: 3235
 #Models/npc_cyborg_enforcer_000137.obj
-index: 3656
+index: 3236
 #Models/npc_cyborg_enforcer_000138.obj
-index: 3657
+index: 3237
 #Models/npc_cyborg_enforcer_000139.obj
-index: 3658
+index: 3238
 #Models/npc_cyborg_enforcer_000140.obj
-index: 3659
+index: 3239
 #Models/npc_cyborg_enforcer_000141.obj
-index: 3660
+index: 3240
 #Models/npc_cyborg_enforcer_000142.obj
-index: 3661
+index: 3241
 #Models/npc_cyborg_enforcer_000143.obj
-index: 3662
+index: 3242
 #Models/npc_cyborg_enforcer_000144.obj
-index: 3663
+index: 3243
 #Models/npc_cyborg_enforcer_000145.obj
-index: 3664
+index: 3244
 #Models/npc_cyborg_enforcer_000146.obj
-index: 3665
+index: 3245
 #Models/npc_cyborg_enforcer_000147.obj
-index: 3666
+index: 3246
 #Models/npc_cyborg_enforcer_000148.obj
-index: 3667
+index: 3247
 #Models/npc_cyborg_enforcer_000149.obj
-index: 3668
+index: 3248
 #Models/npc_cyborg_enforcer_000150.obj
-index: 3669
+index: 3249
 #Models/npc_cyborg_enforcer_000151.obj
-index: 3670
+index: 3250
 #Models/npc_cyborg_enforcer_000152.obj
-index: 3671
+index: 3251
 #Models/npc_cyborg_enforcer_000153.obj
-index: 3672
+index: 3252
 #Models/npc_cyborg_enforcer_000154.obj
-index: 3673
+index: 3253
 #Models/npc_cyborg_enforcer_000155.obj
-index: 3674
+index: 3254
 #Models/npc_cyborg_enforcer_000156.obj
-index: 3675
+index: 3255
 #Models/npc_cyborg_enforcer_000157.obj
-index: 3676
+index: 3256
 #Models/npc_cyborg_enforcer_000158.obj
-index: 3677
+index: 3257
 #Models/npc_cyborg_enforcer_000159.obj
-index: 3678
+index: 3258
 #Models/npc_cyborg_enforcer_000160.obj
-index: 3679
+index: 3259
 #Models/npc_cyborg_enforcer_000161.obj
-index: 3680
+index: 3260
 #Models/npc_cyborg_enforcer_000162.obj
-index: 3681
+index: 3261
 #Models/npc_cyborg_enforcer_000163.obj
-index: 3682
+index: 3262
 #Models/npc_cyborg_enforcer_000164.obj
-index: 3683
+index: 3263
 #Models/npc_cyborg_enforcer_000165.obj
-index: 3684
+index: 3264
 #Models/npc_cyborg_enforcer_000166.obj
-index: 3685
+index: 3265
 #Models/npc_cyborg_enforcer_000167.obj
-index: 3686
+index: 3266
 #Models/npc_cyborg_enforcer_000168.obj
-index: 3687
+index: 3267
 #Models/npc_cyborg_enforcer_000169.obj
-index: 3688
+index: 3268
 #Models/npc_cyborg_enforcer_000170.obj
-index: 3689
+index: 3269
 #Models/npc_cyborg_enforcer_000171.obj
-index: 3690
+index: 3270
 #Models/npc_cyborg_enforcer_000172.obj
-index: 3691
+index: 3271
 #Models/npc_cyborg_enforcer_000173.obj
-index: 3692
+index: 3272
 #Models/npc_cyborg_enforcer_000174.obj
-index: 3693
+index: 3273
 #Models/npc_cyborg_enforcer_000175.obj
-index: 3694
+index: 3274
 #Models/npc_cyborg_enforcer_000176.obj
-index: 3695
+index: 3275
 #Models/npc_cyborg_enforcer_000177.obj
-index: 3696
+index: 3276
 #Models/npc_cyborg_enforcer_000178.obj
-index: 3697
+index: 3277
 #Models/npc_cyborg_enforcer_000179.obj
-index: 3698
+index: 3278
 #Models/npc_cyborg_enforcer_000180.obj
-index: 3699
+index: 3279
 #Models/npc_cyborg_enforcer_000181.obj
-index: 3700
+index: 3280
 #Models/npc_cyborg_enforcer_000182.obj
-index: 3701
+index: 3281
 #Models/npc_cyborg_enforcer_000183.obj
-index: 3702
+index: 3282
 #Models/npc_cyborg_enforcer_000184.obj
-index: 3703
+index: 3283
 #Models/npc_cyborg_enforcer_000185.obj
-index: 3704
+index: 3284
 #Models/npc_cyborg_enforcer_000186.obj
-index: 3705
+index: 3285
 #Models/npc_cyborg_enforcer_000187.obj
-index: 3706
+index: 3286
 #Models/npc_cyborg_enforcer_000188.obj
-index: 3707
+index: 3287
 #Models/npc_cyborg_enforcer_000189.obj
-index: 3708
+index: 3288
 #Models/npc_cyborg_enforcer_000190.obj
-index: 3709
+index: 3289
 #Models/npc_cyborg_enforcer_000191.obj
-index: 3710
+index: 3290
 #Models/npc_cyborg_enforcer_000192.obj
-index: 3711
+index: 3291
 #Models/npc_cyborg_enforcer_000193.obj
-index: 3712
+index: 3292
 #Models/npc_cyborg_enforcer_000194.obj
-index: 3713
+index: 3293
 #Models/npc_cyborg_enforcer_000195.obj
-index: 3714
+index: 3294
 #Models/npc_cyborg_enforcer_000196.obj
-index: 3715
+index: 3295
 #Models/npc_cyborg_enforcer_000197.obj
-index: 3716
+index: 3296
 #Models/npc_cyborg_enforcer_000198.obj
-index: 3717
+index: 3297
 #Models/npc_cyborg_enforcer_000199.obj
-index: 3718
+index: 3298
 #Models/npc_cyborg_enforcer_000200.obj
-index: 3719
+index: 3299
 #Models/npc_cyborg_enforcer_000201.obj
-index: 3720
+index: 3300
 #Models/npc_cyborg_enforcer_000202.obj
-index: 3721
+index: 3301
 #Models/npc_cyborg_enforcer_000203.obj
-index: 3722
+index: 3302
 #Models/npc_cyborg_enforcer_000204.obj
-index: 3723
+index: 3303
 #Models/npc_cyborg_enforcer_000205.obj
-index: 3724
+index: 3304
 #Models/npc_cyborg_enforcer_000206.obj
-index: 3725
+index: 3305
 #Models/npc_cyborg_enforcer_000207.obj
-index: 3726
+index: 3306
 #Models/npc_cyborg_enforcer_000208.obj
-index: 3727
+index: 3307
 #Models/npc_cyborg_enforcer_000209.obj
-index: 3728
+index: 3308
 #Models/npc_cyborg_enforcer_000210.obj
-index: 3729
+index: 3309
 #Models/npc_cyborg_enforcer_000211.obj
-index: 3730
+index: 3310
 #Models/npc_cyborg_enforcer_000212.obj
-index: 3731
+index: 3311
 #Models/npc_cyborg_enforcer_000213.obj
-index: 3732
+index: 3312
 #Models/npc_cyborg_enforcer_000214.obj
-index: 3733
+index: 3313
 #Models/npc_cyborg_enforcer_000215.obj
-index: 3734
+index: 3314
 #Models/npc_cyborg_enforcer_000216.obj
-index: 3735
+index: 3315
 #Models/npc_cyborg_enforcer_000217.obj
-index: 3736
+index: 3316
 #Models/npc_cyborg_enforcer_000218.obj
-index: 3737
+index: 3317
 #Models/npc_cyborg_enforcer_000219.obj
-index: 3738
-#Models/npc_cyborg_enforcer_000220.obj
-index: 3739
-#Models/npc_cyborg_enforcer_000221.obj
-index: 3740
-#Models/npc_cyborg_enforcer_000222.obj
-index: 3741
-#Models/npc_cyborg_enforcer_000223.obj
-index: 3742
-#Models/npc_cyborg_enforcer_000224.obj
-index: 3743
-#Models/npc_cyborg_enforcer_000225.obj
-index: 3744
-#Models/npc_cyborg_enforcer_000226.obj
-index: 3745
-#Models/npc_cyborg_enforcer_000227.obj
-index: 3746
-#Models/npc_cyborg_enforcer_000228.obj
-index: 3747
-#Models/npc_cyborg_enforcer_000229.obj
-index: 3748
-#Models/npc_cyborg_enforcer_000230.obj
-index: 3749
-#Models/npc_cyborg_enforcer_000231.obj
-index: 3750
-#Models/npc_cyborg_enforcer_000232.obj
-index: 3751
-#Models/npc_cyborg_enforcer_000233.obj
-index: 3752
-#Models/npc_cyborg_enforcer_000234.obj
-index: 3753
-#Models/npc_cyborg_enforcer_000235.obj
-index: 3754
-#Models/npc_cyborg_enforcer_000236.obj
-index: 3755
-#Models/npc_cyborg_enforcer_000237.obj
-index: 3756
-#Models/npc_cyborg_enforcer_000238.obj
-index: 3757
-#Models/npc_cyborg_enforcer_000239.obj
-index: 3758
+index: 3318
 #Models/npc_cyborg_enforcer_000240.obj
-index: 3759
+index: 3319
 #Models/npc_cyborg_enforcer_000241.obj
-index: 3760
+index: 3320
 #Models/npc_cyborg_enforcer_000242.obj
-index: 3761
+index: 3321
 #Models/npc_cyborg_enforcer_000243.obj
-index: 3762
+index: 3322
 #Models/npc_cyborg_enforcer_000244.obj
-index: 3763
+index: 3323
 #Models/npc_cyborg_enforcer_000245.obj
-index: 3764
+index: 3324
 #Models/npc_cyborg_enforcer_000246.obj
-index: 3765
+index: 3325
 #Models/npc_cyborg_enforcer_000247.obj
-index: 3766
+index: 3326
 #Models/npc_cyborg_enforcer_000248.obj
-index: 3767
+index: 3327
 #Models/npc_cyborg_enforcer_000249.obj
-index: 3768
+index: 3328
 #Models/npc_cyborg_enforcer_000250.obj
-index: 3769
+index: 3329
 #Models/npc_cyborg_enforcer_000251.obj
-index: 3770
+index: 3330
 #Models/npc_cyborg_enforcer_000252.obj
-index: 3771
+index: 3331
 #Models/npc_cyborg_enforcer_000253.obj
-index: 3772
+index: 3332
 #Models/npc_cyborg_enforcer_000254.obj
-index: 3773
+index: 3333
 #Models/npc_cyborg_enforcer_000255.obj
-index: 3774
+index: 3334
 #Models/npc_cyborg_enforcer_000256.obj
-index: 3775
+index: 3335
 #Models/npc_cyborg_enforcer_000257.obj
-index: 3776
+index: 3336
 #Models/npc_cyborg_enforcer_000258.obj
-index: 3777
+index: 3337
 #Models/npc_cyborg_enforcer_000259.obj
-index: 3778
+index: 3338
 #Models/npc_cyborg_enforcer_000260.obj
-index: 3779
+index: 3339
 #Models/npc_cyborg_enforcer_000261.obj
-index: 3780
+index: 3340
 #Models/npc_cyborg_enforcer_000262.obj
-index: 3781
+index: 3341
 #Models/npc_cyborg_enforcer_000263.obj
-index: 3782
+index: 3342
 #Models/npc_cyborg_enforcer_000264.obj
-index: 3783
+index: 3343
 #Models/npc_cyborg_enforcer_000265.obj
-index: 3784
+index: 3344
 #Models/npc_cyborg_enforcer_000266.obj
-index: 3785
+index: 3345
 #Models/npc_cyborg_enforcer_000267.obj
-index: 3786
+index: 3346
 #Models/npc_cyborg_enforcer_000268.obj
-index: 3787
+index: 3347
 #Models/npc_cyborg_enforcer_000269.obj
-index: 3788
+index: 3348
 #Models/npc_cyborg_enforcer_000270.obj
-index: 3789
+index: 3349
 #Models/npc_cyborg_enforcer_000271.obj
-index: 3790
+index: 3350
 #Models/npc_cyborg_enforcer_000272.obj
-index: 3791
+index: 3351
 #Models/npc_cyborg_enforcer_000273.obj
-index: 3792
+index: 3352
 #Models/npc_cyborg_enforcer_000274.obj
-index: 3793
+index: 3353
 #Models/npc_cyborg_enforcer_000275.obj
-index: 3794
+index: 3354
 #Models/npc_cyborg_enforcer_000276.obj
-index: 3795
+index: 3355
 #Models/npc_cyborg_enforcer_000277.obj
-index: 3796
+index: 3356
 #Models/npc_cyborg_enforcer_000278.obj
-index: 3797
+index: 3357
 #Models/npc_cyborg_enforcer_000279.obj
-index: 3798
+index: 3358
 #Models/npc_cyborg_enforcer_000280.obj
-index: 3799
+index: 3359
 #Models/npc_cyborg_enforcer_000281.obj
-index: 3800
+index: 3360
 #Models/npc_cyborg_enforcer_000282.obj
-index: 3801
+index: 3361
 #Models/npc_cyborg_enforcer_000283.obj
-index: 3802
+index: 3362
 #Models/npc_cyborg_enforcer_000284.obj
-index: 3803
+index: 3363
 #Models/npc_cyborg_enforcer_000285.obj
-index: 3804
+index: 3364
 #Models/npc_cyborg_enforcer_000286.obj
-index: 3805
-#Models/npc_cyborg_enforcer_000287.obj
-index: 3806
-#Models/npc_cyborg_enforcer_000288.obj
-index: 3807
-#Models/npc_cyborg_enforcer_000289.obj
-index: 3808
-#Models/npc_cyborg_enforcer_000290.obj
-index: 3809
-#Models/npc_cyborg_enforcer_000291.obj
-index: 3810
-#Models/npc_cyborg_enforcer_000292.obj
-index: 3811
-#Models/npc_cyborg_enforcer_000293.obj
-index: 3812
-#Models/npc_cyborg_enforcer_000294.obj
-index: 3813
-#Models/npc_cyborg_enforcer_000295.obj
-index: 3814
-#Models/npc_cyborg_enforcer_000296.obj
-index: 3815
-#Models/npc_cyborg_enforcer_000297.obj
-index: 3816
-#Models/npc_cyborg_enforcer_000298.obj
-index: 3817
-#Models/npc_cyborg_enforcer_000299.obj
-index: 3818
-#Models/npc_cyborg_enforcer_000300.obj
-index: 3819
-#Models/npc_cyborg_enforcer_000301.obj
-index: 3820
-#Models/npc_cyborg_enforcer_000302.obj
-index: 3821
-#Models/npc_cyborg_enforcer_000303.obj
-index: 3822
-#Models/npc_cyborg_enforcer_000304.obj
-index: 3823
-#Models/npc_cyborg_enforcer_000305.obj
-index: 3824
+index: 3365
 #Models/npc_cyborg_enforcer_000306.obj
-index: 3825
+index: 3366
 #Models/npc_cyborg_enforcer_000307.obj
-index: 3826
+index: 3367
 #Models/npc_cyborg_enforcer_000308.obj
-index: 3827
+index: 3368
 #Models/npc_cyborg_enforcer_000309.obj
-index: 3828
+index: 3369
 #Models/npc_cyborg_enforcer_000310.obj
-index: 3829
+index: 3370
 #Models/npc_cyborg_enforcer_000311.obj
-index: 3830
+index: 3371
 #Models/npc_cyborg_enforcer_000312.obj
-index: 3831
+index: 3372
 #Models/npc_cyborg_enforcer_000313.obj
-index: 3832
+index: 3373
 #Models/npc_cyborg_enforcer_000314.obj
-index: 3833
+index: 3374
 #Models/npc_cyborg_enforcer_000315.obj
-index: 3834
+index: 3375
 #Models/npc_cyborg_enforcer_000316.obj
-index: 3835
+index: 3376
 #Models/npc_cyborg_enforcer_000317.obj
-index: 3836
+index: 3377
 #Models/npc_cyborg_enforcer_000318.obj
-index: 3837
+index: 3378
 #Models/npc_cyborg_enforcer_000319.obj
-index: 3838
+index: 3379
 #Models/npc_cyborg_enforcer_000320.obj
-index: 3839
+index: 3380
 #Models/npc_cyborg_enforcer_000321.obj
-index: 3840
+index: 3381
 #Models/npc_cyborg_enforcer_000322.obj
-index: 3841
+index: 3382
 #Models/npc_cyborg_enforcer_000323.obj
-index: 3842
+index: 3383
 #Models/npc_cyborg_enforcer_000324.obj
-index: 3843
+index: 3384
 #Models/npc_cyborg_enforcer_000325.obj
-index: 3844
+index: 3385
 #Models/npc_cyborg_enforcer_000326.obj
-index: 3845
+index: 3386
 #Models/npc_cyborg_enforcer_000327.obj
-index: 3846
-#Models/npc_cyborg_enforcer_000328.obj
-index: 3847
+index: 3387
 #Models/npc_cyborg_enforcer_000329.obj
-index: 3848
+index: 3388
 #Models/npc_cyborg_enforcer_000330.obj
-index: 3849
+index: 3389
 #Models/npc_cyborg_enforcer_000331.obj
-index: 3850
+index: 3390
 #Models/npc_cyborg_enforcer_000332.obj
-index: 3851
+index: 3391
 #Models/npc_cyborg_enforcer_000333.obj
-index: 3852
+index: 3392
 #Models/npc_cyborg_enforcer_000334.obj
-index: 3853
+index: 3393
 #Models/npc_cyborg_enforcer_000335.obj
-index: 3854
+index: 3394
 #Models/npc_cyborg_enforcer_000336.obj
-index: 3855
+index: 3395
 #Models/npc_cyborg_enforcer_000337.obj
-index: 3856
+index: 3396
 #Models/npc_cyborg_enforcer_000338.obj
-index: 3857
+index: 3397
 #Models/npc_cyborg_enforcer_000339.obj
-index: 3858
+index: 3398
 #Models/npc_cyborg_enforcer_000340.obj
-index: 3859
+index: 3399
 #Models/npc_cyborg_enforcer_000341.obj
-index: 3860
+index: 3400
 #Models/npc_cyborg_enforcer_000342.obj
-index: 3861
+index: 3401
 #Models/npc_cyborg_enforcer_000343.obj
-index: 3862
+index: 3402
 #Models/npc_cyborg_enforcer_000344.obj
-index: 3863
+index: 3403
 #Models/npc_cyborg_enforcer_000345.obj
-index: 3864
+index: 3404
 #Models/npc_cyborg_enforcer_000346.obj
-index: 3865
+index: 3405
 #Models/npc_cyborg_enforcer_000347.obj
-index: 3866
+index: 3406
 #Models/npc_cyborg_enforcer_000348.obj
-index: 3867
+index: 3407
 #Models/npc_cyborg_enforcer_000349.obj
-index: 3868
+index: 3408
 #Models/npc_cyborg_enforcer_000350.obj
-index: 3869
+index: 3409
 #Models/npc_cyborg_enforcer_000351.obj
-index: 3870
-#Models/npc_cyborg_enforcer_000352.obj
-index: 3871
+index: 3410
 #Models/npc_cyborg_enforcer_000353.obj
-index: 3872
+index: 3411
 #Models/npc_cyborg_enforcer_000354.obj
-index: 3873
+index: 3412
 #Models/npc_cyborg_enforcer_000355.obj
-index: 3874
+index: 3413
 #Models/npc_cyborg_enforcer_000356.obj
-index: 3875
+index: 3414
 #Models/npc_cyborg_enforcer_000357.obj
-index: 3876
+index: 3415
 #Models/npc_cyborg_enforcer_000358.obj
-index: 3877
+index: 3416
 #Models/npc_cyborg_enforcer_000359.obj
-index: 3878
+index: 3417
 #Models/npc_cyborg_enforcer_000360.obj
-index: 3879
+index: 3418
 #Models/npc_cyborg_enforcer_000361.obj
-index: 3880
+index: 3419
 #Models/npc_cyborg_enforcer_000362.obj
-index: 3881
+index: 3420
 #Models/npc_cyborg_enforcer_000363.obj
-index: 3882
+index: 3421
 #Models/npc_cyborg_enforcer_000364.obj
-index: 3883
+index: 3422
 #Models/npc_cyborg_enforcer_000365.obj
-index: 3884
+index: 3423
 #Models/npc_cyborg_enforcer_000366.obj
-index: 3885
+index: 3424
 #Models/npc_cyborg_enforcer_000367.obj
-index: 3886
+index: 3425
 #Models/npc_cyborg_enforcer_000368.obj
-index: 3887
+index: 3426
 #Models/npc_cyborg_enforcer_000369.obj
-index: 3888
+index: 3427
 #Models/npc_cyborg_enforcer_000370.obj
-index: 3889
+index: 3428
 #Models/npc_cyborg_enforcer_000371.obj
-index: 3890
+index: 3429
 #Models/npc_cyborg_enforcer_000372.obj
-index: 3891
+index: 3430
 #Models/npc_cyborg_enforcer_000373.obj
-index: 3892
+index: 3431
 #Models/npc_cyborg_enforcer_000374.obj
-index: 3893
+index: 3432
 #Models/npc_cyborg_enforcer_000375.obj
-index: 3894
+index: 3433
 #Models/npc_cyborg_enforcer_000376.obj
-index: 3895
+index: 3434
 #Models/npc_cyborg_enforcer_000377.obj
-index: 3896
-#Models/npc_cyborg_enforcer_000378.obj
-index: 3897
-#Models/npc_cyborg_enforcer_000379.obj
-index: 3898
+index: 3435
 #Models/npc_cyborg_enforcer_000380.obj
-index: 3899
+index: 3436
 #Models/npc_cyborg_enforcer_000381.obj
-index: 3900
+index: 3437
 #Models/npc_cyborg_enforcer_000382.obj
-index: 3901
+index: 3438
 #Models/npc_cyborg_enforcer_000383.obj
-index: 3902
+index: 3439
 #Models/npc_cyborg_enforcer_000384.obj
-index: 3903
+index: 3440
 #Models/npc_cyborg_enforcer_000385.obj
-index: 3904
+index: 3441
 #Models/npc_cyborg_enforcer_000386.obj
-index: 3905
+index: 3442
 #Models/npc_cyborg_enforcer_000387.obj
-index: 3906
+index: 3443
 #Models/npc_cyborg_enforcer_000388.obj
-index: 3907
+index: 3444
 #Models/npc_cyborg_enforcer_000389.obj
-index: 3908
+index: 3445
 #Models/npc_cyborg_enforcer_000390.obj
-index: 3909
+index: 3446
 #Models/npc_cyborg_enforcer_000391.obj
-index: 3910
+index: 3447
 #Models/npc_cyborg_enforcer_000392.obj
-index: 3911
+index: 3448
 #Models/npc_cyborg_enforcer_000393.obj
-index: 3912
+index: 3449
 #Models/npc_cyborg_enforcer_000394.obj
-index: 3913
+index: 3450
 #Models/npc_cyborg_enforcer_000395.obj
-index: 3914
+index: 3451
 #Models/npc_cyborg_enforcer_000396.obj
-index: 3915
+index: 3452
 #Models/npc_cyborg_enforcer_000397.obj
-index: 3916
+index: 3453
 #Models/npc_cyborg_enforcer_000398.obj
-index: 3917
+index: 3454
 #Models/npc_cyborg_enforcer_000399.obj
-index: 3918
+index: 3455
 #Models/npc_cyborg_enforcer_000400.obj
-index: 3919
+index: 3456
 #Models/npc_cyborg_enforcer_000401.obj
-index: 3920
+index: 3457
 #Models/npc_cyborg_enforcer_000402.obj
-index: 3921
-#Models/npc_cyborg_enforcer_000403.obj
-index: 3922
-#Models/npc_cyborg_enforcer_000404.obj
-index: 3923
-#Models/npc_cyborg_enforcer_000405.obj
-index: 3924
-#Models/npc_cyborg_enforcer_000406.obj
-index: 3925
-#Models/npc_cyborg_enforcer_000407.obj
-index: 3926
-#Models/npc_cyborg_enforcer_000408.obj
-index: 3927
-#Models/npc_cyborg_enforcer_000409.obj
-index: 3928
-#Models/npc_cyborg_enforcer_000410.obj
-index: 3929
-#Models/npc_cyborg_enforcer_000411.obj
-index: 3930
-#Models/npc_cyborg_enforcer_000412.obj
-index: 3931
-#Models/npc_cyborg_enforcer_000413.obj
-index: 3932
-#Models/npc_cyborg_enforcer_000414.obj
-index: 3933
-#Models/npc_cyborg_enforcer_000415.obj
-index: 3934
+index: 3458
 #Models/npc_cyborg_enforcer_000416.obj
-index: 3935
+index: 3459
 #Models/npc_cyborg_enforcer_000417.obj
-index: 3936
+index: 3460
 #Models/npc_cyborg_enforcer_000418.obj
-index: 3937
+index: 3461
 #Models/npc_cyborg_enforcer_000419.obj
-index: 3938
+index: 3462
 #Models/npc_cyborg_enforcer_000420.obj
-index: 3939
+index: 3463
 #Models/npc_cyborg_enforcer_000421.obj
-index: 3940
+index: 3464
 #Models/npc_cyborg_enforcer_000422.obj
-index: 3941
+index: 3465
 #Models/npc_cyborg_enforcer_000423.obj
-index: 3942
+index: 3466
 #Models/npc_cyborg_enforcer_000424.obj
-index: 3943
+index: 3467
 #Models/npc_cyborg_enforcer_000425.obj
-index: 3944
+index: 3468
 #Models/npc_cyborg_enforcer_000426.obj
-index: 3945
+index: 3469
 #Models/npc_cyborg_enforcer_000427.obj
-index: 3946
+index: 3470
 #Models/npc_cyborg_enforcer_000428.obj
-index: 3947
+index: 3471
 #Models/npc_cyborg_enforcer_000429.obj
-index: 3948
+index: 3472
 #Models/npc_cyborg_enforcer_000430.obj
-index: 3949
+index: 3473
 #Models/npc_cyborg_enforcer_000431.obj
-index: 3950
+index: 3474
 #Models/npc_cyborg_enforcer_000432.obj
-index: 3951
+index: 3475
 #Models/npc_cyborg_enforcer_000433.obj
-index: 3952
+index: 3476
 #Models/npc_cyborg_enforcer_000434.obj
-index: 3953
+index: 3477
 #Models/npc_cyborg_enforcer_000435.obj
-index: 3954
+index: 3478
 #Models/npc_cyborg_enforcer_000436.obj
-index: 3955
+index: 3479
 #Models/npc_cyborg_enforcer_000437.obj
-index: 3956
+index: 3480
 #Models/npc_cyborg_enforcer_000438.obj
-index: 3957
-#Models/npc_cyborg_enforcer_000439.obj
-index: 3958
+index: 3481
 
 #Models/npc_cyborgwarrior_000001.obj
 index: 3959
