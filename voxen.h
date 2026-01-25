@@ -933,7 +933,8 @@ void DualLogError(const char* fmt, ...);
 #define ANIM_ATTACK3 5
 #define ANIM_PAIN    6
 #define ANIM_PAIN2   7
-#define ANIM_DYING   8
+#define ANIM_PAIN3   8
+#define ANIM_DYING   9
 
 extern GlobalContext Sys_Global;
 extern QuestBits questData;
