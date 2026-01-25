@@ -1348,6 +1348,14 @@ Individual static variable impacts:
     97 todo.c
 ```
 
+Helper bash commands to generate frame sequences in models.txt:
+start_index=2104                                                                                                                                                                               ✔  0.25  │ 9.8G    19:43:49  01/24/2026  ▓▒░
+for i in $(seq 2 50); do
+  printf "#Models/flight_fanwall_%06d.obj\nindex: %d\n" "$i" "$start_index"
+  ((start_index++))
+done
+
+
 Main Rig.  Settings:
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.
 VoxenSettings voxen_Settings = {

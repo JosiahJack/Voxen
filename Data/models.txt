@@ -3945,2556 +3945,2013 @@ index: 2102
 #Models/flight_fanwall_000050.obj
 index: 2103
 
-
-#Models/npc_bot_cortex_reaver_000001.obj
-index: 2251
+#Models/npc_bot_cortex_reaver_000003.obj
+index: 2104
 animated: 1
 animationNum: 23
-#Models/npc_bot_cortex_reaver_000002.obj
-index: 2252
-#Models/npc_bot_cortex_reaver_000003.obj
-index: 2253
 #Models/npc_bot_cortex_reaver_000004.obj
-index: 2254
+index: 2105
 #Models/npc_bot_cortex_reaver_000005.obj
-index: 2255
+index: 2106
 #Models/npc_bot_cortex_reaver_000006.obj
-index: 2256
+index: 2107
 #Models/npc_bot_cortex_reaver_000007.obj
-index: 2257
+index: 2108
 #Models/npc_bot_cortex_reaver_000008.obj
-index: 2258
+index: 2109
 #Models/npc_bot_cortex_reaver_000009.obj
-index: 2259
+index: 2110
 #Models/npc_bot_cortex_reaver_000010.obj
-index: 2260
+index: 2111
 #Models/npc_bot_cortex_reaver_000011.obj
-index: 2261
+index: 2112
 #Models/npc_bot_cortex_reaver_000012.obj
-index: 2262
+index: 2113
 #Models/npc_bot_cortex_reaver_000013.obj
-index: 2263
+index: 2114
 #Models/npc_bot_cortex_reaver_000014.obj
-index: 2264
+index: 2115
 #Models/npc_bot_cortex_reaver_000015.obj
-index: 2265
+index: 2116
 #Models/npc_bot_cortex_reaver_000016.obj
-index: 2266
+index: 2117
 #Models/npc_bot_cortex_reaver_000017.obj
-index: 2267
+index: 2118
 #Models/npc_bot_cortex_reaver_000018.obj
-index: 2268
+index: 2119
 #Models/npc_bot_cortex_reaver_000019.obj
-index: 2269
+index: 2120
 #Models/npc_bot_cortex_reaver_000020.obj
-index: 2270
+index: 2121
 #Models/npc_bot_cortex_reaver_000021.obj
-index: 2271
+index: 2122
 #Models/npc_bot_cortex_reaver_000022.obj
-index: 2272
+index: 2123
 #Models/npc_bot_cortex_reaver_000023.obj
-index: 2273
+index: 2124
 #Models/npc_bot_cortex_reaver_000024.obj
-index: 2274
+index: 2125
 #Models/npc_bot_cortex_reaver_000025.obj
-index: 2275
+index: 2126
 #Models/npc_bot_cortex_reaver_000026.obj
-index: 2276
+index: 2127
 #Models/npc_bot_cortex_reaver_000027.obj
-index: 2277
+index: 2128
 #Models/npc_bot_cortex_reaver_000028.obj
-index: 2278
+index: 2129
 #Models/npc_bot_cortex_reaver_000029.obj
-index: 2279
+index: 2130
 #Models/npc_bot_cortex_reaver_000030.obj
-index: 2280
+index: 2131
 #Models/npc_bot_cortex_reaver_000031.obj
-index: 2281
+index: 2132
 #Models/npc_bot_cortex_reaver_000032.obj
-index: 2282
+index: 2133
 #Models/npc_bot_cortex_reaver_000033.obj
-index: 2283
+index: 2134
 #Models/npc_bot_cortex_reaver_000034.obj
-index: 2284
+index: 2135
 #Models/npc_bot_cortex_reaver_000035.obj
-index: 2285
+index: 2136
 #Models/npc_bot_cortex_reaver_000036.obj
-index: 2286
-#Models/npc_bot_cortex_reaver_000037.obj
-index: 2287
+index: 2137
 #Models/npc_bot_cortex_reaver_000038.obj
-index: 2288
+index: 2138
 #Models/npc_bot_cortex_reaver_000039.obj
-index: 2289
+index: 2139
 #Models/npc_bot_cortex_reaver_000040.obj
-index: 2290
+index: 2140
 #Models/npc_bot_cortex_reaver_000041.obj
-index: 2291
+index: 2141
 #Models/npc_bot_cortex_reaver_000042.obj
-index: 2292
+index: 2142
 #Models/npc_bot_cortex_reaver_000043.obj
-index: 2293
+index: 2143
 #Models/npc_bot_cortex_reaver_000044.obj
-index: 2294
+index: 2144
 #Models/npc_bot_cortex_reaver_000045.obj
-index: 2295
+index: 2145
 #Models/npc_bot_cortex_reaver_000046.obj
-index: 2296
+index: 2146
 #Models/npc_bot_cortex_reaver_000047.obj
-index: 2297
+index: 2147
 #Models/npc_bot_cortex_reaver_000048.obj
-index: 2298
+index: 2148
 #Models/npc_bot_cortex_reaver_000049.obj
-index: 2299
+index: 2149
 #Models/npc_bot_cortex_reaver_000050.obj
-index: 2300
+index: 2150
 #Models/npc_bot_cortex_reaver_000051.obj
-index: 2301
+index: 2151
 #Models/npc_bot_cortex_reaver_000052.obj
-index: 2302
+index: 2152
 #Models/npc_bot_cortex_reaver_000053.obj
-index: 2303
+index: 2153
 #Models/npc_bot_cortex_reaver_000054.obj
-index: 2304
+index: 2154
 #Models/npc_bot_cortex_reaver_000055.obj
-index: 2305
+index: 2155
 #Models/npc_bot_cortex_reaver_000056.obj
-index: 2306
-#Models/npc_bot_cortex_reaver_000057.obj
-index: 2307
+index: 2156
 #Models/npc_bot_cortex_reaver_000058.obj
-index: 2308
+index: 2156
 #Models/npc_bot_cortex_reaver_000059.obj
-index: 2309
+index: 2157
 #Models/npc_bot_cortex_reaver_000060.obj
-index: 2310
+index: 2158
 #Models/npc_bot_cortex_reaver_000061.obj
-index: 2311
+index: 2159
 #Models/npc_bot_cortex_reaver_000062.obj
-index: 2312
+index: 2160
 #Models/npc_bot_cortex_reaver_000063.obj
-index: 2313
+index: 2161
 #Models/npc_bot_cortex_reaver_000064.obj
-index: 2314
+index: 2162
 #Models/npc_bot_cortex_reaver_000065.obj
-index: 2315
+index: 2163
 #Models/npc_bot_cortex_reaver_000066.obj
-index: 2316
+index: 2164
 #Models/npc_bot_cortex_reaver_000067.obj
-index: 2317
+index: 2165
 #Models/npc_bot_cortex_reaver_000068.obj
-index: 2318
+index: 2166
 #Models/npc_bot_cortex_reaver_000069.obj
-index: 2319
+index: 2167
 #Models/npc_bot_cortex_reaver_000070.obj
-index: 2320
+index: 2168
 #Models/npc_bot_cortex_reaver_000071.obj
-index: 2321
+index: 2169
 #Models/npc_bot_cortex_reaver_000072.obj
-index: 2322
+index: 2170
 #Models/npc_bot_cortex_reaver_000073.obj
-index: 2323
+index: 2171
 #Models/npc_bot_cortex_reaver_000074.obj
-index: 2324
+index: 2172
 #Models/npc_bot_cortex_reaver_000075.obj
-index: 2325
+index: 2173
 #Models/npc_bot_cortex_reaver_000076.obj
-index: 2326
+index: 2174
 #Models/npc_bot_cortex_reaver_000077.obj
-index: 2327
+index: 2175
 #Models/npc_bot_cortex_reaver_000078.obj
-index: 2328
+index: 2176
 #Models/npc_bot_cortex_reaver_000079.obj
-index: 2329
+index: 2177
 #Models/npc_bot_cortex_reaver_000080.obj
-index: 2330
+index: 2178
 #Models/npc_bot_cortex_reaver_000081.obj
-index: 2331
-#Models/npc_bot_cortex_reaver_000082.obj
-index: 2332
-#Models/npc_bot_cortex_reaver_000083.obj
-index: 2333
+index: 2179
 #Models/npc_bot_cortex_reaver_000084.obj
-index: 2334
+index: 2180
 #Models/npc_bot_cortex_reaver_000085.obj
-index: 2335
+index: 2181
 #Models/npc_bot_cortex_reaver_000086.obj
-index: 2336
+index: 2182
 #Models/npc_bot_cortex_reaver_000087.obj
-index: 2337
+index: 2183
 #Models/npc_bot_cortex_reaver_000088.obj
-index: 2338
+index: 2184
 #Models/npc_bot_cortex_reaver_000089.obj
-index: 2339
+index: 2185
 #Models/npc_bot_cortex_reaver_000090.obj
-index: 2340
+index: 2186
 #Models/npc_bot_cortex_reaver_000091.obj
-index: 2341
+index: 2187
 #Models/npc_bot_cortex_reaver_000092.obj
-index: 2342
+index: 2188
 #Models/npc_bot_cortex_reaver_000093.obj
-index: 2343
+index: 2189
 #Models/npc_bot_cortex_reaver_000094.obj
-index: 2344
+index: 2190
 #Models/npc_bot_cortex_reaver_000095.obj
-index: 2345
+index: 2191
 #Models/npc_bot_cortex_reaver_000096.obj
-index: 2346
-#Models/npc_bot_cortex_reaver_000097.obj
-index: 2347
-#Models/npc_bot_cortex_reaver_000098.obj
-index: 2348
+index: 2192
 #Models/npc_bot_cortex_reaver_000099.obj
-index: 2349
+index: 2192
 #Models/npc_bot_cortex_reaver_000100.obj
-index: 2350
+index: 2193
 #Models/npc_bot_cortex_reaver_000101.obj
-index: 2351
+index: 2194
 #Models/npc_bot_cortex_reaver_000102.obj
-index: 2352
+index: 2195
 #Models/npc_bot_cortex_reaver_000103.obj
-index: 2353
+index: 2196
 #Models/npc_bot_cortex_reaver_000104.obj
-index: 2354
+index: 2197
 #Models/npc_bot_cortex_reaver_000105.obj
-index: 2355
+index: 2198
 #Models/npc_bot_cortex_reaver_000106.obj
-index: 2356
+index: 2199
 
 #Models/npc_cyborgassassin_000001.obj
-index: 2357
+index: 2200
 animated: 1
 animationNum: 24
 #Models/npc_cyborgassassin_000002.obj
-index: 2358
+index: 2201
 #Models/npc_cyborgassassin_000003.obj
-index: 2359
+index: 2202
 #Models/npc_cyborgassassin_000004.obj
-index: 2360
+index: 2203
 #Models/npc_cyborgassassin_000005.obj
-index: 2361
+index: 2204
 #Models/npc_cyborgassassin_000006.obj
-index: 2362
+index: 2205
 #Models/npc_cyborgassassin_000007.obj
-index: 2363
+index: 2206
 #Models/npc_cyborgassassin_000008.obj
-index: 2364
+index: 2207
 #Models/npc_cyborgassassin_000009.obj
-index: 2365
+index: 2208
 #Models/npc_cyborgassassin_000010.obj
-index: 2366
+index: 2209
 #Models/npc_cyborgassassin_000011.obj
-index: 2367
+index: 2210
 #Models/npc_cyborgassassin_000012.obj
-index: 2368
+index: 2211
 #Models/npc_cyborgassassin_000013.obj
-index: 2369
+index: 2212
 #Models/npc_cyborgassassin_000014.obj
-index: 2370
+index: 2213
 #Models/npc_cyborgassassin_000015.obj
-index: 2371
+index: 2214
 #Models/npc_cyborgassassin_000016.obj
-index: 2372
+index: 2215
 #Models/npc_cyborgassassin_000017.obj
-index: 2373
+index: 2216
 #Models/npc_cyborgassassin_000018.obj
-index: 2374
+index: 2217
 #Models/npc_cyborgassassin_000019.obj
-index: 2375
+index: 2218
 #Models/npc_cyborgassassin_000020.obj
-index: 2376
+index: 2219
 #Models/npc_cyborgassassin_000021.obj
-index: 2377
+index: 2220
 #Models/npc_cyborgassassin_000022.obj
-index: 2378
+index: 2221
 #Models/npc_cyborgassassin_000023.obj
-index: 2379
+index: 2222
 #Models/npc_cyborgassassin_000024.obj
-index: 2380
+index: 2223
 #Models/npc_cyborgassassin_000025.obj
-index: 2381
+index: 2224
 #Models/npc_cyborgassassin_000026.obj
-index: 2382
+index: 2225
 #Models/npc_cyborgassassin_000027.obj
-index: 2383
+index: 2226
 #Models/npc_cyborgassassin_000028.obj
-index: 2384
+index: 2227
 #Models/npc_cyborgassassin_000029.obj
-index: 2385
+index: 2228
 #Models/npc_cyborgassassin_000030.obj
-index: 2386
+index: 2229
 #Models/npc_cyborgassassin_000031.obj
-index: 2387
+index: 2230
 #Models/npc_cyborgassassin_000032.obj
-index: 2388
+index: 2231
 #Models/npc_cyborgassassin_000033.obj
-index: 2389
+index: 2232
 #Models/npc_cyborgassassin_000034.obj
-index: 2390
+index: 2233
 #Models/npc_cyborgassassin_000035.obj
-index: 2391
+index: 2234
 #Models/npc_cyborgassassin_000036.obj
-index: 2392
+index: 2235
 #Models/npc_cyborgassassin_000037.obj
-index: 2393
+index: 2236
 #Models/npc_cyborgassassin_000038.obj
-index: 2394
+index: 2237
 #Models/npc_cyborgassassin_000039.obj
-index: 2395
+index: 2238
 #Models/npc_cyborgassassin_000040.obj
-index: 2396
+index: 2239
 #Models/npc_cyborgassassin_000041.obj
-index: 2397
+index: 2240
 #Models/npc_cyborgassassin_000042.obj
-index: 2398
+index: 2241
 #Models/npc_cyborgassassin_000043.obj
-index: 2399
+index: 2242
 #Models/npc_cyborgassassin_000044.obj
-index: 2400
+index: 2243
 #Models/npc_cyborgassassin_000045.obj
-index: 2401
+index: 2244
 #Models/npc_cyborgassassin_000046.obj
-index: 2402
+index: 2245
 #Models/npc_cyborgassassin_000047.obj
-index: 2403
+index: 2246
 #Models/npc_cyborgassassin_000048.obj
-index: 2404
+index: 2247
 #Models/npc_cyborgassassin_000049.obj
-index: 2405
+index: 2248
 #Models/npc_cyborgassassin_000050.obj
-index: 2406
+index: 2249
 #Models/npc_cyborgassassin_000051.obj
-index: 2407
+index: 2250
 #Models/npc_cyborgassassin_000052.obj
-index: 2408
+index: 2251
 #Models/npc_cyborgassassin_000053.obj
-index: 2409
+index: 2252
 #Models/npc_cyborgassassin_000054.obj
-index: 2410
+index: 2253
 #Models/npc_cyborgassassin_000055.obj
-index: 2411
+index: 2254
 #Models/npc_cyborgassassin_000056.obj
-index: 2412
+index: 2255
 #Models/npc_cyborgassassin_000057.obj
-index: 2413
+index: 2256
 #Models/npc_cyborgassassin_000058.obj
-index: 2414
+index: 2257
 #Models/npc_cyborgassassin_000059.obj
-index: 2415
+index: 2258
 #Models/npc_cyborgassassin_000060.obj
-index: 2416
-#Models/npc_cyborgassassin_000061.obj
-index: 2417
+index: 2259
 #Models/npc_cyborgassassin_000062.obj
-index: 2418
+index: 2260
 #Models/npc_cyborgassassin_000063.obj
-index: 2419
+index: 2261
 #Models/npc_cyborgassassin_000064.obj
-index: 2420
+index: 2262
 #Models/npc_cyborgassassin_000065.obj
-index: 2421
+index: 2263
 #Models/npc_cyborgassassin_000066.obj
-index: 2422
+index: 2264
 #Models/npc_cyborgassassin_000067.obj
-index: 2423
+index: 2265
 #Models/npc_cyborgassassin_000068.obj
-index: 2424
+index: 2266
 #Models/npc_cyborgassassin_000069.obj
-index: 2425
+index: 2267
 #Models/npc_cyborgassassin_000070.obj
-index: 2426
+index: 2268
 #Models/npc_cyborgassassin_000071.obj
-index: 2427
+index: 2269
 #Models/npc_cyborgassassin_000072.obj
-index: 2428
+index: 2270
 #Models/npc_cyborgassassin_000073.obj
-index: 2429
+index: 2271
 #Models/npc_cyborgassassin_000074.obj
-index: 2430
+index: 2272
 #Models/npc_cyborgassassin_000075.obj
-index: 2431
+index: 2273
 #Models/npc_cyborgassassin_000076.obj
-index: 2432
+index: 2274
 #Models/npc_cyborgassassin_000077.obj
-index: 2433
+index: 2275
 #Models/npc_cyborgassassin_000078.obj
-index: 2434
+index: 2276
 #Models/npc_cyborgassassin_000079.obj
-index: 2435
+index: 2277
 #Models/npc_cyborgassassin_000080.obj
-index: 2436
+index: 2278
 #Models/npc_cyborgassassin_000081.obj
-index: 2437
+index: 2279
 #Models/npc_cyborgassassin_000082.obj
-index: 2438
+index: 2280
 #Models/npc_cyborgassassin_000083.obj
-index: 2439
-#Models/npc_cyborgassassin_000084.obj
-index: 2440
-#Models/npc_cyborgassassin_000085.obj
-index: 2441
+index: 2281
 #Models/npc_cyborgassassin_000086.obj
-index: 2442
+index: 2282
 #Models/npc_cyborgassassin_000087.obj
-index: 2443
+index: 2283
 #Models/npc_cyborgassassin_000088.obj
-index: 2444
+index: 2284
 #Models/npc_cyborgassassin_000089.obj
-index: 2445
+index: 2285
 #Models/npc_cyborgassassin_000090.obj
-index: 2446
+index: 2286
 #Models/npc_cyborgassassin_000091.obj
-index: 2447
+index: 2287
 #Models/npc_cyborgassassin_000092.obj
-index: 2448
+index: 2288
 #Models/npc_cyborgassassin_000093.obj
-index: 2449
+index: 2289
 #Models/npc_cyborgassassin_000094.obj
-index: 2450
+index: 2290
 #Models/npc_cyborgassassin_000095.obj
-index: 2451
+index: 2291
 #Models/npc_cyborgassassin_000096.obj
-index: 2452
+index: 2292
 #Models/npc_cyborgassassin_000097.obj
-index: 2453
+index: 2293
 #Models/npc_cyborgassassin_000098.obj
-index: 2454
+index: 2294
 #Models/npc_cyborgassassin_000099.obj
-index: 2455
+index: 2295
 #Models/npc_cyborgassassin_000100.obj
-index: 2456
+index: 2296
 #Models/npc_cyborgassassin_000101.obj
-index: 2457
+index: 2297
 #Models/npc_cyborgassassin_000102.obj
-index: 2458
+index: 2298
 #Models/npc_cyborgassassin_000103.obj
-index: 2459
+index: 2299
 #Models/npc_cyborgassassin_000104.obj
-index: 2460
+index: 2300
 #Models/npc_cyborgassassin_000105.obj
-index: 2461
+index: 2301
 #Models/npc_cyborgassassin_000106.obj
-index: 2462
+index: 2302
 #Models/npc_cyborgassassin_000107.obj
-index: 2463
+index: 2303
 #Models/npc_cyborgassassin_000108.obj
-index: 2464
+index: 2304
 #Models/npc_cyborgassassin_000109.obj
-index: 2465
+index: 2305
 #Models/npc_cyborgassassin_000110.obj
-index: 2466
+index: 2306
 #Models/npc_cyborgassassin_000111.obj
-index: 2467
+index: 2307
 #Models/npc_cyborgassassin_000112.obj
-index: 2468
+index: 2308
 #Models/npc_cyborgassassin_000113.obj
-index: 2469
+index: 2309
 #Models/npc_cyborgassassin_000114.obj
-index: 2470
+index: 2310
 #Models/npc_cyborgassassin_000115.obj
-index: 2471
+index: 2311
 #Models/npc_cyborgassassin_000116.obj
-index: 2472
+index: 2312
 #Models/npc_cyborgassassin_000117.obj
-index: 2473
+index: 2313
 #Models/npc_cyborgassassin_000118.obj
-index: 2474
+index: 2314
 #Models/npc_cyborgassassin_000119.obj
-index: 2475
+index: 2315
 #Models/npc_cyborgassassin_000120.obj
-index: 2476
+index: 2316
 #Models/npc_cyborgassassin_000121.obj
-index: 2477
+index: 2317
 #Models/npc_cyborgassassin_000122.obj
-index: 2478
-#Models/npc_cyborgassassin_000123.obj
-index: 2479
-#Models/npc_cyborgassassin_000124.obj
-index: 2480
-#Models/npc_cyborgassassin_000125.obj
-index: 2481
-#Models/npc_cyborgassassin_000126.obj
-index: 2482
-#Models/npc_cyborgassassin_000127.obj
-index: 2483
-#Models/npc_cyborgassassin_000128.obj
-index: 2484
-#Models/npc_cyborgassassin_000129.obj
-index: 2485
-#Models/npc_cyborgassassin_000130.obj
-index: 2486
-#Models/npc_cyborgassassin_000131.obj
-index: 2487
-#Models/npc_cyborgassassin_000132.obj
-index: 2488
-#Models/npc_cyborgassassin_000133.obj
-index: 2489
-#Models/npc_cyborgassassin_000134.obj
-index: 2490
-#Models/npc_cyborgassassin_000135.obj
-index: 2491
-#Models/npc_cyborgassassin_000136.obj
-index: 2492
-#Models/npc_cyborgassassin_000137.obj
-index: 2493
-#Models/npc_cyborgassassin_000138.obj
-index: 2494
-#Models/npc_cyborgassassin_000139.obj
-index: 2495
-#Models/npc_cyborgassassin_000140.obj
-index: 2496
-#Models/npc_cyborgassassin_000141.obj
-index: 2497
-#Models/npc_cyborgassassin_000142.obj
-index: 2498
+index: 2318
 #Models/npc_cyborgassassin_000143.obj
-index: 2499
+index: 2319
 #Models/npc_cyborgassassin_000144.obj
-index: 2500
+index: 2320
 #Models/npc_cyborgassassin_000145.obj
-index: 2501
+index: 2321
 #Models/npc_cyborgassassin_000146.obj
-index: 2502
+index: 2322
 #Models/npc_cyborgassassin_000147.obj
-index: 2503
+index: 2323
 #Models/npc_cyborgassassin_000148.obj
-index: 2504
+index: 2324
 #Models/npc_cyborgassassin_000149.obj
-index: 2505
+index: 2325
 #Models/npc_cyborgassassin_000150.obj
-index: 2506
+index: 2326
 #Models/npc_cyborgassassin_000151.obj
-index: 2507
+index: 2327
 #Models/npc_cyborgassassin_000152.obj
-index: 2508
+index: 2328
 #Models/npc_cyborgassassin_000153.obj
-index: 2509
+index: 2329
 #Models/npc_cyborgassassin_000154.obj
-index: 2510
+index: 2330
 #Models/npc_cyborgassassin_000155.obj
-index: 2511
+index: 2331
 #Models/npc_cyborgassassin_000156.obj
-index: 2512
+index: 2332
 #Models/npc_cyborgassassin_000157.obj
-index: 2513
+index: 2333
 #Models/npc_cyborgassassin_000158.obj
-index: 2514
+index: 2334
 #Models/npc_cyborgassassin_000159.obj
-index: 2515
+index: 2335
 #Models/npc_cyborgassassin_000160.obj
-index: 2516
+index: 2336
 #Models/npc_cyborgassassin_000161.obj
-index: 2517
+index: 2337
 #Models/npc_cyborgassassin_000162.obj
-index: 2518
+index: 2338
 #Models/npc_cyborgassassin_000163.obj
-index: 2519
+index: 2339
 #Models/npc_cyborgassassin_000164.obj
-index: 2520
+index: 2340
 #Models/npc_cyborgassassin_000165.obj
-index: 2521
+index: 2341
 #Models/npc_cyborgassassin_000166.obj
-index: 2522
+index: 2342
 #Models/npc_cyborgassassin_000167.obj
-index: 2523
+index: 2343
 #Models/npc_cyborgassassin_000168.obj
-index: 2524
+index: 2344
 #Models/npc_cyborgassassin_000169.obj
-index: 2525
+index: 2345
 #Models/npc_cyborgassassin_000170.obj
-index: 2526
+index: 2346
 #Models/npc_cyborgassassin_000171.obj
-index: 2527
+index: 2347
 #Models/npc_cyborgassassin_000172.obj
-index: 2528
+index: 2348
 #Models/npc_cyborgassassin_000173.obj
-index: 2529
+index: 2349
 #Models/npc_cyborgassassin_000174.obj
-index: 2530
+index: 2350
 #Models/npc_cyborgassassin_000175.obj
-index: 2531
+index: 2351
 #Models/npc_cyborgassassin_000176.obj
-index: 2532
+index: 2352
 #Models/npc_cyborgassassin_000177.obj
-index: 2533
+index: 2353
 #Models/npc_cyborgassassin_000178.obj
-index: 2534
+index: 2354
 #Models/npc_cyborgassassin_000179.obj
-index: 2535
+index: 2355
 #Models/npc_cyborgassassin_000180.obj
-index: 2536
+index: 2356
 #Models/npc_cyborgassassin_000181.obj
-index: 2537
+index: 2357
 #Models/npc_cyborgassassin_000182.obj
-index: 2538
-#Models/npc_cyborgassassin_000183.obj
-index: 2539
-#Models/npc_cyborgassassin_000184.obj
-index: 2540
-#Models/npc_cyborgassassin_000185.obj
-index: 2541
-#Models/npc_cyborgassassin_000186.obj
-index: 2542
-#Models/npc_cyborgassassin_000187.obj
-index: 2543
-#Models/npc_cyborgassassin_000188.obj
-index: 2544
-#Models/npc_cyborgassassin_000189.obj
-index: 2545
-#Models/npc_cyborgassassin_000190.obj
-index: 2546
-#Models/npc_cyborgassassin_000191.obj
-index: 2547
-#Models/npc_cyborgassassin_000192.obj
-index: 2548
-#Models/npc_cyborgassassin_000193.obj
-index: 2549
-#Models/npc_cyborgassassin_000194.obj
-index: 2550
-#Models/npc_cyborgassassin_000195.obj
-index: 2551
-#Models/npc_cyborgassassin_000196.obj
-index: 2552
-#Models/npc_cyborgassassin_000197.obj
-index: 2553
-#Models/npc_cyborgassassin_000198.obj
-index: 2554
-#Models/npc_cyborgassassin_000199.obj
-index: 2555
-#Models/npc_cyborgassassin_000200.obj
-index: 2556
-#Models/npc_cyborgassassin_000201.obj
-index: 2557
-#Models/npc_cyborgassassin_000202.obj
-index: 2558
-#Models/npc_cyborgassassin_000203.obj
-index: 2559
+index: 2358
 #Models/npc_cyborgassassin_000204.obj
-index: 2560
+index: 2359
 #Models/npc_cyborgassassin_000205.obj
-index: 2561
+index: 2360
 #Models/npc_cyborgassassin_000206.obj
-index: 2562
+index: 2361
 #Models/npc_cyborgassassin_000207.obj
-index: 2563
+index: 2362
 #Models/npc_cyborgassassin_000208.obj
-index: 2564
+index: 2363
 #Models/npc_cyborgassassin_000209.obj
-index: 2565
+index: 2364
 #Models/npc_cyborgassassin_000210.obj
-index: 2566
+index: 2365
 #Models/npc_cyborgassassin_000211.obj
-index: 2567
+index: 2366
 #Models/npc_cyborgassassin_000212.obj
-index: 2568
+index: 2367
 #Models/npc_cyborgassassin_000213.obj
-index: 2569
+index: 2368
 #Models/npc_cyborgassassin_000214.obj
-index: 2570
-#Models/npc_cyborgassassin_000215.obj
-index: 2571
+index: 2369
 #Models/npc_cyborgassassin_000216.obj
-index: 2572
+index: 2370
 #Models/npc_cyborgassassin_000217.obj
-index: 2573
+index: 2371
 #Models/npc_cyborgassassin_000218.obj
-index: 2574
+index: 2372
 #Models/npc_cyborgassassin_000219.obj
-index: 2575
+index: 2373
 #Models/npc_cyborgassassin_000220.obj
-index: 2576
+index: 2374
 #Models/npc_cyborgassassin_000221.obj
-index: 2577
+index: 2375
 #Models/npc_cyborgassassin_000222.obj
-index: 2578
+index: 2376
 #Models/npc_cyborgassassin_000223.obj
-index: 2579
+index: 2377
 #Models/npc_cyborgassassin_000224.obj
-index: 2580
+index: 2378
 #Models/npc_cyborgassassin_000225.obj
-index: 2581
+index: 2379
 #Models/npc_cyborgassassin_000226.obj
-index: 2582
+index: 2380
 #Models/npc_cyborgassassin_000227.obj
-index: 2583
-#Models/npc_cyborgassassin_000228.obj
-index: 2584
+index: 2381
 #Models/npc_cyborgassassin_000229.obj
-index: 2585
+index: 2382
 #Models/npc_cyborgassassin_000230.obj
-index: 2586
+index: 2383
 #Models/npc_cyborgassassin_000231.obj
-index: 2587
+index: 2384
 #Models/npc_cyborgassassin_000232.obj
-index: 2588
+index: 2385
 #Models/npc_cyborgassassin_000233.obj
-index: 2589
+index: 2386
 #Models/npc_cyborgassassin_000234.obj
-index: 2590
+index: 2387
 #Models/npc_cyborgassassin_000235.obj
-index: 2591
+index: 2388
 #Models/npc_cyborgassassin_000236.obj
-index: 2592
+index: 2389
 #Models/npc_cyborgassassin_000237.obj
-index: 2593
+index: 2390
 #Models/npc_cyborgassassin_000238.obj
-index: 2594
+index: 2391
 #Models/npc_cyborgassassin_000239.obj
-index: 2595
+index: 2392
 #Models/npc_cyborgassassin_000240.obj
-index: 2596
+index: 2393
 #Models/npc_cyborgassassin_000241.obj
-index: 2597
+index: 2394
 #Models/npc_cyborgassassin_000242.obj
-index: 2598
+index: 2395
 #Models/npc_cyborgassassin_000243.obj
-index: 2599
+index: 2396
 #Models/npc_cyborgassassin_000244.obj
-index: 2600
+index: 2397
 #Models/npc_cyborgassassin_000245.obj
-index: 2601
+index: 2398
 #Models/npc_cyborgassassin_000246.obj
-index: 2602
+index: 2399
 #Models/npc_cyborgassassin_000247.obj
-index: 2603
+index: 2400
 #Models/npc_cyborgassassin_000248.obj
-index: 2604
+index: 2401
 #Models/npc_cyborgassassin_000249.obj
-index: 2605
+index: 2402
 #Models/npc_cyborgassassin_000250.obj
-index: 2606
+index: 2403
 #Models/npc_cyborgassassin_000251.obj
-index: 2607
+index: 2404
 #Models/npc_cyborgassassin_000252.obj
-index: 2608
+index: 2405
 #Models/npc_cyborgassassin_000253.obj
-index: 2609
+index: 2406
 #Models/npc_cyborgassassin_000254.obj
-index: 2610
+index: 2407
 #Models/npc_cyborgassassin_000255.obj
-index: 2611
+index: 2408
 #Models/npc_cyborgassassin_000256.obj
-index: 2612
+index: 2409
 #Models/npc_cyborgassassin_000257.obj
-index: 2613
+index: 2410
 #Models/npc_cyborgassassin_000258.obj
-index: 2614
+index: 2411
 #Models/npc_cyborgassassin_000259.obj
-index: 2615
+index: 2412
 #Models/npc_cyborgassassin_000260.obj
-index: 2616
+index: 2413
 #Models/npc_cyborgassassin_000261.obj
-index: 2617
+index: 2414
 #Models/npc_cyborgassassin_000262.obj
-index: 2618
+index: 2415
 #Models/npc_cyborgassassin_000263.obj
-index: 2619
+index: 2416
 #Models/npc_cyborgassassin_000264.obj
-index: 2620
+index: 2417
 #Models/npc_cyborgassassin_000265.obj
-index: 2621
+index: 2418
 #Models/npc_cyborgassassin_000266.obj
-index: 2622
+index: 2419
 #Models/npc_cyborgassassin_000267.obj
-index: 2623
+index: 2420
 #Models/npc_cyborgassassin_000268.obj
-index: 2624
-#Models/npc_cyborgassassin_000269.obj
-index: 2625
-#Models/npc_cyborgassassin_000270.obj
-index: 2626
-#Models/npc_cyborgassassin_000271.obj
-index: 2627
-#Models/npc_cyborgassassin_000272.obj
-index: 2628
-#Models/npc_cyborgassassin_000273.obj
-index: 2629
-#Models/npc_cyborgassassin_000274.obj
-index: 2630
-#Models/npc_cyborgassassin_000275.obj
-index: 2631
-#Models/npc_cyborgassassin_000276.obj
-index: 2632
-#Models/npc_cyborgassassin_000277.obj
-index: 2633
-#Models/npc_cyborgassassin_000278.obj
-index: 2634
-#Models/npc_cyborgassassin_000279.obj
-index: 2635
+index: 2421
 
 #Models/npc_cyborg_diego_000001.obj
-index: 2636
+index: 2422
 animated: 1
 animationNum: 25
 #Models/npc_cyborg_diego_000002.obj
-index: 2637
+index: 2423
 #Models/npc_cyborg_diego_000003.obj
-index: 2638
+index: 2424
 #Models/npc_cyborg_diego_000004.obj
-index: 2639
+index: 2425
 #Models/npc_cyborg_diego_000005.obj
-index: 2640
+index: 2426
 #Models/npc_cyborg_diego_000006.obj
-index: 2641
+index: 2427
 #Models/npc_cyborg_diego_000007.obj
-index: 2642
+index: 2428
 #Models/npc_cyborg_diego_000008.obj
-index: 2643
+index: 2429
 #Models/npc_cyborg_diego_000009.obj
-index: 2644
+index: 2430
 #Models/npc_cyborg_diego_000010.obj
-index: 2645
+index: 2431
 #Models/npc_cyborg_diego_000011.obj
-index: 2646
+index: 2432
 #Models/npc_cyborg_diego_000012.obj
-index: 2647
+index: 2433
 #Models/npc_cyborg_diego_000013.obj
-index: 2648
+index: 2434
 #Models/npc_cyborg_diego_000014.obj
-index: 2649
+index: 2435
 #Models/npc_cyborg_diego_000015.obj
-index: 2650
+index: 2436
 #Models/npc_cyborg_diego_000016.obj
-index: 2651
+index: 2437
 #Models/npc_cyborg_diego_000017.obj
-index: 2652
+index: 2438
 #Models/npc_cyborg_diego_000018.obj
-index: 2653
+index: 2439
 #Models/npc_cyborg_diego_000019.obj
-index: 2654
+index: 2440
 #Models/npc_cyborg_diego_000020.obj
-index: 2655
+index: 2441
 #Models/npc_cyborg_diego_000021.obj
-index: 2656
+index: 2442
 #Models/npc_cyborg_diego_000022.obj
-index: 2657
+index: 2443
 #Models/npc_cyborg_diego_000023.obj
-index: 2658
+index: 2444
 #Models/npc_cyborg_diego_000024.obj
-index: 2659
+index: 2445
 #Models/npc_cyborg_diego_000025.obj
-index: 2660
+index: 2446
 #Models/npc_cyborg_diego_000026.obj
-index: 2661
+index: 2447
 #Models/npc_cyborg_diego_000027.obj
-index: 2662
+index: 2448
 #Models/npc_cyborg_diego_000028.obj
-index: 2663
+index: 2449
 #Models/npc_cyborg_diego_000029.obj
-index: 2664
+index: 2450
 #Models/npc_cyborg_diego_000030.obj
-index: 2665
+index: 2451
 #Models/npc_cyborg_diego_000031.obj
-index: 2666
+index: 2452
 #Models/npc_cyborg_diego_000032.obj
-index: 2667
+index: 2453
 #Models/npc_cyborg_diego_000033.obj
-index: 2668
+index: 2454
 #Models/npc_cyborg_diego_000034.obj
-index: 2669
+index: 2455
 #Models/npc_cyborg_diego_000035.obj
-index: 2670
+index: 2456
 #Models/npc_cyborg_diego_000036.obj
-index: 2671
+index: 2457
 #Models/npc_cyborg_diego_000037.obj
-index: 2672
+index: 2458
 #Models/npc_cyborg_diego_000038.obj
-index: 2673
+index: 2459
 #Models/npc_cyborg_diego_000039.obj
-index: 2674
+index: 2460
 #Models/npc_cyborg_diego_000040.obj
-index: 2675
+index: 2461
 #Models/npc_cyborg_diego_000041.obj
-index: 2676
+index: 2462
 #Models/npc_cyborg_diego_000042.obj
-index: 2677
+index: 2463
 #Models/npc_cyborg_diego_000043.obj
-index: 2678
+index: 2464
 #Models/npc_cyborg_diego_000044.obj
-index: 2679
+index: 2465
 #Models/npc_cyborg_diego_000045.obj
-index: 2680
+index: 2466
 #Models/npc_cyborg_diego_000046.obj
-index: 2681
+index: 2467
 #Models/npc_cyborg_diego_000047.obj
-index: 2682
+index: 2468
 #Models/npc_cyborg_diego_000048.obj
-index: 2683
+index: 2469
 #Models/npc_cyborg_diego_000049.obj
-index: 2684
+index: 2470
 #Models/npc_cyborg_diego_000050.obj
-index: 2685
+index: 2471
 #Models/npc_cyborg_diego_000051.obj
-index: 2686
+index: 2472
 #Models/npc_cyborg_diego_000052.obj
-index: 2687
+index: 2473
 #Models/npc_cyborg_diego_000053.obj
-index: 2688
+index: 2474
 #Models/npc_cyborg_diego_000054.obj
-index: 2689
+index: 2475
 #Models/npc_cyborg_diego_000055.obj
-index: 2690
+index: 2476
 #Models/npc_cyborg_diego_000056.obj
-index: 2691
+index: 2477
 #Models/npc_cyborg_diego_000057.obj
-index: 2692
+index: 2478
 #Models/npc_cyborg_diego_000058.obj
-index: 2693
+index: 2479
 #Models/npc_cyborg_diego_000059.obj
-index: 2694
+index: 2480
 #Models/npc_cyborg_diego_000060.obj
-index: 2695
+index: 2481
 #Models/npc_cyborg_diego_000061.obj
-index: 2696
+index: 2482
 #Models/npc_cyborg_diego_000062.obj
-index: 2697
+index: 2483
 #Models/npc_cyborg_diego_000063.obj
-index: 2698
+index: 2484
 #Models/npc_cyborg_diego_000064.obj
-index: 2699
+index: 2485
 #Models/npc_cyborg_diego_000065.obj
-index: 2700
+index: 2486
 #Models/npc_cyborg_diego_000066.obj
-index: 2701
+index: 2487
 #Models/npc_cyborg_diego_000067.obj
-index: 2702
+index: 2488
 #Models/npc_cyborg_diego_000068.obj
-index: 2703
+index: 2489
 #Models/npc_cyborg_diego_000069.obj
-index: 2704
+index: 2490
 #Models/npc_cyborg_diego_000070.obj
-index: 2705
+index: 2491
 #Models/npc_cyborg_diego_000071.obj
-index: 2706
+index: 2492
 #Models/npc_cyborg_diego_000072.obj
-index: 2707
+index: 2493
 #Models/npc_cyborg_diego_000073.obj
-index: 2708
+index: 2494
 #Models/npc_cyborg_diego_000074.obj
-index: 2709
+index: 2495
 #Models/npc_cyborg_diego_000075.obj
-index: 2710
+index: 2496
 #Models/npc_cyborg_diego_000076.obj
-index: 2711
+index: 2497
 #Models/npc_cyborg_diego_000077.obj
-index: 2712
+index: 2498
 #Models/npc_cyborg_diego_000078.obj
-index: 2713
+index: 2499
 #Models/npc_cyborg_diego_000079.obj
-index: 2714
+index: 2500
 #Models/npc_cyborg_diego_000080.obj
-index: 2715
+index: 2501
 #Models/npc_cyborg_diego_000081.obj
-index: 2716
+index: 2502
 #Models/npc_cyborg_diego_000082.obj
-index: 2717
+index: 2503
 #Models/npc_cyborg_diego_000083.obj
-index: 2718
+index: 2504
 #Models/npc_cyborg_diego_000084.obj
-index: 2719
+index: 2505
 #Models/npc_cyborg_diego_000085.obj
-index: 2720
+index: 2506
 #Models/npc_cyborg_diego_000086.obj
-index: 2721
+index: 2507
 #Models/npc_cyborg_diego_000087.obj
-index: 2722
+index: 2508
 #Models/npc_cyborg_diego_000088.obj
-index: 2723
+index: 2509
 #Models/npc_cyborg_diego_000089.obj
-index: 2724
+index: 2510
 #Models/npc_cyborg_diego_000090.obj
-index: 2725
+index: 2511
 #Models/npc_cyborg_diego_000091.obj
-index: 2726
+index: 2512
 #Models/npc_cyborg_diego_000092.obj
-index: 2727
+index: 2513
 #Models/npc_cyborg_diego_000093.obj
-index: 2728
+index: 2514
 #Models/npc_cyborg_diego_000094.obj
-index: 2729
+index: 2515
 #Models/npc_cyborg_diego_000095.obj
-index: 2730
+index: 2516
 #Models/npc_cyborg_diego_000096.obj
-index: 2731
+index: 2517
 #Models/npc_cyborg_diego_000097.obj
-index: 2732
+index: 2518
 #Models/npc_cyborg_diego_000098.obj
-index: 2733
+index: 2519
 #Models/npc_cyborg_diego_000099.obj
-index: 2734
+index: 2520
 #Models/npc_cyborg_diego_000100.obj
-index: 2735
+index: 2521
 #Models/npc_cyborg_diego_000101.obj
-index: 2736
+index: 2522
 #Models/npc_cyborg_diego_000102.obj
-index: 2737
+index: 2523
 #Models/npc_cyborg_diego_000103.obj
-index: 2738
+index: 2524
 #Models/npc_cyborg_diego_000104.obj
-index: 2739
+index: 2525
 #Models/npc_cyborg_diego_000105.obj
-index: 2740
+index: 2526
 #Models/npc_cyborg_diego_000106.obj
-index: 2741
+index: 2527
 #Models/npc_cyborg_diego_000107.obj
-index: 2742
+index: 2528
 #Models/npc_cyborg_diego_000108.obj
-index: 2743
+index: 2529
 #Models/npc_cyborg_diego_000109.obj
-index: 2744
+index: 2530
 #Models/npc_cyborg_diego_000110.obj
-index: 2745
+index: 2531
 #Models/npc_cyborg_diego_000111.obj
-index: 2746
+index: 2532
 #Models/npc_cyborg_diego_000112.obj
-index: 2747
+index: 2533
 #Models/npc_cyborg_diego_000113.obj
-index: 2748
+index: 2534
 #Models/npc_cyborg_diego_000114.obj
-index: 2749
+index: 2535
 #Models/npc_cyborg_diego_000115.obj
-index: 2750
+index: 2536
 #Models/npc_cyborg_diego_000116.obj
-index: 2751
+index: 2537
 #Models/npc_cyborg_diego_000117.obj
-index: 2752
+index: 2538
 #Models/npc_cyborg_diego_000118.obj
-index: 2753
+index: 2539
 #Models/npc_cyborg_diego_000119.obj
-index: 2754
+index: 2540
 #Models/npc_cyborg_diego_000120.obj
-index: 2755
+index: 2541
 #Models/npc_cyborg_diego_000121.obj
-index: 2756
+index: 2542
 #Models/npc_cyborg_diego_000122.obj
-index: 2757
+index: 2543
 #Models/npc_cyborg_diego_000123.obj
-index: 2758
+index: 2544
 #Models/npc_cyborg_diego_000124.obj
-index: 2759
+index: 2545
 #Models/npc_cyborg_diego_000125.obj
-index: 2760
+index: 2546
 #Models/npc_cyborg_diego_000126.obj
-index: 2761
+index: 2547
 #Models/npc_cyborg_diego_000127.obj
-index: 2762
+index: 2548
 #Models/npc_cyborg_diego_000128.obj
-index: 2763
+index: 2549
 #Models/npc_cyborg_diego_000129.obj
-index: 2764
+index: 2550
 #Models/npc_cyborg_diego_000130.obj
-index: 2765
+index: 2551
 #Models/npc_cyborg_diego_000131.obj
-index: 2766
+index: 2552
 #Models/npc_cyborg_diego_000132.obj
-index: 2767
+index: 2553
 #Models/npc_cyborg_diego_000133.obj
-index: 2768
+index: 2554
 #Models/npc_cyborg_diego_000134.obj
-index: 2769
+index: 2555
 #Models/npc_cyborg_diego_000135.obj
-index: 2770
+index: 2556
 #Models/npc_cyborg_diego_000136.obj
-index: 2771
+index: 2557
 #Models/npc_cyborg_diego_000137.obj
-index: 2772
+index: 2558
 #Models/npc_cyborg_diego_000138.obj
-index: 2773
+index: 2559
 #Models/npc_cyborg_diego_000139.obj
-index: 2774
+index: 2560
 #Models/npc_cyborg_diego_000140.obj
-index: 2775
+index: 2561
 #Models/npc_cyborg_diego_000141.obj
-index: 2776
+index: 2562
 #Models/npc_cyborg_diego_000142.obj
-index: 2777
+index: 2563
 #Models/npc_cyborg_diego_000143.obj
-index: 2778
+index: 2564
 #Models/npc_cyborg_diego_000144.obj
-index: 2779
+index: 2565
 #Models/npc_cyborg_diego_000145.obj
-index: 2780
+index: 2566
 #Models/npc_cyborg_diego_000146.obj
-index: 2781
+index: 2567
 #Models/npc_cyborg_diego_000147.obj
-index: 2782
+index: 2568
 #Models/npc_cyborg_diego_000148.obj
-index: 2783
+index: 2569
 #Models/npc_cyborg_diego_000149.obj
-index: 2784
+index: 2570
 #Models/npc_cyborg_diego_000150.obj
-index: 2785
+index: 2571
 #Models/npc_cyborg_diego_000151.obj
-index: 2786
+index: 2572
 #Models/npc_cyborg_diego_000152.obj
-index: 2787
+index: 2573
 #Models/npc_cyborg_diego_000153.obj
-index: 2788
+index: 2574
 #Models/npc_cyborg_diego_000154.obj
-index: 2789
+index: 2575
 #Models/npc_cyborg_diego_000155.obj
-index: 2790
-#Models/npc_cyborg_diego_000156.obj
-index: 2791
-#Models/npc_cyborg_diego_000157.obj
-index: 2792
-#Models/npc_cyborg_diego_000158.obj
-index: 2793
-#Models/npc_cyborg_diego_000159.obj
-index: 2794
-#Models/npc_cyborg_diego_000160.obj
-index: 2795
-#Models/npc_cyborg_diego_000161.obj
-index: 2796
-#Models/npc_cyborg_diego_000162.obj
-index: 2797
-#Models/npc_cyborg_diego_000163.obj
-index: 2798
-#Models/npc_cyborg_diego_000164.obj
-index: 2799
-#Models/npc_cyborg_diego_000165.obj
-index: 2800
-#Models/npc_cyborg_diego_000166.obj
-index: 2801
-#Models/npc_cyborg_diego_000167.obj
-index: 2802
-#Models/npc_cyborg_diego_000168.obj
-index: 2803
-#Models/npc_cyborg_diego_000169.obj
-index: 2804
-#Models/npc_cyborg_diego_000170.obj
-index: 2805
-#Models/npc_cyborg_diego_000171.obj
-index: 2806
-#Models/npc_cyborg_diego_000172.obj
-index: 2807
-#Models/npc_cyborg_diego_000173.obj
-index: 2808
-#Models/npc_cyborg_diego_000174.obj
-index: 2809
-#Models/npc_cyborg_diego_000175.obj
-index: 2810
-#Models/npc_cyborg_diego_000176.obj
-index: 2811
-#Models/npc_cyborg_diego_000177.obj
-index: 2812
-#Models/npc_cyborg_diego_000178.obj
-index: 2813
-#Models/npc_cyborg_diego_000179.obj
-index: 2814
-#Models/npc_cyborg_diego_000180.obj
-index: 2815
-#Models/npc_cyborg_diego_000181.obj
-index: 2816
-#Models/npc_cyborg_diego_000182.obj
-index: 2817
-#Models/npc_cyborg_diego_000183.obj
-index: 2818
-#Models/npc_cyborg_diego_000184.obj
-index: 2819
-#Models/npc_cyborg_diego_000185.obj
-index: 2820
-#Models/npc_cyborg_diego_000186.obj
-index: 2821
-#Models/npc_cyborg_diego_000187.obj
-index: 2822
-#Models/npc_cyborg_diego_000188.obj
-index: 2823
-#Models/npc_cyborg_diego_000189.obj
-index: 2824
+index: 2576
 #Models/npc_cyborg_diego_000190.obj
-index: 2825
+index: 2577
 #Models/npc_cyborg_diego_000191.obj
-index: 2826
+index: 2578
 #Models/npc_cyborg_diego_000192.obj
-index: 2827
+index: 2579
 #Models/npc_cyborg_diego_000193.obj
-index: 2828
+index: 2580
 #Models/npc_cyborg_diego_000194.obj
-index: 2829
+index: 2581
 #Models/npc_cyborg_diego_000195.obj
-index: 2830
+index: 2582
 #Models/npc_cyborg_diego_000196.obj
-index: 2831
+index: 2583
 #Models/npc_cyborg_diego_000197.obj
-index: 2832
+index: 2584
 #Models/npc_cyborg_diego_000198.obj
-index: 2833
+index: 2585
 #Models/npc_cyborg_diego_000199.obj
-index: 2834
+index: 2586
 #Models/npc_cyborg_diego_000200.obj
-index: 2835
+index: 2587
 #Models/npc_cyborg_diego_000201.obj
-index: 2836
+index: 2588
 #Models/npc_cyborg_diego_000202.obj
-index: 2837
+index: 2589
 #Models/npc_cyborg_diego_000203.obj
-index: 2838
+index: 2590
 #Models/npc_cyborg_diego_000204.obj
-index: 2839
+index: 2591
 #Models/npc_cyborg_diego_000205.obj
-index: 2840
+index: 2592
 #Models/npc_cyborg_diego_000206.obj
-index: 2841
+index: 2593
 #Models/npc_cyborg_diego_000207.obj
-index: 2842
+index: 2594
 #Models/npc_cyborg_diego_000208.obj
-index: 2843
+index: 2595
 #Models/npc_cyborg_diego_000209.obj
-index: 2844
+index: 2596
 #Models/npc_cyborg_diego_000210.obj
-index: 2845
+index: 2597
 #Models/npc_cyborg_diego_000211.obj
-index: 2846
+index: 2598
 #Models/npc_cyborg_diego_000212.obj
-index: 2847
+index: 2599
 #Models/npc_cyborg_diego_000213.obj
-index: 2848
+index: 2600
 #Models/npc_cyborg_diego_000214.obj
-index: 2849
+index: 2601
 #Models/npc_cyborg_diego_000215.obj
-index: 2850
+index: 2602
 #Models/npc_cyborg_diego_000216.obj
-index: 2851
+index: 2603
 #Models/npc_cyborg_diego_000217.obj
-index: 2852
+index: 2604
 #Models/npc_cyborg_diego_000218.obj
-index: 2853
+index: 2605
 #Models/npc_cyborg_diego_000219.obj
-index: 2854
+index: 2606
 #Models/npc_cyborg_diego_000220.obj
-index: 2855
+index: 2607
 #Models/npc_cyborg_diego_000221.obj
-index: 2856
+index: 2608
 #Models/npc_cyborg_diego_000222.obj
-index: 2857
+index: 2609
 #Models/npc_cyborg_diego_000223.obj
-index: 2858
+index: 2610
 #Models/npc_cyborg_diego_000224.obj
-index: 2859
+index: 2611
 #Models/npc_cyborg_diego_000225.obj
-index: 2860
+index: 2612
 #Models/npc_cyborg_diego_000226.obj
-index: 2861
+index: 2613
 #Models/npc_cyborg_diego_000227.obj
-index: 2862
+index: 2614
 #Models/npc_cyborg_diego_000228.obj
-index: 2863
+index: 2615
 #Models/npc_cyborg_diego_000229.obj
-index: 2864
+index: 2616
 #Models/npc_cyborg_diego_000230.obj
-index: 2865
+index: 2617
 #Models/npc_cyborg_diego_000231.obj
-index: 2866
+index: 2618
 #Models/npc_cyborg_diego_000232.obj
-index: 2867
+index: 2619
 #Models/npc_cyborg_diego_000233.obj
-index: 2868
+index: 2620
 #Models/npc_cyborg_diego_000234.obj
-index: 2869
+index: 2621
 #Models/npc_cyborg_diego_000235.obj
-index: 2870
+index: 2622
 #Models/npc_cyborg_diego_000236.obj
-index: 2871
+index: 2623
 #Models/npc_cyborg_diego_000237.obj
-index: 2872
+index: 2624
 #Models/npc_cyborg_diego_000238.obj
-index: 2873
+index: 2625
 #Models/npc_cyborg_diego_000239.obj
-index: 2874
+index: 2626
 #Models/npc_cyborg_diego_000240.obj
-index: 2875
+index: 2627
 #Models/npc_cyborg_diego_000241.obj
-index: 2876
+index: 2628
 #Models/npc_cyborg_diego_000242.obj
-index: 2877
+index: 2629
 #Models/npc_cyborg_diego_000243.obj
-index: 2878
-#Models/npc_cyborg_diego_000244.obj
-index: 2879
-#Models/npc_cyborg_diego_000245.obj
-index: 2880
-#Models/npc_cyborg_diego_000246.obj
-index: 2881
-#Models/npc_cyborg_diego_000247.obj
-index: 2882
-#Models/npc_cyborg_diego_000248.obj
-index: 2883
-#Models/npc_cyborg_diego_000249.obj
-index: 2884
-#Models/npc_cyborg_diego_000250.obj
-index: 2885
-#Models/npc_cyborg_diego_000251.obj
-index: 2886
-#Models/npc_cyborg_diego_000252.obj
-index: 2887
-#Models/npc_cyborg_diego_000253.obj
-index: 2888
-#Models/npc_cyborg_diego_000254.obj
-index: 2889
-#Models/npc_cyborg_diego_000255.obj
-index: 2890
-#Models/npc_cyborg_diego_000256.obj
-index: 2891
-#Models/npc_cyborg_diego_000257.obj
-index: 2892
-#Models/npc_cyborg_diego_000258.obj
-index: 2893
-#Models/npc_cyborg_diego_000259.obj
-index: 2894
-#Models/npc_cyborg_diego_000260.obj
-index: 2895
-#Models/npc_cyborg_diego_000261.obj
-index: 2896
-#Models/npc_cyborg_diego_000262.obj
-index: 2897
-#Models/npc_cyborg_diego_000263.obj
-index: 2898
-#Models/npc_cyborg_diego_000264.obj
-index: 2899
+index: 2630
 #Models/npc_cyborg_diego_000265.obj
-index: 2900
+index: 2631
 #Models/npc_cyborg_diego_000266.obj
-index: 2901
+index: 2632
 #Models/npc_cyborg_diego_000267.obj
-index: 2902
+index: 2633
 #Models/npc_cyborg_diego_000268.obj
-index: 2903
+index: 2634
 #Models/npc_cyborg_diego_000269.obj
-index: 2904
+index: 2635
 #Models/npc_cyborg_diego_000270.obj
-index: 2905
+index: 2636
 #Models/npc_cyborg_diego_000271.obj
-index: 2906
+index: 2637
 #Models/npc_cyborg_diego_000272.obj
-index: 2907
+index: 2638
 #Models/npc_cyborg_diego_000273.obj
-index: 2908
+index: 2639
 #Models/npc_cyborg_diego_000274.obj
-index: 2909
+index: 2640
 #Models/npc_cyborg_diego_000275.obj
-index: 2910
+index: 2641
 #Models/npc_cyborg_diego_000276.obj
-index: 2911
+index: 2642
 #Models/npc_cyborg_diego_000277.obj
-index: 2912
+index: 2643
 #Models/npc_cyborg_diego_000278.obj
-index: 2913
+index: 2644
 #Models/npc_cyborg_diego_000279.obj
-index: 2914
+index: 2645
 #Models/npc_cyborg_diego_000280.obj
-index: 2915
+index: 2646
 #Models/npc_cyborg_diego_000281.obj
-index: 2916
+index: 2647
 #Models/npc_cyborg_diego_000282.obj
-index: 2917
+index: 2648
 #Models/npc_cyborg_diego_000283.obj
-index: 2918
+index: 2649
 #Models/npc_cyborg_diego_000284.obj
-index: 2919
+index: 2650
 #Models/npc_cyborg_diego_000285.obj
-index: 2920
+index: 2651
 #Models/npc_cyborg_diego_000286.obj
-index: 2921
+index: 2652
 #Models/npc_cyborg_diego_000287.obj
-index: 2922
+index: 2653
 #Models/npc_cyborg_diego_000288.obj
-index: 2923
+index: 2654
 #Models/npc_cyborg_diego_000289.obj
-index: 2924
-#Models/npc_cyborg_diego_000290.obj
-index: 2925
+index: 2655
 #Models/npc_cyborg_diego_000291.obj
-index: 2926
+index: 2656
 #Models/npc_cyborg_diego_000292.obj
-index: 2927
+index: 2657
 #Models/npc_cyborg_diego_000293.obj
-index: 2928
+index: 2658
 #Models/npc_cyborg_diego_000294.obj
-index: 2929
+index: 2659
 #Models/npc_cyborg_diego_000295.obj
-index: 2930
+index: 2660
 #Models/npc_cyborg_diego_000296.obj
-index: 2931
+index: 2661
 #Models/npc_cyborg_diego_000297.obj
-index: 2932
+index: 2662
 #Models/npc_cyborg_diego_000298.obj
-index: 2933
+index: 2663
 #Models/npc_cyborg_diego_000299.obj
-index: 2934
+index: 2664
 #Models/npc_cyborg_diego_000300.obj
-index: 2935
+index: 2665
 #Models/npc_cyborg_diego_000301.obj
-index: 2936
+index: 2666
 #Models/npc_cyborg_diego_000302.obj
-index: 2937
+index: 2667
 #Models/npc_cyborg_diego_000303.obj
-index: 2938
+index: 2668
 #Models/npc_cyborg_diego_000304.obj
-index: 2939
+index: 2669
 #Models/npc_cyborg_diego_000305.obj
-index: 2940
+index: 2670
 #Models/npc_cyborg_diego_000306.obj
-index: 2941
+index: 2671
 #Models/npc_cyborg_diego_000307.obj
-index: 2942
+index: 2672
 #Models/npc_cyborg_diego_000308.obj
-index: 2943
+index: 2673
 #Models/npc_cyborg_diego_000309.obj
-index: 2944
+index: 2674
 #Models/npc_cyborg_diego_000310.obj
-index: 2945
+index: 2675
 #Models/npc_cyborg_diego_000311.obj
-index: 2946
+index: 2676
 #Models/npc_cyborg_diego_000312.obj
-index: 2947
+index: 2677
 #Models/npc_cyborg_diego_000313.obj
-index: 2948
+index: 2678
 #Models/npc_cyborg_diego_000314.obj
-index: 2949
+index: 2679
 #Models/npc_cyborg_diego_000315.obj
-index: 2950
+index: 2680
 #Models/npc_cyborg_diego_000316.obj
-index: 2951
+index: 2681
 #Models/npc_cyborg_diego_000317.obj
-index: 2952
+index: 2682
 #Models/npc_cyborg_diego_000318.obj
-index: 2953
+index: 2683
 #Models/npc_cyborg_diego_000319.obj
-index: 2954
+index: 2684
 #Models/npc_cyborg_diego_000320.obj
-index: 2955
+index: 2685
 #Models/npc_cyborg_diego_000321.obj
-index: 2956
+index: 2686
 #Models/npc_cyborg_diego_000322.obj
-index: 2957
+index: 2687
 #Models/npc_cyborg_diego_000323.obj
-index: 2958
+index: 2688
 #Models/npc_cyborg_diego_000324.obj
-index: 2959
+index: 2689
 #Models/npc_cyborg_diego_000325.obj
-index: 2960
+index: 2690
 #Models/npc_cyborg_diego_000326.obj
-index: 2961
+index: 2691
 #Models/npc_cyborg_diego_000327.obj
-index: 2962
+index: 2692
 #Models/npc_cyborg_diego_000328.obj
-index: 2963
+index: 2693
 #Models/npc_cyborg_diego_000329.obj
-index: 2964
+index: 2694
 #Models/npc_cyborg_diego_000330.obj
-index: 2965
+index: 2695
 #Models/npc_cyborg_diego_000331.obj
-index: 2966
+index: 2696
 #Models/npc_cyborg_diego_000332.obj
-index: 2967
-#Models/npc_cyborg_diego_000333.obj
-index: 2968
+index: 2697
 #Models/npc_cyborg_diego_000334.obj
-index: 2969
+index: 2698
 #Models/npc_cyborg_diego_000335.obj
-index: 2970
+index: 2699
 #Models/npc_cyborg_diego_000336.obj
-index: 2971
+index: 2700
 #Models/npc_cyborg_diego_000337.obj
-index: 2972
+index: 2701
 #Models/npc_cyborg_diego_000338.obj
-index: 2973
+index: 2702
 #Models/npc_cyborg_diego_000339.obj
-index: 2974
+index: 2703
 #Models/npc_cyborg_diego_000340.obj
-index: 2975
+index: 2704
 #Models/npc_cyborg_diego_000341.obj
-index: 2976
+index: 2705
 #Models/npc_cyborg_diego_000342.obj
-index: 2977
+index: 2706
 #Models/npc_cyborg_diego_000343.obj
-index: 2978
+index: 2707
 #Models/npc_cyborg_diego_000344.obj
-index: 2979
+index: 2708
 #Models/npc_cyborg_diego_000345.obj
-index: 2980
+index: 2709
 #Models/npc_cyborg_diego_000346.obj
-index: 2981
+index: 2710
 #Models/npc_cyborg_diego_000347.obj
-index: 2982
+index: 2711
 #Models/npc_cyborg_diego_000348.obj
-index: 2983
+index: 2712
 #Models/npc_cyborg_diego_000349.obj
-index: 2984
+index: 2713
 #Models/npc_cyborg_diego_000350.obj
-index: 2985
+index: 2714
 #Models/npc_cyborg_diego_000351.obj
-index: 2986
+index: 2715
 #Models/npc_cyborg_diego_000352.obj
-index: 2987
+index: 2716
 #Models/npc_cyborg_diego_000353.obj
-index: 2988
+index: 2717
 #Models/npc_cyborg_diego_000354.obj
-index: 2989
+index: 2718
 #Models/npc_cyborg_diego_000355.obj
-index: 2990
+index: 2719
 #Models/npc_cyborg_diego_000356.obj
-index: 2991
+index: 2720
 #Models/npc_cyborg_diego_000357.obj
-index: 2992
+index: 2721
 #Models/npc_cyborg_diego_000358.obj
-index: 2993
+index: 2722
 #Models/npc_cyborg_diego_000359.obj
-index: 2994
+index: 2723
 #Models/npc_cyborg_diego_000360.obj
-index: 2995
+index: 2724
 #Models/npc_cyborg_diego_000361.obj
-index: 2996
+index: 2725
 #Models/npc_cyborg_diego_000362.obj
-index: 2997
+index: 2726
 #Models/npc_cyborg_diego_000363.obj
-index: 2998
+index: 2727
 #Models/npc_cyborg_diego_000364.obj
-index: 2999
+index: 2728
 #Models/npc_cyborg_diego_000365.obj
-index: 3000
+index: 2729
 #Models/npc_cyborg_diego_000366.obj
-index: 3001
+index: 2730
 #Models/npc_cyborg_diego_000367.obj
-index: 3002
+index: 2731
 #Models/npc_cyborg_diego_000368.obj
-index: 3003
+index: 2732
 #Models/npc_cyborg_diego_000369.obj
-index: 3004
+index: 2733
 #Models/npc_cyborg_diego_000370.obj
-index: 3005
+index: 2734
 #Models/npc_cyborg_diego_000371.obj
-index: 3006
+index: 2735
 #Models/npc_cyborg_diego_000372.obj
-index: 3007
+index: 2736
 #Models/npc_cyborg_diego_000373.obj
-index: 3008
+index: 2737
 #Models/npc_cyborg_diego_000374.obj
-index: 3009
+index: 2738
 #Models/npc_cyborg_diego_000375.obj
-index: 3010
+index: 2739
 #Models/npc_cyborg_diego_000376.obj
-index: 3011
+index: 2740
 #Models/npc_cyborg_diego_000377.obj
-index: 3012
+index: 2741
 #Models/npc_cyborg_diego_000378.obj
-index: 3013
+index: 2742
 #Models/npc_cyborg_diego_000379.obj
-index: 3014
+index: 2743
 #Models/npc_cyborg_diego_000380.obj
-index: 3015
+index: 2744
 #Models/npc_cyborg_diego_000381.obj
-index: 3016
+index: 2745
 #Models/npc_cyborg_diego_000382.obj
-index: 3017
+index: 2746
 #Models/npc_cyborg_diego_000383.obj
-index: 3018
+index: 2747
 #Models/npc_cyborg_diego_000384.obj
-index: 3019
+index: 2748
 #Models/npc_cyborg_diego_000385.obj
-index: 3020
+index: 2749
 #Models/npc_cyborg_diego_000386.obj
-index: 3021
+index: 2750
 #Models/npc_cyborg_diego_000387.obj
-index: 3022
+index: 2751
 #Models/npc_cyborg_diego_000388.obj
-index: 3023
+index: 2752
 #Models/npc_cyborg_diego_000389.obj
-index: 3024
+index: 2753
 #Models/npc_cyborg_diego_000390.obj
-index: 3025
+index: 2754
 #Models/npc_cyborg_diego_000391.obj
-index: 3026
+index: 2755
 #Models/npc_cyborg_diego_000392.obj
-index: 3027
+index: 2756
 #Models/npc_cyborg_diego_000393.obj
-index: 3028
+index: 2757
 #Models/npc_cyborg_diego_000394.obj
-index: 3029
+index: 2758
 #Models/npc_cyborg_diego_000395.obj
-index: 3030
+index: 2759
 #Models/npc_cyborg_diego_000396.obj
-index: 3031
+index: 2760
 #Models/npc_cyborg_diego_000397.obj
-index: 3032
+index: 2761
 #Models/npc_cyborg_diego_000398.obj
-index: 3033
+index: 2762
 #Models/npc_cyborg_diego_000399.obj
-index: 3034
+index: 2763
 #Models/npc_cyborg_diego_000400.obj
-index: 3035
+index: 2764
 #Models/npc_cyborg_diego_000401.obj
-index: 3036
+index: 2765
 #Models/npc_cyborg_diego_000402.obj
-index: 3037
+index: 2766
 #Models/npc_cyborg_diego_000403.obj
-index: 3038
+index: 2767
 #Models/npc_cyborg_diego_000404.obj
-index: 3039
+index: 2768
 #Models/npc_cyborg_diego_000405.obj
-index: 3040
+index: 2769
 #Models/npc_cyborg_diego_000406.obj
-index: 3041
+index: 2770
 #Models/npc_cyborg_diego_000407.obj
-index: 3042
+index: 2771
 #Models/npc_cyborg_diego_000408.obj
-index: 3043
+index: 2772
 #Models/npc_cyborg_diego_000409.obj
-index: 3044
+index: 2773
 #Models/npc_cyborg_diego_000410.obj
-index: 3045
+index: 2774
 #Models/npc_cyborg_diego_000411.obj
-index: 3046
+index: 2775
 #Models/npc_cyborg_diego_000412.obj
-index: 3047
+index: 2776
 #Models/npc_cyborg_diego_000413.obj
-index: 3048
+index: 2777
 #Models/npc_cyborg_diego_000414.obj
-index: 3049
+index: 2778
 #Models/npc_cyborg_diego_000415.obj
-index: 3050
+index: 2779
 #Models/npc_cyborg_diego_000416.obj
-index: 3051
+index: 2780
 #Models/npc_cyborg_diego_000417.obj
-index: 3052
-#Models/npc_cyborg_diego_000418.obj
-index: 3053
-#Models/npc_cyborg_diego_000419.obj
-index: 3054
-#Models/npc_cyborg_diego_000420.obj
-index: 3055
-#Models/npc_cyborg_diego_000421.obj
-index: 3056
-#Models/npc_cyborg_diego_000422.obj
-index: 3057
-#Models/npc_cyborg_diego_000423.obj
-index: 3058
-#Models/npc_cyborg_diego_000424.obj
-index: 3059
-#Models/npc_cyborg_diego_000425.obj
-index: 3060
-#Models/npc_cyborg_diego_000426.obj
-index: 3061
-#Models/npc_cyborg_diego_000427.obj
-index: 3062
-#Models/npc_cyborg_diego_000428.obj
-index: 3063
-#Models/npc_cyborg_diego_000429.obj
-index: 3064
-#Models/npc_cyborg_diego_000430.obj
-index: 3065
-#Models/npc_cyborg_diego_000431.obj
-index: 3066
-#Models/npc_cyborg_diego_000432.obj
-index: 3067
-#Models/npc_cyborg_diego_000433.obj
-index: 3068
-#Models/npc_cyborg_diego_000434.obj
-index: 3069
+index: 2781
 
 #Models/npc_cyborg_elite_000001.obj
-index: 3070
+index: 2782
 animated: 1
 animationNum: 26
 #Models/npc_cyborg_elite_000002.obj
-index: 3071
+index: 2783
 #Models/npc_cyborg_elite_000003.obj
-index: 3072
+index: 2784
 #Models/npc_cyborg_elite_000004.obj
-index: 3073
+index: 2785
 #Models/npc_cyborg_elite_000005.obj
-index: 3074
+index: 2786
 #Models/npc_cyborg_elite_000006.obj
-index: 3075
+index: 2787
 #Models/npc_cyborg_elite_000007.obj
-index: 3076
+index: 2788
 #Models/npc_cyborg_elite_000008.obj
-index: 3077
+index: 2789
 #Models/npc_cyborg_elite_000009.obj
-index: 3078
+index: 2790
 #Models/npc_cyborg_elite_000010.obj
-index: 3079
+index: 2791
 #Models/npc_cyborg_elite_000011.obj
-index: 3080
+index: 2792
 #Models/npc_cyborg_elite_000012.obj
-index: 3081
+index: 2793
 #Models/npc_cyborg_elite_000013.obj
-index: 3082
+index: 2794
 #Models/npc_cyborg_elite_000014.obj
-index: 3083
+index: 2795
 #Models/npc_cyborg_elite_000015.obj
-index: 3084
+index: 2796
 #Models/npc_cyborg_elite_000016.obj
-index: 3085
+index: 2797
 #Models/npc_cyborg_elite_000017.obj
-index: 3086
+index: 2798
 #Models/npc_cyborg_elite_000018.obj
-index: 3087
+index: 2799
 #Models/npc_cyborg_elite_000019.obj
-index: 3088
+index: 2800
 #Models/npc_cyborg_elite_000020.obj
-index: 3089
+index: 2801
 #Models/npc_cyborg_elite_000021.obj
-index: 3090
+index: 2802
 #Models/npc_cyborg_elite_000022.obj
-index: 3091
+index: 2803
 #Models/npc_cyborg_elite_000023.obj
-index: 3092
+index: 2804
 #Models/npc_cyborg_elite_000024.obj
-index: 3093
+index: 2805
 #Models/npc_cyborg_elite_000025.obj
-index: 3094
+index: 2806
 #Models/npc_cyborg_elite_000026.obj
-index: 3095
+index: 2807
 #Models/npc_cyborg_elite_000027.obj
-index: 3096
+index: 2808
 #Models/npc_cyborg_elite_000028.obj
-index: 3097
+index: 2809
 #Models/npc_cyborg_elite_000029.obj
-index: 3098
+index: 2810
 #Models/npc_cyborg_elite_000030.obj
-index: 3099
+index: 2811
 #Models/npc_cyborg_elite_000031.obj
-index: 3100
+index: 2812
 #Models/npc_cyborg_elite_000032.obj
-index: 3101
+index: 2813
 #Models/npc_cyborg_elite_000033.obj
-index: 3102
+index: 2814
 #Models/npc_cyborg_elite_000034.obj
-index: 3103
+index: 2815
 #Models/npc_cyborg_elite_000035.obj
-index: 3104
+index: 2816
 #Models/npc_cyborg_elite_000036.obj
-index: 3105
+index: 2817
 #Models/npc_cyborg_elite_000037.obj
-index: 3106
+index: 2818
 #Models/npc_cyborg_elite_000038.obj
-index: 3107
+index: 2819
 #Models/npc_cyborg_elite_000039.obj
-index: 3108
+index: 2820
 #Models/npc_cyborg_elite_000040.obj
-index: 3109
+index: 2821
 #Models/npc_cyborg_elite_000041.obj
-index: 3110
+index: 2822
 #Models/npc_cyborg_elite_000042.obj
-index: 3111
+index: 2823
 #Models/npc_cyborg_elite_000043.obj
-index: 3112
+index: 2824
 #Models/npc_cyborg_elite_000044.obj
-index: 3113
+index: 2825
 #Models/npc_cyborg_elite_000045.obj
-index: 3114
+index: 2826
 #Models/npc_cyborg_elite_000046.obj
-index: 3115
+index: 2827
 #Models/npc_cyborg_elite_000047.obj
-index: 3116
+index: 2828
 #Models/npc_cyborg_elite_000048.obj
-index: 3117
+index: 2829
 #Models/npc_cyborg_elite_000049.obj
-index: 3118
+index: 2830
 #Models/npc_cyborg_elite_000050.obj
-index: 3119
+index: 2831
 #Models/npc_cyborg_elite_000051.obj
-index: 3120
+index: 2832
 #Models/npc_cyborg_elite_000052.obj
-index: 3121
+index: 2833
 #Models/npc_cyborg_elite_000053.obj
-index: 3122
+index: 2834
 #Models/npc_cyborg_elite_000054.obj
-index: 3123
+index: 2835
 #Models/npc_cyborg_elite_000055.obj
-index: 3124
+index: 2836
 #Models/npc_cyborg_elite_000056.obj
-index: 3125
+index: 2837
 #Models/npc_cyborg_elite_000057.obj
-index: 3126
+index: 2838
 #Models/npc_cyborg_elite_000058.obj
-index: 3127
+index: 2839
 #Models/npc_cyborg_elite_000059.obj
-index: 3128
+index: 2840
 #Models/npc_cyborg_elite_000060.obj
-index: 3129
+index: 2841
 #Models/npc_cyborg_elite_000061.obj
-index: 3130
+index: 2842
 #Models/npc_cyborg_elite_000062.obj
-index: 3131
+index: 2843
 #Models/npc_cyborg_elite_000063.obj
-index: 3132
+index: 2844
 #Models/npc_cyborg_elite_000064.obj
-index: 3133
+index: 2845
 #Models/npc_cyborg_elite_000065.obj
-index: 3134
+index: 2846
 #Models/npc_cyborg_elite_000066.obj
-index: 3135
+index: 2847
 #Models/npc_cyborg_elite_000067.obj
-index: 3136
+index: 2848
 #Models/npc_cyborg_elite_000068.obj
-index: 3137
-#Models/npc_cyborg_elite_000069.obj
-index: 3138
-#Models/npc_cyborg_elite_000070.obj
-index: 3139
-#Models/npc_cyborg_elite_000071.obj
-index: 3140
-#Models/npc_cyborg_elite_000072.obj
-index: 3141
-#Models/npc_cyborg_elite_000073.obj
-index: 3142
-#Models/npc_cyborg_elite_000074.obj
-index: 3143
-#Models/npc_cyborg_elite_000075.obj
-index: 3144
-#Models/npc_cyborg_elite_000076.obj
-index: 3145
-#Models/npc_cyborg_elite_000077.obj
-index: 3146
-#Models/npc_cyborg_elite_000078.obj
-index: 3147
-#Models/npc_cyborg_elite_000079.obj
-index: 3148
-#Models/npc_cyborg_elite_000080.obj
-index: 3149
-#Models/npc_cyborg_elite_000081.obj
-index: 3150
-#Models/npc_cyborg_elite_000082.obj
-index: 3151
-#Models/npc_cyborg_elite_000083.obj
-index: 3152
-#Models/npc_cyborg_elite_000084.obj
-index: 3153
-#Models/npc_cyborg_elite_000085.obj
-index: 3154
-#Models/npc_cyborg_elite_000086.obj
-index: 3155
-#Models/npc_cyborg_elite_000087.obj
-index: 3156
-#Models/npc_cyborg_elite_000088.obj
-index: 3157
-#Models/npc_cyborg_elite_000089.obj
-index: 3158
+index: 2849
 #Models/npc_cyborg_elite_000090.obj
-index: 3159
+index: 2850
 #Models/npc_cyborg_elite_000091.obj
-index: 3160
+index: 2851
 #Models/npc_cyborg_elite_000092.obj
-index: 3161
+index: 2852
 #Models/npc_cyborg_elite_000093.obj
-index: 3162
+index: 2853
 #Models/npc_cyborg_elite_000094.obj
-index: 3163
+index: 2854
 #Models/npc_cyborg_elite_000095.obj
-index: 3164
+index: 2855
 #Models/npc_cyborg_elite_000096.obj
-index: 3165
+index: 2856
 #Models/npc_cyborg_elite_000097.obj
-index: 3166
+index: 2857
 #Models/npc_cyborg_elite_000098.obj
-index: 3167
+index: 2858
 #Models/npc_cyborg_elite_000099.obj
-index: 3168
+index: 2859
 #Models/npc_cyborg_elite_000100.obj
-index: 3169
+index: 2860
 #Models/npc_cyborg_elite_000101.obj
-index: 3170
+index: 2861
 #Models/npc_cyborg_elite_000102.obj
-index: 3171
+index: 2862
 #Models/npc_cyborg_elite_000103.obj
-index: 3172
+index: 2863
 #Models/npc_cyborg_elite_000104.obj
-index: 3173
+index: 2864
 #Models/npc_cyborg_elite_000105.obj
-index: 3174
+index: 2865
 #Models/npc_cyborg_elite_000106.obj
-index: 3175
+index: 2866
 #Models/npc_cyborg_elite_000107.obj
-index: 3176
+index: 2867
 #Models/npc_cyborg_elite_000108.obj
-index: 3177
+index: 2868
 #Models/npc_cyborg_elite_000109.obj
-index: 3178
+index: 2869
 #Models/npc_cyborg_elite_000110.obj
-index: 3179
+index: 2870
 #Models/npc_cyborg_elite_000111.obj
-index: 3180
+index: 2871
 #Models/npc_cyborg_elite_000112.obj
-index: 3181
+index: 2872
 #Models/npc_cyborg_elite_000113.obj
-index: 3182
+index: 2873
 #Models/npc_cyborg_elite_000114.obj
-index: 3183
+index: 2874
 #Models/npc_cyborg_elite_000115.obj
-index: 3184
+index: 2875
 #Models/npc_cyborg_elite_000116.obj
-index: 3185
+index: 2876
 #Models/npc_cyborg_elite_000117.obj
-index: 3186
+index: 2877
 #Models/npc_cyborg_elite_000118.obj
-index: 3187
+index: 2878
 #Models/npc_cyborg_elite_000119.obj
-index: 3188
+index: 2879
 #Models/npc_cyborg_elite_000120.obj
-index: 3189
+index: 2880
 #Models/npc_cyborg_elite_000121.obj
-index: 3190
+index: 2881
 #Models/npc_cyborg_elite_000122.obj
-index: 3191
+index: 2882
 #Models/npc_cyborg_elite_000123.obj
-index: 3192
+index: 2883
 #Models/npc_cyborg_elite_000124.obj
-index: 3193
+index: 2884
 #Models/npc_cyborg_elite_000125.obj
-index: 3194
+index: 2885
 #Models/npc_cyborg_elite_000126.obj
-index: 3195
+index: 2886
 #Models/npc_cyborg_elite_000127.obj
-index: 3196
+index: 2887
 #Models/npc_cyborg_elite_000128.obj
-index: 3197
+index: 2888
 #Models/npc_cyborg_elite_000129.obj
-index: 3198
+index: 2889
 #Models/npc_cyborg_elite_000130.obj
-index: 3199
+index: 2890
 #Models/npc_cyborg_elite_000131.obj
-index: 3200
+index: 2891
 #Models/npc_cyborg_elite_000132.obj
-index: 3201
+index: 2892
 #Models/npc_cyborg_elite_000133.obj
-index: 3202
+index: 2893
 #Models/npc_cyborg_elite_000134.obj
-index: 3203
+index: 2894
 #Models/npc_cyborg_elite_000135.obj
-index: 3204
+index: 2895
 #Models/npc_cyborg_elite_000136.obj
-index: 3205
+index: 2896
 #Models/npc_cyborg_elite_000137.obj
-index: 3206
+index: 2897
 #Models/npc_cyborg_elite_000138.obj
-index: 3207
+index: 2898
 #Models/npc_cyborg_elite_000139.obj
-index: 3208
+index: 2899
 #Models/npc_cyborg_elite_000140.obj
-index: 3209
+index: 2900
 #Models/npc_cyborg_elite_000141.obj
-index: 3210
+index: 2901
 #Models/npc_cyborg_elite_000142.obj
-index: 3211
+index: 2902
 #Models/npc_cyborg_elite_000143.obj
-index: 3212
+index: 2903
 #Models/npc_cyborg_elite_000144.obj
-index: 3213
+index: 2904
 #Models/npc_cyborg_elite_000145.obj
-index: 3214
+index: 2905
 #Models/npc_cyborg_elite_000146.obj
-index: 3215
+index: 2906
 #Models/npc_cyborg_elite_000147.obj
-index: 3216
+index: 2907
 #Models/npc_cyborg_elite_000148.obj
-index: 3217
+index: 2908
 #Models/npc_cyborg_elite_000149.obj
-index: 3218
+index: 2909
 #Models/npc_cyborg_elite_000150.obj
-index: 3219
+index: 2910
 #Models/npc_cyborg_elite_000151.obj
-index: 3220
+index: 2911
 #Models/npc_cyborg_elite_000152.obj
-index: 3221
+index: 2912
 #Models/npc_cyborg_elite_000153.obj
-index: 3222
+index: 2913
 #Models/npc_cyborg_elite_000154.obj
-index: 3223
+index: 2914
 #Models/npc_cyborg_elite_000155.obj
-index: 3224
+index: 2915
 #Models/npc_cyborg_elite_000156.obj
-index: 3225
+index: 2916
 #Models/npc_cyborg_elite_000157.obj
-index: 3226
+index: 2917
 #Models/npc_cyborg_elite_000158.obj
-index: 3227
+index: 2918
 #Models/npc_cyborg_elite_000159.obj
-index: 3228
+index: 2919
 #Models/npc_cyborg_elite_000160.obj
-index: 3229
+index: 2920
 #Models/npc_cyborg_elite_000161.obj
-index: 3230
+index: 2921
 #Models/npc_cyborg_elite_000162.obj
-index: 3231
+index: 2922
 #Models/npc_cyborg_elite_000163.obj
-index: 3232
+index: 2923
 #Models/npc_cyborg_elite_000164.obj
-index: 3233
+index: 2924
 #Models/npc_cyborg_elite_000165.obj
-index: 3234
+index: 2925
 #Models/npc_cyborg_elite_000166.obj
-index: 3235
+index: 2926
 #Models/npc_cyborg_elite_000167.obj
-index: 3236
+index: 2927
 #Models/npc_cyborg_elite_000168.obj
-index: 3237
+index: 2928
 #Models/npc_cyborg_elite_000169.obj
-index: 3238
+index: 2929
 #Models/npc_cyborg_elite_000170.obj
-index: 3239
+index: 2930
 #Models/npc_cyborg_elite_000171.obj
-index: 3240
+index: 2931
 #Models/npc_cyborg_elite_000172.obj
-index: 3241
+index: 2932
 #Models/npc_cyborg_elite_000173.obj
-index: 3242
-#Models/npc_cyborg_elite_000174.obj
-index: 3243
-#Models/npc_cyborg_elite_000175.obj
-index: 3244
-#Models/npc_cyborg_elite_000176.obj
-index: 3245
-#Models/npc_cyborg_elite_000177.obj
-index: 3246
-#Models/npc_cyborg_elite_000178.obj
-index: 3247
-#Models/npc_cyborg_elite_000179.obj
-index: 3248
-#Models/npc_cyborg_elite_000180.obj
-index: 3249
-#Models/npc_cyborg_elite_000181.obj
-index: 3250
-#Models/npc_cyborg_elite_000182.obj
-index: 3251
-#Models/npc_cyborg_elite_000183.obj
-index: 3252
-#Models/npc_cyborg_elite_000184.obj
-index: 3253
-#Models/npc_cyborg_elite_000185.obj
-index: 3254
-#Models/npc_cyborg_elite_000186.obj
-index: 3255
-#Models/npc_cyborg_elite_000187.obj
-index: 3256
-#Models/npc_cyborg_elite_000188.obj
-index: 3257
-#Models/npc_cyborg_elite_000189.obj
-index: 3258
-#Models/npc_cyborg_elite_000190.obj
-index: 3259
-#Models/npc_cyborg_elite_000191.obj
-index: 3260
-#Models/npc_cyborg_elite_000192.obj
-index: 3261
-#Models/npc_cyborg_elite_000193.obj
-index: 3262
+index: 2933
 #Models/npc_cyborg_elite_000194.obj
-index: 3263
+index: 2934
 #Models/npc_cyborg_elite_000195.obj
-index: 3264
+index: 2935
 #Models/npc_cyborg_elite_000196.obj
-index: 3265
+index: 2936
 #Models/npc_cyborg_elite_000197.obj
-index: 3266
+index: 2937
 #Models/npc_cyborg_elite_000198.obj
-index: 3267
+index: 2938
 #Models/npc_cyborg_elite_000199.obj
-index: 3268
+index: 2939
 #Models/npc_cyborg_elite_000200.obj
-index: 3269
+index: 2940
 #Models/npc_cyborg_elite_000201.obj
-index: 3270
+index: 2941
 #Models/npc_cyborg_elite_000202.obj
-index: 3271
+index: 2942
 #Models/npc_cyborg_elite_000203.obj
-index: 3272
+index: 2943
 #Models/npc_cyborg_elite_000204.obj
-index: 3273
+index: 2944
 #Models/npc_cyborg_elite_000205.obj
-index: 3274
+index: 2945
 #Models/npc_cyborg_elite_000206.obj
-index: 3275
+index: 2946
 #Models/npc_cyborg_elite_000207.obj
-index: 3276
+index: 2947
 #Models/npc_cyborg_elite_000208.obj
-index: 3277
+index: 2948
 #Models/npc_cyborg_elite_000209.obj
-index: 3278
+index: 2949
 #Models/npc_cyborg_elite_000210.obj
-index: 3279
+index: 2950
 #Models/npc_cyborg_elite_000211.obj
-index: 3280
+index: 2951
 #Models/npc_cyborg_elite_000212.obj
-index: 3281
+index: 2952
 #Models/npc_cyborg_elite_000213.obj
-index: 3282
+index: 2953
 #Models/npc_cyborg_elite_000214.obj
-index: 3283
-#Models/npc_cyborg_elite_000215.obj
-index: 3284
+index: 2954
 #Models/npc_cyborg_elite_000216.obj
-index: 3285
+index: 2955
 #Models/npc_cyborg_elite_000217.obj
-index: 3286
+index: 2956
 #Models/npc_cyborg_elite_000218.obj
-index: 3287
+index: 2957
 #Models/npc_cyborg_elite_000219.obj
-index: 3288
+index: 2958
 #Models/npc_cyborg_elite_000220.obj
-index: 3289
+index: 2959
 #Models/npc_cyborg_elite_000221.obj
-index: 3290
+index: 2960
 #Models/npc_cyborg_elite_000222.obj
-index: 3291
+index: 2961
 #Models/npc_cyborg_elite_000223.obj
-index: 3292
+index: 2962
 #Models/npc_cyborg_elite_000224.obj
-index: 3293
+index: 2963
 #Models/npc_cyborg_elite_000225.obj
-index: 3294
+index: 2964
 #Models/npc_cyborg_elite_000226.obj
-index: 3295
+index: 2965
 #Models/npc_cyborg_elite_000227.obj
-index: 3296
+index: 2966
 #Models/npc_cyborg_elite_000228.obj
-index: 3297
+index: 2967
 #Models/npc_cyborg_elite_000229.obj
-index: 3298
+index: 2968
 #Models/npc_cyborg_elite_000230.obj
-index: 3299
+index: 2969
 #Models/npc_cyborg_elite_000231.obj
-index: 3300
+index: 2970
 #Models/npc_cyborg_elite_000232.obj
-index: 3301
+index: 2971
 #Models/npc_cyborg_elite_000233.obj
-index: 3302
-#Models/npc_cyborg_elite_000234.obj
-index: 3303
+index: 2972
 #Models/npc_cyborg_elite_000235.obj
-index: 3304
+index: 2973
 #Models/npc_cyborg_elite_000236.obj
-index: 3305
+index: 2974
 #Models/npc_cyborg_elite_000237.obj
-index: 3306
+index: 2975
 #Models/npc_cyborg_elite_000238.obj
-index: 3307
+index: 2976
 #Models/npc_cyborg_elite_000239.obj
-index: 3308
+index: 2977
 #Models/npc_cyborg_elite_000240.obj
-index: 3309
+index: 2978
 #Models/npc_cyborg_elite_000241.obj
-index: 3310
+index: 2979
 #Models/npc_cyborg_elite_000242.obj
-index: 3311
+index: 2980
 #Models/npc_cyborg_elite_000243.obj
-index: 3312
+index: 2981
 #Models/npc_cyborg_elite_000244.obj
-index: 3313
-#Models/npc_cyborg_elite_000245.obj
-index: 3314
-#Models/npc_cyborg_elite_000246.obj
-index: 3315
-#Models/npc_cyborg_elite_000247.obj
-index: 3316
-#Models/npc_cyborg_elite_000248.obj
-index: 3317
-#Models/npc_cyborg_elite_000249.obj
-index: 3318
-#Models/npc_cyborg_elite_000250.obj
-index: 3319
-#Models/npc_cyborg_elite_000251.obj
-index: 3320
-#Models/npc_cyborg_elite_000252.obj
-index: 3321
-#Models/npc_cyborg_elite_000253.obj
-index: 3322
-#Models/npc_cyborg_elite_000254.obj
-index: 3323
-#Models/npc_cyborg_elite_000255.obj
-index: 3324
-#Models/npc_cyborg_elite_000256.obj
-index: 3325
-#Models/npc_cyborg_elite_000257.obj
-index: 3326
-#Models/npc_cyborg_elite_000258.obj
-index: 3327
-#Models/npc_cyborg_elite_000259.obj
-index: 3328
-#Models/npc_cyborg_elite_000260.obj
-index: 3329
-#Models/npc_cyborg_elite_000261.obj
-index: 3330
-#Models/npc_cyborg_elite_000262.obj
-index: 3331
-#Models/npc_cyborg_elite_000263.obj
-index: 3332
-#Models/npc_cyborg_elite_000264.obj
-index: 3333
-#Models/npc_cyborg_elite_000265.obj
-index: 3334
-#Models/npc_cyborg_elite_000266.obj
-index: 3335
-#Models/npc_cyborg_elite_000267.obj
-index: 3336
-#Models/npc_cyborg_elite_000268.obj
-index: 3337
-#Models/npc_cyborg_elite_000269.obj
-index: 3338
-#Models/npc_cyborg_elite_000270.obj
-index: 3339
-#Models/npc_cyborg_elite_000271.obj
-index: 3340
-#Models/npc_cyborg_elite_000272.obj
-index: 3341
-#Models/npc_cyborg_elite_000273.obj
-index: 3342
-#Models/npc_cyborg_elite_000274.obj
-index: 3343
-#Models/npc_cyborg_elite_000275.obj
-index: 3344
-#Models/npc_cyborg_elite_000276.obj
-index: 3345
-#Models/npc_cyborg_elite_000277.obj
-index: 3346
-#Models/npc_cyborg_elite_000278.obj
-index: 3347
-#Models/npc_cyborg_elite_000279.obj
-index: 3348
-#Models/npc_cyborg_elite_000280.obj
-index: 3349
-#Models/npc_cyborg_elite_000281.obj
-index: 3350
-#Models/npc_cyborg_elite_000282.obj
-index: 3351
-#Models/npc_cyborg_elite_000283.obj
-index: 3352
-#Models/npc_cyborg_elite_000284.obj
-index: 3353
-#Models/npc_cyborg_elite_000285.obj
-index: 3354
-#Models/npc_cyborg_elite_000286.obj
-index: 3355
-#Models/npc_cyborg_elite_000287.obj
-index: 3356
-#Models/npc_cyborg_elite_000288.obj
-index: 3357
-#Models/npc_cyborg_elite_000289.obj
-index: 3358
-#Models/npc_cyborg_elite_000290.obj
-index: 3359
-#Models/npc_cyborg_elite_000291.obj
-index: 3360
-#Models/npc_cyborg_elite_000292.obj
-index: 3361
-#Models/npc_cyborg_elite_000293.obj
-index: 3362
-#Models/npc_cyborg_elite_000294.obj
-index: 3363
-#Models/npc_cyborg_elite_000295.obj
-index: 3364
-#Models/npc_cyborg_elite_000296.obj
-index: 3365
-#Models/npc_cyborg_elite_000297.obj
-index: 3366
-#Models/npc_cyborg_elite_000298.obj
-index: 3367
-#Models/npc_cyborg_elite_000299.obj
-index: 3368
-#Models/npc_cyborg_elite_000300.obj
-index: 3369
-#Models/npc_cyborg_elite_000301.obj
-index: 3370
-#Models/npc_cyborg_elite_000302.obj
-index: 3371
-#Models/npc_cyborg_elite_000303.obj
-index: 3372
-#Models/npc_cyborg_elite_000304.obj
-index: 3373
-#Models/npc_cyborg_elite_000305.obj
-index: 3374
-#Models/npc_cyborg_elite_000306.obj
-index: 3375
-#Models/npc_cyborg_elite_000307.obj
-index: 3376
-#Models/npc_cyborg_elite_000308.obj
-index: 3377
-#Models/npc_cyborg_elite_000309.obj
-index: 3378
-#Models/npc_cyborg_elite_000310.obj
-index: 3379
-#Models/npc_cyborg_elite_000311.obj
-index: 3380
-#Models/npc_cyborg_elite_000312.obj
-index: 3381
-#Models/npc_cyborg_elite_000313.obj
-index: 3382
-#Models/npc_cyborg_elite_000314.obj
-index: 3383
-#Models/npc_cyborg_elite_000315.obj
-index: 3384
-#Models/npc_cyborg_elite_000316.obj
-index: 3385
-#Models/npc_cyborg_elite_000317.obj
-index: 3386
-#Models/npc_cyborg_elite_000318.obj
-index: 3387
+index: 2982
 #Models/npc_cyborg_elite_000319.obj
-index: 3388
+index: 2983
 #Models/npc_cyborg_elite_000320.obj
-index: 3389
+index: 2984
 #Models/npc_cyborg_elite_000321.obj
-index: 3390
+index: 2985
 #Models/npc_cyborg_elite_000322.obj
-index: 3391
+index: 2986
 #Models/npc_cyborg_elite_000323.obj
-index: 3392
+index: 2987
 #Models/npc_cyborg_elite_000324.obj
-index: 3393
+index: 2988
 #Models/npc_cyborg_elite_000325.obj
-index: 3394
+index: 2989
 #Models/npc_cyborg_elite_000326.obj
-index: 3395
+index: 2990
 #Models/npc_cyborg_elite_000327.obj
-index: 3396
+index: 2991
 #Models/npc_cyborg_elite_000328.obj
-index: 3397
+index: 2992
 #Models/npc_cyborg_elite_000329.obj
-index: 3398
+index: 2993
 #Models/npc_cyborg_elite_000330.obj
-index: 3399
+index: 2994
 #Models/npc_cyborg_elite_000331.obj
-index: 3400
+index: 2995
 #Models/npc_cyborg_elite_000332.obj
-index: 3401
+index: 2996
 #Models/npc_cyborg_elite_000333.obj
-index: 3402
+index: 2997
 #Models/npc_cyborg_elite_000334.obj
-index: 3403
+index: 2998
 #Models/npc_cyborg_elite_000335.obj
-index: 3404
+index: 2999
 #Models/npc_cyborg_elite_000336.obj
-index: 3405
+index: 3000
 #Models/npc_cyborg_elite_000337.obj
-index: 3406
+index: 3001
 #Models/npc_cyborg_elite_000338.obj
-index: 3407
+index: 3002
 #Models/npc_cyborg_elite_000339.obj
-index: 3408
+index: 3003
 #Models/npc_cyborg_elite_000340.obj
-index: 3409
+index: 3004
 #Models/npc_cyborg_elite_000341.obj
-index: 3410
+index: 3005
 #Models/npc_cyborg_elite_000342.obj
-index: 3411
+index: 3006
 #Models/npc_cyborg_elite_000343.obj
-index: 3412
+index: 3007
 #Models/npc_cyborg_elite_000344.obj
-index: 3413
+index: 3008
 #Models/npc_cyborg_elite_000345.obj
-index: 3414
+index: 3009
 #Models/npc_cyborg_elite_000346.obj
-index: 3415
+index: 3010
 #Models/npc_cyborg_elite_000347.obj
-index: 3416
+index: 3011
 #Models/npc_cyborg_elite_000348.obj
-index: 3417
+index: 3012
 #Models/npc_cyborg_elite_000349.obj
-index: 3418
+index: 3013
 #Models/npc_cyborg_elite_000350.obj
-index: 3419
+index: 3014
 #Models/npc_cyborg_elite_000351.obj
-index: 3420
+index: 3015
 #Models/npc_cyborg_elite_000352.obj
-index: 3421
+index: 3016
 #Models/npc_cyborg_elite_000353.obj
-index: 3422
+index: 3017
 #Models/npc_cyborg_elite_000354.obj
-index: 3423
+index: 3018
 #Models/npc_cyborg_elite_000355.obj
-index: 3424
+index: 3019
 #Models/npc_cyborg_elite_000356.obj
-index: 3425
+index: 3020
 #Models/npc_cyborg_elite_000357.obj
-index: 3426
+index: 3021
 #Models/npc_cyborg_elite_000358.obj
-index: 3427
+index: 3022
 #Models/npc_cyborg_elite_000359.obj
-index: 3428
+index: 3023
 #Models/npc_cyborg_elite_000360.obj
-index: 3429
+index: 3024
 #Models/npc_cyborg_elite_000361.obj
-index: 3430
+index: 3025
 #Models/npc_cyborg_elite_000362.obj
-index: 3431
+index: 3026
 #Models/npc_cyborg_elite_000363.obj
-index: 3432
+index: 3027
 #Models/npc_cyborg_elite_000364.obj
-index: 3433
+index: 3028
 #Models/npc_cyborg_elite_000365.obj
-index: 3434
+index: 3029
 #Models/npc_cyborg_elite_000366.obj
-index: 3435
+index: 3030
 #Models/npc_cyborg_elite_000367.obj
-index: 3436
+index: 3031
 #Models/npc_cyborg_elite_000368.obj
-index: 3437
+index: 3032
 #Models/npc_cyborg_elite_000369.obj
-index: 3438
+index: 3033
 #Models/npc_cyborg_elite_000370.obj
-index: 3439
+index: 3034
 #Models/npc_cyborg_elite_000371.obj
-index: 3440
+index: 3035
 #Models/npc_cyborg_elite_000372.obj
-index: 3441
+index: 3036
 #Models/npc_cyborg_elite_000373.obj
-index: 3442
+index: 3037
 #Models/npc_cyborg_elite_000374.obj
-index: 3443
+index: 3038
 #Models/npc_cyborg_elite_000375.obj
-index: 3444
+index: 3039
 #Models/npc_cyborg_elite_000376.obj
-index: 3445
+index: 3040
 #Models/npc_cyborg_elite_000377.obj
-index: 3446
+index: 3041
 #Models/npc_cyborg_elite_000378.obj
-index: 3447
+index: 3042
 #Models/npc_cyborg_elite_000379.obj
-index: 3448
+index: 3043
 #Models/npc_cyborg_elite_000380.obj
-index: 3449
+index: 3044
 #Models/npc_cyborg_elite_000381.obj
-index: 3450
+index: 3045
 #Models/npc_cyborg_elite_000382.obj
-index: 3451
+index: 3046
 #Models/npc_cyborg_elite_000383.obj
-index: 3452
+index: 3047
 #Models/npc_cyborg_elite_000384.obj
-index: 3453
+index: 3048
 #Models/npc_cyborg_elite_000385.obj
-index: 3454
+index: 3049
 #Models/npc_cyborg_elite_000386.obj
-index: 3455
-#Models/npc_cyborg_elite_000387.obj
-index: 3456
-#Models/npc_cyborg_elite_000388.obj
-index: 3457
-#Models/npc_cyborg_elite_000389.obj
-index: 3458
-#Models/npc_cyborg_elite_000390.obj
-index: 3459
-#Models/npc_cyborg_elite_000391.obj
-index: 3460
-#Models/npc_cyborg_elite_000392.obj
-index: 3461
-#Models/npc_cyborg_elite_000393.obj
-index: 3462
-#Models/npc_cyborg_elite_000394.obj
-index: 3463
-#Models/npc_cyborg_elite_000395.obj
-index: 3464
-#Models/npc_cyborg_elite_000396.obj
-index: 3465
-#Models/npc_cyborg_elite_000397.obj
-index: 3466
-#Models/npc_cyborg_elite_000398.obj
-index: 3467
-#Models/npc_cyborg_elite_000399.obj
-index: 3468
-#Models/npc_cyborg_elite_000400.obj
-index: 3469
+index: 3050
 #Models/npc_cyborg_elite_000401.obj
-index: 3470
+index: 3051
 #Models/npc_cyborg_elite_000402.obj
-index: 3471
+index: 3052
 #Models/npc_cyborg_elite_000403.obj
-index: 3472
+index: 3053
 #Models/npc_cyborg_elite_000404.obj
-index: 3473
+index: 3054
 #Models/npc_cyborg_elite_000405.obj
-index: 3474
+index: 3055
 #Models/npc_cyborg_elite_000406.obj
-index: 3475
+index: 3056
 #Models/npc_cyborg_elite_000407.obj
-index: 3476
+index: 3057
 #Models/npc_cyborg_elite_000408.obj
-index: 3477
+index: 3058
 #Models/npc_cyborg_elite_000409.obj
-index: 3478
+index: 3059
 #Models/npc_cyborg_elite_000410.obj
-index: 3479
+index: 3060
 #Models/npc_cyborg_elite_000411.obj
-index: 3480
+index: 3061
 #Models/npc_cyborg_elite_000412.obj
-index: 3481
+index: 3062
 #Models/npc_cyborg_elite_000413.obj
-index: 3482
+index: 3063
 #Models/npc_cyborg_elite_000414.obj
-index: 3483
+index: 3064
 #Models/npc_cyborg_elite_000415.obj
-index: 3484
+index: 3065
 #Models/npc_cyborg_elite_000416.obj
-index: 3485
+index: 3066
 #Models/npc_cyborg_elite_000417.obj
-index: 3486
+index: 3067
 #Models/npc_cyborg_elite_000418.obj
-index: 3487
+index: 3068
 #Models/npc_cyborg_elite_000419.obj
-index: 3488
+index: 3069
 #Models/npc_cyborg_elite_000420.obj
-index: 3489
+index: 3070
 #Models/npc_cyborg_elite_000421.obj
-index: 3490
+index: 3071
 #Models/npc_cyborg_elite_000422.obj
-index: 3491
-#Models/npc_cyborg_elite_000423.obj
-index: 3492
+index: 3072
 #Models/npc_cyborg_elite_000424.obj
-index: 3493
+index: 3073
 #Models/npc_cyborg_elite_000425.obj
-index: 3494
+index: 3074
 #Models/npc_cyborg_elite_000426.obj
-index: 3495
+index: 3075
 #Models/npc_cyborg_elite_000427.obj
-index: 3496
+index: 3076
 #Models/npc_cyborg_elite_000428.obj
-index: 3497
+index: 3077
 #Models/npc_cyborg_elite_000429.obj
-index: 3498
+index: 3078
 #Models/npc_cyborg_elite_000430.obj
-index: 3499
+index: 3079
 #Models/npc_cyborg_elite_000431.obj
-index: 3500
+index: 3080
 #Models/npc_cyborg_elite_000432.obj
-index: 3501
+index: 3081
 #Models/npc_cyborg_elite_000433.obj
-index: 3502
+index: 3082
 #Models/npc_cyborg_elite_000434.obj
-index: 3503
+index: 3083
 #Models/npc_cyborg_elite_000435.obj
-index: 3504
+index: 3084
 #Models/npc_cyborg_elite_000436.obj
-index: 3505
+index: 3085
 #Models/npc_cyborg_elite_000437.obj
-index: 3506
+index: 3086
 #Models/npc_cyborg_elite_000438.obj
-index: 3507
+index: 3087
 #Models/npc_cyborg_elite_000439.obj
-index: 3508
+index: 3088
 #Models/npc_cyborg_elite_000440.obj
-index: 3509
+index: 3089
 #Models/npc_cyborg_elite_000441.obj
-index: 3510
+index: 3090
 #Models/npc_cyborg_elite_000442.obj
-index: 3511
+index: 3091
 #Models/npc_cyborg_elite_000443.obj
-index: 3512
+index: 3092
 #Models/npc_cyborg_elite_000444.obj
-index: 3513
+index: 3093
 #Models/npc_cyborg_elite_000445.obj
-index: 3514
+index: 3094
 #Models/npc_cyborg_elite_000446.obj
-index: 3515
+index: 3095
 #Models/npc_cyborg_elite_000447.obj
-index: 3516
+index: 3096
 #Models/npc_cyborg_elite_000448.obj
-index: 3517
+index: 3097
 #Models/npc_cyborg_elite_000449.obj
-index: 3518
+index: 3098
 #Models/npc_cyborg_elite_000450.obj
-index: 3519
+index: 3099
 
 #Models/npc_cyborg_enforcer_000001.obj
 index: 3520
