@@ -10576,1381 +10576,1233 @@ index: 5385
 index: 5386
 
 #Models/npc_zerogmut_000001.obj
-index: 6129
+index: 5387
 animated: 1
 animationNum: 42
 #Models/npc_zerogmut_000002.obj
-index: 6130
+index: 5388
 #Models/npc_zerogmut_000003.obj
-index: 6131
+index: 5389
 #Models/npc_zerogmut_000004.obj
-index: 6132
+index: 5390
 #Models/npc_zerogmut_000005.obj
-index: 6133
+index: 5391
 #Models/npc_zerogmut_000006.obj
-index: 6134
+index: 5392
 #Models/npc_zerogmut_000007.obj
-index: 6135
+index: 5393
 #Models/npc_zerogmut_000008.obj
-index: 6136
+index: 5394
 #Models/npc_zerogmut_000009.obj
-index: 6137
+index: 5395
 #Models/npc_zerogmut_000010.obj
-index: 6138
+index: 5396
 #Models/npc_zerogmut_000011.obj
-index: 6139
+index: 5397
 #Models/npc_zerogmut_000012.obj
-index: 6140
+index: 5398
 #Models/npc_zerogmut_000013.obj
-index: 6141
+index: 5399
 #Models/npc_zerogmut_000014.obj
-index: 6142
+index: 5400
 #Models/npc_zerogmut_000015.obj
-index: 6143
+index: 5401
 #Models/npc_zerogmut_000016.obj
-index: 6144
+index: 5402
 #Models/npc_zerogmut_000017.obj
-index: 6145
+index: 5403
 #Models/npc_zerogmut_000018.obj
-index: 6146
+index: 5404
 #Models/npc_zerogmut_000019.obj
-index: 6147
+index: 5405
 #Models/npc_zerogmut_000020.obj
-index: 6148
+index: 5406
 #Models/npc_zerogmut_000021.obj
-index: 6149
+index: 5407
 #Models/npc_zerogmut_000022.obj
-index: 6150
+index: 5408
 #Models/npc_zerogmut_000023.obj
-index: 6151
+index: 5409
 #Models/npc_zerogmut_000024.obj
-index: 6152
+index: 5410
 #Models/npc_zerogmut_000025.obj
-index: 6153
+index: 5411
 #Models/npc_zerogmut_000026.obj
-index: 6154
+index: 5412
 #Models/npc_zerogmut_000027.obj
-index: 6155
+index: 5413
 #Models/npc_zerogmut_000028.obj
-index: 6156
+index: 5414
 #Models/npc_zerogmut_000029.obj
-index: 6157
+index: 5415
 #Models/npc_zerogmut_000030.obj
-index: 6158
+index: 5416
 #Models/npc_zerogmut_000031.obj
-index: 6159
+index: 5417
 #Models/npc_zerogmut_000032.obj
-index: 6160
+index: 5418
 #Models/npc_zerogmut_000033.obj
-index: 6161
+index: 5419
 #Models/npc_zerogmut_000034.obj
-index: 6162
+index: 5420
 #Models/npc_zerogmut_000035.obj
-index: 6163
+index: 5421
 #Models/npc_zerogmut_000036.obj
-index: 6164
+index: 5422
 #Models/npc_zerogmut_000037.obj
-index: 6165
+index: 5423
 #Models/npc_zerogmut_000038.obj
-index: 6166
+index: 5424
 #Models/npc_zerogmut_000039.obj
-index: 6167
+index: 5425
 #Models/npc_zerogmut_000040.obj
-index: 6168
+index: 5426
 #Models/npc_zerogmut_000041.obj
-index: 6169
+index: 5427
 #Models/npc_zerogmut_000042.obj
-index: 6170
+index: 5428
 #Models/npc_zerogmut_000043.obj
-index: 6171
+index: 5429
 #Models/npc_zerogmut_000044.obj
-index: 6172
+index: 5430
 #Models/npc_zerogmut_000045.obj
-index: 6173
+index: 5431
 #Models/npc_zerogmut_000046.obj
-index: 6174
+index: 5432
 #Models/npc_zerogmut_000047.obj
-index: 6175
+index: 5433
 #Models/npc_zerogmut_000048.obj
-index: 6176
+index: 5434
 #Models/npc_zerogmut_000049.obj
-index: 6177
+index: 5435
 #Models/npc_zerogmut_000050.obj
-index: 6178
+index: 5436
 #Models/npc_zerogmut_000051.obj
-index: 6179
+index: 5437
 #Models/npc_zerogmut_000052.obj
-index: 6180
+index: 5438
 #Models/npc_zerogmut_000053.obj
-index: 6181
+index: 5439
 #Models/npc_zerogmut_000054.obj
-index: 6182
+index: 5440
 #Models/npc_zerogmut_000055.obj
-index: 6183
+index: 5441
 #Models/npc_zerogmut_000056.obj
-index: 6184
+index: 5442
 #Models/npc_zerogmut_000057.obj
-index: 6185
+index: 5443
 #Models/npc_zerogmut_000058.obj
-index: 6186
+index: 5444
 #Models/npc_zerogmut_000059.obj
-index: 6187
+index: 5445
 #Models/npc_zerogmut_000060.obj
-index: 6188
+index: 5446
 #Models/npc_zerogmut_000061.obj
-index: 6189
+index: 5447
 #Models/npc_zerogmut_000062.obj
-index: 6190
+index: 5448
 #Models/npc_zerogmut_000063.obj
-index: 6191
+index: 5449
 #Models/npc_zerogmut_000064.obj
-index: 6192
+index: 5450
 #Models/npc_zerogmut_000065.obj
-index: 6193
+index: 5451
 #Models/npc_zerogmut_000066.obj
-index: 6194
+index: 5452
 #Models/npc_zerogmut_000067.obj
-index: 6195
+index: 5453
 #Models/npc_zerogmut_000068.obj
-index: 6196
+index: 5454
 #Models/npc_zerogmut_000069.obj
-index: 6197
+index: 5455
 #Models/npc_zerogmut_000070.obj
-index: 6198
+index: 5456
 #Models/npc_zerogmut_000071.obj
-index: 6199
+index: 5457
 #Models/npc_zerogmut_000072.obj
-index: 6200
+index: 5458
 #Models/npc_zerogmut_000073.obj
-index: 6201
+index: 5459
 #Models/npc_zerogmut_000074.obj
-index: 6202
+index: 5460
 #Models/npc_zerogmut_000075.obj
-index: 6203
+index: 5461
 #Models/npc_zerogmut_000076.obj
-index: 6204
+index: 5462
 #Models/npc_zerogmut_000077.obj
-index: 6205
+index: 5463
 #Models/npc_zerogmut_000078.obj
-index: 6206
+index: 5464
 #Models/npc_zerogmut_000079.obj
-index: 6207
+index: 5465
 #Models/npc_zerogmut_000080.obj
-index: 6208
+index: 5466
 #Models/npc_zerogmut_000081.obj
-index: 6209
+index: 5467
 #Models/npc_zerogmut_000082.obj
-index: 6210
+index: 5468
 #Models/npc_zerogmut_000083.obj
-index: 6211
+index: 5469
 #Models/npc_zerogmut_000084.obj
-index: 6212
+index: 5470
 #Models/npc_zerogmut_000085.obj
-index: 6213
+index: 5471
 #Models/npc_zerogmut_000086.obj
-index: 6214
+index: 5472
 #Models/npc_zerogmut_000087.obj
-index: 6215
+index: 5473
 #Models/npc_zerogmut_000088.obj
-index: 6216
+index: 5474
 #Models/npc_zerogmut_000089.obj
-index: 6217
+index: 5475
 #Models/npc_zerogmut_000090.obj
-index: 6218
+index: 5476
 #Models/npc_zerogmut_000091.obj
-index: 6219
+index: 5477
 #Models/npc_zerogmut_000092.obj
-index: 6220
+index: 5478
 #Models/npc_zerogmut_000093.obj
-index: 6221
+index: 5479
 #Models/npc_zerogmut_000094.obj
-index: 6222
+index: 5480
 #Models/npc_zerogmut_000095.obj
-index: 6223
+index: 5481
 #Models/npc_zerogmut_000096.obj
-index: 6224
+index: 5482
 #Models/npc_zerogmut_000097.obj
-index: 6225
+index: 5483
 #Models/npc_zerogmut_000098.obj
-index: 6226
+index: 5484
 #Models/npc_zerogmut_000099.obj
-index: 6227
+index: 5485
 #Models/npc_zerogmut_000100.obj
-index: 6228
+index: 5486
 #Models/npc_zerogmut_000101.obj
-index: 6229
+index: 5487
 #Models/npc_zerogmut_000102.obj
-index: 6230
+index: 5488
 #Models/npc_zerogmut_000103.obj
-index: 6231
+index: 5489
 #Models/npc_zerogmut_000104.obj
-index: 6232
+index: 5490
 #Models/npc_zerogmut_000105.obj
-index: 6233
+index: 5491
 #Models/npc_zerogmut_000106.obj
-index: 6234
+index: 5492
 #Models/npc_zerogmut_000107.obj
-index: 6235
+index: 5493
 #Models/npc_zerogmut_000108.obj
-index: 6236
+index: 5494
 #Models/npc_zerogmut_000109.obj
-index: 6237
+index: 5495
 #Models/npc_zerogmut_000110.obj
-index: 6238
+index: 5496
 #Models/npc_zerogmut_000111.obj
-index: 6239
+index: 5497
 #Models/npc_zerogmut_000112.obj
-index: 6240
+index: 5498
 #Models/npc_zerogmut_000113.obj
-index: 6241
+index: 5499
 #Models/npc_zerogmut_000114.obj
-index: 6242
+index: 5500
 #Models/npc_zerogmut_000115.obj
-index: 6243
+index: 5501
 #Models/npc_zerogmut_000116.obj
-index: 6244
+index: 5502
 #Models/npc_zerogmut_000117.obj
-index: 6245
+index: 5503
 #Models/npc_zerogmut_000118.obj
-index: 6246
+index: 5504
 #Models/npc_zerogmut_000119.obj
-index: 6247
+index: 5505
 #Models/npc_zerogmut_000120.obj
-index: 6248
+index: 5506
 #Models/npc_zerogmut_000121.obj
-index: 6249
+index: 5507
 #Models/npc_zerogmut_000122.obj
-index: 6250
+index: 5508
 #Models/npc_zerogmut_000123.obj
-index: 6251
+index: 5509
 #Models/npc_zerogmut_000124.obj
-index: 6252
+index: 5510
 #Models/npc_zerogmut_000125.obj
-index: 6253
+index: 5511
 #Models/npc_zerogmut_000126.obj
-index: 6254
+index: 5512
 #Models/npc_zerogmut_000127.obj
-index: 6255
+index: 5513
 #Models/npc_zerogmut_000128.obj
-index: 6256
+index: 5514
 #Models/npc_zerogmut_000129.obj
-index: 6257
+index: 5515
 #Models/npc_zerogmut_000130.obj
-index: 6258
+index: 5516
 #Models/npc_zerogmut_000131.obj
-index: 6259
+index: 5517
 #Models/npc_zerogmut_000132.obj
-index: 6260
+index: 5518
 #Models/npc_zerogmut_000133.obj
-index: 6261
+index: 5519
 #Models/npc_zerogmut_000134.obj
-index: 6262
+index: 5520
 #Models/npc_zerogmut_000135.obj
-index: 6263
+index: 5521
 #Models/npc_zerogmut_000136.obj
-index: 6264
+index: 5522
 #Models/npc_zerogmut_000137.obj
-index: 6265
+index: 5523
 #Models/npc_zerogmut_000138.obj
-index: 6266
+index: 5524
 #Models/npc_zerogmut_000139.obj
-index: 6267
+index: 5525
 #Models/npc_zerogmut_000140.obj
-index: 6268
+index: 5526
 #Models/npc_zerogmut_000141.obj
-index: 6269
+index: 5527
 #Models/npc_zerogmut_000142.obj
-index: 6270
+index: 5528
 #Models/npc_zerogmut_000143.obj
-index: 6271
+index: 5529
 #Models/npc_zerogmut_000144.obj
-index: 6272
+index: 5530
 #Models/npc_zerogmut_000145.obj
-index: 6273
+index: 5531
 #Models/npc_zerogmut_000146.obj
-index: 6274
+index: 5532
 #Models/npc_zerogmut_000147.obj
-index: 6275
+index: 5533
 #Models/npc_zerogmut_000148.obj
-index: 6276
+index: 5534
 #Models/npc_zerogmut_000149.obj
-index: 6277
+index: 5535
 #Models/npc_zerogmut_000150.obj
-index: 6278
+index: 5536
 #Models/npc_zerogmut_000151.obj
-index: 6279
+index: 5537
 #Models/npc_zerogmut_000152.obj
-index: 6280
+index: 5538
 #Models/npc_zerogmut_000153.obj
-index: 6281
+index: 5539
 #Models/npc_zerogmut_000154.obj
-index: 6282
+index: 5540
 #Models/npc_zerogmut_000155.obj
-index: 6283
+index: 5541
 #Models/npc_zerogmut_000156.obj
-index: 6284
+index: 5542
 #Models/npc_zerogmut_000157.obj
-index: 6285
+index: 5543
 
 #Models/puzzlepanel1_000001.obj
-index: 6286
+index: 5544
 animated: 1
 animationNum: 43
 #Models/puzzlepanel1_000002.obj
-index: 6287
+index: 5545
 #Models/puzzlepanel1_000003.obj
-index: 6288
+index: 5546
 #Models/puzzlepanel1_000004.obj
-index: 6289
+index: 5547
 #Models/puzzlepanel1_000005.obj
-index: 6290
+index: 5548
 #Models/puzzlepanel1_000006.obj
-index: 6291
+index: 5549
 #Models/puzzlepanel1_000007.obj
-index: 6292
+index: 5550
 #Models/puzzlepanel1_000008.obj
-index: 6293
+index: 5551
 #Models/puzzlepanel1_000009.obj
-index: 6294
+index: 5552
 #Models/puzzlepanel1_000010.obj
-index: 6295
+index: 5553
 #Models/puzzlepanel1_000011.obj
-index: 6296
+index: 5554
 #Models/puzzlepanel1_000012.obj
-index: 6297
+index: 5555
 #Models/puzzlepanel1_000013.obj
-index: 6298
+index: 5556
 #Models/puzzlepanel1_000014.obj
-index: 6299
+index: 5557
 #Models/puzzlepanel1_000015.obj
-index: 6300
+index: 5558
 #Models/puzzlepanel1_000016.obj
-index: 6301
+index: 5559
 #Models/puzzlepanel1_000017.obj
-index: 6302
+index: 5560
 #Models/puzzlepanel1_000018.obj
-index: 6303
+index: 5561
 #Models/puzzlepanel1_000019.obj
-index: 6304
+index: 5562
 #Models/puzzlepanel1_000020.obj
-index: 6305
+index: 5563
 #Models/puzzlepanel1_000021.obj
-index: 6306
-#Models/puzzlepanel1_000022.obj
-index: 6307
-#Models/puzzlepanel1_000023.obj
-index: 6308
-#Models/puzzlepanel1_000024.obj
-index: 6309
-#Models/puzzlepanel1_000025.obj
-index: 6310
-#Models/puzzlepanel1_000026.obj
-index: 6311
-#Models/puzzlepanel1_000027.obj
-index: 6312
-#Models/puzzlepanel1_000028.obj
-index: 6313
-#Models/puzzlepanel1_000029.obj
-index: 6314
-#Models/puzzlepanel1_000030.obj
-index: 6315
-#Models/puzzlepanel1_000031.obj
-index: 6316
-#Models/puzzlepanel1_000032.obj
-index: 6317
-#Models/puzzlepanel1_000033.obj
-index: 6318
-#Models/puzzlepanel1_000034.obj
-index: 6319
-#Models/puzzlepanel1_000035.obj
-index: 6320
-#Models/puzzlepanel1_000036.obj
-index: 6321
-#Models/puzzlepanel1_000037.obj
-index: 6322
-#Models/puzzlepanel1_000038.obj
-index: 6323
-#Models/puzzlepanel1_000039.obj
-index: 6324
-#Models/puzzlepanel1_000040.obj
-index: 6325
-#Models/puzzlepanel1_000041.obj
-index: 6326
-#Models/puzzlepanel1_000042.obj
-index: 6327
-#Models/puzzlepanel1_000043.obj
-index: 6328
+index: 5564
 
 #Models/puzzlepanel2_000000.obj
-index: 6329
+index: 5565
 animated: 1
 animationNum: 44
 #Models/puzzlepanel2_000001.obj
-index: 6330
+index: 5566
 #Models/puzzlepanel2_000002.obj
-index: 6331
+index: 5567
 #Models/puzzlepanel2_000003.obj
-index: 6332
+index: 5568
 #Models/puzzlepanel2_000004.obj
-index: 6333
+index: 5569
 #Models/puzzlepanel2_000005.obj
-index: 6334
+index: 5570
 #Models/puzzlepanel2_000006.obj
-index: 6335
+index: 5571
 #Models/puzzlepanel2_000007.obj
-index: 6336
+index: 5572
 #Models/puzzlepanel2_000008.obj
-index: 6337
+index: 5573
 #Models/puzzlepanel2_000009.obj
-index: 6338
+index: 5574
 #Models/puzzlepanel2_000010.obj
-index: 6339
+index: 5575
 #Models/puzzlepanel2_000011.obj
-index: 6340
+index: 5576
 #Models/puzzlepanel2_000012.obj
-index: 6341
+index: 5577
 #Models/puzzlepanel2_000013.obj
-index: 6342
+index: 5578
 #Models/puzzlepanel2_000014.obj
-index: 6343
+index: 5579
 #Models/puzzlepanel2_000015.obj
-index: 6344
+index: 5580
 #Models/puzzlepanel2_000016.obj
-index: 6345
+index: 5581
 #Models/puzzlepanel2_000017.obj
-index: 6346
+index: 5582
 #Models/puzzlepanel2_000018.obj
-index: 6347
+index: 5583
 #Models/puzzlepanel2_000019.obj
-index: 6348
+index: 5584
 #Models/puzzlepanel2_000020.obj
-index: 6349
+index: 5585
 #Models/puzzlepanel2_000021.obj
-index: 6350
+index: 5586
 #Models/puzzlepanel2_000022.obj
-index: 6351
+index: 5587
 #Models/puzzlepanel2_000023.obj
-index: 6352
+index: 5588
 #Models/puzzlepanel2_000024.obj
-index: 6353
+index: 5589
 #Models/puzzlepanel2_000025.obj
-index: 6354
+index: 5590
 #Models/puzzlepanel2_000026.obj
-index: 6355
+index: 5591
 #Models/puzzlepanel2_000027.obj
-index: 6356
+index: 5592
 #Models/puzzlepanel2_000028.obj
-index: 6357
+index: 5593
 #Models/puzzlepanel2_000029.obj
-index: 6358
+index: 5594
 #Models/puzzlepanel2_000030.obj
-index: 6359
+index: 5595
 
 #Models/puzzlepanel3_000000.obj
-index: 6360
+index: 5596
 animated: 1
 animationNum: 45
 #Models/puzzlepanel3_000001.obj
-index: 6361
+index: 5597
 #Models/puzzlepanel3_000002.obj
-index: 6362
+index: 5598
 #Models/puzzlepanel3_000003.obj
-index: 6363
+index: 5599
 #Models/puzzlepanel3_000004.obj
-index: 6364
+index: 5600
 #Models/puzzlepanel3_000005.obj
-index: 6365
+index: 5601
 #Models/puzzlepanel3_000006.obj
-index: 6366
+index: 5602
 #Models/puzzlepanel3_000007.obj
-index: 6367
+index: 5603
 #Models/puzzlepanel3_000008.obj
-index: 6368
+index: 5604
 #Models/puzzlepanel3_000009.obj
-index: 6369
+index: 5605
 #Models/puzzlepanel3_000010.obj
-index: 6370
+index: 5606
 #Models/puzzlepanel3_000011.obj
-index: 6371
+index: 5607
 #Models/puzzlepanel3_000012.obj
-index: 6372
+index: 5608
 #Models/puzzlepanel3_000013.obj
-index: 6373
+index: 5609
 #Models/puzzlepanel3_000014.obj
-index: 6374
+index: 5610
 #Models/puzzlepanel3_000015.obj
-index: 6375
+index: 5611
 #Models/puzzlepanel3_000016.obj
-index: 6376
+index: 5612
 #Models/puzzlepanel3_000017.obj
-index: 6377
+index: 5613
 #Models/puzzlepanel3_000018.obj
-index: 6378
+index: 5614
 
 #Models/sparkingwire_000001.obj
-index: 6379
+index: 5615
 animated: 1
 animationNum: 46
 #Models/sparkingwire_000002.obj
-index: 6380
+index: 5616
 #Models/sparkingwire_000003.obj
-index: 6381
+index: 5617
 #Models/sparkingwire_000004.obj
-index: 6382
+index: 5618
 #Models/sparkingwire_000005.obj
-index: 6383
+index: 5619
 #Models/sparkingwire_000006.obj
-index: 6384
+index: 5620
 #Models/sparkingwire_000007.obj
-index: 6385
+index: 5621
 #Models/sparkingwire_000008.obj
-index: 6386
+index: 5622
 #Models/sparkingwire_000009.obj
-index: 6387
+index: 5623
 #Models/sparkingwire_000010.obj
-index: 6388
+index: 5624
 #Models/sparkingwire_000011.obj
-index: 6389
+index: 5625
 #Models/sparkingwire_000012.obj
-index: 6390
+index: 5626
 #Models/sparkingwire_000013.obj
-index: 6391
+index: 5627
 #Models/sparkingwire_000014.obj
-index: 6392
+index: 5628
 #Models/sparkingwire_000015.obj
-index: 6393
+index: 5629
 #Models/sparkingwire_000016.obj
-index: 6394
+index: 5630
 #Models/sparkingwire_000017.obj
-index: 6395
+index: 5631
 #Models/sparkingwire_000018.obj
-index: 6396
+index: 5632
 #Models/sparkingwire_000019.obj
-index: 6397
+index: 5633
 #Models/sparkingwire_000020.obj
-index: 6398
+index: 5634
 #Models/sparkingwire_000021.obj
-index: 6399
+index: 5635
 #Models/sparkingwire_000022.obj
-index: 6400
+index: 5636
 #Models/sparkingwire_000023.obj
-index: 6401
+index: 5637
 #Models/sparkingwire_000024.obj
-index: 6402
+index: 5638
 #Models/sparkingwire_000025.obj
-index: 6403
+index: 5639
 #Models/sparkingwire_000026.obj
-index: 6404
+index: 5640
 #Models/sparkingwire_000027.obj
-index: 6405
+index: 5641
 #Models/sparkingwire_000028.obj
-index: 6406
+index: 5642
 #Models/sparkingwire_000029.obj
-index: 6407
+index: 5643
 #Models/sparkingwire_000030.obj
-index: 6408
+index: 5644
 #Models/sparkingwire_000031.obj
-index: 6409
+index: 5645
 #Models/sparkingwire_000032.obj
-index: 6410
+index: 5646
 #Models/sparkingwire_000033.obj
-index: 6411
+index: 5647
 #Models/sparkingwire_000034.obj
-index: 6412
+index: 5648
 #Models/sparkingwire_000035.obj
-index: 6413
+index: 5649
 #Models/sparkingwire_000036.obj
-index: 6414
+index: 5650
 #Models/sparkingwire_000037.obj
-index: 6415
+index: 5651
 #Models/sparkingwire_000038.obj
-index: 6416
+index: 5652
 #Models/sparkingwire_000039.obj
-index: 6417
+index: 5653
 #Models/sparkingwire_000040.obj
-index: 6418
+index: 5654
 #Models/sparkingwire_000041.obj
-index: 6419
+index: 5655
 #Models/sparkingwire_000042.obj
-index: 6420
+index: 5656
 #Models/sparkingwire_000043.obj
-index: 6421
+index: 5657
 #Models/sparkingwire_000044.obj
-index: 6422
+index: 5658
 #Models/sparkingwire_000045.obj
-index: 6423
+index: 5659
 #Models/sparkingwire_000046.obj
-index: 6424
+index: 5660
 #Models/sparkingwire_000047.obj
-index: 6425
+index: 5661
 #Models/sparkingwire_000048.obj
-index: 6426
+index: 5662
 #Models/sparkingwire_000049.obj
-index: 6427
+index: 5663
 #Models/sparkingwire_000050.obj
-index: 6428
+index: 5664
 #Models/sparkingwire_000051.obj
-index: 6429
+index: 5665
 #Models/sparkingwire_000052.obj
-index: 6430
+index: 5666
 #Models/sparkingwire_000053.obj
-index: 6431
+index: 5667
 #Models/sparkingwire_000054.obj
-index: 6432
+index: 5668
 #Models/sparkingwire_000055.obj
-index: 6433
+index: 5669
 #Models/sparkingwire_000056.obj
-index: 6434
+index: 5670
 #Models/sparkingwire_000057.obj
-index: 6435
+index: 5671
 #Models/sparkingwire_000058.obj
-index: 6436
+index: 5672
 #Models/sparkingwire_000059.obj
-index: 6437
+index: 5673
 #Models/sparkingwire_000060.obj
-index: 6438
+index: 5674
 #Models/sparkingwire_000061.obj
-index: 6439
+index: 5675
 #Models/sparkingwire_000062.obj
-index: 6440
+index: 5676
 #Models/sparkingwire_000063.obj
-index: 6441
+index: 5677
 #Models/sparkingwire_000064.obj
-index: 6442
+index: 5678
 #Models/sparkingwire_000065.obj
-index: 6443
+index: 5679
 #Models/sparkingwire_000066.obj
-index: 6444
+index: 5680
 #Models/sparkingwire_000067.obj
-index: 6445
+index: 5681
 #Models/sparkingwire_000068.obj
-index: 6446
+index: 5682
 #Models/sparkingwire_000069.obj
-index: 6447
+index: 5683
 #Models/sparkingwire_000070.obj
-index: 6448
+index: 5684
 #Models/sparkingwire_000071.obj
-index: 6449
+index: 5685
 #Models/sparkingwire_000072.obj
-index: 6450
+index: 5686
 #Models/sparkingwire_000073.obj
-index: 6451
+index: 5687
 #Models/sparkingwire_000074.obj
-index: 6452
+index: 5688
 #Models/sparkingwire_000075.obj
-index: 6453
+index: 5689
 #Models/sparkingwire_000076.obj
-index: 6454
+index: 5690
 #Models/sparkingwire_000077.obj
-index: 6455
+index: 5691
 #Models/sparkingwire_000078.obj
-index: 6456
+index: 5692
 #Models/sparkingwire_000079.obj
-index: 6457
+index: 5693
 #Models/sparkingwire_000080.obj
-index: 6458
+index: 5694
 #Models/sparkingwire_000081.obj
-index: 6459
+index: 5695
 #Models/sparkingwire_000082.obj
-index: 6460
+index: 5696
 #Models/sparkingwire_000083.obj
-index: 6461
+index: 5697
 #Models/sparkingwire_000084.obj
-index: 6462
+index: 5698
 #Models/sparkingwire_000085.obj
-index: 6463
+index: 5699
 #Models/sparkingwire_000086.obj
-index: 6464
+index: 5700
 #Models/sparkingwire_000087.obj
-index: 6465
+index: 5701
 #Models/sparkingwire_000088.obj
-index: 6466
+index: 5702
 #Models/sparkingwire_000089.obj
-index: 6467
+index: 5703
 #Models/sparkingwire_000090.obj
-index: 6468
+index: 5704
 #Models/sparkingwire_000091.obj
-index: 6469
+index: 5705
 #Models/sparkingwire_000092.obj
-index: 6470
+index: 5706
 #Models/sparkingwire_000093.obj
-index: 6471
+index: 5707
 #Models/sparkingwire_000094.obj
-index: 6472
+index: 5708
 #Models/sparkingwire_000095.obj
-index: 6473
+index: 5709
 #Models/sparkingwire_000096.obj
-index: 6474
+index: 5710
 #Models/sparkingwire_000097.obj
-index: 6475
+index: 5711
 #Models/sparkingwire_000098.obj
-index: 6476
+index: 5712
 #Models/sparkingwire_000099.obj
-index: 6477
+index: 5713
 #Models/sparkingwire_000100.obj
-index: 6478
+index: 5714
 
-#Models/switch4_000001.obj
-index: 6479
+#Models/switch4_000002.obj
+index: 5715
 animated: 1
 animationNum: 47
-#Models/switch4_000002.obj
-index: 6480
 #Models/switch4_000003.obj
-index: 6481
+index: 5716
 #Models/switch4_000004.obj
-index: 6482
+index: 5717
 #Models/switch4_000005.obj
-index: 6483
+index: 5718
 #Models/switch4_000006.obj
-index: 6484
-#Models/switch4_000007.obj
-index: 6485
+index: 5719
 
-#Models/switch5_000001.obj
-index: 6486
+#Models/switch5_000002.obj
+index: 5720
 animated: 1
 animationNum: 48
-#Models/switch5_000002.obj
-index: 6487
 #Models/switch5_000003.obj
-index: 6488
+index: 5721
 #Models/switch5_000004.obj
-index: 6489
+index: 5722
 #Models/switch5_000005.obj
-index: 6490
+index: 5723
 #Models/switch5_000006.obj
-index: 6491
-#Models/switch5_000007.obj
-index: 6492
+index: 5724
 #Models/switch5_000008.obj
-index: 6493
+index: 5725
 #Models/switch5_000009.obj
-index: 6494
+index: 5726
 #Models/switch5_000010.obj
-index: 6495
-#Models/switch5_000011.obj
-index: 6496
-#Models/switch5_000012.obj
-index: 6497
+index: 5727
 
 #Models/v_pipe_000001.obj
-index: 6498
+index: 5728
 animated: 1
 animationNum: 49
 #Models/v_pipe_000002.obj
-index: 6499
+index: 5729
 #Models/v_pipe_000003.obj
-index: 6500
+index: 5730
 #Models/v_pipe_000004.obj
-index: 6501
+index: 5731
 #Models/v_pipe_000005.obj
-index: 6502
+index: 5732
 #Models/v_pipe_000006.obj
-index: 6503
+index: 5733
 #Models/v_pipe_000007.obj
-index: 6504
+index: 5734
 #Models/v_pipe_000008.obj
-index: 6505
+index: 5735
 #Models/v_pipe_000009.obj
-index: 6506
+index: 5736
 #Models/v_pipe_000010.obj
-index: 6507
+index: 5737
 #Models/v_pipe_000011.obj
-index: 6508
+index: 5738
 #Models/v_pipe_000012.obj
-index: 6509
+index: 5739
 #Models/v_pipe_000013.obj
-index: 6510
-#Models/v_pipe_000014.obj
-index: 6511
-#Models/v_pipe_000015.obj
-index: 6512
-#Models/v_pipe_000016.obj
-index: 6513
-#Models/v_pipe_000017.obj
-index: 6514
+index: 5740
 #Models/v_pipe_000018.obj
-index: 6515
+index: 5741
 #Models/v_pipe_000019.obj
-index: 6516
+index: 5742
 #Models/v_pipe_000020.obj
-index: 6517
+index: 5743
 #Models/v_pipe_000021.obj
-index: 6518
+index: 5744
 #Models/v_pipe_000022.obj
-index: 6519
+index: 5745
 #Models/v_pipe_000023.obj
-index: 6520
+index: 5746
 #Models/v_pipe_000024.obj
-index: 6521
-#Models/v_pipe_000025.obj
-index: 6522
+index: 5747
 
 #Models/v_rapier_000001.obj
-index: 6523
+index: 5748
 animated: 1
 animationNum: 50
-#Models/v_rapier_000002.obj
-index: 6524
-#Models/v_rapier_000003.obj
-index: 6525
 #Models/v_rapier_000004.obj
-index: 6526
+index: 5749
 #Models/v_rapier_000005.obj
-index: 6527
+index: 5750
 #Models/v_rapier_000006.obj
-index: 6528
+index: 5751
 #Models/v_rapier_000007.obj
-index: 6529
+index: 5752
 #Models/v_rapier_000008.obj
-index: 6530
+index: 5753
 #Models/v_rapier_000009.obj
-index: 6531
+index: 5754
 #Models/v_rapier_000010.obj
-index: 6532
+index: 5755
 #Models/v_rapier_000011.obj
-index: 6533
+index: 5756
 #Models/v_rapier_000012.obj
-index: 6534
+index: 5757
 #Models/v_rapier_000013.obj
-index: 6535
+index: 5758
 #Models/v_rapier_000014.obj
-index: 6536
+index: 5759
 #Models/v_rapier_000015.obj
-index: 6537
+index: 5760
 #Models/v_rapier_000016.obj
-index: 6538
+index: 5761
 #Models/v_rapier_000017.obj
-index: 6539
+index: 5762
 #Models/v_rapier_000018.obj
-index: 6540
+index: 5763
 #Models/v_rapier_000019.obj
-index: 6541
+index: 5764
 #Models/v_rapier_000020.obj
-index: 6542
+index: 5765
 #Models/v_rapier_000021.obj
-index: 6543
+index: 5766
 #Models/v_rapier_000022.obj
-index: 6544
-#Models/v_rapier_000023.obj
-index: 6545
+index: 5767
 
 #Models/npc_mutant_cyborg_000001.obj
-index: 6546
+index: 5768
 animated: 1
 animationNum: 51
 #Models/npc_mutant_cyborg_000002.obj
-index: 6547
+index: 5769
 #Models/npc_mutant_cyborg_000003.obj
-index: 6548
+index: 5770
 #Models/npc_mutant_cyborg_000004.obj
-index: 6549
+index: 5771
 #Models/npc_mutant_cyborg_000005.obj
-index: 6550
+index: 5772
 #Models/npc_mutant_cyborg_000006.obj
-index: 6551
+index: 5773
 #Models/npc_mutant_cyborg_000007.obj
-index: 6552
+index: 5774
 #Models/npc_mutant_cyborg_000008.obj
-index: 6553
+index: 5775
 #Models/npc_mutant_cyborg_000009.obj
-index: 6554
+index: 5776
 #Models/npc_mutant_cyborg_000010.obj
-index: 6555
+index: 5777
 #Models/npc_mutant_cyborg_000011.obj
-index: 6556
+index: 5778
 #Models/npc_mutant_cyborg_000012.obj
-index: 6557
+index: 5779
 #Models/npc_mutant_cyborg_000013.obj
-index: 6558
+index: 5780
 #Models/npc_mutant_cyborg_000014.obj
-index: 6559
+index: 5781
 #Models/npc_mutant_cyborg_000015.obj
-index: 6560
+index: 5782
 #Models/npc_mutant_cyborg_000016.obj
-index: 6561
+index: 5783
 #Models/npc_mutant_cyborg_000017.obj
-index: 6562
+index: 5784
 #Models/npc_mutant_cyborg_000018.obj
-index: 6563
+index: 5785
 #Models/npc_mutant_cyborg_000019.obj
-index: 6564
+index: 5786
 #Models/npc_mutant_cyborg_000020.obj
-index: 6565
+index: 5787
 #Models/npc_mutant_cyborg_000021.obj
-index: 6566
+index: 5788
 #Models/npc_mutant_cyborg_000022.obj
-index: 6567
+index: 5789
 #Models/npc_mutant_cyborg_000023.obj
-index: 6568
+index: 5790
 #Models/npc_mutant_cyborg_000024.obj
-index: 6569
+index: 5791
 #Models/npc_mutant_cyborg_000025.obj
-index: 6570
+index: 5792
 #Models/npc_mutant_cyborg_000026.obj
-index: 6571
+index: 5793
 #Models/npc_mutant_cyborg_000027.obj
-index: 6572
+index: 5794
 #Models/npc_mutant_cyborg_000028.obj
-index: 6573
+index: 5795
 #Models/npc_mutant_cyborg_000029.obj
-index: 6574
+index: 5796
 #Models/npc_mutant_cyborg_000030.obj
-index: 6575
+index: 5797
 #Models/npc_mutant_cyborg_000031.obj
-index: 6576
+index: 5798
 #Models/npc_mutant_cyborg_000032.obj
-index: 6577
+index: 5799
 #Models/npc_mutant_cyborg_000033.obj
-index: 6578
+index: 5800
 #Models/npc_mutant_cyborg_000034.obj
-index: 6579
+index: 5801
 #Models/npc_mutant_cyborg_000035.obj
-index: 6580
+index: 5802
 #Models/npc_mutant_cyborg_000036.obj
-index: 6581
+index: 5803
 #Models/npc_mutant_cyborg_000037.obj
-index: 6582
+index: 5804
 #Models/npc_mutant_cyborg_000038.obj
-index: 6583
+index: 5805
 #Models/npc_mutant_cyborg_000039.obj
-index: 6584
+index: 5806
 #Models/npc_mutant_cyborg_000040.obj
-index: 6585
+index: 5807
 #Models/npc_mutant_cyborg_000041.obj
-index: 6586
+index: 5808
 #Models/npc_mutant_cyborg_000042.obj
-index: 6587
+index: 5809
 #Models/npc_mutant_cyborg_000043.obj
-index: 6588
+index: 5810
 #Models/npc_mutant_cyborg_000044.obj
-index: 6589
+index: 5811
 #Models/npc_mutant_cyborg_000045.obj
-index: 6590
+index: 5812
 #Models/npc_mutant_cyborg_000046.obj
-index: 6591
+index: 5813
 #Models/npc_mutant_cyborg_000047.obj
-index: 6592
+index: 5814
 #Models/npc_mutant_cyborg_000048.obj
-index: 6593
+index: 5815
 #Models/npc_mutant_cyborg_000049.obj
-index: 6594
+index: 5816
 #Models/npc_mutant_cyborg_000050.obj
-index: 6595
+index: 5817
 #Models/npc_mutant_cyborg_000051.obj
-index: 6596
+index: 5818
 #Models/npc_mutant_cyborg_000052.obj
-index: 6597
+index: 5819
 #Models/npc_mutant_cyborg_000053.obj
-index: 6598
+index: 5820
 #Models/npc_mutant_cyborg_000054.obj
-index: 6599
+index: 5821
 #Models/npc_mutant_cyborg_000055.obj
-index: 6600
+index: 5822
 #Models/npc_mutant_cyborg_000056.obj
-index: 6601
+index: 5823
 #Models/npc_mutant_cyborg_000057.obj
-index: 6602
+index: 5824
 #Models/npc_mutant_cyborg_000058.obj
-index: 6603
+index: 5825
 #Models/npc_mutant_cyborg_000059.obj
-index: 6604
+index: 5826
 #Models/npc_mutant_cyborg_000060.obj
-index: 6605
+index: 5827
 #Models/npc_mutant_cyborg_000061.obj
-index: 6606
+index: 5828
 #Models/npc_mutant_cyborg_000062.obj
-index: 6607
+index: 5829
 #Models/npc_mutant_cyborg_000063.obj
-index: 6608
+index: 5830
 #Models/npc_mutant_cyborg_000064.obj
-index: 6609
+index: 5831
 #Models/npc_mutant_cyborg_000065.obj
-index: 6610
-#Models/npc_mutant_cyborg_000066.obj
-index: 6611
-#Models/npc_mutant_cyborg_000067.obj
-index: 6612
-#Models/npc_mutant_cyborg_000068.obj
-index: 6613
-#Models/npc_mutant_cyborg_000069.obj
-index: 6614
-#Models/npc_mutant_cyborg_000070.obj
-index: 6615
-#Models/npc_mutant_cyborg_000071.obj
-index: 6616
-#Models/npc_mutant_cyborg_000072.obj
-index: 6617
-#Models/npc_mutant_cyborg_000073.obj
-index: 6618
-#Models/npc_mutant_cyborg_000074.obj
-index: 6619
+index: 5832
 #Models/npc_mutant_cyborg_000075.obj
-index: 6620
+index: 5833
 #Models/npc_mutant_cyborg_000076.obj
-index: 6621
+index: 5834
 #Models/npc_mutant_cyborg_000077.obj
-index: 6622
+index: 5835
 #Models/npc_mutant_cyborg_000078.obj
-index: 6623
+index: 5836
 #Models/npc_mutant_cyborg_000079.obj
-index: 6624
+index: 5837
 #Models/npc_mutant_cyborg_000080.obj
-index: 6625
+index: 5838
 #Models/npc_mutant_cyborg_000081.obj
-index: 6626
+index: 5839
 #Models/npc_mutant_cyborg_000082.obj
-index: 6627
+index: 5840
 #Models/npc_mutant_cyborg_000083.obj
-index: 6628
+index: 5841
 #Models/npc_mutant_cyborg_000084.obj
-index: 6629
+index: 5842
 #Models/npc_mutant_cyborg_000085.obj
-index: 6630
+index: 5843
 #Models/npc_mutant_cyborg_000086.obj
-index: 6631
+index: 5844
 #Models/npc_mutant_cyborg_000087.obj
-index: 6632
+index: 5845
 #Models/npc_mutant_cyborg_000088.obj
-index: 6633
+index: 5846
 #Models/npc_mutant_cyborg_000089.obj
-index: 6634
+index: 5847
 #Models/npc_mutant_cyborg_000090.obj
-index: 6635
+index: 5848
 #Models/npc_mutant_cyborg_000091.obj
-index: 6636
+index: 5849
 #Models/npc_mutant_cyborg_000092.obj
-index: 6637
+index: 5850
 #Models/npc_mutant_cyborg_000093.obj
-index: 6638
+index: 5851
 #Models/npc_mutant_cyborg_000094.obj
-index: 6639
+index: 5852
 #Models/npc_mutant_cyborg_000095.obj
-index: 6640
+index: 5853
 #Models/npc_mutant_cyborg_000096.obj
-index: 6641
+index: 5854
 #Models/npc_mutant_cyborg_000097.obj
-index: 6642
+index: 5855
 #Models/npc_mutant_cyborg_000098.obj
-index: 6643
-#Models/npc_mutant_cyborg_000099.obj
-index: 6644
-#Models/npc_mutant_cyborg_000100.obj
-index: 6645
-#Models/npc_mutant_cyborg_000101.obj
-index: 6646
-#Models/npc_mutant_cyborg_000102.obj
-index: 6647
-#Models/npc_mutant_cyborg_000103.obj
-index: 6648
-#Models/npc_mutant_cyborg_000104.obj
-index: 6649
-#Models/npc_mutant_cyborg_000105.obj
-index: 6650
-#Models/npc_mutant_cyborg_000106.obj
-index: 6651
-#Models/npc_mutant_cyborg_000107.obj
-index: 6652
-#Models/npc_mutant_cyborg_000108.obj
-index: 6653
+index: 5856
 #Models/npc_mutant_cyborg_000109.obj
-index: 6654
+index: 5857
 #Models/npc_mutant_cyborg_000110.obj
-index: 6655
+index: 5858
 #Models/npc_mutant_cyborg_000111.obj
-index: 6656
+index: 5859
 #Models/npc_mutant_cyborg_000112.obj
-index: 6657
+index: 5860
 #Models/npc_mutant_cyborg_000113.obj
-index: 6658
+index: 5861
 #Models/npc_mutant_cyborg_000114.obj
-index: 6659
+index: 5862
 #Models/npc_mutant_cyborg_000115.obj
-index: 6660
+index: 5863
 #Models/npc_mutant_cyborg_000116.obj
-index: 6661
+index: 5864
 #Models/npc_mutant_cyborg_000117.obj
-index: 6662
+index: 5865
 #Models/npc_mutant_cyborg_000118.obj
-index: 6663
+index: 5866
 #Models/npc_mutant_cyborg_000119.obj
-index: 6664
+index: 5867
 #Models/npc_mutant_cyborg_000120.obj
-index: 6665
+index: 5868
 #Models/npc_mutant_cyborg_000121.obj
-index: 6666
+index: 5869
 #Models/npc_mutant_cyborg_000122.obj
-index: 6667
+index: 5870
 #Models/npc_mutant_cyborg_000123.obj
-index: 6668
+index: 5871
 #Models/npc_mutant_cyborg_000124.obj
-index: 6669
+index: 5872
 #Models/npc_mutant_cyborg_000125.obj
-index: 6670
+index: 5873
 #Models/npc_mutant_cyborg_000126.obj
-index: 6671
-#Models/npc_mutant_cyborg_000127.obj
-index: 6672
+index: 5874
 #Models/npc_mutant_cyborg_000128.obj
-index: 6673
+index: 5875
 #Models/npc_mutant_cyborg_000129.obj
-index: 6674
+index: 5876
 #Models/npc_mutant_cyborg_000130.obj
-index: 6675
+index: 5877
 #Models/npc_mutant_cyborg_000131.obj
-index: 6676
+index: 5878
 #Models/npc_mutant_cyborg_000132.obj
-index: 6677
+index: 5879
 #Models/npc_mutant_cyborg_000133.obj
-index: 6678
+index: 5880
 #Models/npc_mutant_cyborg_000134.obj
-index: 6679
+index: 5881
 #Models/npc_mutant_cyborg_000135.obj
-index: 6680
+index: 5882
 #Models/npc_mutant_cyborg_000136.obj
-index: 6681
+index: 5883
 #Models/npc_mutant_cyborg_000137.obj
-index: 6682
+index: 5884
 #Models/npc_mutant_cyborg_000138.obj
-index: 6683
+index: 5885
 #Models/npc_mutant_cyborg_000139.obj
-index: 6684
+index: 5886
 #Models/npc_mutant_cyborg_000140.obj
-index: 6685
+index: 5887
 #Models/npc_mutant_cyborg_000141.obj
-index: 6686
+index: 5888
 #Models/npc_mutant_cyborg_000142.obj
-index: 6687
-#Models/npc_mutant_cyborg_000143.obj
-index: 6688
+index: 5889
 #Models/npc_mutant_cyborg_000144.obj
-index: 6689
+index: 5890
 #Models/npc_mutant_cyborg_000145.obj
-index: 6690
+index: 5891
 #Models/npc_mutant_cyborg_000146.obj
-index: 6691
+index: 5892
 #Models/npc_mutant_cyborg_000147.obj
-index: 6692
+index: 5893
 #Models/npc_mutant_cyborg_000148.obj
-index: 6693
+index: 5894
 #Models/npc_mutant_cyborg_000149.obj
-index: 6694
+index: 5895
 #Models/npc_mutant_cyborg_000150.obj
-index: 6695
+index: 5896
 #Models/npc_mutant_cyborg_000151.obj
-index: 6696
+index: 5897
 #Models/npc_mutant_cyborg_000152.obj
-index: 6697
+index: 5898
 #Models/npc_mutant_cyborg_000153.obj
-index: 6698
+index: 5899
 #Models/npc_mutant_cyborg_000154.obj
-index: 6699
+index: 5900
 #Models/npc_mutant_cyborg_000155.obj
-index: 6700
+index: 5901
 #Models/npc_mutant_cyborg_000156.obj
-index: 6701
+index: 5902
 #Models/npc_mutant_cyborg_000157.obj
-index: 6702
+index: 5903
 #Models/npc_mutant_cyborg_000158.obj
-index: 6703
+index: 5904
 #Models/npc_mutant_cyborg_000159.obj
-index: 6704
-#Models/npc_mutant_cyborg_000160.obj
-index: 6705
+index: 5905
 #Models/npc_mutant_cyborg_000161.obj
-index: 6706
+index: 5906
 #Models/npc_mutant_cyborg_000162.obj
-index: 6707
+index: 5907
 #Models/npc_mutant_cyborg_000163.obj
-index: 6708
+index: 5908
 #Models/npc_mutant_cyborg_000164.obj
-index: 6709
+index: 5909
 #Models/npc_mutant_cyborg_000165.obj
-index: 6710
+index: 5910
 #Models/npc_mutant_cyborg_000166.obj
-index: 6711
+index: 5911
 #Models/npc_mutant_cyborg_000167.obj
-index: 6712
+index: 5912
 #Models/npc_mutant_cyborg_000168.obj
-index: 6713
+index: 5913
 #Models/npc_mutant_cyborg_000169.obj
-index: 6714
+index: 5914
 #Models/npc_mutant_cyborg_000170.obj
-index: 6715
+index: 5915
 #Models/npc_mutant_cyborg_000171.obj
-index: 6716
+index: 5916
 #Models/npc_mutant_cyborg_000172.obj
-index: 6717
+index: 5917
 #Models/npc_mutant_cyborg_000173.obj
-index: 6718
+index: 5918
 #Models/npc_mutant_cyborg_000174.obj
-index: 6719
-#Models/npc_mutant_cyborg_000175.obj
-index: 6720
+index: 5919
 #Models/npc_mutant_cyborg_000176.obj
-index: 6721
+index: 5920
 #Models/npc_mutant_cyborg_000177.obj
-index: 6722
+index: 5921
 #Models/npc_mutant_cyborg_000178.obj
-index: 6723
+index: 5922
 #Models/npc_mutant_cyborg_000179.obj
-index: 6724
+index: 5923
 #Models/npc_mutant_cyborg_000180.obj
-index: 6725
+index: 5924
 #Models/npc_mutant_cyborg_000181.obj
-index: 6726
+index: 5925
 #Models/npc_mutant_cyborg_000182.obj
-index: 6727
+index: 5926
 #Models/npc_mutant_cyborg_000183.obj
-index: 6728
+index: 5927
 #Models/npc_mutant_cyborg_000184.obj
-index: 6729
+index: 5928
 #Models/npc_mutant_cyborg_000185.obj
-index: 6730
+index: 5929
 #Models/npc_mutant_cyborg_000186.obj
-index: 6731
+index: 5930
 #Models/npc_mutant_cyborg_000187.obj
-index: 6732
+index: 5931
 #Models/npc_mutant_cyborg_000188.obj
-index: 6733
+index: 5932
 #Models/npc_mutant_cyborg_000189.obj
-index: 6734
+index: 5933
 #Models/npc_mutant_cyborg_000190.obj
-index: 6735
+index: 5934
 #Models/npc_mutant_cyborg_000191.obj
-index: 6736
+index: 5935
 #Models/npc_mutant_cyborg_000192.obj
-index: 6737
+index: 5936
 #Models/npc_mutant_cyborg_000193.obj
-index: 6738
+index: 5937
 #Models/npc_mutant_cyborg_000194.obj
-index: 6739
+index: 5938
 #Models/npc_mutant_cyborg_000195.obj
-index: 6740
+index: 5939
 #Models/npc_mutant_cyborg_000196.obj
-index: 6741
+index: 5940
 #Models/npc_mutant_cyborg_000197.obj
-index: 6742
+index: 5941
 #Models/npc_mutant_cyborg_000198.obj
-index: 6743
+index: 5942
 #Models/npc_mutant_cyborg_000199.obj
-index: 6744
+index: 5943
 #Models/npc_mutant_cyborg_000200.obj
-index: 6745
+index: 5944
 #Models/npc_mutant_cyborg_000201.obj
-index: 6746
+index: 5945
 #Models/npc_mutant_cyborg_000202.obj
-index: 6747
+index: 5946
 #Models/npc_mutant_cyborg_000203.obj
-index: 6748
+index: 5947
 #Models/npc_mutant_cyborg_000204.obj
-index: 6749
+index: 5948
 #Models/npc_mutant_cyborg_000205.obj
-index: 6750
+index: 5949
 #Models/npc_mutant_cyborg_000206.obj
-index: 6751
+index: 5950
 #Models/npc_mutant_cyborg_000207.obj
-index: 6752
+index: 5951
 #Models/npc_mutant_cyborg_000208.obj
-index: 6753
+index: 5952
 #Models/npc_mutant_cyborg_000209.obj
-index: 6754
+index: 5953
 #Models/npc_mutant_cyborg_000210.obj
-index: 6755
+index: 5954
 #Models/npc_mutant_cyborg_000211.obj
-index: 6756
+index: 5955
 #Models/npc_mutant_cyborg_000212.obj
-index: 6757
+index: 5956
 #Models/npc_mutant_cyborg_000213.obj
-index: 6758
+index: 5957
 #Models/npc_mutant_cyborg_000214.obj
-index: 6759
+index: 5958
 #Models/npc_mutant_cyborg_000215.obj
-index: 6760
+index: 5959
 #Models/npc_mutant_cyborg_000216.obj
-index: 6761
+index: 5960
 #Models/npc_mutant_cyborg_000217.obj
-index: 6762
+index: 5961
 #Models/npc_mutant_cyborg_000218.obj
-index: 6763
+index: 5962
 #Models/npc_mutant_cyborg_000219.obj
-index: 6764
+index: 5963
 #Models/npc_mutant_cyborg_000220.obj
-index: 6765
+index: 5964
 #Models/npc_mutant_cyborg_000221.obj
-index: 6766
+index: 5965
 #Models/npc_mutant_cyborg_000222.obj
-index: 6767
+index: 5966
 #Models/npc_mutant_cyborg_000223.obj
-index: 6768
+index: 5967
 #Models/npc_mutant_cyborg_000224.obj
-index: 6769
+index: 5968
 #Models/npc_mutant_cyborg_000225.obj
-index: 6770
+index: 5969
 #Models/npc_mutant_cyborg_000226.obj
-index: 6771
+index: 5970
 #Models/npc_mutant_cyborg_000227.obj
-index: 6772
+index: 5971
 #Models/npc_mutant_cyborg_000228.obj
-index: 6773
+index: 5972
 #Models/npc_mutant_cyborg_000229.obj
-index: 6774
+index: 5973
 #Models/npc_mutant_cyborg_000230.obj
-index: 6775
+index: 5974
 #Models/npc_mutant_cyborg_000231.obj
-index: 6776
+index: 5975
 #Models/npc_mutant_cyborg_000232.obj
-index: 6777
+index: 5976
 #Models/npc_mutant_cyborg_000233.obj
-index: 6778
+index: 5977
 #Models/npc_mutant_cyborg_000234.obj
-index: 6779
+index: 5978
 #Models/npc_mutant_cyborg_000235.obj
-index: 6780
+index: 5979
 #Models/npc_mutant_cyborg_000236.obj
-index: 6781
+index: 5980
 #Models/npc_mutant_cyborg_000237.obj
-index: 6782
+index: 5981
 #Models/npc_mutant_cyborg_000238.obj
-index: 6783
+index: 5982
 #Models/npc_mutant_cyborg_000239.obj
-index: 6784
+index: 5983
 #Models/npc_mutant_cyborg_000240.obj
-index: 6785
+index: 5984
 #Models/npc_mutant_cyborg_000241.obj
-index: 6786
+index: 5985
 #Models/npc_mutant_cyborg_000242.obj
-index: 6787
+index: 5986
 #Models/npc_mutant_cyborg_000243.obj
-index: 6788
-#Models/npc_mutant_cyborg_000244.obj
-index: 6789
-#Models/npc_mutant_cyborg_000245.obj
-index: 6790
-#Models/npc_mutant_cyborg_000246.obj
-index: 6791
-#Models/npc_mutant_cyborg_000247.obj
-index: 6792
-#Models/npc_mutant_cyborg_000248.obj
-index: 6793
-#Models/npc_mutant_cyborg_000249.obj
-index: 6794
-#Models/npc_mutant_cyborg_000250.obj
-index: 6795
-#Models/npc_mutant_cyborg_000251.obj
-index: 6796
-#Models/npc_mutant_cyborg_000252.obj
-index: 6797
-#Models/npc_mutant_cyborg_000253.obj
-index: 6798
-#Models/npc_mutant_cyborg_000254.obj
-index: 6799
-#Models/npc_mutant_cyborg_000255.obj
-index: 6800
-#Models/npc_mutant_cyborg_000256.obj
-index: 6801
-#Models/npc_mutant_cyborg_000257.obj
-index: 6802
-#Models/npc_mutant_cyborg_000258.obj
-index: 6803
+index: 5987

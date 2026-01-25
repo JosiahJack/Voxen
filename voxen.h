@@ -918,13 +918,17 @@ void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
 
-#define ANIM_LOOP_ALL    0
-
+#define ANIM_LOOP_ALL 0
 #define ANIM_IDLE_CLOSED 0
 #define ANIM_OPENING     1
 #define ANIM_IDLE_OPEN   2
 #define ANIM_CLOSING     3
-
+#define ANIM_INSTALL     4
+#define ANIM_INSTALLED   5
+#define ANIM_INACTIVE   0
+#define ANIM_ACTIVATE   1
+#define ANIM_ACTIVATED  2
+#define ANIM_DEACTIVATE 3
 #define ANIM_IDLE    0
 #define ANIM_WALK    1
 #define ANIM_RUN     2
@@ -935,6 +939,8 @@ void DualLogError(const char* fmt, ...);
 #define ANIM_PAIN2   7
 #define ANIM_PAIN3   8
 #define ANIM_DYING   9
+#define ANIM_ATTACK_MISS 1
+#define ANIM_ATTACK_HIT  2
 
 extern GlobalContext Sys_Global;
 extern QuestBits questData;
