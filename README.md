@@ -1324,66 +1324,29 @@ Individual static variable impacts:
 ```
 
 ```
-❯ cloc --by-file --exclude-dir=temp_build,.git,Audio,Data,Fonts,Models,Screenshots,Scripts,Textures,Tools,External --not-match-f='\.md$|\.csv$|\.diff$|\.sh$|\.yml|\.cginc$' ./
-      41 text files.
-      41 unique files.                              
-       8 files ignored.
-
-github.com/AlDanial/cloc v 1.90  T=0.02 s (1582.8 files/s, 392392.6 lines/s)
---------------------------------------------------------------------------------
-File                                         blank        comment           code
---------------------------------------------------------------------------------
-./voxen.c                                      117             19           1031
-./entity.c                                      41              6            575
-./dynamic_culling.c                             90             29            564
-./voxen.h                                       33             48            516
-./console.c                                     45              4            421
-./Shaders/composite_frag.glsl                   38             31            416
-./data_fonts.c                                  49              8            375
-./Shaders/chunk_frag.glsl                       28              5            301
-./citadel_enumerations.h                        28             28            297
-./data_models.c                                 36              2            286
-./todo.c                                        34             33            272
-./data_text.c                                   23              1            271
-./data_parser.c                                 34              7            252
-./helpers.c                                     29             27            203
-./event.c                                       36             16            194
-./input.c                                       28              7            175
-./physics.c                                     35             52            175
-./audio.c                                       28              7            153
-./data_textures.c                               16              1            143
-./os.c                                          18              1            112
-./entity.h                                       4              0             85
-./matvecquat.c                                   6              2             53
-./Shaders/shadowmap_frag.glsl                    7              3             51
-./matvecquat.h                                   4              1             51
-./Shaders/text_frag.glsl                         5              6             37
-./vmath.h                                        2              0             37
-./Shaders/chunk_vert.glsl                        5              2             26
-./todo.h                                         0              0             20
-./Shaders/shadowmap_vert.glsl                    4              5             16
-./patches.c                                      2             91             15
-./os.h                                           0              0             10
-./Shaders/text_vert.glsl                         2              1              9
-./Shaders/composite_vert.glsl                    2              3              8
-./hardware.c                                     1              1              2
---------------------------------------------------------------------------------
-SUM:                                           830            447           7152
---------------------------------------------------------------------------------
-```
-
-❯ wc -l *.[ch] 2>/dev/null | sort -nr | head -n 10
-  8509 total
-  1295 voxen.c
-   788 input.c
-   751 types.h
-   672 level.c
+❯ wc -l *.[ch] 2>/dev/null | sort -nr | head -n 50
+ 10055 total
+  1604 ai.c
+  1444 voxen.h
+  1263 voxen.c
+   861 audio.c
    647 dynamic_culling.c
-   640 voxen.h
-   479 console.c
-   335 todo.c
-   317 data_par
-
+   583 input.c
+   504 level.c
+   499 console.c
+   340 data_models.c
+   304 data_parser.c
+   297 data_text.c
+   295 data_fonts.c
+   258 event.c
+   255 os.h
+   220 physics.c
+   174 entity.c
+   167 helpers.c
+   135 data_textures.c
+   108 patches.c
+    97 todo.c
+```
 
 Main Rig.  Settings:
 #define SSR_RES 2 // Ratio is (1 / SSR_RES) * render resolution.

@@ -1,18 +1,12 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
-#include "./External/assimp/cimport.h"
-#include "./External/assimp/scene.h"
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include "External/stb_image.h"
 #include "Shaders/shaders.h"
-#include "entity.c"
 #include "data_textures.c"
-#include "data_models.c"
-#include "dynamic_culling.c"
 #include "audio.c"
-#include "input.c"
 const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
 GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };

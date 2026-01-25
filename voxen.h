@@ -1,8 +1,5 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-// #define ONLY_LOAD_LEVEL_NEEDS
-// #define DEBUG_ENTITIES
-// #define DEBUG_ENTITY_DEFINITIONS
 #include <stdarg.h>
 #include "./External/glad/gl.h"
 #include "./External/glfw3.h"
@@ -1034,7 +1031,6 @@ extern uint8_t lightIntervalStepIsLerpingLength[LIGHT_COUNT];
 extern float intervalStepisLerping[LIGHT_COUNT][30];
 extern float lightMinIntensity[LIGHT_COUNT];
 extern float lightMaxIntensity[LIGHT_COUNT];
-void UpdateVoxelLightLists(void);
 void RenderLoadingProgress(int32_t offset, const char* text);
 void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height);
 
@@ -1136,7 +1132,6 @@ extern bool boosterActive;
 
 #define LAYER_MASK_PLAYER_FEET ((1u << PhysicsLayer_Default) | (1u << PhysicsLayer_Geometry))
 
-void UpdateInstanceMatrix(int32_t i);
 void AddForce(uint16_t idx, Vector3 force, bool isImpulse);
 int32_t Physics(void); // Main event tick
 RaycastHit Raycast(Vector3 origin, Vector3 dir, float distance, uint32_t layerMask);
@@ -1209,8 +1204,6 @@ void ApplySettings(void);
 // Rendering
 #define DEBUG_OPENGL
 #ifdef DEBUG_OPENGL
-	void glDebugMessageCallback(GLDEBUGPROC callback, const void* userParam);
-	void glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint* ids, GLboolean enabled);
 	#define CHECK_GL_ERROR() do { GLenum err = glGetError(); if (err != GL_NO_ERROR) DualLogError("GL Error at %s:%d: %d\n", __FILE__, __LINE__, err); } while(0)
 #else
 	#define CHECK_GL_ERROR() do {} while(0)
@@ -1314,9 +1307,6 @@ void Screenshot(void);
 void CenterStatusPrint(const char* fmt, ...);
 void JournalDump(const char* dem_file);
 void DebugRAM(const char *context);
-void GetLevel_Transform_Offsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
-void GetLevel_LightsStaticImmutable_ContainerOffsets(int32_t curlevel, float* ofsx, float* ofsy, float* ofsz);
-// ============================================================================
 // ----------------------------------------------------------------------------
 // Helper Functions
 extern uint32_t random_range_rng;
@@ -1433,32 +1423,16 @@ void ParseGameData(void);
 bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
 
 extern uint16_t invalidModelIndexCount;
-#ifdef ONLY_LOAD_LEVEL_NEEDS
-    extern bool modelIndexUsedForCurrentLevel[MODEL_IDX_MAX];
-    extern bool textureIndexUsedForCurrentLevel[MAX_VALID_TEXTURE];
-#endif
 extern uint16_t entityCount;
 extern uint16_t loadedInstances;
 extern uint16_t startOfDoubleSidedInstances;
 extern uint16_t startOfTransparentInstances;
 extern uint16_t endOfModels;
 void InitializeEntity(Entity* entry);
-void DualLogEntityInstance(uint16_t idx);
-void DualLogEntity(Entity ent);
 void LoadEntities(void);
 void LoadLevel(uint8_t curlevel);
 
 #define GEOMETRY_LOD_CARD_MODEL_IDX 178 // Need to specify in gamedata.txt
-extern float correctionX, correctionY, correctionZ;
-extern float correctionNPCX, correctionNPCY, correctionNPCZ;
-extern float correctionDoorsX, correctionDoorsY, correctionDoorsZ;
-extern float correctionDynamicsX, correctionDynamicsY, correctionDynamicsZ;
-extern float correctionLightsSaveableX, correctionLightsSaveableY, correctionLightsSaveableZ;
-extern float correctionStaticImmutableX, correctionStaticImmutableY, correctionStaticImmutableZ;
-extern float correctionStaticSaveableX, correctionStaticSaveableY, correctionStaticSaveableZ;
-extern float correctionLightX, correctionLightY, correctionLightZ;
-void SetUnityHierarchyOffsets(uint8_t curlevel);
-void ApplyUnityHierarchyCorrectionAtLevelLoad(uint16_t instanceIdx, uint16_t entIdx);
 void EnableCheatArsenal(uint8_t level);
 uint16_t SpawnDynamicObject(int val, bool cheat);
 void cmd_kill(void);

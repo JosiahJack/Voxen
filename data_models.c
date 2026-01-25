@@ -1,4 +1,9 @@
 // data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
+#include <malloc.h>
+#include "./External/assimp/cimport.h"
+#include "./External/assimp/scene.h"
+#include "os.h" // Operating System calls shim layer.
+#include "voxen.h"
 float** modelVertices = NULL;
 uint32_t** modelTriangles = NULL;
 uint32_t modelVertexCounts[MODEL_IDX_MAX] = {0}; // 4kb
@@ -241,21 +246,10 @@ void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmd
 }
 
 void LoadModels(void) {
-    double start_time = get_time();    
-    if (loadedModelsMaxIndex > 0) {
-        #ifdef ONLY_LOAD_LEVEL_NEEDS
-            glDeleteBuffers(loadedModelsMaxIndex, Sys_Render.vbos);
-            glDeleteBuffers(loadedModelsMaxIndex, Sys_Render.tbos);
-            memset(modelVertexCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
-            memset(modelTriangleCounts, 0, MODEL_IDX_MAX * sizeof(uint32_t));
-            memset(modelHasAnimation, 0, MODEL_IDX_MAX * sizeof(uint8_t));
-            memset(modelBounds, 0, MODEL_IDX_MAX * BOUNDS_ATTRIBUTES_COUNT * sizeof(float));
-            loadedModelsMaxIndex = 0;
-        #else
-            return;
-        #endif
-    }
-    
+    if (loadedModelsMaxIndex > 0) return;
+
+    DebugRAM("start of LoadModels");
+    double start_time = get_time();        
     DataParser model_parser;
     if (!parse_data_file(&model_parser, MODEL_IDX_MAX, "./Data/models.txt")) { DualLogError("Could not parse ./Data/models.txt!\n"); OS_Exit(1); }
 
@@ -265,14 +259,7 @@ void LoadModels(void) {
     }
 
     loadedModelsMaxIndex = (uint16_t)maxIndex + 1U;
-    #ifdef ONLY_LOAD_LEVEL_NEEDS
-        uint16_t actualLoadedModels = 0u;
-        for (int32_t i=0;i<MODEL_IDX_MAX;++i) actualLoadedModels += modelIndexUsedForCurrentLevel[i] ? 1u : 0u;
-        DualLog("Loading   models( %d/%d) with max index  %d ...", actualLoadedModels, model_parser.count, maxIndex);
-    #else
-        DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
-    #endif
-    
+    DualLog("Loading   models( %d/%d) with max index  %d ...", loadedModelsMaxIndex, model_parser.count, maxIndex);
     modelVertices  = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(float*),    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     modelTriangles = OS_AllocateRAM(NULL, loadedModelsMaxIndex * sizeof(uint32_t*), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     DebugRAM("after main OS_AllocateRAM block");
@@ -299,10 +286,6 @@ void LoadModels(void) {
     DebugRAM("prior to model load loop");
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
-        #ifdef ONLY_LOAD_LEVEL_NEEDS
-            if (!modelIndexUsedForCurrentLevel[parserIdx] && numFramesRemaining <= 0u) continue;
-        #endif
-        
         modelHasAnimation[i] = (model_parser.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
         const char *fbx_path = model_parser.entries[parserIdx].path;
         if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); OS_Exit(1); }

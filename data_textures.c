@@ -1,4 +1,5 @@
 // data_textures.c - Load textures from raw .png files on disk
+#include <malloc.h>
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
 uint16_t loadedTexturesMaxIndex;
@@ -6,17 +7,10 @@ bool doubleSidedTexture[MAX_VALID_TEXTURE];
 bool transparentTexture[MAX_VALID_TEXTURE];
 
 void LoadTextures(void) {
+    if (loadedTexturesMaxIndex > 0) return;
+
     double start_time = get_time();
     DebugRAM("start of LoadTextures");
-    if (loadedTexturesMaxIndex > 0) {
-        #ifdef ONLY_LOAD_LEVEL_NEEDS
-            memset(doubleSidedTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
-            memset(transparentTexture, 0, MAX_VALID_TEXTURE * sizeof(bool));
-        #else
-            return;
-        #endif
-    }
-
     loadedTexturesMaxIndex = totalPixels = totalPaletteColors = 0u;
     DataParser texture_parser;
     if (!parse_data_file(&texture_parser, MAX_VALID_TEXTURE, "./Data/textures.txt")) { DualLogError("Could not parse ./Data/textures.txt!\n"); OS_Exit(1); }
@@ -33,21 +27,11 @@ void LoadTextures(void) {
     for (uint32_t k = 0; k < texture_parser.count; k++) { // Match parser entries to indices ahead of loops
         if (texture_parser.entries[k].index < loadedTexturesMaxIndex) {
             matchedParserIdxes[texture_parser.entries[k].index] = k;
-            #ifdef ONLY_LOAD_LEVEL_NEEDS
-                if (texture_parser.entries[k].persistent) textureIndexUsedForCurrentLevel[k] = true; // textureIndexUsedForCurrentLevel pre-cleared by LoadLevel parent calling function of LoadTextures
-            #endif
         }
     }
     
     if (loadedTexturesMaxIndex == 0) { DualLogError("No textures found in textures.txt\n"); OS_Exit(1); }
-    #ifdef ONLY_LOAD_LEVEL_NEEDS
-        uint16_t actualLoadedTextures = 0u;
-        for (int32_t i=0;i<MAX_VALID_TEXTURE;++i) actualLoadedTextures += textureIndexUsedForCurrentLevel[i] ? 1u : 0u;
-        DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", actualLoadedTextures, loadedTexturesMaxIndex);
-    #else
-        DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", loadedTexturesMaxIndex, loadedTexturesMaxIndex);    
-    #endif
-    
+    DualLog("Loading textures( %u/%u), using stb_image version: 2.28, ", loadedTexturesMaxIndex, loadedTexturesMaxIndex);    
     totalPixels = 0U;
     totalPaletteColors = 0U;
     int32_t widths[MAX_VALID_TEXTURE]; memset(widths,0,MAX_VALID_TEXTURE * sizeof(int32_t));
@@ -69,9 +53,6 @@ void LoadTextures(void) {
     for (uint16_t i = 0; i < loadedTexturesMaxIndex; ++i) {
         int32_t currentIndex = matchedParserIdxes[i];
         if (currentIndex < 0) continue;
-        #ifdef ONLY_LOAD_LEVEL_NEEDS
-            if (!textureIndexUsedForCurrentLevel[currentIndex]) continue;
-        #endif
         
         doubleSidedTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_DOUBLESIDED) > 0 ? 1 : 0;
         transparentTexture[currentIndex] = (texture_parser.entries[currentIndex].entflags & ENTFLAG_TRANSPARENT) > 0 ? 1 : 0;

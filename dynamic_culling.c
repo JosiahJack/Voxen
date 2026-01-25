@@ -1,8 +1,11 @@
+#include <stdio.h>
+#include "os.h"
+#include "voxen.h"
+
 uint8_t *stbi_load_from_memory(const uint8_t* buffer, int32_t len, int32_t* x, int32_t* y);
 extern void stbi__arena_init(void);
 extern uint8_t*  stbi__arena_base;
 #define STBI_ARENA_SIZE 16 * 1024 * 1024
-
 uint32_t gridCellStates[ARRSIZE];
 float gridCellFloorHeight[ARRSIZE];
 float gridCellCeilingHeight[ARRSIZE];

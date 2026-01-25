@@ -168,7 +168,7 @@ fi
 cp $GLAD_OBJ "$TEMP_DIR/glad.o"
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c event.c level.c data_parser.c data_text.c data_fonts.c todo.c"
+SOURCES="voxen.c physics.c helpers.c console.c event.c level.c data_parser.c data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 
@@ -184,10 +184,10 @@ total_build_time=$((build_end - shader_start))
 echo "Build completed in ${total_build_time} ms"
 if ! $IS_CI; then
     case "$PLATFORM" in
-        windows)  strip --strip-all voxen.exe; upx --best --lzma ./voxen.exe; WINEPATH="External/Windows" wine ./voxen.exe ;;   # or wine voxen.exe if testing on linux
+        windows)  strip --strip-all voxen.exe; upx -qqq --best --lzma ./voxen.exe; WINEPATH="External/Windows" wine ./voxen.exe ;;   # or wine voxen.exe if testing on linux
         mac)      ./voxen.app ;;
         android)  java -jar bundletool.jar build-apks --bundle=voxen.aab --output=voxen.app;;
-        *)        strip --strip-all voxen; upx --best --lzma ./voxen; ./voxen ;;   # linux
+        *)        strip --strip-all voxen; upx -qqq --best --lzma ./voxen; ./voxen ;;   # linux
 #         *)        ./voxen ;;   # linux
     esac
     rm -f "$TEMP_DIR"/*.o ./Shaders/*.h "$TEMP_DIR"/*.cpp #Cleanup after quitting. Doesn't affect build timer.  Gives me a chance to trivially copy out .o files if I want.

@@ -1,3 +1,6 @@
+#include <limits.h>
+#include "os.h" // Operating System calls shim layer.
+#include "voxen.h"
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
@@ -570,9 +573,6 @@ void ProcessInput(void) {
         instances[editModeSelection].position = oldPos;
         instances[editModeSelection].rotation = oldRot;
         instances[editModeSelection].scale = oldScale;
-        #ifdef DEBUG_ENTITIES
-            DualLogEntityInstance(editModeSelection);
-        #endif
     }
         
     if (ToggleMode()) {
