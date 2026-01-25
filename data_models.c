@@ -51,9 +51,9 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
     [36]={[ANIM_IDLE]={1.0f,1,78,4674,24},[ANIM_WALK]={1.0f,90,129,4752,24},[ANIM_RUN]={1.0f,90,129,4752,24},[ANIM_ATTACK2]={1.0f,142,185,4792,24},[ANIM_DYING]={1.0f,188,225,4836,24},[ANIM_PAIN]={1.0f,227,235,4874,24}}, // npc_plantmutant
     [37]={[ANIM_IDLE]={1.0f,1,42,4883,24},[ANIM_WALK]={2.0f,58,85,4925,24},[ANIM_RUN]={2.0f,58,85,4925,24},[ANIM_ATTACK1]={1.0f,102,123,4953,24},[ANIM_ATTACK2]={1.0f,126,148,4975,24}}, // npc_repairbot
     [38]={[ANIM_IDLE]={1.0f,1,54,4998,24},[ANIM_WALK]={1.0f,1,54,4998,24},[ANIM_RUN]={1.0f,58,95,5052,24}}, // npc_sec1bot
-    [39] = {[ANIM_LOOP_ALL]    = { 1.0f, 0, 75,  5742, 24 }}, // npc_sec2bot
-    [40] = {[ANIM_LOOP_ALL]    = { 1.0f, 0, 84,  5818, 24 }}, // npc_servbot
-    [41] = {[ANIM_LOOP_ALL]    = { 1.0f, 0, 225, 5903, 24 }}, // npc_virusmutant
+    [39]={[ANIM_IDLE]={0.333f,1,17,5090,24},[ANIM_WALK]={0.333f,19,38,5107,24},[ANIM_RUN]={0.333f,19,38,5107,24},[ANIM_ATTACK2]={0.25f,39,48,5127,24},[ANIM_ATTACK3]={1.0f,49,56,5137,24},[ANIM_PAIN]={1.0f,58,63,5145,24},[ANIM_DYING]={0.2f,65,66,5151,24}}, // npc_sec2bot
+    [40]={[ANIM_IDLE]={0.18f,1,9,5153,24},[ANIM_WALK]={0.333f,1,9,5153,24},[ANIM_RUN]={0.333f,1,9,5153,24},[ANIM_ATTACK1]={0.5f,18,28,5162,24},[ANIM_PAIN]={0.333f,54,63,5173,24},[ANIM_DYING]={0.333f,77,85,5183,24}}, // npc_servbot
+    [41]={[ANIM_IDLE]={1.0f,1,66,5192,24},[ANIM_WALK]={1.0f,79,132,5258,24},[ANIM_PAIN]={1.0f,145,157,5312,24},[ANIM_ATTACK2]={1.0f,159,181,5325,24},[ANIM_DYING]={1.0f,183,221,5348,24}}, // npc_virusmutant
     [42] = {[ANIM_LOOP_ALL]    = { 1.0f, 0, 156, 6129, 24 }}, // npc_zerogmut
     [43] = {[ANIM_LOOP_ALL]    = { 1.0f, 1, 43,  6286, 24 }}, // puzzlepanel1
     [44] = {[ANIM_LOOP_ALL]    = { 1.0f, 0, 30,  6329, 24 }}, // puzzlepanel2 (starts at 000000)

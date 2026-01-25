@@ -9973,787 +9973,607 @@ index: 5088
 index: 5089
 
 #Models/npc_sec2bot_000001.obj
-index: 5742
+index: 5090
 animated: 1
 animationNum: 39
 #Models/npc_sec2bot_000002.obj
-index: 5743
+index: 5091
 #Models/npc_sec2bot_000003.obj
-index: 5744
+index: 5092
 #Models/npc_sec2bot_000004.obj
-index: 5745
+index: 5093
 #Models/npc_sec2bot_000005.obj
-index: 5746
+index: 5094
 #Models/npc_sec2bot_000006.obj
-index: 5747
+index: 5095
 #Models/npc_sec2bot_000007.obj
-index: 5748
+index: 5096
 #Models/npc_sec2bot_000008.obj
-index: 5749
+index: 5097
 #Models/npc_sec2bot_000009.obj
-index: 5750
+index: 5098
 #Models/npc_sec2bot_000010.obj
-index: 5751
+index: 5099
 #Models/npc_sec2bot_000011.obj
-index: 5752
+index: 5100
 #Models/npc_sec2bot_000012.obj
-index: 5753
+index: 5101
 #Models/npc_sec2bot_000013.obj
-index: 5754
+index: 5102
 #Models/npc_sec2bot_000014.obj
-index: 5755
+index: 5103
 #Models/npc_sec2bot_000015.obj
-index: 5756
+index: 5104
 #Models/npc_sec2bot_000016.obj
-index: 5757
+index: 5105
 #Models/npc_sec2bot_000017.obj
-index: 5758
-#Models/npc_sec2bot_000018.obj
-index: 5759
+index: 5106
 #Models/npc_sec2bot_000019.obj
-index: 5760
+index: 5107
 #Models/npc_sec2bot_000020.obj
-index: 5761
+index: 5108
 #Models/npc_sec2bot_000021.obj
-index: 5762
+index: 5109
 #Models/npc_sec2bot_000022.obj
-index: 5763
+index: 5110
 #Models/npc_sec2bot_000023.obj
-index: 5764
+index: 5111
 #Models/npc_sec2bot_000024.obj
-index: 5765
+index: 5112
 #Models/npc_sec2bot_000025.obj
-index: 5766
+index: 5113
 #Models/npc_sec2bot_000026.obj
-index: 5767
+index: 5114
 #Models/npc_sec2bot_000027.obj
-index: 5768
+index: 5115
 #Models/npc_sec2bot_000028.obj
-index: 5769
+index: 5116
 #Models/npc_sec2bot_000029.obj
-index: 5770
+index: 5117
 #Models/npc_sec2bot_000030.obj
-index: 5771
+index: 5118
 #Models/npc_sec2bot_000031.obj
-index: 5772
+index: 5119
 #Models/npc_sec2bot_000032.obj
-index: 5773
+index: 5120
 #Models/npc_sec2bot_000033.obj
-index: 5774
+index: 5121
 #Models/npc_sec2bot_000034.obj
-index: 5775
+index: 5122
 #Models/npc_sec2bot_000035.obj
-index: 5776
+index: 5123
 #Models/npc_sec2bot_000036.obj
-index: 5777
+index: 5124
 #Models/npc_sec2bot_000037.obj
-index: 5778
+index: 5125
 #Models/npc_sec2bot_000038.obj
-index: 5779
+index: 5126
 #Models/npc_sec2bot_000039.obj
-index: 5780
+index: 5127
 #Models/npc_sec2bot_000040.obj
-index: 5781
+index: 5128
 #Models/npc_sec2bot_000041.obj
-index: 5782
+index: 5129
 #Models/npc_sec2bot_000042.obj
-index: 5783
+index: 5130
 #Models/npc_sec2bot_000043.obj
-index: 5784
+index: 5131
 #Models/npc_sec2bot_000044.obj
-index: 5785
+index: 5132
 #Models/npc_sec2bot_000045.obj
-index: 5786
+index: 5133
 #Models/npc_sec2bot_000046.obj
-index: 5787
+index: 5134
 #Models/npc_sec2bot_000047.obj
-index: 5788
+index: 5135
 #Models/npc_sec2bot_000048.obj
-index: 5789
+index: 5136
 #Models/npc_sec2bot_000049.obj
-index: 5790
+index: 5137
 #Models/npc_sec2bot_000050.obj
-index: 5791
+index: 5138
 #Models/npc_sec2bot_000051.obj
-index: 5792
+index: 5139
 #Models/npc_sec2bot_000052.obj
-index: 5793
+index: 5140
 #Models/npc_sec2bot_000053.obj
-index: 5794
+index: 5141
 #Models/npc_sec2bot_000054.obj
-index: 5795
+index: 5142
 #Models/npc_sec2bot_000055.obj
-index: 5796
+index: 5143
 #Models/npc_sec2bot_000056.obj
-index: 5797
-#Models/npc_sec2bot_000057.obj
-index: 5798
+index: 5144
 #Models/npc_sec2bot_000058.obj
-index: 5799
+index: 5145
 #Models/npc_sec2bot_000059.obj
-index: 5800
+index: 5146
 #Models/npc_sec2bot_000060.obj
-index: 5801
+index: 5147
 #Models/npc_sec2bot_000061.obj
-index: 5802
+index: 5148
 #Models/npc_sec2bot_000062.obj
-index: 5803
+index: 5149
 #Models/npc_sec2bot_000063.obj
-index: 5804
-#Models/npc_sec2bot_000064.obj
-index: 5805
+index: 5150
 #Models/npc_sec2bot_000065.obj
-index: 5806
+index: 5151
 #Models/npc_sec2bot_000066.obj
-index: 5807
-#Models/npc_sec2bot_000067.obj
-index: 5808
-#Models/npc_sec2bot_000068.obj
-index: 5809
-#Models/npc_sec2bot_000069.obj
-index: 5810
-#Models/npc_sec2bot_000070.obj
-index: 5811
-#Models/npc_sec2bot_000071.obj
-index: 5812
-#Models/npc_sec2bot_000072.obj
-index: 5813
-#Models/npc_sec2bot_000073.obj
-index: 5814
-#Models/npc_sec2bot_000074.obj
-index: 5815
-#Models/npc_sec2bot_000075.obj
-index: 5816
-#Models/npc_sec2bot_000076.obj
-index: 5817
+index: 5152
 
 #Models/npc_servbot_000001.obj
-index: 5818
+index: 5153
 animated: 1
 animationNum: 40
 #Models/npc_servbot_000002.obj
-index: 5819
+index: 5154
 #Models/npc_servbot_000003.obj
-index: 5820
+index: 5155
 #Models/npc_servbot_000004.obj
-index: 5821
+index: 5156
 #Models/npc_servbot_000005.obj
-index: 5822
+index: 5157
 #Models/npc_servbot_000006.obj
-index: 5823
+index: 5158
 #Models/npc_servbot_000007.obj
-index: 5824
+index: 5159
 #Models/npc_servbot_000008.obj
-index: 5825
+index: 5160
 #Models/npc_servbot_000009.obj
-index: 5826
-#Models/npc_servbot_000010.obj
-index: 5827
-#Models/npc_servbot_000011.obj
-index: 5828
-#Models/npc_servbot_000012.obj
-index: 5829
-#Models/npc_servbot_000013.obj
-index: 5830
-#Models/npc_servbot_000014.obj
-index: 5831
-#Models/npc_servbot_000015.obj
-index: 5832
-#Models/npc_servbot_000016.obj
-index: 5833
-#Models/npc_servbot_000017.obj
-index: 5834
+index: 5161
 #Models/npc_servbot_000018.obj
-index: 5835
+index: 5162
 #Models/npc_servbot_000019.obj
-index: 5836
+index: 5163
 #Models/npc_servbot_000020.obj
-index: 5837
+index: 5164
 #Models/npc_servbot_000021.obj
-index: 5838
+index: 5165
 #Models/npc_servbot_000022.obj
-index: 5839
+index: 5166
 #Models/npc_servbot_000023.obj
-index: 5840
+index: 5167
 #Models/npc_servbot_000024.obj
-index: 5841
+index: 5168
 #Models/npc_servbot_000025.obj
-index: 5842
+index: 5169
 #Models/npc_servbot_000026.obj
-index: 5843
+index: 5170
 #Models/npc_servbot_000027.obj
-index: 5844
+index: 5171
 #Models/npc_servbot_000028.obj
-index: 5845
-#Models/npc_servbot_000029.obj
-index: 5846
-#Models/npc_servbot_000030.obj
-index: 5847
-#Models/npc_servbot_000031.obj
-index: 5848
-#Models/npc_servbot_000032.obj
-index: 5849
-#Models/npc_servbot_000033.obj
-index: 5850
-#Models/npc_servbot_000034.obj
-index: 5851
-#Models/npc_servbot_000035.obj
-index: 5852
-#Models/npc_servbot_000036.obj
-index: 5853
-#Models/npc_servbot_000037.obj
-index: 5854
-#Models/npc_servbot_000038.obj
-index: 5855
-#Models/npc_servbot_000039.obj
-index: 5856
-#Models/npc_servbot_000040.obj
-index: 5857
-#Models/npc_servbot_000041.obj
-index: 5858
-#Models/npc_servbot_000042.obj
-index: 5859
-#Models/npc_servbot_000043.obj
-index: 5860
-#Models/npc_servbot_000044.obj
-index: 5861
-#Models/npc_servbot_000045.obj
-index: 5862
-#Models/npc_servbot_000046.obj
-index: 5863
-#Models/npc_servbot_000047.obj
-index: 5864
-#Models/npc_servbot_000048.obj
-index: 5865
-#Models/npc_servbot_000049.obj
-index: 5866
-#Models/npc_servbot_000050.obj
-index: 5867
-#Models/npc_servbot_000051.obj
-index: 5868
-#Models/npc_servbot_000052.obj
-index: 5869
-#Models/npc_servbot_000053.obj
-index: 5870
+index: 5172
 #Models/npc_servbot_000054.obj
-index: 5871
+index: 5173
 #Models/npc_servbot_000055.obj
-index: 5872
+index: 5174
 #Models/npc_servbot_000056.obj
-index: 5873
+index: 5175
 #Models/npc_servbot_000057.obj
-index: 5874
+index: 5176
 #Models/npc_servbot_000058.obj
-index: 5875
+index: 5177
 #Models/npc_servbot_000059.obj
-index: 5876
+index: 5178
 #Models/npc_servbot_000060.obj
-index: 5877
+index: 5179
 #Models/npc_servbot_000061.obj
-index: 5878
+index: 5180
 #Models/npc_servbot_000062.obj
-index: 5879
+index: 5181
 #Models/npc_servbot_000063.obj
-index: 5880
-#Models/npc_servbot_000064.obj
-index: 5881
-#Models/npc_servbot_000065.obj
-index: 5882
-#Models/npc_servbot_000066.obj
-index: 5883
-#Models/npc_servbot_000067.obj
-index: 5884
-#Models/npc_servbot_000068.obj
-index: 5885
-#Models/npc_servbot_000069.obj
-index: 5886
-#Models/npc_servbot_000070.obj
-index: 5887
-#Models/npc_servbot_000071.obj
-index: 5888
-#Models/npc_servbot_000072.obj
-index: 5889
-#Models/npc_servbot_000073.obj
-index: 5890
-#Models/npc_servbot_000074.obj
-index: 5891
-#Models/npc_servbot_000075.obj
-index: 5892
-#Models/npc_servbot_000076.obj
-index: 5893
+index: 5182
 #Models/npc_servbot_000077.obj
-index: 5894
+index: 5183
 #Models/npc_servbot_000078.obj
-index: 5895
+index: 5184
 #Models/npc_servbot_000079.obj
-index: 5896
+index: 5185
 #Models/npc_servbot_000080.obj
-index: 5897
+index: 5186
 #Models/npc_servbot_000081.obj
-index: 5898
+index: 5187
 #Models/npc_servbot_000082.obj
-index: 5899
+index: 5188
 #Models/npc_servbot_000083.obj
-index: 5900
+index: 5189
 #Models/npc_servbot_000084.obj
-index: 5901
+index: 5190
 #Models/npc_servbot_000085.obj
-index: 5902
+index: 5191
 
 #Models/npc_virusmutant_000001.obj
-index: 5903
+index: 5192
 animated: 1
 animationNum: 41
 #Models/npc_virusmutant_000002.obj
-index: 5904
+index: 5193
 #Models/npc_virusmutant_000003.obj
-index: 5905
+index: 5194
 #Models/npc_virusmutant_000004.obj
-index: 5906
+index: 5195
 #Models/npc_virusmutant_000005.obj
-index: 5907
+index: 5196
 #Models/npc_virusmutant_000006.obj
-index: 5908
+index: 5197
 #Models/npc_virusmutant_000007.obj
-index: 5909
+index: 5198
 #Models/npc_virusmutant_000008.obj
-index: 5910
+index: 5199
 #Models/npc_virusmutant_000009.obj
-index: 5911
+index: 5200
 #Models/npc_virusmutant_000010.obj
-index: 5912
+index: 5201
 #Models/npc_virusmutant_000011.obj
-index: 5913
+index: 5202
 #Models/npc_virusmutant_000012.obj
-index: 5914
+index: 5203
 #Models/npc_virusmutant_000013.obj
-index: 5915
+index: 5204
 #Models/npc_virusmutant_000014.obj
-index: 5916
+index: 5205
 #Models/npc_virusmutant_000015.obj
-index: 5917
+index: 5206
 #Models/npc_virusmutant_000016.obj
-index: 5918
+index: 5207
 #Models/npc_virusmutant_000017.obj
-index: 5919
+index: 5208
 #Models/npc_virusmutant_000018.obj
-index: 5920
+index: 5209
 #Models/npc_virusmutant_000019.obj
-index: 5921
+index: 5210
 #Models/npc_virusmutant_000020.obj
-index: 5922
+index: 5211
 #Models/npc_virusmutant_000021.obj
-index: 5923
+index: 5212
 #Models/npc_virusmutant_000022.obj
-index: 5924
+index: 5213
 #Models/npc_virusmutant_000023.obj
-index: 5925
+index: 5214
 #Models/npc_virusmutant_000024.obj
-index: 5926
+index: 5215
 #Models/npc_virusmutant_000025.obj
-index: 5927
+index: 5216
 #Models/npc_virusmutant_000026.obj
-index: 5928
+index: 5217
 #Models/npc_virusmutant_000027.obj
-index: 5929
+index: 5218
 #Models/npc_virusmutant_000028.obj
-index: 5930
+index: 5219
 #Models/npc_virusmutant_000029.obj
-index: 5931
+index: 5220
 #Models/npc_virusmutant_000030.obj
-index: 5932
+index: 5221
 #Models/npc_virusmutant_000031.obj
-index: 5933
+index: 5222
 #Models/npc_virusmutant_000032.obj
-index: 5934
+index: 5223
 #Models/npc_virusmutant_000033.obj
-index: 5935
+index: 5224
 #Models/npc_virusmutant_000034.obj
-index: 5936
+index: 5225
 #Models/npc_virusmutant_000035.obj
-index: 5937
+index: 5226
 #Models/npc_virusmutant_000036.obj
-index: 5938
+index: 5227
 #Models/npc_virusmutant_000037.obj
-index: 5939
+index: 5228
 #Models/npc_virusmutant_000038.obj
-index: 5940
+index: 5229
 #Models/npc_virusmutant_000039.obj
-index: 5941
+index: 5230
 #Models/npc_virusmutant_000040.obj
-index: 5942
+index: 5231
 #Models/npc_virusmutant_000041.obj
-index: 5943
+index: 5232
 #Models/npc_virusmutant_000042.obj
-index: 5944
+index: 5233
 #Models/npc_virusmutant_000043.obj
-index: 5945
+index: 5234
 #Models/npc_virusmutant_000044.obj
-index: 5946
+index: 5235
 #Models/npc_virusmutant_000045.obj
-index: 5947
+index: 5236
 #Models/npc_virusmutant_000046.obj
-index: 5948
+index: 5237
 #Models/npc_virusmutant_000047.obj
-index: 5949
+index: 5238
 #Models/npc_virusmutant_000048.obj
-index: 5950
+index: 5239
 #Models/npc_virusmutant_000049.obj
-index: 5951
+index: 5240
 #Models/npc_virusmutant_000050.obj
-index: 5952
+index: 5241
 #Models/npc_virusmutant_000051.obj
-index: 5953
+index: 5242
 #Models/npc_virusmutant_000052.obj
-index: 5954
+index: 5243
 #Models/npc_virusmutant_000053.obj
-index: 5955
+index: 5244
 #Models/npc_virusmutant_000054.obj
-index: 5956
+index: 5245
 #Models/npc_virusmutant_000055.obj
-index: 5957
+index: 5246
 #Models/npc_virusmutant_000056.obj
-index: 5958
+index: 5247
 #Models/npc_virusmutant_000057.obj
-index: 5959
+index: 5248
 #Models/npc_virusmutant_000058.obj
-index: 5960
+index: 5249
 #Models/npc_virusmutant_000059.obj
-index: 5961
+index: 5250
 #Models/npc_virusmutant_000060.obj
-index: 5962
+index: 5251
 #Models/npc_virusmutant_000061.obj
-index: 5963
+index: 5252
 #Models/npc_virusmutant_000062.obj
-index: 5964
+index: 5253
 #Models/npc_virusmutant_000063.obj
-index: 5965
+index: 5254
 #Models/npc_virusmutant_000064.obj
-index: 5966
+index: 5255
 #Models/npc_virusmutant_000065.obj
-index: 5967
+index: 5256
 #Models/npc_virusmutant_000066.obj
-index: 5968
-#Models/npc_virusmutant_000067.obj
-index: 5969
-#Models/npc_virusmutant_000068.obj
-index: 5970
-#Models/npc_virusmutant_000069.obj
-index: 5971
-#Models/npc_virusmutant_000070.obj
-index: 5972
-#Models/npc_virusmutant_000071.obj
-index: 5973
-#Models/npc_virusmutant_000072.obj
-index: 5974
-#Models/npc_virusmutant_000073.obj
-index: 5975
-#Models/npc_virusmutant_000074.obj
-index: 5976
-#Models/npc_virusmutant_000075.obj
-index: 5977
-#Models/npc_virusmutant_000076.obj
-index: 5978
-#Models/npc_virusmutant_000077.obj
-index: 5979
-#Models/npc_virusmutant_000078.obj
-index: 5980
+index: 5257
 #Models/npc_virusmutant_000079.obj
-index: 5981
+index: 5258
 #Models/npc_virusmutant_000080.obj
-index: 5982
+index: 5259
 #Models/npc_virusmutant_000081.obj
-index: 5983
+index: 5260
 #Models/npc_virusmutant_000082.obj
-index: 5984
+index: 5261
 #Models/npc_virusmutant_000083.obj
-index: 5985
+index: 5262
 #Models/npc_virusmutant_000084.obj
-index: 5986
+index: 5263
 #Models/npc_virusmutant_000085.obj
-index: 5987
+index: 5264
 #Models/npc_virusmutant_000086.obj
-index: 5988
+index: 5265
 #Models/npc_virusmutant_000087.obj
-index: 5989
+index: 5266
 #Models/npc_virusmutant_000088.obj
-index: 5990
+index: 5267
 #Models/npc_virusmutant_000089.obj
-index: 5991
+index: 5268
 #Models/npc_virusmutant_000090.obj
-index: 5992
+index: 5269
 #Models/npc_virusmutant_000091.obj
-index: 5993
+index: 5270
 #Models/npc_virusmutant_000092.obj
-index: 5994
+index: 5271
 #Models/npc_virusmutant_000093.obj
-index: 5995
+index: 5272
 #Models/npc_virusmutant_000094.obj
-index: 5996
+index: 5273
 #Models/npc_virusmutant_000095.obj
-index: 5997
+index: 5274
 #Models/npc_virusmutant_000096.obj
-index: 5998
+index: 5275
 #Models/npc_virusmutant_000097.obj
-index: 5999
+index: 5276
 #Models/npc_virusmutant_000098.obj
-index: 6000
+index: 5277
 #Models/npc_virusmutant_000099.obj
-index: 6001
+index: 5278
 #Models/npc_virusmutant_000100.obj
-index: 6002
+index: 5279
 #Models/npc_virusmutant_000101.obj
-index: 6003
+index: 5280
 #Models/npc_virusmutant_000102.obj
-index: 6004
+index: 5281
 #Models/npc_virusmutant_000103.obj
-index: 6005
+index: 5282
 #Models/npc_virusmutant_000104.obj
-index: 6006
+index: 5283
 #Models/npc_virusmutant_000105.obj
-index: 6007
+index: 5284
 #Models/npc_virusmutant_000106.obj
-index: 6008
+index: 5285
 #Models/npc_virusmutant_000107.obj
-index: 6009
+index: 5286
 #Models/npc_virusmutant_000108.obj
-index: 6010
+index: 5287
 #Models/npc_virusmutant_000109.obj
-index: 6011
+index: 5288
 #Models/npc_virusmutant_000110.obj
-index: 6012
+index: 5289
 #Models/npc_virusmutant_000111.obj
-index: 6013
+index: 5290
 #Models/npc_virusmutant_000112.obj
-index: 6014
+index: 5291
 #Models/npc_virusmutant_000113.obj
-index: 6015
+index: 5292
 #Models/npc_virusmutant_000114.obj
-index: 6016
+index: 5293
 #Models/npc_virusmutant_000115.obj
-index: 6017
+index: 5294
 #Models/npc_virusmutant_000116.obj
-index: 6018
+index: 5295
 #Models/npc_virusmutant_000117.obj
-index: 6019
+index: 5296
 #Models/npc_virusmutant_000118.obj
-index: 6020
+index: 5297
 #Models/npc_virusmutant_000119.obj
-index: 6021
+index: 5298
 #Models/npc_virusmutant_000120.obj
-index: 6022
+index: 5299
 #Models/npc_virusmutant_000121.obj
-index: 6023
+index: 5300
 #Models/npc_virusmutant_000122.obj
-index: 6024
+index: 5301
 #Models/npc_virusmutant_000123.obj
-index: 6025
+index: 5302
 #Models/npc_virusmutant_000124.obj
-index: 6026
+index: 5303
 #Models/npc_virusmutant_000125.obj
-index: 6027
+index: 5304
 #Models/npc_virusmutant_000126.obj
-index: 6028
+index: 5305
 #Models/npc_virusmutant_000127.obj
-index: 6029
+index: 5306
 #Models/npc_virusmutant_000128.obj
-index: 6030
+index: 5307
 #Models/npc_virusmutant_000129.obj
-index: 6031
+index: 5308
 #Models/npc_virusmutant_000130.obj
-index: 6032
+index: 5309
 #Models/npc_virusmutant_000131.obj
-index: 6033
+index: 5310
 #Models/npc_virusmutant_000132.obj
-index: 6034
-#Models/npc_virusmutant_000133.obj
-index: 6035
-#Models/npc_virusmutant_000134.obj
-index: 6036
-#Models/npc_virusmutant_000135.obj
-index: 6037
-#Models/npc_virusmutant_000136.obj
-index: 6038
-#Models/npc_virusmutant_000137.obj
-index: 6039
-#Models/npc_virusmutant_000138.obj
-index: 6040
-#Models/npc_virusmutant_000139.obj
-index: 6041
-#Models/npc_virusmutant_000140.obj
-index: 6042
-#Models/npc_virusmutant_000141.obj
-index: 6043
-#Models/npc_virusmutant_000142.obj
-index: 6044
-#Models/npc_virusmutant_000143.obj
-index: 6045
-#Models/npc_virusmutant_000144.obj
-index: 6046
+index: 5311
 #Models/npc_virusmutant_000145.obj
-index: 6047
+index: 5312
 #Models/npc_virusmutant_000146.obj
-index: 6048
+index: 5313
 #Models/npc_virusmutant_000147.obj
-index: 6049
+index: 5314
 #Models/npc_virusmutant_000148.obj
-index: 6050
+index: 5315
 #Models/npc_virusmutant_000149.obj
-index: 6051
+index: 5316
 #Models/npc_virusmutant_000150.obj
-index: 6052
+index: 5317
 #Models/npc_virusmutant_000151.obj
-index: 6053
+index: 5318
 #Models/npc_virusmutant_000152.obj
-index: 6054
+index: 5319
 #Models/npc_virusmutant_000153.obj
-index: 6055
+index: 5320
 #Models/npc_virusmutant_000154.obj
-index: 6056
+index: 5321
 #Models/npc_virusmutant_000155.obj
-index: 6057
+index: 5322
 #Models/npc_virusmutant_000156.obj
-index: 6058
+index: 5323
 #Models/npc_virusmutant_000157.obj
-index: 6059
-#Models/npc_virusmutant_000158.obj
-index: 6060
+index: 5324
 #Models/npc_virusmutant_000159.obj
-index: 6061
+index: 5325
 #Models/npc_virusmutant_000160.obj
-index: 6062
+index: 5326
 #Models/npc_virusmutant_000161.obj
-index: 6063
+index: 5327
 #Models/npc_virusmutant_000162.obj
-index: 6064
+index: 5328
 #Models/npc_virusmutant_000163.obj
-index: 6065
+index: 5329
 #Models/npc_virusmutant_000164.obj
-index: 6066
+index: 5330
 #Models/npc_virusmutant_000165.obj
-index: 6067
+index: 5331
 #Models/npc_virusmutant_000166.obj
-index: 6068
+index: 5332
 #Models/npc_virusmutant_000167.obj
-index: 6069
+index: 5333
 #Models/npc_virusmutant_000168.obj
-index: 6070
+index: 5334
 #Models/npc_virusmutant_000169.obj
-index: 6071
+index: 5335
 #Models/npc_virusmutant_000170.obj
-index: 6072
+index: 5336
 #Models/npc_virusmutant_000171.obj
-index: 6073
+index: 5337
 #Models/npc_virusmutant_000172.obj
-index: 6074
+index: 5338
 #Models/npc_virusmutant_000173.obj
-index: 6075
+index: 5339
 #Models/npc_virusmutant_000174.obj
-index: 6076
+index: 5340
 #Models/npc_virusmutant_000175.obj
-index: 6077
+index: 5341
 #Models/npc_virusmutant_000176.obj
-index: 6078
+index: 5342
 #Models/npc_virusmutant_000177.obj
-index: 6079
+index: 5343
 #Models/npc_virusmutant_000178.obj
-index: 6080
+index: 5344
 #Models/npc_virusmutant_000179.obj
-index: 6081
+index: 5345
 #Models/npc_virusmutant_000180.obj
-index: 6082
+index: 5346
 #Models/npc_virusmutant_000181.obj
-index: 6083
-#Models/npc_virusmutant_000182.obj
-index: 6084
+index: 5347
 #Models/npc_virusmutant_000183.obj
-index: 6085
+index: 5348
 #Models/npc_virusmutant_000184.obj
-index: 6086
+index: 5349
 #Models/npc_virusmutant_000185.obj
-index: 6087
+index: 5350
 #Models/npc_virusmutant_000186.obj
-index: 6088
+index: 5351
 #Models/npc_virusmutant_000187.obj
-index: 6089
+index: 5352
 #Models/npc_virusmutant_000188.obj
-index: 6090
+index: 5353
 #Models/npc_virusmutant_000189.obj
-index: 6091
+index: 5354
 #Models/npc_virusmutant_000190.obj
-index: 6092
+index: 5355
 #Models/npc_virusmutant_000191.obj
-index: 6093
+index: 5356
 #Models/npc_virusmutant_000192.obj
-index: 6094
+index: 5357
 #Models/npc_virusmutant_000193.obj
-index: 6095
+index: 5358
 #Models/npc_virusmutant_000194.obj
-index: 6096
+index: 5359
 #Models/npc_virusmutant_000195.obj
-index: 6097
+index: 5360
 #Models/npc_virusmutant_000196.obj
-index: 6098
+index: 5361
 #Models/npc_virusmutant_000197.obj
-index: 6099
+index: 5362
 #Models/npc_virusmutant_000198.obj
-index: 6100
+index: 5363
 #Models/npc_virusmutant_000199.obj
-index: 6101
+index: 5364
 #Models/npc_virusmutant_000200.obj
-index: 6102
+index: 5365
 #Models/npc_virusmutant_000201.obj
-index: 6103
+index: 5366
 #Models/npc_virusmutant_000202.obj
-index: 6104
+index: 5367
 #Models/npc_virusmutant_000203.obj
-index: 6105
+index: 5368
 #Models/npc_virusmutant_000204.obj
-index: 6106
+index: 5369
 #Models/npc_virusmutant_000205.obj
-index: 6107
+index: 5370
 #Models/npc_virusmutant_000206.obj
-index: 6108
+index: 5371
 #Models/npc_virusmutant_000207.obj
-index: 6109
+index: 5372
 #Models/npc_virusmutant_000208.obj
-index: 6110
+index: 5373
 #Models/npc_virusmutant_000209.obj
-index: 6111
+index: 5374
 #Models/npc_virusmutant_000210.obj
-index: 6112
+index: 5375
 #Models/npc_virusmutant_000211.obj
-index: 6113
+index: 5376
 #Models/npc_virusmutant_000212.obj
-index: 6114
+index: 5377
 #Models/npc_virusmutant_000213.obj
-index: 6115
+index: 5378
 #Models/npc_virusmutant_000214.obj
-index: 6116
+index: 5379
 #Models/npc_virusmutant_000215.obj
-index: 6117
+index: 5380
 #Models/npc_virusmutant_000216.obj
-index: 6118
+index: 5381
 #Models/npc_virusmutant_000217.obj
-index: 6119
+index: 5382
 #Models/npc_virusmutant_000218.obj
-index: 6120
+index: 5383
 #Models/npc_virusmutant_000219.obj
-index: 6121
+index: 5384
 #Models/npc_virusmutant_000220.obj
-index: 6122
+index: 5385
 #Models/npc_virusmutant_000221.obj
-index: 6123
-#Models/npc_virusmutant_000222.obj
-index: 6124
-#Models/npc_virusmutant_000223.obj
-index: 6125
-#Models/npc_virusmutant_000224.obj
-index: 6126
-#Models/npc_virusmutant_000225.obj
-index: 6127
-#Models/npc_virusmutant_000226.obj
-index: 6128
+index: 5386
 
 #Models/npc_zerogmut_000001.obj
 index: 6129
