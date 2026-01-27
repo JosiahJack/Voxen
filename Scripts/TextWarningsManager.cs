@@ -9,8 +9,8 @@ public class TextWarningsManager : MonoBehaviour {
 	private Text[] warningTexts;
 	private bool[] initialized;
 	private float[] finishedTime;
-	[HideInInspector] public float[] warningLifeTimes;
-	[HideInInspector] public int[] uniqueID;
+	float[] warningLifeTimes;
+	int[] uniqueID;
 	private float warningDefaultLifeTime = 2f;
 
 	void Start () {
@@ -56,7 +56,7 @@ public class TextWarningsManager : MonoBehaviour {
 		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
 
 		for (int i=0;i<warningTextGObjects.Length;i++) {
-			if (!string.IsNullOrWhiteSpace(warningTexts[i].text)) {
+			if (!data_parser_isspace(warningTexts[i].text)) {
 				if (finishedTime[i] < Sys_Global.pauseRelativeTime) {
 					warningTexts[i].text = System.String.Empty;
 					if (warningTextGObjects[i].activeInHierarchy) warningTextGObjects[i].SetActive(false);

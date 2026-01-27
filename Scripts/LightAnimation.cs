@@ -21,11 +21,11 @@ public class LightAnimation : MonoBehaviour {
 	private bool lerpUp;
 	private bool noSteps = false;
 	public float lerpTime = 0.5f; //save
-	[HideInInspector] public float stepTime; //save
+	float stepTime; //save
 	public float lerpStartTime; //save
-	[HideInInspector] public Light animLight;
+	Light animLight;
 	private float differenceInIntensity;
-	[HideInInspector] public float lerpValue; //save
+	float lerpValue; //save
 	private GameObject segiEmitter;
 	private static StringBuilder s1 = new StringBuilder();
 	private bool initialized = false;
@@ -216,12 +216,12 @@ public class LightAnimation : MonoBehaviour {
 		if (la.animLight == null) la.animLight = la.GetComponent<Light>();
 
 		if (index < 0) {
-			Debug.Log("LightAnimation.Load failure, index < 0");
+			DualLog("LightAnimation.Load failure, index < 0");
 			return index + 7;
 		}
 
 		if (entries == null) {
-			Debug.Log("LightAnimation.Load failure, entries == null");
+			DualLog("LightAnimation.Load failure, entries == null");
 			return index + 7;
 		}
 

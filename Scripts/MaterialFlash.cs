@@ -18,8 +18,8 @@ public class MaterialFlash : MonoBehaviour {
 
 	void Start () {
 		meshR = GetComponent<MeshRenderer>();
-		if (normalMat == null) Debug.Log("BUG: MaterialFlash.cs has a null normal material!  Assign your materials!");
-		if (alternateMat == null) Debug.Log("BUG: MaterialFlash.cs has a null alternate material!  Assign your materials!");
+		if (normalMat == null) DualLog("BUG: MaterialFlash.cs has a null normal material!  Assign your materials!");
+		if (alternateMat == null) DualLog("BUG: MaterialFlash.cs has a null alternate material!  Assign your materials!");
 
 		if (startFlashing) isFlashing = true;
 		flashFinished = Time.time;

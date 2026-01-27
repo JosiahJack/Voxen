@@ -18,9 +18,7 @@ public class ItemTabManager : MonoBehaviour {
 
 	public void Reset() {
 		eReaderSectionsContainer.SetActive(false);
-		iconManager.GetComponent<Image>().overrideSprite =
-			Const.a.useableItemsIcons[0]; //nullsprite
-
+		iconManager.GetComponent<Image>().overrideSprite = Const.a.useableItemsIcons[0]; //nullsprite
 		textManager.GetComponent<Text>().text = System.String.Empty;
 		applyButton.SetActive(false);
 		vaporizeButton.SetActive(false);
@@ -36,11 +34,8 @@ public class ItemTabManager : MonoBehaviour {
 		grenadeTimerSlider.SetActive(false);
 		grenadeTimerSliderSlider.SetActive(false);
 		eReaderSectionsContainer.SetActive(true);
-		iconManager.GetComponent<Image>().overrideSprite =
-			Const.a.useableItemsIcons[23]; //datareader
-
-		textManager.GetComponent<Text>().text =
-			Const.a.stringTable[349]; // MULTIMEDIA DATA READER
+		iconManager.GetComponent<Image>().overrideSprite = Const.a.useableItemsIcons[23]; //datareader
+		textManager.GetComponent<Text>().text = Const.a.stringTable[349]; // MULTIMEDIA DATA READER
 	}
 
 	public void SendItemDataToItemTab(int constIndex, int customIndex) {
@@ -71,22 +66,13 @@ public class ItemTabManager : MonoBehaviour {
 				default: ind = 37; break; // You're not Wong there
 			}
 
-			if (ind >= 0 && ind < 38) {
-				iconManager.GetComponent<Image>().overrideSprite =
-					Const.a.logImages[ind];
-			} else {
-				iconManager.GetComponent<Image>().overrideSprite =
-					Const.a.logImages[0];
-			}
+			if (ind >= 0 && ind < 38) iconManager.GetComponent<Image>().overrideSprite = logImages + ind;
+			else iconManager.GetComponent<Image>().overrideSprite = logImages;
 		} else {
-			if (Const.a.useableItemsIcons[constIndex] != null) {
-				iconManager.GetComponent<Image>().overrideSprite =
-					Const.a.useableItemsIcons[constIndex]; //datareader
-			}
+			if (Const.a.useableItemsIcons[constIndex] != null) { iconManager.GetComponent<Image>().overrideSprite = Const.a.useableItemsIcons[constIndex]; //datareader
 		}
 
-		textManager.GetComponent<Text>().text =
-			Const.a.stringTable[constIndex + 326];
+		textManager.GetComponent<Text>().text = Const.a.stringTable[constIndex + 326];
 
 		// Access Cards need special list enabled.
 		if (constIndex == 34 || constIndex == 81 || constIndex == 110
@@ -100,9 +86,7 @@ public class ItemTabManager : MonoBehaviour {
 				acc = (AccessCardType)cardTypes.GetValue(i);
 				if (acc == AccessCardType.None) continue;
 
-				if (Inventory.a.HasAccessCard(acc)) {
-					s1.Append(" " + Inventory.AccessCardCodeForType(acc));
-				}
+				if (Inventory.a.HasAccessCard(acc)) s1.Append(" " + Inventory.AccessCardCodeForType(acc));
 			}
 
 			accessCardListText.text = s1.ToString();

@@ -431,6 +431,8 @@ void Input_MouselookApply(void) {
     UpdatePlayerFacingAngles();
 }
 
+// static const float HeadBobRate   = 0.2f; TODO
+// static const float HeadBobAmount = 0.08f; TODO
 int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     if (CursorVisible()) {
         int32_t newX = cursorPosition_x + xrel;
@@ -545,22 +547,22 @@ void ProcessInput(void) {
     if (Sys_Global.gamePaused || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
     
     // Debug test light TODO: Remove later once player lantern is working
-    uint16_t testLight = 741;
-    uint16_t testLightIdx = (testLight * LIGHT_DATA_SIZE);
-    Vector3 testLightPos = (Vector3){ lights[testLightIdx + LIGHT_DATA_OFFSET_POSX], lights[testLightIdx + LIGHT_DATA_OFFSET_POSY], lights[testLightIdx + LIGHT_DATA_OFFSET_POSZ] };
-    float mx = 0.0f, my = 0.0f, mz = 0.0f;
-    bool moveTestLight =    Sys_Input.keyStates[GLFW_KEY_1].down || Sys_Input.keyStates[GLFW_KEY_2].down
-                         || Sys_Input.keyStates[GLFW_KEY_3].down || Sys_Input.keyStates[GLFW_KEY_4].down
-                         || Sys_Input.keyStates[GLFW_KEY_5].down || Sys_Input.keyStates[GLFW_KEY_6].down;
-    if (moveTestLight) {
-        if (Sys_Input.keyStates[GLFW_KEY_1].down) mx =  0.01f;
-        if (Sys_Input.keyStates[GLFW_KEY_2].down) mx = -0.01f;
-        if (Sys_Input.keyStates[GLFW_KEY_3].down) my =  0.01f;
-        if (Sys_Input.keyStates[GLFW_KEY_4].down) my = -0.01f;
-        if (Sys_Input.keyStates[GLFW_KEY_5].down) mz =  0.01f;
-        if (Sys_Input.keyStates[GLFW_KEY_6].down) mz = -0.01f;
-        lightDirty[testLight] = true; lightsNewPosition[testLight] = Vector3_A_plus_B(testLightPos, (Vector3){ mx, my, mz });
-    }
+//     uint16_t testLight = 741;
+//     uint16_t testLightIdx = (testLight * LIGHT_DATA_SIZE);
+//     Vector3 testLightPos = (Vector3){ lights[testLightIdx + LIGHT_DATA_OFFSET_POSX], lights[testLightIdx + LIGHT_DATA_OFFSET_POSY], lights[testLightIdx + LIGHT_DATA_OFFSET_POSZ] };
+//     float mx = 0.0f, my = 0.0f, mz = 0.0f;
+//     bool moveTestLight =    Sys_Input.keyStates[GLFW_KEY_1].down || Sys_Input.keyStates[GLFW_KEY_2].down
+//                          || Sys_Input.keyStates[GLFW_KEY_3].down || Sys_Input.keyStates[GLFW_KEY_4].down
+//                          || Sys_Input.keyStates[GLFW_KEY_5].down || Sys_Input.keyStates[GLFW_KEY_6].down;
+//     if (moveTestLight) {
+//         if (Sys_Input.keyStates[GLFW_KEY_1].down) mx =  0.01f;
+//         if (Sys_Input.keyStates[GLFW_KEY_2].down) mx = -0.01f;
+//         if (Sys_Input.keyStates[GLFW_KEY_3].down) my =  0.01f;
+//         if (Sys_Input.keyStates[GLFW_KEY_4].down) my = -0.01f;
+//         if (Sys_Input.keyStates[GLFW_KEY_5].down) mz =  0.01f;
+//         if (Sys_Input.keyStates[GLFW_KEY_6].down) mz = -0.01f;
+//         lightDirty[testLight] = true; lightsNewPosition[testLight] = Vector3_A_plus_B(testLightPos, (Vector3){ mx, my, mz });
+//     }
     
     // Debug test entity for confirming model+texture setup + collisions TODO: Remove after combing through entity types.
     if (Sys_Input.keyStates[GLFW_KEY_I].pressed) {

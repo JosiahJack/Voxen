@@ -33,7 +33,7 @@ public class ConfigurationMenuShadowsApply : MonoBehaviour {
 
 	void Initialize() {
 		if (picker == null) picker = GetComponent<Dropdown>();
-		if (picker == null) Debug.Log("BUG: ConfigurationMenuShadowsApply missing component for picker.");
+		if (picker == null) DualLog("BUG: ConfigurationMenuShadowsApply missing component for picker.");
 
 		SetOptionsText();
 		if (picker.value != Const.a.GraphicsShadowMode) {

@@ -8,8 +8,8 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 	public KeycodeDigitImage digit100s;
 	public int keycode; // Set externally by KeypadKeycode.cs's Use()
 	
-	[HideInInspector] public KeypadKeycode keypad; // dido, also set externally
-	[HideInInspector] public int currentEntry;
+	KeypadKeycode keypad; // dido, also set externally
+	int currentEntry;
 	private int entryOnes;
 	private int entryTens;
 	private int entryHuns;

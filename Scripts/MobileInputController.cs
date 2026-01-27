@@ -36,7 +36,7 @@ public class MobileInputController : MonoBehaviour,IBeginDragHandler,
             xpos = xpos - xRatioRight;
         }
 
-        Debug.Log("PointPosition: " + PointPosition.ToString()
+        DualLog("PointPosition: " + PointPosition.ToString()
                   + ", eventData.position: " + eventData.position.ToString());
 
         ypos = (ypos * Screen.height) / (Background.rect.size.x / 2f);

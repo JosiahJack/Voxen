@@ -11,17 +11,17 @@ public class ForceBridge : MonoBehaviour {
 	public ForceFieldColor fieldColor;
 
 	public bool lerping; // save
-	[HideInInspector] public float tickFinished; // save
+	float tickFinished; // save
 
 	public float activatedScaleX; // save
 	public float activatedScaleY; // save
 	public float activatedScaleZ; // save
 	public MeshRenderer mr;
-	[HideInInspector] public BoxCollider bCol;
+	BoxCollider bCol;
 	private AudioSource SFX;
 	private const float tickTime = 0.05f;
 	private bool initialized = false;
-	[HideInInspector] public GameObject segiEmitter;
+	GameObject segiEmitter;
 	private static StringBuilder s1 = new StringBuilder();
 
 	public void Start() {
@@ -188,7 +188,7 @@ public class ForceBridge : MonoBehaviour {
 	public static string Save(GameObject go) {
 		ForceBridge fb = go.GetComponent<ForceBridge>();
 		if (fb == null) {
-			Debug.Log("ForceBridge missing on savetype of ForceBridge!"
+			DualLog("ForceBridge missing on savetype of ForceBridge!"
 					  + "  GameObject.name: " + go.name);
 			return "1|0|0000.00000";
 		}
@@ -220,17 +220,17 @@ public class ForceBridge : MonoBehaviour {
 	public static int Load(GameObject go, ref string[] entries, int index) {
 		ForceBridge fb = go.GetComponent<ForceBridge>(); // fjb
 		if (fb == null) {
-			Debug.Log("ForceBridge.Load failure, fb == null");
+			DualLog("ForceBridge.Load failure, fb == null");
 			return index + 3;
 		}
 
 		if (index < 0) {
-			Debug.Log("ForceBridge.Load failure, index < 0");
+			DualLog("ForceBridge.Load failure, index < 0");
 			return index + 3;
 		}
 
 		if (entries == null) {
-			Debug.Log("ForceBridge.Load failure, entries == null");
+			DualLog("ForceBridge.Load failure, entries == null");
 			return index + 3;
 		}
 

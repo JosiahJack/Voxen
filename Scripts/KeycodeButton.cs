@@ -26,7 +26,7 @@ public class KeycodeButton : MonoBehaviour {
             pointerExit.eventID = EventTriggerType.PointerExit;
             pointerExit.callback.AddListener((data) => { OnPointerExitDelegate((PointerEventData)data); });
             evenT.triggers.Add(pointerExit);
-		} else Debug.Log("Failed to add EventTrigger to " + gameObject.name);
+		} else DualLog("Failed to add EventTrigger to " + gameObject.name);
 	}
 
 	void OnEnable() {

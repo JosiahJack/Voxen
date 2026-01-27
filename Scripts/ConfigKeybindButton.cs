@@ -23,7 +23,7 @@ public class ConfigKeybindButton : MonoBehaviour {
 
 	void Initialize() {
 		if (index < 0 || index >= 40) {
-			Debug.Log("BUG: ConfigKeybindButton index out of range [0,40]");
+			DualLog("BUG: ConfigKeybindButton index out of range [0,40]");
 			index = 0;
 		}
 
@@ -31,7 +31,7 @@ public class ConfigKeybindButton : MonoBehaviour {
 		firstFrame = true;
 		if (self == null) self = GetComponent<Button>();
 		if (self == null) {
-			Debug.Log("BUG: ConfigKeybindButton missing component for self.");
+			DualLog("BUG: ConfigKeybindButton missing component for self.");
 		}
 
 		if (selfText == null) selfText = GetComponentInChildren<Text>(true);

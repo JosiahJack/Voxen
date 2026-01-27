@@ -16,10 +16,10 @@ public class FuncWall : MonoBehaviour {
 	public FuncStates currentState; // save
 	public int[] chunkIDs; // save
 
-	[HideInInspector] public float startTime; // save
-	[HideInInspector] public Vector3 startPosition; // save
-	[HideInInspector] public Rigidbody rbody;
-	[HideInInspector] public bool stopSoundPlayed; // save
+	float startTime; // save
+	Vector3 startPosition; // save
+	Rigidbody rbody;
+	bool stopSoundPlayed; // save
 	private Vector3 tempVec;
 	private float dist;         // Only ever used right away, not saved.
 	private float distanceLeft; // Only ever used right away, not saved.
@@ -39,7 +39,7 @@ public class FuncWall : MonoBehaviour {
 		pr.previousSet = true;
 		targetPositionY = targetPosition.transform.localPosition.y;
 		tempVec = (transform.position - targetPosition.transform.position);
-		float distTotal = Vector3.Distance(startPosition,
+		float distTotal = distance_vector3(startPosition,
 										   targetPosition.transform.position);
 
 		tempVec = -tempVec.normalized;
@@ -101,7 +101,7 @@ public class FuncWall : MonoBehaviour {
 		tempVec = (transform.position - goalPosition).normalized; // Relative
 		tempVec = (tempVec * dist * -1) + transform.position; // Absolute
 		rbody.MovePosition(tempVec);
-		distanceLeft = Vector3.Distance(transform.position, goalPosition);
+		distanceLeft = distance_vector3(transform.position, goalPosition);
 		float distTotal = Mathf.Abs(targetPositionY);
 		percentMoved = (distTotal - distanceLeft) / distTotal;
 		if (float.IsNaN(percentMoved)) percentMoved = 0f;

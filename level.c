@@ -50,9 +50,9 @@ void LoadEntities(void) {
         if (entity_parser.entries[i].index == UINT16_MAX) continue;
 
         entities[i] = entity_parser.entries[i];
-        flag_enable(&entities[i].entflags, ENTFLAG_ACTIVE);
-        flag_set(&entities[i].entflags,    ENTFLAG_GROUNDED, false);
-        flag_set(&entities[i].entflags,    ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(entities[i].index));
+        flag_set(&entities[i].entflags, ENTFLAG_ACTIVE, true);
+        flag_set(&entities[i].entflags, ENTFLAG_GROUNDED, false);
+        flag_set(&entities[i].entflags, ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(entities[i].index));
         if (entity_parser.entries[i].entflags & ENTFLAG_CARDCHUNK) {
             entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX; // Generic LOD card
             entities[i].collider = COLLIDER_TYPE_BOX;
@@ -83,7 +83,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
         
     instances[i].index = entIdx;
-//     if (ConstIndexIsNPC(entIdx)) InitializeAI(i); TODO
+//     if (ConstIndexIsNPC(entIdx)) InitializeAIAfterLoad(i); TODO
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[i].modelIndex = entities[entIdx].modelIndex;
     instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
@@ -616,6 +616,7 @@ void LoadLevel(uint8_t curlevel) {
     DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
+    
     // Set Physics
     for (int i=0;i<ARRSIZE;++i) { gridCellFloorHeight[i] = -FLT_MAX; gridCellCeilingHeight[i] = FLT_MAX;}
     for (int i=PLAYER1;i<loadedInstances;++i) {

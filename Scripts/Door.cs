@@ -3,54 +3,47 @@ using System.Collections;
 using System.Text;
 
 public class Door : MonoBehaviour {
-	public string target;
-	public string argvalue;
-	public bool onlyTargetOnce;
-	[Tooltip("Delay after full open before door closes")] public float delay;
-	[Tooltip("Whether door is locked, unuseable until unlocked")] public bool locked; // saved
-	public int securityThreshhold = 100; // If security level is not below this level, this is unusable.
-	[Tooltip("If yes, door never closes automatically")] public bool stayOpen;
-	[Tooltip("Should door start open (you should set stayOpen too!)")] public bool startOpen;
-	[Tooltip("Should door start partially open")] public bool ajar = false; // save
-	[Tooltip("If partially open, by what percentage")] public float ajarPercentage = 0.5f;
-	[Tooltip("Delay after use before door can be re-used")] public float useTimeDelay = 0.15f;
-	public int lockedMessageLingdex = 3;
-	public bool blocked = false; // save
-	[Tooltip("Door sound when opening or closing")] public int SFXIndex = 75;
-	public AccessCardType requiredAccessCard = AccessCardType.None;
-	public bool accessCardUsedByPlayer = false; // save
-	public DoorState doorOpen; // save
-	public float timeBeforeLasersOn;
-	public GameObject[] laserLines;
-	public GameObject[] collidersList;
-	public bool toggleLasers = false;
-	public bool targettingOnlyUnlocks = false;
-	public float animatorPlaybackTime; // save
-	public bool changeLayerOnOpenClose = false;
-
-	[HideInInspector] public bool targetAlreadyDone = false; // save
-	[HideInInspector] public float lasersFinished; // save
-	[HideInInspector] public float useFinished; // save
-	[HideInInspector] public float waitBeforeClose; // save
-	[HideInInspector] public Animator anim;
-	private AudioSource SFX = null;
-	private GameObject dynamicObjectsContainer;
-	private const float topTime = 1.00f;
-	private const float defaultSpeed = 1.00f;
-	private const float speedZero = 0.00f;
-	private const string idleOpenClipName = "IdleOpen";
-	private const string idleClosedClipName = "IdleClosed";
-	private const string openClipName = "DoorOpen";
-	private const string closeClipName = "DoorClose";
-	private int i = 0;
-	private bool firstUpdateAfterLoad = false;
-	private string loadedClipName;
-	private int loadedClipIndex;
-	private float loadedAnimatorPlaybackTime;
-	private bool initialized = false;
-	private AnimatorStateInfo asi;
-	private bool delayFrame = false;
-	private static StringBuilder s1 = new StringBuilder();
+	string target;
+	bool onlyTargetOnce;
+	float delay;
+	bool locked; // saved
+	int securityThreshhold = 100; // If security level is not below this level, this is unusable.
+	bool stayOpen;
+	bool startOpen;
+	bool ajar = false; // save
+	float ajarPercentage = 0.5f;
+	float useTimeDelay = 0.15f;
+	int lockedMessageLingdex = 3;
+	bool blocked = false; // save
+	int SFXIndex = 75;
+	AccessCardType requiredAccessCard = AccessCardType.None;
+	bool accessCardUsedByPlayer = false; // save
+	DoorState doorOpen; // save
+	float timeBeforeLasersOn;
+	GameObject[] laserLines;
+	GameObject[] collidersList;
+	bool toggleLasers = false;
+	bool targettingOnlyUnlocks = false;
+	float animatorPlaybackTime; // save
+	bool changeLayerOnOpenClose = false;
+	bool targetAlreadyDone = false; // save
+	float lasersFinished; // save
+	float useFinished; // save
+	float waitBeforeClose; // save
+	Animator anim;
+	AudioSource SFX = null;
+	GameObject dynamicObjectsContainer;
+	float topTime = 1.00f;
+	float defaultSpeed = 1.00f;
+	float speedZero = 0.00f;
+	int i = 0;
+	bool firstUpdateAfterLoad = false;
+	string loadedClipName;
+	int loadedClipIndex;
+	float loadedAnimatorPlaybackTime;
+	bool initialized = false;
+	AnimatorStateInfo asi;
+	bool delayFrame = false;
 
 	void Start () {
 		if (initialized) return;
@@ -87,13 +80,13 @@ public class Door : MonoBehaviour {
 		}
 
 		// SHODAN can go anywhere!  Full security override!
-		if (LevelManager.a.superoverride || Const.a.difficultyMission <= 0) {
+		if (LevelManager.a.superoverride || SSys_Global.difficultyMission <= 0) {
 			locked = false;
 			requiredAccessCard = AccessCardType.None;
 			accessCardUsedByPlayer = true;
 		}
 
-		if (Const.a.difficultyMission <= 1) {
+		if (SSys_Global.difficultyMission <= 1) {
 			requiredAccessCard = AccessCardType.None;
 			accessCardUsedByPlayer = true;
 		}
@@ -116,7 +109,6 @@ public class Door : MonoBehaviour {
 
 				if ((onlyTargetOnce && !targetAlreadyDone) || !onlyTargetOnce) {
 					targetAlreadyDone = true;
-					ud.argvalue = argvalue;
 					Const.a.UseTargets(gameObject,ud,target);
 				}
 
@@ -246,7 +238,7 @@ public class Door : MonoBehaviour {
 		for (i=0;i<dynamicObjectsContainer.transform.childCount;i++) {
 			childGO = dynamicObjectsContainer.transform.GetChild(i).gameObject;
 			objPos = childGO.transform.position;
-			if (Vector3.Distance(transform.position,objPos) < 5) {
+			if (distance_vector3(transform.position,objPos) < 5) {
 				Rigidbody childRbody = childGO.GetComponent<Rigidbody>();
 				if (childRbody != null) childRbody.WakeUp(); // No ghosting!
 			}
@@ -305,7 +297,7 @@ public class Door : MonoBehaviour {
 
 		if (Sys_Global.pauseRelativeTime > waitBeforeClose) {
 			if ((doorOpen == DoorState.Open) && (!stayOpen) && (!startOpen) && !delayFrame) {
-				Debug.Log("Close Door, stayOpen: " + stayOpen.ToString());
+				DualLog("Close Door, stayOpen: " + stayOpen.ToString());
 				CloseDoor();
 			}
 		}
@@ -344,144 +336,11 @@ public class Door : MonoBehaviour {
 		loadedAnimatorPlaybackTime = t;
 	}
 
-	public string GetClipName() {
-		string clipName = idleClosedClipName;
-		switch (doorOpen) {
-			case DoorState.Closed: clipName = idleClosedClipName; break;
-			case DoorState.Open: clipName = idleOpenClipName; break;
-			case DoorState.Closing: clipName = closeClipName; break;
-			case DoorState.Opening: clipName = openClipName; break;
-		}
-		return clipName;
-	}
-
 	void OnDisable() {
 		AnimatorStateInfo asi = anim.GetCurrentAnimatorStateInfo(0);
 		loadedClipName = GetClipName();
 		loadedClipIndex = 0;
 		loadedAnimatorPlaybackTime = asi.normalizedTime;
 		firstUpdateAfterLoad = true;
-	}
-
-	public static string Save(GameObject go, PrefabIdentifier prefID) {
-		Door dr = go.GetComponent<Door>();
-		s1.Clear();
-		s1.Append(Utils.SaveString(dr.target,"target"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveString(dr.argvalue,"argvalue"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.onlyTargetOnce,"onlyTargetOnce"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.targetAlreadyDone,"targetAlreadyDone"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(dr.delay,"delay"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.locked,"locked"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.IntToString(dr.securityThreshhold,"securityThreshhold"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.stayOpen,"stayOpen"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.startOpen,"startOpen"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.ajar,"ajar"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(dr.ajarPercentage,"ajarPercentage"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(dr.useTimeDelay,"useTimeDelay"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.IntToString(dr.lockedMessageLingdex,"lockedMessageLingdex"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.blocked,"blocked"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(dr.useFinished,"useFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(dr.waitBeforeClose,"waitBeforeClose"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.IntToString(Utils.AccessCardTypeToInt(dr.requiredAccessCard),"requiredAccessCard"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(dr.timeBeforeLasersOn,"timeBeforeLasersOn"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(dr.lasersFinished,"lasersFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.accessCardUsedByPlayer,"accessCardUsedByPlayer"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.toggleLasers,"toggleLasers"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.targettingOnlyUnlocks,"targettingOnlyUnlocks"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(dr.changeLayerOnOpenClose,"changeLayerOnOpenClose"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.IntToString(DoorStateToInt(dr.doorOpen),"doorOpenState"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(dr.animatorPlaybackTime,"animatorPlaybackTime"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index,
-						   PrefabIdentifier prefID) {
-		Door dr = go.GetComponent<Door>();
-		if (dr == null) {
-			Debug.Log("Door.Load failure, dr == null on " + go.name);
-			return index + 10;
-		}
-
-		if (index < 0) {
-			Debug.Log("Door.Load failure, index < 0");
-			return index + 10;
-		}
-
-		if (entries == null) {
-			Debug.Log("Door.Load failure, entries == null");
-			return index + 10;
-		}
-
-		dr.target = Utils.LoadString(entries[index],"target"); index++;
-		dr.argvalue = Utils.LoadString(entries[index],"argvalue"); index++;
-		dr.onlyTargetOnce = Utils.GetBoolFromString(entries[index],"onlyTargetOnce"); index++;
-		dr.targetAlreadyDone = Utils.GetBoolFromString(entries[index],"targetAlreadyDone"); index++;
-		dr.delay = Utils.GetFloatFromString(entries[index],"delay"); index++;
-		dr.locked = Utils.GetBoolFromString(entries[index],"locked"); index++;
-		dr.securityThreshhold = Utils.GetIntFromString(entries[index],"securityThreshhold"); index++;
-		dr.stayOpen = Utils.GetBoolFromString(entries[index],"stayOpen"); index++;
-		dr.startOpen = Utils.GetBoolFromString(entries[index],"startOpen"); index++;
-		dr.ajar = Utils.GetBoolFromString(entries[index],"ajar"); index++;
-		dr.ajarPercentage = Utils.GetFloatFromString(entries[index],"ajarPercentage"); index++;
-		dr.useTimeDelay = Utils.GetFloatFromString(entries[index],"useTimeDelay"); index++;
-		dr.lockedMessageLingdex = Utils.GetIntFromString(entries[index],"lockedMessageLingdex"); index++;
-		dr.blocked = Utils.GetBoolFromString(entries[index],"blocked"); index++;
-		dr.useFinished = Utils.LoadRelativeTimeDifferential(entries[index],"useFinished"); index++;
-		dr.waitBeforeClose = Utils.LoadRelativeTimeDifferential(entries[index],"waitBeforeClose"); index++;
-		dr.requiredAccessCard = Utils.IntToAccessCardType(Utils.GetIntFromString(entries[index],"requiredAccessCard")); index++;
-		dr.timeBeforeLasersOn = Utils.GetFloatFromString(entries[index],"timeBeforeLasersOn"); index++;
-		dr.lasersFinished = Utils.LoadRelativeTimeDifferential(entries[index],"lasersFinished"); index++;
-		dr.accessCardUsedByPlayer = Utils.GetBoolFromString(entries[index],"accessCardUsedByPlayer"); index++;
-		dr.toggleLasers = Utils.GetBoolFromString(entries[index],"toggleLasers"); index++;
-		dr.targettingOnlyUnlocks = Utils.GetBoolFromString(entries[index],"targettingOnlyUnlocks"); index++;
-		dr.changeLayerOnOpenClose = Utils.GetBoolFromString(entries[index],"changeLayerOnOpenClose"); index++;
-		dr.doorOpen = IntToDoorState(Utils.GetIntFromString(entries[index],"doorOpenState")); index++;
-		dr.animatorPlaybackTime = Utils.GetFloatFromString(entries[index],"animatorPlaybackTime"); index++;
-		dr.SetAnimFromLoad(dr.GetClipName(),0,dr.animatorPlaybackTime);
-		return index;
-	}
-
-	public static int DoorStateToInt(DoorState state) {
-		switch (state) {
-			case DoorState.Closed:  return 0;
-			case DoorState.Open:    return 1;
-			case DoorState.Closing: return 2;
-			case DoorState.Opening: return 3;
-		}
-		return 0;
-	}
-
-	public static DoorState IntToDoorState(int state) {
-		switch (state) {
-			case 0: return DoorState.Closed;
-			case 1: return DoorState.Open;
-			case 2: return DoorState.Closing;
-			case 3: return DoorState.Opening;
-		}
-		return DoorState.Closed;
 	}
 }

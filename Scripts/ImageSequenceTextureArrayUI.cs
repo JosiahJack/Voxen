@@ -21,7 +21,7 @@ public class ImageSequenceTextureArrayUI : MonoBehaviour {
 	
 	void Start () {
 		objects = Resources.LoadAll(resourceFolder, typeof(Sprite)); //Load all textures found on the Sequence folder, that is placed inside the resources folder
-		if (resourceFolder == "AAOutro") Debug.Log("objects.Length: " + objects.Length.ToString());
+		if (resourceFolder == "AAOutro") DualLog("objects.Length: " + objects.Length.ToString());
 		sprites = new Sprite[objects.Length]; //Initialize the array of textures with the same size as the objects array
 
 		//Cast each Object to Texture and store the result inside the Textures array

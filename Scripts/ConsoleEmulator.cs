@@ -70,7 +70,7 @@ public static class ConsoleEmulator {
 			case 6: val = PlayerMovement.a.lastCommand6; break;
 		}
 
-        if (string.IsNullOrWhiteSpace(val)) return;
+        if (data_parser_isspace(val)) return;
 
         PlayerMovement.a.consoleinpFd.text = val;
 		PlayerMovement.a.consoleinpFd.MoveTextEnd(false);
@@ -93,7 +93,7 @@ public static class ConsoleEmulator {
 			case 5: val = PlayerMovement.a.lastCommand5; break;
 			case 6: val = PlayerMovement.a.lastCommand6; break;
 		}
-        if (string.IsNullOrWhiteSpace(val)) { consoleMemdex = 0; return; }
+        if (data_parser_isspace(val)) { consoleMemdex = 0; return; }
 
         PlayerMovement.a.consoleinpFd.text = val;
 		PlayerMovement.a.consoleinpFd.MoveTextEnd(false);
@@ -104,7 +104,7 @@ public static class ConsoleEmulator {
     }
 
     private static void ShiftLastCommand(string entry) {
-        if (string.IsNullOrWhiteSpace(entry)) return; // Only remember real cmd.
+        if (data_parser_isspace(entry)) return; // Only remember real cmd.
 
         lastCommand[6] = lastCommand[5];
         lastCommand[5] = lastCommand[4];
@@ -1381,21 +1381,21 @@ Generic Materials (Const.a.genericMaterials[])
 												GameObject forcedContainer,
 												int saveID) {
 		if (!ConstIndexInBounds(val)) {
-			Debug.Log("Const index out of bounds: " + val.ToString());
+			DualLog("Const index out of bounds: " + val.ToString());
 			return null;
 		}
 		
 		if (cheat) {
-			Debug.Log("Cheat spawn: " + val.ToString() + ", level: "
+			DualLog("Cheat spawn: " + val.ToString() + ", level: "
 					  + lev.ToString() + ", from cheat: " + cheat.ToString()
 					  + ", name: "
 					  + (forcedContainer == null ? "null" : forcedContainer.name)
 					  + ", saveID: " + saveID.ToString());
 		}
 
-		if (LevelManager.a == null) { Debug.Log("No LevelManager"); return null; }
-		if (cheat && Inventory.a == null) { Debug.Log("No Inventory"); return null; }
-		if (cheat && Const.a == null) { Debug.Log("No Const"); return null; }
+		if (LevelManager.a == null) { DualLog("No LevelManager"); return null; }
+		if (cheat && Inventory.a == null) { DualLog("No Inventory"); return null; }
+		if (cheat && Const.a == null) { DualLog("No Const"); return null; }
 
 		if (lev < 0 || lev > 13) lev = 1; // Fallback to Medical.
 		Vector3 spawnPos = Vector3.zero;
@@ -1440,7 +1440,7 @@ Generic Materials (Const.a.genericMaterials[])
 				}
 			}
 		} else {
-			Debug.Log("SpawnDynamicObject failure: go == null at the end when "
+			DualLog("SpawnDynamicObject failure: go == null at the end when "
 					  + "trying to spawn constdex " + val.ToString()
 					  + ", for level " + lev.ToString() + ", given container "
 					  + (forcedContainer == null ? "-" : forcedContainer.name)

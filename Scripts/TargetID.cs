@@ -7,9 +7,9 @@ public class TargetID : MonoBehaviour {
 	public string currentText;
 	public bool useLife;
 	public float lifetime;
-	[HideInInspector] public float lifetimeFinished;
-	[HideInInspector] public float damageTime;
-	[HideInInspector] public float damageTimeFinished;
+	float lifetimeFinished;
+	float damageTime;
+	float damageTimeFinished;
 	public ParticleSystem partSys;
 	/*[DTValidator.Optional] */public Transform parent;
 	/*[DTValidator.Optional] */public HealthManager linkedHM;
@@ -98,7 +98,7 @@ public class TargetID : MonoBehaviour {
 			return;
 		}
 
-		if ((Vector3.Distance(transform.position,
+		if ((distance_vector3(transform.position,
 							  playerCapsuleTransform.position)
 			> playerLinkDistance)) {
 			Deactivate();
@@ -123,7 +123,7 @@ public class TargetID : MonoBehaviour {
 		}
 
 		if (displayRange && linkedHM != null) {
-			float range = Vector3.Distance(playerCapsuleTransform.position,
+			float range = distance_vector3(playerCapsuleTransform.position,
 										   linkedHM.transform.position);
 
 			if (displayHealth) secondaryDisplayString += comma;

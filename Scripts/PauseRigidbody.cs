@@ -2,7 +2,7 @@
 using System.Collections;
 
 public class PauseRigidbody : MonoBehaviour {
-	[HideInInspector] public Rigidbody rbody;
+	Rigidbody rbody;
 	public Vector3 previousVelocity;
 	public bool previousUseGravity;
 	public bool previousKinematic;
@@ -17,7 +17,7 @@ public class PauseRigidbody : MonoBehaviour {
 		if (rbody == null) rbody = GetComponent<Rigidbody>();
 		if (rbody == null) rbody = gameObject.AddComponent<Rigidbody>();
 		if (!Const.a.prb.Contains(this)) Const.a.prb.Add(this);
-		if (rbody.isKinematic && rbody.collisionDetectionMode != CollisionDetectionMode.ContinuousSpeculative) Debug.Log(gameObject.name + " has isKinematic true on initialize when not using ContinuousSpeculative!");
+		if (rbody.isKinematic && rbody.collisionDetectionMode != CollisionDetectionMode.ContinuousSpeculative) DualLog(gameObject.name + " has isKinematic true on initialize when not using ContinuousSpeculative!");
 		SetPreviousValues();
 	}
 

@@ -184,7 +184,7 @@ public class Config {
 		SetVSync();
 		if (MainMenuHandler.a != null) MainMenuHandler.a.RenderConfigView();
 		SaveConfigToPlayerPrefs();
-		if (Const.a.difficultyMission < 3) {
+		if (SSys_Global.difficultyMission < 3) {
 			MissionTimer.a.text.text = System.String.Empty;
 			MissionTimer.a.timerTypeText.text = System.String.Empty;
 			MFDManager.a.overallMissionTimerT.SetActive(false);
@@ -242,7 +242,7 @@ public class Config {
 			QualitySettings.vSyncCount = 0;
 		}
 		
-		Debug.Log("Set VSYNC to " + Const.a.GraphicsVSync.ToString() + ", target framerate is " + Application.targetFrameRate.ToString());
+		DualLog("Set VSYNC to " + Const.a.GraphicsVSync.ToString() + ", target framerate is " + Application.targetFrameRate.ToString());
 	}
 
 	public static void SetFXAA(AntialiasingModel.FxaaPreset preset) {

@@ -9,9 +9,9 @@ public class ObjectImpact : MonoBehaviour {
 	public int impactSFXIndex = 523;
 
 	// Internal references, required
-	[HideInInspector] public AudioSource SFXSource;
-	[HideInInspector] public Rigidbody rbody;
-	[HideInInspector] public Vector3 oldVelocity;
+	AudioSource SFXSource;
+	Rigidbody rbody;
+	Vector3 oldVelocity;
 
 	void Start () {
 		rbody = GetComponent<Rigidbody>();

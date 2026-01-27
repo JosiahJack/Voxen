@@ -34,7 +34,7 @@ public class ConfigurationMenuSSRApply : MonoBehaviour {
 	void Initialize() {
 		if (picker == null) picker = GetComponent<Dropdown>();
 		if (picker == null) {
-			Debug.Log("BUG: ConfigurationMenuSSRApply missing component for "
+			DualLog("BUG: ConfigurationMenuSSRApply missing component for "
 					  + "aaPicker.");
 		}
 

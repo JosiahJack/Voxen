@@ -18,7 +18,6 @@ public class KeypadElevator : MonoBehaviour {
 	public bool padInUse; // save
 	public bool locked = false; // save
 	public string lockedTarget;
-	public string argvalue;
 	public int lockedMessageIndex = -1;
 	
 	private static StringBuilder s1 = new StringBuilder();
@@ -26,7 +25,7 @@ public class KeypadElevator : MonoBehaviour {
 	void Start () {
 		padInUse = false;
 		if (linkedDoor == null) {
-			Debug.Log("BUG: no linked Door for KeypadElevator at location: "
+			DualLog("BUG: no linked Door for KeypadElevator at location: "
 					  + transform.position.ToString());
 		}
 	}
@@ -37,7 +36,7 @@ public class KeypadElevator : MonoBehaviour {
 			return;
 		}
 
-		if (LevelManager.a.superoverride || Const.a.difficultyMission == 0) {
+		if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -46,7 +45,6 @@ public class KeypadElevator : MonoBehaviour {
 			// Target something because we are locked like an info_message to say
 			// hey we are locked, e.g. vox: "Non emergency life pods disabled."
 			Const.sprint(lockedMessageIndex);
-			ud.argvalue = argvalue;
 			Const.a.UseTargets(gameObject,ud,lockedTarget);
 			return;
 		}
@@ -67,7 +65,7 @@ public class KeypadElevator : MonoBehaviour {
 	public static string Save(GameObject go) {
 		KeypadElevator ke = go.GetComponent<KeypadElevator>();
 		if (ke == null) {
-			Debug.Log("KeypadElevator missing on savetype of KeypadElevator! "
+			DualLog("KeypadElevator missing on savetype of KeypadElevator! "
 					  + " GameObject.name: " + go.name);
 
 			return "0|0";
@@ -83,17 +81,17 @@ public class KeypadElevator : MonoBehaviour {
 	public static int Load(GameObject go, ref string[] entries, int index) {
 		KeypadElevator ke = go.GetComponent<KeypadElevator>();
 		if (ke == null) {
-			Debug.Log("KeypadElevator.Load failure, ke == null");
+			DualLog("KeypadElevator.Load failure, ke == null");
 			return index + 2;
 		}
 
 		if (index < 0) {
-			Debug.Log("KeypadElevator.Load failure, index < 0");
+			DualLog("KeypadElevator.Load failure, index < 0");
 			return index + 2;
 		}
 
 		if (entries == null) {
-			Debug.Log("KeypadElevator.Load failure, entries == null");
+			DualLog("KeypadElevator.Load failure, entries == null");
 			return index + 2;
 		}
 

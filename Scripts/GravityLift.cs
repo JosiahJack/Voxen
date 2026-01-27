@@ -100,7 +100,7 @@ public class GravityLift : MonoBehaviour {
 	public static string Save(GameObject go) {
 		GravityLift gl = go.GetComponent<GravityLift>(); // Not quite Open, but hey
 		if (gl == null) {
-			Debug.Log("GravityLift missing on savetype of GravityLift!  GameObject.name: " + go.name);
+			DualLog("GravityLift missing on savetype of GravityLift!  GameObject.name: " + go.name);
 			return "1";
 		}
 
@@ -114,17 +114,17 @@ public class GravityLift : MonoBehaviour {
 	public static int Load(GameObject go, ref string[] entries, int index) {
 		GravityLift gl = go.GetComponent<GravityLift>();
 		if (gl == null) {
-			Debug.Log("GravityLift.Load failure, gl == null");
+			DualLog("GravityLift.Load failure, gl == null");
 			return index + 1;
 		}
 
 		if (index < 0) {
-			Debug.Log("GravityLift.Load failure, index < 0");
+			DualLog("GravityLift.Load failure, index < 0");
 			return index + 1;
 		}
 
 		if (entries == null) {
-			Debug.Log("GravityLift.Load failure, entries == null");
+			DualLog("GravityLift.Load failure, entries == null");
 			return index + 1;
 		}
 

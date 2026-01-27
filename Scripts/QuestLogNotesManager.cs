@@ -1,10 +1,4 @@
-﻿using System.Collections;
-using System.Text;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-
-public class QuestLogNotesManager : MonoBehaviour {
+﻿public class QuestLogNotesManager : MonoBehaviour {
 	public GameObject[] notes;
 	public Text[] labels;
 	public Toggle[] checkBoxes;
@@ -39,7 +33,7 @@ public class QuestLogNotesManager : MonoBehaviour {
 			a.notes[i].SetActive(false);
 		}
 
-		if (Const.a.difficultyMission == 0) {
+		if (SSys_Global.difficultyMission == 0) {
 			gameObject.SetActive(false);
 			return;
 		}
@@ -101,7 +95,7 @@ public class QuestLogNotesManager : MonoBehaviour {
 	}
 
 	public void LogAdded(int logCustomIndex) {
-		if (Const.a.difficultyMission == 0) return;
+		if (SSys_Global.difficultyMission == 0) return;
 		// Not checking for eReader present here...best to assume so we don't
 		// have to do all this later and remember it and save it in save file.
 
@@ -192,7 +186,7 @@ public class QuestLogNotesManager : MonoBehaviour {
 	}
 
 	public void NodesDestroyed(int levelIndex) {
-		if (Const.a.difficultyMission == 0) return;
+		if (SSys_Global.difficultyMission == 0) return;
 
 		switch (levelIndex) {
 			case 1: // Level 1
@@ -271,45 +265,5 @@ public class QuestLogNotesManager : MonoBehaviour {
 			case 2: checkBoxes[13].isOn = true; break; // Antennae destroyed
 			case 3: checkBoxes[14].isOn = true; break; // Self destruct activated.
 		}
-	}
-	
-	public string Save() {
-		StringBuilder s1 = new StringBuilder();
-		s1.Clear();
-		for (int i=0;i<18;i++) {
-			s1.Append(Utils.BoolToString(a.notes[i].activeSelf,"notes[" + i.ToString() + "].activeSelf"));
-			s1.Append(Utils.splitChar);
-		}
-		
-		for (int i=0;i<18;i++) {
-			s1.Append(Utils.SaveString(a.labels[i].text,"labels[" + i.ToString() + "].text"));
-			s1.Append(Utils.splitChar);
-		}
-		
-		for (int i=0;i<18;i++) {
-			s1.Append(Utils.BoolToString(a.checkBoxes[i].isOn,"checkBoxes[" + i.ToString() + "].isOn"));
-			s1.Append(Utils.splitChar);
-		}
-		
-		s1.Append(Utils.BoolToString(a.label15_StrikeThru.activeSelf,"label15_StrikeThru.activeSelf"));
-
-		return s1.ToString();
-	}
-	
-	public int Load(ref string[] entries, int index) {
-		for (int i=0;i<18;i++) {
-			a.notes[i].SetActive(Utils.GetBoolFromString(entries[index],"notes[" + i.ToString() + "].activeSelf")); index++;
-		}
-		
-		for (int i=0;i<18;i++) {
-			a.labels[i].text = Utils.LoadString(entries[index],"labels[" + i.ToString() + "].text"); index++;
-		}
-		
-		for (int i=0;i<18;i++) {
-			a.checkBoxes[i].isOn = Utils.GetBoolFromString(entries[index],"checkBoxes[" + i.ToString() + "].isOn"); index++;
-		}
-		
-		a.label15_StrikeThru.SetActive(Utils.GetBoolFromString(entries[index],"label15_StrikeThru.activeSelf")); index++;
-		return index;
 	}
 }

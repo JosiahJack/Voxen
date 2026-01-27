@@ -7,7 +7,7 @@ public class ElevatorButton : MonoBehaviour {
 	public bool doorOpen = false;
 
 	// Externally modified
-	[HideInInspector] public GameObject targetDestination;
+	GameObject targetDestination;
 
 	// Internal references
 	private Text childText;
@@ -46,7 +46,7 @@ public class ElevatorButton : MonoBehaviour {
 
 		bool dC = MFDManager.a.linkedElevatorDoor.doorOpen == DoorState.Closed;
 		Vector3 plyPos = MFDManager.a.playerCapsuleTransform.position;
-		float dist = Vector3.Distance(MFDManager.a.objectInUsePos,plyPos);
+		float dist = distance_vector3(MFDManager.a.objectInUsePos,plyPos);
 		if (dist > Const.elevatorPadUseDistance && !dC) {
 			Const.sprint(Const.a.stringTable[6]); // Too far away from that.
 			return;

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 public class PuzzleGrid : MonoBehaviour {
-	[HideInInspector] public PuzzleGridPuzzle puzzleGP;
+	PuzzleGridPuzzle puzzleGP;
 	public bool[] powered;
 	public PuzzleCellType[] cellType;
 	public PuzzleGridType gridType;
@@ -50,7 +50,6 @@ public class PuzzleGrid : MonoBehaviour {
 	public bool[] grid;
 	private UseData udSender;
 	private string target;
-	private string argvalue;
 	private bool[] checkedCells;
 
 	void Awake () {
@@ -97,7 +96,7 @@ public class PuzzleGrid : MonoBehaviour {
 		EvaluatePuzzle();
 		UpdateCellImages();
 
-		if (udSender.mainIndex == 54 || Const.a.difficultyPuzzle == 0) {
+		if (udSender.mainIndex == 54 || SSys_Global.difficultyPuzzle == 0) {
 			PuzzleSolved(true);
 		}
 	}
@@ -111,7 +110,7 @@ public class PuzzleGrid : MonoBehaviour {
 		if (puzzleSolved) return;
 
 		if (cellType[index] == PuzzleCellType.Standard) {
-			if (Const.a.difficultyPuzzle == 1) {
+			if (SSys_Global.difficultyPuzzle == 1) {
 				King(index); // Easy puzzle difficulty.  Chose King instead of Pawn to help speed up the puzzle by the antenna trap on Level 7
 			} else {
 				switch (gridType) {
@@ -135,7 +134,7 @@ public class PuzzleGrid : MonoBehaviour {
 			if (puzzleSolved) return;
 
 			if (cellType[index] == PuzzleCellType.Standard) {
-				if (Const.a.difficultyPuzzle == 1) {
+				if (SSys_Global.difficultyPuzzle == 1) {
 					HoverKing(index); // Easy puzzle difficulty.  Chose King instead of Pawn to help speed up the puzzle by the antenna trap on Level 7
 				} else {
 					switch (gridType) {

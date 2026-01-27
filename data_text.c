@@ -5,15 +5,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-void DualLog(const char* fmt, ...);
-void DualLogError(const char* fmt, ...);
-double get_time(void);
 
 Voxen_Text voxen_Text;
 char** audiologNames = NULL;
 char** audiologSubjects = NULL;
 char** audiologSenders = NULL;
 char** audioLogSpeech2Text = NULL;
+uint16_t logImages = 1272; // Start index of first index 0 logImages[0] which is blank1.png
 
 size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst_len) {
     size_t dst_pos = 0; size_t src_pos = 0;
@@ -278,7 +276,6 @@ void LoadLogTextForLanguage(uint8_t lang) {
             voxen_Text.audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
             voxen_Text.audioLogType[readIndexOfLog]               = (uint8_t)readLogType;
             voxen_Text.audioLogLevelFound[readIndexOfLog]         = (uint8_t)readLogLevelFound;
-
             #define REPLACE_STR(dst, src) do { \
                 if ((dst)[readIndexOfLog]) free((dst)[readIndexOfLog]); \
                 size_t slen = strlen(src); \

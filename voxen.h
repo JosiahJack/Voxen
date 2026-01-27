@@ -43,6 +43,7 @@ typedef struct {
 	uint8_t difficultyCyber;
 	bool gamePaused;
 	bool menuActive;
+    bool gameFinished;
 	uint16_t ressurections;
 	uint16_t deaths;
 	uint16_t kills;
@@ -54,6 +55,7 @@ typedef struct {
 	uint32_t savesScummed;
 	uint8_t creditsPageIndex;
 	bool creditsActive;
+    bool decoyActive;
 	uint8_t creditsLength;
 	char playerName[32];
 } GlobalContext;
@@ -206,41 +208,6 @@ typedef struct {
     uint16_t hitInstanceIndex;
     bool hit;
 } RaycastHit;
-
-typedef struct {
-	int lev1SecCode;
-	int lev2SecCode;
-	int lev3SecCode;
-	int lev4SecCode;
-	int lev5SecCode;
-	int lev6SecCode;
-	bool lev1SecCodeLocked;
-	bool lev2SecCodeLocked;
-	bool lev3SecCodeLocked;
-	bool lev4SecCodeLocked;
-	bool lev5SecCodeLocked;
-	bool lev6SecCodeLocked;
-	bool RobotSpawnDeactivated;
-	bool IsotopeInstalled;
-	bool ShieldActivated;
-	bool LaserSafetyOverriden;
-	bool LaserDestroyed;
-	bool BetaGroveCyberUnlocked;
-	bool GroveAlphaJettisonEnabled;
-	bool GroveBetaJettisonEnabled;
-	bool GroveDeltaJettisonEnabled;
-	bool MasterJettisonBroken;
-	bool Relay428Fixed;
-	bool MasterJettisonEnabled;
-	bool BetaGroveJettisoned;
-	bool AntennaNorthDestroyed;
-	bool AntennaSouthDestroyed;
-	bool AntennaEastDestroyed;
-	bool AntennaWestDestroyed;
-	bool SelfDestructActivated;
-	bool BridgeSeparated;
-	bool IsolinearChipsetInstalled;
-} QuestBits;
 
 // BodyState
 typedef uint8_t BodyState;
@@ -687,61 +654,163 @@ typedef struct {
 	int projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
-#define NPCID (instances[i].index - 419)
+#define ENTITY_IDX selfIdx
+#define NPCID (instances[selfIdx].index - 419)
 
+typedef struct {
+	uint16_t owner; // pass main GameObject that contains the script PlayerReferenceManager
+	int mainIndex; // master index value for lookup in the Const tables
+	int customIndex;
+	bool bitsSet;
+	uint16_t texture;
+    
+	// Action bits.  What do we want our target to do, e.g. turn on a light or close a door or activate force bridge
+	// Using multiple bools to allow for multiple actions to be attempted on all the targets
+	bool tripTrigger; // force activate a trigger
+	bool doorOpen; // force opens the door
+	bool doorOpenIfUnlocked; // open a door only if it isn't locked
+	bool doorClose; // force closes the door
+	bool doorLock; // locks door, argvalue sets the locked message
+	bool doorUnlock; // unlocks door
+	bool switchTrigger; // force use a switch
+	bool chargeStationRecharge; // force recharge a charging station
+	bool enemyAlert; // alert an enemy and pass owner as the new enemy
+	bool forceBridgeActivate; // activate a force bridge
+	bool forceBridgeDeactivate; // deactivate a force bridge
+	bool forceBridgeToggle; // toggle a force bridge
+	bool gravityLiftToggle; // activate a gravity lift
+	bool textureChangeToggle; // toggle a texture on something
+	bool lightOn; // turn on the light
+	bool lightOff; // turn out that light!
+	bool lightToggle; // flip the switch
+	bool funcwallMove; // target a moving wall
+	bool missionBitOn; // turn a mission quest bit on
+	bool missionBitOff; // turn a mission quest bit off
+	bool missionBitToggle; // toggle mission bit
+	bool transferToLogicRelay; // send on to any relays to allow for special extra bits
+	bool sendEmail; // send all players an email
+	bool switchLockToggle; // toggle locked state of a ButtonSwitch
+	bool lockCodeToScreenMaterialChanger; // set the code on a screen after CPUs are destroyed
+	bool spawnerActivate; // activate a SpawnManager
+	bool spawnerActivateAlerted; // activate a SpawnManager and notify all enemies of the player's location
+	bool cyborgConversionToggle; // toggle cyborg conversion so player can respawn on current level
+	bool GOSetActive; // turn a gameObject on
+	bool GOSetDeactive; // turn a gameObject off
+	bool GOToggleActive; // toggle gameObject on/off
+	bool toggleRadiationTrigger; // toggle radiation on/off for a radiation trigger
+	bool toggleRelayEnabled; // toggle logic relay enabled state
+	bool togglePuzzlePanelLocked; // toggle whether a puzzle panel is locked or not
+	bool testQuestBitIsOn; // run target if a certain quest bit is on
+	bool testQuestBitIsOff; // run target if a certain quest bit is off
+	bool playSoundOnce; // play a sound effect
+	bool stopSound; // play a sound effect
+	bool sendSprintMessage; // sprint to the status bar
+	bool radiationTreatment; // flash radiation treatment static on player's screen who used the treatment
+	bool startFlashingMaterials; // enable flashing of materials blink blink blink blink blink!
+	bool stopFlashingMaterials; // disable flashing
+	bool unlockElevatorPad; // unlock elevator pad
+	bool unlockKeycodePad; // unlock elevator keypad
+	bool unlockPuzzlePad; // unlock puzzle pad, grid or wire
+	bool screenShake; // shake the screen/earthquake
+	bool awakeSleepingEnemy; // awaken a sleeping enemy, e.g. the sec-2 bots that are in repair sleep on level 8
+	bool branchFlip; // flip logic_branchs
+	bool branchFlipOnly; // only flip the branch, not flip and fire
+	bool doorAccessCardOverrideToggle; // set that access card has already been used
+	bool unlockSwitch; // unlock a ButtonSwitch
+	bool lockElevatorPad; // lock elevator pad
+	bool doorToggle; // Actuate door, similar to use to open/close
+} UseData;
+
+#define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
+#define MAX_WAYPOINTS 32
 #define MAX_CHILD_COUNT 4
 #define MAX_ENTITIES 768 // Unique entity types, different than INSTANCE_COUNT which is the number of instances of any of these entities.
 #define NULLENT 0u
+#define WORLD   0u // Much like Quake, the world is entity 0.  Aand also like Quake, world is nullent and is 0.
 #define PLAYER1 1u
 #define PLAYER2 2u
 #define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE                  1u
-#define ENTFLAG_CARDCHUNK               2u
-#define ENTFLAG_GROUNDED                4U
-#define ENTFLAG_USEGRAVITY              8u
-#define ENTFLAG_KINEMATIC              16u
-#define ENTFLAG_RIGIDBODY              32u
-#define ENTFLAG_DOUBLESIDED            64u
-#define ENTFLAG_TRANSPARENT           128u
-#define ENTFLAG_CHANGE_TEX_ON_ACTIVE  256u
-#define ENTFLAG_BLINK_TEX_ON_ACTIVE   512U
-#define ENTFLAG_NO_SHADOWS           1024u
-#define ENTFLAG_ANIMATED             2048u
-#define ENTFLAG_ASLEEP               4096u // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
-#define ENTFLAG_WALK_PATH_ON_START   8192u
-#define ENTFLAG_TEST_PERSISTENT     16384u
-#define ENTFLAG_TEST_OVERRIDE_TEST  32768u
-#define ENTFLAG_TOUCHING_HURTS      65536u
-#define ENTFLAG_ACT_AS_CORPSE_ONLY 131072u
-#define ENTFLAG_DYING              262144u
-#define ENTFLAG_DEATH_BURST_DONE   524288u
-#define ENTFLAG_DEAD              1048576u
-#define ENTFLAG_TELEPORT_ON_DEATH 2097152u
-#define ENTFLAG_GO_INTO_PAIN      4194304u
-#define ENTFLAG_DONT_LOOP_WAYPTS  8388608u
-#define ENTFLAG_DONT_LOOP_WAYPTS  8388608u
-#define ENTFLAG_VISIT_WAYPTS_RND 16777216u
-#define ENTFLAG_WANDERING        33554432u
-#define ENTFLAG_ACT_AS_TURRET    67108864u
-#define ENTFLAG_TARGID_ATTACHED 134217728u
-// #define ENTFLAG_ENEM_IN_SIGHT
-// #define ENTFLAG_ENEM_IN_FRONT
-// #define ENTFLAG_ENEM_IN_FOV
-// #define ENTFLAG_ENEM_IN_LOS
-// #define ENTFLAG_GO_INTO_PAIN
-// #define ENTFLAG_FIRST_SIGHTING
-// #define ENTFLAG_DYING_SETUP
-// #define ENTFLAG_HAD_ENEMY
-// #define ENTFLAG_SHOT_FIRED
-// #define ENTFLAG_DEAD_CHECKS_DONE
-// #define ENTFLAG_DEATH_BURST_DONE
-// #define ENTFLAG_HOP_DONE
-static inline void flag_enable(uint32_t *flags, uint32_t bit) { *flags |= bit; }
-static inline void flag_disable(uint32_t *flags, uint32_t bit) { *flags &= ~bit; }
-static inline void flag_set(uint32_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+#define ENTFLAG_ACTIVE                      1u
+#define ENTFLAG_CARDCHUNK                   2u
+#define ENTFLAG_GROUNDED                    4u
+#define ENTFLAG_USEGRAVITY                  8u
+#define ENTFLAG_KINEMATIC                  16u
+#define ENTFLAG_RIGIDBODY                  32u
+#define ENTFLAG_DOUBLESIDED                64u
+#define ENTFLAG_TRANSPARENT               128u
+#define ENTFLAG_CHANGE_TEX_ON_ACTIVE      256u
+#define ENTFLAG_BLINK_TEX_ON_ACTIVE       512u
+#define ENTFLAG_NO_SHADOWS               1024u
+#define ENTFLAG_ANIMATED                 2048u
+#define ENTFLAG_ASLEEP                   4096u // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
+#define ENTFLAG_WALK_PATH_ON_START       8192u
+#define ENTFLAG_TEST_PERSISTENT         16384u
+#define ENTFLAG_TEST_OVERRIDE_TEST      32768u
+#define ENTFLAG_TOUCHING_HURTS          65536u
+#define ENTFLAG_ACT_AS_CORPSE_ONLY     131072u
+#define ENTFLAG_DYING                  262144u
+#define ENTFLAG_DEATH_BURST_DONE       524288u
+#define ENTFLAG_DEAD                  1048576u
+#define ENTFLAG_TELEPORT_ON_DEATH     2097152u
+#define ENTFLAG_GO_INTO_PAIN          4194304u
+#define ENTFLAG_DONT_LOOP_WAYPTS      8388608u
+#define ENTFLAG_VISIT_WAYPTS_RND     16777216u
+#define ENTFLAG_WANDERING            33554432u
+#define ENTFLAG_ACT_AS_TURRET        67108864u
+#define ENTFLAG_TARGID_ATTACHED     134217728u
+#define ENTFLAG_ENEM_IN_SIGHT       268435456u
+#define ENTFLAG_ENEM_IN_FRONT       536870912u
+#define ENTFLAG_ENEM_IN_FOV        1073741824u
+#define ENTFLAG_ENEM_IN_LOS        2147483648u
+#define ENTFLAG_FIRST_SIGHTING     4294967296u
+#define ENTFLAG_DYING_SETUP        8589934592u
+#define ENTFLAG_HAD_ENEMY         17179869184u
+#define ENTFLAG_SHOT_FIRED        34359738368u
+#define ENTFLAG_DEAD_CHECKS_DONE  68719476736u
+#define ENTFLAG_HOP_DONE         137438953472u
+
+#define QUESTBIT_ROBOT_SPAWN_DEACTIVATED          1u
+#define QUESTBIT_ISOTOPE_INSTALLED                2u
+#define QUESTBIT_SHIELD_ACTIVATED                 4u
+#define QUESTBIT_LASER_SAFETY_OVERRIDEN           8u
+#define QUESTBIT_LASER_DESTROYED                 16u
+#define QUESTBIT_BETA_GROVE_CYBER_UNLOCKED       32u
+#define QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED    64u
+#define QUESTBIT_GROVE_BETA_JETTISON_ENABLED    128u
+#define QUESTBIT_GROVE_DELTA_JETTISON_ENABLED   256u
+#define QUESTBIT_MASTER_JETTISON_BROKEN         512u
+#define QUESTBIT_RELAY_428_FIXED               1024u
+#define QUESTBIT_MASTER_JETTISON_ENABLED       2048u
+#define QUESTBIT_BETA_GROVE_JETTISONED         4096u
+#define QUESTBIT_ANTENNA_NORTH_DESTROYED       8192u
+#define QUESTBIT_ANTENNA_SOUTH_DESTROYED      16384u
+#define QUESTBIT_ANTENNA_EAST_DESTROYED       32768u
+#define QUESTBIT_ANTENNA_WEST_DESTROYED       65536u
+#define QUESTBIT_SELF_DESTRUCT_ACTIVATED     131072u
+#define QUESTBIT_BRIDGE_SEPARATED            262144u
+#define QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED 524288u
+
+static inline void flag_set(uint64_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 typedef /*FAT*/ struct {
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
-    uint32_t entflags;
+    uint64_t entflags;
+    
+    // Logic and I/O
+    char targetname[40];
+    char target[40];
+    char targetIfFalse[40];
+    uint32_t ioflags;
+    int lev1SecCode;
+	int lev2SecCode;
+	int lev3SecCode;
+	int lev4SecCode;
+	int lev5SecCode;
+	int lev6SecCode;
+    void (*think)(void);
+    void (*use)(void);
+    UseData ud;
+    float health;
+    float cyberHealth;
 
 	// Rendering
 	uint16_t modelIndex;
@@ -811,12 +880,11 @@ typedef /*FAT*/ struct {
     Vector3 gunPointOffset2;
     uint16_t muzzleBurst;
     uint16_t muzzleBurst2;
-    void* think;
     uint16_t enemey;
 	float gracePeriodFinished;
 	float meleeDamageFinished;
     uint8_t walkWaypointsLength;
-    Vector3 walkWaypoints[32];
+    Vector3 walkWaypoints[MAX_WAYPOINTS];
 	uint16_t dyingTexture;
 	uint16_t deathTexture;
 	uint16_t deathBurst;
@@ -846,7 +914,7 @@ typedef /*FAT*/ struct {
 	float wanderFinished;
 	float timeSinceMovedEnough;
 	float posCheckFinished;
-	char targetID[32];
+	char targetID[TARGET_ID_LENGTH];
 
 	// Misc
     char path[128];
@@ -943,34 +1011,32 @@ void DualLogError(const char* fmt, ...);
 #define ANIM_ATTACK_HIT  2
 
 extern GlobalContext Sys_Global;
-extern QuestBits questData;
 extern SettingsSystem Sys_Settings;
 extern VoxenShadowSystem voxen_Shadow_System;
 extern DiagnosticsSystem Sys_Dx;
 extern CheatsSystem Sys_Cheats;
 extern Voxen_Text voxen_Text;
-// ----------------------------------------------------------------------------
-// Audio
+
 extern const char* sounds[670];
+extern const char* audioLogs[134];
 void play_mp3(const char* path, float volume, int32_t fade_in_ms);
 void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 void InitializeAudio(void);
+void InitializeAIAfterLoad(uint16_t i);
 void ResetLevelAudio(void);
 void UpdateAmbientSounds(void);
-// ----------------------------------------------------------------------------
-// Textures
+
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 25000000u
-#define MAX_UNIQUE_COLORS 1024000u
+#define MAX_TOTAL_PIXELS 24595200u
+#define MAX_UNIQUE_COLORS 76800u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
 bool isDoubleSided(uint32_t texIndexToCheck);
 bool isTransparent(uint32_t texIndexToCheck);
 void LoadTextures(void);
-// ----------------------------------------------------------------------------
-// Models
+
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
@@ -1293,6 +1359,7 @@ float GetScreenRelativeY(float percentage);
 #define EV_FLOAT_FIELD_UNUSED 0.0f
 #define EVENT_JOURNAL_BUFFER_SIZE 1000
 #define MAX_EVENTS_PER_FRAME 100
+#define DOUBLE_CLICK_TIME 0.5f
 extern Event eventQueue[MAX_EVENTS_PER_FRAME];
 extern int32_t eventJournalIndex;
 extern bool journalFirstWrite;
@@ -1378,6 +1445,7 @@ static inline float magnitude_vector3(const Vector3 v) { return vsqrtf(dot_vecto
 static inline Vector3 min_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x<b.x ? a.x : b.x, a.y<b.y ? a.y : b.y, a.z<b.z ? a.z : b.z }; }
 static inline Vector3 max_vector3(Vector3 a, Vector3 b) { return (Vector3){ a.x>b.x ? a.x : b.x, a.y>b.y ? a.y : b.y, a.z>b.z ? a.z : b.z }; }
 static inline float dist_sq_vector3(Vector3 a, Vector3 b) { Vector3 d = Vector3_A_minus_B(a, b); return dot_vector3(d, d); }
+static inline float distance_vector3(Vector3 a, Vector3 b) { return magnitude_vector3(Vector3_A_minus_B(a, b)); }
 static inline Vector3 cross_vector3(Vector3 a, Vector3 b) { return (Vector3){a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
 static inline void normalize_vector(float* x, float* y, float* z) { float len = vsqrtf(*x * *x + *y * *y + *z * *z); if (len > 1e-6f) { *x /= len; *y /= len; *z /= len; } }
 static inline Vector3 normalize_vector3(Vector3 v) { float len = magnitude_vector3(v); return len > 0.000001f ? (Vector3){v.x / len, v.y / len, v.z / len} : v; }
@@ -1449,3 +1517,11 @@ float GetPainStatic(void);
 Color GetPainStaticColor(void);
 void CycleToNextMonitor(GLFWwindow* window);
 size_t strlen(const char *s);
+
+typedef struct {
+	uint64_t magicNumber;
+	double thisRunTime;
+	bool isLoading;
+	int missionSplitID;
+} AutoSplitterData;
+extern AutoSplitterData autoSplitter;

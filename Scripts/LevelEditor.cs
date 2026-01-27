@@ -37,19 +37,19 @@ public class LevelEditor : MonoBehaviour {
         if (Input.GetKey(KeyCode.A)) { // Add Cell Tool
 
         } else if (Input.GetKey(KeyCode.D)) { // Delete Cell Tool
-            Debug.Log("Delete Cell Tool");
+            DualLog("Delete Cell Tool");
         } else if (Input.GetKey(KeyCode.E)) { // Enemy Insert Tool
-            Debug.Log("Enemy Insert Tool");
+            DualLog("Enemy Insert Tool");
         } else if (Input.GetKey(KeyCode.T)) { // Item Insert Tool
-            Debug.Log("Item Insert Tool");
+            DualLog("Item Insert Tool");
         } else if (Input.GetKey(KeyCode.W)) { // Light Insert Tool
-            Debug.Log("Light Insert Tool");
+            DualLog("Light Insert Tool");
         } else if (Input.GetKey(KeyCode.Q)) { // Quest and Misc Insert Tool
-            Debug.Log("Quest and Misc Insert Tool");
+            DualLog("Quest and Misc Insert Tool");
         } else if (Input.GetKey(KeyCode.Z)) { // Cell Floor Height Tool
-            Debug.Log("Cell Floor Height Tool");
+            DualLog("Cell Floor Height Tool");
         } else if (Input.GetKey(KeyCode.C)) { // Cell Ceiling Height Tool
-            Debug.Log("Cell Ceiling Height Tool");
+            DualLog("Cell Ceiling Height Tool");
         }
     }
 }

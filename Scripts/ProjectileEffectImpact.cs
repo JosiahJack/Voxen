@@ -1,15 +1,11 @@
-﻿using UnityEngine;
-using System.Collections;
-using System.Text;
-
-public class ProjectileEffectImpact : MonoBehaviour {
+﻿public class ProjectileEffectImpact : MonoBehaviour {
     public PoolType impactType;
 	public bool destroyInsteadOfDeactivate = false;
-	[HideInInspector] public GameObject host;
-    [HideInInspector] public DamageData dd;
+	GameObject host;
+    DamageData dd;
     [SerializeField] public int hitCountBeforeRemoval = 1;
     private Vector3 tempVec;
-    [HideInInspector] public int numHits;
+    int numHits;
 	private static StringBuilder s1 = new StringBuilder();
 
     private void OnEnable() {
@@ -80,7 +76,7 @@ public class ProjectileEffectImpact : MonoBehaviour {
 					if (hm.aic != null) {
 						if (!hm.aic.asleep) Music.a.inCombat = true;
 						if (dd.attackType == AttackType.Tranq) {
-							tranq = hm.aic.Tranquilize(stunAmount,true);
+							tranq = Tranquilize(other,stunAmount,true);
 						}
 					}
 				}
@@ -102,24 +98,5 @@ public class ProjectileEffectImpact : MonoBehaviour {
 			if (destroyInsteadOfDeactivate) Utils.SafeDestroy(gameObject);
 			else gameObject.SetActive(false); // disable the projectile
 		}
-	}
-
-	public static string Save(GameObject go) {
-		ProjectileEffectImpact pei = go.GetComponent<ProjectileEffectImpact>();
-		s1.Clear();
-		s1.Append(Utils.UintToString(pei.hitCountBeforeRemoval,"hitCountBeforeRemoval"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(pei.numHits,"numHits"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pei.destroyInsteadOfDeactivate,"destroyInsteadOfDeactivate"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		ProjectileEffectImpact pei = go.GetComponent<ProjectileEffectImpact>();
-		pei.hitCountBeforeRemoval = Utils.GetIntFromString(entries[index],"hitCountBeforeRemoval"); index++;
-		pei.numHits = Utils.GetIntFromString(entries[index],"numHits"); index++;
-		pei.destroyInsteadOfDeactivate = Utils.GetBoolFromString(entries[index],"destroyInsteadOfDeactivate"); index++;
-		return index;
 	}
 }

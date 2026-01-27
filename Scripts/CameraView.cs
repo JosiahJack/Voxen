@@ -13,7 +13,7 @@ public class CameraView : MonoBehaviour {
 	/*[DTValidator.Optional] */public Transform screenPoint3;
 
 	// Internal references
-	[HideInInspector] public Camera cam;
+	Camera cam;
 	private const float tick = 0.1f;
 	private float tickFinished; // Visual only, Time.time controlled
 	private MeshRenderer mR; // These are the screens showing the feed
@@ -22,19 +22,19 @@ public class CameraView : MonoBehaviour {
 
 	void Start () {
 		cam = GetComponent<Camera>();
-		if (cam == null) Debug.Log("BUG: CameraView missing component for cam");
+		if (cam == null) DualLog("BUG: CameraView missing component for cam");
 		else Utils.DisableCamera(cam);
 
 		tickFinished = Time.time + tick;
 		if (screenPoint == null) {
-			Debug.Log("BUG: CameraView missing manually assigned reference for"
+			DualLog("BUG: CameraView missing manually assigned reference for"
 					  + " screenPoint");
 		} else {
 			mR = screenPoint.gameObject.GetComponent<MeshRenderer>();
 		}
 
 		if (mR == null) {
-			Debug.Log("BUG: CameraView missing component for "
+			DualLog("BUG: CameraView missing component for "
 					  + "screenPoint.gameObject to assign to mR");
 		}
 

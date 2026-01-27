@@ -58,7 +58,7 @@ public class DamageData {
 											   GameObject ownedBy) {
 		if (NPCindex < 0 || NPCindex > 28) {
 			NPCindex = 0;
-			Debug.Log("BUG: NPCindex incorrect on NPC.  Not 0 to 28 on NPC at: "
+			DualLog("BUG: NPCindex incorrect on NPC.  Not 0 to 28 on NPC at: "
 					  + ownedBy.transform.position.x.ToString() + ", "
 					  + ownedBy.transform.position.y.ToString() + ", "
 					  + ownedBy.transform.position.z + ".");
@@ -79,7 +79,7 @@ public class DamageData {
 			dd.damage = Const.a.damageForNPC3[NPCindex];
 			break;
 		default:
-			Debug.Log("BUG: NPC attackIndex not 0,1, or 2!  Damage set to 1.");
+			DualLog("BUG: NPC attackIndex not 0,1, or 2!  Damage set to 1.");
 			dd.damage = 1f;
 			break;
 		}

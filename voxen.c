@@ -5,6 +5,7 @@
 #define STBI_ONLY_PNG
 #include "External/stb_image.h"
 #include "Shaders/shaders.h"
+#include "credits.h"
 #include "data_textures.c"
 #include "audio.c"
 const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
@@ -12,7 +13,7 @@ GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .cre
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
-QuestBits questData;
+AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 uint8_t queuedLevelToLoad = 255u;
 Entity instances[INSTANCE_COUNT];
 float modelMatrices[INSTANCE_COUNT * 16];
@@ -379,13 +380,14 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
 
 void NewGame(void) {
     RenderLoadingProgress(100,"Loading new game...");
-    memset(&questData, 0, sizeof(QuestBits));
-    questData.lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
-    questData.lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
-    questData.lev3SecCode = random_range_u8(0u,9u);
-    questData.lev4SecCode = random_range_u8(0u,9u);
-    questData.lev5SecCode = random_range_u8(0u,9u);
-    questData.lev6SecCode = random_range_u8(0u,9u);
+    // Set World States
+    instances[WORLD].ioflags = 0u;
+    instances[WORLD].lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
+    instances[WORLD].lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
+    instances[WORLD].lev3SecCode = random_range_u8(0u,9u);
+    instances[WORLD].lev4SecCode = random_range_u8(0u,9u);
+    instances[WORLD].lev5SecCode = random_range_u8(0u,9u);
+    instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
     memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     instances[PLAYER1].index = 767;
     instances[PLAYER1].layer = 12; // PhysicsLayer_Player
@@ -836,7 +838,7 @@ static inline void RenderCompositePass(float px, float py, float pz, float * res
     glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
     glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
     uint32_t shieldOnType = 0u; // No shield green tint.
-    if (questData.ShieldActivated) {
+    if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
         if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
         else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
     }
@@ -926,7 +928,7 @@ void CreditsScroll(void) {
     if (Sys_Global.creditsPageIndex == 1) {
         CreditsStats();
         RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL, (const char*)&creditStats);
-    }
+    } else RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL, creditPages[Sys_Global.creditsPageIndex]);
 }
 
 static inline double RenderUI(void) {
@@ -1235,13 +1237,22 @@ int32_t main(int32_t argc, char* argv[]) {
             } else if (read_status == -1) { DualLogError("Error reading log file, exiting playback\n"); OS_Exit(1); }
         }
 
-        if (EventQueueProcess()) OS_Exit(1); // Do everything
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) { // Update Gameplay
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
+            // TODO: UpdatePlayer(PLAYER1);
+            // TODO: UpdatePlayer(PLAYER2);
+            for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) { // Do everything... TODO: Put into event??  eventssss??
+                if (instances[i].think == NULL) continue;
+                
+                instances[i].think(); // Get new states prior to updating animations, physics event, or rendering
+            }
+            
             UpdateAmbientSounds();
             UpdateAnims();
         }
+        
+        if (EventQueueProcess()) OS_Exit(1); // Do everything
         
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateVoxelsAndInstances();
         Render();

@@ -17,7 +17,6 @@ public class InteractablePanel : MonoBehaviour {
 	public int SFXAlreadyInstalledIndex;
 	public int openMessageLingdex;
 	public string target;
-	public string argvalue;
 	
 	private AudioSource SFX;
 	private Animator anim;
@@ -65,7 +64,6 @@ public class InteractablePanel : MonoBehaviour {
 				MouseLookScript.a.ResetHeldItem();
 
 				// use the target now that we are active
-				ud.argvalue = argvalue;
 				Const.a.UseTargets(gameObject,ud,target);
 			} else {
 				Utils.PlayOneShotSavable(SFX,Const.a.sounds[43]); // button_deny, aaaahhh!! Try again
@@ -77,60 +75,5 @@ public class InteractablePanel : MonoBehaviour {
 			Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXOpenIndex]);
 			Const.sprint(openMessageLingdex);
 		}
-	}
-
-	public static string Save(GameObject go) {
-		InteractablePanel ip = go.GetComponent<InteractablePanel>();
-		s1.Clear();
-		s1.Append(Utils.BoolToString(ip.open,"open"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ip.installed,"installed"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveSubActivatedGOState(ip.installationItem));
-		for (int i=0;i<ip.effects.Length;i++) { 
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.SaveSubActivatedGOState(ip.effects[i]));
-		}
-
-		if (ip.installationItem != null) {
-			DelayedSpawn despawner = ip.installationItem.GetComponent<DelayedSpawn>();
-			if (despawner != null) { // plastique
-				s1.Append(Utils.splitChar);
-				s1.Append(DelayedSpawn.Save(ip.installationItem));
-				Transform childTr = ip.installationItem.transform.GetChild(0);
-				if (childTr != null) {
-					DelayedSpawn despawner2 = childTr.gameObject.GetComponent<DelayedSpawn>();
-					if (despawner2 != null) { // plastique
-						s1.Append(Utils.splitChar);
-						s1.Append(DelayedSpawn.Save(childTr.gameObject));
-					}
-				}
-			}
-		}
-
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		InteractablePanel ip = go.GetComponent<InteractablePanel>(); // ip man!
-		ip.open = Utils.GetBoolFromString(entries[index],"open"); index++;
-		ip.installed = Utils.GetBoolFromString(entries[index],"installed"); index++;
-		index = Utils.LoadSubActivatedGOState(ip.installationItem,ref entries,index);
-		for (int i=0; i<ip.effects.Length; i++) { index = Utils.LoadSubActivatedGOState(ip.effects[i],ref entries,index); }
-		if (ip.installationItem != null) {
-			DelayedSpawn despawner = ip.installationItem.GetComponent<DelayedSpawn>();
-			if (despawner != null) { // plastique
-				index = DelayedSpawn.Load(ip.installationItem,ref entries,index);
-				Transform childTr = ip.installationItem.transform.GetChild(0);
-				if (childTr != null) {
-					DelayedSpawn despawner2 = childTr.gameObject.GetComponent<DelayedSpawn>();
-					if (despawner2 != null) { // plastique
-						index = DelayedSpawn.Load(childTr.gameObject,ref entries,index);
-					}
-				}
-			}
-		}
-
-		return index;
 	}
 }

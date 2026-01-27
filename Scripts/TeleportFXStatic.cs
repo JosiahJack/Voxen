@@ -5,7 +5,7 @@ public class TeleportFXStatic : MonoBehaviour {
 	public float intervalTime = 0.08f;
 	public float activeTime = 1f;
 	public Texture2D tempCursorTexture;
-	[HideInInspector] public Texture2D cursorTexture;
+	Texture2D cursorTexture;
 	private float effectFinished;
 	private float flipTime;
 	private float randHolder;

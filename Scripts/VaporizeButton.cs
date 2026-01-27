@@ -34,7 +34,7 @@ public class VaporizeButton : MonoBehaviour {
 			});
 
             evenT.triggers.Add(pointerExit);
-		} else Debug.Log("Failed to add EventTrigger to " + gameObject.name);
+		} else DualLog("Failed to add EventTrigger to " + gameObject.name);
 	}
 
 	void OnEnable() {

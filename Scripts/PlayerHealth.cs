@@ -8,32 +8,32 @@ public class PlayerHealth : MonoBehaviour {
 	public GameObject shieldEffect;
 
 	// Internal references
-	[HideInInspector] public float radiated = 0f; // save
+	float radiated = 0f; // save
 	private float resetAfterDeathTime = 0.5f;
-	[HideInInspector] public float timer; // save
-	[HideInInspector] public bool playerDead = false; // save
+	float timer; // save
+	bool playerDead = false; // save
 	private float mediPatchPulseTime = 0.5f;
 	private float mediPatchHealAmount = 8f;
-	[HideInInspector] public bool radiationArea = false; // save
-	[HideInInspector] public  float radiationBleedOffFinished = 0f;
+	bool radiationArea = false; // save
+	 float radiationBleedOffFinished = 0f;
 	private float radiationBleedOffTime = 1.8f;
 	private float radiationReductionAmount = 1f;
 	private float radiationHealthDamageRatio = 0.1f;
 	private int radiationAmountWarningID = 323;
 	private int radiationAreaWarningID = 322;
-	[HideInInspector] public float mediPatchPulseFinished = 0f; // save
-	[HideInInspector] public int mediPatchPulseCount = 0; // save, Used to incrementally increase the time between health increases by 0.5s every n+0.5s. Saved so we don't use quick load to cheat health faster.
+	float mediPatchPulseFinished = 0f; // save
+	int mediPatchPulseCount = 0; // save, Used to incrementally increase the time between health increases by 0.5s every n+0.5s. Saved so we don't use quick load to cheat health faster.
 	public bool makingNoise = false; // save
-	[HideInInspector] public HealthManager hm;
-	[HideInInspector] public float lastHealth; // save
-	[HideInInspector] public float painSoundFinished; // save
-	[HideInInspector] public float radSoundFinished; // save
-	[HideInInspector] public float radFXFinished; // save
+	HealthManager hm;
+	float lastHealth; // save
+	float painSoundFinished; // save
+	float radSoundFinished; // save
+	float radFXFinished; // save
 	private float radAdjust;
 	private float initialRadiation;
-	[HideInInspector] public float noiseFinished;
-	[HideInInspector] public int deaths = 0;
-	[HideInInspector] public int ressurections = 0;
+	float noiseFinished;
+	int deaths = 0;
+	int ressurections = 0;
 	private static StringBuilder s1 = new StringBuilder();
 	
 	public static PlayerHealth a;
@@ -45,7 +45,7 @@ public class PlayerHealth : MonoBehaviour {
 	void Start () {
 		hm = GetComponent<HealthManager>();
 		if (hm == null) {
-			Debug.LogError("BUG: No HealthManager script found on player (sent"
+			DualLogError("BUG: No HealthManager script found on player (sent"
 					  	   + " from PlayerHealth.Awake)");
 		}
 
@@ -162,7 +162,7 @@ public class PlayerHealth : MonoBehaviour {
 
 	public void PlayerRessurect() {
 		bool ressurected = LevelManager.a.RessurectPlayer();
-		if (!ressurected) Debug.Log("ERROR: failed to ressurect player!");
+		if (!ressurected) DualLog("ERROR: failed to ressurect player!");
 		ressurections++;
 		hm.health = 211f;
 		MFDManager.a.DrawTicks(true);
@@ -226,7 +226,7 @@ public class PlayerHealth : MonoBehaviour {
 		if (enerTake < 0) enerTake = 0;
 		radAdjust = initialRadiation - radiated;
 		if (radAdjust < 0) radAdjust = 0;
-		Debug.Log("Taking energy for envirosuit: " + enerTake.ToString());
+		DualLog("Taking energy for envirosuit: " + enerTake.ToString());
 
 		// Suit absorbs some radiation, say it.
 		// Envirosuit absorbed ##LBP, Radiation poisoning ##LBP

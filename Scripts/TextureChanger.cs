@@ -8,7 +8,7 @@ public class TextureChanger : MonoBehaviour {
 	public Texture2D mainTextureGlow;
 	public Texture2D mainTextureGlow2;
 	public bool startAlternate = false;
-	[HideInInspector] public bool currentTexture = false;
+	bool currentTexture = false;
 	public Renderer rMainLod0;
 	/*[DTValidator.Optional] */public Renderer rMainLod1;
 	/*[DTValidator.Optional] */public Renderer rMainLod2;

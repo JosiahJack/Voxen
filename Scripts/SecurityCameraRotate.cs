@@ -13,8 +13,8 @@ public class SecurityCameraRotate : MonoBehaviour {
 	public float waitTime = 0.8f;
 	public MeshRenderer mR;
 
-	[HideInInspector] public bool active;
-	[HideInInspector] public bool rotatePositive; // save
+	bool active;
+	bool rotatePositive; // save
 	private float degreesYPerSecond = 4f;
 	private float waitingFinished = 0f;
 	private float tickTime = 0.1f;

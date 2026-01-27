@@ -15,12 +15,12 @@ public class PauseScript : MonoBehaviour {
 	public GameObject saveDialog;
 	public GameObject hardSaveDialog;
 
-	[HideInInspector] public bool paused = false;
-	[HideInInspector] public bool previousInvMode = false;
-	[HideInInspector] public bool onSaveDialog = false;
+	bool paused = false;
+	bool previousInvMode = false;
+	bool onSaveDialog = false;
 	public float relativeTime;
 	public float absoluteTime;
-	[HideInInspector] public List<AmbientRegistration> ambientRegistry;
+	List<AmbientRegistration> ambientRegistry;
 	private bool menuActive = true; // Store the state of the main menu
 	                                // gameobject active state so that we don't
 									// have to do a gameobject engine call more
@@ -82,7 +82,7 @@ public class PauseScript : MonoBehaviour {
 		for (int i=0;i<ambientRegistry.Count;i++) {
 			if (ambientRegistry[i] == null) continue;
 
-			hitCount = Physics.RaycastNonAlloc(
+			hitCount = RaycastNonAlloc(
 						MouseLookScript.a.transform.position,
 						ambientRegistry[i].transform.position
 						- MouseLookScript.a.transform.position,
@@ -113,53 +113,6 @@ public class PauseScript : MonoBehaviour {
 
 		Const.a.NPCAudioOcclusion();
 	}
-
-/*
-    void FixedUpdate() {
-		Debug.Log("ObjectContainmentSystem active floor chunks: "
-				  + ObjectContainmentSystem.ActiveFloorChunks.Count.ToString());
-
-		GameObject go = null; // Contain the currently checked floor.
-		Rigidbody rb = null; // Contain the currently checked rigidbody.
-		PauseRigidbody pb = null; // Reference to all the rigidbodies each.
-		Vector3 flrPos = null;
-		Vector3 objPos = null;
-		float x, y, z;
-
-        // Iterate through each floor and check for overlapping rigidbodies
-        for (int i=0;i < ObjectContainmentSystem.ActiveFloorChunks.Count;i++) {
-			go = ObjectContainmentSystem.ActiveFloorChunks[i];
-			flrPos = go.transform.position;
-			for (int k=0;k<Const.a.prb.Count;k++) {
-				pb = Const.a.prb[k];
-				if (!pm.gameObject.activeInHierarchy) continue;
-
-				objPos = pb.gameObject.transform.position;
-				if (!PhysObjAffectedByFloor(objPos, flrPos)) continue;
-
-                Rigidbody rb = pb.rbody;
-                if (flrPos.y - objPos.y > 1.28f)  {
-                    // If the rigidbody falls below the barrier height, set its position to the barrier height
-                    rb.position = new Vector3(rb.position.x, barrierHeight, rb.position.z);
-                    // If the rigidbody has a velocity in the downward direction, set its velocity to zero
-                    if (rb.velocity.y < 0f)
-                    {
-                        rb.velocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
-                    }
-				}
-			}
-
-
-
-            Vector3 barrierCenter = new Vector3(barrierPositions[i].x * gridSize + gridSize / 2f, barrierHeight, barrierPositions[i].y * gridSize + gridSize / 2f);
-            float barrierSize = gridSize / 2f;
-            List<Rigidbody> rigidbodiesInBarrier = rigidbodyOctree.GetObjectsInRange(barrierCenter, barrierSize);
-            for (int j = 0; j < rigidbodiesInBarrier.Count; j++)
-            {
-
-            }
-        }
-    }*/
 
 	private bool PhysObjAffectedByFloor(Vector3 objpos, Vector3 floorpos) {
 		if (objpos.x - floorpos.x > 1.28f && objpos.z - floorpos.z > 1.28f) {
@@ -416,13 +369,4 @@ public class PauseScript : MonoBehaviour {
 	public void AddAmbientToRegistry(AmbientRegistration ar) {
 		ambientRegistry.Add(ar);
 	}
-}
-
-// Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
-[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-public static class AutoSplitterData {
-	public static long magicNumber = 0x1337133713371337;
-	public static double thisRunTime = 0;
-	public static bool isLoading = false;
-	public static int missionSplitID = 0;
 }

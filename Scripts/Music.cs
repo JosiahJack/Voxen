@@ -105,7 +105,7 @@ public class Music : MonoBehaviour {
 		}
 
 		if (tempClip == null) {
-			UnityEngine.Debug.LogWarning("Unable to load " + fName);
+			UnityEngine.DualLogWarning("Unable to load " + fName);
 			if (type == MusicResourceType.Looped) {
 				tempClip = (AudioClip)Resources.Load(
 					"StreamingAssetsRecovery/music/looped/" + fName
@@ -192,7 +192,7 @@ public class Music : MonoBehaviour {
 			if (MainMenuHandler.a.BackGroundMusic.clip == titleMusic
 				&& MainMenuHandler.a.BackGroundMusic.isPlaying) {
 				
-				UnityEngine.Debug.Log("Back ground music started");
+				UnityEngine.DualLog("Back ground music started");
 			}
 		}
 	}

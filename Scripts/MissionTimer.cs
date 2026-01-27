@@ -9,12 +9,12 @@ public class MissionTimer : MonoBehaviour {
 	public string currentMission;
 	public int currentMissionIndex;
 
-	[HideInInspector] public bool lastTimer = false;
-	[HideInInspector] public float t;
+	bool lastTimer = false;
+	float t;
 	private float minutes;
 	private float seconds;
-	[HideInInspector] public float timerFinished;
-	[HideInInspector] public bool timesUP = false;
+	float timerFinished;
+	bool timesUP = false;
 
 	public static MissionTimer a;
 
@@ -38,7 +38,7 @@ public class MissionTimer : MonoBehaviour {
 		
 		QuestLogNotesManager.a.UpdateToNextMission(nextMissionIndex);
 
-		if (Const.a.difficultyMission < 3) return; // Don't update timer on lower skill settings.
+		if (SSys_Global.difficultyMission < 3) return; // Don't update timer on lower skill settings.
 		t = newTimerAmount;
 		currentMissionIndex = nextMissionIndex;
 		currentMission = Const.a.stringTable[misTextIndex];
@@ -46,7 +46,7 @@ public class MissionTimer : MonoBehaviour {
     }
 
     void Update() {
-		if (Const.a.difficultyMission < 3) return;
+		if (SSys_Global.difficultyMission < 3) return;
 		if (Sys_Global.gamePaused) return;
 		if (Sys_Global.menuActive) return;
 		if (MouseLookScript.a.inCyberSpace) return; // timer doesn't count down in cyberspace, yay!

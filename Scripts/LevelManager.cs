@@ -34,7 +34,7 @@ public class LevelManager : MonoBehaviour {
 	public Mesh sphereMesh;
 	public SkyRotate skyRotate;
 	public Material pipe_maint2_3_coolant;
-	[HideInInspector] public List<string>[] DynamicObjectsSavestrings = new List<string>[14];
+	List<string>[] DynamicObjectsSavestrings = new List<string>[14];
 	
 	private bool getValparsed;
 	private bool[] levelDataLoaded;
@@ -63,10 +63,10 @@ public class LevelManager : MonoBehaviour {
 		}
 		if (currentLevel < 0 || currentLevel > 12) return; // 12 because I don't think I support starting in cyberspace, 13, for testing.
 
-		if (sky == null) Debug.Log("BUG: LevelManager missing manually assigned reference for sky.");
+		if (sky == null) DualLog("BUG: LevelManager missing manually assigned reference for sky.");
 		else sky.SetActive(true);
 
-		if (ressurectionBayDoor.Length != 8) Debug.Log("BUG: LevelManager ressurectionBayDoor array length not equal to 8.");
+		if (ressurectionBayDoor.Length != 8) DualLog("BUG: LevelManager ressurectionBayDoor array length not equal to 8.");
 		Time.timeScale = Const.defaultTimeScale;
 		levelDataLoaded = new bool[14];
 		for (int i=0;i<14;i++) levelDataLoaded[i] = false;
@@ -112,7 +112,7 @@ public class LevelManager : MonoBehaviour {
 
 		string dynName = "CitadelScene_dynamics_level"+lev.ToString()+".txt";
 		StreamReader sf = Utils.ReadStreamingAsset(dynName);
-		if (sf == null) { UnityEngine.Debug.Log("Dynamic objects filepath invalid"); return readFileList; }
+		if (sf == null) { UnityEngine.DualLog("Dynamic objects filepath invalid"); return readFileList; }
 
 		string readline;
 		using (sf) {
@@ -205,23 +205,23 @@ public class LevelManager : MonoBehaviour {
 		}
 		if (levelDataLoaded[levnum]) return; // Already loaded.
 
-// 		Debug.Log("Loading level data for " + levnum.ToString());
+// 		DualLog("Loading level data for " + levnum.ToString());
 		LoadLevelLights(levnum);
 		LoadLevelGeometry(levnum);
 		LoadLevelDynamicObjects(levnum);
 		Music.a.LoadLevelMusic(levnum);
 		levelDataLoaded[levnum] = true;
-		UnityEngine.Debug.Log("Number of lights for level " + levnum.ToString() + " with shadows: " + SaveLoad.numLightsWithShadows.ToString());
+		UnityEngine.DualLog("Number of lights for level " + levnum.ToString() + " with shadows: " + SaveLoad.numLightsWithShadows.ToString());
 	}
 
 	public void LoadLevel(int levnum, Vector3 targetPosition) {
-		if (!LevNumInBounds(levnum)) { Debug.LogWarning("levnum out of bounds"); return; }
+		if (!LevNumInBounds(levnum)) { DualLogWarning("levnum out of bounds"); return; }
 
 		// NOTE: Check this first since the button for the current level has a null destination.  This is fine and expected.
 		if (currentLevel == levnum) { Const.sprint(Const.a.stringTable[9]); return; } //Already there
 
 		MFDManager.a.TurnOffElevatorPad();
-// 		Debug.Log("Cleared GUI Over Button state from clicking on elevator button in MFD side pane");
+// 		DualLog("Cleared GUI Over Button state from clicking on elevator button in MFD side pane");
 		GUIState.a.ClearOverButton();
 		if (targetPosition.x == 0 && targetPosition.y == 0 && targetPosition.z == 0) {
 			switch(levnum) {
@@ -252,9 +252,9 @@ public class LevelManager : MonoBehaviour {
 		System.GC.WaitForPendingFinalizers();
 		levels[levnum].SetActive(true); // enable new level
 		PlayerReferenceManager.a.playerCurrentLevel = levnum;
-		if (currentLevel == 2 && AutoSplitterData.missionSplitID == 0) {
-			AutoSplitterData.missionSplitID++; // 1 - Medical split - we are now on level 2
-			Debug.Log("AutoSplitterData missionSplitID incremented: " + AutoSplitterData.missionSplitID.ToString());
+		if (currentLevel == 2 && autoSplitter.missionSplitID == 0) {
+			autoSplitter.missionSplitID++; // 1 - Medical split - we are now on level 2
+			DualLog("AutoSplitterData missionSplitID incremented: %u", autoSplitter.missionSplitID);
 		}
 		
 		PostLoadLevelSetupSystems();
@@ -274,7 +274,7 @@ public class LevelManager : MonoBehaviour {
 	public void LoadLevelFromSave(int levnum) {
 		if (!LevNumInBounds(levnum)) return;
 
-// 		Debug.Log("LevelManager LoadLevelFromSave()");
+// 		DualLog("LevelManager LoadLevelFromSave()");
 		LoadLevelData(levnum); // Let this function check and load data if it isn't yet.
 		currentLevel = levnum; // Set current level to be the new level
 		DisableAllNonOccupiedLevelsExcept(currentLevel); // Unload last level.
@@ -284,21 +284,12 @@ public class LevelManager : MonoBehaviour {
 
 	private void PostLoadLevelSetupSystems() {
 		Music.a.inCombat = false;
-		Music.a.SFXMain.Stop();
-		Music.a.SFXOverlay.Stop();
 		Music.a.levelEntry = true;
 		PlayerHealth.a.radiationArea = false;
 		PlayerMovement.a.ladderState = 0;
 		LoadLevelData(currentLevel);
 		Automap.a.SetAutomapExploredReference(currentLevel);
 		Automap.a.automapBaseImage.overrideSprite = Automap.a.automapsBaseImages[currentLevel];
-		Const.a.ClearActiveAutomapOverlays(); // After other levels turned off.
-		Const.a.ResetPauseLists();
-		Config.SetLanguage(); // Update all translatable text.
-		Const.a.ClearPrefabs();
-		System.GC.Collect();
-		System.GC.WaitForPendingFinalizers();
-		Resources.UnloadUnusedAssets();
 	}
 
 	public void DisableAllNonOccupiedLevelsExcept(int occupiedLevel) {
@@ -432,7 +423,7 @@ public class LevelManager : MonoBehaviour {
 	}
 
 	public int GetCurrentLevelSecurity() {
-		if (Const.a.difficultyMission < 1) return 0;
+		if (SSys_Global.difficultyMission < 1) return 0;
 		if (!LevNumInBounds(currentLevel)) return 0;
 		if (superoverride) return 0; // tee hee we are SHODAN, no security blocks in place
 		return levelSecurity[currentLevel];
@@ -472,7 +463,7 @@ public class LevelManager : MonoBehaviour {
 	}
 
 	public bool PosWithinLeafBounds(Vector3 pos, BoxCollider b) {
-		if (b == null) { Debug.Log("BUG: null BoxCollider passed to PosWithinLeafBounds!"); return false; }
+		if (b == null) { DualLog("BUG: null BoxCollider passed to PosWithinLeafBounds!"); return false; }
 
 		float xMax = b.bounds.max.x;
 		float xMin = b.bounds.min.x;
@@ -505,7 +496,7 @@ public class LevelManager : MonoBehaviour {
 		string gName = "CitadelScene_geometry_level"+curlevel.ToString()+".txt";
 		StreamReader sf = Utils.ReadStreamingAsset(gName);
 		if (sf == null) {
-			UnityEngine.Debug.Log("Geometry input file path invalid");
+			UnityEngine.DualLog("Geometry input file path invalid");
 			return;
 		}
 
@@ -546,7 +537,7 @@ public class LevelManager : MonoBehaviour {
 				lit = chunkLights[i];
 				lit.gameObject.name = "ChunkLight_" + lit.gameObject.name;
 				lit.transform.parent = lightContainers[curlevel].transform;
-// 				UnityEngine.Debug.Log("Moved light off of " + lit.gameObject.name);
+// 				UnityEngine.DualLog("Moved light off of " + lit.gameObject.name);
 			}
 			
 			sf.Close();
@@ -592,7 +583,7 @@ public class LevelManager : MonoBehaviour {
 		string lName = "CitadelScene_lights_level"+curlevel.ToString()+".txt";
 		StreamReader sf = Utils.ReadStreamingAsset(lName);
 		if (sf == null) {
-			UnityEngine.Debug.Log("Lights input file path invalid");
+			UnityEngine.DualLog("Lights input file path invalid");
 			return;
 		}
 
@@ -645,7 +636,7 @@ public class LevelManager : MonoBehaviour {
 		for (int i=0;i<compArray.Length;i++) {
 			AIController aic = compArray[i].gameObject.GetComponent<AIController>();
 			if (aic == null) {
-				UnityEngine.Debug.Log("AIController missing on "
+				UnityEngine.DualLog("AIController missing on "
 									  + "child " + compArray[i].gameObject.name
 									  + " of NPC container " + go.name);
 			} else {

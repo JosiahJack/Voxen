@@ -10,7 +10,7 @@ public class SoftwareInvText : MonoBehaviour {
 	
 	void Start () {
 		text = GetComponent<Text>();
-		if (text == null) UnityEngine.Debug.Log("BUG: Missing Text component for SoftwareInvText");
+		if (text == null) UnityEngine.DualLog("BUG: Missing Text component for SoftwareInvText");
 	}
 
 	public void Select(bool thisOne) {

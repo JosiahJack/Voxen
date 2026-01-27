@@ -34,7 +34,7 @@ public class HardwareButton : MonoBehaviour {
 	// Boo 30,9, 6
 	// Jum 31,10,7
 
-	[HideInInspector] public AudioSource SFX;
+	AudioSource SFX;
 	private const float defaultZero = 0f;
 	private float brightness = 0f;
 	private const float lanternVersion1Brightness = 2.5f;
@@ -67,7 +67,7 @@ public class HardwareButton : MonoBehaviour {
 	// 0 = bio, 1 = sen, 2 = lan, 3 = shi, 4 = nig, 5 = ere, 6 = boo, 7 = jum
 	// verz must come from Inventory.a.hardwareVersionSetting[] as this value has already subtracted 1 since the version number on prefabs is 1 based but the one needed for images is 0 based.
 	public void SetVersionIconForButton(bool isOn, int verz, int button8Index) {
-// 		Debug.Log("SetVersionIconForButton with version " + verz.ToString() + ", and button8Index of " + button8Index.ToString());
+// 		DualLog("SetVersionIconForButton with version " + verz.ToString() + ", and button8Index of " + button8Index.ToString());
 		if (button8Index < 0 || button8Index > 7) button8Index = 0;
 		if (isOn) {
 			switch (verz) {

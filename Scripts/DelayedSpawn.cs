@@ -9,8 +9,8 @@ public class DelayedSpawn : MonoBehaviour {
 	public bool despawnInstead = false; // save
 	public bool doSelfAfterList = false; // save
 	public bool destroyAfterListInsteadOfDeactivate = false; // save
-	[HideInInspector] public float timerFinished; // save
-	[HideInInspector] public bool active; // save
+	float timerFinished; // save
+	bool active; // save
 	private static StringBuilder s1 = new StringBuilder();
 
 	void OnEnable() {
@@ -71,17 +71,17 @@ public class DelayedSpawn : MonoBehaviour {
 	public static int Load(GameObject go, ref string[] entries, int index) {
 		DelayedSpawn ds = go.GetComponent<DelayedSpawn>();
 		if (ds == null) {
-			Debug.Log("DelayedSpawn.Load failure, ds == null");
+			DualLog("DelayedSpawn.Load failure, ds == null");
 			return index + 6;
 		}
 
 		if (index < 0) {
-			Debug.Log("DelayedSpawn.Load failure, index < 0");
+			DualLog("DelayedSpawn.Load failure, index < 0");
 			return index + 6;
 		}
 
 		if (entries == null) {
-			Debug.Log("DelayedSpawn.Load failure, entries == null");
+			DualLog("DelayedSpawn.Load failure, entries == null");
 			return index + 6;
 		}
 

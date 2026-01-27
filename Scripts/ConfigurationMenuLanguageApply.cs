@@ -16,13 +16,13 @@ public class ConfigurationMenuLanguageApply : MonoBehaviour {
 
 	void Initialize() {
 		if (picker == null) picker = GetComponent<Dropdown>();
-		if (picker == null) Debug.Log("BUG: ConfigurationMenuLanguageApply missing component for picker.");
+		if (picker == null) DualLog("BUG: ConfigurationMenuLanguageApply missing component for picker.");
 
 		picker.value = Const.a.AudioLanguage;
 	}
 
 	public void OnDropdownSelect () {
-		Debug.Log("Language select");
+		DualLog("Language select");
 		if (picker != null)
 			Const.a.AudioLanguage = picker.value;
 		else

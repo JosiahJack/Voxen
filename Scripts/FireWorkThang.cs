@@ -27,7 +27,7 @@ public class FireWorkThang : MonoBehaviour {
         if (minScale >= maxScale) {
             minScale = 0f;
             maxScale = 1f;
-            Debug.LogWarning("FireWorkThang maxScale not set higher than min");
+            DualLogWarning("FireWorkThang maxScale not set higher than min");
         }
     }
 

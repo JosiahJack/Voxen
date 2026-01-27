@@ -28,41 +28,41 @@ public class MouseLookScript : MonoBehaviour {
 	public Vector2 lastMousePos;
 	
     // Internal references
-    [HideInInspector] public bool inventoryMode;
+    bool inventoryMode;
 	public bool holdingObject;
-    [HideInInspector] public Vector2 cursorHotspot;
-    [HideInInspector] public Vector3 cameraFocusPoint;
-	[HideInInspector] public GameObject currentButton;
-	[HideInInspector] public GameObject currentSearchItem;
+    Vector2 cursorHotspot;
+    Vector3 cameraFocusPoint;
+	GameObject currentButton;
+	GameObject currentSearchItem;
     public int heldObjectIndex; // save
 	public int heldObjectCustomIndex; // save
 	public int heldObjectAmmo; // save
 	public int heldObjectAmmo2; // save
 	public bool heldObjectLoadedAlternate; // save
-	[HideInInspector] public bool firstTimePickup;
-	[HideInInspector] public bool firstTimeSearch;
+	bool firstTimePickup;
+	bool firstTimeSearch;
 	public bool grenadeActive;
 	public bool inCyberSpace;
     public float yRotation;
-	[HideInInspector] public Vector3 cyberspaceReturnPoint; // save
-	[HideInInspector] public Vector3 cyberspaceReturnCameraLocalRotation; // save
-	[HideInInspector] public Vector3 cyberspaceReturnPlayerCapsuleLocalRotation; // save
-	[HideInInspector] public int cyberspaceReturnLevel; // save
-	[HideInInspector] public Vector3 cyberspaceRecallPoint; // save
-	[HideInInspector] public bool vmailActive = false;
-	[HideInInspector] public bool geniusActive = false;
+	Vector3 cyberspaceReturnPoint; // save
+	Vector3 cyberspaceReturnCameraLocalRotation; // save
+	Vector3 cyberspaceReturnPlayerCapsuleLocalRotation; // save
+	int cyberspaceReturnLevel; // save
+	Vector3 cyberspaceRecallPoint; // save
+	bool vmailActive = false;
+	bool geniusActive = false;
 	private float keyboardTurnSpeed = 15f; // Speed multiplier for turning the view with the keyboard.
     private float tossOffset = 0.5f; // Distance from player origin to spawn objects when tossing them.
     private float tossForce = 10f; // Force given to spawned objects when tossing them.
 	private float[] cameraDistances;
-    [HideInInspector] public float xRotation; // save
+    float xRotation; // save
     private float zRotation;
     private float yRotationV;
     private float xRotationV;
     private float zRotationV;
     private float currentZRotation;
     private string mlookstring1;
-    [HideInInspector] public Camera playerCamera;
+    Camera playerCamera;
     private GameObject heldObject;
 	private Quaternion tempQuat;
 	private Vector3 tempVec;
@@ -84,10 +84,10 @@ public class MouseLookScript : MonoBehaviour {
 	private float rotSpeedX = 0f;
 	private float rotSpeedY = 0f;
 	private Transform playerCapsuleTransform;
-	[HideInInspector] public float returnFromCyberspaceFinished;
+	float returnFromCyberspaceFinished;
 	private float dropFinished;
-	[HideInInspector] public float randomShakeFinished;
-	[HideInInspector] public float randomKlaxonFinished;
+	float randomShakeFinished;
+	float randomKlaxonFinished;
 	public Vector2 debugRT;
 	public Vector2 debugAng;
 	public float joyXStartTime;
@@ -427,7 +427,7 @@ public class MouseLookScript : MonoBehaviour {
 	// Draw line from cursor - used for projectile firing, e.g. magpulse/stugngun/railgun/plasma
 	public void SetCameraFocusPoint() {
 		cursorPoint = MouseCursor.a.GetCursorScreenPointForRay();
-        if (Physics.Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit, Mathf.Infinity)) cameraFocusPoint = tempHit.point;
+        if (Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit, Mathf.Infinity)) cameraFocusPoint = tempHit.point;
 	}
 
 	// Clamp cyberspace up/down look rotation to with in +/- 360f.
@@ -567,7 +567,7 @@ public class MouseLookScript : MonoBehaviour {
 
 	bool RayOffset() {
 		bool successfulRay = false;
-		successfulRay = Physics.Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit,Const.frobDistance,Const.a.layerMaskPlayerFrob);
+		successfulRay = Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit,Const.frobDistance,Const.a.layerMaskPlayerFrob);
 // 		Debug.DrawRay(playerCamera.ScreenPointToRay(cursorPoint).origin,playerCamera.ScreenPointToRay(cursorPoint).direction * Const.frobDistance, Color.green,1f,true);
 		if (successfulRay) {
 			successfulRay = (tempHit.collider != null);
@@ -589,7 +589,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (inCyberSpace) return false;
 
 		float dist = TargetID.GetTargetIDSensingRange(true);
-		bool successfulRay = Physics.Raycast(playerCamera.ScreenPointToRay(cP),
+		bool successfulRay = Raycast(playerCamera.ScreenPointToRay(cP),
 											 out tempHit,dist,
 											 Const.a.layerMaskPlayerTargetIDFrob);
 
@@ -650,7 +650,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (TargetIDFrob(cursorPoint)) return;
 
 		Ray castDir = playerCamera.ScreenPointToRay(cursorPoint);
-		bool successfulRay = Physics.Raycast(castDir, out tempHit,
+		bool successfulRay = Raycast(castDir, out tempHit,
 											 Const.frobDistance,
 											 Const.a.layerMaskPlayerFrob);
 
@@ -750,7 +750,7 @@ public class MouseLookScript : MonoBehaviour {
 							uhr.referenceUseHandler.Use(ud);
 						}
 					} else {
-						Debug.Log("BUG: Attempting to use a useable without a UseHandler or UseHandlerRelay!");
+						DualLog("BUG: Attempting to use a useable without a UseHandler or UseHandlerRelay!");
 					}
 				}
 			} else if (tempHit.collider.CompareTag("Searchable")) { // Search
@@ -772,7 +772,7 @@ public class MouseLookScript : MonoBehaviour {
 
 	bool FrobWithHeldObject() {
 		if (heldObjectIndex < 0) {
-			Debug.Log("BUG: Attempting to frob with held object, but "
+			DualLog("BUG: Attempting to frob with held object, but "
 					  + "heldObjectIndex < 0.");
 			return false; // Invalid item will be dropped, wasn't used up.
 		}
@@ -785,7 +785,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (!frobUser) return false;
 
 		cursorPoint = MouseCursor.a.GetCursorScreenPointForRay();
-		if (!Physics.Raycast(playerCamera.ScreenPointToRay(cursorPoint),
+		if (!Raycast(playerCamera.ScreenPointToRay(cursorPoint),
 							 out tempHit, Const.frobDistance)) {
 			return false; // Can't use it on something, go ahead and drop it.
 		}
@@ -817,7 +817,7 @@ public class MouseLookScript : MonoBehaviour {
 			return true; // Item can get absorbed, not dropped.
 		}
 
-		Debug.Log("BUG: Attempting to frob use a useable " + go.name
+		DualLog("BUG: Attempting to frob use a useable " + go.name
 				  + " without a UseHandler or UseHandlerRelay!");
 
 		return false;
@@ -975,7 +975,7 @@ public class MouseLookScript : MonoBehaviour {
 				break;
 			case ButtonType.GrenadeTimerSlider:
 				Button btn = currentButton.GetComponent<Button>();
-				Debug.Log("GrenadeTimerSlider invoke");
+				DualLog("GrenadeTimerSlider invoke");
 				break;
 		}
 	}
@@ -1005,49 +1005,27 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	void RecoilAndRest() {
-		float targetY = Const.a.playerCameraOffsetY
-						* PlayerMovement.a.currentCrouchRatio;
+		float targetY = Const.a.playerCameraOffsetY * PlayerMovement.a.currentCrouchRatio;
 		float targetX = 0f;
 		if (PlayerMovement.a.relSideways > 0) targetX += 0.12f;
 		if (PlayerMovement.a.relSideways < 0) targetX -= 0.12f;
 		if (PlayerMovement.a.relForward != 0) targetY -= 0.08f;
-
-		// If not shaking or bobbing, this will stay this to lerp to normal.
-// 		headBobY = Const.a.playerCameraOffsetY
-// 				   * PlayerMovement.a.currentCrouchRatio;
 		if (shakeFinished > Sys_Global.pauseRelativeTime) {
-			headBobX = transform.localPosition.x
-					   + random_range(shakeForce * -0.17f,
-												  shakeForce * 0.17f);
-
-			headBobY = transform.localPosition.y
-					   + random_range(shakeForce * -0.08f,
-												  shakeForce * 0.08f);
-
-			headBobZ = transform.localPosition.z
-					   + random_range(shakeForce * -0.17f,
-												  shakeForce * 0.17f);
+			headBobX = instances[PLAYER1].position.x + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
+			headBobY = instances[PLAYER1].position.y + random_range(shakeForce * -0.08f, shakeForce * 0.08f);
+			headBobZ = instances[PLAYER1].position.z + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
 		} else {
 			headBobZ = 0f;
 			Vector3 vel = PlayerMovement.a.rbody.velocity;
 			vel.y = 0f;
-			if (PlayerMovement.a.relForward + PlayerMovement.a.relSideways != 0
-				&& Const.a.HeadBob) {
-
-				if (headBobShiftFinished < Sys_Global.pauseRelativeTime) {
-					headBobShiftFinished = Sys_Global.pauseRelativeTime + 0.2f;
-					if (!PlayerMovement.a.isSprinting) {
-						headBobShiftFinished += 0.1f;
-					}
-
-					bobTarget = Const.HeadBobAmount * -1f
-								* Mathf.Sign(bobTarget);
+			if (PlayerMovement.a.relForward + PlayerMovement.a.relSideways != 0 && Sys_Settings.HeadBob) {
+				if (instances[PLAYER1].headBobShiftFinished < Sys_Global.pauseRelativeTime) {
+					instances[PLAYER1].headBobShiftFinished = Sys_Global.pauseRelativeTime + 0.2f;
+					if (!PlayerMovement.a.isSprinting) instances[PLAYER1].headBobShiftFinished += 0.1f;
+					bobTarget = HeadBobAmount * -1f * Mathf.Sign(bobTarget);
 				}
 
-				if (PlayerMovement.a.rbody.velocity.magnitude > 0.1f){
-					headBobY = Mathf.SmoothDamp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
-				}
-
+				if (PlayerMovement.a.rbody.velocity.magnitude > 0.1f) headBobY = Mathf.SmoothDamp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
 				headBobX = Mathf.SmoothDamp(headBobX,targetX,ref headBobXVel,Const.HeadBobRate);
 			} else {
 				headBobX = Mathf.SmoothDamp(headBobX,0f,ref headBobXVel,Const.HeadBobRate);
@@ -1055,13 +1033,8 @@ public class MouseLookScript : MonoBehaviour {
 			}
 		}
 		
-		if (inCyberSpace) {
-			headBobX = 0f;
-			headBobY = 0f;
-			headBobZ = 0f;
-		}
-		
-		transform.localPosition = new Vector3(headBobX,headBobY,headBobZ);
+		if (inCyberSpace) headBobX = headBobY = headBobZ = 0f;
+		instances[PLAYER1].position = (Vector3){ headBobX, headBobY, headBobZ };
 	}
 
 	void AddItemFail(int index) { // Expects usableItem index
@@ -1163,7 +1136,7 @@ public class MouseLookScript : MonoBehaviour {
 	public void DropHeldItem() {
 		dropFinished = Time.time + 0.2f; // Prevent immediate regrab at high fps
 		if (heldObjectIndex < 0 || heldObjectIndex > 110) { 
-			Debug.Log("BUG: Attempted to DropHeldItem with index out of bounds (<0 or >110) and heldObjectIndex = " + heldObjectIndex.ToString(),player);
+			DualLog("BUG: Attempted to DropHeldItem with index out of bounds (<0 or >110) and heldObjectIndex = " + heldObjectIndex.ToString(),player);
 			ResetHeldItem();
 			return;
 		}
@@ -1204,7 +1177,7 @@ public class MouseLookScript : MonoBehaviour {
 					tossObject.transform.position = (transform.position + (transform.forward * tossOffset));
 				}
 			} else {
-				// Debug.Log("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! MouseLookScript DropHeldItem.",player);
+				// DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! MouseLookScript DropHeldItem.",player);
 				tossObject = Instantiate(heldObject,(transform.position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 				if (tossObject == null) {
 					Const.sprint("BUG: Failed to instantiate object being dropped!",player);
@@ -1324,7 +1297,7 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	void SearchObject (int index){
-		if (currentSearchItem == null) { Debug.Log("BUG: Early exit from SearchObject, currentSearchItem was null!"); return;}
+		if (currentSearchItem == null) { DualLog("BUG: Early exit from SearchObject, currentSearchItem was null!"); return;}
 
 		bool useFX = true;
 		SearchableItem curSearchScript = currentSearchItem.GetComponent<SearchableItem>();
@@ -1376,7 +1349,7 @@ public class MouseLookScript : MonoBehaviour {
 
 	public void UseGrenade (int index) {
 		if (holdingObject) { Const.sprint(Const.a.stringTable[311],player); return; } // Can't use grenade, hands full
-		if (index < 7 || index > 13) { Debug.Log("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
+		if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
 
 		ForceInventoryMode();  // Inventory mode is turned on when picking something up.
 		ResetHeldItem();

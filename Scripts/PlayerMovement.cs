@@ -37,9 +37,9 @@ public class PlayerMovement : MonoBehaviour {
 	public AudioSource SFX;
 	public AudioSource SFXFootsteps;
 	public AudioSource SFXClothes;
-	[HideInInspector] public int SFXJump = 135;
-	[HideInInspector] public int SFXJumpLand = 136;
-	[HideInInspector] public int SFXLadder = 137;
+	int SFXJump = 135;
+	int SFXJumpLand = 136;
+	int SFXLadder = 137;
 	public GameObject fpsCounter;
 	public GameObject locationIndicator;
 	public Text locationText;
@@ -58,15 +58,15 @@ public class PlayerMovement : MonoBehaviour {
 	public string lastCommand6;
 	public int consoleMemdex;
 	private float feetRayLength = 5f;
-	[HideInInspector] public bool FatigueCheat;
+	bool FatigueCheat;
 
 	// Internal references
 	public BodyState bodyState; // save
-	[HideInInspector] public int ladderState = 0; // save
+	int ladderState = 0; // save
 	public bool gravliftState = false; // save
-	[HideInInspector] public bool inCyberSpace = false; // save
-	[HideInInspector] public float walkAcceleration = 2000f;
-	[HideInInspector] public int SFXIndex = -1; // save
+	bool inCyberSpace = false; // save
+	float walkAcceleration = 2000f;
+	int SFXIndex = -1; // save
 	private float walkDeacceleration = 0.1f; // was 0.30f
 	private float walkDeaccelerationBooster = 0.5f; // was 2f, adjusted player physics material to reduce friction for moving up stairs
 	private float deceleration;
@@ -93,19 +93,19 @@ public class PlayerMovement : MonoBehaviour {
 	private float capsuleRadius;
 	private float ladderSpeed = 0.4f;
 	private float fallDamage = 75f;
-	[HideInInspector] public bool CheatWallSticky; // save
-    [HideInInspector] public bool CheatNoclip; // save
-    [HideInInspector] public bool staminupActive = false;
+	bool CheatWallSticky; // save
+    bool CheatNoclip; // save
+    bool staminupActive = false;
 	public Vector2 horizontalMovement;
 	public float verticalMovement;
-	[HideInInspector] public float jumpTime; // save
+	float jumpTime; // save
 	private float crouchingVelocity = 1f;
 	private float lastCrouchRatio;
 	private int layerGeometry = 9;
 	private int layerMask;
-	[HideInInspector] public Rigidbody rbody;
+	Rigidbody rbody;
 	private float fallDamageSpeed = 11.72f;
-	[HideInInspector] public Vector3 oldVelocity; // save
+	Vector3 oldVelocity; // save
 	public float fatigue; // save
 	private float jumpFatigue = 6.5f;
 	private float fatigueWanePerTick = 1f;
@@ -114,49 +114,49 @@ public class PlayerMovement : MonoBehaviour {
 	private float fatigueWaneTickSecs = 0.3f;
 	private float fatiguePerWalkTick = 0.88f;
 	private float fatiguePerSprintTick = 2.85f;
-	[HideInInspector] public bool justJumped = false; // save
-	[HideInInspector] public float fatigueFinished; // save
-	[HideInInspector] public float fatigueFinished2; // save
+	bool justJumped = false; // save
+	float fatigueFinished; // save
+	float fatigueFinished2; // save
 	private int def1 = 1;
 	public bool running = false;
 	public float relForward = 0f;
 	public float relSideways = 0f;
-	[HideInInspector] public bool cyberSetup = false; // save
-	[HideInInspector] public bool cyberDesetup = false; // save
-	[HideInInspector] public SphereCollider cyberCollider;
-	[HideInInspector] public CapsuleCollider capsuleCollider;
-	[HideInInspector] public BodyState oldBodyState; // save
+	bool cyberSetup = false; // save
+	bool cyberDesetup = false; // save
+	SphereCollider cyberCollider;
+	CapsuleCollider capsuleCollider;
+	BodyState oldBodyState; // save
 	public float bonus;
     private float walkDeaccelerationVolx;
     private float walkDeaccelerationVoly;
     private float walkDeaccelerationVolz;
-	[HideInInspector] public bool consoleActivated; // save
-	[HideInInspector] public float leanTarget = 0f; // save
-	[HideInInspector] public float leanShift = 0f; // save
+	bool consoleActivated; // save
+	float leanTarget = 0f; // save
+	float leanShift = 0f; // save
 	private float leanMaxAngle = 35f;
 	private float leanMaxShift = 0.8f;
-	[HideInInspector] public float jumpSFXFinished; // save
-	[HideInInspector] public float ladderSFXFinished;
+	float jumpSFXFinished; // save
+	float ladderSFXFinished;
 	private float ladderSFXIntervalTime = 1f;
 	private float jumpSFXIntervalTime = 1f;
-	[HideInInspector] public float jumpLandSoundFinished; // save
-	[HideInInspector] public float jumpJetEnergySuckTickFinished; // save
+	float jumpLandSoundFinished; // save
+	float jumpJetEnergySuckTickFinished; // save
 	private float jumpJetEnergySuckTick = 1f;
 	private Vector3 tempVec;
 	private Vector2 tempVec2;
 	private int tempInt;
 	private float leanSpeed = 70f;
-	[HideInInspector] public bool Notarget = false; // for cheat to disable enemy sight checks against this player
-	[HideInInspector] public bool fatigueWarned; // save
-	[HideInInspector] public float ressurectingFinished; // save
+	bool Notarget = false; // for cheat to disable enemy sight checks against this player
+	bool fatigueWarned; // save
+	float ressurectingFinished; // save
 	private float burstForce = 35f;
-	[HideInInspector] public float doubleJumpFinished; // save
+	float doubleJumpFinished; // save
 	private Vector3 playerHome;
-	[HideInInspector] public float turboFinished = 0f; // save
-	[HideInInspector] public float turboCyberTime = 15f;
-	[HideInInspector] public bool inCyberTube = false;
-	[HideInInspector] public float stepFinished;
-	[HideInInspector] public float rustleFinished;
+	float turboFinished = 0f; // save
+	float turboCyberTime = 15f;
+	bool inCyberTube = false;
+	float stepFinished;
+	float rustleFinished;
 	private int doubleJumpTicks = 0;
 	private Vector3 tempVecRbody;
 	private bool inputtingMovement;
@@ -262,7 +262,7 @@ public class PlayerMovement : MonoBehaviour {
 // 			foreach (var rt in renderTextures) {
 // 				if (rt.name.Contains("Shadow") || rt.depth > 0) shadowMapCount++;
 // 			}
-// 			Debug.Log($"Lights: {shadowCount}, Shadow Maps: {shadowMapCount}, " +
+// 			DualLog($"Lights: {shadowCount}, Shadow Maps: {shadowMapCount}, " +
 // 					$"Used RAM: {UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / 1024 / 1024} MB");
 // 		}
 
@@ -354,16 +354,16 @@ public class PlayerMovement : MonoBehaviour {
 		if (inCyberSpace) return;
 
 		// Using value of 1.06 = (player capsule height / 2) + 0.06 = 1 + 0.06;
-		bool successfulRay = Physics.Raycast(transform.position, Vector3.down,
+		bool successfulRay = Raycast(transform.position, Vector3.down,
 											 out tempHit,1.1f,
 											 Const.a.layerMaskPlayerFeet);
 
-		//Debug.Log("Feet ray 1 success: " + successfulRay.ToString());
+		//DualLog("Feet ray 1 success: " + successfulRay.ToString());
 		// Success here means hit a useable something.
 		// If a ray hits a wall or other unusable something, that's not success
 		// and print "Can't use <something>"
 		if (!successfulRay || tempHit.collider == null) {
-// 			Debug.Log("bad ray for feet checks");
+// 			DualLog("bad ray for feet checks");
 			// Automatically set grounded false, prevents ability to climb any wall
 			if (!CheatWallSticky || gravliftState) grounded = false;
 			return;
@@ -404,7 +404,7 @@ public class PlayerMovement : MonoBehaviour {
 
 		if (!grounded) return;
 
-		successfulRay = Physics.Raycast(transform.position, Vector3.down,
+		successfulRay = Raycast(transform.position, Vector3.down,
 										out tempHit,feetRayLength,
 										Const.a.layerMaskPlayerFeet);
 		
@@ -1111,7 +1111,7 @@ public class PlayerMovement : MonoBehaviour {
 			|| bodyState == BodyState.ProningDown
 			|| bodyState == BodyState.ProningUp) {
 			bodyLerpGravityOffDelayFinished = 0;
-// 			Debug.Log("Crouching gravity! " + rbody.useGravity.ToString());
+// 			DualLog("Crouching gravity! " + rbody.useGravity.ToString());
 			return true;
 		} else {
 			if (bodyLerpGravityOffDelayFinished == 0) {
@@ -1245,7 +1245,7 @@ public class PlayerMovement : MonoBehaviour {
 				
 				PlayerHealth.a.makingNoise = true;
 				PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
-				Physics.Raycast(transform.position, Vector3.down,
+				Raycast(transform.position, Vector3.down,
 								out tempHit,feetRayLength,
 								Const.a.layerMaskPlayerFeet);
 				
@@ -1334,7 +1334,7 @@ public class PlayerMovement : MonoBehaviour {
 		float upForce = 0f;
 // 		if (rbody.velocity.magnitude < playerSpeed) {
 // 			upForce = (floorDot - 1.0f)/1.0f * playerSpeed;
-// 			if (upForce != 0) Debug.Log("upForce is " + upForce.ToString());
+// 			if (upForce != 0) DualLog("upForce is " + upForce.ToString());
 // 		}
 
 		if (isSprinting) {
@@ -1408,7 +1408,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 		
 		if (velChange >= 3f) {
-			Physics.Raycast(transform.position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
+			Raycast(transform.position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 			if (tempHit.collider == null) return;
 			
 			GameObject hitGO = tempHit.collider.transform.gameObject;
@@ -1484,7 +1484,7 @@ public class PlayerMovement : MonoBehaviour {
 			inputtingMovement = true;
 		}
 
-		if (Const.a.difficultyCyber > 1) {
+		if (SSys_Global.difficultyCyber > 1) {
 			if (rbody.velocity.magnitude < walkAcceleration * 0.05f) {
 				tempVec = MouseCursor.a.GetCursorScreenPointForRay();
 				tempVec = MouseLookScript.a.playerCamera.ScreenPointToRay(tempVec).direction;

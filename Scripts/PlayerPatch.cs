@@ -21,24 +21,24 @@ public class PlayerPatch : MonoBehaviour {
 	public BerserkEffect sensaroundCamLeftBerserk;
 	public BerserkEffect sensaroundCamRightBerserk;
 
-	[HideInInspector] public float berserkFinishedTime; // save
-	[HideInInspector] public float berserkIncrementFinishedTime; // save
-	[HideInInspector] public float detoxFinishedTime; // save
-	[HideInInspector] public float geniusFinishedTime; // save
-	[HideInInspector] public float mediFinishedTime; // save
-	[HideInInspector] public float reflexFinishedTime; // save
-	[HideInInspector] public float sightFinishedTime; // save
-	[HideInInspector] public float sightSideEffectFinishedTime; // save
-	[HideInInspector] public float staminupFinishedTime; // save
-	[HideInInspector] public int berserkIncrement; // save
-	[HideInInspector] public const int PATCH_BERSERK = 1;
-	[HideInInspector] public const int PATCH_DETOX = 2;
-	[HideInInspector] public const int PATCH_GENIUS = 4;
-	[HideInInspector] public const int PATCH_MEDI = 8;
-	[HideInInspector] public const int PATCH_REFLEX = 16;
-	[HideInInspector] public const int PATCH_SIGHT = 32;
-	[HideInInspector] public const int PATCH_STAMINUP = 64;
-	[HideInInspector] public int patchActive;  // bitflag carrier for active patches // save
+	float berserkFinishedTime; // save
+	float berserkIncrementFinishedTime; // save
+	float detoxFinishedTime; // save
+	float geniusFinishedTime; // save
+	float mediFinishedTime; // save
+	float reflexFinishedTime; // save
+	float sightFinishedTime; // save
+	float sightSideEffectFinishedTime; // save
+	float staminupFinishedTime; // save
+	int berserkIncrement; // save
+	const int PATCH_BERSERK = 1;
+	const int PATCH_DETOX = 2;
+	const int PATCH_GENIUS = 4;
+	const int PATCH_MEDI = 8;
+	const int PATCH_REFLEX = 16;
+	const int PATCH_SIGHT = 32;
+	const int PATCH_STAMINUP = 64;
+	int patchActive;  // bitflag carrier for active patches // save
 	private static StringBuilder s1 = new StringBuilder();
 
 	public static PlayerPatch a;

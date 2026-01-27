@@ -20,7 +20,7 @@ public class PlayerReferenceManager : MonoBehaviour {
 	public GameObject playerMFDManager;
 
 	// Internal references
-	[HideInInspector] public int playerCurrentLevel;
+	int playerCurrentLevel;
 
 	public static PlayerReferenceManager a;
 

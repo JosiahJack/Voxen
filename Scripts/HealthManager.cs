@@ -41,22 +41,21 @@ public class HealthManager : MonoBehaviour {
 	public PoolType deathFX;
 	public BloodType bloodType;
 	public string targetOnDeath;
-	public string argvalue;
 	public bool inCyberSpace = false; // Externally modifiable
 
 	// Internal references
-	[HideInInspector] public GameObject attacker;
-	[HideInInspector] public float justHurtByEnemy;
-	[HideInInspector] public bool deathDone = false;
-	[HideInInspector] public AIController aic;
+	GameObject attacker;
+	float justHurtByEnemy;
+	bool deathDone = false;
+	AIController aic;
 	private PrefabIdentifier prefID;
     private float tempFloat;
 	private float take;
-	[HideInInspector] public bool god = false; // is this entity invincible? used for player cheat
-	[HideInInspector] public bool teleportDone;
-	[HideInInspector] public TargetID linkedTargetID;
-	[HideInInspector] public bool awakeInitialized = false;
-	[HideInInspector] public bool startInitialized = false;
+	bool god = false; // is this entity invincible? used for player cheat
+	bool teleportDone;
+	TargetID linkedTargetID;
+	bool awakeInitialized = false;
+	bool startInitialized = false;
 	private bool isScreen = false;
 	private static StringBuilder s1 = new StringBuilder();
 
@@ -98,7 +97,7 @@ public class HealthManager : MonoBehaviour {
 					if (maxhealth == -1) maxhealth = Const.a.healthForNPC[index]; // set maxhealth to default healthForNPC, possible to set higher, e.g. for cyborg assassins on level 9 whose health is 3 times normal
 				}
 
-				if (Const.a.difficultyCombat == 0) {
+				if (Sys_Global.difficultyCombat == 0) {
 					maxhealth = 1;
 					health = maxhealth;
 				}
@@ -106,74 +105,7 @@ public class HealthManager : MonoBehaviour {
 			if (actAsCorpseOnly && isNPC) InitializeCorpseOnly();
         }
 		if (maxhealth <= 0) maxhealth = health;
-		LinkToAutomapOverlay();
 		startInitialized = true;
-	}
-
-	void LinkToAutomapOverlay() {
-		if (!isSecCamera && !isNPC) return;
-		if (linkedOverlay != null) return; // Already have an overlay.
-		if (Const.a == null) return; // Editor script save attempt (dynamic object export).
-		
-		PoolType pt = PoolType.AutomapCameraOverlays;
-		if (isNPC && aic.index > 0 && aic.index < Const.a.typeForNPC.Length) {
-			switch (Const.a.typeForNPC[aic.index]) {
-				case NPCType.Mutant:       pt = PoolType.AutomapMutantOverlays;
-										   break;
-				case NPCType.Supermutant:  pt = PoolType.AutomapMutantOverlays;
-										   break;
-				case NPCType.Robot:        pt = PoolType.AutomapBotOverlays;
-										   break;
-				case NPCType.Cyborg:       pt = PoolType.AutomapCyborgOverlays;
-										   break;
-				case NPCType.Supercyborg:  pt = PoolType.AutomapCyborgOverlays;
-										   break;
-				case NPCType.MutantCyborg: pt = PoolType.AutomapCyborgOverlays;
-										   break;
-			}
-		}
-
-		GameObject overlay = Const.a.GetObjectFromPool(pt);
-		if (overlay != null) {
-			linkedOverlay = overlay.GetComponent<Image>();
-			Utils.EnableImage(linkedOverlay); // Enable on automap.
-			Utils.Activate(overlay); // Mark as used.
-		} else {
-			Debug.Log("BUG: No automap icon type " + pt.ToString());
-		}
-
-		UpdateLinkedOverlay();
-	}
-
-	public void UpdateLinkedOverlay() {
-		if (!isSecCamera && !isNPC) return;
-		if (IsCyberEntity()) return;
-		if (isNPC) {
-			if (Inventory.a != null) {
-				if (Inventory.a.NavUnitVersion() <= 1) return;
-			}
-		}
-
-		Automap.TurnOnLinkedOverlay(linkedOverlay,health,gameObject,isNPC);
-		Automap.SetLinkedOverlayPos(linkedOverlay,health,gameObject);
-	}
-
-	void OnDisable() {
-		if (linkedOverlay != null) {
-			Utils.Deactivate(linkedOverlay.gameObject);
-			Utils.DisableImage(linkedOverlay);
-		}
-	}
-
-	void OnEnable() {
-		Start();
-		UpdateLinkedOverlay();
-	}
-
-	public void ClearOverlays() {
-		if (pstatic != null) pstatic.Deactivate();
-		if (empstatic != null) empstatic.Deactivate();
-		if (healingFXFlash != null) healingFXFlash.SetActive(false);
 	}
 
 	void UseDeathTargets() {
@@ -184,7 +116,6 @@ public class HealthManager : MonoBehaviour {
 		if (isPlayer) return; // Player death does nothing.
 
 		UseData ud = new UseData();
-		ud.argvalue = argvalue;
 		Const.a.UseTargets(gameObject,ud,targetOnDeath);
 	}
 
@@ -201,7 +132,7 @@ public class HealthManager : MonoBehaviour {
 
 	float ApplyAttackTypeAdjustments(float take,DamageData dd) {
 		if (isNPC && health > 0f) {
-			if (Const.a.typeForNPC[index] == NPCType.Mutant) {
+			if (npcTable[NPCID].type[index] == NPCType.Mutant) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -217,7 +148,7 @@ public class HealthManager : MonoBehaviour {
 				}
 			}
 
-			if (Const.a.typeForNPC[index] == NPCType.Supermutant) {
+			if (npcTable[NPCID].type[index] == NPCType.Supermutant) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -233,7 +164,7 @@ public class HealthManager : MonoBehaviour {
 				}
 			}
 
-			if (Const.a.typeForNPC[index] == NPCType.Robot) {
+			if (npcTable[NPCID].type[index] == NPCType.Robot) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -249,7 +180,7 @@ public class HealthManager : MonoBehaviour {
 				}
 			}
 
-			if (Const.a.typeForNPC[index] == NPCType.Cyborg) {
+			if (npcTable[NPCID].type[index] == NPCType.Cyborg) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -265,7 +196,7 @@ public class HealthManager : MonoBehaviour {
 				}
 			}
 
-			if (Const.a.typeForNPC[index] == NPCType.Supercyborg) {
+			if (npcTable[NPCID].type[index] == NPCType.Supercyborg) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -281,7 +212,7 @@ public class HealthManager : MonoBehaviour {
 				}
 			}
 
-			if (Const.a.typeForNPC[index] == NPCType.MutantCyborg) {
+			if (npcTable[NPCID].type[index] == NPCType.MutantCyborg) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -297,7 +228,7 @@ public class HealthManager : MonoBehaviour {
 				}
 			}
 
-			if (Const.a.typeForNPC[index] == NPCType.Cyber) {
+			if (npcTable[NPCID].type[index] == NPCType.Cyber) {
 				switch(dd.attackType) {
 					case AttackType.None: take *= 1f; break; // same
 					case AttackType.Melee: take *= 1f; break; // same
@@ -561,7 +492,7 @@ public class HealthManager : MonoBehaviour {
 
 		if (aic == null) return;
 
-		if (Const.a.typeForNPC[aic.index] == NPCType.Cyber) {
+		if (npcTable[NPCID].type[aic.index] == NPCType.Cyber) {
 			Utils.SafeDestroy(aic.gameObject);
 		} else {
 			// Ok.  We've been through this.  Must keep the parent collider on
@@ -853,7 +784,7 @@ public class HealthManager : MonoBehaviour {
 			s1.Append(Utils.SaveSubActivatedGOState(hm.gibObjects[i]));
 		}
 
-		if (prefID == null) Debug.LogError("Missing PrefabIdentifier on " + go.name + ".");
+		if (prefID == null) DualLogError("Missing PrefabIdentifier on " + go.name + ".");
 		if (prefID.constIndex == 526) { // prop_console02
 			GameObject child = go.transform.GetChild(0).gameObject; 
 			s1.Append(Utils.splitChar);
@@ -896,7 +827,7 @@ public class HealthManager : MonoBehaviour {
 		int numChildrenFromSave = Utils.GetIntFromString(entries[index],"gibObjects.Length"); index++;
 
 		if (numChildren != numChildrenFromSave) {
-			Debug.Log("BUG: HealthManager gibObjects.Length("
+			DualLog("BUG: HealthManager gibObjects.Length("
 					  + numChildren.ToString() + ") != children("
 					  + numChildrenFromSave.ToString() + ") from"
 					  + " savefile on " + go.name + "!");
@@ -924,11 +855,11 @@ public class HealthManager : MonoBehaviour {
 				ista.tickFinished = Utils.LoadRelativeTimeDifferential(entries[index],"ista.tickFinished"); index++;
 			}
 		} else {
-			if (prefID == null) Debug.LogError("Missing PrefabIdentifier on " + go.name + ".");	
+			if (prefID == null) DualLogError("Missing PrefabIdentifier on " + go.name + ".");	
 		}
 
 		hm.teleportOnDeath = Utils.GetBoolFromString(entries[index],"teleportOnDeath"); index++;
-		if (hm.health <= 0 && hm.isNPC && !hm.aic.IsCyberNPC() && hm.teleportOnDeath) {
+		if (hm.health <= 0 && hm.isNPC && !npcTable[NPCID].type == NPCType_Cyber && hm.teleportOnDeath) {
 			hm.aic.enabled = false;
 			AIAnimationController aiac = hm.aic.visibleMeshEntity.GetComponent<AIAnimationController>();
 			if (aiac != null) aiac.enabled = false;

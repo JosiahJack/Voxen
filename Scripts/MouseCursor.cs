@@ -74,13 +74,13 @@ public class MouseCursor : MonoBehaviour {
 		pev = new PointerEventData(EventSystem.current);
 		graphicCastResults = new List<RaycastResult>();
 		canvasRectTransform = canvas.gameObject.GetComponent<RectTransform>();
-		if (canvasRectTransform == null) Debug.LogError("Can't access RectTransform on canvas!");
+		if (canvasRectTransform == null) DualLogError("Can't access RectTransform on canvas!");
 		
 		cursorCanvasRectTransform = cursorCanvas.gameObject.GetComponent<RectTransform>();
-		if (cursorCanvasRectTransform == null) Debug.LogError("Can't access RectTransform on cursorCanvas!");
+		if (cursorCanvasRectTransform == null) DualLogError("Can't access RectTransform on cursorCanvas!");
 		
 		cursorRectTransform = cursorUIImage.GetComponent<RectTransform>();
-		if (cursorRectTransform == null) Debug.LogError("Can't access RectTransform on Cursor!");
+		if (cursorRectTransform == null) DualLogError("Can't access RectTransform on Cursor!");
 	}
 
 	#if UNITY_STANDALONE_LINUX
@@ -111,7 +111,7 @@ public class MouseCursor : MonoBehaviour {
 		//		throw new Exception("Failed to open display");
 		//	}
 
-		//	Debug.Log("warping pointer to " + x.ToString() + ", " + y.ToString());
+		//	DualLog("warping pointer to " + x.ToString() + ", " + y.ToString());
 		//	XWarpPointer(display, IntPtr.Zero, IntPtr.Zero, 0, 0, 0, 0, x, y);
 		//	XCloseDisplay(display);
 		//#elif UNITY_STANDALONE_WIN

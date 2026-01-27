@@ -9,7 +9,7 @@ public class CyberItem : MonoBehaviour {
 	private GameObject explosionEffect;
 
 	void Start() {
-		if (Const.a.difficultyMission == 0) {
+		if (SSys_Global.difficultyMission == 0) {
 			// Disable data objects when Mission difficulty is 0.
 			if (type == SoftwareType.Data) this.gameObject.SetActive(false);
 		}

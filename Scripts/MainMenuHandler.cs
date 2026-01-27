@@ -112,8 +112,8 @@ public class MainMenuHandler : MonoBehaviour {
 	public ConfigurationMenuAudioModeApply audModeApply;
 	public ConfigurationMenuModelDetailApply mdlDetApply;
 
-	[HideInInspector] public bool returnToPause = false;
-	[HideInInspector] public bool fileBrowserOpen = false;
+	bool returnToPause = false;
+	bool fileBrowserOpen = false;
 	public bool dataFound = false;
 	private enum Pages : byte {fp,sp,mp,np,lp,op,sv,cd};
 	private Pages currentPage;
@@ -156,7 +156,7 @@ public class MainMenuHandler : MonoBehaviour {
 		if (MouseLookScript.a == null) return;
 
 		MouseLookScript.a.playerCamera.enabled = true;
-		//UnityEngine.Debug.Log("Camera reenabled");
+		//UnityEngine.DualLog("Camera reenabled");
 	}
 
 	void OnEnable() {
@@ -482,7 +482,7 @@ public class MainMenuHandler : MonoBehaviour {
 		if ((   (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
 			 || (Input.GetKeyDown(KeyCode.LeftAlt) && Input.GetKey(KeyCode.P)))
 			&& !CouldNotFindDialogue.activeInHierarchy) {
-			if (string.IsNullOrWhiteSpace(Const.a.playerName)) {
+			if (data_parser_isspace(Const.a.playerName)) {
 				Const.a.playerName = "Qmaster";
 			}
 
@@ -518,11 +518,11 @@ public class MainMenuHandler : MonoBehaviour {
 	}
 
 	public void StartGame (bool isNew) {
-		Const.a.difficultyCombat = combat.difficultySetting;
-		Const.a.difficultyMission = mission.difficultySetting;
-		Const.a.difficultyPuzzle = puzzle.difficultySetting;
-		Const.a.difficultyCyber = cyber.difficultySetting;
-		if (Const.a.difficultyMission < 3) {
+		Sys_Global.difficultyCombat = combat.difficultySetting;
+		SSys_Global.difficultyMission = mission.difficultySetting;
+		SSys_Global.difficultyPuzzle = puzzle.difficultySetting;
+		SSys_Global.difficultyCyber = cyber.difficultySetting;
+		if (SSys_Global.difficultyMission < 3) {
 			MissionTimer.a.text.text = System.String.Empty;
 			MissionTimer.a.timerTypeText.text = System.String.Empty;
 			MFDManager.a.overallMissionTimerT.SetActive(false);
@@ -534,7 +534,7 @@ public class MainMenuHandler : MonoBehaviour {
 		
 		if (isNew) {
 			string pname = newgamePage.GetComponentInChildren<InputField>(true).text;
-			if (string.IsNullOrWhiteSpace(pname)) pname = "Hacker";
+			if (data_parser_isspace(pname)) pname = "Hacker";
 			Const.a.playerName = pname;
 			Const.a.NewGame();
 		}
@@ -639,9 +639,6 @@ public class MainMenuHandler : MonoBehaviour {
 		if (!optionsPage.activeInHierarchy) yield break;
 		if (!GraphicsTab.activeInHierarchy) yield break;
 
-// 		configCamera.targetTexture.Release();
-// 		configCamera.targetTexture.width = Screen.width;
-// 		configCamera.targetTexture.height = Screen.height;
 		configCamera.fieldOfView = Const.a.player1CapsuleMainCameragGO.GetComponent<Camera>().fieldOfView;
 		Grayscale gsc = configCamera.gameObject.GetComponent<Grayscale>();
 		Grayscale gscMain = Const.a.player1CapsuleMainCameragGO.GetComponent<Camera>().GetComponent<Grayscale>();
@@ -653,10 +650,6 @@ public class MainMenuHandler : MonoBehaviour {
 		DynamicCulling.a.CullCore();
 		if (sega != null) sega.enabled = Const.a.GraphicsSEGI;
 		configCamera.Render();
-// 		if (Const.a.GraphicsSEGI) {
-// 			yield return null;
-// 			configCamera.Render();
-// 		}
 	}
 
 	public void RenderConfigView() {
@@ -678,21 +671,21 @@ public class MainMenuHandler : MonoBehaviour {
 		Utils.ConfirmExistsMakeIfNot(basePath,savName);
 		StreamReader sf = new StreamReader(sP);
 		if (sf == null) {
-			Debug.Log("GetSaveName error! sf null");
+			DualLog("GetSaveName error! sf null");
 			return retval;
 		}
 
 		using (sf) {
 			retval = sf.ReadLine();
 			if (retval == null) {
-				Debug.Log("GetSaveName error! retval null");
+				DualLog("GetSaveName error! retval null");
 				return "! unknown !"; // just in case
 			}
 
 			sf.Close();
 		}
 
-		Debug.Log("GetSaveName retval: " + retval);
+		DualLog("GetSaveName retval: " + retval);
 		return retval;
 	}
 
@@ -944,7 +937,6 @@ public class MainMenuHandler : MonoBehaviour {
 
 	public void SetConfigPreset(int index) {
 		presetQuestionValue = index;
-
 		if (presetQuestionValue == 1)  presetQuestionText.text = Const.a.stringTable[924]; // CHANGE ALL KEYS TO LEGACY PRESET?
 		else presetQuestionText.text = Const.a.stringTable[923]; // RESET ALL KEYS TO DEFAULT?
 
@@ -1088,107 +1080,5 @@ public class MainMenuHandler : MonoBehaviour {
 		Const.a.WriteDatForIntroPlayed(false);
 		Config.SaveConfigToPlayerPrefs();
 		Utils.CopyLogFiles(false);
-	}
-	
-	void OnDestroy() {
-		Button1 = null;
-		Button2 = null;
-		Button3 = null;
-		Button4 = null;
-		startFXObject = null;
-		saltTheFries = null;
-		mainCamera = null;
-		singleplayerPage = null;
-		multiplayerPage = null;
-		newgamePage = null;
-		frontPage = null;
-		loadPage = null;
-		savePage = null;
-		optionsPage = null;
-		creditsPage = null;
-		CouldNotFindDialogue = null;
-		SuccessBanner = null;
-		FailureBanner = null;
-		InitialDisplay = null;
-		dataPathInputText = null;
-		newgameInputText = null;
-		combat = null;
-		mission = null;
-		puzzle = null;
-		cyber = null;
-		saveNameInputField = null;
-		saveNameInput = null;
-		saveNamePlaceholder = null;
-		saveButtonText = null;
-		loadButtonText = null;
-		credScrollManager = null;
-		IntroVideo = null;
-		IntroVideoContainer = null;
-		PresetConfirmDialog = null;
-		presetQuestionText = null;
-		keybindButtons = null;
-		ctInvertUpDnLook = null;
-		ctInvertUpDnCyberLook = null;
-		ctInvertInventoryCyc = null;
-		ctQuickItemPickUp = null;
-		ctQuickReload = null;
-		ctNoShootMode = null;
-		introVideoTextGO1 = null;
-		introVideoTextGO2 = null;
-		introVideoTextGO3 = null;
-		introVideoTextGO4 = null;
-		introVideoTextGO5 = null;
-		introVideoTextGO6 = null;
-		introVideoTextGO7 = null;
-		introVideoTextGO8 = null;
-		introVideoTextGO9 = null;
-		introVideoTextGO10 = null;
-		introVideoTextGO11 = null;
-		introVideoTextGO12 = null;
-		introVideoTextGO13 = null;
-		introVideoTextGO14 = null;
-		introVideoTextGO15 = null;
-		introVideoText1 = null;
-		introVideoText2 = null;
-		introVideoText3 = null;
-		introVideoText4 = null;
-		introVideoText5 = null;
-		introVideoText6 = null;
-		introVideoText7 = null;
-		introVideoText8 = null;
-		introVideoText9 = null;
-		introVideoText10 = null;
-		introVideoText11 = null;
-		introVideoText12 = null;
-		introVideoText13 = null;
-		introVideoText14 = null;
-		introVideoText15 = null;
-		introPlayer = null;
-		DeathVideo = null;
-		DeathVideoContainer = null;
-		deathPlayer = null;
-		deathVideoTextGO1 = null;
-		deathVideoTextGO2 = null;
-		deathVideoText1 = null;
-		deathVideoText2 = null;
-		GraphicsTab = null;
-		InputTab = null;
-		AudioTab = null;
-		GraphicsTabButtonImage = null;
-		InputTabButtonImage = null;
-		AudioTabButtonImage = null;
-		GraphicsTabButtonText = null;
-		InputTabButtonText = null;
-		AudioTabButtonText = null;
-		OptionsTabDehilited = null;
-		OptionsTabHilited = null;
-		configCamera = null;
-		BackGroundMusic = null;
-		aaaApply = null;
-		shadApply = null;
-		ssrApply = null;
-		audModeApply = null;
-		mdlDetApply = null;
-		if (a == this) a = null;
 	}
 }

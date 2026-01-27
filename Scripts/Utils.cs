@@ -43,7 +43,7 @@ public class Utils {
 	public static object SafeIndex(ref object[] array, int index, int max,
                                    object failValue) {
 		if (array.Length < 1) {
-            Debug.Log("SafeIndex: Unexpected situation, array " + nameof(array)
+            DualLog("SafeIndex: Unexpected situation, array " + nameof(array)
                       + " was empty!  Using fallback value of "
                       + failValue.ToString());
 
@@ -51,7 +51,7 @@ public class Utils {
         }
 
 		if (index < 0 || index > max || index > array.Length) {
-            Debug.Log("SafeIndex: Unexpected situation, index "
+            DualLog("SafeIndex: Unexpected situation, index "
                       + index.ToString() + " out of bounds [0,"
                       + array.Length.ToString() + "] or context max of "
                       + max.ToString() + ".  Set to fallback value of "
@@ -270,7 +270,7 @@ public class Utils {
 
             testAlreadyRan = true;
 			testRanSuccessful = false;
-			UnityEngine.Debug.Log("IsStreamingAssetsWritable result false 1");
+			UnityEngine.DualLog("IsStreamingAssetsWritable result false 1");
             return false;
         }
 
@@ -281,14 +281,14 @@ public class Utils {
 
 		bool hasPrFls = false;
 		bool hasPrFls86 = false;
-		if (!string.IsNullOrWhiteSpace(programFilesPath)) hasPrFls = streamingAssetsPath.Contains(programFilesPath);
-		if (!string.IsNullOrWhiteSpace(programFilesX86Path)) hasPrFls86 = streamingAssetsPath.Contains(programFilesX86Path);
+		if (!data_parser_isspace(programFilesPath)) hasPrFls = streamingAssetsPath.Contains(programFilesPath);
+		if (!data_parser_isspace(programFilesX86Path)) hasPrFls86 = streamingAssetsPath.Contains(programFilesX86Path);
         if ((Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
 			&& hasPrFls || hasPrFls86) {
 
 			testAlreadyRan = true;
 			testRanSuccessful = false;
-			UnityEngine.Debug.Log("IsStreamingAssetsWritable result false 2");
+			UnityEngine.DualLog("IsStreamingAssetsWritable result false 2");
             return false; // In a protected directory
         }
 
@@ -300,18 +300,18 @@ public class Utils {
                 File.Delete(testFilePath); // Clean up
 				testAlreadyRan = true;
 				testRanSuccessful = true;
-				UnityEngine.Debug.Log("IsStreamingAssetsWritable result true");
+				UnityEngine.DualLog("IsStreamingAssetsWritable result true");
                 return true;
             }
             
             testAlreadyRan = true;
 			testRanSuccessful = false;
-			UnityEngine.Debug.Log("IsStreamingAssetsWritable result false 3");
+			UnityEngine.DualLog("IsStreamingAssetsWritable result false 3");
             return false;
         } catch {
 			testAlreadyRan = true;
 			testRanSuccessful = false;
-			UnityEngine.Debug.Log("IsStreamingAssetsWritable result false 4");
+			UnityEngine.DualLog("IsStreamingAssetsWritable result false 4");
 			return false; // Exception indicates non-writable directory
         }
     }
@@ -348,7 +348,7 @@ public class Utils {
                 MemoryStream memStr = new MemoryStream(bytes);
                 dataReader = new StreamReader(memStr, Encoding.ASCII);
             } else {
-                UnityEngine.Debug.LogError($"Failed to read {fPath} on Android: {request.error}");
+                UnityEngine.DualLogError($"Failed to read {fPath} on Android: {request.error}");
                 return null; // No recovery needed for Android
             }
         } else {
@@ -357,7 +357,7 @@ public class Utils {
                 dataReader = new StreamReader(fPath, Encoding.ASCII);
             } else {
                 // File missing, attempt recovery from Resources/StreamingAssetsRecovery
-                UnityEngine.Debug.LogWarning($"File {fPath} not found, attempting recovery.");
+                UnityEngine.DualLogWarning($"File {fPath} not found, attempting recovery.");
                 string rsrc = ResourcesPathCombine("StreamingAssetsRecovery",fName);
                 TextAsset resourcesFile = (TextAsset)Resources.Load(rsrc);
                 if (resourcesFile != null) {
@@ -365,7 +365,7 @@ public class Utils {
                     MemoryStream memStr = new MemoryStream(Encoding.ASCII.GetBytes(resourcesFile.text));
                     dataReader = new StreamReader(memStr, Encoding.ASCII);
                 } else {
-                    UnityEngine.Debug.LogError($"Recovery file {rsrc} not found in Resources/StreamingAssetsRecovery.");
+                    UnityEngine.DualLogError($"Recovery file {rsrc} not found in Resources/StreamingAssetsRecovery.");
                     return null;
                 }
             }
@@ -387,13 +387,13 @@ public class Utils {
 	}
 
 	public static void ConfirmExistsMakeIfNot(string basePath, string fileName) {
-		if (string.IsNullOrWhiteSpace(fileName)) {
-			UnityEngine.Debug.LogWarning("fileName was null or whitespace passed to ConfirmExistsMakeIfNot");
+		if (data_parser_isspace(fileName)) {
+			UnityEngine.DualLogWarning("fileName was null or whitespace passed to ConfirmExistsMakeIfNot");
 			return;
 		}
 		
-		if (string.IsNullOrWhiteSpace(basePath)) {
-			UnityEngine.Debug.LogWarning("basePath was null or whitespace passed to ConfirmExistsMakeIfNot");
+		if (data_parser_isspace(basePath)) {
+			UnityEngine.DualLogWarning("basePath was null or whitespace passed to ConfirmExistsMakeIfNot");
 			return;
 		}
 
@@ -405,7 +405,7 @@ public class Utils {
 			Application.platform == RuntimePlatform.OSXPlayer ||
 			!IsStreamingAssetsWritable())) {
 			
-			UnityEngine.Debug.LogWarning("Target path redirected to persistent data path for ConfirmExistsMakeIfNot()");
+			UnityEngine.DualLogWarning("Target path redirected to persistent data path for ConfirmExistsMakeIfNot()");
 			targetPath = Application.persistentDataPath;
 		}
 		
@@ -417,7 +417,7 @@ public class Utils {
 			try {
 				Directory.CreateDirectory(directoryPath);
 			} catch (Exception ex) {
-				UnityEngine.Debug.LogError($"Failed to create directory {directoryPath}: {ex.Message}");
+				UnityEngine.DualLogError($"Failed to create directory {directoryPath}: {ex.Message}");
 				return;
 			}
 		}
@@ -429,15 +429,15 @@ public class Utils {
 				// Recreate from Resources/StreamingAssetsRecovery/*
 				File.WriteAllBytes(strmAstPth, resourcesFile.bytes); // new, contents
 				if (File.Exists(strmAstPth)) {
-					UnityEngine.Debug.Log("File " + strmAstPth + " recreated");
+					UnityEngine.DualLog("File " + strmAstPth + " recreated");
 				} else {
-					UnityEngine.Debug.LogWarning("File " + strmAstPth + " failed to be created by File.WriteAllText!");
+					UnityEngine.DualLogWarning("File " + strmAstPth + " failed to be created by File.WriteAllText!");
 				}
 			} catch (Exception ex) {
-				UnityEngine.Debug.LogError("Failed to recreate " + strmAstPth + ": " + ex.Message);
+				UnityEngine.DualLogError("Failed to recreate " + strmAstPth + ": " + ex.Message);
 			}
         } else {
-			UnityEngine.Debug.LogWarning("File " + fileName + " not found in the Resources/StreamingAssetsRecovery folder");
+			UnityEngine.DualLogWarning("File " + fileName + " not found in the Resources/StreamingAssetsRecovery folder");
 		}
 	}
 
@@ -527,7 +527,7 @@ public class Utils {
 		string nameReceived = splits[0];
 		int valueReceived = GetIntFromString(splits[1],name);
 		if (nameReceived != name) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + typ
+			UnityEngine.DualLogError("BUG: Attempting to parse " + typ
 								       + " when wanting bool named " + name);
 			return TrackType.None;
 		}
@@ -570,7 +570,7 @@ public class Utils {
 		string nameReceived = splits[0];
 		int valueReceived = GetIntFromString(splits[1],name);
 		if (nameReceived != name) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + typ
+			UnityEngine.DualLogError("BUG: Attempting to parse " + typ
 								       + " when wanting bool named " + name);
 			return MusicType.None;
 		}
@@ -715,7 +715,7 @@ public class Utils {
 		}
 
 		if (!StringEquals(val,name)) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + val
+			UnityEngine.DualLogError("BUG: Attempting to parse " + val
 								  + " when wanting bool named " + name
 								  + ", returning false as fallback on "
 								  + SaveObject.currentObjectInfo);
@@ -724,7 +724,7 @@ public class Utils {
 		}
 		
 		if (val.Length - name.Length != 2 || (val[val.Length - 1] != '0' && val[val.Length - 1] != '1')) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + val
+			UnityEngine.DualLogError("BUG: Attempting to parse " + val
 								       + " when wanting bool named " + name
 								       + ", returning false as fallback on "
 								       + SaveObject.currentObjectInfo);
@@ -752,7 +752,7 @@ public class Utils {
 		getValparsed = Int32.TryParse(val, NumberStyles.Integer, en_US_Culture,
                                       out getValreadInt);
 		if (!getValparsed) {
-			UnityEngine.Debug.LogError("BUG: Could not parse int from: " + val
+			UnityEngine.DualLogError("BUG: Could not parse int from: " + val
                                    + ", returning 0 as a fallback on "
 								   + SaveObject.currentObjectInfo);
 			return 0;
@@ -764,7 +764,7 @@ public class Utils {
 	public static int GetIntFromString(string val, string name) {
 		int colonIndex = GetColonIndex(val);
 		if (!StringEquals(val,name,colonIndex)) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + val
+			UnityEngine.DualLogError("BUG: Attempting to parse " + val
 						               + " when wanting int named " + name
 						               + ", returning 0 as fallback on "
 						               + SaveObject.currentObjectInfo);
@@ -774,7 +774,7 @@ public class Utils {
 		int valueStart = colonIndex + 1;								             //    34           Length:15
 		int valueLength = val.Length - valueStart;							         // 0123456789ABCDE   15 - 4 = 11 for valueLength
 		if (!TryParseIntManual(val,valueStart,valueLength, out int getValreadInt)) { // key:-0000.00000
-			UnityEngine.Debug.LogError("BUG: Could not parse int from: " + val
+			UnityEngine.DualLogError("BUG: Could not parse int from: " + val
 									   + " for variable named " + name 
 									   + ", returning 0 as a fallback on "
 									   + SaveObject.currentObjectInfo);
@@ -819,7 +819,7 @@ public class Utils {
 		getValparsed = Single.TryParse(val, NumberStyles.Float, en_US_Culture,
                                        out getValreadFloat);
 		if (!getValparsed) {
-			UnityEngine.Debug.LogError("BUG: Could not parse float from: "
+			UnityEngine.DualLogError("BUG: Could not parse float from: "
                                    + val + ", returning 0.0 as fallback on "
 							   	   + SaveObject.currentObjectInfo);
 			return 0.0f;
@@ -830,7 +830,7 @@ public class Utils {
 	public static float GetFloatFromString(string val, string name) {
 		int colonIndex = GetColonIndex(val);
 		if (!StringEquals(val,name,colonIndex)) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + val
+			UnityEngine.DualLogError("BUG: Attempting to parse " + val
 						               + " when wanting float named " + name
 						               + ", returning 0 as fallback on "
 						               + SaveObject.currentObjectInfo);
@@ -840,7 +840,7 @@ public class Utils {
 		int valueStart = colonIndex + 1;
 		int valueLength = val.Length - valueStart;
 		if (!TryParseFloatManual(val, valueStart, valueLength, out float getValparsed)) {
-			UnityEngine.Debug.LogError("BUG: Could not parse float from: " +
+			UnityEngine.DualLogError("BUG: Could not parse float from: " +
 									   val + " for variable named " + name
 									   + ", returning 0 as a fallback on "
 									   + SaveObject.currentObjectInfo);
@@ -917,7 +917,7 @@ public class Utils {
 		}
 
 		if (nameReceived != name) {
-			UnityEngine.Debug.LogError("BUG: Attempting to parse " + val
+			UnityEngine.DualLogError("BUG: Attempting to parse " + val
 								       + " when wanting string named " + name
 								       + ", returning 'unknown' as fallback on "
 								       + SaveObject.currentObjectInfo);
@@ -1213,7 +1213,7 @@ public class Utils {
 	public static int LoadTransform(Transform tr, ref string[] entries,
 									 int index) {
 		if (tr == null) {
-			Debug.Log("Transform null while trying to load! "
+			DualLog("Transform null while trying to load! "
 					  + SaveObject.currentObjectInfo);
 			
 			if (entries[index].Contains("anchoredPosition")) return index + 22;
@@ -1402,7 +1402,7 @@ public class Utils {
 		Camera cm = go.GetComponent<Camera>();
         Grayscale gsc = go.GetComponent<Grayscale>();
 		if (cm == null) {
-			Debug.Log("Camera missing on savetype of Camera! GameObject.name: "
+			DualLog("Camera missing on savetype of Camera! GameObject.name: "
 					  + go.name);
 
 			return "Camera.enabled:0|Grayscale.enabled:0";
@@ -1593,47 +1593,47 @@ public class Utils {
 		if (go == null) return;
 
 		if (go.layer == 12) {
-			Debug.Log("Tried to Destroy() layered part of player!");
+			DualLog("Tried to Destroy() layered part of player!");
 			return;
 		}
 
 		if (go.name == "Player") {
-			Debug.Log("Tried to Destroy() Player!");
+			DualLog("Tried to Destroy() Player!");
 			return;
 		}
 
 		if (go.name == "Const") {
-			Debug.Log("Tried to Destroy() Const!");
+			DualLog("Tried to Destroy() Const!");
 			return;
 		}
 
 		if (go.name == "PlayerCapsule") {
-			Debug.Log("Tried to Destroy() PlayerCapsule!");
+			DualLog("Tried to Destroy() PlayerCapsule!");
 			return;
 		}
 
 		if (go.name == "Sky") {
-			Debug.Log("Tried to Destroy() Sky!");
+			DualLog("Tried to Destroy() Sky!");
 			return;
 		}
 
 		if (go.name == "LevelManager") {
-			Debug.Log("Tried to Destroy() LevelManager!");
+			DualLog("Tried to Destroy() LevelManager!");
 			return;
 		}
 
 		if (go.name == "EventSystem") {
-			Debug.Log("Tried to Destroy() EventSystem!");
+			DualLog("Tried to Destroy() EventSystem!");
 			return;
 		}
 
 		if (go.name == "Exterior") {
-			Debug.Log("Tried to Destroy() Exterior!");
+			DualLog("Tried to Destroy() Exterior!");
 			return;
 		}
 
 		if (go.name == "1.MedicalLevel") {
-			Debug.Log("Tried to Destroy() Medical level!");
+			DualLog("Tried to Destroy() Medical level!");
 			return;
 		}
 
@@ -1688,12 +1688,12 @@ public class Utils {
 			dd.impactVelocity = dd.damage * impactScale * 0.1f;
 			Vector3 dir = go.transform.position - centerPoint;
 			RaycastHit hit;
-			float dist = Vector3.Distance(centerPoint, go.transform.position); // Original distance
+			float dist = distance_vector3(centerPoint, go.transform.position); // Original distance
 			bool applyImpact = (dist < 4f); // Close enough, no raycast needed
 
 			if (!applyImpact) {
 				// Only raycast if not close
-				bool raycastHit = Physics.Raycast(centerPoint, dir, out hit, radius + 0.02f, Const.a.layerMaskExplosion);
+				bool raycastHit = Raycast(centerPoint, dir, out hit, radius + 0.02f, Const.a.layerMaskExplosion);
 				applyImpact = raycastHit && (hit.collider == colliders[i] || (hit.rigidbody == rbody && rbody != null));
 			}
 
@@ -1809,9 +1809,9 @@ public class Utils {
 
             // Copy the log file to the StreamingAssets folder
             File.Copy(logFilePath, destinationPath);
-            Debug.Log("Log file copied to StreamingAssets folder.");
+            DualLog("Log file copied to StreamingAssets folder.");
         } else {
-            Debug.LogWarning("Log file not found, hmmm");
+            DualLogWarning("Log file not found, hmmm");
         }
     }
 

@@ -15,19 +15,19 @@ public class NPC_ZeroG_MutantAnims : MonoBehaviour {
 		tickFinished = Sys_Global.pauseRelativeTime;
 		ResetFrames(); // turn off all frames just in case I left one on in the editor
 		if (endOnLastFrame && startFrame == (frames.Length-1)) {
-			if (frames[startFrame] == null) { Debug.Log("BUG: frames[startFrame] is null. startFrame is " + startFrame.ToString()); gameObject.SetActive(false); return;}
+			if (frames[startFrame] == null) { DualLog("BUG: frames[startFrame] is null. startFrame is " + startFrame.ToString()); gameObject.SetActive(false); return;}
 			frames[startFrame].SetActive(true);
 		}
 		currentFrame = startFrame;
 		if (currentFrame > frames.Length) {
 			currentFrame = frames.Length;
 		}
-		if (aic == null) Debug.Log("BUG: AIController aic was null on NPC_ZeroG_MutantAnims!");
+		if (aic == null) DualLog("BUG: AIController aic was null on NPC_ZeroG_MutantAnims!");
 	}
 
 	void ResetFrames() {
 		for (int i=0;i<frames.Length;i++) {
-			if (frames[i] == null) {Debug.Log("BUG: frames["+i.ToString()+"] is null"); continue;}
+			if (frames[i] == null) {DualLog("BUG: frames["+i.ToString()+"] is null"); continue;}
 			frames[i].SetActive(false);
 		}
 	}

@@ -1,32 +1,22 @@
-﻿using UnityEngine;
-using System.Collections;
-using System.Text;
-
-public class ChargeStation : MonoBehaviour {
+﻿public class ChargeStation : MonoBehaviour {
 	// Externally modified per prefab instance
-	public float amount = 170;  //default to 2/3 of 255, the total energy player can have
-	public float resetTime = 150; //150 seconds
-	public bool requireReset;
-	public float minSecurityLevel = 100;
-	public float damageOnUse = 0f; 
-	public string target;
-	public string argvalue;
-	public int rechargeMsgLingdex = 1;
-	public int usedMsgLingdex = 0;
-
-	// Internal references
-	[HideInInspector] public float nextthink; // save, stores the time after which this will be usable again.  Soem charge stations must recharge.
+	float amount = 170; // default to 2/3 of 255, the total energy player can have
+	float resetTime = 150; // seconds
+	bool requireReset;
+	float minSecurityLevel = 100;
+	float damageOnUse = 0f; 
+	string target;
+	int rechargeMsgLingdex = 1;
+	int usedMsgLingdex = 0;
+    float nextthink; // stores the time after which this will be usable again.  Soem charge stations must recharge.
 	private static StringBuilder s1 = new StringBuilder();
 	
 	void Awake() {
 		nextthink = Sys_Global.pauseRelativeTime;
 	}
 
-	public void Use (UseData ud) {
-		if (LevelManager.a.GetCurrentLevelSecurity() > minSecurityLevel) { 
-			MFDManager.a.BlockedBySecurity (transform.position);
-			return;
-		}
+	void Use (UseData ud) {
+		if (LevelManager.a.GetCurrentLevelSecurity() > minSecurityLevel) { MFDManager.a.BlockedBySecurity (transform.position); return; }
 		
 		if (nextthink < Sys_Global.pauseRelativeTime) {
 			if (PlayerEnergy.a.energy >= PlayerEnergy.a.maxenergy) {
@@ -52,69 +42,13 @@ public class ChargeStation : MonoBehaviour {
 
 			Const.sprint(usedMsgLingdex);
 			if (requireReset) nextthink = Sys_Global.pauseRelativeTime + resetTime;
-			ud.argvalue = argvalue;
 			Const.a.UseTargets(gameObject,ud,target);
 		} else {
 			Const.sprint(rechargeMsgLingdex);
 		}
 	}
 
-	public void ForceRecharge() {
+	void ForceRecharge() {
 		nextthink = 0;
-	}
-
-	public static string Save(GameObject go) {
-		ChargeStation chg = go.GetComponent<ChargeStation>();
-		s1.Clear();
-		s1.Append(Utils.SaveRelativeTimeDifferential(chg.nextthink,"nextthink")); // float - time before recharged
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(chg.amount,"amount"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(chg.resetTime,"resetTime"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(chg.requireReset,"requireReset"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(chg.minSecurityLevel,"minSecurityLevel"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(chg.damageOnUse,"damageOnUse"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveString(chg.target,"target"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveString(chg.argvalue,"argvalue"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(chg.rechargeMsgLingdex,"rechargeMsgLingdex"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(chg.usedMsgLingdex,"usedMsgLingdex"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		ChargeStation chg = go.GetComponent<ChargeStation>();
-		if (chg == null) {
-			Debug.Log("ChargeStation.Load failure, chg == null");
-			return index + 12;
-		}
-
-		if (index < 0) {
-			Debug.Log("ChargeStation.Load failure, index < 0");
-			return index + 12;
-		}
-
-		if (entries == null) {
-			Debug.Log("ChargeStation.Load failure, entries == null");
-			return index + 12;
-		}
-
-		chg.nextthink = Utils.LoadRelativeTimeDifferential(entries[index],"nextthink"); index++; // float - time before recharged
-		chg.amount  = Utils.GetFloatFromString(entries[index],"amount"); index++;
-		chg.resetTime  = Utils.GetFloatFromString(entries[index],"resetTime"); index++;
-		chg.requireReset  = Utils.GetBoolFromString(entries[index],"requireReset"); index++;
-		chg.minSecurityLevel  = Utils.GetFloatFromString(entries[index],"minSecurityLevel"); index++;
-		chg.damageOnUse  = Utils.GetFloatFromString(entries[index],"damageOnUse"); index++;
-		chg.target = Utils.LoadString(entries[index],"target"); index++;
-		chg.argvalue = Utils.LoadString(entries[index],"argvalue"); index++;
-		chg.rechargeMsgLingdex = Utils.GetIntFromString(entries[index],"rechargeMsgLingdex"); index++;
-		chg.usedMsgLingdex = Utils.GetIntFromString(entries[index],"usedMsgLingdex"); index++;
-		return index;
 	}
 }

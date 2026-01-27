@@ -16,7 +16,6 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 	public int height;
 	public HUDColor theme;
 	public string target;
-	public string argvalue;
 	public bool locked = false; // save
 	public int successMessageLingdex = 4;
 	public int messageOnLockedLingdex = 302;
@@ -27,7 +26,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 	public bool animate = true;
 	public bool inUse = false;
 
-	[HideInInspector] public bool fired = false; // save
+	bool fired = false; // save
 	private Animator anim;
 	private bool alreadyOpen = false;
 	private static StringBuilder s1 = new StringBuilder();
@@ -37,7 +36,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		if (animate) {
 			anim = GetComponent<Animator>();
 			if (anim == null) {
-				Debug.Log("BUG: Puzzle panel has no animator on "
+				DualLog("BUG: Puzzle panel has no animator on "
 						  + "PuzzleGridPuzzle.cs");
 			}
 
@@ -60,7 +59,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			return;
 		}
 
-		if (LevelManager.a.superoverride || Const.a.difficultyMission == 0) {
+		if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -70,12 +69,11 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			return;
 		}
 
-		ud.argvalue = argvalue;
 		TargetIO tio = GetComponent<TargetIO>();
 		if (tio != null) {
 			ud.SetBits(tio);
 		} else {
-			Debug.Log("BUG: no TargetIO.cs found on an object with a "
+			DualLog("BUG: no TargetIO.cs found on an object with a "
 					  + "PuzzleGridPuzzle.cs script!  Trying to call Use "
 					  + "without parameters!");
 		}
@@ -102,7 +100,6 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		if (onlyFireOnce) fired = true;
 		UseData ud = new UseData();
 		ud.owner = owner;
-		ud.argvalue = argvalue;
 		Const.a.UseTargets(gameObject,ud,target);
 		Const.sprint(successMessageLingdex);
 	}

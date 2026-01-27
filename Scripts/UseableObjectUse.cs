@@ -12,7 +12,7 @@ public class UseableObjectUse : MonoBehaviour {
 
 	void Awake() {
 		// 33% chance of not spawning logic probes on Puzzle difficulty of 3
-		if (Const.a.difficultyPuzzle == 3) {
+		if (SSys_Global.difficultyPuzzle == 3) {
 			if (useableItemIndex == 54) {
 				if (random_range(0,1f) < 0.33f) {
 					Utils.SafeDestroy(gameObject);
@@ -21,14 +21,14 @@ public class UseableObjectUse : MonoBehaviour {
 		}
 
 		// Remove access cards on Mission difficulty 1 or 0
-		if (Const.a.difficultyMission <= 1) {
+		if (SSys_Global.difficultyMission <= 1) {
 			if (useableItemIndex >= 81 && useableItemIndex <= 91) {
 				Utils.SafeDestroy(gameObject);
 			}
 		}
 
 		// Remove audiologs on Mission difficulty 0
-		if (Const.a.difficultyMission == 0) {
+		if (SSys_Global.difficultyMission == 0) {
 			if (useableItemIndex == 6) Utils.SafeDestroy(gameObject);
 		}
 	}
@@ -40,7 +40,7 @@ public class UseableObjectUse : MonoBehaviour {
 	        return;
 	    }
 	    
-		if (useableItemIndex < 0) Debug.Log("BUG: Useable index less than 0!");
+		if (useableItemIndex < 0) DualLog("BUG: Useable index less than 0!");
 		MouseLookScript.a.holdingObject = true;
 		MouseLookScript.a.heldObjectIndex = useableItemIndex;
 		MouseLookScript.a.heldObjectCustomIndex = customIndex;
@@ -70,7 +70,7 @@ public class UseableObjectUse : MonoBehaviour {
 	public static string Save(GameObject go) {
 		UseableObjectUse uou = go.GetComponent<UseableObjectUse>();
 		if (uou == null) {
-			Debug.Log("UseableObjectUse missing on saveable");
+			DualLog("UseableObjectUse missing on saveable");
 			return "-1|-1|0|0|BUG: Missing UseableObjectUse";
 		}
 
@@ -97,17 +97,17 @@ public class UseableObjectUse : MonoBehaviour {
 	public static int Load(GameObject go, ref string[] entries, int index) {
 		UseableObjectUse uou = go.GetComponent<UseableObjectUse>();
 		if (uou == null) {
-			Debug.Log("UseableObjectUse.Load failure, uou == null");
+			DualLog("UseableObjectUse.Load failure, uou == null");
 			return index + 4;
 		}
 
 		if (index < 0) {
-			Debug.Log("UseableObjectUse.Load failure, index < 0");
+			DualLog("UseableObjectUse.Load failure, index < 0");
 			return index + 4;
 		}
 
 		if (entries == null) {
-			Debug.Log("UseableObjectUse.Load failure, entries == null");
+			DualLog("UseableObjectUse.Load failure, entries == null");
 			return index + 4;
 		}
 

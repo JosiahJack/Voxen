@@ -20,16 +20,16 @@ public class SceneTransitionHandler : MonoBehaviour {
             setActiveAtNext = false;
             Scene mainScene = SceneManager.GetSceneByName("CitadelScene");
             if (mainScene != null) SceneManager.SetActiveScene(mainScene);
-            Debug.Log("Reinit FULL const tables");
+            DualLog("Reinit FULL const tables");
             Const.a.Awake();
-            Const.a.difficultyCombat = diffCombatCarryover;
-            Const.a.difficultyMission = diffMissionCarryover;
-            Const.a.difficultyPuzzle = diffPuzzleCarryover;
-            Const.a.difficultyCyber = diffCyberCarryover;
-            Debug.Log("Const.a.difficultyCombat " + Const.a.difficultyCombat.ToString());
+            Sys_Global.difficultyCombat = diffCombatCarryover;
+            SSys_Global.difficultyMission = diffMissionCarryover;
+            SSys_Global.difficultyPuzzle = diffPuzzleCarryover;
+            SSys_Global.difficultyCyber = diffCyberCarryover;
+            DualLog("Sys_Global.difficultyCombat " + Sys_Global.difficultyCombat.ToString());
             // Must delay by 1 frame.
             Scene loadScene = SceneManager.GetSceneByName("LoadScene");
-            Debug.Log("Unloading LoadScene");
+            DualLog("Unloading LoadScene");
             //if (loadScene != null) SceneManager.UnloadSceneAsync(loadScene);
         }
 

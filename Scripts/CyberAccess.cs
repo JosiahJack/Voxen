@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 public class CyberAccess : MonoBehaviour {
-	public string target;
-	public string argvalue;
+	string target;
 
 	// Entry Positions:
 	// ======================
@@ -18,7 +17,6 @@ public class CyberAccess : MonoBehaviour {
 	// 	L9 185.161 84.502 -46.04246
 	
     public void Use (UseData ud) {
-		ud.argvalue = argvalue;
 		Const.a.UseTargets(gameObject,ud,target);
 		Const.sprint(Const.a.stringTable[441]); // Entering Cyberspace!
 		Vector3 entryPosition = new Vector3( 195.42000f, -13.44000f,  33.28000f);

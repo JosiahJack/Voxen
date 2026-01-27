@@ -16,9 +16,9 @@ public class GrenadeActivate : MonoBehaviour {
 	public PoolType explosionType = PoolType.GrenadeFragExplosions;
 	public bool active = false;
 	
-	[HideInInspector] public float timeFinished; // save
-	[HideInInspector] public bool explodeOnContact = false; // save
-	[HideInInspector] public bool useTimer = false; // save
+	float timeFinished; // save
+	bool explodeOnContact = false; // save
+	bool useTimer = false; // save
 	private GameObject explosionEffect;
 	private Rigidbody rbody;
 	private static StringBuilder s1 = new StringBuilder();
@@ -89,7 +89,7 @@ public class GrenadeActivate : MonoBehaviour {
 	}
 
 	public void Explode() {
-		Debug.Log("Grenade exploded");
+		DualLog("Grenade exploded");
 		Utils.DisableCollision(gameObject);
 		DamageData dd = new DamageData();
 		dd.damage = damage;
@@ -149,7 +149,7 @@ public class GrenadeActivate : MonoBehaviour {
 	public static int Load(GameObject go, ref string[] entries, int index) {
 		GrenadeActivate ga = go.GetComponent<GrenadeActivate>();
 		if (entries == null) {
-			Debug.Log("GrenadeActivate.Load failure, entries == null");
+			DualLog("GrenadeActivate.Load failure, entries == null");
 			return index + 7;
 		}
 

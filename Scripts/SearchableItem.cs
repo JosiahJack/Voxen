@@ -12,8 +12,8 @@ public class SearchableItem : MonoBehaviour {
 	public int[] randomItemDropChance;
 	[Tooltip("Name of the searchable item.")] public string objectName;
 
-	[HideInInspector] public bool searchableInUse;
-	[HideInInspector] public bool generationDone = false;
+	bool searchableInUse;
+	bool generationDone = false;
 	private static StringBuilder s1 = new StringBuilder();
 	public int maxRandomItems = 2;
 
@@ -133,7 +133,7 @@ public class SearchableItem : MonoBehaviour {
 		if (go.name.Contains("se_corpse_eaten")) se = go.transform.GetChild(0).GetComponent<SearchableItem>(); // se_corpse_eaten
 		else se = go.GetComponent<SearchableItem>();
 		
-		if (se == null) Debug.LogError("SearchableItem missing on " + go.name);
+		if (se == null) DualLogError("SearchableItem missing on " + go.name);
 		se.lookUpIndex = Utils.GetIntFromString(entries[index],"lookUpIndex"); index++;
 		se.maxRandomItems = Utils.GetIntFromString(entries[index],"maxRandomItems"); index++;
 		se.generateContents = Utils.GetBoolFromString(entries[index],"generateContents"); index++;

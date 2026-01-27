@@ -9,7 +9,7 @@ public class EReaderSectionsButtons : MonoBehaviour {
 	public EReaderSectionsButtonHighlight ersbh3;
 
 	void OnEnable() {
-		if (Const.a.difficultyMission == 0) ersbh3.gameObject.SetActive(false);
+		if (SSys_Global.difficultyMission == 0) ersbh3.gameObject.SetActive(false);
 		else ersbh3.gameObject.SetActive(true);
 
 		HighlightOthers();

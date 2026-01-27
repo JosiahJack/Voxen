@@ -18,9 +18,9 @@ public class Inventory : MonoBehaviour {
 	public int[] hardwareVersionSetting; // save
 	public GameObject[] hwButtons; // The UI buttons in the mfd center tab's Hardware tab.
 	public HardwareButton hardwareButtonManager;
-	[HideInInspector] public int hardwareInvCurrent; // save, Current slot in the general inventory (14 slots).
-	[HideInInspector] public int hardwareInvIndex; // save, Current index to the item look-up table.
-	[HideInInspector] public bool[] hardwareIsActive; // save
+	int hardwareInvCurrent; // save, Current slot in the general inventory (14 slots).
+	int hardwareInvIndex; // save, Current index to the item look-up table.
+	bool[] hardwareIsActive; // save
 	public Text[] hardwareInvText;
 	private int[] hardwareInvReferenceIndex;
 	public Button[] hardwareButtons;
@@ -46,19 +46,19 @@ public class Inventory : MonoBehaviour {
 	// General
 	public GameObject[] genButtons;
 	public Text[] genButtonsText;
-    [HideInInspector] public int[] generalInventoryIndexRef; // save
-	[HideInInspector] public int generalInvCurrent = new int(); // save, Current slot in the general inventory (14 slots).
-	[HideInInspector] public int generalInvIndex = new int(); // save, Current index to the item look-up table.
+    int[] generalInventoryIndexRef; // save
+	int generalInvCurrent = new int(); // save, Current slot in the general inventory (14 slots).
+	int generalInvIndex = new int(); // save, Current index to the item look-up table.
 
 	// Grenade
-	[HideInInspector] public int[] grenAmmo; // save
+	int[] grenAmmo; // save
 	public GrenadeButton[] grenButtons;
 	public Text[] grenInventoryText;
 	public Text[] grenCountsText;
 	public CapsuleCollider playerCapCollider;
 	public int grenadeCurrent = new int(); // save
-	[HideInInspector] public float nitroTimeSetting; // save
-	[HideInInspector] public float earthShakerTimeSetting; // save
+	float nitroTimeSetting; // save
+	float earthShakerTimeSetting; // save
 	private int[] grenCountsLastCount;
 
 	// Logs
@@ -76,24 +76,24 @@ public class Inventory : MonoBehaviour {
 	public VideoPlayer vmailshieldsupVideo;
 	
 	private AudioSource SFXSource;
-	[HideInInspector] public bool[] hasLog; // save
-	[HideInInspector] public bool[] readLog; // save
-	[HideInInspector] public int[] numLogsFromLevel; // save
-	[HideInInspector] public int lastAddedIndex = -1; // save
-	[HideInInspector] public bool beepDone = false; // save
+	bool[] hasLog; // save
+	bool[] readLog; // save
+	int[] numLogsFromLevel; // save
+	int lastAddedIndex = -1; // save
+	bool beepDone = false; // save
 	private int tempRefIndex = -1;
 	private bool logPaused;
-	[HideInInspector] public int emailCurrent; // save
-	[HideInInspector] public int emailIndex; // save
+	int emailCurrent; // save
+	int emailIndex; // save
 
 	// Patches
 	public GameObject patchInventoryContainer;
 	public Text[] patchInventoryText;
 	public Text[] patchCountTextObjects;
 	public PatchButton[] patchButtonScripts;
-	[HideInInspector] public int[] patchCounts;
-	[HideInInspector] public int patchCurrent = new int(); // save, Current slot in the patch inventory (7 slots).
-	[HideInInspector] public int patchIndex = new int(); // save, Current index to the look-up tables.
+	int[] patchCounts;
+	int patchCurrent = new int(); // save, Current slot in the patch inventory (7 slots).
+	int patchIndex = new int(); // save, Current index to the look-up tables.
 	private int[] patchLastCount;
 
 	// Software
@@ -109,21 +109,21 @@ public class Inventory : MonoBehaviour {
 	public Text recallCountText;
 	public GameObject decoyPrefab;
 	public GameObject CyberSpaceStaticContainer;
-	[HideInInspector] public int currentCyberItem = -1; // save
-	[HideInInspector] public bool isPulserNotDrill = true; // save
-	[HideInInspector] public int[] softVersions; // save
-	[HideInInspector] public bool[] hasSoft; // save
-	[HideInInspector] public bool[] hasMinigame; // save
+	int currentCyberItem = -1; // save
+	bool isPulserNotDrill = true; // save
+	int[] softVersions; // save
+	bool[] hasSoft; // save
+	bool[] hasMinigame; // save
 	public GameObject[] miniGameButton;
 
 	// Weapons
-	[HideInInspector] public int[] weaponInventoryIndices; // save
-    [HideInInspector] public int[] weaponInventoryAmmoIndices; // save
-	[HideInInspector] public int numweapons = 0; // save
-	[HideInInspector] public int[] wepAmmo; // save
-	[HideInInspector] public int[] wepAmmoSecondary; // save
-	[HideInInspector] public float[] currentEnergyWeaponHeat; // save
-	[HideInInspector] public bool[] wepLoadedWithAlternate; // save
+	int[] weaponInventoryIndices; // save
+    int[] weaponInventoryAmmoIndices; // save
+	int numweapons = 0; // save
+	int[] wepAmmo; // save
+	int[] wepAmmoSecondary; // save
+	float[] currentEnergyWeaponHeat; // save
+	bool[] wepLoadedWithAlternate; // save
 
 	public bool hasNewNotes = true; // save
 	public bool hasNewData = false; // save
@@ -387,7 +387,7 @@ public class Inventory : MonoBehaviour {
 			logPaused = true;
 			if (SFXSource == null) SFXSource = GetComponent<AudioSource>();
 			if (SFXSource == null) {
-				Debug.Log("ERROR: Missing SFXSource on Inventory!");
+				DualLog("ERROR: Missing SFXSource on Inventory!");
 			} else SFXSource.Pause();
 		}
 		//--- End Logs ---
@@ -423,7 +423,7 @@ public class Inventory : MonoBehaviour {
 		}
 
 		if (generalInvIndex >= 14 || generalInvIndex < 0) {
-			Debug.Log("generalInvIndex out of bounds at "
+			DualLog("generalInvIndex out of bounds at "
 					  + generalInvIndex.ToString() + ", reset to 0.");
 			generalInvIndex = 0;
 		}
@@ -499,14 +499,14 @@ public class Inventory : MonoBehaviour {
 				}
 			}
 		}
-		if (hardwareInvIndex >= 14 || hardwareInvIndex < 0) { Debug.Log("hardwareInvIndex out of bounds at " + hardwareInvIndex.ToString() + ", reset to 0."); hardwareInvIndex = 0; }
+		if (hardwareInvIndex >= 14 || hardwareInvIndex < 0) { DualLog("hardwareInvIndex out of bounds at " + hardwareInvIndex.ToString() + ", reset to 0."); hardwareInvIndex = 0; }
 		//--- End Hardware ---
 
 		// Logs
 		if (logPaused) {
 			logPaused = false;
 			if (SFXSource == null) SFXSource = GetComponent<AudioSource>();
-			if (SFXSource == null) Debug.Log("ERROR: Missing SFXSource on Inventory!");
+			if (SFXSource == null) DualLog("ERROR: Missing SFXSource on Inventory!");
 			else SFXSource.UnPause();
 		}
 
@@ -971,7 +971,7 @@ public class Inventory : MonoBehaviour {
 			if (generalInvCurrent != 0) {
 				generalInventoryIndexRef[generalInvCurrent] = -1;
 			}
-		} else Debug.Log("BUG: Current general inv button was null");
+		} else DualLog("BUG: Current general inv button was null");
 	}
 	//--- End General ---
 
@@ -1185,7 +1185,7 @@ public class Inventory : MonoBehaviour {
 
 	public void AddAudioLogToInventory(int index) {
 		if (index < 0) {
-			Debug.Log("BUG: Audio log picked up has no assigned index (-1)");
+			DualLog("BUG: Audio log picked up has no assigned index (-1)");
 			return;
 		}
 
@@ -1512,7 +1512,7 @@ public class Inventory : MonoBehaviour {
 				hasLog[vers] = true;
 				return true;
 			case SoftwareType.Integrity:
-				//Debug.Log("Cyber integrity touched");
+				//DualLog("Cyber integrity touched");
 				if (hm.cyberHealth >=255) return false;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
 				hm.cyberHealth += 77f;

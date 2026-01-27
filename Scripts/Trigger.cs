@@ -10,10 +10,10 @@ public class Trigger : MonoBehaviour {
 	public int numPlayers = 0;
 	public string target;
 	public string argvalue; // e.g. how much to set a counter to
-	[HideInInspector] public GameObject recentMostActivator;
-	[HideInInspector] public float delayFireFinished;
-	[HideInInspector] public float delayResetFinished;
-	[HideInInspector] public bool allDone = false;
+	GameObject recentMostActivator;
+	float delayFireFinished;
+	float delayResetFinished;
+	bool allDone = false;
 	private static StringBuilder s1 = new StringBuilder();
 
     IEnumerator DelayedTarget(GameObject activator) {
@@ -29,7 +29,7 @@ public class Trigger : MonoBehaviour {
 	}
 
 	void TriggerTripped (Collider col, bool initialEntry) {
-		if (col == null) Debug.Log("BUG: TriggerTripped was fed a null col!");
+		if (col == null) DualLog("BUG: TriggerTripped was fed a null col!");
 
 		if (col.gameObject.CompareTag("Player")) {
 			HealthManager hm = Utils.GetMainHealthManager(col.gameObject);

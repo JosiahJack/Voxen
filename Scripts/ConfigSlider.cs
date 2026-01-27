@@ -16,10 +16,10 @@ public class ConfigSlider : MonoBehaviour {
 	}
 
 	void AlignSettingToConfigFile() {
-		if (index < 0 || index >= 7) { index = 0; Debug.Log("BUG: Setting index on ConfigSlider to 0 because it was outside the range >=0index<7");}
+		if (index < 0 || index >= 7) { index = 0; DualLog("BUG: Setting index on ConfigSlider to 0 because it was outside the range >=0index<7");}
 
 		if (slideControl == null) slideControl = GetComponent<Slider>();
-		if (slideControl == null) Debug.Log("BUG: No slider component for object with ConfigSlider script");
+		if (slideControl == null) DualLog("BUG: No slider component for object with ConfigSlider script");
 
 		switch(index) {
 			case 0: slideControl.value = Const.a.GraphicsFOV; break;

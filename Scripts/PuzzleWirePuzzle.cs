@@ -15,7 +15,6 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 	public HUDColor theme;
 	public HUDColor[] wireColors;
 	public string target;
-	public string argvalue;
 	public bool locked = false; // save
 	public int successMessageLingdex = 4;
 	public string successMessage = "";
@@ -32,7 +31,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 		puzzleSolved = false;
 		if (animate) {
 			anim = GetComponent<Animator>();
-			if (anim == null) Debug.Log("BUG: Puzzle panel has no animator on PuzzleGridPuzzle.cs");
+			if (anim == null) DualLog("BUG: Puzzle panel has no animator on PuzzleGridPuzzle.cs");
 		}
 	}
 
@@ -65,7 +64,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 			return;
 		}
 
-		if (LevelManager.a.superoverride || Const.a.difficultyMission == 0) {
+		if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -75,12 +74,11 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 			return;
 		}
 
-		ud.argvalue = argvalue;
 		TargetIO tio = GetComponent<TargetIO>();
 		if (tio != null) {
 			ud.SetBits(tio);
 		} else {
-			Debug.Log("BUG: no TargetIO.cs found on an object with a "
+			DualLog("BUG: no TargetIO.cs found on an object with a "
 					  + "PuzzleGridPuzzle.cs script!  Trying to call Use "
 					  + "without parameters!");
 		}
@@ -92,46 +90,14 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 											 currentPositionsRight,
 											 solutionPositionsLeft,
 											 solutionPositionsRight,theme,
-											 wireColors,target,argvalue,ud,
+											 wireColors,target,ud,
 											 transform.position,this);
 	}
 
 	public void UseTargets (GameObject owner) {
 		UseData ud = new UseData();
 		ud.owner = owner;
-		ud.argvalue = argvalue;
 		Const.a.UseTargets(gameObject,ud,target);
 		Const.sprint(successMessageLingdex);
-	}
-
-	public static string Save(GameObject go) {
-		PuzzleWirePuzzle pwp = go.GetComponent<PuzzleWirePuzzle>();
-		s1.Clear();
-		s1.Append(Utils.BoolToString(pwp.puzzleSolved,"puzzleSolved"));
-		for (int i=0;i<7;i++) {
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.UintToString(pwp.currentPositionsLeft[i],"currentPositionsLeft[" + i.ToString() + "]"));
-		}
-		for (int i=0;i<7;i++) {
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.UintToString(pwp.currentPositionsRight[i],"currentPositionsRight[" + i.ToString() + "]"));
-		}
-		
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pwp.locked,"locked"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		PuzzleWirePuzzle pwp = go.GetComponent<PuzzleWirePuzzle>();
-		pwp.puzzleSolved = Utils.GetBoolFromString(entries[index],"puzzleSolved"); index++;
-		for (int i=0;i<pwp.currentPositionsLeft.Length;i++) {
-			pwp.currentPositionsLeft[i] = Utils.GetIntFromString(entries[index],"currentPositionsLeft[" + i.ToString() + "]"); index++;
-		}
-		for (int i=0;i<pwp.currentPositionsRight.Length;i++) {
-			pwp.currentPositionsRight[i] = Utils.GetIntFromString(entries[index],"currentPositionsRight[" + i.ToString() + "]"); index++;
-		}
-		pwp.locked = Utils.GetBoolFromString(entries[index],"locked"); index++;
-		return index;
 	}
 }

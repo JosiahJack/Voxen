@@ -8,12 +8,12 @@ public class AnimatorDelayedStop : MonoBehaviour {
 
 	void Start() {
 		anim = GetComponent<Animator>();
-		if (anim == null) Debug.Log("BUG: AnimatorDelayedStop missing component for anim");
+		if (anim == null) DualLog("BUG: AnimatorDelayedStop missing component for anim");
 	}
 
 	void OnEnable() {
 		if (anim == null) anim = GetComponent<Animator>();
-		if (anim == null) Debug.Log("BUG: AnimatorDelayedStop missing component for anim");
+		if (anim == null) DualLog("BUG: AnimatorDelayedStop missing component for anim");
         StartCoroutine(EnableObjects());
     }
 

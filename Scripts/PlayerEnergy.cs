@@ -11,10 +11,10 @@ public class PlayerEnergy : MonoBehaviour {
 
 	// Internal references
 	private float tick = 0.1f;
-	[HideInInspector] public float tickFinished; // save
+	float tickFinished; // save
 	private float tempF;
-	[HideInInspector] public float maxenergy = 255f;
-	[HideInInspector] public int drainJPM = 0;
+	float maxenergy = 255f;
+	int drainJPM = 0;
 	private string jpm = " J/min";
 	private static StringBuilder s1 = new StringBuilder();
 
@@ -49,7 +49,7 @@ public class PlayerEnergy : MonoBehaviour {
             if (aic.hasTargetIDAttached) continue;
             
 			// if NPC is in range....
-			float far = Vector3.Distance(aic.transform.position,
+			float far = distance_vector3(aic.transform.position,
 			                             transform.position);
 			if (far > TargetID.GetTargetIDSensingRange(false)) continue;
 			

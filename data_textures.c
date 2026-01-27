@@ -87,7 +87,7 @@ void LoadTextures(void) {
                 }
             }
             
-            if (pal_size >= 256) { DualLogError("Texture %s exceeded 256 colors\n", texture_parser.entries[currentIndex].path); /*OS_Exit(1);*/ break; }
+            if (pal_size >= 256) { DualLogError("Texture %s exceeded 256 colors %u\n", texture_parser.entries[currentIndex].path, pal_size); /*OS_Exit(1);*/ break; }
                         
             palette[pal_size] = color;
             indices[p] = pal_size;

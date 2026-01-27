@@ -31,7 +31,7 @@ public class EnergySlider : MonoBehaviour {
 		if (val < 0) val = 0f;
 		if (val >= 98f) val = 100f;
 		slideS.value = val;
-		Debug.Log("Set energy slider value to " + slideS.value.ToString()
+		DualLog("Set energy slider value to " + slideS.value.ToString()
 				  + ", from " + val.ToString());
         WeaponCurrent.a.weaponEnergySetting[WeaponCurrent.a.weaponCurrent] =
 			slideS.value;

@@ -4,7 +4,7 @@ using UnityEngine;
 
 // Used to change gravity lift from red to green.
 public class MaterialChanger : MonoBehaviour {
-	[HideInInspector] public bool alreadyDone = false;
+	bool alreadyDone = false;
 	public int levelIndex = 0;
 
 	IEnumerator SetMaterialFromCode(int index){

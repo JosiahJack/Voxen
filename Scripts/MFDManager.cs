@@ -35,7 +35,7 @@ public class MFDManager : MonoBehaviour  {
 	public Text multiMediaHeaderLabel;
 	public EReaderSectionsButtons ersbLH;
 	public EReaderSectionsButtons ersbRH;
-	[HideInInspector] public int lastMultiMediaTabOpened = 1; // save, 0 = email table, 1 = log table, 2 = data table
+	int lastMultiMediaTabOpened = 1; // save, 0 = email table, 1 = log table, 2 = data table
 	public GameObject miniGamesContainer;
 	public GameObject minigameButtonsContainer;
 	public GameObject minigameCamera;
@@ -127,19 +127,19 @@ public class MFDManager : MonoBehaviour  {
 	public bool lastLogSideRH;
 	public bool lastLogSecondarySideRH;
 	public bool lastMinigameSideRH;
-	[HideInInspector] public float logFinished;
-	[HideInInspector] public bool logActive;
-	[HideInInspector] public AudioLogType logType;
-	[HideInInspector] public Door linkedElevatorDoor;
-	[HideInInspector] public Vector3 objectInUsePos;
-	[HideInInspector] public PuzzleGridPuzzle tetheredPGP = null;
-	[HideInInspector] public PuzzleWirePuzzle tetheredPWP = null;
-	[HideInInspector] public SearchableItem tetheredSearchable = null;
-	[HideInInspector] public KeypadElevator tetheredKeypadElevator = null;
-	[HideInInspector] public KeypadKeycode tetheredKeypadKeycode = null;
-	[HideInInspector] public bool paperLogInUse = false;
-	[HideInInspector] public bool usingObject = false;
-	[HideInInspector] public int applyButtonReferenceIndex = 0;
+	float logFinished;
+	bool logActive;
+	AudioLogType logType;
+	Door linkedElevatorDoor;
+	Vector3 objectInUsePos;
+	PuzzleGridPuzzle tetheredPGP = null;
+	PuzzleWirePuzzle tetheredPWP = null;
+	SearchableItem tetheredSearchable = null;
+	KeypadElevator tetheredKeypadElevator = null;
+	KeypadKeycode tetheredKeypadKeycode = null;
+	bool paperLogInUse = false;
+	bool usingObject = false;
+	int applyButtonReferenceIndex = 0;
 	public int curCenterTab = 0;
 	public bool mouseClickHeldOverGUI;
 
@@ -165,8 +165,8 @@ public class MFDManager : MonoBehaviour  {
 		// "ML-41 PISTOL","LG-XX PLASMA RIFLE","MM-76 RAIL GUN",
 		// "DC-05 RIOT GUN","RF-07 SKORPION","SPARQ BEAM","DH-07 STUNGUN"};
 	private int wep16index = 0;
-	[HideInInspector] public LogDataTabContainerManager logDataTabInfoLH;
-	[HideInInspector] public LogDataTabContainerManager logDataTabInfoRH;
+	LogDataTabContainerManager logDataTabInfoLH;
+	LogDataTabContainerManager logDataTabInfoRH;
 
 	// For health and energy ticks
 	public Sprite[] tickImages;
@@ -418,7 +418,7 @@ public class MFDManager : MonoBehaviour  {
 
 		// Handle severing connection with in use keypads, puzzles, etc. when player drifts too far away
 		if (usingObject) {
-			if (Vector3.Distance(playerCapsuleTransform.position, objectInUsePos) > (Const.frobDistance + 0.16f)) {
+			if (distance_vector3(playerCapsuleTransform.position, objectInUsePos) > (Const.frobDistance + 0.16f)) {
 				if (tetheredPGP != null) {
 					ClosePuzzleGrid();
 					tetheredPGP = null;
@@ -616,7 +616,7 @@ public class MFDManager : MonoBehaviour  {
 		hardwareButtonsContainer.SetActive(false);
 		viewWeaponsContainer.SetActive(false);
 		CyberTimer ct = cyberTimer.GetComponent<CyberTimer>();
-		if (ct != null) ct.Reset(Const.a.difficultyCyber);
+		if (ct != null) ct.Reset(SSys_Global.difficultyCyber);
 		CenterTabButtonClickSilent(3,true);
 		GUIState.a.ClearOverButton();
 	}
@@ -1153,16 +1153,16 @@ public class MFDManager : MonoBehaviour  {
 		usingObject = true;
 	}
 
-	public void SendWirePuzzleToDataTab(bool[] sentWiresOn, bool[] sentNodeRowsActive, int[] sentCurrentPositionsLeft, int[] sentCurrentPositionsRight, int[] sentTargetsLeft, int[] sentTargetsRight, HUDColor theme, HUDColor[] wireColors, string t1, string a1, UseData udSent,Vector3 tetherPoint, PuzzleWirePuzzle pwp) {
+	public void SendWirePuzzleToDataTab(bool[] sentWiresOn, bool[] sentNodeRowsActive, int[] sentCurrentPositionsLeft, int[] sentCurrentPositionsRight, int[] sentTargetsLeft, int[] sentTargetsRight, HUDColor theme, HUDColor[] wireColors, string t1, UseData udSent,Vector3 tetherPoint, PuzzleWirePuzzle pwp) {
 		TabReset(lastDataSideRH);
 		if (lastDataSideRH) {
 			// Send to RH tab
-			puzzleWireRH.GetComponent<PuzzleWire>().SendWirePuzzleData(sentWiresOn,sentNodeRowsActive,sentCurrentPositionsLeft,sentCurrentPositionsRight,sentTargetsLeft,sentTargetsRight,theme,wireColors,t1,a1,udSent,pwp);
+			puzzleWireRH.GetComponent<PuzzleWire>().SendWirePuzzleData(sentWiresOn,sentNodeRowsActive,sentCurrentPositionsLeft,sentCurrentPositionsRight,sentTargetsLeft,sentTargetsRight,theme,wireColors,t1,udSent,pwp);
 			OpenTab(4,true,TabMSG.WirePuzzle,0,Handedness.RH);
 			SearchFXRH.SetActive(true);
 		} else {
 			// Send to LH tab
-			puzzleWireLH.GetComponent<PuzzleWire>().SendWirePuzzleData(sentWiresOn,sentNodeRowsActive,sentCurrentPositionsLeft,sentCurrentPositionsRight,sentTargetsLeft,sentTargetsRight,theme,wireColors,t1,a1,udSent,pwp);
+			puzzleWireLH.GetComponent<PuzzleWire>().SendWirePuzzleData(sentWiresOn,sentNodeRowsActive,sentCurrentPositionsLeft,sentCurrentPositionsRight,sentTargetsLeft,sentTargetsRight,theme,wireColors,t1,udSent,pwp);
 			OpenTab(4,true,TabMSG.WirePuzzle,0,Handedness.LH);
 			SearchFXLH.SetActive(true);
 		}
@@ -1201,7 +1201,7 @@ public class MFDManager : MonoBehaviour  {
 		OpenTab(4,true,TabMSG.AudioLog,index,Handedness.LH);  // LH
 		if (Const.a.audioLogImagesRefIndicesRH[index] != 0) { // RH, but only
 															  // if has image.
-			Debug.Log("Activating 2nd image for logs");
+			DualLog("Activating 2nd image for logs");
 			TabReset(true);
 			OpenTab(4,true,TabMSG.AudioLog,index,Handedness.RH);
 		}
@@ -1316,7 +1316,7 @@ public class MFDManager : MonoBehaviour  {
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Const.a.difficultyMission <= 1) {
+			if (SSys_Global.difficultyMission <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		} else {
@@ -1327,7 +1327,7 @@ public class MFDManager : MonoBehaviour  {
 			kkb.keycode = keycode;
 			kkb.keypad = keypad;
 			kkb.ResetEntry();
-			if (Const.a.difficultyMission <= 1) {
+			if (SSys_Global.difficultyMission <= 1) {
 				kkb.currentEntry = keycode;
 			}
 		}

@@ -32,7 +32,7 @@ public class ConfigurationMenuModelDetailApply : MonoBehaviour {
 
 	void Initialize() {
 		if (picker == null) picker = GetComponent<Dropdown>();
-		if (picker == null) Debug.Log("BUG: ConfigurationMenuModelDetailApply missing component for picker.");
+		if (picker == null) DualLog("BUG: ConfigurationMenuModelDetailApply missing component for picker.");
 
 		SetOptionsText();
 		if (picker.value != Const.a.GraphicsModelDetail) {

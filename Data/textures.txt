@@ -2555,3 +2555,79 @@ index: 1269
 index: 1270
 #Textures/med2_6_spec.png
 index: 1271
+#Textures/UI/logimages/blank1.png
+index: 1272
+#Textures/UI/logimages/Baerga.png
+index: 1273
+#Textures/UI/logimages/blocked_by_sec1.png
+index: 1274
+#Textures/UI/logimages/blocked_by_sec2.png
+index: 1275
+#Textures/UI/logimages/blocked_by_sec3.png
+index: 1276
+#Textures/UI/logimages/Brocail-1_rightpane.png
+index: 1277
+#Textures/UI/logimages/cybdiego.png
+index: 1278
+#Textures/UI/logimages/DArcy.png
+index: 1279
+#Textures/UI/logimages/diagnostic.png
+index: 1280
+#Textures/UI/logimages/Diego.png
+index: 1281
+#Textures/UI/logimages/Engle.png
+index: 1282
+#Textures/UI/logimages/Ghiran.png
+index: 1283
+#Textures/UI/logimages/Grossman.png
+index: 1284
+#Textures/UI/logimages/Hessman.png
+index: 1285
+#Textures/UI/logimages/Honig.png
+index: 1286
+#Textures/UI/logimages/Kell.png
+index: 1287
+#Textures/UI/logimages/Lansing-1_rightpane.png
+index: 1288
+#Textures/UI/logimages/Lansing.png
+index: 1289
+#Textures/UI/logimages/laserbad.png
+index: 1290
+#Textures/UI/logimages/logocrate.png
+index: 1291
+#Textures/UI/logimages/logogears.png
+index: 1292
+#Textures/UI/logimages/logomed.png
+index: 1293
+#Textures/UI/logimages/logosci.png
+index: 1294
+#Textures/UI/logimages/logotriop.png
+index: 1295
+#Textures/UI/logimages/logotriopwings.png
+index: 1296
+#Textures/UI/logimages/MacLeod.png
+index: 1297
+#Textures/UI/logimages/Parovski-2_rightpane.png
+index: 1298
+#Textures/UI/logimages/Parovski.png
+index: 1299
+#Textures/UI/logimages/Schuler.png
+index: 1300
+#Textures/UI/logimages/SHODAN-cyborg_rightpane.png
+index: 1301
+#Textures/UI/logimages/SHODAN-grayscale.png
+index: 1302
+#Textures/UI/logimages/SHODAN.png
+index: 1303
+#Textures/UI/logimages/stackhouse.png
+index: 1304
+#Textures/UI/logimages/Stannek.png
+index: 1305
+#Textures/UI/logimages/Stevens-1_rightpane.png
+index: 1306
+#Textures/UI/logimages/Travers.png
+index: 1307
+#Textures/UI/logimages/Wong.png
+index: 1308
+#Textures/UI/logimages/severed_head.png
+index: 1309

@@ -6,7 +6,7 @@ using System.Linq;
 
 public class ConfigurationMenuVideo : MonoBehaviour {
 	// Internal references
-	[HideInInspector] public Resolution[] resolutions;
+	Resolution[] resolutions;
 	private Dropdown resSelector;
 
 	void Start () {
@@ -21,7 +21,7 @@ public class ConfigurationMenuVideo : MonoBehaviour {
 		resolutions = GetResolutions().ToArray();
 		if (resSelector == null) resSelector = GetComponent<Dropdown>();
 		if (resSelector == null) {
-			Debug.Log("BUG: ConfigurationMenuVideo missing resSelector.");
+			DualLog("BUG: ConfigurationMenuVideo missing resSelector.");
 			return;
 		}
 

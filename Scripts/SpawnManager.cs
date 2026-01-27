@@ -23,17 +23,17 @@ public class SpawnManager : MonoBehaviour {
 
 	void Start() {
 		delayFinished = Sys_Global.pauseRelativeTime;
-		if (Const.a.difficultyCombat == 1) {
+		if (Sys_Global.difficultyCombat == 1) {
 			numberToSpawn = (int) Mathf.Floor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Const.a.difficultyCombat == 3) {
+		if (Sys_Global.difficultyCombat == 3) {
 			numberToSpawn = (int) Mathf.Floor(numberToSpawn*1.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
-		if (Const.a.difficultyCombat > 3) {
+		if (Sys_Global.difficultyCombat > 3) {
 			numberToSpawn = (int) Mathf.Floor(numberToSpawn*5f); // Hehe :)
 		}
 	}
@@ -82,9 +82,9 @@ public class SpawnManager : MonoBehaviour {
 	}
 
 	void Spawn(int index) {
-		if (Const.a.difficultyCombat == 0) return; // Not on combat diff 0
+		if (Sys_Global.difficultyCombat == 0) return; // Not on combat diff 0
 
-		Debug.Log("Spawning new enemy " + index.ToString());
+		DualLog("Spawning new enemy " + index.ToString());
 		dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
 		Vector3 spot = GetRandomLocation();
 		if (spot.x == 0 && spot.y == 0 && spot.z == 0) return;
@@ -94,7 +94,7 @@ public class SpawnManager : MonoBehaviour {
 		);
 
 		if (instGO == null) {
-			Debug.Log("BUG: Could not spawn NPC index " + index.ToString());
+			DualLog("BUG: Could not spawn NPC index " + index.ToString());
 		} else {
 			instGO.transform.position = spot;
 			AIController aic = instGO.GetComponent<AIController>();
@@ -134,12 +134,12 @@ public class SpawnManager : MonoBehaviour {
 	bool AreaHidden(Vector3 spot) {
 		Vector3 plyPos = Const.a.player1Capsule.transform.position;
 		float range = 50f;
-		if (Vector3.Distance(plyPos,spot) > range) return true;
+		if (distance_vector3(plyPos,spot) > range) return true;
 
 		int mask = Const.a.layerMaskNPCAttack;
 		Vector3 ray = (plyPos - spot).normalized;
 		RaycastHit tempHit;
-		if (Physics.Raycast(spot,ray,out tempHit,range,mask)) {
+		if (Raycast(spot,ray,out tempHit,range,mask)) {
 			if (tempHit.collider.CompareTag("Player")) return false;
 		}
 		return true;

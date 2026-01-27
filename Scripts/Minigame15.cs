@@ -50,7 +50,7 @@ public class Minigame15 : MonoBehaviour {
         // TODO: Pick image, set size, hide numbers if using image.
         for (int i=1;i<=16;i++) { curNum[i] = i; sliding[i] = false; }
         int sixteenIndex = 16;
-        int shuffleIter = Const.a.difficultyPuzzle * 5;
+        int shuffleIter = SSys_Global.difficultyPuzzle * 5;
         while (shuffleIter > 0) {
             int randIter = 32;
             while (randIter > 0) { // Find cell next to empty slot

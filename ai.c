@@ -1,80 +1,97 @@
 // ai.c - AI logic control for NPC's enemies in the game.
+#include "voxen.h"
 const float stopDistance = 1.28f; // Constant
-const float positionCheckDelay = 2f;
-const float searchTime = 5f;
+const float positionCheckDelay = 2.0f;
+const float searchTime = 5.0f;
 Vector3 targetOffset = new Vector3(0.0f, 0.24f, 0.0f);
+uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
 
-float AI_Tranquilize(float amount, bool energy) {
-    if (Sys_AI.type[index] == NPCType_Robot && !energy) return 0.0f;
+float Tranquilize(uint16_t selfIdx, float amount, bool energy) {
+    #define SELF instances[selfIdx]
+    if (npcTable[NPCID].type == NPCType_Robot && !energy) return 0.0f;
 
-    float tranqSecs = (tranqSecs < 3.0f) ? npcTable[NPCID].timeForTranquilization : amount;
-    tranquilizeFinished = Mathf.Max(Sys_Global.pauseRelativeTime + tranqSecs, tranquilizeFinished + tranqSecs);
+    float tranqSecs = (amount < 3.0f) ? npcTable[NPCID].timeForTranquilization : amount; // If we're going to tranq, at least do it for 3 secs.
+    SELF.tranquilizeFinished = Mathf.Max(Sys_Global.pauseRelativeTime + tranqSecs, SELF.tranquilizeFinished + tranqSecs);
     return tranqSecs;
+    #undef SELF
 }
 
-static inline bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
+static inline bool IsCyberNPC(uint16_t selfIdx) { return npcTable[NPCID].type == NPCType_Cyber; }
 
-void InitializeAIAfterLoad(uint16_t i) {
-    instances[i].layer = PhysicsLayer_NPC;
-    instances[i].idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[NPCID].timeIdleSFXMin, npcTable[NPCID].timeIdleSFXMax);
-    instances[i].attack1SoundTime = instances[i].attack2SoundTime = instances[i].attack3SoundTime = Sys_Global.pauseRelativeTime;
-    instances[i].timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
-    SetHuntFinished();
-    instances[i].attackFinished = Sys_Global.pauseRelativeTime;
-    instances[i].attack2Finished = Sys_Global.pauseRelativeTime;
-    instances[i].attack3Finished = Sys_Global.pauseRelativeTime;
-    instances[i].timeTillPainFinished = Sys_Global.pauseRelativeTime;
-    instances[i].timeTillDeadFinished = Sys_Global.pauseRelativeTime;
-    instances[i].meleeDamageFinished = Sys_Global.pauseRelativeTime;
-    instances[i].gracePeriodFinished = Sys_Global.pauseRelativeTime;
-    instances[i].randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
-    instances[i].randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
-    instances[i].randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
-    instances[i].tranquilizeFinished = Sys_Global.pauseRelativeTime;
-    instances[i].deathBurstFinished = Sys_Global.pauseRelativeTime;
-    instances[i].wanderFinished = Sys_Global.pauseRelativeTime;
-    instances[i].posCheckFinished = Sys_Global.pauseRelativeTime;
-    instances[i].lastPosition = instances[i].position;
-    instances[i].timeSinceMovedEnough = 0.0f;
-    if (instances[i].walkWaypointsLength > 0 && instances[i].walkPathOnStart && !instances[i].asleep) {
-        instances[i].currentDestination = instances[i].walkWaypoints[instances[i].currentWaypoint];
-        instances[i].currentState = AIState_Walk; // If waypoints are set, start walking
+void SetHuntFinished(uint16_t selfIdx) {
+    #define SELF instances[selfIdx]
+    SELF.huntFinished = Sys_Global.pauseRelativeTime;
+    int diff = Sys_Global.difficultyCombat;
+    if (npcTable[NPCID].type == NPCType_Cyber) diff = SSys_Global.difficultyCyber;
+    if (diff <= 1) { // More forgetful on easy.
+        huntFinished += Mathf.Max((Const.a.huntTime[index] * 0.75f),60.0f);
+    } else if (diff >= 3) { // Good memory on hard.
+        huntFinished += Mathf.Max((Const.a.huntTime[index] * 2.00f),60.0f); 
     } else {
-        instances[i].currentState = AIState_Idle; // No waypoints, stay put
+        huntFinished += Mathf.Max(Const.a.huntTime[index], 60.0f);
+    }
+    #undef SELF
+}
+
+void InitializeAIAfterLoad(uint16_t selfIdx) {
+    #define SELF instances[selfIdx]
+    SELF.layer = PhysicsLayer_NPC;
+    SELF.idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[NPCID].timeIdleSFXMin, npcTable[NPCID].timeIdleSFXMax);
+    SELF.attack1SoundTime = SELF.attack2SoundTime = SELF.attack3SoundTime = Sys_Global.pauseRelativeTime;
+    SELF.timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
+    SetHuntFinished();
+    SELF.attackFinished = Sys_Global.pauseRelativeTime;
+    SELF.attack2Finished = Sys_Global.pauseRelativeTime;
+    SELF.attack3Finished = Sys_Global.pauseRelativeTime;
+    SELF.timeTillPainFinished = Sys_Global.pauseRelativeTime;
+    SELF.timeTillDeadFinished = Sys_Global.pauseRelativeTime;
+    SELF.meleeDamageFinished = Sys_Global.pauseRelativeTime;
+    SELF.gracePeriodFinished = Sys_Global.pauseRelativeTime;
+    SELF.randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
+    SELF.randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
+    SELF.randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
+    SELF.tranquilizeFinished = Sys_Global.pauseRelativeTime;
+    SELF.deathBurstFinished = Sys_Global.pauseRelativeTime;
+    SELF.wanderFinished = Sys_Global.pauseRelativeTime;
+    SELF.posCheckFinished = Sys_Global.pauseRelativeTime;
+    SELF.lastPosition = SELF.position;
+    SELF.timeSinceMovedEnough = 0.0f;
+    if (SELF.walkWaypointsLength > 0 && SELF.walkPathOnStart && !SELF.asleep) {
+        SELF.currentDestination = SELF.walkWaypoints[SELF.currentWaypoint];
+        SELF.currentState = AIState_Walk; // If waypoints are set, start walking
+    } else {
+        SELF.currentState = AIState_Idle; // No waypoints, stay put
     }
 
-    if (instances[i].wandering && (random_range(0.0f,1.0f) < 0.5f)) {
-        currentState = AIState_Walk;
-    } else wandering = false;
+    if (SELF.wandering && (random_range(0.0f,1.0f) < 0.5f)) currentState = AIState_Walk;
+    else SELF.wandering = false;
 
-    if (asleep) {
-        currentState = AIState_Idle;
-        Utils.Activate(sleepingCables);
+    if (SELF.entflags & ENTFLAG_ASLEEP) {
+        SELF.currentState = AIState_Idle;
+        flag_set(instances[SELF.sleepingCables].entflags, ENTFLAG_ACTIVE, true);
     }
 
-    raycastingTickFinished = tickFinished + Random.value; // Separate rand.
-    attackFinished = Sys_Global.pauseRelativeTime + 1.0f;
-    instances[i].idealTransformForward = instances[i].forward;
-    if (!IsCyberNPC()) targetID = Const.GetTargetID(index);
-    else             targetID = Const.GetCyberTargetID(index);
-
+    SELF.attackFinished = Sys_Global.pauseRelativeTime + 1.0f;
+    SELF.idealTransformForward = SELF.forward;
+    SELF.targetID = snprintf(SELF.targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[NPCID].name,npcCountInWorldPerType[index]++);
     if (asleep) Utils.Activate(sleepingCables);
     startInitialized = true;
+    #undef SELF
 }
 
-	void AI_Face(Vector3 goalLocation) {
-		if (asleep) return;
+	void AI_Face(uint16_t selfIdx, Vector3 goalLocation) {
+        #define SELF instances[selfIdx]
+		if (SELF.asleep) return;
 
 		faceVec = goalLocation - instances[i].position;
-		if (!IsCyberNPC()) faceVec.y = 0f;
-		if (faceVec.x == 0f && faceVec.z == 0f && faceVec.y == 0f) return; // Avoid zero quat error.
-		if (Vector3.Dot(faceVec,Vector3.up) > 0.99f && !IsCyberNPC()) return; // Up results in no Y rotation.
+		if (!npcTable[NPCID].type == NPCType_Cyber) faceVec.y = 0.0f;
+		if (Vector3.Dot(faceVec,Vector3.up) > 0.99f && !npcTable[NPCID].type == NPCType_Cyber) return; // Up results in no Y rotation.
 
 		// Rotate as fast as we can towards facing the goal location.
 		Vector3 up = Vector3.up;
-		if (IsCyberNPC() && enemy != null) {
+		if (npcTable[NPCID].type == NPCType_Cyber && enemy != null) {
 			up = enemy.transform.up;
-			transform.rotation = enemy.transform.rotation;
+			SELF.rotation = enemy.rotation;
 			return;
 		}
 		
@@ -82,30 +99,15 @@ void InitializeAIAfterLoad(uint16_t i) {
 			if (enemy != null) faceVec = enemy.transform.position - transform.position;
 			else faceVec.x += 0.001f;
 		}
+		
 		lookRot = Quaternion.LookRotation(faceVec,up);
-		transform.rotation =
-			Quaternion.Slerp(transform.rotation,lookRot,Const.aiTickTime
-							 * npcTable[index].yawSpeed * Time.deltaTime); 
+		transform.rotation = Quaternion.Slerp(transform.rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
+        #undef SELF
 	}
 
-	void LateUpdate() {
-		Const.a.numberOfRaycastsThisFrame = 0;
-	}
-
-	public bool HasHealth(HealthManager hm) {
-		if (hm == null) return false;
-		if (IsCyberNPC()) return (hm.cyberHealth > 0);
-		return (hm.health > 0);
-	}
-
-	void EnableAutomapOverlay() {
-		if (healthManager.linkedOverlay == null) return;
-
-		if (healthManager.health > 0 && gameObject.activeInHierarchy) {
-			Utils.EnableImage(healthManager.linkedOverlay);
-		} else {
-			Utils.DisableImage(healthManager.linkedOverlay);
-		}
+	bool HasHealth(uint16_t i) {
+		if (IsCyberNPC(i)) return (instances[i].cyberHealth > 0.0f);
+		return (instances[i].health > 0.0f);
 	}
 
 	void Update() {
@@ -124,7 +126,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 			if (enemyHM == null) enemyHM = Utils.GetMainHealthManager(enemy);
 			if (enemyHM != null) {
 				if (!HasHealth(enemyHM)) {
-					Debug.Log("Enemy died, forgetting and wandering");
+					DualLog("Enemy died, forgetting and wandering");
 					if (IsCyberNPC()) {
 						currentState = AIState_Idle;
 					} else {
@@ -135,7 +137,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 					}
 					
 					enemy = null; // Forget the enemy.
-					Debug.Log("enemy forgotten");
+					DualLog("enemy forgotten");
 					enemyHM = null;
 					posCheckFinished = Sys_Global.pauseRelativeTime;
 					lastPosition = transform.position;
@@ -146,7 +148,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 			if (enemy != null) {
 				enemyInFrontChecks(enemy);
 				rangeToEnemy = (enemy.transform.position
-							- sightPoint.transform.position).sqrMagnitude;
+							- Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset)).sqrMagnitude;
 			}
 		} else {
 			infront = false;
@@ -186,7 +188,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 				}
 
                 idealTransformForward = currentDestination
-										- sightPoint.transform.position;
+										- Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
 
                 if (!IsCyberNPC()) idealTransformForward.y = 0;
 				idealTransformForward = idealTransformForward.normalized;
@@ -260,27 +262,16 @@ void InitializeAIAfterLoad(uint16_t i) {
 		if (enemy != null) {
 		    idealPos = transform.position; // Where it's at
 		    idealPos.y = enemy.transform.position.y + 0.24f; // Player eye height.
-		} else if (!Const.a.RaycastBudgetExceeded()) {
-			if (Physics.Raycast(sightPoint.transform.position,
-								sightPoint.transform.up * -1,out tempHit,
-								Const.a.sightRange[index],
-								Const.a.layerMaskNPCSight)) {
-				Const.a.numberOfRaycastsThisFrame++;
-				distDn = Vector3.Distance(sightPoint.transform.position, tempHit.point);
+		} else {
+			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), sightPoint.transform.up * -1,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
+				distDn = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), tempHit.point);
 				floorPoint = tempHit.point;
 			}
 
-			if (Physics.Raycast(sightPoint.transform.position, sightPoint.transform.up,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
-				Const.a.numberOfRaycastsThisFrame++;
-				distUp = Vector3.Distance(sightPoint.transform.position, tempHit.point);
-			}
-
+			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), sightPoint.transform.up,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) distUp = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), tempHit.point);
 			float distT = (distUp + distDn);
 			float yHeight = Const.a.flightHeight[index];
-			if (Const.a.flightHeightIsPercentage[index]) {
-				yHeight *= distT;
-			}
-
+			if (Const.a.flightHeightIsPercentage[index]) yHeight *= distT;
 			idealPos = floorPoint + new Vector3(0,yHeight, 0);
 		}
 
@@ -291,22 +282,20 @@ void InitializeAIAfterLoad(uint16_t i) {
 		transform.position = Vector3.MoveTowards(transform.position,idealPos,spd);
 	}
 
-	public bool CheckPain() {
-		if (IsCyberNPC()) return false;
-		if (asleep) return false;
+	public bool CheckPain(uint16_t i) {
+		if (IsCyberNPC(i)) return false;
+		if (instances[i].asleep) return false;
 		if (npcTable[index].timeBetweenPain <= 0) return false;
 
 		if (goIntoPain && timeTillPainFinished < Sys_Global.pauseRelativeTime) {
 			currentState = AIState_Pain;
 			if (attacker != null) {
 				if (timeTillEnemyChangeFinished < Sys_Global.pauseRelativeTime) {
-					timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime
-						+ Const.a.timeToChangeEnemy[index];
-						
+					timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime + Const.a.timeToChangeEnemy[index];
 					AIController attackerAIC = attacker.GetComponent<AIController>();
 					if (attackerAIC != null && attacker.layer != 12) { // Attacker is an NPC and not the player.
-						NPCType myType = Const.a.type[index];
-						NPCType attackerType = Const.a.type[attackerAIC.index];
+						NPCType myType = npcTable[NPCID].type;
+						NPCType attackerType = npcTable[attackerAIC.index].type;
 						bool canInfight = false;
 						
 						// Check infighting rules
@@ -343,14 +332,12 @@ void InitializeAIAfterLoad(uint16_t i) {
 								   + Const.a.timeToPain[index];
 			return true;
 		}
+		
 		return false;
 	}
 
 	void Idle() {
-		if (enemy != null && HasHealth(healthManager)) {
-			currentState = AIState_Run;
-			return;
-		}
+		if (enemy != null && HasHealth(healthManager)) { currentState = AIState_Run; return; }
 
 		if (idleTime < Sys_Global.pauseRelativeTime) {
 			if (random_range(0,1f) < 0.5f) { // 50% Chance of idle.
@@ -391,7 +378,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		if (tranquilizeFinished >= Sys_Global.pauseRelativeTime) return;
 		if (!withinPVS && DynamicCulling.a.cullEnabled) return;
 		
-		float dist = Vector3.Distance(sightPoint.transform.position,currentDestination);
+		float dist = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),currentDestination);
 		if (wandering) {
 			if (wanderFinished < Sys_Global.pauseRelativeTime || (dist < (stopDistance * 0.5f))) {
 				wanderFinished = Sys_Global.pauseRelativeTime + random_range(3f,8f);
@@ -406,9 +393,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 					// Move it move it.
 					float playbackTime = 1f;
 					if (hopAnimator != null) {
-						AnimatorStateInfo asi =
-							hopAnimator.GetCurrentAnimatorStateInfo(0);
-
+						AnimatorStateInfo asi = hopAnimator.GetCurrentAnimatorStateInfo(0);
 						playbackTime = asi.normalizedTime;
 					}
 
@@ -427,15 +412,10 @@ void InitializeAIAfterLoad(uint16_t i) {
 					tempVec = (sightPoint.transform.forward
 							   * Const.a.walkSpeed[index]);
 
-					if (Const.a.numberOfRaycastsThisFrame <= Const.maxRaycastsPerFrame
-						&& npcTable[index].moveType[index] != AIMoveType.Fly) {
-
-						Vector3 checkPos = sightPoint.transform.position
-										   + (tempVec.normalized * 0.48f);
-
+					if (npcTable[index].moveType[index] != AIMoveType.Fly) {
+						Vector3 checkPos = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset) + (tempVec.normalized * 0.48f);
 						int mk = Const.a.layerMaskNPCCollision;
-						if (!Physics.Raycast(checkPos,Vector3.down,2.56f,mk)) {
-							Const.a.numberOfRaycastsThisFrame++;
+						if (!Raycast(checkPos,Vector3.down,2.56f,mk)) {
 							tempVec.x = 0f;
 							tempVec.z = 0f;
 						}
@@ -619,7 +599,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		// Randomly select point but only from available choices
 		int nearest = 0;		
 		for (int i=0;i<availablePositions.Count;i++) {
-			if (Vector3.Distance(enemy.transform.position,availablePositions[i]) < Vector3.Distance(enemy.transform.position,availablePositions[nearest])) nearest = i;
+			if (distance_vector3(enemy.transform.position,availablePositions[i]) < distance_vector3(enemy.transform.position,availablePositions[nearest])) nearest = i;
 		}
 		
 		return availablePositions[nearest];
@@ -628,7 +608,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 	Vector3 GetSearchPoint(bool hunting) {
 		//if (hunting) return lastKnownEnemyPos; // When we can't see the enemy, go to the last spot we saw them.
 		
-		switch(Const.a.type[index]) {
+		switch(npcTable[NPCID].type) {
 			case NPCType_Mutant: return GetWanderPoint();
 			case NPCType_Supermutant: return GetWanderPoint();
 			case NPCType_Robot: return GetAStarPoint();
@@ -638,20 +618,6 @@ void InitializeAIAfterLoad(uint16_t i) {
 		}
 		
 		return GetWanderPoint();
-	}
-	
-	private void SetHuntFinished() {
-// 		Debug.Log("Set hunt finished time");
-		huntFinished = Sys_Global.pauseRelativeTime;
-		int diff = Const.a.difficultyCombat;
-		if (IsCyberNPC()) diff = Const.a.difficultyCyber;
-		if (diff <= 1) { // More forgetful on easy.
-			huntFinished += Mathf.Max((Const.a.huntTime[index] * 0.75f),60f);
-		} else if (diff >= 3) { // Good memory on hard.
-			huntFinished += Mathf.Max((Const.a.huntTime[index] * 2.00f),60f); 
-		} else {
-		    huntFinished += Mathf.Max(Const.a.huntTime[index],60f);
-		}
 	}
 
 	void Run() {
@@ -666,8 +632,8 @@ void InitializeAIAfterLoad(uint16_t i) {
 
 		if (posCheckFinished <= Sys_Global.pauseRelativeTime && !IsCyberNPC()) {
 			posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
-			float distToEnem = Vector3.Distance(sightPoint.transform.position,enemy.transform.position);
-			distToLastPos = Vector3.Distance(transform.position,lastPosition);
+			float distToEnem = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),enemy.transform.position);
+			distToLastPos = distance_vector3(transform.position,lastPosition);
 			lastPosition = transform.position;
 			if (distToLastPos < 0.48f && distToEnem > stopDistance && !wandering) {
 				wanderFinished = Sys_Global.pauseRelativeTime + searchTime;
@@ -682,7 +648,7 @@ void InitializeAIAfterLoad(uint16_t i) {
             if (huntFinished > Sys_Global.pauseRelativeTime) {
                 Hunt();
             } else {
-				Debug.Log("enemy hunt ended");
+				DualLog("enemy hunt ended");
                 enemy = null;
 				enemyHM = null;
 				wandering = true; // Sometimes look like we are still searching
@@ -721,7 +687,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 				if (Const.a.hopsOnMove[index]) HopMove();
 				else                                 RunMove(); // <<<<<RUN
 			} else {
-				if (Const.a.difficultyCombat >= 2) {
+				if (Sys_Global.difficultyCombat >= 2) {
 					if (random_range(0f,1f) < 0.5f) AI_Face(currentDestination);
 				}
 			}
@@ -758,7 +724,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		if (enemy == null) return;
 
 		if (actAsTurret) {
-			currentDestination = sightPoint.transform.position;
+			currentDestination = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
 			return;
 		}
 
@@ -768,7 +734,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		// Attack3 used targettingPosition but it is so rare I decided to use
 		// the known working method from Attack1 and Attack2.
         currentDestination = enemy.transform.position;
-		Vector3 eyePos = sightPoint.transform.position;
+		Vector3 eyePos = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
 		float sqrDist = (eyePos - currentDestination).sqrMagnitude;
 		if (sqrDist <= (stopDistance * stopDistance)) return; // At stop point.
 		if (!WithinAngleToTarget()) return; // Still turning to face.
@@ -925,9 +891,8 @@ void InitializeAIAfterLoad(uint16_t i) {
 		Vector3 pos = GetAttackStartPoint(attackNum);
 		float range = GetRangeForAttack(attackNum);
 		int mask = Const.a.layerMaskNPCAttack;
-		if (!Physics.Raycast(pos,tempVec,out tempHit,range,mask)) return false;
+		if (!Raycast(pos,tempVec,out tempHit,range,mask)) return false;
 
-		Const.a.numberOfRaycastsThisFrame++;
 		tempHM = Utils.GetMainHealthManager(tempHit);
 		return true;
     }
@@ -950,7 +915,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		GameObject dCont = LevelManager.a.GetCurrentDynamicContainer();
 		laz.transform.SetParent(dCont.transform,true);
 		LaserDrawing ldraw = laz.GetComponent<LaserDrawing>();
-		ldraw.startPoint = sightPoint.transform.position;
+		ldraw.startPoint = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
 		ldraw.endPoint = tempHit.point;
 		Utils.Activate(laz);
 	}
@@ -960,7 +925,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		if (!laserLightning.enabled) return;
 
 		Vector3[] pts = new Vector3[] {
-			sightPoint.transform.position,
+			Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),
 			enemy.transform.position
 		};
 
@@ -1106,7 +1071,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		float take = DamageData.GetDamageTakeAmount(dd);
 		dd.other = gameObject;
 		dd.damage = take;
-		Utils.ApplyImpactForceSphere(dd,sightPoint.transform.position,
+		Utils.ApplyImpactForceSphere(dd,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),
 									 Const.a.attack3Radius[index],1.5f);
 
 		healthManager.TakeDamage(dd); // Self destruct.
@@ -1269,7 +1234,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		}
 
 		dyingSetup = true;
-// 		Debug.Log("NPC " + gameObject.name + " finished dying setup");
+// 		DualLog("NPC " + gameObject.name + " finished dying setup");
 	}
 
 	public bool DeactivatesVisibleMeshWhileDying() {
@@ -1285,17 +1250,17 @@ void InitializeAIAfterLoad(uint16_t i) {
 		// Check if timer for dying animation is finished letting it play.
 		if (timeTillDeadFinished < Sys_Global.pauseRelativeTime) {
 			ai_dead = true;
-// 			Debug.Log("NPC " + gameObject.name + " has now died");
+// 			DualLog("NPC " + gameObject.name + " has now died");
 			ai_dying = false;
 			currentState = AIState_Dead;
 		}
 
 		if (DeactivatesVisibleMeshWhileDying() && visibleMeshEntity.activeSelf) {
 			Utils.Deactivate(visibleMeshEntity);
-			UnityEngine.Debug.Log("DeactivatesVisibleMeshWhileDying while dying deactivate visibleMeshEntity");
+			UnityEngine.DualLog("DeactivatesVisibleMeshWhileDying while dying deactivate visibleMeshEntity");
 			if (visibleMeshVisible) {
 				visibleMeshVisible = false;
-// 				Debug.Log("NPC " + gameObject.name + " visibleMeshVisible now "
+// 				DualLog("NPC " + gameObject.name + " visibleMeshVisible now "
 // 						  + "false due to dying");
 			}
 		}
@@ -1311,10 +1276,10 @@ void InitializeAIAfterLoad(uint16_t i) {
 		if (deadChecksDone) return;
 		
 		if (DeactivatesVisibleMeshWhileDying() && visibleMeshEntity.activeSelf) {
-			UnityEngine.Debug.Log("DeactivatesVisibleMeshWhileDying while dead deactivate visibleMeshEntity");
+			UnityEngine.DualLog("DeactivatesVisibleMeshWhileDying while dead deactivate visibleMeshEntity");
 			Utils.Deactivate(visibleMeshEntity);
 			visibleMeshVisible = false;
-// 			Debug.Log("NPC " + gameObject.name + " visibleMeshVisible now "
+// 			DualLog("NPC " + gameObject.name + " visibleMeshVisible now "
 // 			+ "false due to dead");
 		}
 
@@ -1356,9 +1321,9 @@ void InitializeAIAfterLoad(uint16_t i) {
 		if (!HasHealth(healthManager)) return false;
 		
 		bool enemyIsNPC = enemy.layer == 10;
-	    int diff = Const.a.difficultyCombat;
+	    int diff = Sys_Global.difficultyCombat;
 		if (IsCyberNPC()) {
-			diff = Const.a.difficultyCyber;
+			diff = SSys_Global.difficultyCyber;
 		} else {
 			if ((!withinPVS && !enemyIsNPC) && DynamicCulling.a.cullEnabled) return false;
 		}
@@ -1374,31 +1339,20 @@ void InitializeAIAfterLoad(uint16_t i) {
 		}
 
 		if (IsCyberNPC() && Const.a.decoyActive) {
-			//Debug.Log("Decoy forget!");
+			//DualLog("Decoy forget!");
 			LOSpossible = false; // Silly decoy hack to prevent seeing player.
 			return false;
 		}
 
 		// Get distance between enemy and found player
-		float dist = Vector3.Distance(enemy.transform.position,
-									  sightPoint.transform.position);
-
-		if (dist > Const.a.sightRange[index]) {
-			//Debug.Log("Distance to enemy is too far to see");
-			return false;
-		}
-
+		float dist = distance_vector3(enemy.transform.position, Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
+		if (dist > Const.a.sightRange[index]) return false;
 		if (IsCyberNPC() || enemyIsNPC) return true;
 
-		if (Const.a.numberOfRaycastsThisFrame > Const.maxRaycastsPerFrame) {
-			return inSight; // Zero order hold last until next actual update.
-		}
-
 		// Get vector line made from enemy to found player
-		Vector3 line = enemy.transform.position - sightPoint.transform.position;
-        if (Physics.Raycast(sightPoint.transform.position,line.normalized,
-							out tempHit, Const.a.sightRange[index],
-							Const.a.layerMaskNPCSight)) {
+		Vector3 line = enemy.transform.position - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+        RaycastHit tempHit;
+        if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),line.normalized, out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
 			Const.a.numberOfRaycastsThisFrame++;
 			GameObject hitObj = tempHit.collider.gameObject;
             if (hitObj == enemy) {
@@ -1406,21 +1360,19 @@ void InitializeAIAfterLoad(uint16_t i) {
                 return true;
 			} else {
 				// If we are a smart cookie, open doors if we see a door while trying to look at player.
-				if (hitObj != null && (Vector3.Distance(tempHit.point,sightPoint.transform.position) < 2f)
-					&& Const.a.type[index] != NPCType_Mutant && Const.a.type[index] != NPCType_Supermutant && Const.a.type[index] != NPCType_Cyber) {
+				if (hitObj != null && (distance_vector3(tempHit.point,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset)) < 2.0f)
+					&& npcTable[NPCID].type[index] != NPCType_Mutant && npcTable[NPCID].type[index] != NPCType_Supermutant && npcTable[NPCID].type[index] != NPCType_Cyber) {
 
 					Door dr = hitObj.GetComponent<Door>();
 					if (dr == null) {
 						UseHandlerRelay uhr = hitObj.GetComponent<UseHandlerRelay>();
 						if (uhr != null) {
-							if (uhr.referenceUseHandler != null) {
-								dr = uhr.referenceUseHandler.GetComponent<Door>();
-							}
+							if (uhr.referenceUseHandler != null) dr = uhr.referenceUseHandler.GetComponent<Door>();
 						}
 					}
 
 					if (dr != null) {
-						if ((dr.doorOpen == DoorState.Closed || (dr.doorOpen == DoorState.Closing && Const.a.difficultyCombat > 2))
+						if ((dr.doorOpen == DoorState.Closed || (dr.doorOpen == DoorState.Closing && Sys_Global.difficultyCombat > 2))
 							&& !dr.locked && (LevelManager.a.GetCurrentLevelSecurity() <= dr.securityThreshhold)
 							&& (dr.requiredAccessCard == AccessCardType.None || dr.accessCardUsedByPlayer || Inventory.a.HasAccessCard(dr.requiredAccessCard))) {
 						
@@ -1432,15 +1384,15 @@ void InitializeAIAfterLoad(uint16_t i) {
         }
 
         LOSpossible = false;
-		//Debug.Log("Can't see current enemy after raycasting");
+		//DualLog("Can't see current enemy after raycasting");
 
         return false;
 	}
 
 	bool CheckIfPlayerInSight() {
-	    int diff = Const.a.difficultyCombat;
+	    int diff = Sys_Global.difficultyCombat;
 		if (IsCyberNPC()) {
-			diff = Const.a.difficultyCyber;
+			diff = SSys_Global.difficultyCyber;
 		} else {
 			if (!withinPVS && DynamicCulling.a.cullEnabled) return false;
 		}
@@ -1452,7 +1404,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 							 // CheckIfEnemyInSight so it doesn't break it.
 
 		if (IsCyberNPC() && Const.a.decoyActive) {
-			//Debug.Log("Decoy forget!");
+			//DualLog("Decoy forget!");
 			return false;
 		}
 		if (Const.a.player1Capsule == null) return false; // No found player
@@ -1463,7 +1415,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 		tempVec = Const.a.player1Capsule.transform.position;
 
 		// Get distance between enemy and found player
-		float dist = Vector3.Distance(tempVec,sightPoint.transform.position);
+		float dist = distance_vector3(tempVec,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
 
 		// Don't waste time raycasting if we won't be able to see them anyway.
 		if (dist > Const.a.sightRange[index]) return false;
@@ -1475,17 +1427,11 @@ void InitializeAIAfterLoad(uint16_t i) {
 		}
 
 		// Get vector line made from enemy to found player
-		Vector3 checkline = tempVec - sightPoint.transform.position;
+		Vector3 checkline = tempVec - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
 		float angle = Vector3.Angle(checkline,sightPoint.transform.forward);
 		if (angle < (Const.a.fov[index] * 0.5f)) {
-			// Check for line of sight
-			if (Const.a.RaycastBudgetExceeded()) return inSight; // No change.
-
 			// Changed from using sight range to dist to minimize checkdistance.
-			if (Physics.Raycast(sightPoint.transform.position,
-								checkline.normalized,out tempHit,
-								(dist + 0.1f),Const.a.layerMaskNPCSight)) {
-				Const.a.numberOfRaycastsThisFrame++;
+			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), checkline.normalized,out tempHit, (dist + 0.1f),Const.a.layerMaskNPCSight)) {
 				if (tempHit.collider.gameObject == Const.a.player1Capsule) {
 					LOSpossible = true;  // Clear path from enemy to found player
 					SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
@@ -1507,15 +1453,7 @@ void InitializeAIAfterLoad(uint16_t i) {
 				// walls in the ways still due to the angles.  Changed from
 				// using sight range to dist to minimize checkdistance; added
 				// slight amount to it though to avoid quantization inaccuracies.
-
-				if (Const.a.numberOfRaycastsThisFrame > Const.maxRaycastsPerFrame) {
-					return inSight; // Don't change it, zero order hold.
-				}
-
-				if (Physics.Raycast(sightPoint.transform.position,
-									checkline.normalized, out tempHit,
-									(dist + 0.1f),Const.a.layerMaskNPCSight)) {
-					Const.a.numberOfRaycastsThisFrame++;
+				if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), checkline.normalized, out tempHit, (dist + 0.1f),Const.a.layerMaskNPCSight)) {
 					if (tempHit.collider.gameObject == Const.a.player1Capsule) {
 						LOSpossible = true; // Clear path from enemy to player.
 						SetEnemy(Const.a.player1Capsule,Const.a.player1TargettingPos);
@@ -1574,8 +1512,8 @@ void InitializeAIAfterLoad(uint16_t i) {
 	    }
 
         infrontVec = target.transform.position;
-		infrontVec.y = sightPoint.transform.position.y; // Ignore height delta.
-		infrontVec = Vector3.Normalize(infrontVec - sightPoint.transform.position);
+		infrontVec.y = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset).y; // Ignore height delta.
+		infrontVec = Vector3.Normalize(infrontVec - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
 		inProjFOV = false;
 		infront = false;
         dotResult = Vector3.Dot(infrontVec,sightPoint.transform.forward);
@@ -1588,17 +1526,258 @@ void InitializeAIAfterLoad(uint16_t i) {
 		}
     }
 
-	public void Alert(UseData ud) {
-		if (Const.a.difficultyCombat == 0) return;
+	void Alert() {
+		if (Sys_Global.difficultyCombat == 0) return;
 
 		SetEnemy(Const.a.player1Capsule,Const.a.player1Capsule.transform);
 		currentDestination = enemy.transform.position;
 		inSight = false;
 	}
 
-	public void AwakeFromSleep(UseData ud) {
+	void AwakeFromSleep() {
 		asleep = false;
 		Utils.Deactivate(sleepingCables);
-		Alert(ud);
+		Alert();
 	}
 }
+
+// public class AIAnimationController : MonoBehaviour {
+// 	// External manually assigned references, unsaved, depends on prefab
+// 	public AIController aic;
+// 
+// 	// Externall set values per instance
+// 	public bool useDeadAnimForDeath = false; // save
+// 	public bool playDeathAnim = true; // save
+// 	public bool playDyingAnim = true; // save
+// 	public float minWalkSpeedToAnimate = 0.32f; // save
+// 
+// 	// Internal
+// 	float currentClipPercentage; // save
+// 	bool dying; // save
+// 	float animSwapFinished; // save
+// 	string clipName;
+// 
+// 	// Derived or temporary variables, unsaved
+// 	Animator anim;
+// 	private SkinnedMeshRenderer smR; // Optional, used for performance
+// 	private AnimatorStateInfo anstinfo;
+// 	private bool checkVisWithSMR = false;
+// 	private bool pauseStateUpdated = false;
+// 	private bool firstUpdateAfterLoad = false;
+// 	private string loadedClipName;
+// 	private int loadedClipIndex;
+// 	private float loadedAnimatorPlaybackTime;
+// 	private float loadedSetSpeed;
+// 	private bool initialized = false;
+// 	private bool doneDidDead = false;
+// 	private static StringBuilder s1 = new StringBuilder();
+// 
+// 	public void Start () {
+// 	    if (initialized) return;
+// 	    
+// 	    animSwapFinished = Sys_Global.pauseRelativeTime;
+// 		anim = GetComponent<Animator>();
+// 		smR = GetComponentInChildren<SkinnedMeshRenderer>(true);
+// 		if (smR != null) checkVisWithSMR = true;
+// 		else checkVisWithSMR = false;
+// 		
+// 		switch (aic.currentState) {
+// 			case AIState_Idle: 		clipName = "Idle";	  break;
+// 			case AIState_Walk:	 	clipName = "Walk"; 	  break;
+// 			case AIState_Run: 		clipName = "Run";	  break;
+// 			case AIState_Attack1: 	clipName = "Attack1"; break;
+// 			case AIState_Attack2: 	clipName = "Attack2"; break;
+// 			case AIState_Attack3: 	clipName = "Attack3"; break;
+// 			case AIState_Pain: 		clipName = "Pain";	break;
+// 			case AIState_Dying: 	clipName = "Death";	break;
+// 			case AIState_Dead:
+// 				if (useDeadAnimForDeath) clipName = "Dead";
+// 				else clipName = "Death";
+// 
+// 				break;
+// 			default: 				clipName = "Idle";	break;
+// 		}
+// 		
+// 		initialized = true;
+// 	}
+// 
+// 	void OnEnable() {
+// 		doneDidDead = false; // Ensure death anim is set to proper frame on enable.
+// 	}
+// 
+// 	void Update() {
+// 		if (Sys_Global.gamePaused || Sys_Global.menuActive) {
+// 			if (!pauseStateUpdated) {
+// 				if (anim.speed != 0) anim.speed = 0;
+// 				pauseStateUpdated = true;
+// 			}
+// 			return;
+// 		} else {
+// 			if (pauseStateUpdated) {
+// 				if (anim.speed != 1f) anim.speed = 1f;
+// 				pauseStateUpdated = false;
+// 			}
+// 		}
+// 
+// 		if (checkVisWithSMR) {
+// 			if (smR != null) {
+// 				if (!smR.isVisible && aic.withinPVS) return;
+// 			}
+// 		}
+// 		
+// 		if (firstUpdateAfterLoad) { SetAnimAfterLoad(); firstUpdateAfterLoad = false; return; }
+// 		
+// 		if (aic.asleep && aic.currentState != AIState_Dying
+// 			&& aic.currentState != AIState_Dead) {
+// 			Idle();
+// 			return;
+// 		}
+// 		
+// 		if (aic.currentState == AIState_Run && aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
+// 			Idle();
+// 			return;
+// 		}
+// 
+// 		switch (aic.currentState) {
+// 			case AIState_Idle: 		Idle(); 	break;
+// 			case AIState_Walk:	 	Walk(); 	break;
+// 			case AIState_Run: 		Run(); 		break;
+// 			case AIState_Attack1: 	Attack1(); 	break;
+// 			case AIState_Attack2: 	Attack2(); 	break;
+// 			case AIState_Attack3: 	Attack3(); 	break;
+// 			case AIState_Pain: 		Pain();		break;
+// 			case AIState_Dying: 	Dying(); 	break;
+// 			case AIState_Dead:		Dead();		break;
+// 			default: 				Idle(); 	break;
+// 		}
+// 	}
+// 
+// 	void Idle () {
+// 		if (aic.asleep || aic.tranquilizeFinished >= Sys_Global.pauseRelativeTime) {
+// 			if (anim.speed > 0) anim.speed = 0;
+// 		} else {
+// 			if (anim.speed != 1f) anim.speed = 1f;
+// 			if (random_range(0,1f) < 0.5f) {
+// 			    anim.Play("Idle");
+// 			    clipName = "Idle";
+// 			}
+// 		}
+// 	}
+// 
+// 	void Run () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		if (aic.actAsTurret) {
+// 			anim.Play("Idle");
+// 			clipName = "Idle";
+// 		} else {
+// 			anim.Play("Run");
+// 			clipName = "Run";
+// 		}
+// 	}
+// 
+// 	void Walk () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		if (aic.rbody.velocity.sqrMagnitude >
+// 			(minWalkSpeedToAnimate * minWalkSpeedToAnimate)) {
+// 			if (aic.actAsTurret) {
+// 				anim.Play("Idle");
+// 				clipName = "Idle";
+// 			} else {
+// 				anim.Play("Walk");
+// 				clipName = "Walk";
+// 			}
+// 		} else {
+// 			 // Prevent flickering by using a delay timer.
+// 			if (animSwapFinished < Sys_Global.pauseRelativeTime) {
+// 				animSwapFinished = Sys_Global.pauseRelativeTime + 0.5f;
+// 				anim.Play("Idle");
+// 				clipName = "Idle";
+// 			}
+// 		}
+// 	}
+// 
+// 	void Attack1 () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anim.Play("Attack1");
+// 		clipName = "Attack1";
+// 	}
+// 
+// 	void Attack2 () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anim.Play("Attack2");
+// 		clipName = "Attack2";
+// 	}
+// 
+// 	void Attack3 () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anim.Play("Attack3");
+// 		clipName = "Attack3";
+// 	}
+// 
+// 	void Pain () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anim.Play("Pain");
+// 		clipName = "Pain";
+// 	}
+// 
+// 	void Dying () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		aic.asleep = false;
+// 		Utils.Deactivate(aic.sleepingCables);
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anstinfo = anim.GetCurrentAnimatorStateInfo(0);
+// 		currentClipPercentage = anstinfo.normalizedTime % 1;
+// 		dying = true;
+// 		if (playDyingAnim) {
+// 		    anim.Play("Death");
+// 		    clipName = "Death";
+// 		}
+// 		if (currentClipPercentage > 0.99f) dying = false;
+// 	}
+// 
+// 	void Dead () {
+// 		if (playDeathAnim) {
+// 			if (useDeadAnimForDeath) {
+// 				if (!doneDidDead) anim.Play("Dead",0,1.0f);
+// 				doneDidDead = true;
+// 				clipName = "Dead";
+// 			} else {
+// 				if (!doneDidDead) anim.Play("Death",0,1.0f);
+// 				doneDidDead = true;
+// 				clipName = "Death";
+// 			}
+// 		}
+// 
+// 		if (anim.speed > 0f) anim.speed = 0f;
+// 	}
+// 
+// 	void Inspect () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anim.Play("Inspect");
+// 		clipName = "Inspect";
+// 	}
+// 
+// 	void Interacting () {
+// 		if (anim.speed != 1f) anim.speed = 1f;
+// 		anim.Play("Interact");
+// 		clipName = "Interact";
+// 	}
+// 	
+// 	void SetAnimAfterLoad() {
+// 		firstUpdateAfterLoad = false;
+// 		anim.speed = loadedSetSpeed;
+// 		if (anim.speed == 0) anim.speed = 1f;
+// 		if (data_parser_isspace(loadedClipName)) loadedClipName = "Idle";
+// 		if (loadedClipIndex < 0) loadedClipIndex = 0;
+// 		anim.Play(loadedClipName,loadedClipIndex,loadedAnimatorPlaybackTime);
+// 	}
+// 	
+// 	public void SetAnimFromLoad(string n, int i, float t, float sp) {
+// 		firstUpdateAfterLoad = true;
+// 		loadedClipName = n;
+// 		loadedClipIndex = i;
+// 		loadedAnimatorPlaybackTime = t;
+// 		loadedSetSpeed = sp;
+// 		anim.speed = loadedSetSpeed;
+// 	}
+// }

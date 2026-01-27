@@ -7,11 +7,10 @@ public class CyberSwitch : MonoBehaviour {
 	public int textIndex = 463;
 	public bool active = false; // save
 	public string target;
-	public string argvalue;
 	public GameObject activeCenter;
 	public GameObject deactiveCenter;
 	public GameObject iceNode;
-	[HideInInspector] public bool iceActive;
+	bool iceActive;
 	private static StringBuilder s1 = new StringBuilder();
 
 	void Awake() {
@@ -46,56 +45,7 @@ public class CyberSwitch : MonoBehaviour {
 
 			UseData ud = new UseData();
 			ud.owner = other.gameObject;
-			ud.argvalue = argvalue;
 			Const.a.UseTargets(gameObject,ud,target);
 		}
-	}
-
-	public static string Save(GameObject go, PrefabIdentifier prefID) {
-		CyberSwitch cs = go.GetComponent<CyberSwitch>();
-		s1.Clear();
-		s1.Append(Utils.BoolToString(cs.active,"CyberSwitch.active"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(cs.textIndex,"textIndex"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveString(cs.target,"target"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveString(cs.argvalue,"argvalue"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(cs.iceActive,"iceActive"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(cs.iceNode.activeSelf,"iceNode.activeSelf"));
-		s1.Append(Utils.splitChar);
-		s1.Append(HealthManager.Save(cs.iceNode,prefID));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index,
-						   PrefabIdentifier prefID, int levID) {
-		CyberSwitch cs = go.GetComponent<CyberSwitch>();
-		if (cs == null) {
-			Debug.Log("CyberSwitch.Load failure, cs == null");
-			return index + 13;
-		}
-
-		if (index < 0) {
-			Debug.Log("CyberSwitch.Load failure, index < 0");
-			return index + 13;
-		}
-
-		if (entries == null) {
-			Debug.Log("CyberSwitch.Load failure, entries == null");
-			return index + 13;
-		}
-
-		cs.active = Utils.GetBoolFromString(entries[index],"CyberSwitch.active"); index++;
-		cs.textIndex = Utils.GetIntFromString(entries[index],"textIndex"); index++;
-		cs.target = Utils.LoadString(entries[index],"target"); index++;
-		cs.argvalue = Utils.LoadString(entries[index],"argvalue"); index++;
-		cs.iceActive = Utils.GetBoolFromString(entries[index],"iceActive"); index++;
-		cs.iceNode.SetActive(Utils.GetBoolFromString(entries[index],"iceNode.activeSelf")); index++;
-		index = HealthManager.Load(cs.iceNode,ref entries,index,prefID,levID);
-		cs.Initialize(cs.active,cs.iceActive);
-		return index;
 	}
 }

@@ -14,7 +14,7 @@ public class GetInput : MonoBehaviour {
 	public UIButtonMask consoleButton;
 	public GameObject touchablesContainer;
 	public static GetInput a;
-	[HideInInspector] public bool isCapsLockOn;
+	bool isCapsLockOn;
 	private bool lastjoy3 = false;
 	private bool lastUse = false;
 	private Vector2 LTSCenter;

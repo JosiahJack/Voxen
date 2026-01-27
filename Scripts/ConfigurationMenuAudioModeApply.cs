@@ -38,7 +38,7 @@ public class ConfigurationMenuAudioModeApply : MonoBehaviour {
 	void Initialize() {
 		if (picker == null) picker = GetComponent<Dropdown>();
 		if (picker == null) {
-			Debug.Log("BUG: ConfigurationMenuAudioModeApply missing component for "
+			DualLog("BUG: ConfigurationMenuAudioModeApply missing component for "
 					  + "aaPicker.");
 		}
 

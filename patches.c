@@ -5,6 +5,25 @@
 #define PATCH_REFLEX   16
 #define PATCH_SIGHT    32
 #define PATCH_STAMINUP 64
+#define BERSERK_TIME  20.0f
+#define DETOX_TIME    60.0f
+#define GENIUS_TIME  180.0f
+#define MEDI_TIME     35.0f
+#define REFLEX_TIME  155.0f
+#define SIGHT_TIME    40.0f
+#define STAMINUP_TIME 60.0f
+#define SIGHT_SIDE_EFFECT_TIME 17.0f
+#define REFLEX_TIME_SCALE 0.25f
+#define DEFAULT_TIME_SCALE 1.0f
+#define BERSERK_DAMAGE_MULTIPLIER 4.0f // Quad Damage!
+#define NITRO_MIN_TIME     1.0f
+#define NITRO_MAX_TIME    60.0f
+#define NITRO_DEFAULT_TIME 7.0f
+#define EARTH_SHAKER_MIN_TIME      4.0f
+#define EARTH_SHAKER_MAX_TIME     60.0f
+#define EARTH_SHAKER_DEFAULT_TIME 10.0f
+#define GLOBAL_SHAKE_DISTANCE 0.3f
+#define GLOBAL_SHAKE_FORCE    1.0f
 
 void ActivatePatch(int index) { // Expects the usableItems index
 //     bool depleted = false;

@@ -66,7 +66,6 @@ public class PuzzleWire : MonoBehaviour {
 	public float actualValue;
 	private int numberOfWires;
 	public string target;
-	public string argvalue;
 	private UseData udSender;
 	public bool geniusActive;
 	public Image[] geniusHintsLH;
@@ -151,7 +150,7 @@ public class PuzzleWire : MonoBehaviour {
 						numberOfWires++;
 				}
 
-				if (Const.a.difficultyPuzzle == 3) {
+				if (SSys_Global.difficultyPuzzle == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = rememberColors[0];
 					wireColors[1] = rememberColors[1];
@@ -192,7 +191,7 @@ public class PuzzleWire : MonoBehaviour {
 				}
 			} else {
 				DisableGeniusHints();
-				if (Const.a.difficultyPuzzle == 3) {
+				if (SSys_Global.difficultyPuzzle == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = HUDColor.Yellow;
 					wireColors[1] = HUDColor.Yellow;
@@ -283,7 +282,7 @@ public class PuzzleWire : MonoBehaviour {
 		}
 	}
 
-	public void SendWirePuzzleData(bool[] sentWiresOn, bool[] sentNodeRowsActive, int[] sentCurrentPositionsLeft, int[] sentCurrentPositionsRight, int[] sentTargetsLeft, int[] sentTargetsRight,HUDColor sentTheme, HUDColor[] sentHUDColors, string t1, string a1, UseData udSent,PuzzleWirePuzzle pwp) {
+	public void SendWirePuzzleData(bool[] sentWiresOn, bool[] sentNodeRowsActive, int[] sentCurrentPositionsLeft, int[] sentCurrentPositionsRight, int[] sentTargetsLeft, int[] sentTargetsRight,HUDColor sentTheme, HUDColor[] sentHUDColors, string t1, UseData udSent,PuzzleWirePuzzle pwp) {
 		wireIsActive = sentWiresOn;
 		nodeRowIsActive = sentNodeRowsActive;
 		wire1LHPosition = sentCurrentPositionsLeft[0];
@@ -318,7 +317,7 @@ public class PuzzleWire : MonoBehaviour {
 		theme = sentTheme;
 		wireColors = sentHUDColors;
 		rememberColors = sentHUDColors;
-		if (Const.a.difficultyPuzzle == 3) {
+		if (SSys_Global.difficultyPuzzle == 3) {
 			// Set all wire colors to the same on hard
 			wireColors[0] = HUDColor.Yellow;
 			wireColors[1] = HUDColor.Yellow;
@@ -328,17 +327,15 @@ public class PuzzleWire : MonoBehaviour {
 			wireColors[5] = HUDColor.Yellow;
 			wireColors[6] = HUDColor.Yellow;
 		}
+		
 		target = t1;
-		argvalue = a1;
 		puzzleWP = pwp;
 		Solved = pwp.puzzleSolved;
 		CheckEnabledNodes();
 		EvaluatePuzzle();
 		ChangeAppearance();
 
-		if (udSent.mainIndex == 54 || Const.a.difficultyPuzzle == 0) {
-			PuzzleSolved(true);
-		}
+		if (udSent.mainIndex == 54 || SSys_Global.difficultyPuzzle == 0) PuzzleSolved(true);
 	}
 
 	private Vector3 GetPositionOfLHNode(int index) {
@@ -640,7 +637,7 @@ public class PuzzleWire : MonoBehaviour {
 		if (wire5RHPosition == wire5RHTarget && wireIsActive[4]) tempF += 0.19f;
 		if (wire6RHPosition == wire6RHTarget && wireIsActive[5]) tempF += 0.19f;
 		if (wire7RHPosition == wire7RHTarget && wireIsActive[6]) tempF += 0.19f;
-		if (Const.a.difficultyPuzzle == 1) tempF += 0.19f;
+		if (SSys_Global.difficultyPuzzle == 1) tempF += 0.19f;
 		actualValue = tempF;
 		if (tempF > 0.92f || AllWiresCorrect()) PuzzleSolved(false);
 	}
