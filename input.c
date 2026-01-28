@@ -1,4 +1,3 @@
-#include <limits.h>
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
 InputSystem Sys_Input;
@@ -46,35 +45,6 @@ InputElement inputElements[149] = {
     { "PRINT", GLFW_KEY_PRINT_SCREEN }, { "JOY 18", GLFW_HAT_DOWN }, { "JOY 19", GLFW_HAT_LEFT }, { "GPAD A", GLFW_GAMEPAD_BUTTON_A }, { "GPAD B", GLFW_GAMEPAD_BUTTON_B }, { "GPAD X", GLFW_GAMEPAD_BUTTON_X }, { "GPAD Y", GLFW_GAMEPAD_BUTTON_Y }, { "GPAD L1", GLFW_GAMEPAD_BUTTON_LEFT_BUMPER }, { "GPAD R1", GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER }, { "GPAD BACK", GLFW_GAMEPAD_BUTTON_BACK },
     { "GPAD START", GLFW_GAMEPAD_BUTTON_START }, { "GPAD GUIDE", GLFW_GAMEPAD_BUTTON_GUIDE }, { "GPAD LSTICK CLICK", GLFW_GAMEPAD_BUTTON_LEFT_THUMB }, { "GPAD RSTICK CLICK", GLFW_GAMEPAD_BUTTON_RIGHT_THUMB }, { "GPAD D UP", GLFW_GAMEPAD_BUTTON_DPAD_UP }, { "GPAD D RIGHT", GLFW_GAMEPAD_BUTTON_DPAD_RIGHT }, { "GPAD D DOWN", GLFW_GAMEPAD_BUTTON_DPAD_DOWN }, { "GPAD D LEFT", GLFW_GAMEPAD_BUTTON_DPAD_LEFT }, { "UNUSED", 0 } //, {}
 };
-
-char* data_parser_trim(char* s) {
-    while (data_parser_isspace((unsigned char)*s)) s++;
-    if (*s == 0) return s;
-
-    char* e = s + strlen(s) - 1;
-    while (e > s && data_parser_isspace((unsigned char)*e)) e--;
-    e[1] = 0;
-    return s;
-}
-
-int atoi(const char *str) {
-    while (data_parser_isspace(*str)) str++;
-    int sign = 1;
-         if (*str == '-') { sign = -1; str++; }
-    else if (*str == '+') str++;
-
-    if (*str < '0' || *str > '9') return 0;
-    int result = 0;
-    while (*str >= '0' && *str <= '9') {
-        int digit = *str - '0';
-        if (result > (INT_MAX - digit) / 10) return (sign == 1) ? INT_MAX : INT_MIN;
-
-        result = result * 10 + digit;
-        str++;
-    }
-
-    return sign * result;
-}
 
 typedef enum { SETTING_U8, SETTING_U16, SETTING_INPUT } SettingType;
 typedef struct { const char* name; void* ptr; SettingType type; } Setting;
@@ -124,8 +94,8 @@ void LoadConfig(void) {
         char* val = data_parser_trim(eq + 1);
         for (int i = 0; i < configTableSize; i++) {
             if (!strcmp(key, configTable[i].name)) {
-                if (configTable[i].type == SETTING_U8)         *( uint8_t*)configTable[i].ptr = (uint8_t)atoi(val);
-                else if (configTable[i].type == SETTING_U16)   *(uint16_t*)configTable[i].ptr = (uint16_t)atoi(val);
+                if (configTable[i].type == SETTING_U8)         *( uint8_t*)configTable[i].ptr = (uint8_t)StringToInt(val);
+                else if (configTable[i].type == SETTING_U16)   *(uint16_t*)configTable[i].ptr = (uint16_t)StringToInt(val);
                 else if (configTable[i].type == SETTING_INPUT) *(uint16_t*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);
                 break;
             }

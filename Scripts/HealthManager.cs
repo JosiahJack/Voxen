@@ -15,9 +15,6 @@ public class HealthManager : MonoBehaviour {
 	/*[DTValidator.Optional] */public GameObject[] gibObjects;
 	/*[DTValidator.Optional] */public GameObject[] disableOnGib;
 
-	// External references, optional...Player references only
-	/*[DTValidator.Optional] */public PainStaticFX pstatic;
-	/*[DTValidator.Optional] */public PainStaticFX empstatic;
 	/*[DTValidator.Optional] */public GameObject healingFXFlash;
 
 	// Externally set values in inspector per instance

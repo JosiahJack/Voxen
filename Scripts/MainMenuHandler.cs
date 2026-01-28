@@ -482,7 +482,7 @@ public class MainMenuHandler : MonoBehaviour {
 		if ((   (Input.GetKey(KeyCode.LeftAlt) && Input.GetKeyDown(KeyCode.P))
 			 || (Input.GetKeyDown(KeyCode.LeftAlt) && Input.GetKey(KeyCode.P)))
 			&& !CouldNotFindDialogue.activeInHierarchy) {
-			if (data_parser_isspace(Const.a.playerName)) {
+			if (StringIsEmpty(Const.a.playerName)) {
 				Const.a.playerName = "Qmaster";
 			}
 
@@ -534,7 +534,7 @@ public class MainMenuHandler : MonoBehaviour {
 		
 		if (isNew) {
 			string pname = newgamePage.GetComponentInChildren<InputField>(true).text;
-			if (data_parser_isspace(pname)) pname = "Hacker";
+			if (StringIsEmpty(pname)) pname = "Hacker";
 			Const.a.playerName = pname;
 			Const.a.NewGame();
 		}

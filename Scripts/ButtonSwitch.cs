@@ -1,13 +1,4 @@
 ﻿public class ButtonSwitch : MonoBehaviour {
-	int securityThreshhold = 100;  // If security level is not <= this level (100), this is unusable until security falls.
-	string target;
-	int messageIndex = -1;
-	float delay = 0f;
-	int SFXIndex = 44;
-	int SFXLockedIndex = -1;
-	bool blinkWhenActive; // save
-	bool changeMatOnActive = true; // save
-	bool animateModel = false; // save
 	bool locked = false; // save
 	int lockedMessageLingdex = 193;
 	bool active; // save

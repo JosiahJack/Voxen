@@ -124,12 +124,9 @@ void LoadTextures(void) {
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     glFlush();
     glFinish();
-    free(texture_parser.entries);
+    OS_DeallocateRAM(texture_parser.entries,texture_parser.count * sizeof(Entity));
     OS_DeallocateRAM(arena, arena_size); arena = NULL;
     OS_DeallocateRAM(stbi__arena_base, STBI_ARENA_SIZE); stbi__arena_base = NULL;
-    #ifndef WINDOWS
-        malloc_trim(0);
-    #endif
     double end_time = get_time();
     DualLog(" took %.6f secs\n", end_time - start_time);
     DebugRAM("After LoadTextures and after deallocation of LoadTextures arena and stbi arena");

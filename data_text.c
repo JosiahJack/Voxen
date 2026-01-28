@@ -33,16 +33,16 @@ size_t utf16le_to_utf8(const uint8_t* src, size_t src_len, char* dst, size_t dst
 }
 
 void LoadTextForLanguage(uint8_t lang) {
-    char textFile[256]; strcpy(textFile, "./Data/text_english.txt");
+    char textFile[256];
     switch (lang) {
-        case 0: strcpy(textFile, "./Data/text_english.txt"); break;
-        case 1: strcpy(textFile, "./Data/text_espanol.txt"); break;
-        case 2: strcpy(textFile, "./Data/text_deutsch.txt"); break;
-        case 3: strcpy(textFile, "./Data/text_francais.txt"); break;
-        case 4: strcpy(textFile, "./Data/text_nihongo.txt"); break;
-        case 5: strcpy(textFile, "./Data/text_russkiy.txt"); break;
-        case 6: strcpy(textFile, "./Data/text_italiano.txt"); break;
-        case 7: strcpy(textFile, "./Data/text_portugues.txt"); break;
+        case 1:  StringCopyInto_A_From_B(textFile, "./Data/text_espanol.txt", 256); break;
+        case 2:  StringCopyInto_A_From_B(textFile, "./Data/text_deutsch.txt", 256); break;
+        case 3:  StringCopyInto_A_From_B(textFile, "./Data/text_francais.txt", 256); break;
+        case 4:  StringCopyInto_A_From_B(textFile, "./Data/text_nihongo.txt", 256); break;
+        case 5:  StringCopyInto_A_From_B(textFile, "./Data/text_russkiy.txt", 256); break;
+        case 6:  StringCopyInto_A_From_B(textFile, "./Data/text_italiano.txt", 256); break;
+        case 7:  StringCopyInto_A_From_B(textFile, "./Data/text_portugues.txt", 256); break;
+        default: StringCopyInto_A_From_B(textFile, "./Data/text_english.txt", 256); break;
     }
 
     FILE* fp = fopen(textFile, "rb"); if (!fp) { DualLog("Failed to open text file: %s\n", textFile); return; }
@@ -117,7 +117,7 @@ void LoadTextForLanguage(uint8_t lang) {
             OS_Exit(1);
         }
 
-        size_t len = strlen(utf8_line);
+        size_t len = GetStringLength(utf8_line);
         while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) utf8_line[--len] = '\0';
         if (len == 0) {
             if (lineNum < TEXT_STRING_COUNT) voxen_Text.stringTable[lineNum][0] = '\0';                
@@ -160,16 +160,15 @@ void LoadLogTextForLanguage(uint8_t lang) {
     audiologSubjects    = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audioLogSpeech2Text = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     char textFile[256];
-    strcpy(textFile, "./Data/logs_text_english.txt");
     switch (lang) {
-        case 0: strcpy(textFile, "./Data/logs_text_english.txt"); break;
-        case 1: strcpy(textFile, "./Data/logs_text_espanol.txt"); break;
-        case 2: strcpy(textFile, "./Data/logs_text_deutsch.txt"); break;
-        case 3: strcpy(textFile, "./Data/logs_text_francais.txt"); break;
-        case 4: strcpy(textFile, "./Data/logs_text_nihongo.txt"); break;
-        case 5: strcpy(textFile, "./Data/logs_text_russkiy.txt"); break;
-        case 6: strcpy(textFile, "./Data/logs_text_italiano.txt"); break;
-        case 7: strcpy(textFile, "./Data/logs_text_portugues.txt"); break;
+        case 1:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_espanol.txt", 256); break;
+        case 2:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_deutsch.txt", 256); break;
+        case 3:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_francais.txt", 256); break;
+        case 4:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_nihongo.txt", 256); break;
+        case 5:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_russkiy.txt", 256); break;
+        case 6:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_italiano.txt", 256); break;
+        case 7:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_portugues.txt", 256); break;
+        default: StringCopyInto_A_From_B(textFile, "./Data/logs_text_english.txt", 256); break;
     }
 
     FILE *fp = fopen(textFile, "rb");
@@ -229,7 +228,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
             utf16le_to_utf8(&voxen_Text.file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
         } else { DualLogError("Unknown encoding for %s\n", textFile); OS_Exit(1); }
 
-        size_t len = strlen(utf8_line);
+        size_t len = GetStringLength(utf8_line);
         while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) utf8_line[--len] = '\0';
         if (len == 0) { ++lineNum; continue; }   /* blank line -> skip */
 
@@ -244,7 +243,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
 
         while (token && num_fields < 32) {
             if (token[0] == '"') ++token;
-            size_t tlen = strlen(token);
+            size_t tlen = GetStringLength(token);
             if (tlen && token[tlen - 1] == '"') token[--tlen] = '\0';
             memcpy(fields[num_fields], token, sizeof(fields[0]) - 1);
             fields[num_fields][sizeof(fields[0]) - 1] = '\0';
@@ -253,22 +252,21 @@ void LoadLogTextForLanguage(uint8_t lang) {
             token = strtok_r(NULL, ",", &saveptr);
         }
 
-        int   readIndexOfLog      = (num_fields > 0) ? atoi(fields[0]) : -1;
-        int   readLogImageLHIndex = (num_fields > 1) ? atoi(fields[1]) : -1;
-        int   readLogImageRHIndex = (num_fields > 2) ? atoi(fields[2]) : -1;
-        char  readLogName[64]     = {0};
-        char  readLogSender[64]   = {0};
-        char  readLogSubject[256] = {0};
-        char  readLogText[TEXT_LOCALIZATION_MAX_LENGTH * 4] = {0};
-        int   readLogType         = (num_fields > 6) ? atoi(fields[6]) : 0;
-        int   readLogLevelFound   = (num_fields > 7) ? atoi(fields[7]) : 0;
-        if (num_fields > 3) memcpy(readLogName,     fields[3], sizeof(readLogName) - 1);
-        if (num_fields > 4) memcpy(readLogSender,   fields[4], sizeof(readLogSender) - 1);
-        if (num_fields > 5) memcpy(readLogSubject,  fields[5], sizeof(readLogSubject) - 1);
-        strcpy(readLogText, "");
+        int  readIndexOfLog      = (num_fields > 0) ? StringToInt(fields[0]) : -1;
+        int  readLogImageLHIndex = (num_fields > 1) ? StringToInt(fields[1]) : -1;
+        int  readLogImageRHIndex = (num_fields > 2) ? StringToInt(fields[2]) : -1;
+        char readLogName[64]     = {0};
+        char readLogSender[64]   = {0};
+        char readLogSubject[256] = {0};
+        char readLogText[TEXT_LOCALIZATION_MAX_LENGTH * 4] = {0};
+        int  readLogType         = (num_fields > 6) ? StringToInt(fields[6]) : 0;
+        int  readLogLevelFound   = (num_fields > 7) ? StringToInt(fields[7]) : 0;
+        if (num_fields > 3) memcpy(readLogName,    fields[3], sizeof(readLogName) - 1);
+        if (num_fields > 4) memcpy(readLogSender,  fields[4], sizeof(readLogSender) - 1);
+        if (num_fields > 5) memcpy(readLogSubject, fields[5], sizeof(readLogSubject) - 1);
         for (int f = 8; f < num_fields; ++f) {
-            if (f > 8) strcat(readLogText, ",");
-            strcat(readLogText, fields[f]);
+            if (f > 8) StringConcatenate(readLogText, ",", TEXT_LOCALIZATION_MAX_LENGTH * 4);
+            StringConcatenate(readLogText, fields[f], TEXT_LOCALIZATION_MAX_LENGTH * 4);
         }
 
         if (readIndexOfLog >= 0 && readIndexOfLog < TEXT_LOGS_COUNT) {
@@ -278,9 +276,9 @@ void LoadLogTextForLanguage(uint8_t lang) {
             voxen_Text.audioLogLevelFound[readIndexOfLog]         = (uint8_t)readLogLevelFound;
             #define REPLACE_STR(dst, src) do { \
                 if ((dst)[readIndexOfLog]) free((dst)[readIndexOfLog]); \
-                size_t slen = strlen(src); \
+                size_t slen = GetStringLength(src); \
                 (dst)[readIndexOfLog] = malloc(slen + 1); \
-                if ((dst)[readIndexOfLog]) strcpy((dst)[readIndexOfLog], src); \
+                if ((dst)[readIndexOfLog]) StringCopyInto_A_From_B((dst)[readIndexOfLog], src, slen + 1); \
                 else (dst)[readIndexOfLog] = NULL; \
             } while (0)
 

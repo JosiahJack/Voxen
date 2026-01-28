@@ -120,7 +120,7 @@ WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
 MAC_CC="gcc"
 COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra \
-               -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 -Wvla \
+               -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
                -Wdouble-promotion -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
                -Werror=implicit-function-declaration -Og -D_GNU_SOURCE"
 
@@ -168,7 +168,7 @@ fi
 cp $GLAD_OBJ "$TEMP_DIR/glad.o"
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c console.c event.c level.c data_parser.c data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c"
+SOURCES="voxen.c physics.c helpers.c animation.c console.c event.c level.c data_parser.c data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 

@@ -6,7 +6,7 @@ public class TriggeredSprintMessage : MonoBehaviour {
 	public int messageLingdex = -1;
 	public string messageToDisplay;
 	void Start () {
-		if (data_parser_isspace(messageToDisplay)) {
+		if (StringIsEmpty(messageToDisplay)) {
 			if (messageLingdex >= 0) {
 				messageToDisplay = Const.a.stringTable[messageLingdex];
 			} else {

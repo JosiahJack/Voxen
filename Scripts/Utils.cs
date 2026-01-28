@@ -281,8 +281,8 @@ public class Utils {
 
 		bool hasPrFls = false;
 		bool hasPrFls86 = false;
-		if (!data_parser_isspace(programFilesPath)) hasPrFls = streamingAssetsPath.Contains(programFilesPath);
-		if (!data_parser_isspace(programFilesX86Path)) hasPrFls86 = streamingAssetsPath.Contains(programFilesX86Path);
+		if (!StringIsEmpty(programFilesPath)) hasPrFls = streamingAssetsPath.Contains(programFilesPath);
+		if (!StringIsEmpty(programFilesX86Path)) hasPrFls86 = streamingAssetsPath.Contains(programFilesX86Path);
         if ((Application.platform == RuntimePlatform.WindowsPlayer || Application.platform == RuntimePlatform.WindowsEditor)
 			&& hasPrFls || hasPrFls86) {
 
@@ -387,12 +387,12 @@ public class Utils {
 	}
 
 	public static void ConfirmExistsMakeIfNot(string basePath, string fileName) {
-		if (data_parser_isspace(fileName)) {
+		if (StringIsEmpty(fileName)) {
 			UnityEngine.DualLogWarning("fileName was null or whitespace passed to ConfirmExistsMakeIfNot");
 			return;
 		}
 		
-		if (data_parser_isspace(basePath)) {
+		if (StringIsEmpty(basePath)) {
 			UnityEngine.DualLogWarning("basePath was null or whitespace passed to ConfirmExistsMakeIfNot");
 			return;
 		}

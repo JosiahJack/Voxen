@@ -70,7 +70,7 @@ public static class ConsoleEmulator {
 			case 6: val = PlayerMovement.a.lastCommand6; break;
 		}
 
-        if (data_parser_isspace(val)) return;
+        if (StringIsEmpty(val)) return;
 
         PlayerMovement.a.consoleinpFd.text = val;
 		PlayerMovement.a.consoleinpFd.MoveTextEnd(false);
@@ -93,7 +93,7 @@ public static class ConsoleEmulator {
 			case 5: val = PlayerMovement.a.lastCommand5; break;
 			case 6: val = PlayerMovement.a.lastCommand6; break;
 		}
-        if (data_parser_isspace(val)) { consoleMemdex = 0; return; }
+        if (StringIsEmpty(val)) { consoleMemdex = 0; return; }
 
         PlayerMovement.a.consoleinpFd.text = val;
 		PlayerMovement.a.consoleinpFd.MoveTextEnd(false);
@@ -104,7 +104,7 @@ public static class ConsoleEmulator {
     }
 
     private static void ShiftLastCommand(string entry) {
-        if (data_parser_isspace(entry)) return; // Only remember real cmd.
+        if (StringIsEmpty(entry)) return; // Only remember real cmd.
 
         lastCommand[6] = lastCommand[5];
         lastCommand[5] = lastCommand[4];

@@ -61,10 +61,7 @@ void LoadEntities(void) {
         }
     }
 
-    free(entity_parser.entries);
-    #ifndef WINDOWS
-        malloc_trim(0);
-    #endif
+    OS_DeallocateRAM(entity_parser.entries,entity_parser.count * sizeof(Entity));
     DualLog(" took %f secs\n", get_time() - start_time);
     DebugRAM("after loading all entities");
 }
@@ -325,7 +322,7 @@ void LoadLevel(uint8_t curlevel) {
     char firstKeyCheck[11];
     char initialLine[LINE_LEN_MAX];
     while (fgets(lineSpace, LINE_LEN_MAX, file)) {
-        size_t len = strlen(lineSpace);
+        size_t len = GetStringLength(lineSpace);
         while (len && (lineSpace[len - 1] == '\n' || lineSpace[len - 1] == '\r'))
         lineSpace[--len] = '\0';
         line = lineSpace;
@@ -353,7 +350,7 @@ void LoadLevel(uint8_t curlevel) {
                 *pipe = '\0';          // Split string at the pipe
                 line = pipe + 1;       // Point to rest of the line after the pipe
             } else { // Else this is the last string after the last pipe with last kv pair
-                line += strlen(line);
+                line += GetStringLength(line);
             }
            
             if (kvString[0] == '\0' || strchr(kvString, ':') == NULL) continue;

@@ -34,7 +34,6 @@ typedef struct {
    uint8_t *img_buffer, *img_buffer_end;
 } stbi__context;
 
-// #include <stdlib.h>
 void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
 void *memset(void *s, int c, size_t n);
 

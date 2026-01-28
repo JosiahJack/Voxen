@@ -139,7 +139,104 @@ uint8_t random_range(float a, float b) {
     return a + ((b - a) * ((float)rand() / RAND_MAX));
 }
 
-int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
+size_t GetStringLength(const char *s) {
+    if (s == NULL) return 0;
+    
+    const char *p = s;
+    while (*(p++));
+    return (size_t)(p - s - 1);
+}
+
+char* data_parser_trim(char* s) {
+    while (CharacterIsEmpty((unsigned char)*s)) s++;
+    if (*s == 0) return s;
+
+    char* e = s + GetStringLength(s) - 1;
+    while (e > s && CharacterIsEmpty((unsigned char)*e)) e--;
+    e[1] = 0;
+    return s;
+}
+
+int32_t StringToInt(const char *str) { // atoi replacement
+    while (CharacterIsEmpty(*str)) str++;
+    int sign = 1;
+         if (*str == '-') { sign = -1; str++; }
+    else if (*str == '+') str++;
+
+    if (*str < '0' || *str > '9') return 0;
+    int64_t result = 0;
+    while (*str >= '0' && *str <= '9') {
+        int digit = *str - '0';
+        if (result > (2147483647 - digit) / 10) return (sign == 1) ? 2147483647 : -2147483648;
+
+        result = result * 10 + digit;
+        str++;
+    }
+
+    return (int32_t)(sign * result);
+}
+
+bool CharacterIsEmpty(const char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; } // isspace replacement
+bool StringIsEmpty(const char* a) { // C# String.IsNullOrWhiteSpace replacement
+    size_t size = GetStringLength(a);
+    for(size_t i=0;i < size;++i) {
+        if (a[i] == '\0') break;
+        if (!CharacterIsEmpty(a[i])) return false;
+    }
+    
+    return true;
+}
+
+bool StringsAreEqual(const char* a, const char* b) { // !strcmp replacement (hated its inverted logic)
+    size_t size  = GetStringLength(a);
+    size_t size2 = GetStringLength(b);
+    if (size != size2) return false;
+    
+    for (size_t i=0;i<size;++i) {
+        if (a[i] != b[i]) return false;
+        if (a[i] == '\0') break;
+    }
+    
+    return true;
+}
+
+bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit) { // !strcmp replacement (hated its inverted logic)
+    size_t size  = GetStringLength(a);
+    size_t size2 = GetStringLength(b);
+    if (size != size2) return false;
+    
+    for (size_t i=0;i<limit;++i) {
+        if (a[i] != b[i]) return false;
+        if (a[i] == '\0') break;
+    }
+    
+    return true;
+}
+
+void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // strcpy replacement
+    size_t size2=GetStringLength(b);
+    if (size2>=bufferSize) { DualLogError("Error attempting string copy from B into A but B is bigger than buffer limit %u! A: ",bufferSize); DualLogError("%s, B: %s\n",a,b); OS_Exit(1); }
+    
+    for (size_t i=0;i<size2;++i) a[i] = b[i];
+    a[size2] = '\0';
+}
+
+void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize) { // strcpy replacement (hopefully my mnemonic "SubstringFrom_B" will help me remember substringSize comes before be in the args passed)
+    if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer!\n");  OS_Exit(1); }
+    
+    for (size_t i=0;i<substringSize;++i) a[i] = b[i];
+    a[substringSize] = '\0';
+}
+
+void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat replacement
+    size_t size  = GetStringLength(a);
+    size_t size2 = GetStringLength(b);
+    if (size + size2 >= bufferSize) { DualLogError("Strings to large to concat, will overflow buffer: GetStringLength(%s{%u} + %s{%u} > %u)\n",a,size,b,size2,bufferSize); OS_Exit(1); }
+
+    char* dest = a + size;
+    for (size_t i=0;i<size2; ++i) dest[i] = b[i];
+    dest[size2] = '\0';
+}
 
 // Using "relative time" = pauseRelativeTime and "finished" = some
 // script's timer float value, e.g. attackFinished, in the notes below...
@@ -163,5 +260,3 @@ int data_parser_isspace(char c) { return c == ' ' || c == '\t' || c == '\n' || c
 // finished) somewhere instead of (finished < time) which is my usual Quake
 // derived timer pattern.
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) { return parse_float(trimmed_value, initialLine, lineNum) + (float)Sys_Global.pauseRelativeTime; }
-
-size_t strlen(const char *s) { const char *p = s; while (*(p++)); return (size_t)(p - s - 1); }

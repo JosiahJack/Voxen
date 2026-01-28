@@ -1,7 +1,6 @@
 // console.c - Console Emulator
 #include <ctype.h> // For tolower
 #include <string.h>
-#include <stdlib.h> // For atoi
 #include <stdio.h> // For snprintf
 #include "voxen.h"
 
@@ -25,15 +24,15 @@ void ToggleConsole(void) {
 }
 
 static void AddToHistory(const char* entry) {
-    if (strlen(entry) == 0) return;
-    if (numHistory > 0 && strcmp(entry, history[numHistory - 1]) == 0) return;
+    if (GetStringLength(entry) == 0) return;
+    if (numHistory > 0 && StringsAreEqual(entry, history[numHistory - 1])) return;
     
     if (numHistory < MAX_HISTORY) {
-        strcpy(history[numHistory], entry);
+        StringCopyInto_A_From_B(history[numHistory], entry, TEXT_BUFFER_SIZE);
         numHistory++;
     } else {
-        for (int i = 0; i < MAX_HISTORY - 1; i++) strcpy(history[i], history[i + 1]);
-        strcpy(history[MAX_HISTORY - 1], entry);
+        for (int i = 0; i < MAX_HISTORY - 1; i++) StringCopyInto_A_From_B(history[i], history[i + 1], TEXT_BUFFER_SIZE); // Shift list toward 0
+        StringCopyInto_A_From_B(history[MAX_HISTORY - 1], entry, TEXT_BUFFER_SIZE);
     }
 }
 
@@ -41,8 +40,8 @@ static void RecallHistory(int direction) { // direction 1 up (older), -1 down (n
     if (direction == 1) { // up
         if (historyPos > 0) {
             historyPos--;
-            strcpy(consoleEntryText, history[historyPos]);
-            currentEntryLength = strlen(consoleEntryText);
+            StringCopyInto_A_From_B(consoleEntryText, history[historyPos], TEXT_BUFFER_SIZE);
+            currentEntryLength = GetStringLength(consoleEntryText);
         }
     } else if (direction == -1) { // down
         if (historyPos < numHistory) {
@@ -51,8 +50,8 @@ static void RecallHistory(int direction) { // direction 1 up (older), -1 down (n
                 consoleEntryText[0] = '\0';
                 currentEntryLength = 0;
             } else {
-                strcpy(consoleEntryText, history[historyPos]);
-                currentEntryLength = strlen(consoleEntryText);
+                StringCopyInto_A_From_B(consoleEntryText, history[historyPos], TEXT_BUFFER_SIZE);
+                currentEntryLength = GetStringLength(consoleEntryText);
             }
         }
     }
@@ -82,7 +81,7 @@ __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd
         if (c1 != c2) return 0;
     }
 
-    return *cmd == '\0' && (*input == '\0' || data_parser_isspace((unsigned char)*input) || *input == '_' || *input == '\0');
+    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((unsigned char)*input) || *input == '_' || *input == '\0');
 }
 
 static void cmd_noclip(void) {
@@ -154,7 +153,7 @@ static int ParseLevelArg(const char* arg) {
     clean[j] = '\0';
 
     // Special cases
-    if (strcmp(clean, "r") == 0 || strstr(clean, "reactor")) return 0;
+    if (StringsAreEqual(clean, "r") || strstr(clean, "reactor")) return 0;
     if (strstr(clean, "g1") || strstr(clean, "10")) return 10;
     if (strstr(clean, "g2") || strstr(clean, "11")) return 11;
     if (strstr(clean, "g4") || strstr(clean, "12")) return 12;
@@ -163,7 +162,7 @@ static int ParseLevelArg(const char* arg) {
         return -2; // Special code: do not load
     }
 
-    int level = atoi(clean);
+    int level = StringToInt(clean);
     if (level >= 0 && level < Sys_Global.numLevels) return level;
     return -1; // Invalid
 }
@@ -410,17 +409,17 @@ static const ConsoleCommand g_ConsoleCommands[] = {
 };
 
 void ProcessConsoleCommand(const char* command) {
-    if (command == NULL || strlen(command) == 0) { ToggleConsole(); return; }
+    if (command == NULL || GetStringLength(command) == 0) { ToggleConsole(); return; }
 
     char ts[TEXT_BUFFER_SIZE];
-    strncpy(ts, command, sizeof(ts)-1);
+    StringCopyInto_A_SubstringFrom_B(ts, sizeof(ts)-1, command, TEXT_BUFFER_SIZE);
     ts[sizeof(ts)-1] = '\0';
     const char* command_trimmed = ts;
-    while (*command_trimmed && data_parser_isspace((unsigned char)*command_trimmed)) command_trimmed++;
+    while (*command_trimmed && CharacterIsEmpty((unsigned char)*command_trimmed)) command_trimmed++;
     const char* space = command_trimmed;
-    while (*space && !data_parser_isspace((unsigned char)*space)) space++;
+    while (*space && !CharacterIsEmpty((unsigned char)*space)) space++;
     const char* arg_start = space;
-    while (*arg_start && data_parser_isspace((unsigned char)*arg_start)) arg_start++;
+    while (*arg_start && CharacterIsEmpty((unsigned char)*arg_start)) arg_start++;
     AddToHistory(command);
     bool commandProcessed = false;
     for (const ConsoleCommand* cmd = g_ConsoleCommands; cmd->name; ++cmd) {
@@ -431,7 +430,7 @@ void ProcessConsoleCommand(const char* command) {
                 if (!*arg_start) {
                     CenterStatusPrint("Missing argument, usage: %s <number>", cmd->name);
                 } else {
-                    cmd->func.withInt(atoi(arg_start));                                        commandProcessed = true;
+                    cmd->func.withInt(StringToInt(arg_start));                                 commandProcessed = true;
                 }
             }
         }

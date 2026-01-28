@@ -1,6 +1,11 @@
 ﻿// entlogic.c - Handles entity update logic and I/O between them
 #include "voxen.h"
+void EntityLogicStart() {
+    
+}
 
+//-----------------------------------------------------------------------------
+// Target I/O System
 void TargetOnGatePassed(bool bitToCheck, bool passIfTrue, UseData ud, string targ, string targOnFalse) {
     if (passIfTrue) {
         if (!bitToCheck) { UseTargets(ud,tio,targ); return; }
@@ -309,26 +314,26 @@ void ToggleBits() {
 }
 
 void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
-    if (RobotSpawnDeactivated && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
-    if (IsotopeInstalled && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
-    if (ShieldActivated && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
-    if (LaserSafetyOverriden && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
-    if (LaserDestroyed && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-    if (BetaGroveCyberUnlocked && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
-    if (GroveAlphaJettisonEnabled && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-    if (GroveBetaJettisonEnabled && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-    if (GroveDeltaJettisonEnabled && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-    if (MasterJettisonBroken && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
-    if (Relay428Fixed && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
-    if (MasterJettisonEnabled && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
-    if (BetaGroveJettisoned && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
-    if (AntennaNorthDestroyed && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-    if (AntennaSouthDestroyed && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-    if (AntennaEastDestroyed && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-    if (AntennaWestDestroyed && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
-    if (SelfDestructActivated && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
-    if (BridgeSeparated && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
-    if (IsolinearChipsetInstalled && (!data_parser_isspace(target) || !data_parser_isspace(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+    if (RobotSpawnDeactivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.RobotSpawnDeactivated, testIfTrue, ud, tio, target, targetIfFalse);
+    if (IsotopeInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsotopeInstalled, testIfTrue, ud, tio, target, targetIfFalse);
+    if (ShieldActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.ShieldActivated, testIfTrue, ud, tio, target, targetIfFalse);
+    if (LaserSafetyOverriden && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserSafetyOverriden, testIfTrue, ud, tio, target, targetIfFalse);
+    if (LaserDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.LaserDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+    if (BetaGroveCyberUnlocked && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveCyberUnlocked, testIfTrue, ud, tio, target, targetIfFalse);
+    if (GroveAlphaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveAlphaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+    if (GroveBetaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveBetaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+    if (GroveDeltaJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.GroveDeltaJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+    if (MasterJettisonBroken && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonBroken, testIfTrue, ud, tio, target, targetIfFalse);
+    if (Relay428Fixed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.Relay428Fixed, testIfTrue, ud, tio, target, targetIfFalse);
+    if (MasterJettisonEnabled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.MasterJettisonEnabled, testIfTrue, ud, tio, target, targetIfFalse);
+    if (BetaGroveJettisoned && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BetaGroveJettisoned, testIfTrue, ud, tio, target, targetIfFalse);
+    if (AntennaNorthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaNorthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+    if (AntennaSouthDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaSouthDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+    if (AntennaEastDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaEastDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+    if (AntennaWestDestroyed && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.AntennaWestDestroyed, testIfTrue, ud, tio, target, targetIfFalse);
+    if (SelfDestructActivated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.SelfDestructActivated, testIfTrue, ud, tio, target, targetIfFalse);
+    if (BridgeSeparated && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.BridgeSeparated, testIfTrue, ud, tio, target, targetIfFalse);
+    if (IsolinearChipsetInstalled && (!StringIsEmpty(target) || !StringIsEmpty(targetIfFalse))) Const.a.questData.TargetOnGatePassed(Const.a.questData.IsolinearChipsetInstalled, testIfTrue, ud, tio, target, targetIfFalse);
 }
 
 // 	float justSavedTimeStamp;
@@ -1120,7 +1125,7 @@ void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
 void UseTargets(UseData ud, uint16_t i, string targetname) {
 // 		// Next check if targetname is valid.  This is fine if not, some
 // 		// triggers we just want to play the trigger's SFX and do nothing else.
-// 		if (data_parser_isspace(targetname)) return;
+// 		if (StringIsEmpty(targetname)) return;
 // 
 // 		UseData tempUD = new UseData();
 // 		float numtargetsfound = 0;
@@ -1318,7 +1323,7 @@ void UseTargets(UseData ud, uint16_t i, string targetname) {
 // 	public void Initialize() {
 // 		if (startInitialized) return;
 // 
-// 		if (data_parser_isspace(instances[i].targetname[0])) DualLogError("instance[%u] marked as disable on first load but has no targetname: %s!\n",i, instances[i].targetname);
+// 		if (StringIsEmpty(instances[i].targetname[0])) DualLogError("instance[%u] marked as disable on first load but has no targetname: %s!\n",i, instances[i].targetname);
 //         if (disableThisGOOnAwake && !alreadyDisabledThisGOOnceEver) flag_set(&instances[i].entflags, ENTFLAG_ACTIVE, false);
 // 		startInitialized = true;
 // 	}

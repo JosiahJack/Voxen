@@ -1750,24 +1750,12 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 // 
 // 		if (anim.speed > 0f) anim.speed = 0f;
 // 	}
-// 
-// 	void Inspect () {
-// 		if (anim.speed != 1f) anim.speed = 1f;
-// 		anim.Play("Inspect");
-// 		clipName = "Inspect";
-// 	}
-// 
-// 	void Interacting () {
-// 		if (anim.speed != 1f) anim.speed = 1f;
-// 		anim.Play("Interact");
-// 		clipName = "Interact";
-// 	}
-// 	
+//  	
 // 	void SetAnimAfterLoad() {
 // 		firstUpdateAfterLoad = false;
 // 		anim.speed = loadedSetSpeed;
 // 		if (anim.speed == 0) anim.speed = 1f;
-// 		if (data_parser_isspace(loadedClipName)) loadedClipName = "Idle";
+// 		if (StringIsEmpty(loadedClipName)) loadedClipName = "Idle";
 // 		if (loadedClipIndex < 0) loadedClipIndex = 0;
 // 		anim.Play(loadedClipName,loadedClipIndex,loadedAnimatorPlaybackTime);
 // 	}

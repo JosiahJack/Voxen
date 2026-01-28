@@ -1,4 +1,5 @@
 // voxen.c - A realtime OpenGL 4.3+ Game Engine for Citadel: The System Shock Fan Remake
+#include <stdlib.h>
 #include "os.h" // Operating System calls shim layer.
 #include "voxen.h"
 #define STB_IMAGE_IMPLEMENTATION
@@ -409,6 +410,49 @@ void NewGame(void) {
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
 }
 
+void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed
+    double start_time = get_time();
+    DualLog("Loading game definition...");
+    OsFileHandle fp    = OS_OpenReadonly("./Data/gamedata.txt");
+    if (!fp) { DualLogError("\nCannot open ./Data/gamedata.txt\n"); DualLogError("Could not parse ./Data/gamedata.txt!\n"); OS_Exit(1); }
+    
+    int32_t gamedatSize = OS_FileSize(fp);
+    char* fb = OS_AllocateFileBackedRAMReadonly(gamedatSize, fp, "./Data/gamedata.txt");
+    if (!fb || gamedatSize < 1) { DualLogError("Could not open backed buffer for ./Data/gamedata.txt\n"); OS_Exit(1); }
+    
+    OS_Close(fp);
+    uint32_t lineNum = 0; uint8_t lineLength = 0; char line[256]; char key[256]; char value[256]; bool is_comment = false, in_value = false;
+    uint32_t keyLength = 0; uint32_t valueLength = 0;
+    for (int32_t i=0;i<gamedatSize;++i) { // Less 1 to avoid comment check overflow
+        if (lineLength>=255 || valueLength>=255 || keyLength>=255) continue; // Keep going until we hit a newline or EOF, no valid line is this long so must be a comment.
+        if (fb[i] == ' ' || fb[i] == '\t' || fb[i] == '\v' || fb[i] == '\f' || fb[i] == '\r') continue; // Disregard blanks or Windows garbage (this ain't a typewriter, yeesh).
+        if (fb[i] == '/' && fb[i + 1] == '/') is_comment = true;
+        if (fb[i] == '\n') {
+            if (keyLength == 0 || valueLength == 0) { is_comment = in_value = false; lineLength = keyLength = valueLength = 0; lineNum++; continue; }
+
+            // Ok, process kv pair
+            value[valueLength] = '\0'; line[lineLength] = '\0';
+                 if (StringsAreEqual(key, "modname"))    StringCopyInto_A_From_B(Sys_Global.global_modname,value,sizeof(Sys_Global.global_modname));
+            else if (StringsAreEqual(key, "levelcount")) Sys_Global.numLevels = parse_numberu8(value, line, lineNum);
+            else if (StringsAreEqual(key, "startlevel")) Sys_Global.startLevel = parse_numberu8(value, line, lineNum);
+            
+            is_comment = in_value = false; lineLength = keyLength = valueLength = 0; lineNum++;
+            continue;
+        }
+        
+        if (is_comment) continue; // Keep walking characters to finish the commented line.
+        if (fb[i] == ':') { in_value = true; key[keyLength] = '\0'; continue; } // Skip splitter, mark inside value for key:value pair.
+
+        if (in_value) { value[valueLength] = fb[i]; valueLength++; }
+        else          {   key[keyLength] = fb[i];   keyLength++; }
+        
+        line[lineLength] = fb[i]; lineLength++; // Keep filling up the current line.
+    }
+
+    if (StringsAreEqual(Sys_Global.global_modname, "Citadel")) Sys_Global.global_modIsCitadel = true;
+    DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
+}
+
 void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     double init_start_time = get_time();
     Sys_Dx.globalFrameNum = 0;
@@ -477,7 +521,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     InitFontAtlasses();
     RenderLoadingProgress(80,"Loading...");
     InitializeAudio(); // Audio    
-    ParseGameData();
+    LoadGameModDefinition();
     glGenFramebuffers(1, &Sys_Render.gBufferFBO);
     ApplySettings(); // After loading of text and game data.
     glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
@@ -489,7 +533,7 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     glDepthMask(GL_TRUE); // Always true, set just once ever.
     glfwSetWindowTitle(Sys_Global.window, Sys_Global.global_modname);
     OsFileHandle fp = OS_OpenReadonly("./Textures/UI/menudot1.png");
-    if (fp == 0) {
+    if (fp) {
         int windowIconFileSize = OS_FileSize(fp);
         uint8_t* file_buffer = OS_AllocateFileBackedRAMReadonly(windowIconFileSize, fp, "./Textures/UI/menudot1.png");
         if (!file_buffer) { DualLogError("Could not open backed buffer for ./Textures/UI/menudot1.png\n"); OS_Exit(1); }

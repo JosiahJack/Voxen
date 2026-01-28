@@ -211,7 +211,7 @@ void InitFontAtlasses(void) {
     DualLog("Font ranges changed or .vfnt files not present – regenerating...");
 
     // Primary
-    unsigned char *bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
+    unsigned char *bmp = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     stbtt_pack_context pc;
     stbtt_PackBegin(&pc, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
@@ -245,10 +245,9 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
-    free(bmp);
 
     // Secondary
-    bmp = calloc(FONT_ATLAS_SIZE * FONT_ATLAS_SIZE, 1);
+    memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc2;
     stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     pc2.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
@@ -287,9 +286,6 @@ void InitFontAtlasses(void) {
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTextureParameteri(fontAtlasTexStopD, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     write_font_cache(sec_cache, sec_expected, fbx_stamp2, fontPackedCharStopD, numPackedGlyphsStopD, fixedNumberAdvanceWidthStopD, bmp);
-    free(bmp);
-    #if defined(LINUX) || defined(ANDROID)
-        malloc_trim(0);
-    #endif
+    OS_DeallocateRAM(bmp,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     DualLog(" took %.3f s\n", get_time() - t0);
 }

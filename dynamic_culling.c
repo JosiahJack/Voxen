@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include "os.h"
 #include "voxen.h"
 
@@ -237,7 +236,7 @@ int32_t CastStraightZ(int32_t px, int32_t pz, int32_t signz) {
     bool currentVisible = true;
     int32_t x = px;
     int32_t z = pz + signz;
-    int32_t zabs = abs(z);
+    int32_t zabs = vabs(z);
     for (;zabs<WORLDX;z+=signz) { // Up/Down
         currentVisible = false;
         int32_t cellIdx_x_zmnus1 = ((z - 1) * WORLDX) + x;
@@ -294,7 +293,7 @@ int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
     int32_t x = px + signx;
     int32_t z = pz;
     bool currentVisible = true;
-    int32_t xabs = abs(x);
+    int32_t xabs = vabs(x);
     for (;xabs<WORLDX;x+=signx) { // Right/Left
         currentVisible = false;
         int32_t cellIdx_xmnus1_z = (z * WORLDX) + x - 1;
@@ -343,7 +342,7 @@ int32_t CastStraightX(int32_t px, int32_t pz, int32_t signx) {
 }
 
 void CastRay(int32_t x0, int32_t z0, int32_t x1, int32_t z1) {
-    int32_t dx = abs(x1 - x0);       int32_t dz = abs(z1 - z0);
+    int32_t dx = vabs(x1 - x0);       int32_t dz = vabs(z1 - z0);
     int32_t sx = (x0 < x1) ? 1 : -1; int32_t sz = (z0 < z1) ? 1 : -1;
     int32_t x = x0;                  int32_t z = z0;
     int32_t lastX = x;               int32_t lastZ = z;

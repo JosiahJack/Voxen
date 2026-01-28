@@ -730,76 +730,81 @@ typedef struct {
 #define PLAYER1 1u
 #define PLAYER2 2u
 #define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE                      1u
-#define ENTFLAG_CARDCHUNK                   2u
-#define ENTFLAG_GROUNDED                    4u
-#define ENTFLAG_USEGRAVITY                  8u
-#define ENTFLAG_KINEMATIC                  16u
-#define ENTFLAG_RIGIDBODY                  32u
-#define ENTFLAG_DOUBLESIDED                64u
-#define ENTFLAG_TRANSPARENT               128u
-#define ENTFLAG_CHANGE_TEX_ON_ACTIVE      256u
-#define ENTFLAG_BLINK_TEX_ON_ACTIVE       512u
-#define ENTFLAG_NO_SHADOWS               1024u
-#define ENTFLAG_ANIMATED                 2048u
-#define ENTFLAG_ASLEEP                   4096u // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
-#define ENTFLAG_WALK_PATH_ON_START       8192u
-#define ENTFLAG_TEST_PERSISTENT         16384u
-#define ENTFLAG_TEST_OVERRIDE_TEST      32768u
-#define ENTFLAG_TOUCHING_HURTS          65536u
-#define ENTFLAG_ACT_AS_CORPSE_ONLY     131072u
-#define ENTFLAG_DYING                  262144u
-#define ENTFLAG_DEATH_BURST_DONE       524288u
-#define ENTFLAG_DEAD                  1048576u
-#define ENTFLAG_TELEPORT_ON_DEATH     2097152u
-#define ENTFLAG_GO_INTO_PAIN          4194304u
-#define ENTFLAG_DONT_LOOP_WAYPTS      8388608u
-#define ENTFLAG_VISIT_WAYPTS_RND     16777216u
-#define ENTFLAG_WANDERING            33554432u
-#define ENTFLAG_ACT_AS_TURRET        67108864u
-#define ENTFLAG_TARGID_ATTACHED     134217728u
-#define ENTFLAG_ENEM_IN_SIGHT       268435456u
-#define ENTFLAG_ENEM_IN_FRONT       536870912u
-#define ENTFLAG_ENEM_IN_FOV        1073741824u
-#define ENTFLAG_ENEM_IN_LOS        2147483648u
-#define ENTFLAG_FIRST_SIGHTING     4294967296u
-#define ENTFLAG_DYING_SETUP        8589934592u
-#define ENTFLAG_HAD_ENEMY         17179869184u
-#define ENTFLAG_SHOT_FIRED        34359738368u
-#define ENTFLAG_DEAD_CHECKS_DONE  68719476736u
-#define ENTFLAG_HOP_DONE         137438953472u
+#define ENTFLAG_ACTIVE               (1ull <<  0)
+#define ENTFLAG_CARDCHUNK            (1ull <<  1)
+#define ENTFLAG_GROUNDED             (1ull <<  2)
+#define ENTFLAG_USEGRAVITY           (1ull <<  3)
+#define ENTFLAG_KINEMATIC            (1ull <<  4)
+#define ENTFLAG_RIGIDBODY            (1ull <<  5)
+#define ENTFLAG_DOUBLESIDED          (1ull <<  6)
+#define ENTFLAG_TRANSPARENT          (1ull <<  7)
+#define ENTFLAG_CHANGE_TEX_ON_ACTIVE (1ull <<  8)
+#define ENTFLAG_BLINK_TEX_ON_ACTIVE  (1ull <<  9)
+#define ENTFLAG_NO_SHADOWS           (1ull << 10)
+#define ENTFLAG_ANIMATED             (1ull << 11)
+#define ENTFLAG_ASLEEP               (1ull << 12) // Check if enemy starts out asleep such as the sleeping sec-2 bots on level 8 in the maintenance and recharge bays.
+#define ENTFLAG_WALK_PATH_ON_START   (1ull << 13)
+#define ENTFLAG_TEST_PERSISTENT      (1ull << 14)
+#define ENTFLAG_TEST_OVERRIDE_TEST   (1ull << 15)
+#define ENTFLAG_TOUCHING_HURTS       (1ull << 16)
+#define ENTFLAG_ACT_AS_CORPSE_ONLY   (1ull << 17)
+#define ENTFLAG_DYING                (1ull << 18)
+#define ENTFLAG_DEATH_BURST_DONE     (1ull << 19)
+#define ENTFLAG_DEAD                 (1ull << 20)
+#define ENTFLAG_TELEPORT_ON_DEATH    (1ull << 21)
+#define ENTFLAG_GO_INTO_PAIN         (1ull << 22)
+#define ENTFLAG_DONT_LOOP_WAYPTS     (1ull << 23)
+#define ENTFLAG_VISIT_WAYPTS_RND     (1ull << 24)
+#define ENTFLAG_WANDERING            (1ull << 25)
+#define ENTFLAG_ACT_AS_TURRET        (1ull << 26)
+#define ENTFLAG_TARGID_ATTACHED      (1ull << 27)
+#define ENTFLAG_ENEM_IN_SIGHT        (1ull << 28)
+#define ENTFLAG_ENEM_IN_FRONT        (1ull << 29)
+#define ENTFLAG_ENEM_IN_FOV          (1ull << 30)
+#define ENTFLAG_ENEM_IN_LOS          (1ull << 31)
+#define ENTFLAG_FIRST_SIGHTING       (1ull << 32)
+#define ENTFLAG_DYING_SETUP          (1ull << 33)
+#define ENTFLAG_HAD_ENEMY            (1ull << 34)
+#define ENTFLAG_SHOT_FIRED           (1ull << 35)
+#define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 36)
+#define ENTFLAG_HOP_DONE             (1ull << 37)
 
-#define QUESTBIT_ROBOT_SPAWN_DEACTIVATED          1u
-#define QUESTBIT_ISOTOPE_INSTALLED                2u
-#define QUESTBIT_SHIELD_ACTIVATED                 4u
-#define QUESTBIT_LASER_SAFETY_OVERRIDEN           8u
-#define QUESTBIT_LASER_DESTROYED                 16u
-#define QUESTBIT_BETA_GROVE_CYBER_UNLOCKED       32u
-#define QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED    64u
-#define QUESTBIT_GROVE_BETA_JETTISON_ENABLED    128u
-#define QUESTBIT_GROVE_DELTA_JETTISON_ENABLED   256u
-#define QUESTBIT_MASTER_JETTISON_BROKEN         512u
-#define QUESTBIT_RELAY_428_FIXED               1024u
-#define QUESTBIT_MASTER_JETTISON_ENABLED       2048u
-#define QUESTBIT_BETA_GROVE_JETTISONED         4096u
-#define QUESTBIT_ANTENNA_NORTH_DESTROYED       8192u
-#define QUESTBIT_ANTENNA_SOUTH_DESTROYED      16384u
-#define QUESTBIT_ANTENNA_EAST_DESTROYED       32768u
-#define QUESTBIT_ANTENNA_WEST_DESTROYED       65536u
-#define QUESTBIT_SELF_DESTRUCT_ACTIVATED     131072u
-#define QUESTBIT_BRIDGE_SEPARATED            262144u
-#define QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED 524288u
+#define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1u <<  0)
+#define QUESTBIT_ISOTOPE_INSTALLED            (1u <<  1)
+#define QUESTBIT_SHIELD_ACTIVATED             (1u <<  2)
+#define QUESTBIT_LASER_SAFETY_OVERRIDEN       (1u <<  3)
+#define QUESTBIT_LASER_DESTROYED              (1u <<  4)
+#define QUESTBIT_BETA_GROVE_CYBER_UNLOCKED    (1u <<  5)
+#define QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED (1u <<  6)
+#define QUESTBIT_GROVE_BETA_JETTISON_ENABLED  (1u <<  7)
+#define QUESTBIT_GROVE_DELTA_JETTISON_ENABLED (1u <<  8)
+#define QUESTBIT_MASTER_JETTISON_BROKEN       (1u <<  9)
+#define QUESTBIT_RELAY_428_FIXED              (1u << 10)
+#define QUESTBIT_MASTER_JETTISON_ENABLED      (1u << 11)
+#define QUESTBIT_BETA_GROVE_JETTISONED        (1u << 12)
+#define QUESTBIT_ANTENNA_NORTH_DESTROYED      (1u << 13)
+#define QUESTBIT_ANTENNA_SOUTH_DESTROYED      (1u << 14)
+#define QUESTBIT_ANTENNA_EAST_DESTROYED       (1u << 15)
+#define QUESTBIT_ANTENNA_WEST_DESTROYED       (1u << 16)
+#define QUESTBIT_SELF_DESTRUCT_ACTIVATED      (1u << 17)
+#define QUESTBIT_BRIDGE_SEPARATED             (1u << 18)
+#define QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED  (1u << 19)
 
 static inline void flag_set(uint64_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 typedef /*FAT*/ struct {
-    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     uint64_t entflags;
+    uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     
     // Logic and I/O
+    uint32_t ioflags;
     char targetname[40];
     char target[40];
     char targetIfFalse[40];
-    uint32_t ioflags;
+    uint8_t securityThreshold;
+    uint16_t messageIndex;
+    float delay;
+    uint16_t activateSFX;
+    uint16_t lockedSFX;
     int lev1SecCode;
 	int lev2SecCode;
 	int lev3SecCode;
@@ -1389,7 +1394,16 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
 uint8_t random_range(float a, float b);
-int data_parser_isspace(char c);
+char* data_parser_trim(char* s);
+int32_t StringToInt(const char *str);
+size_t GetStringLength(const char *s);
+bool CharacterIsEmpty(const char c);
+bool StringIsEmpty(const char* c);
+bool StringsAreEqual(const char* c, const char* c2);
+bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit);
+void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize);
+void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize);
+void StringConcatenate(char* a, const char* b, size_t bufferSize);
 uint32_t parse_numberu32(const char* str, const char* line, uint32_t lineNum);
 uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum);
 uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum);
@@ -1494,7 +1508,6 @@ static inline void mul_mat4(float *out, const float *a, const float *b) { // out
 	out[15] = a[3] * b[12] + a[7] * b[13] + a[11]* b[14] + a[15] * b[15];
 }
 
-void ParseGameData(void);
 bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename);
 
 extern uint16_t invalidModelIndexCount;
@@ -1516,7 +1529,6 @@ void cmd_shake(void);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
 void CycleToNextMonitor(GLFWwindow* window);
-size_t strlen(const char *s);
 
 typedef struct {
 	uint64_t magicNumber;
