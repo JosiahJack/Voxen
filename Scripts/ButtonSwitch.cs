@@ -1,28 +1,6 @@
 ﻿public class ButtonSwitch : MonoBehaviour {
-	bool locked = false; // save
-	int lockedMessageLingdex = 193;
-	bool active; // save
-	Material mainSwitchMaterial;
-	Material alternateSwitchMaterial;
-	AudioSource SFXSource;
-	MeshRenderer mRenderer;
-	Animator anim;
-	GameObject player; // Set on use, no need for initialization check.
-	const float tickTime = 1.5f;
-	bool awakeInitialized = false;
-    float delayFinished;
-	float tickFinished;
-	bool alternateOn;
-	string currentClipName;
-	private static StringBuilder s1 = new StringBuilder();
-
 	void Awake() {
 		if (awakeInitialized) return;
-
-		SFXSource = GetComponent<AudioSource>();
-		if (SFXSource == null) {
-		    DualLog("BUG: ButtonSwitch missing component for SFXSource");
-		} else SFXSource.playOnAwake = false;
 		
 		mRenderer = GetComponent<MeshRenderer>();
 		delayFinished = 0; // prevent using targets on awake
@@ -43,12 +21,12 @@
 	    } else if (LevelManager.a.GetCurrentLevelSecurity()
 	               > securityThreshhold) {
 	                   
-			MFDManager.a.BlockedBySecurity(transform.position);
+			MFDManager.a.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
 		if (locked) {
-			Const.sprint(lockedMessageLingdex);
+			CenterStatusPrint("%s",Sys_Text.stringTable[lockedMessageLingdex]);
 			if (SFXLockedIndex >= 0 && SFXLockedIndex < Const.a.sounds.Length) {
 				Utils.PlayOneShotSavable(SFXSource,Const.a.sounds[SFXLockedIndex]);
 			}
@@ -57,9 +35,8 @@
 		}
 
         // Set playerCamera to owner of the input (always should be the camera)
-		player = ud.owner;
 		Utils.PlayOneShotSavable(SFXSource,Const.a.sounds[SFXIndex]);
-		Const.sprint(messageIndex);
+		CenterStatusPrint("%s",Sys_Text.stringTable[messageIndex]);
 		if (delay > 0f) delayFinished = Sys_Global.pauseRelativeTime + delay;
 		else UseTargets();
 	}
@@ -75,7 +52,6 @@
 
 	void UseTargets () {
 		UseData ud = new UseData();
-		ud.owner = player;
 		Const.a.UseTargets(gameObject,ud,target);
 		active = !active;
 		alternateOn = active;
@@ -101,47 +77,19 @@
 
 	void ToggleMaterial() {
 		if (mRenderer == null) mRenderer = GetComponent<MeshRenderer>();
-		if (alternateOn) mRenderer.material = alternateSwitchMaterial;
-		else             mRenderer.material = mainSwitchMaterial;
+		if (alternateOn) instances[i].texture = alternateSwitchMaterial;
+		else             instances[i].texture = mainSwitchMaterial;
 	}
 
 	void SetMaterialToAlternate() {
 		if (!blinkWhenActive) return;
 
-		if (mRenderer == null) mRenderer = GetComponent<MeshRenderer>();
-		if (mRenderer.material != alternateSwitchMaterial) {
-		    mRenderer.material = alternateSwitchMaterial;
-		}
+		instances[i].texture = alternateSwitchMaterial;
 	}
 
 	void SetMaterialToNormal() {
 		if (!blinkWhenActive) return;
-
-		if (mRenderer == null) mRenderer = GetComponent<MeshRenderer>();
-		if (mRenderer.material != mainSwitchMaterial) {
-		    mRenderer.material = mainSwitchMaterial;
-		}
-	}
-
-	Update() {
-		if (Sys_Global.gamePaused || Sys_Global.menuActive) return;
-
-		if ((delayFinished < Sys_Global.pauseRelativeTime) && delayFinished != 0) {
-			delayFinished = 0;
-			UseTargets();
-		}
-
-		if (blinkWhenActive) {
-			if (active) {
-				if (tickFinished < Sys_Global.pauseRelativeTime) {
-					if (mRenderer.isVisible) {
-						if (alternateOn) SetMaterialToAlternate();
-						else SetMaterialToNormal();
-					}
-					alternateOn = !alternateOn;
-					tickFinished = Sys_Global.pauseRelativeTime + tickTime;
-				}
-			}
-		}
+        
+		instances[i].texture = mainSwitchMaterial;
 	}
 }

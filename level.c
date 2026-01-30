@@ -59,6 +59,11 @@ void LoadEntities(void) {
             entities[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
             entities[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
         }
+        
+        if (ConstIndexIsButtonSwitch(entities[i].index)) {
+            entities[i].lockedMessageLingdex = 193; // ButtonSwitch
+            entities[i].tickTime = 1.5;
+        }
     }
 
     OS_DeallocateRAM(entity_parser.entries,entity_parser.count * sizeof(Entity));
@@ -84,7 +89,6 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     bool isCardChunk = (entities[entIdx].entflags & ENTFLAG_CARDCHUNK);
     instances[i].modelIndex = entities[entIdx].modelIndex;
     instances[i].colliderMeshIndex = entities[entIdx].colliderMeshIndex;
-    flag_set(&instances[i].entflags, ENTFLAG_ANIMATED, modelHasAnimation[instances[i].modelIndex]);
     instances[i].numclips = entities[entIdx].numclips;
     instances[i].animationNum = entities[entIdx].animationNum;
     instances[i].texIndex = entities[entIdx].texIndex;
@@ -95,7 +99,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
     instances[i].normIndex = entities[entIdx].normIndex;
     if (instances[i].normIndex >= MAX_VALID_TEXTURE) instances[i].normIndex = 0;
     instances[i].lodIndex = entities[entIdx].lodIndex;
-    flag_set(&instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk); // Decided `instances[i].entflags = entities[entIdx].entflags;` was dangerous/error-prone, commented out in lieu of these explicit sets to better preserve the loaded data:
+    flag_set(&instances[i].entflags, ENTFLAG_CARDCHUNK,  isCardChunk);
     flag_set(&instances[i].entflags, ENTFLAG_USEGRAVITY,  entities[entIdx].entflags & ENTFLAG_USEGRAVITY);
     flag_set(&instances[i].entflags, ENTFLAG_KINEMATIC,  entities[entIdx].entflags & ENTFLAG_KINEMATIC);
     flag_set(&instances[i].entflags, ENTFLAG_RIGIDBODY,  entities[entIdx].entflags & ENTFLAG_RIGIDBODY);
@@ -113,6 +117,7 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
         instances[i].child_scale[c] = isCardChunk ? entities[entIdx].child_scale[c] : (Vector3){ 1.0f, 1.0f, 1.0f };
     }
     
+    instances[i].lockedMessageLingdex = entities[entIdx].lockedMessageLingdex;
     dirtyInstances[i] = true;
     loadedInstances++;
 }
@@ -622,6 +627,7 @@ void LoadLevel(uint8_t curlevel) {
         if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(instances[i].index)) instances[i].gravity = 1.0f; // Normal gravity
         else instances[i].gravity = 0.0f;
         
+        if (instances[i].index < MAX_ENTITIES) flag_set(&instances[i].entflags, ENTFLAG_ANIMATED, entities[instances[i].index].entflags & ENTFLAG_ANIMATED);        
         if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
         if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
         if (instances[i].collider == COLLIDER_TYPE_CONVEXMESH && instances[i].colliderMeshIndex >= loadedModelsMaxIndex) continue;

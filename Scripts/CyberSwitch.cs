@@ -38,7 +38,7 @@ public class CyberSwitch : MonoBehaviour {
 		if (active) return;
 
 		if (other.gameObject.CompareTag("Player")) {
-			MFDManager.a.CyberSprint(Const.a.stringTable[textIndex]);
+			MFDManager.a.CyberSprint(Sys_Text.stringTable[textIndex]);
 			active = true;
 			deactiveCenter.SetActive(false);
 			activeCenter.SetActive(true);

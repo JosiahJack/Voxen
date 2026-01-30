@@ -23,13 +23,13 @@ public class TextLocalization : MonoBehaviour {
     public void UpdateText() {
         if (lingdex < 0) return;
         if (Const.a == null) return;
-        if (Const.a.stringTable == null) return;
-        if (lingdex >= Const.a.stringTable.Length) return;
+        if (Sys_Text.stringTable == null) return;
+        if (lingdex >= Sys_Text.stringTable.Length) return;
 
         if (txt == null && tM != null) {
-            tM.text = Const.a.stringTable[lingdex];
+            tM.text = Sys_Text.stringTable[lingdex];
         } else if (tM == null && txt != null) {
-            txt.text = Const.a.stringTable[lingdex];
+            txt.text = Sys_Text.stringTable[lingdex];
         }
     }
 }

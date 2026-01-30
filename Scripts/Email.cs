@@ -8,15 +8,15 @@ public class Email : MonoBehaviour {
 
     public void Targetted() {
 		// Give email.
-		if (Inventory.a.hasLog[emailIndex]) return; // Already have it.
+		if (inventoryPlayer1.hasLog[emailIndex]) return; // Already have it.
 
-		Inventory.a.hasLog[emailIndex] = true;
-		Inventory.a.hasNewEmail = true;
-		Inventory.a.lastAddedIndex = emailIndex;
+		inventoryPlayer1.hasLog[emailIndex] = true;
+		inventoryPlayer1.hasNewEmail = true;
+		inventoryPlayer1.lastAddedIndex = emailIndex;
 		if (Const.a.audioLogType[emailIndex] == AudioLogType.Email) {
-			Inventory.a.beepDone = true;
+			inventoryPlayer1.beepDone = true;
 		}
 
-		if (autoPlayEmail) Inventory.a.PlayLastAddedLog(emailIndex);
+		if (autoPlayEmail) inventoryPlayer1.PlayLastAddedLog(emailIndex);
 	}
 }

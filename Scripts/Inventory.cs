@@ -10,7 +10,6 @@ using UnityEngine.Video;
 public class Inventory : MonoBehaviour {
 	// Access Cards
 	public AccessCardType[] accessCardsOwned; // save
-	private AccessCardType doorAccessTypeAcquired;
 
 	// Hardware
 	public bool[] hasHardware; // save
@@ -145,36 +144,6 @@ public class Inventory : MonoBehaviour {
 	// Singleton instance
 	public static Inventory a;
 
-	// Index cheat sheets
-	//-------------------------------------------------------------------------
-	// 0 = System Analyzer
-	// 1 = Navigation Unit
-	// 2 = Datareader/EReader
-	// 3 = Sensaround
-	// 4 = Target Identifier
-	// 5 = Energy Shield
-	// 6 = Biomonitor
-	// 7 = Head Mounted Lantern
-	// 8 = Envirosuit
-	// 9 = Turbo Motion Booster
-	//10 = Jump Jet Boots
-	//11 = Infrared Night Sight Enhancement
-	//12 = Tractor Beam
-	//13 = Fry Salter
-
-	// Hw referenceIndex, ref14Index
-	// Sys 21,0
-	// Nav 22,1
-	// Ere 23,2
-	// Sen 24,3
-	// Trg 25,4
-	// Shi 26,5
-	// Bio 27,6
-	// Lan 28,7
-	// Env 29,8
-	// Boo 30,9
-	// Jum 31,10
-	// Nig 32,11
 	public int hardware14fromConstdex (int constdex) {
 		switch (constdex) {
 			case 21: return 0;
@@ -219,7 +188,7 @@ public class Inventory : MonoBehaviour {
 		// Access Cards
 		a.accessCardsOwned = new AccessCardType[32];
 		for (int i = 0; i < a.accessCardsOwned.Length; i++) {
-			a.accessCardsOwned[i] = AccessCardType.None;
+			a.accessCardsOwned[i] = AccessCardType_None;
 		}
 
 		// Hardware
@@ -243,7 +212,7 @@ public class Inventory : MonoBehaviour {
 
         a.generalInvCurrent = a.generalInvIndex = 0;
         a.generalInventoryIndexRef[0] = 81;
-		a.genButtonsText[0].text = Const.a.stringTable[597]; // ACCESS CARDS
+		a.genButtonsText[0].text = Sys_Text.stringTable[597]; // ACCESS CARDS
 
 		// Grenades
 		a.grenAmmo = new int[7];
@@ -332,7 +301,7 @@ public class Inventory : MonoBehaviour {
 				if (referenceIndex > -1) {
 					if (i != 0) { // Access Cards text set in Awake the once.
 						genButtonsText[i].text =
-							Const.a.stringTable[referenceIndex + 326];
+							Sys_Text.stringTable[referenceIndex + 326];
 					}
 				} else {
 					genButtonsText[i].text = string.Empty;
@@ -358,7 +327,7 @@ public class Inventory : MonoBehaviour {
 		if (genButtons[0].activeSelf) return;
 
 		for (int j = 0; j < a.accessCardsOwned.Length; j++) {
-			if (a.accessCardsOwned[j] != AccessCardType.None) {
+			if (a.accessCardsOwned[j] != AccessCardType_None) {
 				genButtons[0].SetActive(true);
 				break;
 			}
@@ -397,24 +366,24 @@ public class Inventory : MonoBehaviour {
 
 		// Update Senaraound camera positions to match player camer height.
 		Vector3 camPos =
-		  hardwareButtonManager.sensaroundCenterCamera.transform.localPosition;
+		  hardwareButtonManager.sensaroundCenterCamera.instances[i].position;
 
-		camPos.y = MouseLookScript.a.transform.localPosition.y;
-		hardwareButtonManager.sensaroundCenterCamera.transform.localPosition =
+		camPos.y = MouseLookScript.a.instances[i].position.y;
+		hardwareButtonManager.sensaroundCenterCamera.instances[i].position =
 			camPos;
 
 		camPos =
-		  hardwareButtonManager.sensaroundCenterCamera.transform.localPosition;
+		  hardwareButtonManager.sensaroundCenterCamera.instances[i].position;
 
-		camPos.y = MouseLookScript.a.transform.localPosition.y;
-		hardwareButtonManager.sensaroundLHCamera.transform.localPosition =
+		camPos.y = MouseLookScript.a.instances[i].position.y;
+		hardwareButtonManager.sensaroundLHCamera.instances[i].position =
 			camPos;
 
 		camPos =
-		  hardwareButtonManager.sensaroundCenterCamera.transform.localPosition;
+		  hardwareButtonManager.sensaroundCenterCamera.instances[i].position;
 
-		camPos.y = MouseLookScript.a.transform.localPosition.y;
-		hardwareButtonManager.sensaroundRHCamera.transform.localPosition =
+		camPos.y = MouseLookScript.a.instances[i].position.y;
+		hardwareButtonManager.sensaroundRHCamera.instances[i].position =
 			camPos;
 
 		// General
@@ -440,10 +409,10 @@ public class Inventory : MonoBehaviour {
 							grenButtons[grenadeCurrent].useableItemIndex
 						);
 					} else {
-						Const.sprint(Const.a.stringTable[322] ); // Out of grenades.
+						CenterStatusPrint("%s", Sys_Text.stringTable[322] ); // Out of grenades.
 					}
 				} else {
-					Const.sprint(Const.a.stringTable[322] ); // Out of grenades.
+					CenterStatusPrint("%s", Sys_Text.stringTable[322] ); // Out of grenades.
 				}
 			}
 		}
@@ -489,7 +458,7 @@ public class Inventory : MonoBehaviour {
 			for (int i=0;i<hardwareInvText.Length;i++) {
 				if (hardwareInvText[i].gameObject.activeInHierarchy) {
 					hardwareInvText[i].text = 
-					  Const.a.stringTable[hardwareInvReferenceIndex[i] + 326]
+					  Sys_Text.stringTable[hardwareInvReferenceIndex[i] + 326]
 					  + " v" + hardwareVersion[i].ToString();
 					if (i == hardwareInvCurrent) {
 						hardwareInvText[i].color = Const.a.ssYellowText; // Yellow
@@ -523,7 +492,7 @@ public class Inventory : MonoBehaviour {
 				lastAddedIndex = FindNextUnreadLog();
 				if (lastAddedIndex == tempRefIndex) lastAddedIndex = -1;
 				CheckForUnreadLogs();
-				Const.sprint(Const.a.stringTable[1019]); // "Log playback stopped"
+				CenterStatusPrint("%s", Sys_Text.stringTable[1019]); // "Log playback stopped"
 			}
 		}
 		//--- End Logs ---
@@ -534,7 +503,7 @@ public class Inventory : MonoBehaviour {
 				if (patchCounts[patchCurrent] > 0) {
 					patchButtonScripts[patchCurrent].PatchUse();
 				} else {
-					Const.sprint(Const.a.stringTable[324] ); // Out of patches.
+					CenterStatusPrint("%s", Sys_Text.stringTable[324] ); // Out of patches.
 				}
 			}
 			if (GetInput.a.PatchCycUp())   PatchCycleUp(true);
@@ -582,7 +551,7 @@ public class Inventory : MonoBehaviour {
 			for (int i=0;i<weaponShotsInventory.Length;i++) {
 				if (weaponButtonText[i].gameObject.activeInHierarchy) {
 					weaponButtonText[i].text =
-						Const.a.stringTable[326 + weaponInventoryIndices[i]];
+						Sys_Text.stringTable[326 + weaponInventoryIndices[i]];
 
 					weaponShotsInventory[i].text = weaponShotsInventoryText[i];
 					if (i == yellowWep) {
@@ -607,25 +576,25 @@ public class Inventory : MonoBehaviour {
 	}
 
 	public bool HasAnyAccessCards() {
-		if (HasAccessCard(AccessCardType.Standard)) return true;
-		if (HasAccessCard(AccessCardType.Medical)) return true;
-		if (HasAccessCard(AccessCardType.Science)) return true;
-		if (HasAccessCard(AccessCardType.Admin)) return true;
-		if (HasAccessCard(AccessCardType.Group1)) return true;
-		if (HasAccessCard(AccessCardType.Group2)) return true;
-		if (HasAccessCard(AccessCardType.Group3)) return true;
-		if (HasAccessCard(AccessCardType.Group4)) return true;
-		if (HasAccessCard(AccessCardType.GroupA)) return true;
-		if (HasAccessCard(AccessCardType.GroupB)) return true;
-		if (HasAccessCard(AccessCardType.Storage)) return true;
-		if (HasAccessCard(AccessCardType.Engineering)) return true;
-		if (HasAccessCard(AccessCardType.Maintenance)) return true;
-		if (HasAccessCard(AccessCardType.Security)) return true;
-		if (HasAccessCard(AccessCardType.Per1)) return true;
-		if (HasAccessCard(AccessCardType.Per2)) return true;
-		if (HasAccessCard(AccessCardType.Per3)) return true;
-		if (HasAccessCard(AccessCardType.Per4)) return true;
-		if (HasAccessCard(AccessCardType.Per5)) return true;
+		if (HasAccessCard(AccessCardType_Standard)) return true;
+		if (HasAccessCard(AccessCardType_Medical)) return true;
+		if (HasAccessCard(AccessCardType_Science)) return true;
+		if (HasAccessCard(AccessCardType_Admin)) return true;
+		if (HasAccessCard(AccessCardType_Group1)) return true;
+		if (HasAccessCard(AccessCardType_Group2)) return true;
+		if (HasAccessCard(AccessCardType_Group3)) return true;
+		if (HasAccessCard(AccessCardType_Group4)) return true;
+		if (HasAccessCard(AccessCardType_GroupA)) return true;
+		if (HasAccessCard(AccessCardType_GroupB)) return true;
+		if (HasAccessCard(AccessCardType_Storage)) return true;
+		if (HasAccessCard(AccessCardType_Engineering)) return true;
+		if (HasAccessCard(AccessCardType_Maintenance)) return true;
+		if (HasAccessCard(AccessCardType_Security)) return true;
+		if (HasAccessCard(AccessCardType_Per1)) return true;
+		if (HasAccessCard(AccessCardType_Per2)) return true;
+		if (HasAccessCard(AccessCardType_Per3)) return true;
+		if (HasAccessCard(AccessCardType_Per4)) return true;
+		if (HasAccessCard(AccessCardType_Per5)) return true;
 		return false;
 	}
 
@@ -638,68 +607,69 @@ public class Inventory : MonoBehaviour {
 
 	public static string AccessCardCodeForType(AccessCardType acc) {
 		switch(acc) {
-			case AccessCardType.Standard: return "STD";
-			case AccessCardType.Medical: return "MED";
-			case AccessCardType.Science: return "SCI";
-			case AccessCardType.Admin: return "ADM";
-			case AccessCardType.Group1: return "Group-1";
-			case AccessCardType.Group2: return "Group-2";
-			case AccessCardType.Group3: return "Group-3";
-			case AccessCardType.Group4: return "Group-4";
-			case AccessCardType.GroupA: return "Group-A";
-			case AccessCardType.GroupB: return "Group-B";
-			case AccessCardType.Storage: return "STO";
-			case AccessCardType.Engineering: return "ENG";
-			case AccessCardType.Maintenance: return "MTN";
-			case AccessCardType.Security: return "SEC";
-			case AccessCardType.Per1: return "PER-1";
-			case AccessCardType.Per2: return "PER-2";
-			case AccessCardType.Per3: return "PER-3";
-			case AccessCardType.Per4: return "PER-4";
-			case AccessCardType.Per5: return "PER-5";
+			case AccessCardType_Standard: return "STD";
+			case AccessCardType_Medical: return "MED";
+			case AccessCardType_Science: return "SCI";
+			case AccessCardType_Admin: return "ADM";
+			case AccessCardType_Group1: return "Group-1";
+			case AccessCardType_Group2: return "Group-2";
+			case AccessCardType_Group3: return "Group-3";
+			case AccessCardType_Group4: return "Group-4";
+			case AccessCardType_GroupA: return "Group-A";
+			case AccessCardType_GroupB: return "Group-B";
+			case AccessCardType_Storage: return "STO";
+			case AccessCardType_Engineering: return "ENG";
+			case AccessCardType_Maintenance: return "MTN";
+			case AccessCardType_Security: return "SEC";
+			case AccessCardType_Per1: return "PER-1";
+			case AccessCardType_Per2: return "PER-2";
+			case AccessCardType_Per3: return "PER-3";
+			case AccessCardType_Per4: return "PER-4";
+			case AccessCardType_Per5: return "PER-5";
 		}
 		return "Group-2";
 	}
 
 	public void AddAccessCardToInventory (int index) {
 		if (MouseLookScript.a.firstTimePickup) MFDManager.a.CenterTabButtonClickSilent(2,true);
+        AccessCardType doorAccessTypeAcquired;
 		switch (index) {
-			case 34: doorAccessTypeAcquired = AccessCardType.Admin; break;	  // Green Rim, Turquoise Inner with Yellow Cross (card_group5)
-			case 81: doorAccessTypeAcquired = AccessCardType.Standard; break; //CHECKED! Good here.  Orange Rim, Turquoise Inner (card_std)
-			case 83: doorAccessTypeAcquired = AccessCardType.Group1; break; //CHECKED! Good here.  Blue Rim, Orange Inner (card_group1_actual)
-			case 84: doorAccessTypeAcquired = AccessCardType.Science; break; //CHECKED! Good here.  All Yellow (card_group1)
-			case 85: doorAccessTypeAcquired = AccessCardType.Engineering; break;  //CHECKED! Good here.  Blue Rim, Turquoise Inner (card_eng)
-			case 86: doorAccessTypeAcquired = AccessCardType.GroupB; break; //CHECKED! Good here.  Blue Rim, Orange Inner (card_group1_actual)
-			case 87: doorAccessTypeAcquired = AccessCardType.Security; break; //CHECKED! Good here. Command = Security = Storage Red Rim, Yellow Inner (card_per1)
-			case 88: doorAccessTypeAcquired = AccessCardType.Per5; break; // Purple Rim, Red Inner (card_per5)
-			case 89: doorAccessTypeAcquired = AccessCardType.Medical; break; // Gray with Red Cross (card_medi)
-			case 90: doorAccessTypeAcquired = AccessCardType.Group3; break; // CHECKED! Good here.  Blue Rim, Orange Inner with Yellow prongs (card_blue)
-			case 91: doorAccessTypeAcquired = AccessCardType.Group4; break; // Cyberspace only
-			case 110: doorAccessTypeAcquired = AccessCardType.Per1; break; // Darcy, Purple Rim, Red Inner (card_per5)
+			case 34: doorAccessTypeAcquired = AccessCardType_Admin; break;	  // Green Rim, Turquoise Inner with Yellow Cross (card_group5)
+			case 81: doorAccessTypeAcquired = AccessCardType_Standard; break; //CHECKED! Good here.  Orange Rim, Turquoise Inner (card_std)
+			case 83: doorAccessTypeAcquired = AccessCardType_Group1; break; //CHECKED! Good here.  Blue Rim, Orange Inner (card_group1_actual)
+			case 84: doorAccessTypeAcquired = AccessCardType_Science; break; //CHECKED! Good here.  All Yellow (card_group1)
+			case 85: doorAccessTypeAcquired = AccessCardType_Engineering; break;  //CHECKED! Good here.  Blue Rim, Turquoise Inner (card_eng)
+			case 86: doorAccessTypeAcquired = AccessCardType_GroupB; break; //CHECKED! Good here.  Blue Rim, Orange Inner (card_group1_actual)
+			case 87: doorAccessTypeAcquired = AccessCardType_Security; break; //CHECKED! Good here. Command = Security = Storage Red Rim, Yellow Inner (card_per1)
+			case 88: doorAccessTypeAcquired = AccessCardType_Per5; break; // Purple Rim, Red Inner (card_per5)
+			case 89: doorAccessTypeAcquired = AccessCardType_Medical; break; // Gray with Red Cross (card_medi)
+			case 90: doorAccessTypeAcquired = AccessCardType_Group3; break; // CHECKED! Good here.  Blue Rim, Orange Inner with Yellow prongs (card_blue)
+			case 91: doorAccessTypeAcquired = AccessCardType_Group4; break; // Cyberspace only
+			case 110: doorAccessTypeAcquired = AccessCardType_Per1; break; // Darcy, Purple Rim, Red Inner (card_per5)
 			default: 
-				Const.sprint("BUG: Attempted to add an unmarked access card, we'll treat it as a STANDARD.");
-				doorAccessTypeAcquired = AccessCardType.Standard;
+				CenterStatusPrint("BUG: Attempted to add an unmarked access card, we'll treat it as a STANDARD.");
+				doorAccessTypeAcquired = AccessCardType_Standard;
 				break;
 		}
 
 		 // Command = STO+MTN+SEC
 		if (HasAccessCard(doorAccessTypeAcquired) || (index == 87
-			  && HasAccessCard(AccessCardType.Storage) // If Command, only give
-			  && HasAccessCard(AccessCardType.Security)//    message if missing
-			  && HasAccessCard(AccessCardType.Maintenance))) { //        all 3
-			Const.sprint(Const.a.stringTable[44] + AccessCardCodeForType(doorAccessTypeAcquired)); // Already have access: ##
+			  && HasAccessCard(AccessCardType_Storage) // If Command, only give
+			  && HasAccessCard(AccessCardType_Security)//    message if missing
+			  && HasAccessCard(AccessCardType_Maintenance))) { //        all 3
+			CenterStatusPrint("%s", Sys_Text.stringTable[44] + AccessCardCodeForType(doorAccessTypeAcquired)); // Already have access: ##
 		} else {
 			bool added = false;
 			if (index == 87) {
 				for (int j=0;j<3;j++) {
 					switch(j) {
-						case 0: doorAccessTypeAcquired = AccessCardType.Storage; break;
-						case 1: doorAccessTypeAcquired = AccessCardType.Security; break;
-						case 2: doorAccessTypeAcquired = AccessCardType.Maintenance; break;
+						case 0: doorAccessTypeAcquired = AccessCardType_Storage; break;
+						case 1: doorAccessTypeAcquired = AccessCardType_Security; break;
+						case 2: doorAccessTypeAcquired = AccessCardType_Maintenance; break;
 					}
 
 					for (int i=0;i<accessCardsOwned.Length;i++) {
-						if (accessCardsOwned[i] == AccessCardType.None){
+						if (accessCardsOwned[i] == AccessCardType_None){
 							added = true;
 							accessCardsOwned[i] = doorAccessTypeAcquired;
 							break;
@@ -708,7 +678,7 @@ public class Inventory : MonoBehaviour {
 				}
 			} else {
 				for (int i=0;i<accessCardsOwned.Length;i++) {
-					if (accessCardsOwned[i] == AccessCardType.None){
+					if (accessCardsOwned[i] == AccessCardType_None){
 						added = true;
 						accessCardsOwned[i] = doorAccessTypeAcquired;
 						break;
@@ -719,15 +689,15 @@ public class Inventory : MonoBehaviour {
 			if (added) {
 				if (index == 87) {
 					// New accesses gained STO MTN SEC
-					Const.sprint(Const.a.stringTable[45] 
-						+ AccessCardCodeForType(AccessCardType.Storage)
+					CenterStatusPrint("%s", Sys_Text.stringTable[45] 
+						+ AccessCardCodeForType(AccessCardType_Storage)
 						+ ", "
-						+ AccessCardCodeForType(AccessCardType.Security)
+						+ AccessCardCodeForType(AccessCardType_Security)
 						+ ", "
-						+ AccessCardCodeForType(AccessCardType.Maintenance)); 
+						+ AccessCardCodeForType(AccessCardType_Maintenance)); 
 				} else {
 					 // New accesses gained ##
-					Const.sprint(Const.a.stringTable[45]
+					CenterStatusPrint("%s", Sys_Text.stringTable[45]
 						+ AccessCardCodeForType(doorAccessTypeAcquired));
 				}
 
@@ -738,7 +708,7 @@ public class Inventory : MonoBehaviour {
 					MouseLookScript.a.firstTimePickup = false;
 				}
 			} else {
-				Const.sprint("BUG: Something went wrong when trying to add that access card.");
+				CenterStatusPrint("BUG: Something went wrong when trying to add that access card.");
 				MFDManager.a.ResetItemTab();
 			}
 		}
@@ -754,14 +724,14 @@ public class Inventory : MonoBehaviour {
 		if (index < 0) return;
 
 		if (hwversion < 0) {
-			Const.sprint("BUG: Adding hardware with no version, using 0 (v1)");
+			CenterStatusPrint("BUG: Adding hardware with no version, using 0 (v1)");
 			hwversion = 0;
 		}
 
 		if (overt) MFDManager.a.SendInfoToItemTab(constIndex);
 		if (hwversion < 0) hwversion = 0;
 		if (hwversion <= hardwareVersion[index] && hwversion > 0) {
-		    if (overt) Const.sprint(Const.a.stringTable[46]); // "THAT WARE IS OBSOLETE. DISCARDED."
+		    if (overt) CenterStatusPrint("%s", Sys_Text.stringTable[46]); // "THAT WARE IS OBSOLETE. DISCARDED."
 		    return;
 		}
 
@@ -844,7 +814,7 @@ public class Inventory : MonoBehaviour {
 			hardwareButtonManager.buttons[button8Index].gameObject.SetActive(true);
 		}
 
-		if (overt) Const.sprint(Const.a.stringTable[textIndex + 326] + " v" + hwversion.ToString() );
+		if (overt) CenterStatusPrint("%s", Sys_Text.stringTable[textIndex + 326] + " v" + hwversion.ToString() );
 		if (MouseLookScript.a.firstTimePickup && overt) {
 			MFDManager.a.CenterTabButtonClickSilent(1,true);
 		}
@@ -909,7 +879,7 @@ public class Inventory : MonoBehaviour {
 	public void HideBioMonitor() {
 		if (hardwareButtonManager == null) return;
 		if (hardwareButtonManager.bioMonitorContainer == null) return;
-		if (MFDManager.a.FPS.activeInHierarchy) return;
+		if (Sys_Cheats.showFPS) return;
 		
 		hardwareButtonManager.bioMonitorContainer.SetActive(false);
 	}
@@ -939,8 +909,8 @@ public class Inventory : MonoBehaviour {
 			generalInventoryIndexRef[i] = index;
 
 			// Item added to general inventory
-			Const.sprint(Const.a.stringTable[index + 326]
-						 + Const.a.stringTable[31]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[index + 326]
+						 + Sys_Text.stringTable[31]);
 
 			GeneralInvButton gv = genButtons[i].GetComponent<GeneralInvButton>();
 			if (gv != null) {
@@ -948,7 +918,7 @@ public class Inventory : MonoBehaviour {
 				gv.customIndex = customIndex;
 			}
 
-			if (Inventory.a.generalInvCurrent == i) { // Only if current.
+			if (inventoryPlayer1.generalInvCurrent == i) { // Only if current.
 				MFDManager.a.SendInfoToItemTab(index,customIndex);
 			}
 
@@ -995,13 +965,13 @@ public class Inventory : MonoBehaviour {
 		MFDManager.a.CenterTabButtonClickSilent(0,true);
 		grenButtons[nextIndex].GrenadeInvSelect();
 		switch(grenadeCurrent) {
-			case 0: Const.sprint(Const.a.stringTable[579]); break;
-			case 1: Const.sprint(Const.a.stringTable[580]); break;
-			case 2: Const.sprint(Const.a.stringTable[581]); break;
-			case 3: Const.sprint(Const.a.stringTable[582]); break;
-			case 4: Const.sprint(Const.a.stringTable[583]); break;
-			case 5: Const.sprint(Const.a.stringTable[584]); break;
-			case 6: Const.sprint(Const.a.stringTable[585]); break;
+			case 0: CenterStatusPrint("%s", Sys_Text.stringTable[579]); break;
+			case 1: CenterStatusPrint("%s", Sys_Text.stringTable[580]); break;
+			case 2: CenterStatusPrint("%s", Sys_Text.stringTable[581]); break;
+			case 3: CenterStatusPrint("%s", Sys_Text.stringTable[582]); break;
+			case 4: CenterStatusPrint("%s", Sys_Text.stringTable[583]); break;
+			case 5: CenterStatusPrint("%s", Sys_Text.stringTable[584]); break;
+			case 6: CenterStatusPrint("%s", Sys_Text.stringTable[585]); break;
 		}
 	}
 
@@ -1024,13 +994,13 @@ public class Inventory : MonoBehaviour {
 		MFDManager.a.CenterTabButtonClickSilent(0,true);
 		grenButtons[nextIndex].GrenadeInvSelect();
 		switch(grenadeCurrent) {
-			case 0: Const.sprint(Const.a.stringTable[579]); break;
-			case 1: Const.sprint(Const.a.stringTable[580]); break;
-			case 2: Const.sprint(Const.a.stringTable[581]); break;
-			case 3: Const.sprint(Const.a.stringTable[582]); break;
-			case 4: Const.sprint(Const.a.stringTable[583]); break;
-			case 5: Const.sprint(Const.a.stringTable[584]); break;
-			case 6: Const.sprint(Const.a.stringTable[585]); break;
+			case 0: CenterStatusPrint("%s", Sys_Text.stringTable[579]); break;
+			case 1: CenterStatusPrint("%s", Sys_Text.stringTable[580]); break;
+			case 2: CenterStatusPrint("%s", Sys_Text.stringTable[581]); break;
+			case 3: CenterStatusPrint("%s", Sys_Text.stringTable[582]); break;
+			case 4: CenterStatusPrint("%s", Sys_Text.stringTable[583]); break;
+			case 5: CenterStatusPrint("%s", Sys_Text.stringTable[584]); break;
+			case 6: CenterStatusPrint("%s", Sys_Text.stringTable[585]); break;
 		}
 	}
 
@@ -1051,9 +1021,7 @@ public class Inventory : MonoBehaviour {
 		}
 
 		grenAmmo[index]++;
-		Const.sprint(Const.a.stringTable[useableIndex + 326]
-					 + Const.a.stringTable[34] );
-
+		CenterStatusPrint("%s%s", Sys_Text.stringTable[useableIndex + 326], Sys_Text.stringTable[34]);
 		MFDManager.a.NotifyToCenterTab(0);
 		MFDManager.a.SendInfoToItemTab(useableIndex);
     }
@@ -1092,7 +1060,7 @@ public class Inventory : MonoBehaviour {
 		if (logIndex < 0) return;
 
 		SFXSource.Stop();
-		if (!Inventory.a.hasHardware[2]) return;
+		if (!inventoryPlayer1.hasHardware[2]) return;
 
 		Utils.PlayOneShotSavable(SFXSource,Const.a.audioLogs[logIndex],((float)Const.a.AudioVolumeMessage)/100f); // Play the log audio
 		if (!readLog[logIndex]) QuestLogNotesManager.a.LogAdded(logIndex);
@@ -1172,7 +1140,7 @@ public class Inventory : MonoBehaviour {
 					break;
 			}
 		}
-		Const.sprint(Const.a.stringTable[1020] + Const.a.audiologNames[logIndex]); // "Playing "
+		CenterStatusPrint("%s", Sys_Text.stringTable[1020] + Const.a.audiologNames[logIndex]); // "Playing "
 		MFDManager.a.SendAudioLogToDataTab(logIndex);
 	}
 
@@ -1191,7 +1159,7 @@ public class Inventory : MonoBehaviour {
 
 		if (index == 128) {
 			// Trioptimum Funpack Module, don't play on company time!
-			Const.sprint(Const.a.stringTable[309]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[309]);
 			return;
 		}
 
@@ -1208,14 +1176,14 @@ public class Inventory : MonoBehaviour {
 
 		if (hasHardware[2] == true) {
 			// Audio log ## picked up.  Press '##' to play back.
-			Const.sprint(Const.a.stringTable[36] + Const.a.audiologNames[index]
-						 + Const.a.stringTable[37]
+			CenterStatusPrint("%s", Sys_Text.stringTable[36] + Const.a.audiologNames[index]
+						 + Sys_Text.stringTable[37]
 						 + Const.a.InputValues[Const.a.InputCodeSettings[15]]
-						 + Const.a.stringTable[38]);
+						 + Sys_Text.stringTable[38]);
 		} else {
 			// Audio log ## picked up.  Proper hardware not detected to play.
-			Const.sprint(Const.a.stringTable[36] + Const.a.audiologNames[index]
-						 + Const.a.stringTable[310]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[36] + Const.a.audiologNames[index]
+						 + Sys_Text.stringTable[310]);
 		}
 	}
 	//--- End Logs ---
@@ -1271,8 +1239,8 @@ public class Inventory : MonoBehaviour {
 		}
 		MFDManager.a.SendInfoToItemTab(constIndex);
 		MFDManager.a.NotifyToCenterTab(0);
-		Const.sprint(Const.a.stringTable[constIndex + 326]
-					 + Const.a.stringTable[35]); //  added to patch inventory
+		CenterStatusPrint("%s", Sys_Text.stringTable[constIndex + 326]
+					 + Sys_Text.stringTable[35]); //  added to patch inventory
     }
 	//--- End Patches ---
 
@@ -1281,7 +1249,7 @@ public class Inventory : MonoBehaviour {
 		if (currentCyberItem <= 0) {
 			currentCyberItem = GetExistingCyberItemIndex(); // try one more time to be sure
 			if (currentCyberItem <= 0) {
-				Const.sprint(Const.a.stringTable[473],Const.a.player1); // Out of expendable softwares.
+				CenterStatusPrint("%s", Sys_Text.stringTable[473],Const.a.player1); // Out of expendable softwares.
 				return;
 			}
 			// oh it was good, ok then moving on down...
@@ -1377,7 +1345,7 @@ public class Inventory : MonoBehaviour {
 
 	public void UseDecoy() {
 		if (Const.a.decoyActive) {
-			Const.sprint(Const.a.stringTable[537],Const.a.player1);
+			CenterStatusPrint("%s", Sys_Text.stringTable[537],Const.a.player1);
 			return;
 		}
 		if (softVersions[4] <= 0) {
@@ -1389,7 +1357,7 @@ public class Inventory : MonoBehaviour {
 			hasSoft[4] = false;
 			softs[4].SetActive(false); // turn the button off now that we are out
 		}
-		GameObject decoyObj = Instantiate(decoyPrefab,PlayerMovement.a.transform.position,MouseLookScript.a.transform.rotation) as GameObject;
+		GameObject decoyObj = Instantiate(decoyPrefab,PlayerMovement.a.instances[i].position,MouseLookScript.a.instances[i].rotation) as GameObject;
 		if (decoyObj != null) {
 			decoyObj.transform.SetParent(CyberSpaceStaticContainer.transform,true);
 		}
@@ -1405,7 +1373,7 @@ public class Inventory : MonoBehaviour {
 			hasSoft[5] = false;
 			softs[5].SetActive(false); // turn the button off now that we are out
 		}
-		PlayerMovement.a.transform.position = MouseLookScript.a.cyberspaceRecallPoint; // pop back to cyber section start
+		PlayerMovement.a.instances[i].position = MouseLookScript.a.cyberspaceRecallPoint; // pop back to cyber section start
 	}
 
 	public bool AddSoftwareItem(SoftwareType type, int vers) {
@@ -1418,11 +1386,11 @@ public class Inventory : MonoBehaviour {
 					isPulserNotDrill = false; // equip drill if we don't already have pulser
 				}
 				if (vers > softVersions[0]) softVersions[0] = vers;
-				else Const.sprint(Const.a.stringTable[46],Const.a.player1);
+				else CenterStatusPrint("%s", Sys_Text.stringTable[46],Const.a.player1);
 				drillVersionText.text = softVersions[0].ToString();
 				hasSoft[0] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				Const.sprint(Const.a.stringTable[444] + softVersions[0].ToString() + Const.a.stringTable[458],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[444] + softVersions[0].ToString() + Sys_Text.stringTable[458],Const.a.player1);
 				return true;
 			case SoftwareType.Pulser:	
 				softs[1].SetActive(true);
@@ -1432,20 +1400,20 @@ public class Inventory : MonoBehaviour {
 					isPulserNotDrill = true; // always equip pulser when first picking it up
 				}
 				if (vers > softVersions[1]) softVersions[1] = vers;
-				else Const.sprint(Const.a.stringTable[46],Const.a.player1);
+				else CenterStatusPrint("%s", Sys_Text.stringTable[46],Const.a.player1);
 				pulserVersionText.text = softVersions[1].ToString();
 				hasSoft[1] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				Const.sprint(Const.a.stringTable[445] + softVersions[1].ToString() + Const.a.stringTable[458],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[445] + softVersions[1].ToString() + Sys_Text.stringTable[458],Const.a.player1);
 				return true;
 			case SoftwareType.CShield:	
 				softs[2].SetActive(true);
 				if (vers > softVersions[2]) softVersions[2] = vers;
-				else Const.sprint(Const.a.stringTable[46],Const.a.player1);
+				else CenterStatusPrint("%s", Sys_Text.stringTable[46],Const.a.player1);
 				cshieldVersionText.text = softVersions[2].ToString();
 				hasSoft[2] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				Const.sprint(Const.a.stringTable[446] + softVersions[2].ToString() + Const.a.stringTable[458],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[446] + softVersions[2].ToString() + Sys_Text.stringTable[458],Const.a.player1);
 				return true;
 			case SoftwareType.Turbo:
 				if (currentCyberItem == -1f) currentCyberItem = 0;
@@ -1454,7 +1422,7 @@ public class Inventory : MonoBehaviour {
 				turboCountText.text = softVersions[3].ToString();
 				hasSoft[3] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				Const.sprint(Const.a.stringTable[447],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[447],Const.a.player1);
 				return true;
 			case SoftwareType.Decoy:	
 				if (currentCyberItem == -1f) currentCyberItem = 1;
@@ -1463,7 +1431,7 @@ public class Inventory : MonoBehaviour {
 				decoyCountText.text = softVersions[4].ToString();
 				hasSoft[4] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				Const.sprint(Const.a.stringTable[448],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[448],Const.a.player1);
 				return true;
 			case SoftwareType.Recall:	
 				if (currentCyberItem == -1f) currentCyberItem = 2;
@@ -1472,7 +1440,7 @@ public class Inventory : MonoBehaviour {
 				recallCountText.text = softVersions[5].ToString();
 				hasSoft[5] = true;
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
-				Const.sprint(Const.a.stringTable[449],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[449],Const.a.player1);
 				return true;
 			case SoftwareType.Game:		
 				softs[6].SetActive(true);
@@ -1481,25 +1449,25 @@ public class Inventory : MonoBehaviour {
 				miniGameButton[vers].SetActive(true);
 				switch(vers) {
 					case 0: // Ping
-							Const.sprint(Const.a.stringTable[450],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[450],Const.a.player1);
 							break;
 					case 1: // 15
-							Const.sprint(Const.a.stringTable[451],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[451],Const.a.player1);
 							break;
 					case 2: // Wing 0
-							Const.sprint(Const.a.stringTable[452],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[452],Const.a.player1);
 							break;
 					case 3: // Botbounce
-							Const.sprint(Const.a.stringTable[453],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[453],Const.a.player1);
 							break;
 					case 4: // Eel Zapper
-							Const.sprint(Const.a.stringTable[454],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[454],Const.a.player1);
 							break;
 					case 5: // Road
-							Const.sprint(Const.a.stringTable[455],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[455],Const.a.player1);
 							break;
 					case 6: // TriopToe
-							Const.sprint(Const.a.stringTable[456],Const.a.player1);
+							CenterStatusPrint("%s", Sys_Text.stringTable[456],Const.a.player1);
 							break;
 				}
 				Utils.PlayUIOneShotSavable(86); // frob_hardware
@@ -1508,7 +1476,7 @@ public class Inventory : MonoBehaviour {
 			case SoftwareType.Data:
 				hasNewData = true;
 				Utils.PlayUIOneShotSavable(87); // frob_item
-				Const.sprint(Const.a.stringTable[457],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[457],Const.a.player1);
 				hasLog[vers] = true;
 				return true;
 			case SoftwareType.Integrity:
@@ -1518,7 +1486,7 @@ public class Inventory : MonoBehaviour {
 				hm.cyberHealth += 77f;
 				if (hm.cyberHealth > 255f) hm.cyberHealth = 255f;
 				MFDManager.a.DrawTicks(true);
-				Const.sprint(Const.a.stringTable[459],Const.a.player1);
+				CenterStatusPrint("%s", Sys_Text.stringTable[459],Const.a.player1);
 				return true;
 			case SoftwareType.Keycard:
 				hasNewData = true;
@@ -1581,9 +1549,9 @@ public class Inventory : MonoBehaviour {
 		case 37:
 			//ER-90 Blaster
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Const.a.stringTable[14]; // OVERHEATED
+				retval = Sys_Text.stringTable[14]; // OVERHEATED
 			} else {
-				retval = Const.a.stringTable[15]; // READY
+				retval = Sys_Text.stringTable[15]; // READY
 			}
 			break;
 		case 38:
@@ -1609,9 +1577,9 @@ public class Inventory : MonoBehaviour {
 		case 40:
 			//RW-45 Ion Beam
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Const.a.stringTable[14]; // OVERHEATED
+				retval = Sys_Text.stringTable[14]; // OVERHEATED
 			} else {
-				retval = Const.a.stringTable[15]; // READY
+				retval = Sys_Text.stringTable[15]; // READY
 			}
 			break;
 		case 41:
@@ -1655,9 +1623,9 @@ public class Inventory : MonoBehaviour {
 		case 46:
 			//LG-XX Plasma Rifle
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Const.a.stringTable[14]; // OVERHEATED
+				retval = Sys_Text.stringTable[14]; // OVERHEATED
 			} else {
-				retval = Const.a.stringTable[15]; // READY
+				retval = Sys_Text.stringTable[15]; // READY
 			}
 			break;
 		case 47:
@@ -1683,17 +1651,17 @@ public class Inventory : MonoBehaviour {
 		case 50:
 			//Sparq Beam
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Const.a.stringTable[14]; // OVERHEATED
+				retval = Sys_Text.stringTable[14]; // OVERHEATED
 			} else {
-				retval = Const.a.stringTable[15]; // READY
+				retval = Sys_Text.stringTable[15]; // READY
 			}
 			break;
 		case 51:
 			//DH-07 Stungun
 			if (currentEnergyWeaponHeat[index] > 80f) {
-				retval = Const.a.stringTable[14]; // OVERHEATED
+				retval = Sys_Text.stringTable[14]; // OVERHEATED
 			} else {
-				retval = Const.a.stringTable[15]; // READY
+				retval = Sys_Text.stringTable[15]; // READY
 			}
 			break;
 		}
@@ -1718,8 +1686,8 @@ public class Inventory : MonoBehaviour {
 		if (isSecondary) wepAmmoSecondary[index] += amount;
 		else			 wepAmmo[index]          += amount;
 
-		Const.sprint(Const.a.stringTable[constIndex + 326]
-					 + Const.a.stringTable[630]); // Item added to ammo
+		CenterStatusPrint("%s", Sys_Text.stringTable[constIndex + 326]
+					 + Sys_Text.stringTable[630]); // Item added to ammo
 
 		MFDManager.a.NotifyToCenterTab(0);
 		MFDManager.a.SendInfoToItemTab(constIndex);
@@ -1735,7 +1703,7 @@ public class Inventory : MonoBehaviour {
             if (weaponInventoryIndices[i] >= 0) continue;
 
 			weaponInventoryIndices[i] = index;
-			weaponButtonText[i].text = Const.a.stringTable[326 + index];
+			weaponButtonText[i].text = Sys_Text.stringTable[326 + index];
 			int index16 = WeaponFire.Get16WeaponIndexFromConstIndex(index);
 			WeaponButton wepBut = MFDManager.a.wepbutMan.wepButtonsScripts[i];
 			wepBut.useableItemIndex = index;
@@ -1768,8 +1736,8 @@ public class Inventory : MonoBehaviour {
 
 			}
 
-			Const.sprint(Const.a.stringTable[index + 326]
-						 + Const.a.stringTable[33]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[index + 326]
+						 + Sys_Text.stringTable[33]);
 
 			MFDManager.a.NotifyToCenterTab(0);
 			return true;
@@ -1861,7 +1829,7 @@ public class Inventory : MonoBehaviour {
 			int dex = inv.weaponInventoryIndices[i];
 			if (dex < 0) continue;
 
-			inv.weaponButtonText[i].text = Const.a.stringTable[dex + 326];
+			inv.weaponButtonText[i].text = Sys_Text.stringTable[dex + 326];
 		}
 
 		inv.grenadeCurrent = Utils.GetIntFromString(entries[index],"grenadeCurrent"); index++;
@@ -1882,7 +1850,7 @@ public class Inventory : MonoBehaviour {
 		inv.hardwareInvCurrent = Utils.GetIntFromString(entries[index],"hardwareInvCurrent"); index++;
 		inv.hardwareInvIndex = Utils.GetIntFromString(entries[index],"hardwareInvIndex"); index++;
 		for (j=0;j<13;j++) { inv.hardwareIsActive[j] = Utils.GetBoolFromString(entries[index],"hardwareIsActive[" + j.ToString() + "]"); index++; }
-        if (Inventory.a.hasHardware[1]) { // Explicitly check primary instance.
+        if (inventoryPlayer1.hasHardware[1]) { // Explicitly check primary instance.
 			MouseLookScript.a.compassContainer.SetActive(true);
 			MouseLookScript.a.automapContainerLH.SetActive(true);
 			MouseLookScript.a.automapContainerRH.SetActive(true);
@@ -1992,7 +1960,7 @@ public class Inventory : MonoBehaviour {
 			int referenceIndex = genbut.useableItemIndex;
 			if (inv.generalInventoryIndexRef[i] > -1) {
 				inv.genButtonsText[i].text =
-					Const.a.stringTable[inv.generalInventoryIndexRef[i] + 326];
+					Sys_Text.stringTable[inv.generalInventoryIndexRef[i] + 326];
 			} else {
 				inv.genButtonsText[i].text = string.Empty;
 			}

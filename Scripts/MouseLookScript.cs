@@ -151,7 +151,7 @@ public class MouseLookScript : MonoBehaviour {
 		// Allow quick load straight from the menu or pause.
 		if (Input.GetKeyUp(f9)) {
 			if (inCyberSpace) {
-				Const.sprint(Const.a.stringTable[1023]); // "Cannot load in cyberspace"
+				CenterStatusPrint("%s", Sys_Text.stringTable[1023]); // "Cannot load in cyberspace"
 				return;
 			}
 
@@ -176,7 +176,7 @@ public class MouseLookScript : MonoBehaviour {
 		// ====================================================================
 		if (Input.GetKeyUp(f6)) {
 			if (inCyberSpace) {
-				Const.sprint(Const.a.stringTable[602]); // Cannot save in cyberspace
+				CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 				return;
 			}
 			
@@ -219,7 +219,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (inCyberSpace) { // Barrel roll!
 			if (GetInput.a.LeanLeft()) {
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.transform.position,
+					playerCapsuleTransform.instances[i].position,
 					playerCapsuleTransform.transform.forward,
 					cyberSpinSensitivity * Time.deltaTime * 100f
 				);
@@ -227,7 +227,7 @@ public class MouseLookScript : MonoBehaviour {
 
 			if (GetInput.a.LeanRight()) {
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.transform.position,
+					playerCapsuleTransform.instances[i].position,
 					playerCapsuleTransform.transform.forward,
 					cyberSpinSensitivity * Time.deltaTime * -1f * 100f
 				);
@@ -235,7 +235,7 @@ public class MouseLookScript : MonoBehaviour {
 		} else {
 			if (compassContainer.activeInHierarchy) {
 				// Update automap player icon orientation.
-				compassContainer.transform.rotation =
+				compassContainer.instances[i].rotation =
 					Quaternion.Euler(0f, -yRotation + 180f, 0f);
 			}
 		}
@@ -246,7 +246,7 @@ public class MouseLookScript : MonoBehaviour {
 
 	public void Frob() {
 		if (vmailActive && !inCyberSpace) {
-			Inventory.a.DeactivateVMail(); vmailActive = false;
+			inventoryPlayer1.DeactivateVMail(); vmailActive = false;
 			return;
 		}
 
@@ -340,12 +340,12 @@ public class MouseLookScript : MonoBehaviour {
 			xRotation = Clamp0360(xRotation); // Limit up/down to within 360°.
 			yRotation = angX;
 			playerCapsuleTransform.RotateAround(
-				playerCapsuleTransform.transform.position,
+				playerCapsuleTransform.instances[i].position,
 				playerCapsuleTransform.transform.up,yRotation
 			);
 
 			playerCapsuleTransform.RotateAround(
-				playerCapsuleTransform.transform.position,
+				playerCapsuleTransform.instances[i].position,
 				playerCapsuleTransform.transform.right,-xRotation
 			);
 		} else {
@@ -353,7 +353,7 @@ public class MouseLookScript : MonoBehaviour {
 			if (Const.a.InputInvertLook) xRotation += angY;
 			else xRotation -= angY;
 
-			xRotation = Mathf.Clamp(xRotation, -90f, 90f); // Limit up/down.
+			xRotation = vclamp(xRotation, -90f, 90f); // Limit up/down.
 			yRotation += angX;
 
 			// Apply the mouselook. Left/Right component applied to capsule.
@@ -363,7 +363,7 @@ public class MouseLookScript : MonoBehaviour {
 
 			// Up down component only applied to camera.  Must be 0 for others
 			// or else movement will go in wrong direction!
-			transform.localRotation = Quaternion.Euler(xRotation,0f,0f);
+			instances[i].rotation = Quaternion.Euler(xRotation,0f,0f);
 			float xCenter = (float)Screen.width * 0.5f;
 			float yCenter = (float)Screen.height * 0.5f;
 			float xOffset = ((float)Input.mousePosition.x - xCenter);
@@ -377,8 +377,8 @@ public class MouseLookScript : MonoBehaviour {
 	public void EnterCyberspace(Vector3 entryPoint) {
 		cyberspaceRecallPoint = entryPoint;
 		playerRadiationTreatmentFlash.SetActive(true);
-		cyberspaceReturnPoint = PlayerMovement.a.transform.position;
-		cyberspaceReturnCameraLocalRotation = transform.localRotation.eulerAngles;
+		cyberspaceReturnPoint = PlayerMovement.a.instances[i].position;
+		cyberspaceReturnCameraLocalRotation = instances[i].rotation.eulerAngles;
 		cyberspaceReturnPlayerCapsuleLocalRotation = playerCapsuleTransform.localRotation.eulerAngles;
 		cyberspaceReturnLevel = LevelManager.a.currentLevel;
 		MFDManager.a.EnterCyberspace();
@@ -402,7 +402,7 @@ public class MouseLookScript : MonoBehaviour {
 		playerCapsuleTransform.localRotation = Quaternion.Euler(0f,
 			cyberspaceReturnPlayerCapsuleLocalRotation.y,0f);
 
-		transform.localRotation = // Up down component applied to camera
+		instances[i].rotation = // Up down component applied to camera
 			Quaternion.Euler(cyberspaceReturnCameraLocalRotation.x,
 							 cyberspaceReturnCameraLocalRotation.y,
 							 cyberspaceReturnCameraLocalRotation.z);
@@ -427,12 +427,12 @@ public class MouseLookScript : MonoBehaviour {
 	// Draw line from cursor - used for projectile firing, e.g. magpulse/stugngun/railgun/plasma
 	public void SetCameraFocusPoint() {
 		cursorPoint = MouseCursor.a.GetCursorScreenPointForRay();
-        if (Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit, Mathf.Infinity)) cameraFocusPoint = tempHit.point;
+        if (Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit, 71.68f)) cameraFocusPoint = tempHit.point;
 	}
 
 	// Clamp cyberspace up/down look rotation to with in +/- 360f.
 	float Clamp0360(float val) {
-		return (val - (Mathf.CeilToInt(val*(1f/360f)) * 360f)); // Subtract out 360 times the number of times 360 fits within val.
+		return (val - (vceil(val*(1f/360f)) * 360f)); // Subtract out 360 times the number of times 360 fits within val.
 	}
 
 	public void SetCameraCullDistances() {
@@ -469,18 +469,18 @@ public class MouseLookScript : MonoBehaviour {
 			else
 				xRotation += keyboardTurnSpeed;
 
-			if (!inCyberSpace) xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit up and down angle.
-			transform.localRotation = Quaternion.Euler(xRotation,0f,
-													   transform.localRotation.z);
+			if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
+			instances[i].rotation = Quaternion.Euler(xRotation,0f,
+													   instances[i].rotation.z);
 		} else if (rightTouchstick.y > 0f) {
 			if ((inCyberSpace && Const.a.InputInvertCyberspaceLook) || (!inCyberSpace && Const.a.InputInvertLook))
 				xRotation += keyboardTurnSpeed * rightTouchstick.y;
 			else
 				xRotation -= keyboardTurnSpeed * rightTouchstick.y;
 
-			if (!inCyberSpace) xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit up and down angle.
-			transform.localRotation = Quaternion.Euler(xRotation, 0f,
-													   transform.localRotation.z);
+			if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
+			instances[i].rotation = Quaternion.Euler(xRotation, 0f,
+													   instances[i].rotation.z);
 		}
 	}
 
@@ -492,14 +492,14 @@ public class MouseLookScript : MonoBehaviour {
 				angX = -keyboardTurnSpeed * 18f * ((Const.a.GraphicsFOV / 2f) / Screen.width / 2f);
 				yRotation = angX;
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.transform.position,
+					playerCapsuleTransform.instances[i].position,
 					playerCapsuleTransform.transform.up,yRotation
 				);
 			} else if (GetInput.a.TurnRight()) {
 				angX = keyboardTurnSpeed * 18f * ((Const.a.GraphicsFOV / 2f) / Screen.width / 2f);
 				yRotation = angX;
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.transform.position,
+					playerCapsuleTransform.instances[i].position,
 					playerCapsuleTransform.transform.up,yRotation
 				);
 			}
@@ -527,7 +527,7 @@ public class MouseLookScript : MonoBehaviour {
 			
 				xRotation = Clamp0360(xRotation); // Limit up/down to within 360°.
 				playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.transform.position,
+					playerCapsuleTransform.instances[i].position,
 					playerCapsuleTransform.transform.right,-xRotation
 				);
 			} else if (GetInput.a.LookUp()) {
@@ -537,7 +537,7 @@ public class MouseLookScript : MonoBehaviour {
 			
 				xRotation = Clamp0360(xRotation); // Limit up/down to within 360°.
 					playerCapsuleTransform.RotateAround(
-					playerCapsuleTransform.transform.position,
+					playerCapsuleTransform.instances[i].position,
 					playerCapsuleTransform.transform.right,-xRotation
 				);
 			}
@@ -549,18 +549,18 @@ public class MouseLookScript : MonoBehaviour {
 				else
 					xRotation += keyboardTurnSpeed;
 
-				if (!inCyberSpace) xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit up and down angle.
-				transform.localRotation = Quaternion.Euler(xRotation,0f,
-														transform.localRotation.z);
+				if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
+				instances[i].rotation = Quaternion.Euler(xRotation,0f,
+														instances[i].rotation.z);
 			} else if (GetInput.a.LookUp()) {
 				if ((inCyberSpace && Const.a.InputInvertCyberspaceLook) || (!inCyberSpace && Const.a.InputInvertLook))
 					xRotation += keyboardTurnSpeed;
 				else
 					xRotation -= keyboardTurnSpeed;
 
-				if (!inCyberSpace) xRotation = Mathf.Clamp(xRotation, -90f, 90f);  // Limit up and down angle.
-				transform.localRotation = Quaternion.Euler(xRotation, 0f,
-														transform.localRotation.z);
+				if (!inCyberSpace) xRotation = vclamp(xRotation, -90f, 90f);  // Limit up and down angle.
+				instances[i].rotation = Quaternion.Euler(xRotation, 0f,
+														instances[i].rotation.z);
 			}
 		}
 	}
@@ -568,7 +568,6 @@ public class MouseLookScript : MonoBehaviour {
 	bool RayOffset() {
 		bool successfulRay = false;
 		successfulRay = Raycast(playerCamera.ScreenPointToRay(cursorPoint), out tempHit,Const.frobDistance,Const.a.layerMaskPlayerFrob);
-// 		Debug.DrawRay(playerCamera.ScreenPointToRay(cursorPoint).origin,playerCamera.ScreenPointToRay(cursorPoint).direction * Const.frobDistance, Color.green,1f,true);
 		if (successfulRay) {
 			successfulRay = (tempHit.collider != null);
 			if (successfulRay) {
@@ -617,7 +616,7 @@ public class MouseLookScript : MonoBehaviour {
 			}
 		}
 
-		if (Inventory.a.hasHardware[4] && Inventory.a.hardwareVersion[4] > 1) {
+		if (inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1) {
 			if (!aic.hasTargetIDAttached) {
 				WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f);
 				if (Application.platform != RuntimePlatform.Android) {
@@ -635,7 +634,7 @@ public class MouseLookScript : MonoBehaviour {
 		}
 
 		// "Can't use <enemy>"
-		Const.sprint(Const.a.stringTable[29] + Const.a.nameForNPC[aic.index],
+		CenterStatusPrint("%s", Sys_Text.stringTable[29] + Const.a.nameForNPC[aic.index],
 					 player);
 
 		return true;
@@ -650,14 +649,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (TargetIDFrob(cursorPoint)) return;
 
 		Ray castDir = playerCamera.ScreenPointToRay(cursorPoint);
-		bool successfulRay = Raycast(castDir, out tempHit,
-											 Const.frobDistance,
-											 Const.a.layerMaskPlayerFrob);
-
-// 		Debug.DrawRay(playerCamera.ScreenPointToRay(cursorPoint).origin,
-// 					  playerCamera.ScreenPointToRay(cursorPoint).direction
-// 					    * Const.frobDistance, Color.green,1f,true);
-
+		bool successfulRay = Raycast(castDir, out tempHit, Const.frobDistance, Const.a.layerMaskPlayerFrob);
 		firstHit = tempHit;
 		// Success here means hit a useable something.
 		// If a ray hits a wall or other unusable something,
@@ -757,7 +749,7 @@ public class MouseLookScript : MonoBehaviour {
 				currentSearchItem = tempHit.collider.gameObject;
 				SearchObject(currentSearchItem.GetComponent<SearchableItem>().lookUpIndex);
 			} else {
-				Const.sprint(29); // "Can't use "
+				CenterStatusPrint(29); // "Can't use "
 			}
 		} else { // Frobbed into empty space, so whatever it is is too far.
 			if (tempHit.collider != null) {
@@ -765,7 +757,7 @@ public class MouseLookScript : MonoBehaviour {
 				UseName.UseNameSprint(tempHit.collider.gameObject);
 			} else {
 				// You are too far away from that
-				Const.sprint(Const.a.stringTable[30],player);
+				CenterStatusPrint("%s", Sys_Text.stringTable[30],player);
 			}
 		}
 	}
@@ -850,7 +842,7 @@ public class MouseLookScript : MonoBehaviour {
 		if (am2 > 0) loadAlt = true;
 		PutObjectInHand(indexPriorToRemoval,-1,am1,am2,loadAlt,true);
 		WeaponCurrent.a.RemoveWeapon(wepbut.WepButtonIndex);
-		Inventory.a.RemoveWeapon(wepbut.WepButtonIndex);
+		inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
 		MFDManager.a.SetAmmoIcons(-1,false) ; // Clear the ammo icons.
 		MFDManager.a.HideAmmoAndEnergyItems();
 		wepbut.useableItemIndex = -1;
@@ -874,21 +866,21 @@ public class MouseLookScript : MonoBehaviour {
 			case ButtonType.Grenade:
 				GrenadeButton grenbut = currentButton.GetComponent<GrenadeButton>();
 				indexPriorToRemoval = grenbut.useableItemIndex;
-				Inventory.a.grenAmmo[grenbut.GrenButtonIndex]--;
-				Inventory.a.GrenadeCycleDown();
-				//Inventory.a.grenadeCurrent = -1; This was up here, and seemed fine.  Might need to revert line 473 add.
-				if (Inventory.a.grenAmmo[grenbut.GrenButtonIndex] <= 0) {
-					Inventory.a.grenAmmo[grenbut.GrenButtonIndex] = 0;
-					Inventory.a.grenadeCurrent = -1;
+				inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex]--;
+				inventoryPlayer1.GrenadeCycleDown();
+				//inventoryPlayer1.grenadeCurrent = -1; This was up here, and seemed fine.  Might need to revert line 473 add.
+				if (inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] <= 0) {
+					inventoryPlayer1.grenAmmo[grenbut.GrenButtonIndex] = 0;
+					inventoryPlayer1.grenadeCurrent = -1;
 					for (int i = 0; i < 7; i++) {
-						if (Inventory.a.grenAmmo[i] > 0) {
-							Inventory.a.grenadeCurrent = i;
+						if (inventoryPlayer1.grenAmmo[i] > 0) {
+							inventoryPlayer1.grenadeCurrent = i;
 						}
 					}
 
-					MFDManager.a.SendInfoToItemTab(Inventory.a.grenadeCurrent);
-					if (Inventory.a.grenadeCurrent < 0) {
-						Inventory.a.grenadeCurrent = 0;
+					MFDManager.a.SendInfoToItemTab(inventoryPlayer1.grenadeCurrent);
+					if (inventoryPlayer1.grenadeCurrent < 0) {
+						inventoryPlayer1.grenadeCurrent = 0;
 					}
 				}
 
@@ -898,17 +890,17 @@ public class MouseLookScript : MonoBehaviour {
 			case ButtonType.Patch:
 				PatchButton patbut = currentButton.GetComponent<PatchButton>();
 				indexPriorToRemoval = patbut.useableItemIndex;
-				Inventory.a.patchCounts[patbut.PatchButtonIndex]--;
-				if (Inventory.a.patchCounts[patbut.PatchButtonIndex] <= 0) {
-					Inventory.a.patchCounts[patbut.PatchButtonIndex] = 0;
-					Inventory.a.patchCurrent = -1;
+				inventoryPlayer1.patchCounts[patbut.PatchButtonIndex]--;
+				if (inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] <= 0) {
+					inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] = 0;
+					inventoryPlayer1.patchCurrent = -1;
 					GUIState.a.ClearOverButton();
 					for (int i = 0; i < 7; i++) {
-						if (Inventory.a.patchCounts[i] > 0) Inventory.a.patchCurrent = i;
+						if (inventoryPlayer1.patchCounts[i] > 0) inventoryPlayer1.patchCurrent = i;
 					}
-					MFDManager.a.SendInfoToItemTab(Inventory.a.patchCurrent);
-					if (Inventory.a.patchCurrent < 0) {
-						Inventory.a.patchCurrent = 0;
+					MFDManager.a.SendInfoToItemTab(inventoryPlayer1.patchCurrent);
+					if (inventoryPlayer1.patchCurrent < 0) {
+						inventoryPlayer1.patchCurrent = 0;
 					}
 				}
 				PutObjectInHand(indexPriorToRemoval,-1,0,0,false,true);
@@ -926,16 +918,16 @@ public class MouseLookScript : MonoBehaviour {
 
 				indexPriorToRemoval = genbut.useableItemIndex;
 				customIndexPrior = genbut.customIndex;
-				Inventory.a.generalInventoryIndexRef[genbut.GeneralInvButtonIndex] = -1;
-				Inventory.a.generalInvCurrent = -1;
+				inventoryPlayer1.generalInventoryIndexRef[genbut.GeneralInvButtonIndex] = -1;
+				inventoryPlayer1.generalInvCurrent = -1;
 				for (int i = 0; i < 7; i++) {
-					if (Inventory.a.generalInventoryIndexRef[i] >= 0) {
-						Inventory.a.generalInvCurrent = i;
+					if (inventoryPlayer1.generalInventoryIndexRef[i] >= 0) {
+						inventoryPlayer1.generalInvCurrent = i;
 					}
 				}
 				int referenceIndex = -1;
-				if (Inventory.a.generalInvCurrent >= 0) {
-					referenceIndex = Inventory.a.genButtons[Inventory.a.generalInvCurrent].transform.GetComponent<GeneralInvButton>().useableItemIndex;
+				if (inventoryPlayer1.generalInvCurrent >= 0) {
+					referenceIndex = inventoryPlayer1.genButtons[inventoryPlayer1.generalInvCurrent].transform.GetComponent<GeneralInvButton>().useableItemIndex;
 				}
 
 				if (referenceIndex < 0 || referenceIndex > 110) {
@@ -999,7 +991,7 @@ public class MouseLookScript : MonoBehaviour {
 			AddItemToInventory(heldObjectIndex,heldObjectCustomIndex);
 			ResetHeldItem();
 		} else {
-			Const.sprint(Const.a.stringTable[heldObjectIndex + 326] + Const.a.stringTable[319],player);
+			CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326] + Sys_Text.stringTable[319],player);
 			ForceInventoryMode();
 		}	
 	}
@@ -1022,14 +1014,14 @@ public class MouseLookScript : MonoBehaviour {
 				if (instances[PLAYER1].headBobShiftFinished < Sys_Global.pauseRelativeTime) {
 					instances[PLAYER1].headBobShiftFinished = Sys_Global.pauseRelativeTime + 0.2f;
 					if (!PlayerMovement.a.isSprinting) instances[PLAYER1].headBobShiftFinished += 0.1f;
-					bobTarget = HeadBobAmount * -1f * Mathf.Sign(bobTarget);
+					bobTarget = HeadBobAmount * -1f * vsign(bobTarget);
 				}
 
-				if (PlayerMovement.a.rbody.velocity.magnitude > 0.1f) headBobY = Mathf.SmoothDamp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
-				headBobX = Mathf.SmoothDamp(headBobX,targetX,ref headBobXVel,Const.HeadBobRate);
+				if (PlayerMovement.a.rbody.velocity.magnitude > 0.1f) headBobY = smooth_damp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
+				headBobX = smooth_damp(headBobX,targetX,ref headBobXVel,Const.HeadBobRate);
 			} else {
-				headBobX = Mathf.SmoothDamp(headBobX,0f,ref headBobXVel,Const.HeadBobRate);
-				headBobY = Mathf.SmoothDamp(headBobY,Const.a.playerCameraOffsetY * PlayerMovement.a.currentCrouchRatio,ref headBobYVel,Const.HeadBobRate);
+				headBobX = smooth_damp(headBobX,0f,ref headBobXVel,Const.HeadBobRate);
+				headBobY = smooth_damp(headBobY,Const.a.playerCameraOffsetY * PlayerMovement.a.currentCrouchRatio,ref headBobYVel,Const.HeadBobRate);
 			}
 		}
 		
@@ -1039,8 +1031,8 @@ public class MouseLookScript : MonoBehaviour {
 
 	void AddItemFail(int index) { // Expects usableItem index
 		DropHeldItem();
-		Const.sprint(Const.a.stringTable[32] + Const.a.stringTable[index + 326]
-					 + Const.a.stringTable[318],player); // Inventory full.
+		CenterStatusPrint("%s", Sys_Text.stringTable[32] + Sys_Text.stringTable[index + 326]
+					 + Sys_Text.stringTable[318],player); // Inventory full.
 	}
 
 	public void AddItemToInventory(int index, int customIndex) {
@@ -1053,64 +1045,64 @@ public class MouseLookScript : MonoBehaviour {
              || (index >= 52 && index < 59)
              || (index >= 61 && index <= 64)
              || (index >= 92 && index <= 101)) {
-			if (!Inventory.a.AddGeneralObjectToInventory(index,customIndex)) {
+			if (!inventoryPlayer1.AddGeneralObjectToInventory(index,customIndex)) {
 				AddItemFail(index);
 			}
 		} else if (index == 6) {
-			Inventory.a.AddAudioLogToInventory(heldObjectCustomIndex);
+			inventoryPlayer1.AddAudioLogToInventory(heldObjectCustomIndex);
 		} else if (index >= 36 && index <= 51) {
-			if (!Inventory.a.AddWeaponToInventory(index,heldObjectAmmo,
+			if (!inventoryPlayer1.AddWeaponToInventory(index,heldObjectAmmo,
 												  heldObjectAmmo2,
 												  heldObjectLoadedAlternate)) {
 				AddItemFail(index);
 			}
 		} else if (index == 34 || index == 81 || (index >= 83 && index <= 91) || index == 110) {
-			Inventory.a.AddAccessCardToInventory(index);
+			inventoryPlayer1.AddAccessCardToInventory(index);
 		} else {
 			switch (index) {
-				case 7:  Inventory.a.AddGrenadeToInventory(0,index); break; // Frag
-				case 8:  Inventory.a.AddGrenadeToInventory(3,index); break; // Concussion
-				case 9:  Inventory.a.AddGrenadeToInventory(1,index); break; // EMP
-				case 10: Inventory.a.AddGrenadeToInventory(6,index); break; // Earth Shaker
-				case 11: Inventory.a.AddGrenadeToInventory(4,index); break; // Land Mine
-				case 12: Inventory.a.AddGrenadeToInventory(5,index); break; // Nitropak
-				case 13: Inventory.a.AddGrenadeToInventory(2,index); break; // Gas
-				case 14: Inventory.a.AddPatchToInventory(2,index); break;
-				case 15: Inventory.a.AddPatchToInventory(6,index); break;
-				case 16: Inventory.a.AddPatchToInventory(5,index); break;
-				case 17: Inventory.a.AddPatchToInventory(3,index); break;
-				case 18: Inventory.a.AddPatchToInventory(4,index); break;
-				case 19: Inventory.a.AddPatchToInventory(1,index); break;
-				case 20: Inventory.a.AddPatchToInventory(0,index); break;
-				case 21: Inventory.a.AddHardwareToInventory(0,index,customIndex,true); break;
-				case 22: Inventory.a.AddHardwareToInventory(1,index,customIndex,true); break;
-				case 23: Inventory.a.AddHardwareToInventory(2,index,customIndex,true); break;
-				case 24: Inventory.a.AddHardwareToInventory(3,index,customIndex,true); break;
-				case 25: Inventory.a.AddHardwareToInventory(4,index,customIndex,true); break;
-				case 26: Inventory.a.AddHardwareToInventory(5,index,customIndex,true); break;
-				case 27: Inventory.a.AddHardwareToInventory(6,index,customIndex,true); break;
-				case 28: Inventory.a.AddHardwareToInventory(7,index,customIndex,true); break;
-				case 29: Inventory.a.AddHardwareToInventory(8,index,customIndex,true); break;
-				case 30: Inventory.a.AddHardwareToInventory(9,index,customIndex,true); break;
-				case 31: Inventory.a.AddHardwareToInventory(10,index,customIndex,true); break;
-				case 32: Inventory.a.AddHardwareToInventory(11,index,customIndex,true); break;
-				case 60: Inventory.a.AddAmmoToInventory(12,index, Const.a.magazinePitchCountForWeapon[12], false); break; // rubber slugs
-				case 65: Inventory.a.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], true); break; // magpulse cartridge super
-				case 66: Inventory.a.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon[2], false); break; // needle darts
-				case 67: Inventory.a.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon2[2], true); break; // tranquilizer darts
-				case 68: Inventory.a.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon[9], false); break; // standard bullets
-				case 69: Inventory.a.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon2[9], true); break; // teflon bullets
-				case 70: Inventory.a.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon[7], false); break; // hollow point rounds
-				case 71: Inventory.a.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon2[7], true); break; // slug rounds
-				case 72: Inventory.a.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon[0], false); break; // magnesium tipped slugs
-				case 73: Inventory.a.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon2[0], true); break; // penetrator slugs
-				case 74: Inventory.a.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon[3], false); break; // hornet clip
-				case 75: Inventory.a.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon2[3], true); break; // splinter clip
-				case 76: Inventory.a.AddAmmoToInventory(11,index, Const.a.magazinePitchCountForWeapon[11], false); break; // rail rounds
-				case 77: Inventory.a.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon[13], false); break; // slag magazine
-				case 78: Inventory.a.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon2[13], true); break; // large slag magazine
-				case 79: Inventory.a.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon[8], false); break; // magpulse cartridges
-				case 80: Inventory.a.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], false); break; // small magpulse cartridges
+				case 7:  inventoryPlayer1.AddGrenadeToInventory(0,index); break; // Frag
+				case 8:  inventoryPlayer1.AddGrenadeToInventory(3,index); break; // Concussion
+				case 9:  inventoryPlayer1.AddGrenadeToInventory(1,index); break; // EMP
+				case 10: inventoryPlayer1.AddGrenadeToInventory(6,index); break; // Earth Shaker
+				case 11: inventoryPlayer1.AddGrenadeToInventory(4,index); break; // Land Mine
+				case 12: inventoryPlayer1.AddGrenadeToInventory(5,index); break; // Nitropak
+				case 13: inventoryPlayer1.AddGrenadeToInventory(2,index); break; // Gas
+				case 14: inventoryPlayer1.AddPatchToInventory(2,index); break;
+				case 15: inventoryPlayer1.AddPatchToInventory(6,index); break;
+				case 16: inventoryPlayer1.AddPatchToInventory(5,index); break;
+				case 17: inventoryPlayer1.AddPatchToInventory(3,index); break;
+				case 18: inventoryPlayer1.AddPatchToInventory(4,index); break;
+				case 19: inventoryPlayer1.AddPatchToInventory(1,index); break;
+				case 20: inventoryPlayer1.AddPatchToInventory(0,index); break;
+				case 21: inventoryPlayer1.AddHardwareToInventory(0,index,customIndex,true); break;
+				case 22: inventoryPlayer1.AddHardwareToInventory(1,index,customIndex,true); break;
+				case 23: inventoryPlayer1.AddHardwareToInventory(2,index,customIndex,true); break;
+				case 24: inventoryPlayer1.AddHardwareToInventory(3,index,customIndex,true); break;
+				case 25: inventoryPlayer1.AddHardwareToInventory(4,index,customIndex,true); break;
+				case 26: inventoryPlayer1.AddHardwareToInventory(5,index,customIndex,true); break;
+				case 27: inventoryPlayer1.AddHardwareToInventory(6,index,customIndex,true); break;
+				case 28: inventoryPlayer1.AddHardwareToInventory(7,index,customIndex,true); break;
+				case 29: inventoryPlayer1.AddHardwareToInventory(8,index,customIndex,true); break;
+				case 30: inventoryPlayer1.AddHardwareToInventory(9,index,customIndex,true); break;
+				case 31: inventoryPlayer1.AddHardwareToInventory(10,index,customIndex,true); break;
+				case 32: inventoryPlayer1.AddHardwareToInventory(11,index,customIndex,true); break;
+				case 60: inventoryPlayer1.AddAmmoToInventory(12,index, Const.a.magazinePitchCountForWeapon[12], false); break; // rubber slugs
+				case 65: inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], true); break; // magpulse cartridge super
+				case 66: inventoryPlayer1.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon[2], false); break; // needle darts
+				case 67: inventoryPlayer1.AddAmmoToInventory(2,index, Const.a.magazinePitchCountForWeapon2[2], true); break; // tranquilizer darts
+				case 68: inventoryPlayer1.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon[9], false); break; // standard bullets
+				case 69: inventoryPlayer1.AddAmmoToInventory(9,index, Const.a.magazinePitchCountForWeapon2[9], true); break; // teflon bullets
+				case 70: inventoryPlayer1.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon[7], false); break; // hollow point rounds
+				case 71: inventoryPlayer1.AddAmmoToInventory(7,index, Const.a.magazinePitchCountForWeapon2[7], true); break; // slug rounds
+				case 72: inventoryPlayer1.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon[0], false); break; // magnesium tipped slugs
+				case 73: inventoryPlayer1.AddAmmoToInventory(0,index, Const.a.magazinePitchCountForWeapon2[0], true); break; // penetrator slugs
+				case 74: inventoryPlayer1.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon[3], false); break; // hornet clip
+				case 75: inventoryPlayer1.AddAmmoToInventory(3,index, Const.a.magazinePitchCountForWeapon2[3], true); break; // splinter clip
+				case 76: inventoryPlayer1.AddAmmoToInventory(11,index, Const.a.magazinePitchCountForWeapon[11], false); break; // rail rounds
+				case 77: inventoryPlayer1.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon[13], false); break; // slag magazine
+				case 78: inventoryPlayer1.AddAmmoToInventory(13,index, Const.a.magazinePitchCountForWeapon2[13], true); break; // large slag magazine
+				case 79: inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon[8], false); break; // magpulse cartridges
+				case 80: inventoryPlayer1.AddAmmoToInventory(8,index, Const.a.magazinePitchCountForWeapon2[8], false); break; // small magpulse cartridges
 			}
 		}
 
@@ -1143,7 +1135,7 @@ public class MouseLookScript : MonoBehaviour {
 
 		if (!grenadeActive) heldObject = Const.a.GetPrefab(heldObjectIndex + 307); // heldObject is set by UseGrenade() so don't override here.
 		if (heldObject == null) {
-			Const.sprint("BUG: Object "+heldObjectIndex.ToString()+" not assigned, vaporized.",player);
+			CenterStatusPrint("BUG: Object "+heldObjectIndex.ToString()+" not assigned, vaporized.",player);
 			ResetHeldItem();
 			return;
 		}
@@ -1170,17 +1162,17 @@ public class MouseLookScript : MonoBehaviour {
 
 			if (freeObjectInPoolFound) {
 				if (tossObject == null) {
-					Const.sprint("BUG: Failed to get freeObjectInPool for object being dropped!",player);
+					CenterStatusPrint("BUG: Failed to get freeObjectInPool for object being dropped!",player);
 					ResetHeldItem();
 					return;
 				} else {
-					tossObject.transform.position = (transform.position + (transform.forward * tossOffset));
+					tossObject.instances[i].position = (instances[i].position + (transform.forward * tossOffset));
 				}
 			} else {
 				// DualLog("WARNING: Failed to get freeObjectInPool for object " + heldObject.ToString() + "being dropped! MouseLookScript DropHeldItem.",player);
-				tossObject = Instantiate(heldObject,(transform.position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+				tossObject = Instantiate(heldObject,(instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 				if (tossObject == null) {
-					Const.sprint("BUG: Failed to instantiate object being dropped!",player);
+					CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
 					ResetHeldItem();
 					return;
 				}
@@ -1208,9 +1200,9 @@ public class MouseLookScript : MonoBehaviour {
 			// Throw an active grenade
 			grenadeActive = false;
 			MFDManager.a.mouseClickHeldOverGUI = true; // Prevent shooting it.
-			tossObject = Instantiate(heldObject,(transform.position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
+			tossObject = Instantiate(heldObject,(instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 			if (tossObject == null) {
-				Const.sprint("BUG: Failed to instantiate object being dropped!",player);
+				CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
 				ResetHeldItem();
 				return;
 			}
@@ -1267,7 +1259,7 @@ public class MouseLookScript : MonoBehaviour {
 		}
 
 		if (vmailActive) {
-			Inventory.a.DeactivateVMail();
+			inventoryPlayer1.DeactivateVMail();
 			vmailActive = false;
 		}
 	}
@@ -1310,8 +1302,8 @@ public class MouseLookScript : MonoBehaviour {
 					curSearchScript.contents[i] = -1;
 					curSearchScript.customIndex[i] = -1;
 					if (heldObjectIndex != -1) holdingObject = true;
-					Const.sprint(Const.a.stringTable[heldObjectIndex + 326]
-								 + Const.a.stringTable[319],player); // picked up
+					CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326]
+								 + Sys_Text.stringTable[319],player); // picked up
 
 					MFDManager.a.DisableSearchItemImage(i);
 					useFX = false;
@@ -1342,30 +1334,30 @@ public class MouseLookScript : MonoBehaviour {
 		MFDManager.a.SendSearchToDataTab(curSearchScript.objectName,
 										 numberFoundContents,resultContents,
 										 resultCustomIndex,
-										 currentSearchItem.transform.position,
+										 currentSearchItem.instances[i].position,
 										 curSearchScript, useFX);
 		ForceInventoryMode();
 	}
 
 	public void UseGrenade (int index) {
-		if (holdingObject) { Const.sprint(Const.a.stringTable[311],player); return; } // Can't use grenade, hands full
+		if (holdingObject) { CenterStatusPrint("%s", Sys_Text.stringTable[311],player); return; } // Can't use grenade, hands full
 		if (index < 7 || index > 13) { DualLog("BUG: index outside of 7 to 13 passed to UseGrenade() in MouseLookScript.cs"); return; }
 
 		ForceInventoryMode();  // Inventory mode is turned on when picking something up.
 		ResetHeldItem();
 		MouseCursor.a.liveGrenade = true;
 		grenadeActive = true;
-		Const.sprint(Const.a.stringTable[index + 326]
-					 + Const.a.stringTable[320],player); // activated, grenade is LIVE!
+		CenterStatusPrint("%s", Sys_Text.stringTable[index + 326]
+					 + Sys_Text.stringTable[320],player); // activated, grenade is LIVE!
 
 		switch(index) { // Subtract one from the correct grenade inventory
-			case 7:  heldObject = Const.a.GetPrefab(370); Inventory.a.RemoveGrenade(0); break; // Frag
-			case 8:  heldObject = Const.a.GetPrefab(372); Inventory.a.RemoveGrenade(3); break; // Concussion
-			case 9:  heldObject = Const.a.GetPrefab(387); Inventory.a.RemoveGrenade(1); break; // EMP
-			case 10: heldObject = Const.a.GetPrefab(389); Inventory.a.RemoveGrenade(6); break; // Earth Shaker
-			case 11: heldObject = Const.a.GetPrefab(402); Inventory.a.RemoveGrenade(4); break; // Land Mine
-			case 12: heldObject = Const.a.GetPrefab(403); Inventory.a.RemoveGrenade(5); break; // Nitropak
-			case 13: heldObject = Const.a.GetPrefab(404); Inventory.a.RemoveGrenade(2); break; // Gas
+			case 7:  heldObject = Const.a.GetPrefab(370); inventoryPlayer1.RemoveGrenade(0); break; // Frag
+			case 8:  heldObject = Const.a.GetPrefab(372); inventoryPlayer1.RemoveGrenade(3); break; // Concussion
+			case 9:  heldObject = Const.a.GetPrefab(387); inventoryPlayer1.RemoveGrenade(1); break; // EMP
+			case 10: heldObject = Const.a.GetPrefab(389); inventoryPlayer1.RemoveGrenade(6); break; // Earth Shaker
+			case 11: heldObject = Const.a.GetPrefab(402); inventoryPlayer1.RemoveGrenade(4); break; // Land Mine
+			case 12: heldObject = Const.a.GetPrefab(403); inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
+			case 13: heldObject = Const.a.GetPrefab(404); inventoryPlayer1.RemoveGrenade(2); break; // Gas
 		}
 		MFDManager.a.ResetItemTab();
 		PutObjectInHand(index,-1,0,0,false,true);

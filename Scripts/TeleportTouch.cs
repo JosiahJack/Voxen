@@ -29,7 +29,7 @@ public class TeleportTouch : MonoBehaviour {
 					MFDManager.a.teleportFX.SetActive(true);
 					TeleportTouch tt = allTeleportTouches[targetDestinationID];
 					if (tt != null) {
-						col.transform.position = tt.transform.position; // Do it!
+						col.instances[i].position = tt.instances[i].position; // Do it!
 						tt.justUsed = Sys_Global.pauseRelativeTime + 1.0f;
 					}
 					

@@ -30,7 +30,7 @@ public class InteractablePanel : MonoBehaviour {
 	public void Use(UseData ud) {
 		if (open) {
 			if (installed && ud.mainIndex == -1) {
-				Const.sprint(alreadyInstalledMessageLingdex);
+				CenterStatusPrint(alreadyInstalledMessageLingdex);
 				return; // do nothing already done here
 			}
 
@@ -46,7 +46,7 @@ public class InteractablePanel : MonoBehaviour {
 				installed = true;
 				if (installationItem != null) installationItem.SetActive(true);
 				Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXInstallationIndex]);
-				Const.sprint(installedMessageLingdex);
+				CenterStatusPrint(installedMessageLingdex);
 				// any extra effect objects?  activate them here...good for sparks or turning on any extra bits and bobs
 				if (effects.Length > 0) {
 					for(int i=0;i<effects.Length;i++) {
@@ -67,13 +67,13 @@ public class InteractablePanel : MonoBehaviour {
 				Const.a.UseTargets(gameObject,ud,target);
 			} else {
 				Utils.PlayOneShotSavable(SFX,Const.a.sounds[43]); // button_deny, aaaahhh!! Try again
-				Const.sprint(wrongItemMessageLingdex);
+				CenterStatusPrint(wrongItemMessageLingdex);
 			}
 		} else {
 			open = true;
 			anim.Play("Open");
 			Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXOpenIndex]);
-			Const.sprint(openMessageLingdex);
+			CenterStatusPrint(openMessageLingdex);
 		}
 	}
 }

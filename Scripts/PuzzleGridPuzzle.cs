@@ -50,12 +50,12 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 
 	public void Use (UseData ud) {
 		if (dead) {
-			Const.sprint(messageOnBrokenLingdex);
+			CenterStatusPrint(messageOnBrokenLingdex);
 			return;
 		}
 
 		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(transform.position);
+			MFDManager.a.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
@@ -65,7 +65,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		}
 
 		if (locked) {
-			Const.sprint(messageOnLockedLingdex);
+			CenterStatusPrint(messageOnLockedLingdex);
 			return;
 		}
 
@@ -78,7 +78,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 					  + "without parameters!");
 		}
 
-		Const.sprint(Const.a.stringTable[190],ud.owner); // Puzzle accessed
+		CenterStatusPrint("%s", Sys_Text.stringTable[190],ud.owner); // Puzzle accessed
 		inUse = true;
 		if (animate && anim != null && !alreadyOpen) {
 			anim.Play("Open");
@@ -88,12 +88,12 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		MFDManager.a.SendGridPuzzleToDataTab(grid,cellType,gridType,
 											 sourceIndex,outputIndex,width,
 											 height,theme,target,ud,
-											 transform.position,this);
+											 instances[i].position,this);
 	}
 
 	public void UseTargets (GameObject owner) {
 		if (onlyFireOnce && fired) {
-			Const.sprint(alreadyFiredMessageLingdex);
+			CenterStatusPrint(alreadyFiredMessageLingdex);
 			return;
 		}
 
@@ -101,7 +101,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		UseData ud = new UseData();
 		ud.owner = owner;
 		Const.a.UseTargets(gameObject,ud,target);
-		Const.sprint(successMessageLingdex);
+		CenterStatusPrint(successMessageLingdex);
 	}
 
 	public static string Save(GameObject go) {

@@ -83,9 +83,9 @@ public class PauseScript : MonoBehaviour {
 			if (ambientRegistry[i] == null) continue;
 
 			hitCount = RaycastNonAlloc(
-						MouseLookScript.a.transform.position,
-						ambientRegistry[i].transform.position
-						- MouseLookScript.a.transform.position,
+						MouseLookScript.a.instances[i].position,
+						ambientRegistry[i].instances[i].position
+						- MouseLookScript.a.instances[i].position,
 						results,32f,Const.a.layerMaskPlayerFrob,
 						QueryTriggerInteraction.UseGlobal);
 
@@ -144,12 +144,12 @@ public class PauseScript : MonoBehaviour {
 			MouseLookScript.a.ToggleInventoryMode();
 		}
 		
-		if (Inventory.a.vmailbetajet.activeInHierarchy) Inventory.a.vmailbetajetVideo.Pause();
-		if (Inventory.a.vmailbridgesep.activeInHierarchy) Inventory.a.vmailbridgesepVideo.Pause();
-		if (Inventory.a.vmailcitadestruct.activeInHierarchy) Inventory.a.vmailcitadestructVideo.Pause();
-		if (Inventory.a.vmailgenstatus.activeInHierarchy) Inventory.a.vmailgenstatusVideo.Pause();
-		if (Inventory.a.vmaillaserdest.activeInHierarchy) Inventory.a.vmaillaserdestVideo.Pause();
-		if (Inventory.a.vmailshieldsup.activeInHierarchy) Inventory.a.vmailshieldsupVideo.Pause();
+		if (inventoryPlayer1.vmailbetajet.activeInHierarchy) inventoryPlayer1.vmailbetajetVideo.Pause();
+		if (inventoryPlayer1.vmailbridgesep.activeInHierarchy) inventoryPlayer1.vmailbridgesepVideo.Pause();
+		if (inventoryPlayer1.vmailcitadestruct.activeInHierarchy) inventoryPlayer1.vmailcitadestructVideo.Pause();
+		if (inventoryPlayer1.vmailgenstatus.activeInHierarchy) inventoryPlayer1.vmailgenstatusVideo.Pause();
+		if (inventoryPlayer1.vmaillaserdest.activeInHierarchy) inventoryPlayer1.vmaillaserdestVideo.Pause();
+		if (inventoryPlayer1.vmailshieldsup.activeInHierarchy) inventoryPlayer1.vmailshieldsupVideo.Pause();
 		EnablePauseUI();
 		pauseText.SetActive(true);
 	}
@@ -162,12 +162,12 @@ public class PauseScript : MonoBehaviour {
 			MouseLookScript.a.SetCameraCullDistances();
 		}
 		DisablePauseUI();
-		if (Inventory.a.vmailbetajet.activeInHierarchy) Inventory.a.vmailbetajetVideo.Play();
-		if (Inventory.a.vmailbridgesep.activeInHierarchy) Inventory.a.vmailbridgesepVideo.Play();
-		if (Inventory.a.vmailcitadestruct.activeInHierarchy) Inventory.a.vmailcitadestructVideo.Play();
-		if (Inventory.a.vmailgenstatus.activeInHierarchy) Inventory.a.vmailgenstatusVideo.Play();
-		if (Inventory.a.vmaillaserdest.activeInHierarchy) Inventory.a.vmaillaserdestVideo.Play();
-		if (Inventory.a.vmailshieldsup.activeInHierarchy) Inventory.a.vmailshieldsupVideo.Play();
+		if (inventoryPlayer1.vmailbetajet.activeInHierarchy) inventoryPlayer1.vmailbetajetVideo.Play();
+		if (inventoryPlayer1.vmailbridgesep.activeInHierarchy) inventoryPlayer1.vmailbridgesepVideo.Play();
+		if (inventoryPlayer1.vmailcitadestruct.activeInHierarchy) inventoryPlayer1.vmailcitadestructVideo.Play();
+		if (inventoryPlayer1.vmailgenstatus.activeInHierarchy) inventoryPlayer1.vmailgenstatusVideo.Play();
+		if (inventoryPlayer1.vmaillaserdest.activeInHierarchy) inventoryPlayer1.vmaillaserdestVideo.Play();
+		if (inventoryPlayer1.vmailshieldsup.activeInHierarchy) inventoryPlayer1.vmailshieldsupVideo.Play();
 		pauseText.SetActive(false);
 	}
 
@@ -230,7 +230,7 @@ public class PauseScript : MonoBehaviour {
 		if (onSaveDialog) return;
 
 		if (PlayerMovement.a.inCyberSpace) {
-			Const.sprint(Const.a.stringTable[602]); // Cannot save in cyberspace
+			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 			OpenSaveDialogHard();
 			return;
 		}
@@ -261,7 +261,7 @@ public class PauseScript : MonoBehaviour {
 
 	public void SavePause() {
 		if (PlayerMovement.a.inCyberSpace) {
-			Const.sprint(Const.a.stringTable[602]); // Cannot save in cyberspace
+			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 			return;
 		}
 		if (onSaveDialog) return;
@@ -361,7 +361,7 @@ public class PauseScript : MonoBehaviour {
 	// Let screenshot save without putting text in it.
 	public IEnumerator ScreenshotSprint(string sname) {
 		yield return new WaitForSeconds(0.1f);
-		Const.sprint(Const.a.stringTable[1024] + sname); // "Wrote screenshot "
+		CenterStatusPrint("%s", Sys_Text.stringTable[1024] + sname); // "Wrote screenshot "
 
 	}
 

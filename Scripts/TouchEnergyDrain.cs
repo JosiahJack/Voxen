@@ -20,7 +20,7 @@ public class TouchEnergyDrain : MonoBehaviour {
 				if (pe != null) {
 					pe.TakeEnergy(drainage);
 					if (BiomonitorGraphSystem.a != null) {
-						BiomonitorGraphSystem.a.EnergyPulse(drainage);
+						BiomonitorEnergyPulse(drainage);
 					}
 				}
 			}

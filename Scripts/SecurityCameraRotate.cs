@@ -48,8 +48,8 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotatePositive () {
-		if (((transform.rotation.eulerAngles.y + 1f) >= endYAngle)
-			&& ((transform.rotation.eulerAngles.y - 1f) <= endYAngle)) {
+		if (((instances[i].rotation.eulerAngles.y + 1f) >= endYAngle)
+			&& ((instances[i].rotation.eulerAngles.y - 1f) <= endYAngle)) {
 			rotatePositive = false;
 			waitingFinished = Sys_Global.pauseRelativeTime + waitTime;
 			return;
@@ -60,8 +60,8 @@ public class SecurityCameraRotate : MonoBehaviour {
 	}
 
 	void RotateNegative () {
-		if (((transform.rotation.eulerAngles.y + 1f) >= startYAngle)
-			&& ((transform.rotation.eulerAngles.y - 1f) <= startYAngle)) {
+		if (((instances[i].rotation.eulerAngles.y + 1f) >= startYAngle)
+			&& ((instances[i].rotation.eulerAngles.y - 1f) <= startYAngle)) {
 			rotatePositive = true;
 			waitingFinished = Sys_Global.pauseRelativeTime + waitTime;
 			return;

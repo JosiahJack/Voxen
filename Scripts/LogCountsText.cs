@@ -14,8 +14,8 @@ public class LogCountsText : MonoBehaviour {
 
 	void Update() {
 		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-			tempint = Inventory.a.numLogsFromLevel[countsSlotnum];
-			if (tempint > 0)text.text = Inventory.a.numLogsFromLevel[countsSlotnum].ToString();
+			tempint = inventoryPlayer1.numLogsFromLevel[countsSlotnum];
+			if (tempint > 0)text.text = inventoryPlayer1.numLogsFromLevel[countsSlotnum].ToString();
 			else 			text.text = " ";  // Blank out the text
 		}
 	}

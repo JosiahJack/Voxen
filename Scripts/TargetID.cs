@@ -33,26 +33,26 @@ public class TargetID : MonoBehaviour {
     }
 
 	void FixedUpdate() {
-		if (parent != null) transform.position = parent.position;
+		if (parent != null) instances[i].position = parent.position;
 	}
 	
 	public void SendDamageReceive(float damage, DamageData dd) {
 		if (linkedHM == null) return;
 
 		if (dd.attackType == AttackType.Tranq) {
-			currentText = Const.a.stringTable[536]; // STUNNED
+			currentText = Sys_Text.stringTable[536]; // STUNNED
 			damageTimeFinished = Sys_Global.pauseRelativeTime - 1f; // Expire damage text, Update handles "STUNNED"
 		} else {
 			if (damage > linkedHM.maxhealth * 0.75f) {
-				currentText = Const.a.stringTable[514]; // SEVERE DAMAGE
+				currentText = Sys_Text.stringTable[514]; // SEVERE DAMAGE
 			} else if (damage > linkedHM.maxhealth * 0.50f) {
-				currentText = Const.a.stringTable[515]; // MAJOR DAMAGE
+				currentText = Sys_Text.stringTable[515]; // MAJOR DAMAGE
 			} else if (damage > linkedHM.maxhealth * 0.25f) {
-				currentText = Const.a.stringTable[513]; // NORMAL DAMAGE
+				currentText = Sys_Text.stringTable[513]; // NORMAL DAMAGE
 			} else if (damage > 0f) {
-				currentText = Const.a.stringTable[512]; // MINOR DAMAGE
+				currentText = Sys_Text.stringTable[512]; // MINOR DAMAGE
 			} else {
-				currentText = Const.a.stringTable[511]; // NO DAMAGE
+				currentText = Sys_Text.stringTable[511]; // NO DAMAGE
 			}
 			damageTime = (damage == 0f) ? 1f : 2.5f;
 			damageTimeFinished = Sys_Global.pauseRelativeTime + damageTime;
@@ -98,7 +98,7 @@ public class TargetID : MonoBehaviour {
 			return;
 		}
 
-		if ((distance_vector3(transform.position,
+		if ((distance_vector3(instances[i].position,
 							  playerCapsuleTransform.position)
 			> playerLinkDistance)) {
 			Deactivate();
@@ -117,14 +117,14 @@ public class TargetID : MonoBehaviour {
 		}
 
 		if (displayHealth && linkedHM != null) {
-			secondaryDisplayString = Mathf.Floor(linkedHM.health).ToString();
+			secondaryDisplayString = vfloor(linkedHM.health).ToString();
 		} else {
 			secondaryDisplayString = System.String.Empty;
 		}
 
 		if (displayRange && linkedHM != null) {
 			float range = distance_vector3(playerCapsuleTransform.position,
-										   linkedHM.transform.position);
+										   linkedHM.instances[i].position);
 
 			if (displayHealth) secondaryDisplayString += comma;
 			secondaryDisplayString += (range.ToString("0.0") + rangeMetersM);
@@ -133,18 +133,18 @@ public class TargetID : MonoBehaviour {
 		if (displayAttitude && linkedHM != null) {
 			if (displayRange || displayHealth) secondaryDisplayString += comma;
 			if (linkedHM.aic.asleep) {
-				secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[519]); // Asleep
+				secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[519]); // Asleep
 			} else {
 				switch (linkedHM.aic.currentState) {
-					case AIState_Walk: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[517]); break; // Cautious
-					case AIState_Inspect: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[517]); break; // Cautious
-					case AIState_Interacting: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[517]); break; // Cautious
-					case AIState_Run: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[518]); break; // Hostile
-					case AIState_Attack1: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[518]); break; // Hostile
-					case AIState_Attack2: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[518]); break; // Hostile
-					case AIState_Attack3: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[518]); break; // Hostile
-					case AIState_Pain: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[518]); break; // Hostile
-					default: secondaryDisplayString = (secondaryDisplayString + Const.a.stringTable[516]); break; // Idle
+					case AIState_Walk: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[517]); break; // Cautious
+					case AIState_Inspect: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[517]); break; // Cautious
+					case AIState_Interacting: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[517]); break; // Cautious
+					case AIState_Run: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
+					case AIState_Attack1: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
+					case AIState_Attack2: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
+					case AIState_Attack3: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
+					case AIState_Pain: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[518]); break; // Hostile
+					default: secondaryDisplayString = (secondaryDisplayString + Sys_Text.stringTable[516]); break; // Idle
 				}
 			}
 		}
@@ -154,12 +154,12 @@ public class TargetID : MonoBehaviour {
 				if (linkedHM.aic != null) {
 					if (linkedHM.aic.tranquilizeFinished > Sys_Global.pauseRelativeTime
 						&& damageTimeFinished < Sys_Global.pauseRelativeTime) {
-						currentText = Const.a.stringTable[536]; // STUNNED
+						currentText = Sys_Text.stringTable[536]; // STUNNED
 					} else {
 						if (damageTimeFinished < Sys_Global.pauseRelativeTime) {
 							currentText = "";
-							if (!Inventory.a.hasHardware[4]
-								&& (currentText != Const.a.stringTable[511])) {
+							if (!inventoryPlayer1.hasHardware[4]
+								&& (currentText != Sys_Text.stringTable[511])) {
 
 								Deactivate();
 								return;
@@ -176,7 +176,7 @@ public class TargetID : MonoBehaviour {
 		float sensingRange = 12f;
 		if (manual) {
 			// Get manual lockon distance for frob raytrace.  Less than tether.
-			switch (Inventory.a.hardwareVersion[4]) {
+			switch (inventoryPlayer1.hardwareVersion[4]) {
 				case 1: sensingRange = 13f; break;
 				case 2: sensingRange = 13f; break;
 				case 3: sensingRange = 13f; break;
@@ -184,7 +184,7 @@ public class TargetID : MonoBehaviour {
 			}
 		} else {
 			// Get auto-lock distance.  Less than tether.
-			switch (Inventory.a.hardwareVersion[4]) {
+			switch (inventoryPlayer1.hardwareVersion[4]) {
 				case 1: sensingRange = 0f; break; // No auto-lock on v1
 				case 2: sensingRange = 0f; break; // No auto-lock on v2
 				case 3: sensingRange = 13f; break;
@@ -197,7 +197,7 @@ public class TargetID : MonoBehaviour {
 	// Set to higher than the auto-lock distances above.
 	public static float GetTargetIDTetherRange() {
 		float dist = 15f;
-		switch (Inventory.a.hardwareVersion[4]) {
+		switch (inventoryPlayer1.hardwareVersion[4]) {
 			case 1: dist = 15f; break; // Set higher than manual lockons.
 			case 2: dist = 15f; break; // Set higher than manual lockons.
 			case 3: dist = 15f; break;

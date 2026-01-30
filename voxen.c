@@ -9,11 +9,15 @@
 #include "credits.h"
 #include "data_textures.c"
 #include "audio.c"
+#include "update.c"
 const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
 GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
+BioMonitorSystem bioMonitor;
+InventorySystem inventoryPlayer1;
+InventorySystem inventoryPlayer2;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
 uint8_t queuedLevelToLoad = 255u;
 Entity instances[INSTANCE_COUNT];
@@ -51,6 +55,7 @@ float intervalStepisLerping[LIGHT_COUNT][30];
 bool lightCastsShadows[LIGHT_COUNT];
 uint16_t useableItemsFrobIcons[94];
 bool boosterActive;
+uint16_t selfIdx;
 
 static inline void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
 static inline GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
@@ -418,7 +423,7 @@ void LoadGameModDefinition(void) { // Unique set separate from savedata path and
     
     int32_t gamedatSize = OS_FileSize(fp);
     char* fb = OS_AllocateFileBackedRAMReadonly(gamedatSize, fp, "./Data/gamedata.txt");
-    if (!fb || gamedatSize < 1) { DualLogError("Could not open backed buffer for ./Data/gamedata.txt\n"); OS_Exit(1); }
+    if (!fb || gamedatSize < 1) { DualLogError("Could not open ./Data/gamedata.txt\n"); OS_Exit(1); }
     
     OS_Close(fp);
     uint32_t lineNum = 0; uint8_t lineLength = 0; char line[256]; char key[256]; char value[256]; bool is_comment = false, in_value = false;
@@ -570,6 +575,19 @@ void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
+    
+    // Menu Active Items, System Wide Game Logic Starts:
+    bioMonitor.beatFinished = get_time() + 0.5; // Half second beat tick
+    bioMonitor.widthPerc = 0.4f; bioMonitor.heightPerc = 0.1f;
+    bioMonitor.backgroundColor = (Color){0.2f,0.2f,1.0f,0.01f};
+    bioMonitor.ergColor = (Color){0.0f,0.5f,1.0f,1.0f}; bioMonitor.chiColor = (Color){0.7f,0.0f,1.0f,1.0f}; bioMonitor.ecgColor = (Color){1.0f,0.0f,0.0f,1.0f};
+    bioMonitor.ymax = 36;
+    bioMonitor.tick = 0.02; bioMonitor.tick0 = 0.0211; bioMonitor.tick1 = 0.050; bioMonitor.tick2 = 0.0104;
+    bioMonitor.min[BIOM_ERG] =  0.0f; bioMonitor.min[BIOM_CHI] = -2.0f; bioMonitor.min[BIOM_ECG] = -1.0f;
+    bioMonitor.max[BIOM_ERG] =  1.0f; bioMonitor.max[BIOM_CHI] =  2.0f; bioMonitor.max[BIOM_ECG] =  1.0f;
+    BioMonitorClearGraphs();
+    
+    // Testing:
     NewGame(); // TODO: Do this from menu not immediately lol
     DebugRAM("InitializeEnvironment end");
 }
@@ -596,17 +614,6 @@ void AddDebugLine(Vector3 start, Vector3 end) {
     Sys_Dx.debugLineVertCount = i;
 }
 
-__attribute__((pure)) bool EntityIsAnimated(uint16_t entIdx) {
-    return (   entIdx == 53
-            || entIdx == 79
-            || (entIdx >= 420 && entIdx <= 442)
-            || (entIdx >= 496 && entIdx <= 514)
-            || entIdx == 585
-            || entIdx == 602
-            || (entIdx >= 609 && entIdx <= 614)
-            || (entIdx >= 741 && entIdx <= 745));
-}
-
 void PortalCulling(void);
 void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
@@ -615,7 +622,7 @@ void UpdateAnims(void) {
         if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
         if (instances[i].numclips == 0) continue; // Invalid animation clip index
-        if (!EntityIsAnimated(instances[i].index)) continue;
+        if (!(instances[i].entflags & ENTFLAG_ANIMATED)) continue;
         
         AnimationClip currentClip = modelAnimationClips[animNum][instances[i].clip];
         if (instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
@@ -627,21 +634,21 @@ void UpdateAnims(void) {
 
         instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
         dirtyInstances[i] = true;
-        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) {
-            uint8_t portalIdx = instances[i].portalIndex;
-            if (portalIdx < MAX_PORTALS) {
-                uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
-                bool currentState = activePortals[portalIdx].open;
-                if (instances[i].modelIndex == closedModelIndex && currentState) {
-                    activePortals[portalIdx].open = false;
-                    activePortals[portalIdx].dirty = true;
-                    portalsNeedUpdated = true;
-                } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
-                    activePortals[portalIdx].open = true;
-                    activePortals[portalIdx].dirty = true;
-                    portalsNeedUpdated = true;
-                }
-            }
+        if (!EntityIndexIsPortalBlockingDoor(instances[i].index)) continue;
+        
+        uint8_t portalIdx = instances[i].portalIndex;
+        if (portalIdx >= MAX_PORTALS) continue;
+        
+        uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
+        bool currentState = activePortals[portalIdx].open;
+        if (instances[i].modelIndex == closedModelIndex && currentState) {
+            activePortals[portalIdx].open = false;
+            activePortals[portalIdx].dirty = true;
+            portalsNeedUpdated = true;
+        } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
+            activePortals[portalIdx].open = true;
+            activePortals[portalIdx].dirty = true;
+            portalsNeedUpdated = true;
         }
     }
     
@@ -733,8 +740,7 @@ void RenderShadowmaps(void) {
             bestScores[numberFoundLightCandidatesForShadows] = score;
             numberFoundLightCandidatesForShadows++;
         } else if (score < bestScores[0]) {  // Only compare against current worst
-            // Find worst (highest score) and replace it
-            int worstIdx = 0;
+            int worstIdx = 0; // Find worst (highest score) and replace it
             for (uint32_t j = 1; j < numberFoundLightCandidatesForShadows; ++j) {
                 if (bestScores[j] > bestScores[worstIdx]) worstIdx = j;
             }
@@ -769,17 +775,6 @@ void RenderShadowmaps(void) {
             if (modelVertexCounts[mdx] < 3) continue;
             if (mdx >= loadedModelsMaxIndex) continue;
             if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
-
-            // TODO Fix logic around portal cells preventing doors from passing the check below causing shadows to flicker off when the door closes.  Commented out the below for lighting stability.
-//             bool cellNotVisible = CellNotVisible(PosGetCellCoords(playerPos.x, playerPos.z)); // Cache cell indices once per mesh rather than once per light.
-//             if (cellNotVisible && !(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-//                 if (EntityIndexIsPortalBlockingDoor(instances[i].index) && instances[i].portalIndex < MAX_PORTALS) {
-//                     Portal doorPortal = activePortals[instances[i].portalIndex];
-//                     uint16_t cellAIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
-//                     uint16_t cellBIndex = (doorPortal.cellA.z * WORLDX) + doorPortal.cellA.x;
-//                     if (CellNotVisible(cellAIndex) && CellNotVisible(cellBIndex)) continue; // Neither cell is visible for door
-//                 } else continue;
-//             }
 
             shadowCasterIndices[numShadowCasters] = i;
             numShadowCasters++;
@@ -865,44 +860,7 @@ void RenderShadowmaps(void) {
     voxen_Shadow_System.shadowTime = get_time() - shadowStartTime;
 }
 
-static inline void RenderCompositePass(float px, float py, float pz, float * restrict viewProj, float * restrict invViewRot) {
-    glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
-    glUniform1i(4, 4); // outputImage texture sampler2D
-    float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)Sys_Global.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
-    if (berserkFinished < (float)Sys_Global.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
-    glUniform1f(9, berserkTimeRemainingNormalized);
-    glUniform1f(10, berserkSeedTime);
-    glUniform1ui(11, Sys_Settings.Brightness);
-    glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-    glUniform3f(13, px, py, pz);
-    glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
-    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
-    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
-    glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
-    uint32_t shieldOnType = 0u; // No shield green tint.
-    if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
-        if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-        else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
-    }
-    
-    glUniform1ui(20, shieldOnType);
-    Color painStaticColor = GetPainStaticColor();
-    glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
-    glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
-    glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
-    glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
-    glUniform1f(28, GetPainStatic());
-    glBindVertexArray(Sys_Render.quadVAO);
-    glDisable(GL_DEPTH_TEST);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    Sys_Dx.drawCallsRenderedThisFrame++;
-    Sys_Dx.verticesRenderedThisFrame += 4;
-}
-
 char creditStats[4096];
-
 float GetScore(float stupid, bool isFinal) {
     float score = 0.0f;
     float victories = (float)(Sys_Global.kills + Sys_Global.cyberkills);
@@ -1019,13 +977,13 @@ static inline double RenderUI(void) {
     CreditsScroll();
     double time_now = get_time();
     if (Sys_Cheats.showFPS && !Sys_Cheats.noHUD) {
-        double thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
-        double cpuFrameTime = Sys_Dx.cpuTime * 1000.0;
+        Sys_Dx.thisFrameTime = (time_now - Sys_Global.last_time) * 1000.0;
+        Sys_Dx.cpuFrameTime = Sys_Dx.cpuTime * 1000.0;
         uint8_t timingColor = TEXT_WHITE;
-        if (vabs(thisFrameTime - cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
-        if (thisFrameTime > 6.944444) timingColor = TEXT_RED;
+        if (vabs(Sys_Dx.thisFrameTime - Sys_Dx.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
+        if (Sys_Dx.thisFrameTime > 6.944444) timingColor = TEXT_RED;
         Sys_Dx.drawCallsRenderedThisFrame += 2; Sys_Dx.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", thisFrameTime,cpuFrameTime);
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
         RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
     }
     
@@ -1159,6 +1117,7 @@ void Render(void) {
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
     Vector3 playerPos = instances[PLAYER1].position;
+    float px = playerPos.x, py = playerPos.y, pz = playerPos.z;
     {// mat4_lookat_from(view,&instances[PLAYER1].rotation, playerPos); Manually inlined for performance
         float x = instances[PLAYER1].rotation.x, y = instances[PLAYER1].rotation.y, z = instances[PLAYER1].rotation.z, w = instances[PLAYER1].rotation.w;
         float x2 = x * x, y2 = y * y, z2 = z * z;
@@ -1186,7 +1145,39 @@ void Render(void) {
         if (Sys_Settings.Reflections > 0u) RenderSSR(viewProj, playerPos); // Screen Space Reflections
     }
 
-    RenderCompositePass(playerPos.x, playerPos.y, playerPos.z, viewProj, invViewRot);
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
+    glUniform1i(4, 4); // outputImage texture sampler2D
+    float berserkTimeRemainingNormalized = berserkFinished > 0.0001f ? (berserkFinished - (float)Sys_Global.pauseRelativeTime) / PATCH_TIME_BERSERK : 0.0f;
+    if (berserkFinished < (float)Sys_Global.pauseRelativeTime && berserkFinished > 0.0001f) berserkFinished = berserkTimeRemainingNormalized = 0.0f;
+    glUniform1f(9, berserkTimeRemainingNormalized);
+    glUniform1f(10, berserkSeedTime);
+    glUniform1ui(11, Sys_Settings.Brightness);
+    glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+    glUniform3f(13, px, py, pz);
+    glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
+    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
+    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
+    glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    uint32_t shieldOnType = 0u; // No shield green tint.
+    if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+        if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+        else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+    }
+    
+    glUniform1ui(20, shieldOnType);
+    Color painStaticColor = GetPainStaticColor();
+    glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
+    glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
+    glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
+    glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
+    glUniform1f(28, GetPainStatic());
+    glBindVertexArray(Sys_Render.quadVAO);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    Sys_Dx.drawCallsRenderedThisFrame++;
+    Sys_Dx.verticesRenderedThisFrame += 4;
     Sys_Global.last_time = RenderUI();
     if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
@@ -1258,10 +1249,10 @@ int32_t main(int32_t argc, char* argv[]) {
        
         // Update Time
         Sys_Global.current_time = get_time();
-        double frame_time = Sys_Global.current_time - Sys_Global.last_topframe_time;
-        Sys_Global.absoluteTime += frame_time;
+        Sys_Global.deltaTime = Sys_Global.current_time - Sys_Global.last_topframe_time;
+        Sys_Global.absoluteTime += Sys_Global.deltaTime;
         Sys_Global.last_topframe_time = Sys_Global.current_time;
-        if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += frame_time;
+        if (!Sys_Global.gamePaused) Sys_Global.pauseRelativeTime += Sys_Global.deltaTime;
     
         // Update Events, calls Physics()
         glfwPollEvents();
@@ -1286,10 +1277,9 @@ int32_t main(int32_t argc, char* argv[]) {
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
             // TODO: UpdatePlayer(PLAYER1);
             // TODO: UpdatePlayer(PLAYER2);
+            BioMonitorUpdate();
             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) { // Do everything... TODO: Put into event??  eventssss??
-                if (instances[i].think == NULL) continue;
-                
-                instances[i].think(); // Get new states prior to updating animations, physics event, or rendering
+                Update(i); // Get new states prior to updating animations, physics event, or rendering
             }
             
             UpdateAmbientSounds();

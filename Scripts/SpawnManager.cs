@@ -24,17 +24,17 @@ public class SpawnManager : MonoBehaviour {
 	void Start() {
 		delayFinished = Sys_Global.pauseRelativeTime;
 		if (Sys_Global.difficultyCombat == 1) {
-			numberToSpawn = (int) Mathf.Floor(numberToSpawn*0.5f);
+			numberToSpawn = (int) vfloor(numberToSpawn*0.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
 		if (Sys_Global.difficultyCombat == 3) {
-			numberToSpawn = (int) Mathf.Floor(numberToSpawn*1.5f);
+			numberToSpawn = (int) vfloor(numberToSpawn*1.5f);
 			if (numberToSpawn < 1) numberToSpawn = 1;
 		}
 
 		if (Sys_Global.difficultyCombat > 3) {
-			numberToSpawn = (int) Mathf.Floor(numberToSpawn*5f); // Hehe :)
+			numberToSpawn = (int) vfloor(numberToSpawn*5f); // Hehe :)
 		}
 	}
 
@@ -96,7 +96,7 @@ public class SpawnManager : MonoBehaviour {
 		if (instGO == null) {
 			DualLog("BUG: Could not spawn NPC index " + index.ToString());
 		} else {
-			instGO.transform.position = spot;
+			instGO.instances[i].position = spot;
 			AIController aic = instGO.GetComponent<AIController>();
 			if (aic == null) return;
 
@@ -132,7 +132,7 @@ public class SpawnManager : MonoBehaviour {
 	}
 
 	bool AreaHidden(Vector3 spot) {
-		Vector3 plyPos = Const.a.player1Capsule.transform.position;
+		Vector3 plyPos = Const.a.player1Capsule.instances[i].position;
 		float range = 50f;
 		if (distance_vector3(plyPos,spot) > range) return true;
 

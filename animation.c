@@ -139,8 +139,8 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
 		if (lightContainer != null) {
 			lit = lightContainer.GetComponent<Light>();
 			if (lit != null) {
-				if ((transform.localScale.x < 1.0f) || (transform.localScale.y < 1.0f) || (transform.localScale.z < 1.0f)) {
-					float factor = Mathf.Min(transform.localScale.x, transform.localScale.y, transform.localScale.z);
+				if ((instances[i].scale.x < 1.0f) || (instances[i].scale.y < 1.0f) || (instances[i].scale.z < 1.0f)) {
+					float factor = vmin(instances[i].scale.x, instances[i].scale.y, instances[i].scale.z);
 					lit.range *= factor;
 					if (lit.range < 2.0f) lit.range = 2.0f;
 				}

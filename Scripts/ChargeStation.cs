@@ -16,11 +16,11 @@
 	}
 
 	void Use (UseData ud) {
-		if (LevelManager.a.GetCurrentLevelSecurity() > minSecurityLevel) { MFDManager.a.BlockedBySecurity (transform.position); return; }
+		if (LevelManager.a.GetCurrentLevelSecurity() > minSecurityLevel) { MFDManager.a.BlockedBySecurity (instances[i].position); return; }
 		
 		if (nextthink < Sys_Global.pauseRelativeTime) {
 			if (PlayerEnergy.a.energy >= PlayerEnergy.a.maxenergy) {
-				Const.sprint(303);
+				CenterStatusPrint("%s",Sys_Text.stringTable[303]);
 				return;
 			} else {
 				PlayerEnergy.a.GiveEnergy(amount, EnergyType.ChargeStation);
@@ -31,7 +31,7 @@
 				DamageData dd = new DamageData();
 
 				// Don't ever kill the player from this, way too cheap.
-				dd.damage = Mathf.Min(damageOnUse,PlayerHealth.a.hm.health - 1);
+				dd.damage = vmin(damageOnUse,PlayerHealth.a.hm.health - 1);
 
 				// No impact force here, it's a zap.  Ouch, it zapped me...that
 				// really hurt Chargie, that hurt my finger, owhow, OW! ow,
@@ -40,11 +40,11 @@
 				if (dd.damage > 0) PlayerHealth.a.hm.TakeDamage(dd);
 			}
 
-			Const.sprint(usedMsgLingdex);
+			CenterStatusPrint("%s",Sys_Text.stringTable[usedMsgLingdex]);
 			if (requireReset) nextthink = Sys_Global.pauseRelativeTime + resetTime;
 			Const.a.UseTargets(gameObject,ud,target);
 		} else {
-			Const.sprint(rechargeMsgLingdex);
+			CenterStatusPrint("%s",Sys_Text.stringTable[rechargeMsgLingdex]);
 		}
 	}
 

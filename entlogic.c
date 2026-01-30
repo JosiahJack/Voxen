@@ -25,14 +25,14 @@ void EnableBits(uint16_t i) {
         DualLog("QUESTBIT_SHIELD_ACTIVATED: 1");
         QuestLogNotesManager.a.notes[8].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
-        QuestLogNotesManager.a.labels[8].text = Const.a.stringTable[560];
+        QuestLogNotesManager.a.labels[8].text = Sys_Text.stringTable[560];
     }
     
     if (instances[i].ioflags & QUESTBIT_LASER_SAFETY_OVERRIDEN) {
         DualLog("QUESTBIT_LASER_SAFETY_OVERRIDEN: 1");
         QuestLogNotesManager.a.notes[7].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
-        QuestLogNotesManager.a.labels[7].text = Const.a.stringTable[559];
+        QuestLogNotesManager.a.labels[7].text = Sys_Text.stringTable[559];
     }
     
     if (instances[i].ioflags & QUESTBIT_LASER_DESTROYED) {
@@ -40,7 +40,7 @@ void EnableBits(uint16_t i) {
         if (AutoSplitterData.missionSplitID == 1) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[9].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
-        QuestLogNotesManager.a.labels[9].text = Const.a.stringTable[561];
+        QuestLogNotesManager.a.labels[9].text = Sys_Text.stringTable[561];
     }
     
     if (instances[i].ioflags & QUESTBIT_BETA_GROVE_CYBER_UNLOCKED) {
@@ -68,15 +68,15 @@ void EnableBits(uint16_t i) {
         if (AutoSplitterData.missionSplitID == 2) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[12].SetActive(true);
         QuestLogNotesManager.a.notes[11].SetActive(true);
-        QuestLogNotesManager.a.labels[11].text = Const.a.stringTable[563]; // Set:Diagnose and repair broken relay
+        QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
     }
     
     if (instances[i].ioflags & QUESTBIT_RELAY_428_FIXED) {
         DualLog("QUESTBIT_RELAY_428_FIXED: 1");
         QuestLogNotesManager.a.notes[11].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
-        QuestLogNotesManager.a.labels[11].text = Const.a.stringTable[563]; // Set:Diagnose and repair broken relay
-        QuestLogNotesManager.a.labels[11].text += Const.a.stringTable[564]; // Add:: 428.
+        QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
+        QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564]; // Add:: 428.
     }
     
     if (instances[i].ioflags & QUESTBIT_MASTER_JETTISON_ENABLED) {
@@ -84,7 +84,7 @@ void EnableBits(uint16_t i) {
         if (AutoSplitterData.missionSplitID == 3) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[10].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
-        QuestLogNotesManager.a.labels[10].text = Const.a.stringTable[562];
+        QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562];
     }
     
     if (instances[i].ioflags & QUESTBIT_BETA_GROVE_JETTISONED) {
@@ -92,9 +92,9 @@ void EnableBits(uint16_t i) {
         if (AutoSplitterData.missionSplitID == 4) AutoSplitterData.missionSplitID++;
         QuestLogNotesManager.a.notes[12].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
-        QuestLogNotesManager.a.labels[12].text = Const.a.stringTable[565];
+        QuestLogNotesManager.a.labels[12].text = Sys_Text.stringTable[565];
         QuestLogNotesManager.a.notes[13].SetActive(true);
-        QuestLogNotesManager.a.labels[13].text = Const.a.stringTable[566];
+        QuestLogNotesManager.a.labels[13].text = Sys_Text.stringTable[566];
     }
     
     if (instances[i].ioflags & QUESTBIT_ANTENNA_NORTH_DESTROYED) {
@@ -137,8 +137,8 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.notes[15].SetActive(true); // Escape pod
         QuestLogNotesManager.a.notes[16].SetActive(true); // Access the bridge
         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
-        QuestLogNotesManager.a.labels[14].text = Const.a.stringTable[567]; // Set:Engage reactor self-destruct.
-        QuestLogNotesManager.a.labels[15].text = Const.a.stringTable[568]; // Set:Escape on escape pod.
+        QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567]; // Set:Engage reactor self-destruct.
+        QuestLogNotesManager.a.labels[15].text = Sys_Text.stringTable[568]; // Set:Escape on escape pod.
     }
     
     if (instances[i].ioflags & QUESTBIT_BRIDGE_SEPARATED) {
@@ -159,12 +159,12 @@ void EnableBits(uint16_t i) {
         QuestLogNotesManager.a.notes[13].SetActive(true);
         QuestLogNotesManager.a.notes[14].SetActive(true); // Self destruct
         QuestLogNotesManager.a.checkBoxes[14].isOn = Const.a.questData.SelfDestructActivated;
-        QuestLogNotesManager.a.labels[14].text = Const.a.stringTable[567]; // Set:Engage reactor self-destruct.
+        QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567]; // Set:Engage reactor self-destruct.
         QuestLogNotesManager.a.notes[16].SetActive(true);
         QuestLogNotesManager.a.notes[17].SetActive(true);
         QuestLogNotesManager.a.checkBoxes[16].isOn = true;
-        QuestLogNotesManager.a.labels[16].text = Const.a.stringTable[569]; // Set:Access the bridge.
-        QuestLogNotesManager.a.labels[17].text = Const.a.stringTable[570]; // Set:Destroy SHODAN.
+        QuestLogNotesManager.a.labels[16].text = Sys_Text.stringTable[569]; // Set:Access the bridge.
+        QuestLogNotesManager.a.labels[17].text = Sys_Text.stringTable[570]; // Set:Destroy SHODAN.
     }
     
     if (instances[i].ioflags & QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED) DualLog("QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED: 1");
@@ -229,7 +229,7 @@ void ToggleBits() {
         QuestLogNotesManager.a.checkBoxes[8].isOn = Const.a.questData.ShieldActivated;
         if (Const.a.questData.ShieldActivated) {
             QuestLogNotesManager.a.notes[8].SetActive(true);
-            QuestLogNotesManager.a.labels[8].text = Const.a.stringTable[560];
+            QuestLogNotesManager.a.labels[8].text = Sys_Text.stringTable[560];
         }
     }
     if (LaserSafetyOverriden) {
@@ -237,7 +237,7 @@ void ToggleBits() {
         QuestLogNotesManager.a.checkBoxes[7].isOn = Const.a.questData.LaserSafetyOverriden;
         if (Const.a.questData.LaserSafetyOverriden) {
             QuestLogNotesManager.a.notes[7].SetActive(true);
-            QuestLogNotesManager.a.labels[7].text = Const.a.stringTable[559];
+            QuestLogNotesManager.a.labels[7].text = Sys_Text.stringTable[559];
         }
     }
     if (LaserDestroyed) {
@@ -246,7 +246,7 @@ void ToggleBits() {
         QuestLogNotesManager.a.checkBoxes[9].isOn = Const.a.questData.LaserDestroyed;
         if (Const.a.questData.LaserDestroyed) {
             QuestLogNotesManager.a.notes[9].SetActive(true);
-            QuestLogNotesManager.a.labels[9].text = Const.a.stringTable[561];
+            QuestLogNotesManager.a.labels[9].text = Sys_Text.stringTable[561];
         }
     }
     if (BetaGroveCyberUnlocked) Const.a.questData.BetaGroveCyberUnlocked = !Const.a.questData.BetaGroveCyberUnlocked;
@@ -257,7 +257,7 @@ void ToggleBits() {
         Const.a.questData.MasterJettisonBroken = !Const.a.questData.MasterJettisonBroken;
         if (Const.a.questData.MasterJettisonBroken) {
             QuestLogNotesManager.a.notes[11].SetActive(true); // Diagnose and repair broken relay
-            QuestLogNotesManager.a.labels[11].text = Const.a.stringTable[563];// Set:Diagnose and repair broken relay
+            QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563];// Set:Diagnose and repair broken relay
         }
     }
     if (Relay428Fixed) {
@@ -265,8 +265,8 @@ void ToggleBits() {
         QuestLogNotesManager.a.checkBoxes[11].isOn = Const.a.questData.Relay428Fixed;
         if (Const.a.questData.Relay428Fixed) {
             QuestLogNotesManager.a.notes[11].SetActive(true);
-            QuestLogNotesManager.a.labels[11].text = Const.a.stringTable[563]; // Set:Diagnose and repair broken relay
-            QuestLogNotesManager.a.labels[11].text += Const.a.stringTable[564]; // Add:: 428.
+            QuestLogNotesManager.a.labels[11].text = Sys_Text.stringTable[563]; // Set:Diagnose and repair broken relay
+            QuestLogNotesManager.a.labels[11].text += Sys_Text.stringTable[564]; // Add:: 428.
         }
     }
     if (MasterJettisonEnabled) {
@@ -274,7 +274,7 @@ void ToggleBits() {
         QuestLogNotesManager.a.checkBoxes[10].isOn = Const.a.questData.MasterJettisonEnabled;
         if (Const.a.questData.MasterJettisonEnabled) {
             QuestLogNotesManager.a.notes[10].SetActive(true);
-            QuestLogNotesManager.a.labels[10].text = Const.a.stringTable[562];
+            QuestLogNotesManager.a.labels[10].text = Sys_Text.stringTable[562];
         }
     }
     if (BetaGroveJettisoned) {
@@ -282,9 +282,9 @@ void ToggleBits() {
         QuestLogNotesManager.a.checkBoxes[12].isOn = Const.a.questData.BetaGroveJettisoned;
         if (Const.a.questData.BetaGroveJettisoned ) {
             QuestLogNotesManager.a.notes[12].SetActive(true);
-            QuestLogNotesManager.a.labels[12].text = Const.a.stringTable[565];
+            QuestLogNotesManager.a.labels[12].text = Sys_Text.stringTable[565];
             QuestLogNotesManager.a.notes[13].SetActive(true);
-            QuestLogNotesManager.a.labels[13].text = Const.a.stringTable[566];
+            QuestLogNotesManager.a.labels[13].text = Sys_Text.stringTable[566];
         }
     }
     if (AntennaNorthDestroyed) Const.a.questData.AntennaNorthDestroyed = !Const.a.questData.AntennaNorthDestroyed;
@@ -296,8 +296,8 @@ void ToggleBits() {
         if (Const.a.questData.SelfDestructActivated) {
             QuestLogNotesManager.a.notes[14].SetActive(true);
             QuestLogNotesManager.a.notes[15].SetActive(true); // Escape pod
-            QuestLogNotesManager.a.labels[14].text = Const.a.stringTable[567];// Set:Engage reactor self-destruct.
-            QuestLogNotesManager.a.labels[15].text = Const.a.stringTable[568];// Set:Escape on escape pod.
+            QuestLogNotesManager.a.labels[14].text = Sys_Text.stringTable[567];// Set:Engage reactor self-destruct.
+            QuestLogNotesManager.a.labels[15].text = Sys_Text.stringTable[568];// Set:Escape on escape pod.
         }
     }
     if (BridgeSeparated) {
@@ -306,8 +306,8 @@ void ToggleBits() {
             QuestLogNotesManager.a.notes[16].SetActive(true);
             QuestLogNotesManager.a.notes[17].SetActive(true);
             QuestLogNotesManager.a.checkBoxes[16].isOn = true;
-            QuestLogNotesManager.a.labels[16].text = Const.a.stringTable[569]; // Set:Access the bridge.
-            QuestLogNotesManager.a.labels[17].text = Const.a.stringTable[570]; // Set:Destroy SHODAN.
+            QuestLogNotesManager.a.labels[16].text = Sys_Text.stringTable[569]; // Set:Access the bridge.
+            QuestLogNotesManager.a.labels[17].text = Sys_Text.stringTable[570]; // Set:Destroy SHODAN.
         }
     }
     if (IsolinearChipsetInstalled) Const.a.questData.IsolinearChipsetInstalled = !Const.a.questData.IsolinearChipsetInstalled;
@@ -985,7 +985,7 @@ void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
 // 				LevelManager.a.npcsm[i].RepopulateChildList();
 // 			}
 // 			
-// 			if (Inventory.a.hasHardware[1]) {
+// 			if (inventoryPlayer1.hasHardware[1]) {
 // 				// Go through all HealthManagers in the game and initialize the
 // 				// linked overlays now for Automap.  Done after instantiation.
 // 				List<GameObject> hmGOs = new List<GameObject>();
@@ -1068,9 +1068,9 @@ void TestBits(bool testIfTrue, UseData ud, TargetIO tio) {
 // 			}
 // 
 // 			hitCount = RaycastNonAlloc(
-// 						MouseLookScript.a.transform.position,
-// 						aic.transform.position
-// 						  - MouseLookScript.a.transform.position,
+// 						MouseLookScript.a.instances[i].position,
+// 						aic.instances[i].position
+// 						  - MouseLookScript.a.instances[i].position,
 // 						results,32f,Const.a.layerMaskPlayerFrob,
 // 						QueryTriggerInteraction.UseGlobal);
 // 
@@ -1244,7 +1244,7 @@ void UseTargets(UseData ud, uint16_t i, string targetname) {
 // 			MouseLookScript.a.ScreenShake(force,1f);
 // 		} else {
 // 			// check if player is close enough and shake em' up!
-// 			if (distance_vector3(transform.position,player1Capsule.transform.position) < distance) {
+// 			if (distance_vector3(instances[i].position,player1Capsule.instances[i].position) < distance) {
 // 				MouseLookScript.a.ScreenShake(force,1f);
 // 			}
 // 		}
@@ -1377,9 +1377,9 @@ void Targetted(UseData ud, uint16_t i) {
 //         Door dr = GetComponent<Door>();
 //         if (dr != null) {
 //             if (!dr.locked
-//                 && (dr.requiredAccessCard == AccessCardType.None
+//                 && (dr.requiredAccessCard == AccessCardType_None
 //                     || dr.accessCardUsedByPlayer
-//                     || Inventory.a.HasAccessCard(dr.requiredAccessCard))) {
+//                     || inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
 //                 
 //                 dr.ForceOpen();
 //             }
@@ -1569,7 +1569,7 @@ void Targetted(UseData ud, uint16_t i) {
 // 
 //     if (ud.sendSprintMessage) {
 //         TriggeredSprintMessage tsm = GetComponent<TriggeredSprintMessage>();
-//         if (tsm != null) Const.sprint(tsm.messageToDisplay);
+//         if (tsm != null) CenterStatusPrint(tsm.messageToDisplay);
 //     }
 // 
 //     if (ud.radiationTreatment) {

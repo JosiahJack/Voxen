@@ -43,7 +43,7 @@ public static class ObjectContainmentSystem {
         Vector3 checkpos;
         float distMin = 1000000f;
         for (int i=0;i<ActiveFloorChunks.Count;i++) {
-            checkpos = ActiveFloorChunks[i].transform.position;
+            checkpos = ActiveFloorChunks[i].instances[i].position;
             float deltax = x - checkpos.x;
             float deltay = y - checkpos.z; // Stupid Unity
             if (deltax < distMin) distMin = deltax;
@@ -53,7 +53,7 @@ public static class ObjectContainmentSystem {
 
         // Go back and find the floor closest to us.  Could have blasted away via explosion.
         for (int i=0;i<ActiveFloorChunks.Count;i++) {
-            checkpos = ActiveFloorChunks[i].transform.position;
+            checkpos = ActiveFloorChunks[i].instances[i].position;
             float deltax = x - checkpos.x;
             float deltay = y - checkpos.z; // Stupid Unity
             if (deltax - distMin < 1.28f) return checkpos;

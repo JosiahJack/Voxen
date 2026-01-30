@@ -159,9 +159,8 @@ void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int
     glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-parameter"
 void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
+    (void)window;
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
@@ -191,7 +190,6 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     glBindImageTexture(0, Sys_Render.inputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Main Rendered Color
     glBindImageTexture(1, Sys_Render.inputWorldPosID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA16F); // World Position XYZ
     glBindImageTexture(2, Sys_Render.inputSpecID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // Specular
-    //                 3 = depth
     glBindImageTexture(4, Sys_Render.outputImageID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA8); // SSR result
     glBindImageTexture(5, Sys_Render.inputNormalID, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG16F); // Normal XYZ
     glActiveTexture(GL_TEXTURE4);
@@ -204,7 +202,6 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-#pragma GCC diagnostic pop
 
 void SetGI(void) {
     if (Sys_Settings.GI) {
@@ -214,7 +211,7 @@ void SetGI(void) {
 
 void SetSpeakerMode(void) {
     switch (Sys_Settings.SpeakerMode) {
-        case 0: break;//targetMode = AudioSpeakerMode.Mono; break;
+        case 0: break;//targetMode = AudioSpeakerMode.Mono; break; // TODO
         case 1: break;//targetMode = AudioSpeakerMode.Stereo; break;
         case 2: break;//targetMode = AudioSpeakerMode.Quad; break;
         case 3: break;//targetMode = AudioSpeakerMode.Surround; break;
@@ -417,7 +414,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     
     if (Sys_Global.gamePaused || Sys_Global.inventoryMode) return 0;
     
-    float sensitivity = clampf((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
+    float sensitivity = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
     cam_yaw += (float)xrel * sensitivity;
     if (cam_yaw >= 360.0f) cam_yaw -= 360.0f;
     if (cam_yaw < 0.0f) cam_yaw += 360.0f;

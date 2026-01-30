@@ -160,7 +160,7 @@ public class MinigameBotBounce : MonoBehaviour {
         playerPaddleImg.color = Color.Lerp(playerPaddleImg.color,Color.white,3f);
         x = playerPaddle.localPosition.x;
         playerVel = (MinigameCursor.a.minigameMouseX - x) / 48f;
-        playerVel = Mathf.Clamp(playerVel,-1f,1f);
+        playerVel = vclamp(playerVel,-1f,1f);
         x += playerVel * playerRate;
         if (x < (-128f + paddleWidthH)) {
             x = -128f + paddleWidthH;

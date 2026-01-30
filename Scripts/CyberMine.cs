@@ -30,7 +30,7 @@ public class CyberMine : MonoBehaviour {
 				DamageData damageData = new DamageData();
 				damageData.other = gameObject;
 				damageData.isOtherNPC = false;
-				damageData.attacknormal = (transform.position - col.transform.position);
+				damageData.attacknormal = (instances[i].position - col.instances[i].position);
 				damageData.owner = gameObject;
 				damageData.attackType = AttackType.None;
 				damageData.damage = dmg;

@@ -172,7 +172,7 @@ public class MouseCursor : MonoBehaviour {
 	
 	private void EnableLiveGrenadeTooltip() {
 		tooltipLiveGrenade.SetActive(true); // Display "live" next to cursor
-		tooltipLiveGrenadeText.text = Const.a.stringTable[586];
+		tooltipLiveGrenadeText.text = Sys_Text.stringTable[586];
 	}
 
 	void Update() {
@@ -186,8 +186,8 @@ public class MouseCursor : MonoBehaviour {
 		offsetX = cursorSize * halfFactor;
 		offsetY = offsetX;
 		cursorPosition = new Vector2(Input.mousePosition.x,Input.mousePosition.y);
-		cursorPosition.x = Mathf.Clamp(cursorPosition.x,0,Screen.width);
-		cursorPosition.y = Mathf.Clamp(cursorPosition.y,0,Screen.height);
+		cursorPosition.x = vclamp(cursorPosition.x,0,Screen.width);
+		cursorPosition.y = vclamp(cursorPosition.y,0,Screen.height);
 		lastMousePos = Input.mousePosition;
 		UpdateSafeZone();
 		UpdateEventSystemPointerStatus();

@@ -37,10 +37,10 @@ public class FuncWall : MonoBehaviour {
 		pr.previousKinematic = true;
 		pr.previouscolDetMode = CollisionDetectionMode.ContinuousSpeculative;
 		pr.previousSet = true;
-		targetPositionY = targetPosition.transform.localPosition.y;
-		tempVec = (transform.position - targetPosition.transform.position);
+		targetPositionY = targetPosition.instances[i].position.y;
+		tempVec = (instances[i].position - targetPosition.instances[i].position);
 		float distTotal = distance_vector3(startPosition,
-										   targetPosition.transform.position);
+										   targetPosition.instances[i].position);
 
 		tempVec = -tempVec.normalized;
 		if (currentState == FuncStates.AjarMovingTarget) {
@@ -62,8 +62,8 @@ public class FuncWall : MonoBehaviour {
 		if (tempVec.z >  10000f) tempVec.z =  10000f;
 		if (tempVec.z < -10000f) tempVec.z = -10000f;
 		if (float.IsNaN(tempVec.z)) tempVec.z = 0f;
-		tempVec += transform.position;
-		transform.position = tempVec;
+		tempVec += instances[i].position;
+		instances[i].position = tempVec;
 	}
 
 	public void Targetted (UseData ud) {
@@ -98,11 +98,11 @@ public class FuncWall : MonoBehaviour {
 	void MoveToPosition(Vector3 goalPosition, FuncStates newState) {
 		rbody.WakeUp();
 		dist = speed * Time.deltaTime;
-		tempVec = (transform.position - goalPosition).normalized; // Relative
-		tempVec = (tempVec * dist * -1) + transform.position; // Absolute
+		tempVec = (instances[i].position - goalPosition).normalized; // Relative
+		tempVec = (tempVec * dist * -1) + instances[i].position; // Absolute
 		rbody.MovePosition(tempVec);
-		distanceLeft = distance_vector3(transform.position, goalPosition);
-		float distTotal = Mathf.Abs(targetPositionY);
+		distanceLeft = distance_vector3(instances[i].position, goalPosition);
+		float distTotal = vabs(targetPositionY);
 		percentMoved = (distTotal - distanceLeft) / distTotal;
 		if (float.IsNaN(percentMoved)) percentMoved = 0f;
 		if (percentMoved > 1.0f) percentMoved = 1.0f;
@@ -126,13 +126,13 @@ public class FuncWall : MonoBehaviour {
 
 		switch (currentState) {
 			case FuncStates.Start:
-				transform.position = startPosition;
+				instances[i].position = startPosition;
 				if (rbody.velocity.sqrMagnitude > 0) {
 					rbody.velocity = Const.a.vectorZero;
 				}
 				break;
 			case FuncStates.Target:
-				transform.position = targetPosition.transform.position;
+				instances[i].position = targetPosition.instances[i].position;
 				if (rbody.velocity.sqrMagnitude > 0) {
 					rbody.velocity = Const.a.vectorZero;
 				}
@@ -141,7 +141,7 @@ public class FuncWall : MonoBehaviour {
 				MoveToPosition(startPosition, FuncStates.Start);
 				break;
 			case FuncStates.MovingTarget:
-				MoveToPosition(targetPosition.transform.position,
+				MoveToPosition(targetPosition.instances[i].position,
 								FuncStates.Target);
 				break;
 		}
@@ -224,7 +224,7 @@ public class FuncWall : MonoBehaviour {
 		Transform info_target = go.transform.parent.transform.GetChild(1);
 		index = Utils.LoadTransform(info_target,ref entries,index);
 		index = Utils.LoadAudioSource(go,ref entries,index);
-		fw.transform.localPosition = new Vector3(0f,0f,0f);
+		fw.instances[i].position = new Vector3(0f,0f,0f);
 		int numChildren = Utils.GetIntFromString(entries[index],"chunkIDs.Length"); index++;
 		fw.chunkIDs = new int[numChildren];
 		int chunkdex = 0;
@@ -239,7 +239,7 @@ public class FuncWall : MonoBehaviour {
 			// func_wall prefab and that there are no children chunks on the
 			// mover_target GameObject yet.
 			GameObject childGO = Instantiate(Const.a.GetPrefab(chunkdex),
-						go.transform.localPosition, // 0's, transform is below
+						go.instances[i].position, // 0's, transform is below
 						Const.a.quaternionIdentity) as GameObject;
 			childGO.transform.SetParent(go.transform); // Set parent prior
 													   // to loading transform.

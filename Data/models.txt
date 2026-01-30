@@ -843,7 +843,7 @@ index: 589
 index: 590
 #Models/shelves.fbx
 index: 591
-#Models/skeleton.fbx
+#Models/skeleton.obj
 index: 592
 #Models/skull.fbx
 index: 593
@@ -993,7 +993,7 @@ index: 669
 
 #Models/access_card_collider.fbx
 index: 672
-#Models/a_hornet_collider.fbx
+#Models/a_hornet_collider.obj
 index: 673
 #Models/a_magcart_collider.fbx
 index: 674

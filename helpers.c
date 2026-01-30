@@ -57,6 +57,7 @@ bool ConstIndexIsGenericTransform(int constdex) { return constdex == 749; }
 bool ConstIndexIsNPC(int constdex) { return (constdex >= 419 && constdex < 448); }
 bool ConstIndexIsHardware(int constdex) { return (constdex >= 328) && (constdex <= 339); }
 bool ConstIndexIsAmbient(int constdex) { return (constdex >= 621 && constdex <= 655); }
+bool ConstIndexIsButtonSwitch(int constdex) { return ((constdex >= 688 && constdex <= 692) || constdex == 694 || constdex == 695); }
 bool ConstIndexIsDynamicObject(uint16_t constIndex) {
     return     (constIndex >= 307 && constIndex <= 404)
             ||  constIndex == 417
@@ -137,6 +138,28 @@ uint8_t random_range_u8(uint8_t a, uint8_t b) {
 
 uint8_t random_range(float a, float b) {
     return a + ((b - a) * ((float)rand() / RAND_MAX));
+}
+
+float lerp(float min, float max, float val) { return min + (max - min) * vclamp(val,0.0f,1.0f); }
+float inverse_lerp(float min, float max, float val) { return (min == max) ? 0.0f : vclamp((val - min) / (max - min),0.0f,1.0f); }
+
+float smooth_damp(float current, float target, float *current_velocity, float smooth_time) { 
+    if (smooth_time < 0.0001f) smooth_time = 0.0001f;
+    float omega = 2.0f / smooth_time;
+    float x = omega * (float)Sys_Global.timeSinceLastPhysicsTick;
+    float exp = 1.0f / (1.0f + x + 0.48f * x * x + 0.235f * x * x * x);
+    float change = current - target;
+    float original_to = target;
+    target = current - change;
+    float temp = (*current_velocity + omega * change) * (float)Sys_Global.timeSinceLastPhysicsTick;
+    *current_velocity = (*current_velocity - omega * temp) * exp;
+    float output = target + (change + temp) * exp;
+    if ((original_to - current > 0.0f) == (output > original_to)) {
+        output = original_to;
+        *current_velocity = (output - original_to) / (float)Sys_Global.timeSinceLastPhysicsTick;
+    }
+
+    return output;
 }
 
 size_t GetStringLength(const char *s) {

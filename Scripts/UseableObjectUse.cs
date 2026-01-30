@@ -52,8 +52,8 @@ public class UseableObjectUse : MonoBehaviour {
 			MouseLookScript.a.ResetHeldItem();
 		} else {
 			MouseLookScript.a.ForceInventoryMode();  // Inventory mode is turned on when picking something up
-			Const.sprint(Const.a.stringTable[useableItemIndex + 326] // <item>
-						 + Const.a.stringTable[319]); // picked up.
+			CenterStatusPrint("%s", Sys_Text.stringTable[useableItemIndex + 326] // <item>
+						 + Sys_Text.stringTable[319]); // picked up.
 		}
 		
 		Destroy(gameObject);

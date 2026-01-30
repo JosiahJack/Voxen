@@ -27,12 +27,12 @@ public class KeypadKeycode : MonoBehaviour {
 	    if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
 	        locked = false; // SHODAN can go anywhere!  Full security override!
 		} else if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-		    MFDManager.a.BlockedBySecurity(transform.position);
+		    MFDManager.a.BlockedBySecurity(instances[i].position);
 		    return;
 		}
 
 		if (locked) {
-			Const.sprint(lockedMessageLingdex);
+			CenterStatusPrint(lockedMessageLingdex);
 
 			// Target something because we are locked like a Vox message to
 			// say we're locked, e.g. "Non emergency life pods disabled."
@@ -54,7 +54,7 @@ public class KeypadKeycode : MonoBehaviour {
 					}
 				}
 			} else {
-				Const.sprint(289);
+				CenterStatusPrint(289);
 				return;
 			}
 		}
@@ -73,7 +73,7 @@ public class KeypadKeycode : MonoBehaviour {
 					}
 				}
 			} else {
-				Const.sprint(290);
+				CenterStatusPrint(290);
 				return;
 			}
 		}
@@ -81,7 +81,7 @@ public class KeypadKeycode : MonoBehaviour {
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
 		MouseLookScript.a.ForceInventoryMode();
-		MFDManager.a.SendKeypadKeycodeToDataTab(keycode,transform.position,
+		MFDManager.a.SendKeypadKeycodeToDataTab(keycode,instances[i].position,
 		                                        this,solved);
 	}
 
@@ -89,6 +89,6 @@ public class KeypadKeycode : MonoBehaviour {
 		UseData ud = new UseData();
 		ud.owner = playerCamera;
 		Const.a.UseTargets(gameObject,ud,target);
-		Const.sprint(successMessageLingdex);
+		CenterStatusPrint(successMessageLingdex);
 	}
 }

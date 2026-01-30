@@ -27,7 +27,7 @@ public class LogContentsButtonsManager : MonoBehaviour {
 			for (int i=0; i<15; i++) {
 				LogButtonsText[i].text = logNames[i];
 				logRefButtons[i].logReferenceIndex = retrievedIndices[i];
-				if (Inventory.a.hasLog[retrievedIndices[i]]) {
+				if (inventoryPlayer1.hasLog[retrievedIndices[i]]) {
 					LogButtons[i].SetActive(true);
 				} else {
 					LogButtons[i].SetActive(false);

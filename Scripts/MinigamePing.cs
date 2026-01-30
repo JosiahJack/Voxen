@@ -247,7 +247,7 @@ public class MinigamePing : MonoBehaviour {
         playerPaddleImg.color = Color.Lerp(playerPaddleImg.color,Color.white,3f);
         x = playerPaddle.localPosition.x;
         playerVel = (MinigameCursor.a.minigameMouseX - x) / 48f;
-        playerVel = Mathf.Clamp(playerVel,-1f,1f);
+        playerVel = vclamp(playerVel,-1f,1f);
         x += playerVel * playerRate;
         if (x < (-128f + paddleWidthH)) {
             x = -128f + paddleWidthH;
@@ -263,7 +263,7 @@ public class MinigamePing : MonoBehaviour {
         computerPaddleImg.color = Color.Lerp(computerPaddleImg.color,Color.white,3f);
         x = computerPaddle.localPosition.x;
         computerVel = (ball.localPosition.x - x) / 48f;
-        computerVel = Mathf.Clamp(computerVel,-1f,1f);
+        computerVel = vclamp(computerVel,-1f,1f);
         x += computerVel * computerRate;
         if (x < (-128f + paddleWidthH)) {
             x = -128f + paddleWidthH;

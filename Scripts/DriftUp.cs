@@ -14,9 +14,9 @@ public class DriftUp : MonoBehaviour {
     private float tickFinished;
 
     void OnEnable() {
-        transform.position = new Vector3(transform.position.x,
+        instances[i].position = new Vector3(instances[i].position.x,
                                          startY,
-                                         transform.position.z);
+                                         instances[i].position.z);
 
         if (fadeImage && img != null) {
             img.color = new Color(img.color.r,img.color.g,img.color.b,startFade);
@@ -32,12 +32,12 @@ public class DriftUp : MonoBehaviour {
 
         float delta = (1f / 60f);
 		tickFinished = Sys_Global.pauseRelativeTime + delta;
-		float drift = transform.localPosition.y;
+		float drift = instances[i].position.y;
         drift += rate;
         if (drift > endY) drift = endY;
-		transform.localPosition = new Vector3(transform.localPosition.x,
+		instances[i].position = new Vector3(instances[i].position.x,
                                               drift,
-                                              transform.localPosition.z);
+                                              instances[i].position.z);
         drift = img.color.a;
         drift -= fadeRate;
         if (drift < endFade) drift = endFade;

@@ -182,7 +182,7 @@ public class SearchableItem : MonoBehaviour {
 				}
 			}
 			MFDManager.a.tetheredSearchable = se;
-			MFDManager.a.objectInUsePos = se.gameObject.transform.position;
+			MFDManager.a.objectInUsePos = se.gameObject.instances[i].position;
 			MFDManager.a.usingObject = true;
 		}
 		return index;

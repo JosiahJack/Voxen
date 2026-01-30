@@ -279,42 +279,6 @@ public class MFDManager : MonoBehaviour  {
 		a.minigameCamera.SetActive(false);
 	}
 
-	void WeaponCycleUp() {
-		if (MouseLookScript.a.inCyberSpace) {
-			// There's only two cyberspace weapons, up is down.
-			Inventory.a.isPulserNotDrill = !Inventory.a.isPulserNotDrill;
-			Utils.PlayUIOneShotSavable(80); // changeweapon
-			if (Inventory.a.isPulserNotDrill) {
-				Inventory.a.pulserButtonText.Select(true);
-				Inventory.a.drillButtonText.Select(false);
-			} else {
-				Inventory.a.pulserButtonText.Select(false);
-				Inventory.a.drillButtonText.Select(true);
-			}
-		} else {
-			if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleDown();
-			else wepbutMan.WeaponCycleUp();
-		}
-	}
-
-	void WeaponCycleDown() {
-		if (MouseLookScript.a.inCyberSpace) {
-			// There's only two cyberspace weapons, up is down.
-			Inventory.a.isPulserNotDrill = !Inventory.a.isPulserNotDrill;
-			Utils.PlayUIOneShotSavable(80); // changeweapon
-			if (Inventory.a.isPulserNotDrill) {
-				Inventory.a.pulserButtonText.Select(true);
-				Inventory.a.drillButtonText.Select(false);
-			} else {
-				Inventory.a.pulserButtonText.Select(false);
-				Inventory.a.drillButtonText.Select(true);
-			}
-		} else {
-			if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleUp();
-			else wepbutMan.WeaponCycleDown();
-		}
-	}
-
 	void Update() {
 		// Actions during Pause and Unpause (always)
 		if (FPS.activeInHierarchy) {
@@ -383,7 +347,7 @@ public class MFDManager : MonoBehaviour  {
 				ResetMultiMediaTabs();
 				Utils.PlayUIOneShotSavable(97);
 				CenterTabButtonClickSilent(0,true);
-				if (Inventory.a.hardwareIsActive[3]) {
+				if (inventoryPlayer1.hardwareIsActive[3]) {
 					hwb.SensaroundOff();
 					Utils.PlayUIOneShotSavable(82); // deactivate
 				}
@@ -402,7 +366,7 @@ public class MFDManager : MonoBehaviour  {
 				ResetMultiMediaTabs();
 				Utils.PlayUIOneShotSavable(97);
 				CenterTabButtonClickSilent(0,true);
-				if (Inventory.a.hardwareIsActive[3]) {
+				if (inventoryPlayer1.hardwareIsActive[3]) {
 					hwb.SensaroundOff();
 					Utils.PlayUIOneShotSavable(82); // deactivate
 				}
@@ -456,7 +420,7 @@ public class MFDManager : MonoBehaviour  {
 		if (wep16index >=0 && wep16index < 16) {
 			if (leftTC.TabManager.WeaponTab.activeInHierarchy) {
 				iconLH.overrideSprite = wepIcons[wep16index];
-				if (Inventory.a.numweapons <= 0
+				if (inventoryPlayer1.numweapons <= 0
 					|| WeaponCurrent.a.weaponCurrentPending >= 0) {
 					Utils.DisableImage(iconLH);
 				} else {
@@ -466,7 +430,7 @@ public class MFDManager : MonoBehaviour  {
 
 			if (rightTC.TabManager.WeaponTab.activeInHierarchy) {
 				iconRH.overrideSprite = wepIcons[wep16index];
-				if (Inventory.a.numweapons <= 0
+				if (inventoryPlayer1.numweapons <= 0
 					|| WeaponCurrent.a.weaponCurrentPending >= 0) {
 					Utils.DisableImage(iconRH);
 				} else {
@@ -499,24 +463,24 @@ public class MFDManager : MonoBehaviour  {
 		if (hwb.buttons[5].gameObject.activeSelf) {
 			bool foundsome = false;
 			for (int i=0;i<hwb.ecbm.mmLBs.Length;i++) {
-				if (Inventory.a.hasLog[hwb.ecbm.mmLBs[i].logReferenceIndex] && !Inventory.a.readLog[hwb.ecbm.mmLBs[i].logReferenceIndex]) foundsome = true;
+				if (inventoryPlayer1.hasLog[hwb.ecbm.mmLBs[i].logReferenceIndex] && !inventoryPlayer1.readLog[hwb.ecbm.mmLBs[i].logReferenceIndex]) foundsome = true;
 			}
 
 			if (foundsome) {
 				// You've got mail!
 				if (blinkFinished < Sys_Global.pauseRelativeTime) {
 					blinkFinished = blinkTick + Sys_Global.pauseRelativeTime;
-					Inventory.a.hardwareIsActive[2] = !Inventory.a.hardwareIsActive[2];
-					if (Inventory.a.hardwareIsActive[2]) {
+					inventoryPlayer1.hardwareIsActive[2] = !inventoryPlayer1.hardwareIsActive[2];
+					if (inventoryPlayer1.hardwareIsActive[2]) {
 						hwb.buttons[5].image.overrideSprite = hwb.buttonActive1[5];
 					} else {
 						hwb.buttons[5].image.overrideSprite = hwb.buttonDeactive[5];
 					}
 				}
-				if (beepFinished < Sys_Global.pauseRelativeTime && Inventory.a.beepDone) {
+				if (beepFinished < Sys_Global.pauseRelativeTime && inventoryPlayer1.beepDone) {
 					beepFinished = beepTick + Sys_Global.pauseRelativeTime;
 					beepCount++;
-					if (beepCount >= 3) { Inventory.a.beepDone = false; beepCount = 0; } // Reset beeping, notification done.
+					if (beepCount >= 3) { inventoryPlayer1.beepDone = false; beepCount = 0; } // Reset beeping, notification done.
 					Utils.PlayOneShotSavable(hwb.SFX,Const.a.sounds[83]); // emailalert, GO active handled by guard clause.
 				}
 			} else {
@@ -630,7 +594,7 @@ public class MFDManager : MonoBehaviour  {
 		ctbButtonMain.SetActive(true);
 		ctbButtonHardware.SetActive(true);
 		ctbButtonGeneral.SetActive(true);
-		if (Inventory.a.hardwareIsActive[3]) MFDManager.a.hwb.UnhideSensaround();
+		if (inventoryPlayer1.hardwareIsActive[3]) MFDManager.a.hwb.UnhideSensaround();
 		tabButtonsLHButtons.SetActive(true);
 		tabButtonsRHButtons.SetActive(true);
 		Config.SetSEGI(); // Turn it back on if setting is on.
@@ -829,9 +793,9 @@ public class MFDManager : MonoBehaviour  {
 		for (int i=0; i<7; i++) {
 			WeaponButton wepbut = wepbutMan.wepButtonsScripts[i];
 			GameObject buttonGO = wepbut.gameObject;
-			if (Inventory.a.weaponInventoryIndices[i] > 0) {
+			if (inventoryPlayer1.weaponInventoryIndices[i] > 0) {
 				if (!buttonGO.activeInHierarchy) buttonGO.SetActive(true);
-				wepbut.useableItemIndex = Inventory.a.weaponInventoryIndices[i];
+				wepbut.useableItemIndex = inventoryPlayer1.weaponInventoryIndices[i];
 				if (!wepbutMan.wepCountsText[i].activeInHierarchy) {
 					wepbutMan.wepCountsText[i].SetActive(true);
 				}
@@ -973,25 +937,25 @@ public class MFDManager : MonoBehaviour  {
 			// General Inventory
 			// ----------------------------------------------------------------
 			GameObject invbtn = 
-				Inventory.a.genButtons[Inventory.a.generalInvCurrent];
+				inventoryPlayer1.genButtons[inventoryPlayer1.generalInvCurrent];
 
 			if (invbtn != null) {
 				invbtn.GetComponent<GeneralInvButton>().DoubleClick();
 			}
 
-			int nextIndex = Inventory.a.generalInvIndex - 1;
+			int nextIndex = inventoryPlayer1.generalInvIndex - 1;
 			if (nextIndex < 0) nextIndex = 0;
-			Inventory.a.generalInvIndex = nextIndex;
+			inventoryPlayer1.generalInvIndex = nextIndex;
 
 			// Set item tab to next general inv current.
-			SendInfoToItemTab(Inventory.a.generalInvIndex);
+			SendInfoToItemTab(inventoryPlayer1.generalInvIndex);
 		} else {
 			// Patches
 			// ----------------------------------------------------------------
-			Inventory.a.patchButtonScripts[Inventory.a.patchCurrent].DoubleClick();
+			inventoryPlayer1.patchButtonScripts[inventoryPlayer1.patchCurrent].DoubleClick();
 
 			// Set item tab to next patch.
-			SendInfoToItemTab(Inventory.a.patchIndex);
+			SendInfoToItemTab(inventoryPlayer1.patchIndex);
 		}
 	}
 
@@ -1044,21 +1008,21 @@ public class MFDManager : MonoBehaviour  {
 		string headerName = name;
 		if (pid != null) {
 			switch(pid.constIndex) {
-				case 464: headerName = Const.a.stringTable[895]; break;
-				case 465: headerName = Const.a.stringTable[897]; break;
-				case 530: headerName = Const.a.stringTable[898]; break;
-				case 466: headerName = Const.a.stringTable[897]; break;
-				case 467: headerName = Const.a.stringTable[897]; break;
-				case 468: headerName = Const.a.stringTable[897]; break;
-				case 469: headerName = Const.a.stringTable[897]; break;
-				case 470: headerName = Const.a.stringTable[897]; break;
-				case 471: headerName = Const.a.stringTable[897]; break;
-				case 472: headerName = Const.a.stringTable[899]; break;
-				case 473: headerName = Const.a.stringTable[899]; break;
-				case 474: headerName = Const.a.stringTable[899]; break;
-				case 475: headerName = Const.a.stringTable[899]; break;
-				case 476: headerName = Const.a.stringTable[899]; break;
-				case 531: headerName = Const.a.stringTable[896]; break;
+				case 464: headerName = Sys_Text.stringTable[895]; break;
+				case 465: headerName = Sys_Text.stringTable[897]; break;
+				case 530: headerName = Sys_Text.stringTable[898]; break;
+				case 466: headerName = Sys_Text.stringTable[897]; break;
+				case 467: headerName = Sys_Text.stringTable[897]; break;
+				case 468: headerName = Sys_Text.stringTable[897]; break;
+				case 469: headerName = Sys_Text.stringTable[897]; break;
+				case 470: headerName = Sys_Text.stringTable[897]; break;
+				case 471: headerName = Sys_Text.stringTable[897]; break;
+				case 472: headerName = Sys_Text.stringTable[899]; break;
+				case 473: headerName = Sys_Text.stringTable[899]; break;
+				case 474: headerName = Sys_Text.stringTable[899]; break;
+				case 475: headerName = Sys_Text.stringTable[899]; break;
+				case 476: headerName = Sys_Text.stringTable[899]; break;
+				case 531: headerName = Sys_Text.stringTable[896]; break;
 			}
 		}
 
@@ -1277,7 +1241,7 @@ public class MFDManager : MonoBehaviour  {
 			blockedBySecurityLH.SetActive(true);
 		}
 
-		Const.sprint(25);
+		CenterStatusPrint(25);
 		Utils.PlayUIOneShotSavable(468,0.85f);
 		objectInUsePos = tetherPoint;
 		usingObject = true;
@@ -1457,16 +1421,16 @@ public class MFDManager : MonoBehaviour  {
 		Utils.Deactivate(energyHeatTicksLH);
 		Utils.Deactivate(overloadButtonLH);
 		if (loadNormalAmmoButtonTextLH != null) {
-			if (normdex > 0 && normdex < Const.a.stringTable.Length) {
-				loadNormalAmmoButtonTextLH.text = Const.a.stringTable[normdex];
+			if (normdex > 0 && normdex < Sys_Text.stringTable.Length) {
+				loadNormalAmmoButtonTextLH.text = Sys_Text.stringTable[normdex];
 			} else {
 				loadNormalAmmoButtonTextLH.text = "";
 			}
 		}
 
 		if (loadAlternateAmmoButtonTextLH != null) {
-			if (altdex > 0 && altdex < Const.a.stringTable.Length) {
-				loadAlternateAmmoButtonTextLH.text = Const.a.stringTable[altdex];
+			if (altdex > 0 && altdex < Sys_Text.stringTable.Length) {
+				loadAlternateAmmoButtonTextLH.text = Sys_Text.stringTable[altdex];
 			} else {
 				loadAlternateAmmoButtonTextLH.text = "";
 			}
@@ -1482,16 +1446,16 @@ public class MFDManager : MonoBehaviour  {
 		Utils.Deactivate(energyHeatTicksRH);
 		Utils.Deactivate(overloadButtonRH);
 		if (loadNormalAmmoButtonTextRH != null) {
-			if (normdex > 0 && normdex < Const.a.stringTable.Length) {
-				loadNormalAmmoButtonTextRH.text = Const.a.stringTable[normdex];
+			if (normdex > 0 && normdex < Sys_Text.stringTable.Length) {
+				loadNormalAmmoButtonTextRH.text = Sys_Text.stringTable[normdex];
 			} else {
 				loadNormalAmmoButtonTextRH.text = "";
 			}
 		}
 
 		if (loadAlternateAmmoButtonTextRH != null) {
-			if (altdex > 0 && altdex < Const.a.stringTable.Length) {
-				loadAlternateAmmoButtonTextRH.text = Const.a.stringTable[altdex];
+			if (altdex > 0 && altdex < Sys_Text.stringTable.Length) {
+				loadAlternateAmmoButtonTextRH.text = Sys_Text.stringTable[altdex];
 			} else {
 				loadAlternateAmmoButtonTextRH.text = "";
 			}
@@ -1570,7 +1534,7 @@ public class MFDManager : MonoBehaviour  {
 
 		Image norm = loadNormalAmmoButton.GetComponent<Image>();
 		Image anorm = loadAlternateAmmoButton.GetComponent<Image>();
-		if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+		if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 			SetAmmoIcons(WeaponCurrent.a.weaponIndex,true);
 			norm.overrideSprite = ammoButtonDeHighlighted;
 			if (WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent] > 0) {
@@ -1591,7 +1555,7 @@ public class MFDManager : MonoBehaviour  {
 
 	public void UpdateHUDAmmoCountsEither() {
 		if (WeaponCurrent.a.weaponCurrent >= 0) {
-			if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+			if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 				UpdateHUDAmmoCounts(WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent]);
 			} else {
 				UpdateHUDAmmoCounts(WeaponCurrent.a.currentMagazineAmount[WeaponCurrent.a.weaponCurrent]);
@@ -1613,7 +1577,7 @@ public class MFDManager : MonoBehaviour  {
 
 	public void SetWepInfo(int index) { // Expects usableItem index.
 		if (index >= 0) {
-			weptextRH.text = weptextLH.text = Const.a.stringTable[index + 326];
+			weptextRH.text = weptextLH.text = Sys_Text.stringTable[index + 326];
 			iconRH.overrideSprite = iconLH.overrideSprite = Const.a.useableItemsIcons[index];
 		} else {
 			weptextRH.text = weptextLH.text = "";
@@ -1629,14 +1593,14 @@ public class MFDManager : MonoBehaviour  {
 			rightTC.ReturnToLastTab();
 			if (rightTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (Inventory.a.hasHardware[0]) sysAnalyzerRH.SetActive(true);
+					if (inventoryPlayer1.hasHardware[0]) sysAnalyzerRH.SetActive(true);
 				}
 			}
 		} else {
 			leftTC.ReturnToLastTab();
 			if (leftTC.lastTab == 4) {
 				if (tetheredPGP == null && tetheredPWP == null && tetheredKeypadElevator == null && tetheredKeypadKeycode == null && tetheredSearchable == null) {
-					if (Inventory.a.hasHardware[0]) sysAnalyzerLH.SetActive(true);
+					if (inventoryPlayer1.hasHardware[0]) sysAnalyzerLH.SetActive(true);
 				}
 			}
 		}
@@ -1703,7 +1667,7 @@ public class MFDManager : MonoBehaviour  {
 
 		Utils.PlayUIOneShotSavable(97);
 		CenterTabButtonClickSilent(tabNum,false);
-		if (Inventory.a.hardwareIsActive[3]) {
+		if (inventoryPlayer1.hardwareIsActive[3]) {
 			hwb.SensaroundOff();
 			Utils.PlayUIOneShotSavable(82); // deactivate
 		}
@@ -1874,7 +1838,7 @@ public class MFDManager : MonoBehaviour  {
 		MFDManager.a.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		dataTab.SetActive(true);
-		Inventory.a.hasNewData = false;
+		inventoryPlayer1.hasNewData = false;
 		multiMediaHeaderLabel.text = "DATA";
 		lastMultiMediaTabOpened = 2;
 		ersbLH.SetEReaderSectionsButtonsHighlights(2);
@@ -1887,7 +1851,7 @@ public class MFDManager : MonoBehaviour  {
 		MFDManager.a.mouseClickHeldOverGUI = true;
 		ResetMultiMediaTabs();
 		notesTab.SetActive(true);
-		Inventory.a.hasNewNotes = false;
+		inventoryPlayer1.hasNewNotes = false;
 		multiMediaHeaderLabel.text = "NOTES";
 		lastMultiMediaTabOpened = 3;
 		ersbLH.SetEReaderSectionsButtonsHighlights(3);
@@ -1919,7 +1883,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_Ping() {
-		Const.sprint(Const.a.stringTable[1021] + " PING");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " PING");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigamePingSpaceContainer.SetActive(true);
@@ -1928,7 +1892,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_15() {
-		Const.sprint(Const.a.stringTable[1021] + " 15");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " 15");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigame15SpaceContainer.SetActive(true);
@@ -1937,7 +1901,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_Wing0() {
-		Const.sprint(Const.a.stringTable[1021] + " WING-0");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " WING-0");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameWing0SpaceContainer.SetActive(true);
@@ -1946,7 +1910,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_Botbounce() {
-		Const.sprint(Const.a.stringTable[1021] + " BOTBOUNCE");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " BOTBOUNCE");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameBotbounceSpaceContainer.SetActive(true);
@@ -1955,7 +1919,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_EelZapper() {
-		Const.sprint(Const.a.stringTable[1021] + " EEL ZAPPER");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " EEL ZAPPER");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameEelZapperSpaceContainer.SetActive(true);
@@ -1964,7 +1928,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_Road() {
-		Const.sprint(Const.a.stringTable[1021] + " ROAD");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " ROAD");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameRoadSpaceContainer.SetActive(true);
@@ -1973,7 +1937,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_TriopToe() {
-		Const.sprint(Const.a.stringTable[1021] + " TRIOPTOE");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " TRIOPTOE");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameTriopToeSpaceContainer.SetActive(true);
@@ -1984,7 +1948,7 @@ public class MFDManager : MonoBehaviour  {
 	// The original seemed to have planned for 9 minigames.  Maybe I'll make my
 	// own new ones someday.
 	public void MinigameStart_CorporateConquer() {
-		Const.sprint(Const.a.stringTable[1021] + " CORP CONQ");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " CORP CONQ");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameCorpConqSpaceContainer.SetActive(true);
@@ -1993,7 +1957,7 @@ public class MFDManager : MonoBehaviour  {
 	}
 
 	public void MinigameStart_Chess() {
-		Const.sprint(Const.a.stringTable[1021] + " Chess");
+		CenterStatusPrint("%s", Sys_Text.stringTable[1021] + " Chess");
 		minigameButtonsContainer.SetActive(false);
 		minigameViewContainer.SetActive(true);
 		minigameChessSpaceContainer.SetActive(true);

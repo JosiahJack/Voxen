@@ -18,7 +18,7 @@
 
 		numHits++;
 		float stunAmount = 3f + ((WeaponFire.a.stungunSetting / 100f) * 7f); // Const.a.damagePerHitForWeapon[wep16Index] vs Const.a.damagePerHitForWeapon2[wep16Index] for Stungun.
-		stunAmount = Mathf.Clamp(stunAmount, 3f, 10f);
+		stunAmount = vclamp(stunAmount, 3f, 10f);
 		dd.other = other.gameObject;
 		dd.isOtherNPC = false;
 		// GetDamageTakeAmount expects damageData to already have the
@@ -34,7 +34,7 @@
 		// Most already was when launched by AIController or WeaponFire.
 		dd.damage = DamageData.GetDamageTakeAmount(dd);
 		if (impactType == PoolType.RailgunImpacts) {
-			Utils.ApplyImpactForceSphere(dd,transform.position,3.2f,1f);
+			Utils.ApplyImpactForceSphere(dd,instances[i].position,3.2f,1f);
 			WeaponFire.a.fogFac += 4;
 		}
 
@@ -45,7 +45,7 @@
 			GameObject impact = Const.a.GetObjectFromPool(impactType); 
 			Vector3 hitPos = other.contacts[0].point; 
 			if (impact != null) {
-				impact.transform.position = hitPos;
+				impact.instances[i].position = hitPos;
 				impact.SetActive(true); // Enable the impact effect
 			}
 
@@ -91,7 +91,7 @@
 			GameObject impact = Const.a.GetObjectFromPool(impactType); 
 			Vector3 hitPos = other.contacts[0].point; 
 			if (impact != null) {
-				impact.transform.position = hitPos;
+				impact.instances[i].position = hitPos;
 				impact.SetActive(true); // Enable the impact effect
 			}
 

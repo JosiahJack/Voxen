@@ -36,9 +36,9 @@ public class CreditsScroll : MonoBehaviour {
 		if (!MainMenuHandler.a.dataFound) outroPlayer.SetDirectAudioMute(0,true);
 		else outroPlayer.SetDirectAudioMute(0,false);
 
-		endVideoText1.text = Const.a.stringTable[610];
-		endVideoText2.text = Const.a.stringTable[611];
-		endVideoText3.text = Const.a.stringTable[612];
+		endVideoText1.text = Sys_Text.stringTable[610];
+		endVideoText2.text = Sys_Text.stringTable[611];
+		endVideoText3.text = Sys_Text.stringTable[612];
 		Utils.Deactivate(endVideoTextGO2);
 		Utils.Deactivate(endVideoTextGO3);
 		vidFinished = Time.time + vidLength;

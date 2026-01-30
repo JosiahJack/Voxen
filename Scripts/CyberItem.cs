@@ -20,7 +20,7 @@ public class CyberItem : MonoBehaviour {
 			PlayerMovement pm = other.gameObject.GetComponent<PlayerMovement>();
 			if (pm == null) return;
 
-			if (!Inventory.a.AddSoftwareItem(type,version)) return;
+			if (!inventoryPlayer1.AddSoftwareItem(type,version)) return;
 
 			explosionEffect = null;
 			explosionEffect = Const.a.GetObjectFromPool(PoolType.CyberDissolve);
@@ -28,7 +28,7 @@ public class CyberItem : MonoBehaviour {
 				explosionEffect.SetActive(true);
 
 				// Put vaporization effect at raycast center.
-				explosionEffect.transform.position = transform.position; 
+				explosionEffect.instances[i].position = instances[i].position; 
 			}
 
 			// We've been picked up, quick hide like you were.

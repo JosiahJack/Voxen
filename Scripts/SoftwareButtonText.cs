@@ -13,7 +13,7 @@ public class SoftwareButtonText : MonoBehaviour {
 
 	void Update() {
 		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
-			if (slotnum == Inventory.a.currentCyberItem) {
+			if (slotnum == inventoryPlayer1.currentCyberItem) {
 				text.color = Const.a.ssYellowText; // Yellow
 			} else {
 				text.color = Const.a.ssGreenText; // Green

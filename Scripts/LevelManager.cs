@@ -218,33 +218,33 @@ public class LevelManager : MonoBehaviour {
 		if (!LevNumInBounds(levnum)) { DualLogWarning("levnum out of bounds"); return; }
 
 		// NOTE: Check this first since the button for the current level has a null destination.  This is fine and expected.
-		if (currentLevel == levnum) { Const.sprint(Const.a.stringTable[9]); return; } //Already there
+		if (currentLevel == levnum) { CenterStatusPrint("%s", Sys_Text.stringTable[9]); return; } //Already there
 
 		MFDManager.a.TurnOffElevatorPad();
 // 		DualLog("Cleared GUI Over Button state from clicking on elevator button in MFD side pane");
 		GUIState.a.ClearOverButton();
 		if (targetPosition.x == 0 && targetPosition.y == 0 && targetPosition.z == 0) {
 			switch(levnum) {
-				case 0:  targetPosition = elevatorTargetDestinations[25].transform.position; break;
-				case 1:  targetPosition =  elevatorTargetDestinations[0].transform.position; break;
-				case 2:  targetPosition =  elevatorTargetDestinations[1].transform.position; break;
-				case 3:  targetPosition =  elevatorTargetDestinations[3].transform.position; break;
-				case 4:  targetPosition =  elevatorTargetDestinations[6].transform.position; break;
-				case 5:  targetPosition =  elevatorTargetDestinations[7].transform.position; break;
-				case 6:  targetPosition =  elevatorTargetDestinations[9].transform.position; break;
-				case 7:  targetPosition = elevatorTargetDestinations[17].transform.position; break;
-				case 8:  targetPosition = elevatorTargetDestinations[19].transform.position; break;
-				case 9:  targetPosition = elevatorTargetDestinations[21].transform.position; break;
-				case 10: targetPosition = elevatorTargetDestinations[22].transform.position; break;
-				case 11: targetPosition = elevatorTargetDestinations[23].transform.position; break;
-				case 12: targetPosition = elevatorTargetDestinations[24].transform.position; break;
+				case 0:  targetPosition = elevatorTargetDestinations[25].instances[i].position; break;
+				case 1:  targetPosition =  elevatorTargetDestinations[0].instances[i].position; break;
+				case 2:  targetPosition =  elevatorTargetDestinations[1].instances[i].position; break;
+				case 3:  targetPosition =  elevatorTargetDestinations[3].instances[i].position; break;
+				case 4:  targetPosition =  elevatorTargetDestinations[6].instances[i].position; break;
+				case 5:  targetPosition =  elevatorTargetDestinations[7].instances[i].position; break;
+				case 6:  targetPosition =  elevatorTargetDestinations[9].instances[i].position; break;
+				case 7:  targetPosition = elevatorTargetDestinations[17].instances[i].position; break;
+				case 8:  targetPosition = elevatorTargetDestinations[19].instances[i].position; break;
+				case 9:  targetPosition = elevatorTargetDestinations[21].instances[i].position; break;
+				case 10: targetPosition = elevatorTargetDestinations[22].instances[i].position; break;
+				case 11: targetPosition = elevatorTargetDestinations[23].instances[i].position; break;
+				case 12: targetPosition = elevatorTargetDestinations[24].instances[i].position; break;
 			}
 		}
 
 		if (QuestLogNotesManager.a != null) QuestLogNotesManager.a.NotifyLevelChange(levnum);
  
 		// Return to level from cyberspace.
-		PlayerReferenceManager.a.playerCapsule.transform.position = targetPosition;
+		PlayerReferenceManager.a.playerCapsule.instances[i].position = targetPosition;
 		currentLevel = levnum; // Set current level to be the new level
 		DisableAllNonOccupiedLevelsExcept(currentLevel);
 		DynamicCulling.camPositions = new Dictionary<GameObject, Vector3>();
@@ -454,7 +454,7 @@ public class LevelManager : MonoBehaviour {
 		if ((levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) && (levelSmallNodeDestroyedCount[currentLevel] == levelSmallNodeCount[currentLevel]) && (levelCameraDestroyedCount[currentLevel] == levelCameraCount[currentLevel])) {
 			levelSecurity[currentLevel] = 0;
 		}
-		Const.sprint(Const.a.stringTable[306] + levelSecurity[currentLevel].ToString() + Const.a.stringTable[307]);
+		CenterStatusPrint("%s", Sys_Text.stringTable[306] + levelSecurity[currentLevel].ToString() + Sys_Text.stringTable[307]);
 
 		// Notify quest log if all nodes were destroyed
 		if (levelLargeNodeDestroyedCount[currentLevel] == levelLargeNodeCount[currentLevel]) {

@@ -190,13 +190,13 @@ static const float camMaxAmount = 0.2548032f
 // 			Utils.DisableCamera(automapCamera);
 // 		}
 // 
-// 		if (Inventory.a.NavUnitVersion() < 2) {
+// 		if (inventoryPlayer1.NavUnitVersion() < 2) {
 // 			Utils.Deactivate(poolContainerAutomapBotOverlays);
 // 		} else {
 // 			Utils.Activate(poolContainerAutomapBotOverlays);
 // 		}
 // 
-// 		if (Inventory.a.NavUnitVersion() < 3) {
+// 		if (inventoryPlayer1.NavUnitVersion() < 3) {
 // 			Utils.Deactivate(poolContainerAutomapCyborgOverlays);
 // 			Utils.Deactivate(poolContainerAutomapMutantOverlays);
 // 		} else {
@@ -260,21 +260,21 @@ static const float camMaxAmount = 0.2548032f
 // 			float zRH = automapNormalPlayerIconRH.localRotation.z;
 // 			float zFull = automapFullPlayerIcon.rectTransform.localRotation.z;
 // 			Quaternion icoQ = Quaternion.Euler(0,0,icoZAdj);
-// 			if (Mathf.Abs(zLH - icoZAdj) > 0.5f) {
+// 			if (vabs(zLH - icoZAdj) > 0.5f) {
 // 				automapNormalPlayerIconLH.localRotation = icoQ;
 // 			}
 // 
-// 			if (Mathf.Abs(zRH - icoZAdj) > 0.5f) {
+// 			if (vabs(zRH - icoZAdj) > 0.5f) {
 // 				automapNormalPlayerIconRH.localRotation = icoQ;
 // 			}
 // 
-// 			if (Mathf.Abs(zFull - icoZAdj) > 0.5f) {
+// 			if (vabs(zFull - icoZAdj) > 0.5f) {
 // 				automapFullPlayerIcon.rectTransform.localRotation = icoQ;
 // 			}
 // 
 // 			updateTime = 0.2f;
-// 			if (Inventory.a.NavUnitVersion() > 1) updateTime = 0.1f;
-// 			if (Inventory.a.NavUnitVersion() > 2) {
+// 			if (inventoryPlayer1.NavUnitVersion() > 1) updateTime = 0.1f;
+// 			if (inventoryPlayer1.NavUnitVersion() > 2) {
 // 				updateTime = 0.05f;
 // 
 // 				// Display hazards
@@ -342,7 +342,7 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	void SetAutomapActiveState() {
-// 		if (Inventory.a.hasHardware[1]) {
+// 		if (inventoryPlayer1.hasHardware[1]) {
 // 			if (AutoMapDisplayActive()) {
 // 				ActivateAutomapUI();
 // 			} else {
@@ -423,9 +423,9 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	void AutomapZoomOut() {
-// 		if (Inventory.a.NavUnitVersion() < 2) {
+// 		if (inventoryPlayer1.NavUnitVersion() < 2) {
 // 			// Map hardware version doesn't support zoom.
-// 			Const.sprint(Const.a.stringTable[465]);
+// 			CenterStatusPrint("%s", Sys_Text.stringTable[465]);
 // 			return;
 // 		}
 // 
@@ -434,16 +434,16 @@ static const float camMaxAmount = 0.2548032f
 // 			currentAutomapZoomLevel = 2;
 // 
 // 			// zoom at max
-// 			Const.sprint(Const.a.stringTable[316],Const.a.player1);
+// 			CenterStatusPrint("%s", Sys_Text.stringTable[316],Const.a.player1);
 // 			return;
 // 		}
 // 		AutomapZoomAdjust();
 // 	}
 // 
 // 	public void AutomapZoomIn() {
-// 		if (Inventory.a.NavUnitVersion() < 2) {
+// 		if (inventoryPlayer1.NavUnitVersion() < 2) {
 // 			// Map hardware version doesn't support zoom.
-// 			Const.sprint(Const.a.stringTable[465],Const.a.player1);
+// 			CenterStatusPrint("%s", Sys_Text.stringTable[465],Const.a.player1);
 // 			return;
 // 		}
 // 
@@ -452,7 +452,7 @@ static const float camMaxAmount = 0.2548032f
 // 			currentAutomapZoomLevel = 0;
 // 
 // 			// zoom at min
-// 			Const.sprint(Const.a.stringTable[317],Const.a.player1);
+// 			CenterStatusPrint("%s", Sys_Text.stringTable[317],Const.a.player1);
 // 			return;
 // 		}
 // 		AutomapZoomAdjust();
@@ -468,8 +468,8 @@ static const float camMaxAmount = 0.2548032f
 // 		}
 // 
 // 		Vector3 scaleVec = new Vector3(zoom,zoom,zoom);
-// 		automapContainerLH.transform.localScale = scaleVec;
-// 		automapContainerRH.transform.localScale = scaleVec;
+// 		automapContainerLH.instances[i].scale = scaleVec;
+// 		automapContainerRH.instances[i].scale = scaleVec;
 // 	}
 // 
 // 	public void ToggleSideTop() {
@@ -479,8 +479,8 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	public void AutomapGoSide() {
-// 		automapSideButtonTextLH.text = Const.a.stringTable[887];
-// 		automapSideButtonTextRH.text = Const.a.stringTable[887];
+// 		automapSideButtonTextLH.text = Sys_Text.stringTable[887];
+// 		automapSideButtonTextRH.text = Sys_Text.stringTable[887];
 // 		automapInnerCircleLH.gameObject.SetActive(false);
 // 		automapInnerCircleRH.gameObject.SetActive(false);
 // 		automapOuterCircleLH.gameObject.SetActive(false);
@@ -496,8 +496,8 @@ static const float camMaxAmount = 0.2548032f
 // 	}
 // 
 // 	public void AutomapGoTop() {
-// 		automapSideButtonTextLH.text = Const.a.stringTable[888];
-// 		automapSideButtonTextRH.text = Const.a.stringTable[888];
+// 		automapSideButtonTextLH.text = Sys_Text.stringTable[888];
+// 		automapSideButtonTextRH.text = Sys_Text.stringTable[888];
 // 		automapInnerCircleLH.gameObject.SetActive(true);
 // 		automapInnerCircleRH.gameObject.SetActive(true);
 // 		automapOuterCircleLH.gameObject.SetActive(true);
@@ -513,7 +513,7 @@ static const float camMaxAmount = 0.2548032f
 // 	public void AutomapGoFull() {
 // 		if (inSideView) {
 // 			AutomapGoTop();
-// 			UpdateAutomap(PlayerMovement.a.transform.localPosition);
+// 			UpdateAutomap(PlayerMovement.a.instances[i].position);
 // 		}
 // 		Utils.Activate(automapFull);
 // 		inFullMap = true;
@@ -554,7 +554,7 @@ static const float camMaxAmount = 0.2548032f
 // 									bool isNPC) {
 // 		if (over == null) return;
 // 
-// 		bool navVersionFine = Inventory.a != null ? Inventory.a.NavUnitVersion() > 1 : false;
+// 		bool navVersionFine = Inventory.a != null ? inventoryPlayer1.NavUnitVersion() > 1 : false;
 // 		if (health > 0 && ((isNPC && navVersionFine) || !isNPC)) {
 // 			Utils.EnableImage(over); // Enable on automap.
 // 			Utils.Activate(over.gameObject);
@@ -579,7 +579,7 @@ static const float camMaxAmount = 0.2548032f
 // 			if (parGo != null) scr = parGo.GetComponent<SecurityCameraRotate>();
 // 		}
 // 
-// 		if (scr != null) worldPos = scr.transform.position;
+// 		if (scr != null) worldPos = scr.instances[i].position;
 // 		over.rectTransform.anchoredPosition = GetMapPos(worldPos);
 // 	}
 // }

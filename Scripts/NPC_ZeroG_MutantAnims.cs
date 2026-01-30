@@ -50,7 +50,7 @@ public class NPC_ZeroG_MutantAnims : MonoBehaviour {
 
 				// Increment frame more than 1 if it's been more time elapsed than 2 frames worth
 				if ((tickFinished - Sys_Global.pauseRelativeTime) > (tickTime * 2f)) {
-					currentFrame += (int) (Mathf.Ceil((tickFinished - Sys_Global.pauseRelativeTime)/tickTime)); // increment by however many frames we skipped, e.g. slower than 24fps
+					currentFrame += (int) (vceil((tickFinished - Sys_Global.pauseRelativeTime)/tickTime)); // increment by however many frames we skipped, e.g. slower than 24fps
 				} else {
 					currentFrame++; // only been one frame time, increment by 1
 				}

@@ -49,8 +49,8 @@ public class PlayerEnergy : MonoBehaviour {
             if (aic.hasTargetIDAttached) continue;
             
 			// if NPC is in range....
-			float far = distance_vector3(aic.transform.position,
-			                             transform.position);
+			float far = distance_vector3(aic.instances[i].position,
+			                             instances[i].position);
 			if (far > TargetID.GetTargetIDSensingRange(false)) continue;
 			
 			WeaponFire.a.CreateTargetIDInstance(-1f,aic.healthManager,-1f);
@@ -70,8 +70,8 @@ public class PlayerEnergy : MonoBehaviour {
 				// 2 = Datareader doesn't take energy
 
 				// 3 Drain sensaround
-				if (Inventory.a.hardwareIsActive[3]) {
-					switch (Inventory.a.hardwareVersion[3]) {
+				if (inventoryPlayer1.hardwareIsActive[3]) {
+					switch (inventoryPlayer1.hardwareVersion[3]) {
 						case 0: tempF = 0.01535f; drainJPM += 9; break; // takes about 300s to drain full energy
 						case 1: tempF = 0.03413f; drainJPM += 20; break; // takes about 300s to drain full energy
 						case 2: tempF = 0.02559f; drainJPM += 15; break; // takes about 240s to drain full energy
@@ -81,13 +81,13 @@ public class PlayerEnergy : MonoBehaviour {
 				}
 
 				// 4 = Target Identifier doesn't take energy
-				if (Inventory.a.hasHardware[4]) {
+				if (inventoryPlayer1.hasHardware[4]) {
 				    TargetIdentifierSenseTargets();
 				}
 
 				// 5 = Energy Shield - handled by HealthManager
-				if (Inventory.a.hardwareIsActive[5]) {
-					switch (Inventory.a.hardwareVersionSetting[5]) {
+				if (inventoryPlayer1.hardwareIsActive[5]) {
+					switch (inventoryPlayer1.hardwareVersionSetting[5]) {
 						case 0: tempF = 0.04096f; drainJPM += 24; break;
 						case 1: tempF = 0.10239f; drainJPM += 60; break;
 						case 2: tempF = 0.17919f; drainJPM += 105; break;
@@ -98,8 +98,8 @@ public class PlayerEnergy : MonoBehaviour {
 				}
 
 				// 6 = Biomonitor
-				if (Inventory.a.hardwareIsActive[6]) {
-					switch (Inventory.a.hardwareVersionSetting[6]) {
+				if (inventoryPlayer1.hardwareIsActive[6]) {
+					switch (inventoryPlayer1.hardwareVersionSetting[6]) {
 						case 0: tempF = 0.001706f; drainJPM += 1;  activeEnergyDrainers = true; break;
 						case 1: tempF = 0; break; // doesn't take energy
 					}
@@ -107,8 +107,8 @@ public class PlayerEnergy : MonoBehaviour {
 				}
 
 				// 7 = Head Mounted Lantern
-				if (Inventory.a.hardwareIsActive[7]) {
-					switch (Inventory.a.hardwareVersionSetting[7]) {
+				if (inventoryPlayer1.hardwareIsActive[7]) {
+					switch (inventoryPlayer1.hardwareVersionSetting[7]) {
 						case 0: tempF = 0.02559f; drainJPM += 15; break;// takes about 180s to drain full energy
 						case 1: tempF = 0.04266f; drainJPM += 25; break; // takes about 120s to drain full energy
 						case 2: tempF = 0.05119f; drainJPM += 30; break; // takes about 90s to drain full energy
@@ -120,8 +120,8 @@ public class PlayerEnergy : MonoBehaviour {
 				// 8 Envirosuit - handled by HealthManager for radiation checks
 
 				// 9 = Turbo Motion Booster - done in PlayerMovement since we only use energy on boost, no drain with skates
-				if (Inventory.a.hardwareIsActive[9]) {
-					switch (Inventory.a.hardwareVersionSetting[9]) {
+				if (inventoryPlayer1.hardwareIsActive[9]) {
+					switch (inventoryPlayer1.hardwareVersionSetting[9]) {
 						case 0: tempF = 0f; break;
 						case 1: tempF = 0.02f; drainJPM += 16; break; // takes about 120s to drain full energy
 						case 2: tempF = 0.015f; drainJPM += 12; break; // takes about 90s to drain full energy
@@ -133,7 +133,7 @@ public class PlayerEnergy : MonoBehaviour {
 				// 10 Jump Jet Boots - done in PlayerMovement since we only drain while jumping
 
 				// 11 Drain nightsight
-				if (Inventory.a.hardwareIsActive [11]) {
+				if (inventoryPlayer1.hardwareIsActive [11]) {
 					tempF = 0.08533f; drainJPM += 50; // takes about 120s to drain full energy
 					activeEnergyDrainers = true;
 					TakeEnergy(tempF);
@@ -158,13 +158,13 @@ public class PlayerEnergy : MonoBehaviour {
 	}
 
 	void DeactivateHardwareOnEnergyDepleted() {
-		Inventory.a.hardwareIsActive[3] = false;
-		Inventory.a.hardwareButtonManager.SensaroundOff(); //sensaround
-		if (Inventory.a.hardwareIsActive [6] && Inventory.a.hardwareVersionSetting[6] == 0) Inventory.a.hardwareButtonManager.BioOff(); // biomonitor, but only on v1, v2 doesn't use power
-		if (Inventory.a.hardwareIsActive [5]) Inventory.a.hardwareButtonManager.ShieldOffWithEffects(); // shield
-		if (Inventory.a.hardwareIsActive [7]) Inventory.a.hardwareButtonManager.LanternOff(); // lantern
-		if (Inventory.a.hardwareIsActive [9]) Inventory.a.hardwareButtonManager.BoosterOff(); // turbo motion booster
-		if (Inventory.a.hardwareIsActive [11]) Inventory.a.hardwareButtonManager.InfraredOff(); // infrared
+		inventoryPlayer1.hardwareIsActive[3] = false;
+		inventoryPlayer1.hardwareButtonManager.SensaroundOff(); //sensaround
+		if (inventoryPlayer1.hardwareIsActive [6] && inventoryPlayer1.hardwareVersionSetting[6] == 0) inventoryPlayer1.hardwareButtonManager.BioOff(); // biomonitor, but only on v1, v2 doesn't use power
+		if (inventoryPlayer1.hardwareIsActive [5]) inventoryPlayer1.hardwareButtonManager.ShieldOffWithEffects(); // shield
+		if (inventoryPlayer1.hardwareIsActive [7]) inventoryPlayer1.hardwareButtonManager.LanternOff(); // lantern
+		if (inventoryPlayer1.hardwareIsActive [9]) inventoryPlayer1.hardwareButtonManager.BoosterOff(); // turbo motion booster
+		if (inventoryPlayer1.hardwareIsActive [11]) inventoryPlayer1.hardwareButtonManager.InfraredOff(); // infrared
 	}
 
     public void TakeEnergy(float take) {
@@ -176,7 +176,7 @@ public class PlayerEnergy : MonoBehaviour {
 		if (energy <= 0f) {
 			energy = 0f;
 			Utils.PlayUIOneShotSavable(84); // energy_gone
-			Const.sprint(314); //Power supply exhausted.
+			CenterStatusPrint(314); //Power supply exhausted.
 			DeactivateHardwareOnEnergyDepleted();
 		}
 	}

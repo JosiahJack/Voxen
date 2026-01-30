@@ -20,7 +20,7 @@ public class ExplosionLife : MonoBehaviour {
 		while (t < fadeTime) {
 			t += Time.deltaTime;
 			
-			if (l != null) l.intensity = Mathf.Lerp(fadeStart, fadeEnd, t / fadeTime);
+			if (l != null) l.intensity = lerp(fadeStart, fadeEnd, t / fadeTime);
 			yield return new WaitForSeconds(thinkInterval);
 		}
 		if (l != null) l.intensity = 0f;

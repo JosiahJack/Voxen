@@ -160,28 +160,28 @@ public class MainMenuHandler : MonoBehaviour {
 	}
 
 	void OnEnable() {
-		if (Inventory.a != null) Inventory.a.HideBioMonitor();
+		if (Inventory.a != null) inventoryPlayer1.HideBioMonitor();
 		DisableCameraDuringMenu();
 		if (IntroVideoContainer.activeSelf) {
 			vidFinished = Time.time + vidLength;
 			vidStartTime = Time.time;
 
 			// Setup text.
-			introVideoText1.text = Const.a.stringTable[613];
-			introVideoText2.text = Const.a.stringTable[614];
-			introVideoText3.text = Const.a.stringTable[615];
-			introVideoText4.text = Const.a.stringTable[616];
-			introVideoText5.text = Const.a.stringTable[617];
-			introVideoText6.text = Const.a.stringTable[618];
-			introVideoText7.text = Const.a.stringTable[619];
-			introVideoText8.text = Const.a.stringTable[620];
-			introVideoText9.text = Const.a.stringTable[621];
-			introVideoText10.text = Const.a.stringTable[622];
-			introVideoText11.text = Const.a.stringTable[623];
-			introVideoText12.text = Const.a.stringTable[624];
-			introVideoText13.text = Const.a.stringTable[625];
-			introVideoText14.text = Const.a.stringTable[626];
-			introVideoText15.text = Const.a.stringTable[627];
+			introVideoText1.text = Sys_Text.stringTable[613];
+			introVideoText2.text = Sys_Text.stringTable[614];
+			introVideoText3.text = Sys_Text.stringTable[615];
+			introVideoText4.text = Sys_Text.stringTable[616];
+			introVideoText5.text = Sys_Text.stringTable[617];
+			introVideoText6.text = Sys_Text.stringTable[618];
+			introVideoText7.text = Sys_Text.stringTable[619];
+			introVideoText8.text = Sys_Text.stringTable[620];
+			introVideoText9.text = Sys_Text.stringTable[621];
+			introVideoText10.text = Sys_Text.stringTable[622];
+			introVideoText11.text = Sys_Text.stringTable[623];
+			introVideoText12.text = Sys_Text.stringTable[624];
+			introVideoText13.text = Sys_Text.stringTable[625];
+			introVideoText14.text = Sys_Text.stringTable[626];
+			introVideoText15.text = Sys_Text.stringTable[627];
 			Utils.Activate(introVideoTextGO1);
 			Utils.Deactivate(introVideoTextGO2);
 			Utils.Deactivate(introVideoTextGO3);
@@ -201,7 +201,7 @@ public class MainMenuHandler : MonoBehaviour {
 	}
 
 	void OnDisable() {
-		if (Inventory.a != null) Inventory.a.UnHideBioMonitor();
+		if (Inventory.a != null) inventoryPlayer1.UnHideBioMonitor();
 		ReEnableCamera();
 	}
 	
@@ -728,7 +728,7 @@ public class MainMenuHandler : MonoBehaviour {
 
 	public void SaveGame(int index,string savename) {
 		Const.a.StartSave(index,savename);
-		Const.sprint(Const.a.stringTable[28] + index.ToString() + "!",Const.a.player1);
+		CenterStatusPrint("%s", Sys_Text.stringTable[28] + index.ToString() + "!",Const.a.player1);
 		PauseScript.a.EnablePauseUI();
 		MouseCursor.a.mainCamera.enabled = true;
 		this.gameObject.SetActive(false);
@@ -737,7 +737,7 @@ public class MainMenuHandler : MonoBehaviour {
 	public void LoadGame(int index) {
 		if (loadButtonText[index].text == "- unused -"
 			|| loadButtonText[index].text == "- unused quicksave -") {
-			Const.sprint(Const.a.stringTable[1022]); // "No data to load."
+			CenterStatusPrint("%s", Sys_Text.stringTable[1022]); // "No data to load."
 		} else Const.a.Load(index,false);
 	}
 
@@ -860,8 +860,8 @@ public class MainMenuHandler : MonoBehaviour {
 		deathPlayer.url = urlPath;
 		deathPlayer.Play();
 		deathPlayer.SetDirectAudioMute(0,true);
-		deathVideoText1.text = Const.a.stringTable[628];
-		deathVideoText2.text = Const.a.stringTable[629];
+		deathVideoText1.text = Sys_Text.stringTable[628];
+		deathVideoText2.text = Sys_Text.stringTable[629];
 		Utils.Activate(deathVideoTextGO1);
 		Utils.Deactivate(deathVideoTextGO2);
 		gameObject.SetActive(true);
@@ -890,21 +890,21 @@ public class MainMenuHandler : MonoBehaviour {
 		vidStartTime = Time.time;
 
 		// Setup text.
-		introVideoText1.text = Const.a.stringTable[613];
-		introVideoText2.text = Const.a.stringTable[614];
-		introVideoText3.text = Const.a.stringTable[615];
-		introVideoText4.text = Const.a.stringTable[616];
-		introVideoText5.text = Const.a.stringTable[617];
-		introVideoText6.text = Const.a.stringTable[618];
-		introVideoText7.text = Const.a.stringTable[619];
-		introVideoText8.text = Const.a.stringTable[620];
-		introVideoText9.text = Const.a.stringTable[621];
-		introVideoText10.text = Const.a.stringTable[622];
-		introVideoText11.text = Const.a.stringTable[623];
-		introVideoText12.text = Const.a.stringTable[624];
-		introVideoText13.text = Const.a.stringTable[625];
-		introVideoText14.text = Const.a.stringTable[626];
-		introVideoText15.text = Const.a.stringTable[627];
+		introVideoText1.text = Sys_Text.stringTable[613];
+		introVideoText2.text = Sys_Text.stringTable[614];
+		introVideoText3.text = Sys_Text.stringTable[615];
+		introVideoText4.text = Sys_Text.stringTable[616];
+		introVideoText5.text = Sys_Text.stringTable[617];
+		introVideoText6.text = Sys_Text.stringTable[618];
+		introVideoText7.text = Sys_Text.stringTable[619];
+		introVideoText8.text = Sys_Text.stringTable[620];
+		introVideoText9.text = Sys_Text.stringTable[621];
+		introVideoText10.text = Sys_Text.stringTable[622];
+		introVideoText11.text = Sys_Text.stringTable[623];
+		introVideoText12.text = Sys_Text.stringTable[624];
+		introVideoText13.text = Sys_Text.stringTable[625];
+		introVideoText14.text = Sys_Text.stringTable[626];
+		introVideoText15.text = Sys_Text.stringTable[627];
 		Utils.Activate(introVideoTextGO1);
 		Utils.Deactivate(introVideoTextGO2);
 		Utils.Deactivate(introVideoTextGO3);
@@ -937,8 +937,8 @@ public class MainMenuHandler : MonoBehaviour {
 
 	public void SetConfigPreset(int index) {
 		presetQuestionValue = index;
-		if (presetQuestionValue == 1)  presetQuestionText.text = Const.a.stringTable[924]; // CHANGE ALL KEYS TO LEGACY PRESET?
-		else presetQuestionText.text = Const.a.stringTable[923]; // RESET ALL KEYS TO DEFAULT?
+		if (presetQuestionValue == 1)  presetQuestionText.text = Sys_Text.stringTable[924]; // CHANGE ALL KEYS TO LEGACY PRESET?
+		else presetQuestionText.text = Sys_Text.stringTable[923]; // RESET ALL KEYS TO DEFAULT?
 
 		PresetConfirmDialog.SetActive(true);
 	}

@@ -752,7 +752,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// First run along line up and to the right
 		int tempIndex = cellDiagUpRt;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				grid[tempIndex] = !grid[tempIndex];
 			else
@@ -763,7 +763,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Now up and to the left
 		tempIndex = cellDiagUpLf;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				grid[tempIndex] = !grid[tempIndex];
 			else
@@ -774,7 +774,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Now down and to the right
 		tempIndex = cellDiagDnRt;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				grid[tempIndex] = !grid[tempIndex];
 			else
@@ -785,7 +785,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Finally down and to the left
 		tempIndex = cellDiagDnLf;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				grid[tempIndex] = !grid[tempIndex];
 			else
@@ -807,7 +807,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// First run along line up and to the right
 		int tempIndex = cellDiagUpRt;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				geniusHighlights[tempIndex].enabled = true;
 			else
@@ -818,7 +818,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Now up and to the left
 		tempIndex = cellDiagUpLf;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				geniusHighlights[tempIndex].enabled = true;
 			else
@@ -829,7 +829,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Now down and to the right
 		tempIndex = cellDiagDnRt;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				 geniusHighlights[tempIndex].enabled = true;
 			else
@@ -840,7 +840,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Finally down and to the left
 		tempIndex = cellDiagDnLf;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				geniusHighlights[tempIndex].enabled = true;
 			else
@@ -929,7 +929,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// First run along line up and to the right
 		tempIndex = cellDiagUpRt;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				geniusHighlights[tempIndex].enabled = true;
 			else
@@ -940,7 +940,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Now up and to the left
 		tempIndex = cellDiagUpLf;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				geniusHighlights[tempIndex].enabled = true;
 			else
@@ -951,7 +951,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Now down and to the right
 		tempIndex = cellDiagDnRt;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				 geniusHighlights[tempIndex].enabled = true;
 			else
@@ -962,7 +962,7 @@ public class PuzzleGrid : MonoBehaviour {
 
 		// Finally down and to the left
 		tempIndex = cellDiagDnLf;
-		for (int i=0;i<Mathf.Min(height,width);i++) {
+		for (int i=0;i<vmin(height,width);i++) {
 			if (tempIndex != -1 && cellType[tempIndex] == PuzzleCellType.Standard)
 				geniusHighlights[tempIndex].enabled = true;
 			else

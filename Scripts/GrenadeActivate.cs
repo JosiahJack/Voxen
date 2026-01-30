@@ -68,10 +68,10 @@ public class GrenadeActivate : MonoBehaviour {
 			case 7: explodeOnContact = true; break; // Fragmentation Grenade
 			case 8: explodeOnContact = true; break; // Concussion Grenade
 			case 9: explodeOnContact = true; break; // EMP Grenade
-			case 10: timeFinished = Sys_Global.pauseRelativeTime + Inventory.a.earthShakerTimeSetting;
+			case 10: timeFinished = Sys_Global.pauseRelativeTime + inventoryPlayer1.earthShakerTimeSetting;
 					 useTimer = true; break;        // Earthshaker Bomb
 			case 11: useProx = true; explodeOnContact = false; break; // Land Mine
-			case 12: timeFinished = Sys_Global.pauseRelativeTime + Inventory.a.nitroTimeSetting; 
+			case 12: timeFinished = Sys_Global.pauseRelativeTime + inventoryPlayer1.nitroTimeSetting; 
 					 useTimer = true; break;        // Nitropack Explosive
 			case 13: explodeOnContact = true; break; // Gas Grenade
 			default: return;
@@ -103,11 +103,11 @@ public class GrenadeActivate : MonoBehaviour {
 			PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 2f;
 		}
 		
-		Utils.ApplyImpactForceSphere(dd,transform.position,nearradius,1.0f);
+		Utils.ApplyImpactForceSphere(dd,instances[i].position,nearradius,1.0f);
 		GameObject explosionEffect = Const.a.GetObjectFromPool(explosionType);
 		if (explosionEffect != null) {
 			explosionEffect.SetActive(true);
-			explosionEffect.transform.position = transform.position;
+			explosionEffect.instances[i].position = instances[i].position;
 			int soundIndex = 60; // attack1_explode
 			switch(constIndex) {
 				case 7:  soundIndex = 64; WeaponFire.a.fogFac += 5; break; // frag, explosion1
@@ -119,61 +119,10 @@ public class GrenadeActivate : MonoBehaviour {
 				case 13: soundIndex = 63; WeaponFire.a.fogFac += 10; break; // gas, explode_minor
 			}
 			
-			Utils.PlayTempAudio(transform.position,Const.a.sounds[soundIndex]);
+			play_wav(sounds[soundIndex],1.0f,instances[i].position,true);
 		}
 
 		Const.a.Shake(true,-1,-1);
 		gameObject.SetActive(false);
-	}
-
-	// Live grenades - These should only be up in the air or active running timer, but still...or it's a landmine
-	public static string Save(GameObject go) {
-		s1.Clear();
-		GrenadeActivate ga = go.GetComponent<GrenadeActivate>();
-		s1.Append(Utils.UintToString(ga.constIndex,"constIndex"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ga.active,"active"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ga.useTimer,"useTimer"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(ga.timeFinished,"timeFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ga.explodeOnContact,"explodeOnContact"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ga.useProx,"useProx"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ga.IsNPCMine(),"IsNPCMine"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		GrenadeActivate ga = go.GetComponent<GrenadeActivate>();
-		if (entries == null) {
-			DualLog("GrenadeActivate.Load failure, entries == null");
-			return index + 7;
-		}
-
-		ga.constIndex = Utils.GetIntFromString(entries[index],"constIndex"); index++;
-		ga.active = Utils.GetBoolFromString(entries[index],"active"); index++;
-		ga.useTimer = Utils.GetBoolFromString(entries[index],"useTimer"); index++;
-		ga.timeFinished = Utils.LoadRelativeTimeDifferential(entries[index],"timeFinished"); index++;
-		ga.explodeOnContact = Utils.GetBoolFromString(entries[index],"explodeOnContact"); index++;
-		ga.useProx = Utils.GetBoolFromString(entries[index],"useProx"); index++;
-		bool isNPC = Utils.GetBoolFromString(entries[index],"IsNPCMine"); index++;
-		if (isNPC) {
-			go.layer = 24; // NPCBullet
-		} else {
-			go.layer = 11; // Bullet (player's)
-		}
-
-		if (ga.constIndex == 11) {
-			if (isNPC) ga.active = true;
-			GameObject childGO = ga.transform.GetChild(0).gameObject;
-			if (childGO != null) {
-				childGO.layer = go.layer;
-			}
-		}
-
-		return index;
 	}
 }

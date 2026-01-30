@@ -64,7 +64,7 @@ public class Utils {
 	}
 
 	public static float Sign(float value) {
-		if (value < Mathf.Epsilon && value > -Mathf.Epsilon) return 0f;
+		if (value < FLT_EPSILON && value > -FLT_EPSILON) return 0f;
 		if (value > 0f) return 1f;
 		return -1f;
 	}
@@ -450,54 +450,54 @@ public class Utils {
 
 	public static int AccessCardTypeToInt(AccessCardType acc) {
 		switch (acc) {
-			case AccessCardType.None:        return  0;
-			case AccessCardType.Standard:    return  1;
-			case AccessCardType.Medical:     return  2;
-			case AccessCardType.Science:     return  3;
-			case AccessCardType.Admin:       return  4;
-			case AccessCardType.Group1:      return  5;
-			case AccessCardType.Group2:      return  6;
-			case AccessCardType.Group3:      return  7;
-			case AccessCardType.Group4:      return  8;
-			case AccessCardType.GroupA:      return  9;
-			case AccessCardType.GroupB:      return 10;
-			case AccessCardType.Storage:     return 11;
-			case AccessCardType.Engineering: return 12;
-			case AccessCardType.Maintenance: return 13;
-			case AccessCardType.Security:    return 14;
-			case AccessCardType.Per1:        return 15;
-			case AccessCardType.Per2:        return 16;
-			case AccessCardType.Per3:        return 17;
-			case AccessCardType.Per4:        return 18;
-			case AccessCardType.Per5:        return 19;
+			case AccessCardType_None:        return  0;
+			case AccessCardType_Standard:    return  1;
+			case AccessCardType_Medical:     return  2;
+			case AccessCardType_Science:     return  3;
+			case AccessCardType_Admin:       return  4;
+			case AccessCardType_Group1:      return  5;
+			case AccessCardType_Group2:      return  6;
+			case AccessCardType_Group3:      return  7;
+			case AccessCardType_Group4:      return  8;
+			case AccessCardType_GroupA:      return  9;
+			case AccessCardType_GroupB:      return 10;
+			case AccessCardType_Storage:     return 11;
+			case AccessCardType_Engineering: return 12;
+			case AccessCardType_Maintenance: return 13;
+			case AccessCardType_Security:    return 14;
+			case AccessCardType_Per1:        return 15;
+			case AccessCardType_Per2:        return 16;
+			case AccessCardType_Per3:        return 17;
+			case AccessCardType_Per4:        return 18;
+			case AccessCardType_Per5:        return 19;
 		}
 		return 0;
 	}
 
 	public static AccessCardType IntToAccessCardType(int cardType) {
 		switch (cardType) {
-			case 0:  return AccessCardType.None;
-			case 1:  return AccessCardType.Standard;
-			case 2:  return AccessCardType.Medical;
-			case 3:  return AccessCardType.Science;
-			case 4:  return AccessCardType.Admin;
-			case 5:  return AccessCardType.Group1;
-			case 6:  return AccessCardType.Group2;
-			case 7:  return AccessCardType.Group3;
-			case 8:  return AccessCardType.Group4;
-			case 9:  return AccessCardType.GroupA;
-			case 10: return AccessCardType.GroupB;
-			case 11: return AccessCardType.Storage;
-			case 12: return AccessCardType.Engineering;
-			case 13: return AccessCardType.Maintenance;
-			case 14: return AccessCardType.Security;
-			case 15: return AccessCardType.Per1;
-			case 16: return AccessCardType.Per2;
-			case 17: return AccessCardType.Per3;
-			case 18: return AccessCardType.Per4;
-			case 19: return AccessCardType.Per5;
+			case 0:  return AccessCardType_None;
+			case 1:  return AccessCardType_Standard;
+			case 2:  return AccessCardType_Medical;
+			case 3:  return AccessCardType_Science;
+			case 4:  return AccessCardType_Admin;
+			case 5:  return AccessCardType_Group1;
+			case 6:  return AccessCardType_Group2;
+			case 7:  return AccessCardType_Group3;
+			case 8:  return AccessCardType_Group4;
+			case 9:  return AccessCardType_GroupA;
+			case 10: return AccessCardType_GroupB;
+			case 11: return AccessCardType_Storage;
+			case 12: return AccessCardType_Engineering;
+			case 13: return AccessCardType_Maintenance;
+			case 14: return AccessCardType_Security;
+			case 15: return AccessCardType_Per1;
+			case 16: return AccessCardType_Per2;
+			case 17: return AccessCardType_Per3;
+			case 18: return AccessCardType_Per4;
+			case 19: return AccessCardType_Per5;
 		}
-		return AccessCardType.None;
+		return AccessCardType_None;
 	}
 	
 	public static string TrackTypeToString(TrackType typ, string name) {
@@ -1686,9 +1686,9 @@ public class Utils {
 
 			Rigidbody rbody = go.GetComponent<Rigidbody>();
 			dd.impactVelocity = dd.damage * impactScale * 0.1f;
-			Vector3 dir = go.transform.position - centerPoint;
+			Vector3 dir = go.instances[i].position - centerPoint;
 			RaycastHit hit;
-			float dist = distance_vector3(centerPoint, go.transform.position); // Original distance
+			float dist = distance_vector3(centerPoint, go.instances[i].position); // Original distance
 			bool applyImpact = (dist < 4f); // Close enough, no raycast needed
 
 			if (!applyImpact) {
@@ -1721,7 +1721,7 @@ public class Utils {
 					if (go.layer == 10) dd.impactVelocity *= 0.5f;
 					rbody.AddExplosionForce(dd.impactVelocity, centerPoint, radius, 1f, ForceMode.Impulse);
 					Vector3 deltaV = rbody.velocity - originalVelocity;
-					float damageScale = Mathf.Min(dd.damage / refDamage, maxScale);
+					float damageScale = vmin(dd.damage / refDamage, maxScale);
 					float maxDeltaV = (baseSpeed + k * rbody.mass) * damageScale;
 					if (deltaV.magnitude > maxDeltaV) {
 						deltaV = deltaV.normalized * maxDeltaV;
@@ -1736,7 +1736,7 @@ public class Utils {
 	public static void PlayTempAudio(Vector3 spot,AudioClip clip,float volume) {
 		GameObject tempAud = Const.a.GetObjectFromPool(PoolType.TempAudioSources);
 		if (tempAud != null) {
-			tempAud.transform.position = spot; // set temporary audiosource to right here
+			tempAud.instances[i].position = spot; // set temporary audiosource to right here
 			PooledItemDestroy poolDet = tempAud.GetComponent<PooledItemDestroy>();
 			if (poolDet != null) poolDet.itemLifeTime = clip.length;
 			tempAud.SetActive(true);
@@ -1749,182 +1749,4 @@ public class Utils {
 		PlayTempAudio(spot,clip,1f);
 	}
 
-	public static HealthManager GetMainHealthManager(GameObject go) {
-		if (go == null) return null;
-
-		HealthManager retval = null;
-		retval = go.GetComponent<HealthManager>();
-		if (retval != null) return retval;
-
-		// For hopper joint collisions or other combo-collider setups.
-		HealthManagerRelay hmr = go.GetComponent<HealthManagerRelay>();
-		if (hmr != null) retval = hmr.healthManagerToRedirectTo;
-		return retval;
-	}
-
-	public static HealthManager GetMainHealthManager(RaycastHit hit) {
-		if (hit.collider == null && hit.transform == null) return null;
-
-		HealthManager retval = null;
-		HealthManagerRelay hmr = null;
-		GameObject colGO = null;
-		GameObject hitGO = null;
-
-		// Check compound collider's main parent first.  Thanks andeeee!!
-		if (hit.collider != null) colGO = hit.collider.transform.gameObject;
-
-		if (colGO != null) hmr = colGO.GetComponent<HealthManagerRelay>();
-		hitGO = hit.transform.gameObject; // The actual hit object.
-		if (colGO != null) retval = colGO.GetComponent<HealthManager>();
-		if (retval != null) return retval;
-		if (hitGO == null) return null;
-
-		retval = hitGO.GetComponent<HealthManager>();
-		if (retval == null) {
-			// For hopper joint collisions or other combo-collider setups.
-			if (hmr == null) hmr = colGO.GetComponent<HealthManagerRelay>();
-			if (hmr != null) {
-				retval = hmr.healthManagerToRedirectTo;
-			}
-		}
-
-		return retval;
-	}
-
-    public static void CopyLogFiles(bool prev) {
-        #if UNITY_EDITOR
-            if (prev) return; // Just the one log in Editor (e.g. tests)
-        #endif
-        
-        string logFilePath = GetLogFilePath(prev);
-        string logname = "/Player.log";
-        if (prev) logname = "/Player-prev.log";
-        string destinationPath = Application.streamingAssetsPath + logname;
-
-        if (File.Exists(logFilePath)) {
-            // Delete the existing destination log file if it already exists
-            if (File.Exists(destinationPath)) {
-                File.Delete(destinationPath);
-            }
-
-            // Copy the log file to the StreamingAssets folder
-            File.Copy(logFilePath, destinationPath);
-            DualLog("Log file copied to StreamingAssets folder.");
-        } else {
-            DualLogWarning("Log file not found, hmmm");
-        }
-    }
-
-    private static string GetLogFilePath(bool prev) {
-        string logFilePath = "";
-		#if UNITY_EDITOR
-			// Editor log doesn't need specified.
-		#else
-			string logname = "/Player.log";
-			if (prev) logname = "/Player-prev.log";
-		#endif
-
-        #if UNITY_EDITOR
-            // Editor log file path
-            logFilePath = Application.consoleLogPath;
-        #elif UNITY_ANDROID
-            // Android log file path
-            logFilePath = Application.persistentDataPath + logname;
-        #elif UNITY_IOS
-            // iOS log file path
-            logFilePath = Application.temporaryCachePath + logname;
-        #else
-            // Standalone platforms (Windows, macOS, etc.)
-            logFilePath = Application.persistentDataPath + logname;
-        #endif
-
-        return logFilePath;
-    }
-    
-    public static GameObject CreateSEGIEmitter(GameObject go, int curlevel, int lineNum, Light lit) {
-		GameObject segiEmitter = new GameObject("SEGIEmitter" + curlevel.ToString() + "." + lineNum.ToString());
-        segiEmitter.transform.parent = go.transform;
-        segiEmitter.transform.localPosition = new Vector3(0f,0f,0f);
-        MeshFilter mf = segiEmitter.AddComponent<MeshFilter>();
-        mf.sharedMesh = Const.a.sphereMesh;
-        MeshRenderer mR = segiEmitter.AddComponent<MeshRenderer>();
-        mR.material = Const.a.segiEmitterMaterial1;
-        mR.material.SetColor("_EmissionColor",new Color(lit.color.r * lit.intensity,lit.color.g * lit.intensity,lit.color.b * lit.intensity,1f));
-        segiEmitter.transform.localScale = new Vector3(Mathf.Max(lit.range * Const.segiVoxelSize,8f),Mathf.Max(lit.range * Const.segiVoxelSize,8f),Mathf.Max(lit.range * Const.segiVoxelSize,8f));
-        segiEmitter.layer = 2; // IgnoreRaycast
-        return segiEmitter;
-	}
-	
-	// Allows for checking if a value given is within the tolerance of a comparison value.
-    public static bool InTol(float inVal, float compareVal, float epsilon) {
-        return ((inVal > (compareVal - epsilon)) && (inVal < (compareVal + epsilon)));
-    }
-    
-    // Calculate the nearest center for x and z based on the grid size of 2.56
-    // Keeping y as is since it's not grid-bound (could be fractional grid in increments of 0.16f or similar).
-    public static Vector3 GetCellCenter(Vector3 pos) {
-        return new Vector3(Mathf.Round(pos.x / 2.56f) * 2.56f,
-                           pos.y,
-                           Mathf.Round(pos.z / 2.56f) * 2.56f);
-    }
-    
-    public static bool IsAxisAligned(Quaternion quat) {
-        Vector3 euangs = quat.eulerAngles;
-        euangs = new Vector3(Mathf.Abs(euangs.x) % 360f, Mathf.Abs(euangs.y) % 360f, Mathf.Abs(euangs.z) % 360f);
-        bool xIs90, yIs90, zIs90;
-        xIs90 = yIs90 = zIs90 = false;
-        float tol = 0.5f; // Must be positive tolerance!  This is degrees.
-        if (Utils.InTol(euangs.x,0f,tol) || Utils.InTol(euangs.x,90f,tol) || Utils.InTol(euangs.x,180f,tol) || Utils.InTol(euangs.x,270f,tol) || Utils.InTol(euangs.x,360f,tol)) xIs90 = true;
-        if (Utils.InTol(euangs.y,0f,tol) || Utils.InTol(euangs.y,90f,tol) || Utils.InTol(euangs.y,180f,tol) || Utils.InTol(euangs.y,270f,tol) || Utils.InTol(euangs.y,360f,tol)) yIs90 = true;
-        if (Utils.InTol(euangs.z,0f,tol) || Utils.InTol(euangs.z,90f,tol) || Utils.InTol(euangs.z,180f,tol) || Utils.InTol(euangs.z,270f,tol) || Utils.InTol(euangs.z,360f,tol)) zIs90 = true;
-        return (xIs90 && yIs90 && zIs90);
-    }
-
-    public static float GetFloorHeight(Quaternion quat, float yHeight) {
-        Vector3 euangs = quat.eulerAngles;
-        euangs = new Vector3(Mathf.Abs(euangs.x) % 360f, Mathf.Abs(euangs.y) % 360f, Mathf.Abs(euangs.z) % 360f);
-        if (QuaternionApproximatelyEquals(quat,Quaternion.Euler(180f,0f,0f),30f)) return yHeight;
-        else return -1300f;
-	}
-    
-    public static bool QuaternionApproximatelyEquals(Quaternion quat, Quaternion other, float toleranceDeg) {
-        float angle = Quaternion.Angle(quat, other); // Quaternion.Angle is in degrees.
-        
-        // Check if the angle between the quaternions is less than or equal to the tolerance
-        return angle <= toleranceDeg;
-    }
-    
-    // Magic numbers corresponding to 45deg somehow from the sin/cos of
-	// radians of pi/4 best I can tell.  These are just what are saved
-	// from ToString() on quaternion transform.rotation channels.
-	static float twentySevenths = 0.27060f;
-	static float sixtyFifths    = 0.65328f;
-    
-    public static bool ChunkIs45NW_NE_SW_SE_Laterally(Quaternion quat) {
-		int count27 = 0;
-		int count65 = 0;
-		foreach (var component in new float[] { quat.x, quat.y, quat.z, quat.w }) {
-			if (Mathf.Abs(Mathf.Abs(component) - twentySevenths) < 0.01f) count27++;
-			else if (Mathf.Abs(Mathf.Abs(component) - sixtyFifths) < 0.01f) count65++;
-		}
-		
-		// Check if we have exactly 2 of each value type for a 45-degree rotation
-		// Seems this is the magic incantation to get any 45deg as long as
-		// any two of the quaternion channels are one magic number and the
-		// other two are tother.
-		return (count27 == 2 && count65 == 2);
-	}
-	
-	#if UNITY_EDITOR
-		public static List<GameObject> GetAllObjectsOnlyInScene() {
-			List<GameObject> objectsInScene = new List<GameObject>();
-			foreach (GameObject go in Resources.FindObjectsOfTypeAll(typeof(GameObject)) as GameObject[]) {
-				if (!EditorUtility.IsPersistent(go.transform.root.gameObject)
-					&& !(go.hideFlags == HideFlags.NotEditable
-						|| go.hideFlags == HideFlags.HideAndDontSave)) objectsInScene.Add(go);
-			}
-
-			return objectsInScene;
-		}
-	#endif
 }

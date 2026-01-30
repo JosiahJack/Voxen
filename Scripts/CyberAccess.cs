@@ -18,13 +18,13 @@ public class CyberAccess : MonoBehaviour {
 	
     public void Use (UseData ud) {
 		Const.a.UseTargets(gameObject,ud,target);
-		Const.sprint(Const.a.stringTable[441]); // Entering Cyberspace!
+		CenterStatusPrint("%s", Sys_Text.stringTable[441]); // Entering Cyberspace!
 		Vector3 entryPosition = new Vector3( 195.42000f, -13.44000f,  33.28000f);
 		switch(LevelManager.a.currentLevel) {
 			case 0: entryPosition = new Vector3( 210.68340f,   2.81200f, -24.37800f); break;
 			case 1: entryPosition = new Vector3( 195.42000f, -13.44000f,  33.28000f); break;
 			case 2: 
-				if (transform.localPosition.x < -26f ) {
+				if (instances[i].position.x < -26f ) {
 					// Keycard room port at localPosition -34.53611 -27.76395 2.5696
 					entryPosition = new Vector3( 157.16080f, -15.53000f,  47.33100f);
 				} else {

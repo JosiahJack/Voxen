@@ -65,30 +65,30 @@ public class VaporizeButton : MonoBehaviour {
 	public void OnVaporizeClick() {
 		MFDManager.a.mouseClickHeldOverGUI = true;
 		if (Inventory.a == null) return;
-		if (Inventory.a.generalInvCurrent == 0) return; // Access Cards index.
+		if (inventoryPlayer1.generalInvCurrent == 0) return; // Access Cards index.
 
-		int cur = Inventory.a.generalInvCurrent;
-		Inventory.a.generalInventoryIndexRef[cur] = -1; // Remove item
-		Inventory.a.generalInvCurrent -= 1;
-		if (Inventory.a.generalInvCurrent < 0) {
-			Inventory.a.generalInvCurrent = 0; // Bound to lowest, but only
+		int cur = inventoryPlayer1.generalInvCurrent;
+		inventoryPlayer1.generalInventoryIndexRef[cur] = -1; // Remove item
+		inventoryPlayer1.generalInvCurrent -= 1;
+		if (inventoryPlayer1.generalInvCurrent < 0) {
+			inventoryPlayer1.generalInvCurrent = 0; // Bound to lowest, but only
 		}									   // since it is Access Cards.
 
 
-		cur = Inventory.a.generalInvCurrent;
-		if (Inventory.a.generalInventoryIndexRef[cur] < 0) {
+		cur = inventoryPlayer1.generalInvCurrent;
+		if (inventoryPlayer1.generalInventoryIndexRef[cur] < 0) {
 			for (int i=13; i >= 0; i--) {
-				if (Inventory.a.generalInventoryIndexRef[i] >= 0) {
-					Inventory.a.generalInvCurrent = i;
+				if (inventoryPlayer1.generalInventoryIndexRef[i] >= 0) {
+					inventoryPlayer1.generalInvCurrent = i;
 					break; // Found last item in inventory.
 				}
 			}
 		}
 
-		cur = Inventory.a.generalInvCurrent;
-		int indexRef = Inventory.a.generalInventoryIndexRef[cur];
-		if (Inventory.a.generalInvCurrent == 0) {
-			if (Inventory.a.HasAnyAccessCards()) {
+		cur = inventoryPlayer1.generalInvCurrent;
+		int indexRef = inventoryPlayer1.generalInventoryIndexRef[cur];
+		if (inventoryPlayer1.generalInvCurrent == 0) {
+			if (inventoryPlayer1.HasAnyAccessCards()) {
 				MFDManager.a.SendInfoToItemTab(indexRef);
 			} else {
 				// If no access cards, reset item tab to show nothing.
@@ -96,7 +96,7 @@ public class VaporizeButton : MonoBehaviour {
 				PtrExit();
 			}
 		} else {
-			GeneralInvButton genbut = Inventory.a.genButtons[cur].GetComponent<GeneralInvButton>();
+			GeneralInvButton genbut = inventoryPlayer1.genButtons[cur].GetComponent<GeneralInvButton>();
 			MFDManager.a.SendInfoToItemTab(indexRef,genbut.customIndex);
 		}
 	}

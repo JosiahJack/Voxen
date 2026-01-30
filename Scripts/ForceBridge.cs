@@ -76,35 +76,35 @@ public class ForceBridge : MonoBehaviour {
 		if (activated) {
 			Utils.Activate(segiEmitter);
 			if (lerping) {
-				float sx = transform.localScale.x;
-				float sy = transform.localScale.y;
-				float sz = transform.localScale.z;
-				if (x) sx = Mathf.Lerp(transform.localScale.x,activatedScaleX,tickTime*2);
-				if (y) sy = Mathf.Lerp(transform.localScale.y,activatedScaleY,tickTime*2);
-				if (z) sz = Mathf.Lerp(transform.localScale.z,activatedScaleZ,tickTime*2);
-				transform.localScale = new Vector3(sx,sy,sz);
+				float sx = instances[i].scale.x;
+				float sy = instances[i].scale.y;
+				float sz = instances[i].scale.z;
+				if (x) sx = lerp(instances[i].scale.x,activatedScaleX,tickTime*2);
+				if (y) sy = lerp(instances[i].scale.y,activatedScaleY,tickTime*2);
+				if (z) sz = lerp(instances[i].scale.z,activatedScaleZ,tickTime*2);
+				instances[i].scale = new Vector3(sx,sy,sz);
 				if (   (activatedScaleX - sx) < 0.08f
 					&& (activatedScaleY - sy) < 0.08f
 					&& (activatedScaleZ - sz) < 0.08f) {
 
-					transform.localScale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
+					instances[i].scale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
 					lerping = false;
 				}
 			} else {
-				if (transform.localScale.x != activatedScaleX) transform.localScale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
-				if (transform.localScale.y != activatedScaleY) transform.localScale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
-				if (transform.localScale.z != activatedScaleZ) transform.localScale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
+				if (instances[i].scale.x != activatedScaleX) instances[i].scale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
+				if (instances[i].scale.y != activatedScaleY) instances[i].scale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
+				if (instances[i].scale.z != activatedScaleZ) instances[i].scale = new Vector3(activatedScaleX,activatedScaleY,activatedScaleZ);
 			}
 		} else {
 			if (lerping) {
 				// lerp scale down on deactivate
-				float sx = transform.localScale.x;
-				float sy = transform.localScale.y;
-				float sz = transform.localScale.z;
-				if (x) sx = Mathf.Lerp(transform.localScale.x,0f,tickTime*2);
-				if (y) sy = Mathf.Lerp(transform.localScale.y,0f,tickTime*2);
-				if (z) sz = Mathf.Lerp(transform.localScale.z,0f,tickTime*2);
-				transform.localScale = new Vector3(sx,sy,sz);
+				float sx = instances[i].scale.x;
+				float sy = instances[i].scale.y;
+				float sz = instances[i].scale.z;
+				if (x) sx = lerp(instances[i].scale.x,0f,tickTime*2);
+				if (y) sy = lerp(instances[i].scale.y,0f,tickTime*2);
+				if (z) sz = lerp(instances[i].scale.z,0f,tickTime*2);
+				instances[i].scale = new Vector3(sx,sy,sz);
 				if ((sx < 0.08f || sy < 0.08f || sz < 0.08f)) {
 					Utils.DisableMeshRenderer(mr);
 					Utils.DisableBoxCollider(bCol);
@@ -130,7 +130,7 @@ public class ForceBridge : MonoBehaviour {
 		if (x) sx = 0.1f;
 		if (y) sy = 0.1f;
 		if (z) sz = 0.1f;
-		transform.localScale = new Vector3(sx,sy,sz);
+		instances[i].scale = new Vector3(sx,sy,sz);
 	}
 
 	public void Deactivate(bool isSilent) {
@@ -153,8 +153,8 @@ public class ForceBridge : MonoBehaviour {
 	private GameObject CreateSEGIEmitterCube() {
 		GameObject segiEmitter = new GameObject("ForceBridgeSEGIEmitter_"  + LevelManager.a.currentLevel.ToString() + "." + gameObject.name);
         segiEmitter.transform.parent = transform;
-        segiEmitter.transform.localPosition = new Vector3(0f,0f,0f);
-		segiEmitter.transform.localScale = new Vector3(1f,1f,1f); // Parent scales it
+        segiEmitter.instances[i].position = new Vector3(0f,0f,0f);
+		segiEmitter.instances[i].scale = new Vector3(1f,1f,1f); // Parent scales it
         MeshFilter mf = segiEmitter.AddComponent<MeshFilter>();
         mf.sharedMesh = Const.a.cubeMesh;
         MeshRenderer mR = segiEmitter.AddComponent<MeshRenderer>();
@@ -238,11 +238,11 @@ public class ForceBridge : MonoBehaviour {
 		if (fb.activated) {
 			Utils.EnableMeshRenderer(fb.mr);
 			Utils.EnableBoxCollider(fb.bCol);
-			fb.transform.localScale = new Vector3(fb.activatedScaleX,fb.activatedScaleY,fb.activatedScaleZ);
+			fb.instances[i].scale = new Vector3(fb.activatedScaleX,fb.activatedScaleY,fb.activatedScaleZ);
 		} else {
-			if (fb.transform.localScale.x < 0.08f
-				|| fb.transform.localScale.y < 0.08f
-				|| fb.transform.localScale.z < 0.08f) {
+			if (fb.instances[i].scale.x < 0.08f
+				|| fb.instances[i].scale.y < 0.08f
+				|| fb.instances[i].scale.z < 0.08f) {
 
 				Utils.DisableMeshRenderer(fb.mr);
 				Utils.DisableBoxCollider(fb.bCol);
@@ -259,7 +259,7 @@ public class ForceBridge : MonoBehaviour {
 		fb.activatedScaleY = Utils.GetFloatFromString(entries[index],"activatedScaleY"); index++;
 		fb.activatedScaleZ = Utils.GetFloatFromString(entries[index],"activatedScaleZ"); index++;
 		if (fb.activated) {
-			fb.transform.localScale = new Vector3(fb.activatedScaleX,
+			fb.instances[i].scale = new Vector3(fb.activatedScaleX,
 												  fb.activatedScaleY,
 												  fb.activatedScaleZ);
 			fb.Activate(true);

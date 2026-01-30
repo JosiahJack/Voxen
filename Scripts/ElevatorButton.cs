@@ -40,7 +40,7 @@ public class ElevatorButton : MonoBehaviour {
 		MFDManager.a.mouseClickHeldOverGUI = true;
 
 		if (MFDManager.a.linkedElevatorDoor == null) {
-			Const.sprint(Const.a.stringTable[6]); // Too far away from that.
+			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
 			return;
 		}
 
@@ -48,12 +48,12 @@ public class ElevatorButton : MonoBehaviour {
 		Vector3 plyPos = MFDManager.a.playerCapsuleTransform.position;
 		float dist = distance_vector3(MFDManager.a.objectInUsePos,plyPos);
 		if (dist > Const.elevatorPadUseDistance && !dC) {
-			Const.sprint(Const.a.stringTable[6]); // Too far away from that.
+			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
 			return;
 		}
 
 		if (!dC) {
-			Const.sprint(Const.a.stringTable[7]); // Door not closed.
+			CenterStatusPrint("%s", Sys_Text.stringTable[7]); // Door not closed.
 			return;
 		}
 
@@ -61,10 +61,10 @@ public class ElevatorButton : MonoBehaviour {
 			if (targetDestination == null) {
 				LevelManager.a.LoadLevel(levelIndex,Vector3.zero);
 			} else {
-				LevelManager.a.LoadLevel(levelIndex,targetDestination.transform.position);
+				LevelManager.a.LoadLevel(levelIndex,targetDestination.instances[i].position);
 			}
 		} else {
-			Const.sprint(Const.a.stringTable[8]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[8]);
 		}
 	}
 

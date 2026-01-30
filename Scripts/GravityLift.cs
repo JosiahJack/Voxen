@@ -33,8 +33,8 @@ public class GravityLift : MonoBehaviour {
 			}
 		}
 
-		float topY = transform.position.y + (boxcol.size.y/2f);
-		float dist = topY - other.gameObject.transform.position.y + 0.48f;
+		float topY = instances[i].position.y + (boxcol.size.y/2f);
+		float dist = topY - other.gameObject.instances[i].position.y + 0.48f;
 		float velY = otherRbody.velocity.y;
 		if (otherRbody.velocity.y < 0f) velY = 0f; // Saturate at bottom end.
 

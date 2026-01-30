@@ -26,13 +26,13 @@ public class KeypadElevator : MonoBehaviour {
 		padInUse = false;
 		if (linkedDoor == null) {
 			DualLog("BUG: no linked Door for KeypadElevator at location: "
-					  + transform.position.ToString());
+					  + instances[i].position.ToString());
 		}
 	}
 
 	public void Use (UseData ud) {
 		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(transform.position);
+			MFDManager.a.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
@@ -44,7 +44,7 @@ public class KeypadElevator : MonoBehaviour {
 		if (locked) {
 			// Target something because we are locked like an info_message to say
 			// hey we are locked, e.g. vox: "Non emergency life pods disabled."
-			Const.sprint(lockedMessageIndex);
+			CenterStatusPrint(lockedMessageIndex);
 			Const.a.UseTargets(gameObject,ud,lockedTarget);
 			return;
 		}
@@ -54,7 +54,7 @@ public class KeypadElevator : MonoBehaviour {
 		MFDManager.a.SendElevatorKeypadToDataTab(this,buttonsEnabled,
 												 buttonsDarkened,buttonText,
 												 targetDestination,
-												 transform.position,linkedDoor,
+												 instances[i].position,linkedDoor,
 												 currentFloor);
 	}
 

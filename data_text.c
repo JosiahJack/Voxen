@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-Voxen_Text voxen_Text;
+Voxen_Text Sys_Text;
 char** audiologNames = NULL;
 char** audiologSubjects = NULL;
 char** audiologSenders = NULL;
@@ -47,21 +47,21 @@ void LoadTextForLanguage(uint8_t lang) {
 
     FILE* fp = fopen(textFile, "rb"); if (!fp) { DualLog("Failed to open text file: %s\n", textFile); return; }
     fseek(fp, 0, SEEK_END); size_t file_size = (size_t)ftell(fp); fseek(fp, 0, SEEK_SET);
-    if (fread(voxen_Text.file_data, 1, file_size, fp) != file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Exit(1); }
+    if (fread(Sys_Text.file_data, 1, file_size, fp) != file_size) { DualLogError("Failed to read %s?\n",textFile); OS_Exit(1); }
     fclose(fp);
     size_t data_pos = 0;
     int is_utf16le = 0;
     int is_utf8    = 0;
-    if (file_size >= 2 && voxen_Text.file_data[0] == 0xFF && voxen_Text.file_data[1] == 0xFE) {          // UTF-16-LE BOM
+    if (file_size >= 2 && Sys_Text.file_data[0] == 0xFF && Sys_Text.file_data[1] == 0xFE) {          // UTF-16-LE BOM
         data_pos = 2;
         is_utf16le = 1;
-    } else if (file_size >= 3 && voxen_Text.file_data[0] == 0xEF && voxen_Text.file_data[1] == 0xBB && voxen_Text.file_data[2] == 0xBF) {
+    } else if (file_size >= 3 && Sys_Text.file_data[0] == 0xEF && Sys_Text.file_data[1] == 0xBB && Sys_Text.file_data[2] == 0xBF) {
         data_pos = 3;
         is_utf8 = 1;
     } else {                                   // No BOM → heuristic
         size_t null_bytes = 0;
         for (size_t i = 1; i < (size_t)file_size && i < 1024; i += 2) {
-            if (voxen_Text.file_data[i] == 0) ++null_bytes;
+            if (Sys_Text.file_data[i] == 0) ++null_bytes;
         }
         if (null_bytes * 3 > file_size) {      // >33% null bytes → UTF-16-LE
             is_utf16le = 1;
@@ -76,10 +76,10 @@ void LoadTextForLanguage(uint8_t lang) {
         ++totalLines; size_t line_start = data_pos;
         if (is_utf8) {                         // ----- UTF-8 path -----
             while (data_pos < (size_t)file_size) {
-                uint8_t c = voxen_Text.file_data[data_pos];
+                uint8_t c = Sys_Text.file_data[data_pos];
                 if (c == '\r') {
                     ++data_pos;
-                    if (data_pos < (size_t)file_size && voxen_Text.file_data[data_pos] == '\n') ++data_pos;
+                    if (data_pos < (size_t)file_size && Sys_Text.file_data[data_pos] == '\n') ++data_pos;
                     break;
                 }
                 if (c == '\n') { ++data_pos; break; }
@@ -88,20 +88,20 @@ void LoadTextForLanguage(uint8_t lang) {
             }
             size_t len = data_pos - line_start;
             if (len == 0) {                         // blank line
-                if (lineNum < TEXT_STRING_COUNT) voxen_Text.stringTable[lineNum][0] = '\0';                
+                if (lineNum < TEXT_STRING_COUNT) Sys_Text.stringTable[lineNum][0] = '\0';                
                 ++lineNum;
                 continue;
             }
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
-            memcpy(utf8_line, &voxen_Text.file_data[line_start], len);
+            memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
         } else if (is_utf16le) {                               // ----- UTF-16-LE path -----
             while (data_pos + 1 < (size_t)file_size) {
-                uint16_t code = (uint16_t)voxen_Text.file_data[data_pos + 1] << 8 | voxen_Text.file_data[data_pos];
+                uint16_t code = (uint16_t)Sys_Text.file_data[data_pos + 1] << 8 | Sys_Text.file_data[data_pos];
                 data_pos += 2;
                 if (code == 0x000D) {
                     if (data_pos + 1 < (size_t)file_size) {
-                        uint16_t next = (uint16_t)voxen_Text.file_data[data_pos + 1] << 8 | voxen_Text.file_data[data_pos];
+                        uint16_t next = (uint16_t)Sys_Text.file_data[data_pos + 1] << 8 | Sys_Text.file_data[data_pos];
                         if (next == 0x000A) data_pos += 2;
                     }
                     break;
@@ -111,7 +111,7 @@ void LoadTextForLanguage(uint8_t lang) {
             size_t utf16_len = data_pos - line_start;
             if (utf16_len == 0) continue;
             utf8_line[0] = '\0';
-            utf16le_to_utf8(&voxen_Text.file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
+            utf16le_to_utf8(&Sys_Text.file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
         } else {
             DualLogError("Unknown encoding, not UTF-8 nor UTF-16LE for %s\n",textFile);
             OS_Exit(1);
@@ -120,14 +120,14 @@ void LoadTextForLanguage(uint8_t lang) {
         size_t len = GetStringLength(utf8_line);
         while (len > 0 && (utf8_line[len - 1] == '\n' || utf8_line[len - 1] == '\r')) utf8_line[--len] = '\0';
         if (len == 0) {
-            if (lineNum < TEXT_STRING_COUNT) voxen_Text.stringTable[lineNum][0] = '\0';                
+            if (lineNum < TEXT_STRING_COUNT) Sys_Text.stringTable[lineNum][0] = '\0';                
             ++lineNum;
             continue;
         }
 
         if (lineNum < TEXT_STRING_COUNT) {
-            memcpy(voxen_Text.stringTable[lineNum], utf8_line, len);
-            voxen_Text.stringTable[lineNum][len] = '\0';
+            memcpy(Sys_Text.stringTable[lineNum], utf8_line, len);
+            Sys_Text.stringTable[lineNum][len] = '\0';
             ++lineNum;
         }
     }
@@ -151,10 +151,10 @@ void LoadLogTextForLanguage(uint8_t lang) {
     #if defined(LINUX) || defined(ANDROID)
         malloc_trim(0);
     #endif
-    memset(voxen_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
-    memset(voxen_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
-    memset(voxen_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
-    memset(voxen_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
+    memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
+    memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
+    memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
+    memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
     audiologNames       = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audiologSenders     = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audiologSubjects    = calloc(TEXT_LOGS_COUNT, sizeof(char*));
@@ -177,17 +177,17 @@ void LoadLogTextForLanguage(uint8_t lang) {
     fseek(fp, 0, SEEK_END);
     long file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
-    if (fread(voxen_Text.file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); OS_Exit(1); return; } // Suppress -fanalyzer warning about double free by including unnecessary `return;` here.
+    if (fread(Sys_Text.file_data, 1, (size_t)file_size, fp) != (size_t)file_size) { DualLogError("Failed to read %s\n", textFile); fclose(fp); OS_Exit(1); return; } // Suppress -fanalyzer warning about double free by including unnecessary `return;` here.
     fclose(fp);
     size_t data_pos = 0;
     int is_utf16le = 0, is_utf8 = 0;
 
-    if (file_size >= 2 && voxen_Text.file_data[0] == 0xFF && voxen_Text.file_data[1] == 0xFE) { data_pos = 2; is_utf16le = 1; }
-    else if (file_size >= 3 && voxen_Text.file_data[0] == 0xEF && voxen_Text.file_data[1] == 0xBB && voxen_Text.file_data[2] == 0xBF) { data_pos = 3; is_utf8 = 1; }
+    if (file_size >= 2 && Sys_Text.file_data[0] == 0xFF && Sys_Text.file_data[1] == 0xFE) { data_pos = 2; is_utf16le = 1; }
+    else if (file_size >= 3 && Sys_Text.file_data[0] == 0xEF && Sys_Text.file_data[1] == 0xBB && Sys_Text.file_data[2] == 0xBF) { data_pos = 3; is_utf8 = 1; }
     else {
         int null_bytes = 0;
         for (size_t i = 1; i < (size_t)file_size && i < 1024; i += 2)
-            if (voxen_Text.file_data[i] == 0) ++null_bytes;
+            if (Sys_Text.file_data[i] == 0) ++null_bytes;
         if (null_bytes > (file_size / 3)) is_utf16le = 1;
         else                               is_utf8    = 1;
     }
@@ -199,23 +199,23 @@ void LoadLogTextForLanguage(uint8_t lang) {
         size_t line_start = data_pos;
         if (is_utf8) {
             while (data_pos < (size_t)file_size) {
-                uint8_t c = voxen_Text.file_data[data_pos];
-                if (c == '\r') { ++data_pos; if (data_pos < (size_t)file_size && voxen_Text.file_data[data_pos] == '\n') ++data_pos; break; }
+                uint8_t c = Sys_Text.file_data[data_pos];
+                if (c == '\r') { ++data_pos; if (data_pos < (size_t)file_size && Sys_Text.file_data[data_pos] == '\n') ++data_pos; break; }
                 if (c == '\n') { ++data_pos; break; }
                 ++data_pos;
             }
             size_t len = data_pos - line_start;
             if (len == 0) continue;
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
-            memcpy(utf8_line, &voxen_Text.file_data[line_start], len);
+            memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
         } else if (is_utf16le) {
             while (data_pos + 1 < (size_t)file_size) {
-                uint16_t code = (uint16_t)voxen_Text.file_data[data_pos + 1] << 8 | voxen_Text.file_data[data_pos];
+                uint16_t code = (uint16_t)Sys_Text.file_data[data_pos + 1] << 8 | Sys_Text.file_data[data_pos];
                 data_pos += 2;
                 if (code == 0x000D) {
                     if (data_pos + 1 < (size_t)file_size) {
-                        uint16_t next = (uint16_t)voxen_Text.file_data[data_pos + 1] << 8 | voxen_Text.file_data[data_pos];
+                        uint16_t next = (uint16_t)Sys_Text.file_data[data_pos + 1] << 8 | Sys_Text.file_data[data_pos];
                         if (next == 0x000A) data_pos += 2;
                     }
                     break;
@@ -225,7 +225,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
             size_t utf16_len = data_pos - line_start;
             if (utf16_len == 0) continue;
             utf8_line[0] = '\0';
-            utf16le_to_utf8(&voxen_Text.file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
+            utf16le_to_utf8(&Sys_Text.file_data[line_start], utf16_len, utf8_line, sizeof(utf8_line));
         } else { DualLogError("Unknown encoding for %s\n", textFile); OS_Exit(1); }
 
         size_t len = GetStringLength(utf8_line);
@@ -270,10 +270,10 @@ void LoadLogTextForLanguage(uint8_t lang) {
         }
 
         if (readIndexOfLog >= 0 && readIndexOfLog < TEXT_LOGS_COUNT) {
-            voxen_Text.audioLogImagesRefIndicesLH[readIndexOfLog] = (uint16_t)readLogImageLHIndex;
-            voxen_Text.audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
-            voxen_Text.audioLogType[readIndexOfLog]               = (uint8_t)readLogType;
-            voxen_Text.audioLogLevelFound[readIndexOfLog]         = (uint8_t)readLogLevelFound;
+            Sys_Text.audioLogImagesRefIndicesLH[readIndexOfLog] = (uint16_t)readLogImageLHIndex;
+            Sys_Text.audioLogImagesRefIndicesRH[readIndexOfLog] = (uint16_t)readLogImageRHIndex;
+            Sys_Text.audioLogType[readIndexOfLog]               = (uint8_t)readLogType;
+            Sys_Text.audioLogLevelFound[readIndexOfLog]         = (uint8_t)readLogLevelFound;
             #define REPLACE_STR(dst, src) do { \
                 if ((dst)[readIndexOfLog]) free((dst)[readIndexOfLog]); \
                 size_t slen = GetStringLength(src); \

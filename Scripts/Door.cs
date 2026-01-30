@@ -16,7 +16,7 @@ public class Door : MonoBehaviour {
 	int lockedMessageLingdex = 3;
 	bool blocked = false; // save
 	int SFXIndex = 75;
-	AccessCardType requiredAccessCard = AccessCardType.None;
+	AccessCardType requiredAccessCard = AccessCardType_None;
 	bool accessCardUsedByPlayer = false; // save
 	DoorState doorOpen; // save
 	float timeBeforeLasersOn;
@@ -50,7 +50,7 @@ public class Door : MonoBehaviour {
 
 		anim = GetComponent<Animator>();
 		animatorPlaybackTime = 0;
-		if (requiredAccessCard == AccessCardType.None) {
+		if (requiredAccessCard == AccessCardType_None) {
 			accessCardUsedByPlayer = true;
 		}
 		
@@ -75,19 +75,19 @@ public class Door : MonoBehaviour {
 		if (ud.owner == null) return;
 		
 		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(transform.position);
+			MFDManager.a.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
 		// SHODAN can go anywhere!  Full security override!
 		if (LevelManager.a.superoverride || SSys_Global.difficultyMission <= 0) {
 			locked = false;
-			requiredAccessCard = AccessCardType.None;
+			requiredAccessCard = AccessCardType_None;
 			accessCardUsedByPlayer = true;
 		}
 
 		if (SSys_Global.difficultyMission <= 1) {
-			requiredAccessCard = AccessCardType.None;
+			requiredAccessCard = AccessCardType_None;
 			accessCardUsedByPlayer = true;
 		}
 
@@ -96,14 +96,14 @@ public class Door : MonoBehaviour {
 		if (useFinished >= Sys_Global.pauseRelativeTime) return;
 
 		useFinished = Sys_Global.pauseRelativeTime + useTimeDelay;	
-		if (requiredAccessCard == AccessCardType.None
-			|| Inventory.a.HasAccessCard(requiredAccessCard)
+		if (requiredAccessCard == AccessCardType_None
+			|| inventoryPlayer1.HasAccessCard(requiredAccessCard)
 			|| accessCardUsedByPlayer) {
 
 			if (!locked) {
-				if (requiredAccessCard != AccessCardType.None) {
+				if (requiredAccessCard != AccessCardType_None) {
 					// State that we just used a keycard and access was granted
-					Const.sprint(Inventory.AccessCardCodeForType(requiredAccessCard) + Const.a.stringTable[4]);
+					CenterStatusPrint(Inventory.AccessCardCodeForType(requiredAccessCard) + Sys_Text.stringTable[4]);
 					accessCardUsedByPlayer = true;
 				}
 
@@ -120,11 +120,11 @@ public class Door : MonoBehaviour {
 				DoorActuate();
 			} else {
 				// Use access card
-				if (requiredAccessCard != AccessCardType.None) {
-					Const.sprint(requiredAccessCard.ToString() + Const.a.stringTable[4] + Const.a.stringTable[5]);
+				if (requiredAccessCard != AccessCardType_None) {
+					CenterStatusPrint(requiredAccessCard.ToString() + Sys_Text.stringTable[4] + Sys_Text.stringTable[5]);
 					accessCardUsedByPlayer = true;
 				} else {
-					Const.sprint(lockedMessageLingdex); 
+					CenterStatusPrint(lockedMessageLingdex); 
 					Utils.PlayOneShotSavable(SFX,Const.a.sounds[467],0.55f);
 					if (QuestLogNotesManager.a != null) {
 						QuestLogNotesManager.a.NotifyLockedDoorAttempt(this);
@@ -133,7 +133,7 @@ public class Door : MonoBehaviour {
 			}
 		} else {
 			// Tell owner of the Use command that an access card is needed.
-			Const.sprint(requiredAccessCard.ToString() + Const.a.stringTable[2]);
+			CenterStatusPrint(requiredAccessCard.ToString() + Sys_Text.stringTable[2]);
 			Utils.PlayOneShotSavable(SFX,Const.a.sounds[466],0.7f);
 		}
 	}
@@ -237,8 +237,8 @@ public class Door : MonoBehaviour {
 		GameObject childGO;
 		for (i=0;i<dynamicObjectsContainer.transform.childCount;i++) {
 			childGO = dynamicObjectsContainer.transform.GetChild(i).gameObject;
-			objPos = childGO.transform.position;
-			if (distance_vector3(transform.position,objPos) < 5) {
+			objPos = childGO.instances[i].position;
+			if (distance_vector3(instances[i].position,objPos) < 5) {
 				Rigidbody childRbody = childGO.GetComponent<Rigidbody>();
 				if (childRbody != null) childRbody.WakeUp(); // No ghosting!
 			}

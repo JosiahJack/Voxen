@@ -6,35 +6,30 @@ const float searchTime = 5.0f;
 Vector3 targetOffset = new Vector3(0.0f, 0.24f, 0.0f);
 uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
 
-float Tranquilize(uint16_t selfIdx, float amount, bool energy) {
-    #define SELF instances[selfIdx]
+float Tranquilize(float amount, bool energy) {
     if (npcTable[NPCID].type == NPCType_Robot && !energy) return 0.0f;
 
     float tranqSecs = (amount < 3.0f) ? npcTable[NPCID].timeForTranquilization : amount; // If we're going to tranq, at least do it for 3 secs.
-    SELF.tranquilizeFinished = Mathf.Max(Sys_Global.pauseRelativeTime + tranqSecs, SELF.tranquilizeFinished + tranqSecs);
+    SELF.tranquilizeFinished = vmax(Sys_Global.pauseRelativeTime + tranqSecs, SELF.tranquilizeFinished + tranqSecs);
     return tranqSecs;
-    #undef SELF
 }
 
-static inline bool IsCyberNPC(uint16_t selfIdx) { return npcTable[NPCID].type == NPCType_Cyber; }
+static inline bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
 
-void SetHuntFinished(uint16_t selfIdx) {
-    #define SELF instances[selfIdx]
+void SetHuntFinished() {
     SELF.huntFinished = Sys_Global.pauseRelativeTime;
     int diff = Sys_Global.difficultyCombat;
     if (npcTable[NPCID].type == NPCType_Cyber) diff = SSys_Global.difficultyCyber;
     if (diff <= 1) { // More forgetful on easy.
-        huntFinished += Mathf.Max((Const.a.huntTime[index] * 0.75f),60.0f);
+        huntFinished += vmax((Const.a.huntTime[index] * 0.75f),60.0f);
     } else if (diff >= 3) { // Good memory on hard.
-        huntFinished += Mathf.Max((Const.a.huntTime[index] * 2.00f),60.0f); 
+        huntFinished += vmax((Const.a.huntTime[index] * 2.00f),60.0f); 
     } else {
-        huntFinished += Mathf.Max(Const.a.huntTime[index], 60.0f);
+        huntFinished += vmax(Const.a.huntTime[index], 60.0f);
     }
-    #undef SELF
 }
 
-void InitializeAIAfterLoad(uint16_t selfIdx) {
-    #define SELF instances[selfIdx]
+void InitializeAIAfterLoad() {
     SELF.layer = PhysicsLayer_NPC;
     SELF.idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[NPCID].timeIdleSFXMin, npcTable[NPCID].timeIdleSFXMax);
     SELF.attack1SoundTime = SELF.attack2SoundTime = SELF.attack3SoundTime = Sys_Global.pauseRelativeTime;
@@ -76,11 +71,9 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
     SELF.targetID = snprintf(SELF.targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[NPCID].name,npcCountInWorldPerType[index]++);
     if (asleep) Utils.Activate(sleepingCables);
     startInitialized = true;
-    #undef SELF
 }
 
-	void AI_Face(uint16_t selfIdx, Vector3 goalLocation) {
-        #define SELF instances[selfIdx]
+	void AI_Face(Vector3 goalLocation) {
 		if (SELF.asleep) return;
 
 		faceVec = goalLocation - instances[i].position;
@@ -95,13 +88,13 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 			return;
 		}
 		
-		if (goalLocation == transform.position) {
-			if (enemy != null) faceVec = enemy.transform.position - transform.position;
+		if (goalLocation == instances[i].position) {
+			if (enemy != null) faceVec = enemy.instances[i].position - instances[i].position;
 			else faceVec.x += 0.001f;
 		}
 		
 		lookRot = Quaternion.LookRotation(faceVec,up);
-		transform.rotation = Quaternion.Slerp(transform.rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
+		instances[i].rotation = Quaternion.Slerp(instances[i].rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
         #undef SELF
 	}
 
@@ -140,14 +133,14 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 					DualLog("enemy forgotten");
 					enemyHM = null;
 					posCheckFinished = Sys_Global.pauseRelativeTime;
-					lastPosition = transform.position;
+					lastPosition = instances[i].position;
 				}
 			}
 
 			// Enemy still has health
 			if (enemy != null) {
 				enemyInFrontChecks(enemy);
-				rangeToEnemy = (enemy.transform.position
+				rangeToEnemy = (enemy.instances[i].position
 							- Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset)).sqrMagnitude;
 			}
 		} else {
@@ -165,8 +158,8 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
         if (healthManager.linkedOverlay != null) {
             if (!IsCyberNPC()
                 //&& healthManager.health > 0 // Only health, not cyber.
-                && Inventory.a.hasHardware[1]
-                && Inventory.a.NavUnitVersion() > 1) {
+                && inventoryPlayer1.hasHardware[1]
+                && inventoryPlayer1.NavUnitVersion() > 1) {
 
                 healthManager.UpdateLinkedOverlay();
             } else {
@@ -179,12 +172,12 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
         if (currentState != AIState_Dead) {
             if (currentState != AIState_Idle) {
 				if (actAsTurret && enemy != null) {
-					currentDestination = enemy.transform.position;
-					currentDestination.y = enemy.transform.position.y + 0.24f;
+					currentDestination = enemy.instances[i].position;
+					currentDestination.y = enemy.instances[i].position.y + 0.24f;
 				}
 
 				if (IsCyberNPC() && enemy != null) {
-					currentDestination = enemy.transform.position;
+					currentDestination = enemy.instances[i].position;
 				}
 
                 idealTransformForward = currentDestination
@@ -192,7 +185,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
                 if (!IsCyberNPC()) idealTransformForward.y = 0;
 				idealTransformForward = idealTransformForward.normalized;
-				if (idealTransformForward.sqrMagnitude > Mathf.Epsilon
+				if (idealTransformForward.sqrMagnitude > FLT_EPSILON
 					|| IsCyberNPC()) {
 
 					AI_Face(currentDestination);
@@ -260,8 +253,8 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		Vector3 floorPoint = new Vector3();
 		floorPoint = Const.a.vectorZero;
 		if (enemy != null) {
-		    idealPos = transform.position; // Where it's at
-		    idealPos.y = enemy.transform.position.y + 0.24f; // Player eye height.
+		    idealPos = instances[i].position; // Where it's at
+		    idealPos.y = enemy.instances[i].position.y + 0.24f; // Player eye height.
 		} else {
 			if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), sightPoint.transform.up * -1,out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
 				distDn = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset), tempHit.point);
@@ -275,11 +268,11 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 			idealPos = floorPoint + new Vector3(0,yHeight, 0);
 		}
 
-		float dist = Mathf.Abs(idealPos.y - transform.position.y);
+		float dist = vabs(idealPos.y - instances[i].position.y);
 		if (dist < 0.16f) return; // Close enuff
 
 		float spd = Const.a.runSpeed[index] * Time.deltaTime;
-		transform.position = Vector3.MoveTowards(transform.position,idealPos,spd);
+		instances[i].position = Vector3.MoveTowards(instances[i].position,idealPos,spd);
 	}
 
 	public bool CheckPain(uint16_t i) {
@@ -319,11 +312,11 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 					posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
 					wandering = false;
 					wanderFinished = Sys_Global.pauseRelativeTime;
-					lastPosition = transform.position;
+					lastPosition = instances[i].position;
 					if (enemy != null) {
 						enemyHM = Utils.GetMainHealthManager(enemy);
-						lastKnownEnemyPos = enemy.transform.position;
-						currentDestination = enemy.transform.position;
+						lastKnownEnemyPos = enemy.instances[i].position;
+						currentDestination = enemy.instances[i].position;
 					}
 				}
 			}
@@ -362,10 +355,10 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 	}
 
 	Vector3 GetWanderPoint() {
-		float newX = transform.position.x + random_range(-79f,79f);
-		float newZ = transform.position.z + random_range(-79f,79f);
+		float newX = instances[i].position.x + random_range(-79f,79f);
+		float newZ = instances[i].position.z + random_range(-79f,79f);
 		float newY = 0f;
-		if (IsCyberNPC()) newY = transform.position.y + random_range(-79f,79f);
+		if (IsCyberNPC()) newY = instances[i].position.y + random_range(-79f,79f);
 		return new Vector3(newX,newY,newZ);
 	}
 
@@ -458,7 +451,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		if (walkWaypoints.Length < 1) return;
 		if (walkWaypoints[currentWaypoint] == null) return; // No gaps allowed.
 
-		currentDestination = walkWaypoints[currentWaypoint].transform.position;
+		currentDestination = walkWaypoints[currentWaypoint].instances[i].position;
 	}
 
 	bool CanAttack1(float dist) {
@@ -564,17 +557,17 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 	Vector3 GetAStarPoint() {
 		if (DynamicCulling.a == null) return GetWanderPoint();
 		
-		Vector2Int currentCell = DynamicCulling.a.PosToCellCoords(transform.position);
+		Vector2Int currentCell = DynamicCulling.a.PosToCellCoords(instances[i].position);
 		if (!DynamicCulling.a.XYPairInBounds(currentCell.x,currentCell.y)) return GetWanderPoint();
 			
 		bool clearNorth = false;
 		bool clearSouth = false;
 		bool clearEast = false;
 		bool clearWest = false;
-		Vector3 northPoint = transform.position + new Vector3(0f,0f,2.56f);
-		Vector3 southPoint = transform.position + new Vector3(0f,0f,-2.56f);
-		Vector3 eastPoint = transform.position + new Vector3(2.56f,0f,0f);
-		Vector3 westPoint = transform.position + new Vector3(-2.56f,0f,0f);
+		Vector3 northPoint = instances[i].position + new Vector3(0f,0f,2.56f);
+		Vector3 southPoint = instances[i].position + new Vector3(0f,0f,-2.56f);
+		Vector3 eastPoint = instances[i].position + new Vector3(2.56f,0f,0f);
+		Vector3 westPoint = instances[i].position + new Vector3(-2.56f,0f,0f);
 		List<Vector3> availablePositions = new List<Vector3>();
 		if (DynamicCulling.a.XYPairInBounds(currentCell.x,currentCell.y + 1)) {
 			clearNorth = (DynamicCulling.a.gridCells[currentCell.x,currentCell.y + 1].open && !DynamicCulling.a.gridCells[currentCell.x,currentCell.y].closedNorth);
@@ -599,7 +592,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		// Randomly select point but only from available choices
 		int nearest = 0;		
 		for (int i=0;i<availablePositions.Count;i++) {
-			if (distance_vector3(enemy.transform.position,availablePositions[i]) < distance_vector3(enemy.transform.position,availablePositions[nearest])) nearest = i;
+			if (distance_vector3(enemy.instances[i].position,availablePositions[i]) < distance_vector3(enemy.instances[i].position,availablePositions[nearest])) nearest = i;
 		}
 		
 		return availablePositions[nearest];
@@ -632,9 +625,9 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
 		if (posCheckFinished <= Sys_Global.pauseRelativeTime && !IsCyberNPC()) {
 			posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
-			float distToEnem = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),enemy.transform.position);
-			distToLastPos = distance_vector3(transform.position,lastPosition);
-			lastPosition = transform.position;
+			float distToEnem = distance_vector3(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),enemy.instances[i].position);
+			distToLastPos = distance_vector3(instances[i].position,lastPosition);
+			lastPosition = instances[i].position;
 			if (distToLastPos < 0.48f && distToEnem > stopDistance && !wandering) {
 				wanderFinished = Sys_Global.pauseRelativeTime + searchTime;
 				wandering = true;
@@ -659,7 +652,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
         }
         
 		if (enemy != null && !wandering) {
-			targettingPosition = enemy.transform.position + targetOffset;
+			targettingPosition = enemy.instances[i].position + targetOffset;
 			currentDestination = targettingPosition;
 			lastKnownEnemyPos = targettingPosition;
 		}
@@ -697,10 +690,10 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
     void Hunt() {
 		if (IsCyberNPC()) {
-			currentDestination = enemy.transform.position; // See through walls
+			currentDestination = enemy.instances[i].position; // See through walls
 		} else {
 			// UPDATE: A* Pathfinding with world grid.
-			currentDestination = GetSearchPoint(true); //enemy.transform.position;//lastKnownEnemyPos;
+			currentDestination = GetSearchPoint(true); //enemy.instances[i].position;//lastKnownEnemyPos;
 		}
 
 		// Destination is still far enough away and within angle, then move.
@@ -733,7 +726,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
 		// Attack3 used targettingPosition but it is so rare I decided to use
 		// the known working method from Attack1 and Attack2.
-        currentDestination = enemy.transform.position;
+        currentDestination = enemy.instances[i].position;
 		Vector3 eyePos = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
 		float sqrDist = (eyePos - currentDestination).sqrMagnitude;
 		if (sqrDist <= (stopDistance * stopDistance)) return; // At stop point.
@@ -789,11 +782,11 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
     bool WithinAngleToTarget () {
 		if (IsCyberNPC()) return true;
-		if (idealTransformForward.sqrMagnitude <= Mathf.Epsilon) return false;
+		if (idealTransformForward.sqrMagnitude <= FLT_EPSILON) return false;
 
 		Quaternion lookRot = Quaternion.LookRotation(idealTransformForward);
 		float fovMov = Const.a.fovStartMovement[index];
-		float ang = Quaternion.Angle(transform.rotation,lookRot);
+		float ang = Quaternion.Angle(instances[i].rotation,lookRot);
 		if (ang < fovMov) return true;
 		if (ang < (fovMov * 1.5f)) {
 			if (random_range(0f,1f) < 0.5f) return true;
@@ -807,16 +800,16 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		switch (attackNum) {
 			case 2:
 				if (gunPoint != null) {
-					startPos = gunPoint.transform.position;
+					startPos = gunPoint.instances[i].position;
 				} else if (gunPoint2 != null) {
-					startPos = gunPoint2.transform.position;
+					startPos = gunPoint2.instances[i].position;
 				}
 				break;
 			case 3:
 				if (gunPoint2 != null) {
-					startPos = gunPoint2.transform.position;
+					startPos = gunPoint2.instances[i].position;
 				} else if (gunPoint != null) {
-					startPos = gunPoint.transform.position;
+					startPos = gunPoint.instances[i].position;
 				}
 				break;
 		}
@@ -858,8 +851,8 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
 		if (impact == null) return;
 
-		impact.transform.position = tempHit.point + (tempHit.normal * offset);
-		impact.transform.rotation = Quaternion.FromToRotation(Vector3.up,
+		impact.instances[i].position = tempHit.point + (tempHit.normal * offset);
+		impact.instances[i].rotation = Quaternion.FromToRotation(Vector3.up,
 															  tempHit.normal);
 		impact.SetActive(true);
     }
@@ -907,7 +900,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
 		if (!hasLaser) return;
 
-		GameObject laz = Instantiate(Const.a.GetPrefab(408),transform.position,
+		GameObject laz = Instantiate(Const.a.GetPrefab(408),instances[i].position,
 									 Const.a.quaternionIdentity) as GameObject;
 
 		if (laz == null) return; // No laser!
@@ -926,7 +919,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 
 		Vector3[] pts = new Vector3[] {
 			Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),
-			enemy.transform.position
+			enemy.instances[i].position
 		};
 
 		laserLightning.SetPositions(pts);
@@ -1037,7 +1030,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 			pei.dd = damageData;
 			pei.host = gameObject;
 		}
-		beachball.transform.position = startPos;
+		beachball.instances[i].position = startPos;
 		beachball.transform.forward = tempVec.normalized;
 		Utils.Activate(beachball);
 		GrenadeActivate ga = beachball.GetComponent<GrenadeActivate>();
@@ -1215,9 +1208,9 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		gameObject.layer = 13; // Change to Corpse layer
 
 		// Bump it up a hair to prevent corpse falling through the floor
-		//transform.position = new Vector3(transform.position.x,
-		//								 transform.position.y + 0.04f,
-		//								 transform.position.z);
+		//instances[i].position = new Vector3(instances[i].position.x,
+		//								 instances[i].position.y + 0.04f,
+		//								 instances[i].position.z);
 
 		firstSighting = true;
 
@@ -1333,7 +1326,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		if (PlayerMovement.a.Notarget && !enemyIsNPC) {
 			enemy = null; // Force forget when using Notarget cheat.
 			posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
-			lastPosition = transform.position;
+			lastPosition = instances[i].position;
 			LOSpossible = false;
 			return false;
 		}
@@ -1345,12 +1338,12 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		}
 
 		// Get distance between enemy and found player
-		float dist = distance_vector3(enemy.transform.position, Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
+		float dist = distance_vector3(enemy.instances[i].position, Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
 		if (dist > Const.a.sightRange[index]) return false;
 		if (IsCyberNPC() || enemyIsNPC) return true;
 
 		// Get vector line made from enemy to found player
-		Vector3 line = enemy.transform.position - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
+		Vector3 line = enemy.instances[i].position - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset);
         RaycastHit tempHit;
         if (Raycast(Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset),line.normalized, out tempHit, Const.a.sightRange[index], Const.a.layerMaskNPCSight)) {
 			Const.a.numberOfRaycastsThisFrame++;
@@ -1374,7 +1367,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 					if (dr != null) {
 						if ((dr.doorOpen == DoorState.Closed || (dr.doorOpen == DoorState.Closing && Sys_Global.difficultyCombat > 2))
 							&& !dr.locked && (LevelManager.a.GetCurrentLevelSecurity() <= dr.securityThreshhold)
-							&& (dr.requiredAccessCard == AccessCardType.None || dr.accessCardUsedByPlayer || Inventory.a.HasAccessCard(dr.requiredAccessCard))) {
+							&& (dr.requiredAccessCard == AccessCardType_None || dr.accessCardUsedByPlayer || inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
 						
 							dr.DoorActuate();
 						}
@@ -1412,7 +1405,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		// Can't see him, he's on notarget.
 		if (PlayerMovement.a.Notarget) return false;
 
-		tempVec = Const.a.player1Capsule.transform.position;
+		tempVec = Const.a.player1Capsule.instances[i].position;
 
 		// Get distance between enemy and found player
 		float dist = distance_vector3(tempVec,Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
@@ -1481,9 +1474,9 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		posCheckFinished = Sys_Global.pauseRelativeTime + positionCheckDelay;
 		wandering = false;
 		wanderFinished = Sys_Global.pauseRelativeTime;
-		lastPosition = transform.position;
+		lastPosition = instances[i].position;
 		enemyHM = Utils.GetMainHealthManager(enemSent);
-		lastKnownEnemyPos = enemy.transform.position;
+		lastKnownEnemyPos = enemy.instances[i].position;
 		targettingPosition = targettingPosSent.position;
 		SetHuntFinished();
 	}
@@ -1511,7 +1504,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 	        return;
 	    }
 
-        infrontVec = target.transform.position;
+        infrontVec = target.instances[i].position;
 		infrontVec.y = Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset).y; // Ignore height delta.
 		infrontVec = Vector3.Normalize(infrontVec - Vector3_A_plus_B(instances[i].position + instances[i].sightPointOffset));
 		inProjFOV = false;
@@ -1530,7 +1523,7 @@ void InitializeAIAfterLoad(uint16_t selfIdx) {
 		if (Sys_Global.difficultyCombat == 0) return;
 
 		SetEnemy(Const.a.player1Capsule,Const.a.player1Capsule.transform);
-		currentDestination = enemy.transform.position;
+		currentDestination = enemy.instances[i].position;
 		inSight = false;
 	}
 

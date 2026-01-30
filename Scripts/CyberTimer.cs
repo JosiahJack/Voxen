@@ -30,7 +30,7 @@ public class CyberTimer : MonoBehaviour {
 			if (t <= 0) MouseLookScript.a.ExitCyberspace();
 			if (timerFinished < Sys_Global.pauseRelativeTime) {
 				t -= 1f;
-				minutes = Mathf.Floor(t/60f);
+				minutes = vfloor(t/60f);
 				seconds = t - (minutes*60);
 				text.text = (minutes.ToString("00") + ":" + seconds.ToString("00"));
 				timerFinished = Sys_Global.pauseRelativeTime + 1f;

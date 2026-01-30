@@ -35,7 +35,7 @@ public class ItemTabManager : MonoBehaviour {
 		grenadeTimerSliderSlider.SetActive(false);
 		eReaderSectionsContainer.SetActive(true);
 		iconManager.GetComponent<Image>().overrideSprite = Const.a.useableItemsIcons[23]; //datareader
-		textManager.GetComponent<Text>().text = Const.a.stringTable[349]; // MULTIMEDIA DATA READER
+		textManager.GetComponent<Text>().text = Sys_Text.stringTable[349]; // MULTIMEDIA DATA READER
 	}
 
 	public void SendItemDataToItemTab(int constIndex, int customIndex) {
@@ -72,21 +72,21 @@ public class ItemTabManager : MonoBehaviour {
 			if (Const.a.useableItemsIcons[constIndex] != null) { iconManager.GetComponent<Image>().overrideSprite = Const.a.useableItemsIcons[constIndex]; //datareader
 		}
 
-		textManager.GetComponent<Text>().text = Const.a.stringTable[constIndex + 326];
+		textManager.GetComponent<Text>().text = Sys_Text.stringTable[constIndex + 326];
 
 		// Access Cards need special list enabled.
 		if (constIndex == 34 || constIndex == 81 || constIndex == 110
 			|| (constIndex >= 83 && constIndex <= 91)) {
 			accessCardList.SetActive(true);
-			AccessCardType acc = AccessCardType.Standard;
+			AccessCardType acc = AccessCardType_Standard;
 			Array cardTypes = Enum.GetValues(typeof(AccessCardType));
 			StringBuilder s1 = new StringBuilder();
 			s1.Clear();
 			for (int i=0;i<cardTypes.Length;i++) {
 				acc = (AccessCardType)cardTypes.GetValue(i);
-				if (acc == AccessCardType.None) continue;
+				if (acc == AccessCardType_None) continue;
 
-				if (Inventory.a.HasAccessCard(acc)) s1.Append(" " + Inventory.AccessCardCodeForType(acc));
+				if (inventoryPlayer1.HasAccessCard(acc)) s1.Append(" " + Inventory.AccessCardCodeForType(acc));
 			}
 
 			accessCardListText.text = s1.ToString();

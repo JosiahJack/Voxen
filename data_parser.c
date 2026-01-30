@@ -155,7 +155,7 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
                     else if (StringsAreEqual(trimmed_key, "persistent"))        flag_set(&entry.entflags,ENTFLAG_TEST_PERSISTENT,parse_bool(trimmed_value, start, lineNum));
                     
                     else if (StringsAreEqual(trimmed_key, "model"))             entry.modelIndex = parse_numberu16(trimmed_value, start, lineNum);
-                    else if (StringsAreEqual(trimmed_key, "animationNum"))      entry.animationNum = parse_numberu16(trimmed_value, start, lineNum);
+                    else if (StringsAreEqual(trimmed_key, "animationNum")) {    entry.animationNum = parse_numberu16(trimmed_value, start, lineNum); entry.entflags |= ENTFLAG_ANIMATED; }
                     else if (StringsAreEqual(trimmed_key, "animated"))          flag_set(&entry.entflags,ENTFLAG_ANIMATED,parse_numberu8(trimmed_value, start, lineNum));
 
                     else if (StringsAreEqual(trimmed_key, "texture"))           entry.texIndex = parse_numberu16(trimmed_value, start, lineNum);

@@ -54,7 +54,6 @@ public class HealthManager : MonoBehaviour {
 	bool awakeInitialized = false;
 	bool startInitialized = false;
 	private bool isScreen = false;
-	private static StringBuilder s1 = new StringBuilder();
 
 	public void Awake () {
 		if (awakeInitialized) return;
@@ -266,8 +265,8 @@ public class HealthManager : MonoBehaviour {
 		if (isPlayer) {
 			float absorb = 0;
 			if (inCyberSpace) {
-				if (Inventory.a.hasSoft[2]) {
-					switch(Inventory.a.softVersions[2]) {
+				if (inventoryPlayer1.hasSoft[2]) {
+					switch(inventoryPlayer1.softVersions[2]) {
 						case 0: absorb = 0.00f; break;
 						case 1: absorb = 0.10f; break;
 						case 2: absorb = 0.15f; break;
@@ -290,15 +289,15 @@ public class HealthManager : MonoBehaviour {
 					empstatic.Flash(2);
 					PlayerEnergy.a.TakeEnergy(11f);
 					if (BiomonitorGraphSystem.a != null) {
-						BiomonitorGraphSystem.a.EnergyPulse(11f);
+						BiomonitorEnergyPulse(11f);
 					}
 				}
 
-				if (Inventory.a.hardwareIsActive[5] && Inventory.a.hasHardware[5]) {
+				if (inventoryPlayer1.hardwareIsActive[5] && inventoryPlayer1.hasHardware[5]) {
 					// Versions of shield protect against 20, 40, 75, 75%'s
 					// Versions of shield thresholds are 0, 10, 15, 30...ooh what's this hang on now...Huh, turns out it absorbs all damage below the thresshold!  Cool!
 					float thresh = 0;
-					switch(Inventory.a.hardwareVersion[5]) {
+					switch(inventoryPlayer1.hardwareVersion[5]) {
 						case 0: absorb = 0.2f;   thresh = 0f; break;
 						case 1: absorb = 0.4f;  thresh = 10f; break;
 						case 2: absorb = 0.75f; thresh = 15f; break;
@@ -313,7 +312,7 @@ public class HealthManager : MonoBehaviour {
 						PlayerHealth.a.shieldEffect.SetActive(true); // Activate shield screen effect to indicate damage was absorbed, effect intensity determined by absorb amount
 						Utils.PlayUIOneShotSavable(94); // Play shield absorb sound
 						int abs = (int)(absorb * 100f); //  for int display of absorbption percent
-						Const.sprint(Const.a.stringTable[208] + abs.ToString() + Const.a.stringTable[209],dd.other);  // Shield absorbs x% damage
+						CenterStatusPrint("%s", Sys_Text.stringTable[208] + abs.ToString() + Sys_Text.stringTable[209],dd.other);  // Shield absorbs x% damage
 					}
 				}
 				if (take > 0 && ((absorb <0.4f) || random_range(0,1f) < 0.5f)) {
@@ -479,7 +478,7 @@ public class HealthManager : MonoBehaviour {
 
 		deathDone = true; // Mark it so we only die once.
 		CreateDeathEffects(deathFX);
-		if (NPCID == 0 && !instances[i].actAsCorpseOnly) play_wav(sounds[64], 1.0f, transform.position, true); // npc_autobomb: explosion1
+		if (NPCID == 0 && !instances[i].actAsCorpseOnly) play_wav(sounds[64], 1.0f, instances[i].position, true); // npc_autobomb: explosion1
 
 		if (aic == null) {
 			if (transform.parent != null) {
@@ -546,7 +545,7 @@ public class HealthManager : MonoBehaviour {
 			case 526: soundex = 68; break; // prop_console02: hit3
 		}
 		
-		Utils.PlayTempAudio(transform.position,Const.a.sounds[soundex]);
+		play_wav(sounds[soundex],1.0f,instances[i].position,true);
 		if (deathFX != PoolType.None) HideSelf();
 	}
 
@@ -595,7 +594,7 @@ public class HealthManager : MonoBehaviour {
 
 			GameObject tossObject =
 				Instantiate(Const.a.GetPrefab(searchableItem.contents[i] + 307),
-							transform.position,Const.a.quaternionIdentity)
+							instances[i].position,Const.a.quaternionIdentity)
 								as GameObject;
 
 			if (tossObject != null) {
@@ -604,7 +603,7 @@ public class HealthManager : MonoBehaviour {
 				tossObject.GetComponent<UseableObjectUse>().customIndex =
 					searchableItem.customIndex[i];
 			} else {
-				Const.sprint("BUG: Failed to instantiate object being dropped on gib.");
+				CenterStatusPrint("BUG: Failed to instantiate object being dropped on gib.");
 			}
 			searchableItem.contents[i] = -1;
 			searchableItem.customIndex[i] = -1;
@@ -620,7 +619,7 @@ public class HealthManager : MonoBehaviour {
 		if (deathDone) return;
 
 		deathDone = true; // Screens maintain collisions, so not disabling here; also maintain visible mesh, don't turn it off
-		Utils.PlayTempAudio(transform.position,Const.a.sounds[69]);
+		play_wav(sounds[69],1.0f,instances[i].position,true);
 		ImageSequenceTextureArray ista = GetComponent<ImageSequenceTextureArray>();
 		ista.Destroy(); // ista deada nowa
 		if (gibOnDeath) Gib();
@@ -632,7 +631,7 @@ public class HealthManager : MonoBehaviour {
 		GameObject explosionEffect = Const.a.GetObjectFromPool(fx);
 		if (explosionEffect == null) return;
 
-		Vector3 pos = transform.position;
+		Vector3 pos = instances[i].position;
 		BoxCollider boxCol = GetComponent<BoxCollider>();
 		if (boxCol != null) pos = transform.TransformPoint(boxCol.center);
 
@@ -646,7 +645,7 @@ public class HealthManager : MonoBehaviour {
 
  		// Enable death effects (e.g. explosion particle effect)
 		explosionEffect.SetActive(true);
-		explosionEffect.transform.position = pos;
+		explosionEffect.instances[i].position = pos;
 	}
 
 	void HideSelf() {
@@ -748,119 +747,5 @@ public class HealthManager : MonoBehaviour {
 		if (inCyberSpace) return true;
 		if (!isPlayer && cyberHealth > 0f) return true;
 		return (index > 23 && isNPC); // 24, 25, 26, 27, 28 are Cyber enemies
-	}
-
-	// Generic health info string
-	public static string Save(GameObject go, PrefabIdentifier prefID) {
-		HealthManager hm;
-		if (go.name.Contains("se_corpse_eaten")) hm = go.transform.GetChild(0).GetComponent<HealthManager>(); // se_corpse_eaten
-		else hm = go.GetComponent<HealthManager>();
-		
-		if (!hm.awakeInitialized) hm.Awake();
-		if (!hm.startInitialized) hm.Start();
-		s1.Clear();
-		s1.Append(Utils.FloatToString(hm.health,"health"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(hm.cyberHealth,"cyberHealth"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(hm.deathDone,"deathDone"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(hm.god,"godmode"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(hm.actAsCorpseOnly,"actAsCorpseOnly"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(hm.teleportDone,"teleportDone"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveString(hm.targetOnDeath,"targetOnDeath"));
-		s1.Append(Utils.splitChar);
-		s1.Append(TargetIO.Save(go));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(hm.gibObjects.Length,"gibObjects.Length"));
-		for (int i=0;i<hm.gibObjects.Length; i++) {
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.SaveSubActivatedGOState(hm.gibObjects[i]));
-		}
-
-		if (prefID == null) DualLogError("Missing PrefabIdentifier on " + go.name + ".");
-		if (prefID.constIndex == 526) { // prop_console02
-			GameObject child = go.transform.GetChild(0).gameObject; 
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.BoolToString(child.activeSelf,"child.activeSelf"));
-			ImageSequenceTextureArray ista = child.GetComponent<ImageSequenceTextureArray>();
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.SaveString(ista.resourceFolder,"resourceFolder"));
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.SaveRelativeTimeDifferential(ista.tickFinished,"ista.tickFinished"));
-		} else if (prefID.constIndex == 574) { // prop_healingbed
-			GameObject child = go.transform.GetChild(0).gameObject;
-			ImageSequenceTextureArray ista = child.GetComponent<ImageSequenceTextureArray>();
-			s1.Append(Utils.splitChar);
-			s1.Append(Utils.SaveRelativeTimeDifferential(ista.tickFinished,"ista.tickFinished"));
-		}
-
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(hm.teleportOnDeath,"teleportOnDeath"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index,
-						   PrefabIdentifier prefID, int levID) {
-		HealthManager hm;
-		if (go.name.Contains("se_corpse_eaten")) hm = go.transform.GetChild(0).GetComponent<HealthManager>(); // se_corpse_eaten
-		else hm = go.GetComponent<HealthManager>();
-
-		if (!hm.awakeInitialized) hm.Awake();
-		if (!hm.startInitialized) hm.Start();
-		hm.health = Utils.GetFloatFromString(entries[index],"health"); index++;
-		hm.cyberHealth = Utils.GetFloatFromString(entries[index],"cyberHealth"); index++;
-		hm.deathDone = Utils.GetBoolFromString(entries[index],"deathDone"); index++;
-		hm.god = Utils.GetBoolFromString(entries[index],"godmode"); index++;
-		hm.actAsCorpseOnly = Utils.GetBoolFromString(entries[index],"actAsCorpseOnly"); index++;
-		hm.teleportDone = Utils.GetBoolFromString(entries[index],"teleportDone"); index++;
-        hm.targetOnDeath = Utils.LoadString(entries[index],"targetOnDeath"); index++;
-		index = TargetIO.Load(go,ref entries,index);
-		hm.AwakeFromLoad(levID);
-		int numChildren = hm.gibObjects.Length;
-		int numChildrenFromSave = Utils.GetIntFromString(entries[index],"gibObjects.Length"); index++;
-
-		if (numChildren != numChildrenFromSave) {
-			DualLog("BUG: HealthManager gibObjects.Length("
-					  + numChildren.ToString() + ") != children("
-					  + numChildrenFromSave.ToString() + ") from"
-					  + " savefile on " + go.name + "!");
-			return index;
-		}
-
-		if (numChildren > 0) {
-			for (int i=0; i<numChildren; i++) {
-				index = Utils.LoadSubActivatedGOState(hm.gibObjects[i],ref entries,index);
-			}
-		}
-
-		if (prefID != null) {
-			if (prefID.constIndex == 526) { // prop_console02
-				if (go.transform.childCount > 0) { // Screen is first child.
-					GameObject child = go.transform.GetChild(0).gameObject;
-					child.SetActive(Utils.GetBoolFromString(entries[index],"child.activeSelf")); index++;
-					ImageSequenceTextureArray ista = child.GetComponent<ImageSequenceTextureArray>();
-					ista.resourceFolder = Utils.LoadString(entries[index],"resourceFolder"); index++;
-					ista.tickFinished = Utils.LoadRelativeTimeDifferential(entries[index],"ista.tickFinished"); index++;
-				}
-			} else if (prefID.constIndex == 574) { // prop_healingbed
-				GameObject child = go.transform.GetChild(0).gameObject;
-				ImageSequenceTextureArray ista = child.GetComponent<ImageSequenceTextureArray>();
-				ista.tickFinished = Utils.LoadRelativeTimeDifferential(entries[index],"ista.tickFinished"); index++;
-			}
-		} else {
-			if (prefID == null) DualLogError("Missing PrefabIdentifier on " + go.name + ".");	
-		}
-
-		hm.teleportOnDeath = Utils.GetBoolFromString(entries[index],"teleportOnDeath"); index++;
-		if (hm.health <= 0 && hm.isNPC && !npcTable[NPCID].type == NPCType_Cyber && hm.teleportOnDeath) {
-			hm.aic.enabled = false;
-			AIAnimationController aiac = hm.aic.visibleMeshEntity.GetComponent<AIAnimationController>();
-			if (aiac != null) aiac.enabled = false;
-		}
-		return index;
 	}
 }

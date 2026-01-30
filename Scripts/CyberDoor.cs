@@ -13,9 +13,9 @@ public class CyberDoor : MonoBehaviour {
 
 	void OnCollisionEnter (Collision other) {
 		if (isDoor && other.gameObject.CompareTag("Player")) {
-            string msg = (Const.a.stringTable[messageIndex] + "  "
-                + Const.a.stringTable[601]); // Reroute power to remove barrier.
-			Const.sprint(msg); 
+            string msg = (Sys_Text.stringTable[messageIndex] + "  "
+                + Sys_Text.stringTable[601]); // Reroute power to remove barrier.
+			CenterStatusPrint(msg); 
 		}
 	}
 }

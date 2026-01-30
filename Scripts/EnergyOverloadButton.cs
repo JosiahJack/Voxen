@@ -35,25 +35,25 @@ public class EnergyOverloadButton : MonoBehaviour {
         if (clickFinished >= Time.time) return;
 
         clickFinished = Time.time + 0.4f;
-        if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 25f) {
-            Const.sprint(Const.a.stringTable[12]);
+        if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 25f) {
+            CenterStatusPrint("%s", Sys_Text.stringTable[12]);
             return;
         }
 
         if (WeaponFire.a.overloadEnabled) {
-            Const.sprint(Const.a.stringTable[13]);
+            CenterStatusPrint("%s", Sys_Text.stringTable[13]);
             WeaponFire.a.overloadEnabled = false;
             buttonSprite.overrideSprite = normalButtonSprite;
             buttonText.color = textClickableColor;
             energySettingText.color = textEnergySetting;
-            energySettingText.text = Const.a.stringTable[16];
+            energySettingText.text = Sys_Text.stringTable[16];
         } else { 
-            Const.sprint(Const.a.stringTable[17]);
+            CenterStatusPrint("%s", Sys_Text.stringTable[17]);
             WeaponFire.a.overloadEnabled = true;
             buttonSprite.overrideSprite = overloadButtonSprite;
             buttonText.color = textOverloadColor;
             energySettingText.color = textEnergyOverloaded;
-            energySettingText.text = Const.a.stringTable[18];
+            energySettingText.text = Sys_Text.stringTable[18];
         }
     }
 

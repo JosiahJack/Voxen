@@ -61,7 +61,7 @@ public class CameraView : MonoBehaviour {
 	}
 	
 	public bool IsVisible() {
-		Vector2Int cellPos = DynamicCulling.a.PosToCellCoords(transform.position);
+		Vector2Int cellPos = DynamicCulling.a.PosToCellCoords(instances[i].position);
 		if (DynamicCulling.a.XYPairInBounds(cellPos.x,cellPos.y)) {
 			if (DynamicCulling.a.cullEnabled) {
 				if (!DynamicCulling.a.GetPlayerCell().visible) return false;

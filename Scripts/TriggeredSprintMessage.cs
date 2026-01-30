@@ -8,7 +8,7 @@ public class TriggeredSprintMessage : MonoBehaviour {
 	void Start () {
 		if (StringIsEmpty(messageToDisplay)) {
 			if (messageLingdex >= 0) {
-				messageToDisplay = Const.a.stringTable[messageLingdex];
+				messageToDisplay = Sys_Text.stringTable[messageLingdex];
 			} else {
 				DualLog("BUG: Attempting to set TriggeredSprintMessage with a -1 index and a nullorwhitespace overrideString");
 			}

@@ -22,9 +22,9 @@ public class GeneralInvButton : MonoBehaviour {
 	}
 
 	public void GeneralInvUse() {
-        Inventory.a.generalInvCurrent = GeneralInvButtonIndex; //Set current
+        inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
 		useableItemIndex =
-			Inventory.a.generalInventoryIndexRef[GeneralInvButtonIndex];
+			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex];
 
 		// Access Cards
 		if (GeneralInvButtonIndex == 0) {
@@ -45,14 +45,14 @@ public class GeneralInvButton : MonoBehaviour {
     }
 
     public void DoubleClick() {
-        Inventory.a.generalInvCurrent = GeneralInvButtonIndex; //Set current
+        inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
 		MFDManager.a.mouseClickHeldOverGUI = true;
 		GeneralInvApply();
 	}
 
 	void ApplyBattery() {
 		if (PlayerEnergy.a.energy >= 255f) {
-			Const.sprint(Const.a.stringTable[303]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[303]);
 			reduce = false;
 		}
 
@@ -62,7 +62,7 @@ public class GeneralInvButton : MonoBehaviour {
 
 	void ApplyIcadBattery() {
 		if (PlayerEnergy.a.energy >= 255f) {
-			Const.sprint(Const.a.stringTable[303]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[303]);
 			reduce = false;
 			return;
 		}
@@ -73,7 +73,7 @@ public class GeneralInvButton : MonoBehaviour {
 
 	void ApplyHealthkit() {
 		if (PlayerHealth.a.hm.health >= PlayerHealth.a.hm.maxhealth) {
-			Const.sprint(Const.a.stringTable[304]);
+			CenterStatusPrint("%s", Sys_Text.stringTable[304]);
 			reduce = false;
 			return;
 		}
@@ -94,7 +94,7 @@ public class GeneralInvButton : MonoBehaviour {
 
         reduce = false;
 		useableItemIndex =
-			Inventory.a.generalInventoryIndexRef[GeneralInvButtonIndex];
+			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex];
 		switch (useableItemIndex) {
 			case 52: ApplyBattery(); break;
 			case 53: ApplyIcadBattery(); break;
@@ -105,12 +105,12 @@ public class GeneralInvButton : MonoBehaviour {
 									 Handedness.LH);
 
 				// Set current.
-				Inventory.a.generalInvCurrent = GeneralInvButtonIndex;
+				inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex;
 				break;
 		}
 
 		if (reduce)  {
-			Inventory.a.generalInventoryIndexRef[GeneralInvButtonIndex] = -1;
+			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex] = -1;
 			GUIState.a.ClearOverButton();
 		}
 	}

@@ -30,15 +30,15 @@ uint16_t SpawnDynamicObject(int val, bool cheat) {
     uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
     if (cheat && ConstIndexIsHardware(val)) { // Hardware
 //         UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
-//         int dex14 = Inventory.a.hardware14fromConstdex(uo.useableItemIndex);
-//         if (Inventory.a.hasHardware[dex14]) uo.customIndex = (Inventory.a.hardwareVersion[dex14] + 1);
+//         int dex14 = inventoryPlayer1.hardware14fromConstdex(uo.useableItemIndex);
+//         if (inventoryPlayer1.hasHardware[dex14]) uo.customIndex = (inventoryPlayer1.hardwareVersion[dex14] + 1);
     }
 
     return entityIndexInInstanceTable;
 }
 
 void cmd_kill(void) {
-    CenterStatusPrint("%s", voxen_Text.stringTable[1011]); // "Player decides to become a cyborg."
+    CenterStatusPrint("%s", Sys_Text.stringTable[1011]); // "Player decides to become a cyborg."
     // TakeDamage(...)
 }
 

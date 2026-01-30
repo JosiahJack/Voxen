@@ -84,7 +84,7 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 
 	void SetDigit(int value) {
 		if ((value > 9) || (value < 0)) {
-			Const.sprint("BUG: incorrect value sent to keypad controller");
+			CenterStatusPrint("BUG: incorrect value sent to keypad controller");
 			return;
 		}
 

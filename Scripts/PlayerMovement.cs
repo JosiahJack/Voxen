@@ -106,7 +106,6 @@ public class PlayerMovement : MonoBehaviour {
 	Rigidbody rbody;
 	private float fallDamageSpeed = 11.72f;
 	Vector3 oldVelocity; // save
-	public float fatigue; // save
 	private float jumpFatigue = 6.5f;
 	private float fatigueWanePerTick = 1f;
 	private float fatigueWanePerTickCrouched = 2f;
@@ -204,7 +203,7 @@ public class PlayerMovement : MonoBehaviour {
 		doubleJumpFinished = Sys_Global.pauseRelativeTime;
 		doubleJumpTicks = 0;
 		turboFinished = Sys_Global.pauseRelativeTime;
-		playerHome = transform.localPosition;
+		playerHome = instances[i].position;
 		ConsoleEmulator.lastCommand = new string[7];
 		ConsoleEmulator.consoleMemdex = consoleMemdex = 0;
 		FatigueCheat = false;
@@ -232,10 +231,10 @@ public class PlayerMovement : MonoBehaviour {
 
 		// Bug Hunter feedback (puts it into their screenshots for me)
 		if (locationIndicator.activeInHierarchy) {
-			locationText.text = Const.a.stringTable[738] // "location: "
-								+ (transform.position.x.ToString("00.00")
-								+ " " + transform.position.y.ToString("00.00")
-								+ " " + transform.position.z.ToString("00.00"));
+			locationText.text = Sys_Text.stringTable[738] // "location: "
+								+ (instances[i].position.x.ToString("00.00")
+								+ " " + instances[i].position.y.ToString("00.00")
+								+ " " + instances[i].position.z.ToString("00.00"));
 		}
 
 		// Prevent falling or movement while menu is up. Force it here in case
@@ -282,7 +281,7 @@ public class PlayerMovement : MonoBehaviour {
 		Prone();
 		EndCrouchProneTransition();
 		FatigueApply(); // Here fatigue me out, except in cyberspace
-		Automap.a.UpdateAutomap(transform.localPosition); // Update the map.
+		Automap.a.UpdateAutomap(instances[i].position); // Update the map.
 	}
 
 	void FixedUpdate() {
@@ -354,7 +353,7 @@ public class PlayerMovement : MonoBehaviour {
 		if (inCyberSpace) return;
 
 		// Using value of 1.06 = (player capsule height / 2) + 0.06 = 1 + 0.06;
-		bool successfulRay = Raycast(transform.position, Vector3.down,
+		bool successfulRay = Raycast(instances[i].position, Vector3.down,
 											 out tempHit,1.1f,
 											 Const.a.layerMaskPlayerFeet);
 
@@ -386,7 +385,7 @@ public class PlayerMovement : MonoBehaviour {
 			SFXClothes.Stop();
 		}
 
-		if ((Mathf.Abs(relForward) + Mathf.Abs(relSideways)) == 0) return;
+		if ((vabs(relForward) + vabs(relSideways)) == 0) return;
 
 		if (rustleFinished < Sys_Global.pauseRelativeTime) {
 			rustleFinished = isSprinting
@@ -404,12 +403,11 @@ public class PlayerMovement : MonoBehaviour {
 
 		if (!grounded) return;
 
-		successfulRay = Raycast(transform.position, Vector3.down,
+		successfulRay = Raycast(instances[i].position, Vector3.down,
 										out tempHit,feetRayLength,
 										Const.a.layerMaskPlayerFeet);
 		
 		if (tempHit.collider == null) return;
-// 		Debug.DrawRay(transform.position,tempHit.point,Color.green,1f,true);
 		hitGO = tempHit.collider.transform.gameObject;
 		PrefabIdentifier prefID = hitGO.GetComponent<PrefabIdentifier>();
 		if (prefID == null) {
@@ -881,7 +879,7 @@ public class PlayerMovement : MonoBehaviour {
 
 		float retval = maxWalkSpeed;
 		bonus = 0f;
-		if (Inventory.a.BoosterActive()) bonus = boosterSpeedBoost;
+		if (inventoryPlayer1.BoosterActive()) bonus = boosterSpeedBoost;
 		switch (bodyState) {
 			case BodyState.Standing: 		retval = maxWalkSpeed;   break;
 			case BodyState.Crouch: 			retval = maxCrouchSpeed; break;
@@ -892,8 +890,8 @@ public class PlayerMovement : MonoBehaviour {
 			case BodyState.ProningUp: 		retval = maxProneSpeed;  break;
 		}
 
-		if ((isSprinting || Inventory.a.BoosterActive()) && running) {
-			if (fatigue > 80f && !Inventory.a.BoosterActive()) {
+		if ((isSprinting || inventoryPlayer1.BoosterActive()) && running) {
+			if (instances[PLAYER1].fatigue > 80f && !inventoryPlayer1.BoosterActive()) {
 				retval = maxSprintSpeedFatigued;
 			} else {
 				retval = maxSprintSpeed;
@@ -922,35 +920,20 @@ public class PlayerMovement : MonoBehaviour {
 	void ApplyBodyStateLerps() {
 		switch (bodyState) {
 		case BodyState.CrouchingDown:
-			currentCrouchRatio = Mathf.SmoothDamp(currentCrouchRatio,-0.01f,
-												   ref crouchingVelocity,
-												   transitionToCrouchSec);
+			currentCrouchRatio = smooth_damp(currentCrouchRatio,-0.01f, ref crouchingVelocity, transitionToCrouchSec);
 			break;
 		case BodyState.StandingUp:
 			lastCrouchRatio = currentCrouchRatio;
-			currentCrouchRatio = Mathf.SmoothDamp(currentCrouchRatio,1.01f,
-												   ref crouchingVelocity,
-												   transitionToCrouchSec);
-
-			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio)
-										  * capsuleHeight) / 2)
-										+ transform.position.y);
+			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, transitionToCrouchSec);
+			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + instances[i].position.y);
 			break;
 		case BodyState.ProningDown:
-			currentCrouchRatio = Mathf.SmoothDamp(currentCrouchRatio,-0.01f,
-												  ref crouchingVelocity,
-												  transitionToCrouchSec);
+			currentCrouchRatio = smooth_damp(currentCrouchRatio,-0.01f, ref crouchingVelocity, transitionToCrouchSec);
 			break;
 		case BodyState.ProningUp: // Prone to crouch
 			lastCrouchRatio = currentCrouchRatio;
-			currentCrouchRatio = Mathf.SmoothDamp(currentCrouchRatio,1.01f,
-												  ref crouchingVelocity,
-												  (transitionToCrouchSec
-												   + transitionToProneAdd));
-
-			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio)
-										  * capsuleHeight) / 2)
-										+ transform.position.y);
+			currentCrouchRatio = smooth_damp(currentCrouchRatio,1.01f, ref crouchingVelocity, (transitionToCrouchSec + transitionToProneAdd));
+			LocalPositionSetY(transform,(((currentCrouchRatio - lastCrouchRatio) * capsuleHeight) / 2) + instances[i].position.y);
 			break;
 		}
 	}
@@ -984,14 +967,14 @@ public class PlayerMovement : MonoBehaviour {
 		if (inCyberSpace) return; // Don't affect lean transform in cyber.
 
 		if (leanTarget > 0) {
-			if (Mathf.Abs(leanTarget - 0) < 0.05f) {
+			if (vabs(leanTarget - 0) < 0.05f) {
 				leanShift = 0;
 				leanTarget = 0;
 			} else {
 				leanTarget -= (leanSpeed * Time.deltaTime * leanReset);
 			}
 
-			if (Mathf.Abs(leanShift - 0) < 0.05f) {
+			if (vabs(leanShift - 0) < 0.05f) {
 				leanShift = 0;
 				leanTarget = 0;
 			} else {
@@ -999,14 +982,14 @@ public class PlayerMovement : MonoBehaviour {
 							* leanReset;
 			}
 		} else {
-			if (Mathf.Abs(leanTarget - 0) < 0.05f) {
+			if (vabs(leanTarget - 0) < 0.05f) {
 				leanShift = 0;
 				leanTarget = 0;
 			} else {
 				leanTarget += (leanSpeed * Time.deltaTime * leanReset);
 			}
 
-			if (Mathf.Abs(leanShift - 0) < 0.05f) {
+			if (vabs(leanShift - 0) < 0.05f) {
 				leanShift = 0;
 				leanTarget = 0;
 			} else {
@@ -1046,12 +1029,12 @@ public class PlayerMovement : MonoBehaviour {
 		if (CheatNoclip) {
 			deceleration = 0.05f;
 			// Prevent gravity from affecting and decelerate like a horizontal.
-			tempVecRbody.y = Mathf.SmoothDamp(rbody.velocity.y,0,
+			tempVecRbody.y = smooth_damp(rbody.velocity.y,0,
 											  ref walkDeaccelerationVoly,
 											  deceleration);
 			if (isSprinting && running) return;
 		} else {
-			if (Inventory.a.BoosterActive()) {
+			if (inventoryPlayer1.BoosterActive()) {
 				deceleration = walkDeaccelerationBooster;
 			}
 
@@ -1059,15 +1042,15 @@ public class PlayerMovement : MonoBehaviour {
 											   // gravity keep pulling down.
 		}
 
-		tempVecRbody.x = Mathf.SmoothDamp(rbody.velocity.x,0,
+		tempVecRbody.x = smooth_damp(rbody.velocity.x,0,
 										  ref walkDeaccelerationVolx,
 										  deceleration);
 
-		tempVecRbody.z = Mathf.SmoothDamp(rbody.velocity.z,0,
+		tempVecRbody.z = smooth_damp(rbody.velocity.z,0,
 										  ref walkDeaccelerationVolz,
 										  deceleration);
 		if (inCyberSpace) {
-			tempVecRbody.y = Mathf.SmoothDamp(rbody.velocity.y,0,
+			tempVecRbody.y = smooth_damp(rbody.velocity.y,0,
 											  ref walkDeaccelerationVolz,
 											  deceleration);
 		}
@@ -1133,49 +1116,42 @@ public class PlayerMovement : MonoBehaviour {
 	// Get input for Jump and set impulse time, removed
 	// "&& (ladderState == 0)" since I want to be able to jump off a ladder
 	void Jump() {
-		if (CheatNoclip && !Inventory.a.JumpJetsActive()) return;
+		if (CheatNoclip && !inventoryPlayer1.JumpJetsActive()) return;
 
 		if (doubleJumpFinished < Sys_Global.pauseRelativeTime) {
 			doubleJumpTicks--;
 			if (doubleJumpTicks < 0) doubleJumpTicks = 0;
 		}
 
-		if ((!gravliftState && GetInput.a.Jump())
-			|| gravliftState && GetInput.a.JumpDown()) {
+		if ((!gravliftState && GetInput.a.Jump()) || gravliftState && GetInput.a.JumpDown()) {
 
 			if (!justJumped) {
-				if (grounded || gravliftState || Inventory.a.JumpJetsActive()) {
+				if (grounded || gravliftState || inventoryPlayer1.JumpJetsActive()) {
 					jumpTime = jumpImpulseTime;
 					doubleJumpFinished = Sys_Global.pauseRelativeTime + Const.doubleClickTime;
 					doubleJumpTicks++;
 					justJumped = true;
-					if (!Inventory.a.JumpJetsActive() && !Inventory.a.BoosterActive()) {
-						fatigue += jumpFatigue;
-					}
+					if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) instances[PLAYER1].fatigue += jumpFatigue;
 				} else {
 					if (ladderState > 1) {
 						jumpTime = jumpImpulseTime;
 						justJumped = true;
-						if (!Inventory.a.JumpJetsActive() && !Inventory.a.BoosterActive()) {
-							fatigue += jumpFatigue;
+						if (!inventoryPlayer1.JumpJetsActive() && !inventoryPlayer1.BoosterActive()) {
+							instances[PLAYER1].fatigue += jumpFatigue;
 						}
 					}
 				}
 			}
 
-			if (Inventory.a.BoosterActive() && Inventory.a.BoosterSetToBoost()) {
+			if (inventoryPlayer1.BoosterActive() && inventoryPlayer1.BoosterSetToBoost()) {
 				if (justJumped && doubleJumpTicks == 2) {
 					// Booster thrust
-					rbody.AddForce(new Vector3(transform.forward.x * burstForce,
-											   transform.forward.y * burstForce,
-											   transform.forward.z * burstForce),
-											   ForceMode.Impulse);
-					
+					rbody.AddForce(new Vector3(transform.forward.x * burstForce, transform.forward.y * burstForce, transform.forward.z * burstForce), ForceMode.Impulse);
 					PlayerHealth.a.makingNoise = true;
 					PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
 					PlayerEnergy.a.TakeEnergy(22f);
 					if (BiomonitorGraphSystem.a != null) {
-						BiomonitorGraphSystem.a.EnergyPulse(22f);
+						BiomonitorEnergyPulse(22f);
 					}
 
 					justJumped = false;
@@ -1188,7 +1164,7 @@ public class PlayerMovement : MonoBehaviour {
 			}
 		}
 
-		if (staminupActive || FatigueCheat) fatigue = 0;
+		if (staminupActive || FatigueCheat) instances[PLAYER1].fatigue = 0.0f;
 		
 		// Perform Jump
 		float jumpVelocityApply = jumpVelocity * rbody.mass;
@@ -1198,16 +1174,16 @@ public class PlayerMovement : MonoBehaviour {
 		while (jumpTimeMod > 0) { // Why is this a `while` instead of an `if`??
 							   // Because otherwise it don't work, duh!
 			jumpTimeMod -= Time.smoothDeltaTime;
-			if (fatigue > 80 && !Inventory.a.JumpJetsActive()) {
+			if (instances[PLAYER1].fatigue > 80.0f && !inventoryPlayer1.JumpJetsActive()) {
 				jumpVelocityApply = jumpVelocityFatigued * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
 			}
 
-			if (Inventory.a.JumpJetsActive()) {
+			if (inventoryPlayer1.JumpJetsActive()) {
 				float energysuck = 25f;
 				jumpVelocityApply = jumpVelocityBoots * rbody.mass;
 				jumpVel.y = jumpVelocityApply;
-				switch (Inventory.a.hardwareVersionSetting[10]) {
+				switch (inventoryPlayer1.hardwareVersionSetting[10]) {
 					case 0: energysuck = 11f; break;
 					case 1: energysuck = 26f; break;
 					case 2: energysuck = 22f; break;
@@ -1219,7 +1195,7 @@ public class PlayerMovement : MonoBehaviour {
 						jumpJetEnergySuckTickFinished = Sys_Global.pauseRelativeTime + jumpJetEnergySuckTick;
 						PlayerEnergy.a.TakeEnergy(energysuck);
 						if (BiomonitorGraphSystem.a != null) {
-							BiomonitorGraphSystem.a.EnergyPulse(energysuck);
+							BiomonitorEnergyPulse(energysuck);
 						}
 					}
 				} else {
@@ -1235,17 +1211,17 @@ public class PlayerMovement : MonoBehaviour {
 			}
 		}
 
-		if (justJumped && !Inventory.a.JumpJetsActive()) {
+		if (justJumped && !inventoryPlayer1.JumpJetsActive()) {
 			// Play jump sound
 			if (jumpSFXFinished < Sys_Global.pauseRelativeTime) {
 				jumpSFXFinished = Sys_Global.pauseRelativeTime + jumpSFXIntervalTime;
 				SFX.pitch = 1f;
 				float jumpSFXVolume = 1.0f;
-				if (fatigue > 80) jumpSFXVolume = 0.5f; // Quietly, we tired.
+				if (instances[PLAYER1].fatigue > 80.0f) jumpSFXVolume = 0.5f; // Quietly, we tired.
 				
 				PlayerHealth.a.makingNoise = true;
 				PlayerHealth.a.noiseFinished = Sys_Global.pauseRelativeTime + 0.5f;
-				Raycast(transform.position, Vector3.down,
+				Raycast(instances[i].position, Vector3.down,
 								out tempHit,feetRayLength,
 								Const.a.layerMaskPlayerFeet);
 				
@@ -1260,8 +1236,7 @@ public class PlayerMovement : MonoBehaviour {
 				if (prefID == null) { Utils.PlayOneShotSavable(SFX,SFXJump,jumpSFXVolume); return; }
 				
 				FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
-				AudioClip stcp = JumpSound(fstep);
-				Utils.PlayTempAudio(transform.position - feetOffset,stcp,jumpSFXVolume);
+				play_wav(sounds[JumpSound(fstep)],jumpSFXVolume,Vector3_A_minus_B(instances[i].position,feetOffset),true);
 			}
 			justJumped = false;
 		}
@@ -1277,10 +1252,10 @@ public class PlayerMovement : MonoBehaviour {
 		float sidForce = 0f;
 		float forForce = 0f;
 		float upForce = 0f;
-		if (grounded || Inventory.a.JumpJetsActive()) {
+		if (grounded || inventoryPlayer1.JumpJetsActive()) {
 			// Ladder climb, allow while grounded
 			float bonus = 1f;
-			if (Inventory.a.JumpJetsActive()) bonus = 2f;
+			if (inventoryPlayer1.JumpJetsActive()) bonus = 2f;
 
 			sidForce = relSideways * walkAcceleration * Time.deltaTime;
 			forForce = relForward * walkAcceleration * Time.deltaTime;
@@ -1311,14 +1286,14 @@ public class PlayerMovement : MonoBehaviour {
 			rbody.AddRelativeForce(sidForce,upForce,forForce);
 		}
 
-		if (Inventory.a.BoosterActive() && Inventory.a.BoosterSetToSkates()) {
+		if (inventoryPlayer1.BoosterActive() && inventoryPlayer1.BoosterSetToSkates()) {
 			deceleration = walkDeaccelerationBooster;
 		} else {
 			deceleration = walkDeacceleration;
 		}
 
 		// Set vertical velocity towards 0 when climbing.
-		RigidbodySetVelocityY(rbody,(Mathf.SmoothDamp(rbody.velocity.y,0,
+		RigidbodySetVelocityY(rbody,(smooth_damp(rbody.velocity.y,0,
 													  ref walkDeaccelerationVoly,
 													  deceleration)));
 	}
@@ -1347,11 +1322,11 @@ public class PlayerMovement : MonoBehaviour {
 		movDir = movDir.normalized;
 		if (floorDot < 0.98f) {
 			if (Vector3.Dot(movDir,floorAng) < 0f) {
-				if (Inventory.a.BoosterActive()) forForce *= 2f;
+				if (inventoryPlayer1.BoosterActive()) forForce *= 2f;
 			}
 		}
 
-		if (grounded || Inventory.a.JumpJetsActive()) {
+		if (grounded || inventoryPlayer1.JumpJetsActive()) {
 			// Normal walking
 			runTime += Time.deltaTime;
 			if (relForward == 0 && relSideways == 0) runTime = 0;
@@ -1361,20 +1336,14 @@ public class PlayerMovement : MonoBehaviour {
 			movDir.y = 0;
 			if (floorDot > 0.9f) rbody.velocity = movDir;
 			movDir = movDir.normalized;
-			if (fatigueFinished2 < Sys_Global.pauseRelativeTime
-				&& movDir.sqrMagnitude > 0f && grounded
-				&& (relForward != 0 || relSideways != 0)) {
-
-				fatigueFinished2 = Sys_Global.pauseRelativeTime
-								   + fatigueWaneTickSecs;
-
-				if (!Inventory.a.BoosterActive()) {
-					if (isSprinting) fatigue += fatiguePerSprintTick;
-					else fatigue += fatiguePerWalkTick;
+			if (fatigueFinished2 < Sys_Global.pauseRelativeTime && movDir.sqrMagnitude > 0f && grounded && (relForward != 0 || relSideways != 0)) {
+				fatigueFinished2 = Sys_Global.pauseRelativeTime + fatigueWaneTickSecs;
+				if (!inventoryPlayer1.BoosterActive()) {
+					if (isSprinting) instances[PLAYER1].fatigue += fatiguePerSprintTick;
+					else instances[PLAYER1].fatigue += fatiguePerWalkTick;
 				}
 			}
 		} else {
-
 			// Sprinting in the air
 			sidForce *= walkAccelAirRatio;
 			forForce *= walkAccelAirRatio;
@@ -1393,7 +1362,7 @@ public class PlayerMovement : MonoBehaviour {
 		if (ladderState > 0) return;
 
 		// Handle fall damage (no impact damage in cyber space 5/5/18, JJ)
-		float velChange = Mathf.Abs((oldVelocity.y - rbody.velocity.y));
+		float velChange = vabs((oldVelocity.y - rbody.velocity.y));
 		if (velChange >= fallDamageSpeed) {
 			DamageData dd = new DamageData ();
 			float falltake = fallDamage - random_range(0,68f);
@@ -1408,7 +1377,7 @@ public class PlayerMovement : MonoBehaviour {
 		}
 		
 		if (velChange >= 3f) {
-			Raycast(transform.position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
+			Raycast(instances[i].position, Vector3.down,out tempHit,feetRayLength,Const.a.layerMaskPlayerFeet);
 			if (tempHit.collider == null) return;
 			
 			GameObject hitGO = tempHit.collider.transform.gameObject;
@@ -1421,9 +1390,8 @@ public class PlayerMovement : MonoBehaviour {
 			if (prefID == null) return;
 			
 			FootStepType fstep = GetFootstepTypeForPrefab(prefID.constIndex);
-			AudioClip stcp = JumpLandSound(fstep);
-			float vol = Mathf.Max(Mathf.Min(1f - ((fallDamageSpeed - velChange) / fallDamageSpeed),1f),0.5f);
-			Utils.PlayTempAudio(transform.position - feetOffset,stcp,vol);
+			float vol = vmax(vmin(1f - ((fallDamageSpeed - velChange) / fallDamageSpeed),1f),0.5f);
+			play_wav(sounds[JumpLandSound(fstep)],vol,Vector3_A_minus_B(instances[i].position,feetOffset),true);
 		}
 	}
 
@@ -1520,31 +1488,28 @@ public class PlayerMovement : MonoBehaviour {
 	}
 
 	void FatigueApply() {
-		if (fatigue > 100f) fatigue = 100f; // Clamp at 100% maximum
-		if (fatigue < 0) fatigue = 0; // Clamp at 0% minimum.
-
-		if (fatigue > 80f && !fatigueWarned && !inCyberSpace) {
-			twm.SendWarning(Const.a.stringTable[868],0.1f,0,HUDColor.White,324);
+		if (instances[PLAYER1].fatigue > 100.0f) instances[PLAYER1].fatigue = 100.0f; // Clamp at 100% maximum
+		if (instances[PLAYER1].fatigue <   0.0f) instances[PLAYER1].fatigue =   0.0f; // Clamp at   0% minimum.
+		if (instances[PLAYER1].fatigue > 80.0f && !fatigueWarned && !inCyberSpace) {
+			twm.SendWarning(Sys_Text.stringTable[868],0.1f,0,HUDColor.White,324);
 			fatigueWarned = true;
-		} else {
-			fatigueWarned = false;
-		}
+		} else fatigueWarned = false;
 
 		if (inCyberSpace) return;
-		if (CheatNoclip || FatigueCheat) { fatigue = 0; return; }
+		if (CheatNoclip || FatigueCheat) { instances[PLAYER1].fatigue = 0.0f; return; }
 		if (fatigueFinished >= Sys_Global.pauseRelativeTime) return;
 
 		fatigueFinished = Sys_Global.pauseRelativeTime + fatigueWaneTickSecs;
 		switch (bodyState) {
-			case BodyState.Standing:    fatigue -= fatigueWanePerTick; break;
-			case BodyState.Crouch:      fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState.StandingUp:  fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState.ProningDown: fatigue -= fatigueWanePerTickCrouched; break;
-			case BodyState.Prone:       fatigue -= fatigueWanePerTickProne; break;
-			case BodyState.ProningUp:   fatigue -= fatigueWanePerTickProne; break;
-			default: fatigue -= fatigueWanePerTick; break;
+			case BodyState.Standing:    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
+			case BodyState.Crouch:      instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState.StandingUp:  instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState.ProningDown: instances[PLAYER1].fatigue -= fatigueWanePerTickCrouched; break;
+			case BodyState.Prone:       instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			case BodyState.ProningUp:   instances[PLAYER1].fatigue -= fatigueWanePerTickProne; break;
+			default:                    instances[PLAYER1].fatigue -= fatigueWanePerTick; break;
 		}
-		if (fatigue < 0) fatigue = 0; // Clamp at 0% minimum.
+		if (instances[PLAYER1].fatigue < 0) instances[PLAYER1].fatigue = 0; // Clamp at 0% minimum.
 	}
 
 	void EndCrouchProneTransition() {
@@ -1590,7 +1555,7 @@ public class PlayerMovement : MonoBehaviour {
 			if (bodyState == BodyState.Prone || bodyState == BodyState.ProningDown) {
 				if (CantStand()) {
 					if (CantCrouch()) {
-						Const.sprint(Const.a.stringTable[188]);
+						CenterStatusPrint("%s", Sys_Text.stringTable[188]);
 						return; // Can't crouch here
 					} else bodyState = BodyState.ProningUp; // Can't stand, but can crouch here
 
@@ -1614,14 +1579,14 @@ public class PlayerMovement : MonoBehaviour {
 					 + ((1f - currentCrouchRatio) * 1.6f)); // Crouch/Prone add
 
 		Vector3 ofs = new Vector3(0f,ofsY,0f);
-		return Physics.CheckCapsule(cameraObject.transform.position,
-									cameraObject.transform.position + ofs,
+		return Physics.CheckCapsule(cameraObject.instances[i].position,
+									cameraObject.instances[i].position + ofs,
 									capsuleRadius,layerMask);
 	}
 
 	bool CantCrouch() {
-		return Physics.CheckCapsule(cameraObject.transform.position,
-									cameraObject.transform.position
+		return Physics.CheckCapsule(cameraObject.instances[i].position,
+									cameraObject.instances[i].position
 									+ new Vector3(0f,0.2f,0f),
 									capsuleRadius,layerMask);
 	}
@@ -1633,14 +1598,14 @@ public class PlayerMovement : MonoBehaviour {
 		if (!GetInput.a.Crouch()) return;
 
 		if ((bodyState == BodyState.Crouch) || (bodyState == BodyState.CrouchingDown)) {
-			if (CantStand()) Const.sprint(Const.a.stringTable[187]); // Can't stand here
+			if (CantStand()) CenterStatusPrint("%s", Sys_Text.stringTable[187]); // Can't stand here
 			else bodyState = BodyState.StandingUp; // Start standing up
 		} else {
 			if ((bodyState == BodyState.Standing) || (bodyState == BodyState.StandingUp)) {
 				bodyState = BodyState.CrouchingDown; // Start crouching down
 			} else {
 				if ((bodyState == BodyState.Prone) || (bodyState == BodyState.ProningDown)) {
-					if ((CantCrouch())) { Const.sprint(Const.a.stringTable[188]); return; } // Can't crouch here
+					if ((CantCrouch())) { CenterStatusPrint("%s", Sys_Text.stringTable[188]); return; } // Can't crouch here
 					
 					bodyState = BodyState.ProningUp; // Start getting up to crouch
 				}
@@ -1680,7 +1645,7 @@ public class PlayerMovement : MonoBehaviour {
 			cyberDesetup = false;
 			cyberSetup = false;
 			cyberCollider.enabled = false; // Can't touch dis!
-			Mathf.Clamp(MouseLookScript.a.xRotation, -90f, 90f); // Pre-clamp camera rotation.
+			vclamp(MouseLookScript.a.xRotation, -90f, 90f); // Pre-clamp camera rotation.
 			MouseLookScript.a.inCyberSpace = false; // Disable full camera rotation up/down by enabling auto clamp.
 			bodyState = oldBodyState; // Return to what we were doing in the "real world" (real lol)
 			if (CheatNoclip) { // Flying cheat...also map editing mode!
@@ -1771,7 +1736,7 @@ public class PlayerMovement : MonoBehaviour {
 		
 		int contactCount = collision.contactCount;
 		float maxSlope = 0.35f;
-		if (Inventory.a.BoosterActive()) maxSlope = 0.7f;
+		if (inventoryPlayer1.BoosterActive()) maxSlope = 0.7f;
 		for(tempInt=0;tempInt<collision.contactCount;tempInt++) {
 			contactPoint = collision.GetContact(tempInt);;
 			floorAng = contactPoint.normal;
@@ -1802,7 +1767,7 @@ public class PlayerMovement : MonoBehaviour {
 			case 12: arsenal = cheatL6arsenal; break;
 			default: arsenal = cheatL1arsenal; break;
 		}
-		GameObject cheatArsenal = Instantiate(arsenal,transform.position,
+		GameObject cheatArsenal = Instantiate(arsenal,instances[i].position,
 								    Const.a.quaternionIdentity) as GameObject;
 									
 		if (cheatArsenal == null) return; // Failed!
@@ -1851,132 +1816,4 @@ public class PlayerMovement : MonoBehaviour {
 			PauseScript.a.PauseEnable();
 		}
     }
-
-	public static string Save(GameObject go) {
-		PlayerMovement pm = go.GetComponent<PlayerMovement>();
-		s1.Clear();
-		s1.Append(Utils.SaveTransform(go.transform));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRigidbody(go));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.playerSpeed,"playerSpeed"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.grounded,"grounded"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.currentCrouchRatio,"currentCrouchRatio")); 
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(Utils.BodyStateToInt(pm.bodyState),"bodyState"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(pm.ladderState,"ladderState"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.gravliftState,"gravliftState"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.inCyberSpace,"inCyberSpace"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.CheatWallSticky,"CheatWallSticky"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.CheatNoclip,"CheatNoclip"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.jumpTime,"jumpTime")); // not a timer
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.oldVelocity.x,"oldVelocity.x"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.oldVelocity.y,"oldVelocity.y"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.oldVelocity.z,"oldVelocity.z"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.fatigue,"fatigue"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.justJumped,"justJumped"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.fatigueFinished,"fatigueFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.fatigueFinished2,"fatigueFinished2"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.cyberSetup,"cyberSetup"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.cyberDesetup,"cyberDesetup"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(Utils.BodyStateToInt(pm.oldBodyState),"oldBodyState"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.leanTarget,"leanTarget"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.leanShift,"leanShift"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.jumpSFXFinished,"jumpSFXFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.jumpLandSoundFinished,"jumpLandSoundFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.jumpJetEnergySuckTickFinished,"jumpJetEnergySuckTickFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(pm.fatigueWarned,"fatigueWarned"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.turboFinished,"turboFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.ressurectingFinished,"ressurectingFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(pm.doubleJumpFinished,"doubleJumpFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(pm.SFX.time,"SFX.time"));
-		s1.Append(Utils.splitChar);
-		if (!pm.SFX.isPlaying) pm.SFXIndex = -1; // Safely can set to null, not
-												 // playing a sound.
-
-		s1.Append(Utils.UintToString(pm.SFXIndex,"SFXIndex"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		PlayerMovement pm = go.GetComponent<PlayerMovement>();
-		float readFloatx, readFloaty, readFloatz;
-		string oldpos = go.transform.localPosition.ToString();
-		index = Utils.LoadTransform(go.transform,ref entries,index);
-		index = Utils.LoadRigidbody(go,ref entries,index);
-		pm.playerSpeed = Utils.GetFloatFromString(entries[index],"playerSpeed"); index++;
-		pm.grounded = Utils.GetBoolFromString(entries[index],"grounded"); index++;
-		pm.currentCrouchRatio = Utils.GetFloatFromString(entries[index],"currentCrouchRatio"); index++;
-		if (pm.capsuleCollider == null) pm.capsuleCollider = pm.gameObject.GetComponent<CapsuleCollider>();
-		pm.capsuleCollider.height = pm.currentCrouchRatio * 2f;
-		pm.leanCapsuleCollider.height = pm.capsuleCollider.height;
-		pm.bodyState = Utils.IntToBodyState(Utils.GetIntFromString(entries[index],"bodyState")); index++;
-		pm.ladderState = Utils.GetIntFromString(entries[index],"ladderState"); index++;
-		pm.gravliftState = Utils.GetBoolFromString(entries[index],"gravliftState"); index++;
-		pm.inCyberSpace = Utils.GetBoolFromString(entries[index],"inCyberSpace"); index++;
-		pm.CheatWallSticky = Utils.GetBoolFromString(entries[index],"CheatWallSticky"); index++;
-		pm.CheatNoclip = Utils.GetBoolFromString(entries[index],"CheatNoclip"); index++;
-		pm.jumpTime = Utils.GetFloatFromString(entries[index],"jumpTime"); index++; // Not a timer.
-		readFloatx = Utils.GetFloatFromString(entries[index],"oldVelocity.x"); index++;
-		readFloaty = Utils.GetFloatFromString(entries[index],"oldVelocity.y"); index++;
-		readFloatz = Utils.GetFloatFromString(entries[index],"oldVelocity.z"); index++;
-		pm.oldVelocity = new Vector3(readFloatx,readFloaty,readFloatz);
-		pm.fatigue = Utils.GetFloatFromString(entries[index],"fatigue"); index++;
-		pm.justJumped = Utils.GetBoolFromString(entries[index],"justJumped"); index++;
-		pm.fatigueFinished = Utils.LoadRelativeTimeDifferential(entries[index],"fatigueFinished"); index++;
-		pm.fatigueFinished2 = Utils.LoadRelativeTimeDifferential(entries[index],"fatigueFinished2"); index++;
-		pm.cyberSetup = Utils.GetBoolFromString(entries[index],"cyberSetup"); index++;
-		pm.cyberDesetup = Utils.GetBoolFromString(entries[index],"cyberDesetup"); index++;
-		pm.oldBodyState = Utils.IntToBodyState(Utils.GetIntFromString(entries[index],"oldBodyState")); index++;
-		pm.leanTarget = Utils.GetFloatFromString(entries[index],"leanTarget"); index++;
-		pm.leanShift = Utils.GetFloatFromString(entries[index],"leanShift"); index++;
-		pm.leanTransform.localRotation = Quaternion.Euler(0, 0, pm.leanTarget);
-		pm.leanTransform.localPosition = new Vector3(pm.leanShift,0,0);
-		pm.jumpSFXFinished = Utils.LoadRelativeTimeDifferential(entries[index],"jumpSFXFinished"); index++;
-		pm.jumpLandSoundFinished = Utils.LoadRelativeTimeDifferential(entries[index],"jumpLandSoundFinished"); index++;
-		pm.jumpJetEnergySuckTickFinished = Utils.LoadRelativeTimeDifferential(entries[index],"jumpJetEnergySuckTickFinished"); index++;
-		pm.fatigueWarned = Utils.GetBoolFromString(entries[index],"fatigueWarned"); index++;
-		pm.turboFinished = Utils.LoadRelativeTimeDifferential(entries[index],"turboFinished"); index++;
-		pm.ressurectingFinished = Utils.LoadRelativeTimeDifferential(entries[index],"ressurectingFinished"); index++;
-		pm.doubleJumpFinished = Utils.LoadRelativeTimeDifferential(entries[index],"doubleJumpFinished"); index++;
-		float sfxTime = Utils.GetFloatFromString(entries[index],"SFX.time"); index++;
-		pm.SFXIndex = Utils.GetIntFromString(entries[index],"SFXIndex"); index++;
-		pm.ladderSFXFinished = 0;
-		if (pm.SFXIndex >= 0) {
-			pm.SFX.time = sfxTime;
-			pm.SFX.clip = Const.a.sounds[pm.SFXIndex];
-			Utils.PlayOneShotSavable(pm.SFX,Const.a.sounds[pm.SFXIndex]);
-		}
-
-		pm.ConsoleDisable();
-		return index;
-	}
 }

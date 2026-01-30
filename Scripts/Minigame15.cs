@@ -206,9 +206,9 @@ public class Minigame15 : MonoBehaviour {
             sliderButton.localPosition = position[from];
             sliding[to] = true;
             float xdiff = position[to].x - position[from].x;
-            xdiff = Mathf.Abs(xdiff) > 2f ? xdiff : 0f;
+            xdiff = vabs(xdiff) > 2f ? xdiff : 0f;
             float ydiff = position[to].y - position[from].y;
-            ydiff = Mathf.Abs(ydiff) > 2f ? ydiff : 0f;
+            ydiff = vabs(ydiff) > 2f ? ydiff : 0f;
             Vector2 sliddirBefore = new Vector2(xdiff,ydiff);
             slideDir[to] = new Vector2(Utils.Sign(xdiff),Utils.Sign(ydiff));
             slideTickFinished = Sys_Global.pauseRelativeTime + 0.1f;

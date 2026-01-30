@@ -15,8 +15,6 @@
 #define PLAYER_HEIGHT 2.00f
 #define PLAYER_CAM_OFFSET_Y 0.84f // Split capsule shape in the middle, camera is thus 0.16 away from top of the capsule ((2 / 2 = 1) - 0.84)
 
-float fatigue;
-
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 static uint32_t GetCollisionMask(uint8_t layer) {
@@ -75,7 +73,7 @@ float GetBasePlayerSpeed(bool running) {
     }
 
     if ((isSprinting || boosterActive) && running) {
-        if (fatigue > 80.0f && boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
+        if (instances[PLAYER1].fatigue > 80.0f && boosterActive) retval = PLAYER_MAX_SPRINT_SPEED_FATIGUED;
         else                                           retval = PLAYER_MAX_SPRINT_SPEED;
 
         if (bodyState == BodyState_Standing || bodyState == BodyState_Crouch || bodyState == BodyState_CrouchingDown) {

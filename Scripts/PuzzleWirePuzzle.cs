@@ -55,12 +55,12 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 
 	public void Use (UseData ud) {
 		if (dead) {
-			Const.sprint(messageOnBrokenLingdex);
+			CenterStatusPrint(messageOnBrokenLingdex);
 			return;
 		}
 
 		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(transform.position);
+			MFDManager.a.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
@@ -70,7 +70,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 		}
 
 		if (locked) {
-			Const.sprint(messageOnLockedLingdex);
+			CenterStatusPrint(messageOnLockedLingdex);
 			return;
 		}
 
@@ -83,7 +83,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 					  + "without parameters!");
 		}
 
-		Const.sprint(190); //Puzzle accessed
+		CenterStatusPrint(190); //Puzzle accessed
 		inUse = true;
 		MFDManager.a.SendWirePuzzleToDataTab(wiresOn,rowsActive,
 											 currentPositionsLeft,
@@ -91,13 +91,13 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 											 solutionPositionsLeft,
 											 solutionPositionsRight,theme,
 											 wireColors,target,ud,
-											 transform.position,this);
+											 instances[i].position,this);
 	}
 
 	public void UseTargets (GameObject owner) {
 		UseData ud = new UseData();
 		ud.owner = owner;
 		Const.a.UseTargets(gameObject,ud,target);
-		Const.sprint(successMessageLingdex);
+		CenterStatusPrint(successMessageLingdex);
 	}
 }

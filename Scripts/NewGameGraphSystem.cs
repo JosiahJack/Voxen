@@ -129,12 +129,12 @@ public class NewGameGraphSystem : MonoBehaviour {
 		else if (random_range(0f,1f) > 0.95f) ergValue = 0.3f;
 
 		// Chi Brain Waves
-		chiValue = Mathf.Sin(Time.time * beatTime * 0.15f);
+		chiValue = vsinf(Time.time * beatTime * 0.15f);
 
 		// ECG: Create shifted sine wave for heart beat.
 		if (beatFinished < Time.time) beatFinished = Time.time + 5f;
 		beatShift = (beatFinished - Time.time)/(beatTime * 0.5f);
-		if (beatShift > 0.94f) ecgValue = Mathf.Sin(beatShift * freq);
+		if (beatShift > 0.94f) ecgValue = vsinf(beatShift * freq);
 		else ecgValue = 0;
 
 		 // Inject variation when beating
@@ -271,13 +271,13 @@ public class NewGameGraphSystem : MonoBehaviour {
 
         switch(index) {
             case 0:
-                value = Mathf.InverseLerp(min[0],max[0],val);
+                value = inverse_lerp(min[0],max[0],val);
                 y0 = (int)(value * graphHeight);
                 if (y0 > ymax) y0 = ymax;
                 if (y0 < 0) y0 = 0;
                 currentColors[y0] = ergColor;
                 colorsERG[currentIndex0][y0] = ergColor;
-                if (Mathf.Abs(lastERG - y0) > 2) {
+                if (vabs(lastERG - y0) > 2) {
                     dist = lastERG;
                     if (lastCHI > y0) {
                         dist = lastERG - 1;
@@ -303,13 +303,13 @@ public class NewGameGraphSystem : MonoBehaviour {
                 }
                 break;
             case 1:
-                value = Mathf.InverseLerp(min[1],max[1],val);
+                value = inverse_lerp(min[1],max[1],val);
                 y0 = (int)(value * graphHeight);
                 if (y0 > ymax) y0 = ymax;
                 if (y0 < 0) y0 = 0;
                 currentColors[y0] = chiColor;
                 colorsCHI[currentIndex1][y0] = chiColor;
-                if (Mathf.Abs(lastCHI - y0) > 2) {
+                if (vabs(lastCHI - y0) > 2) {
                     dist = lastCHI;
                     if (lastCHI > y0) {
                         dist = lastCHI - 1;
@@ -336,13 +336,13 @@ public class NewGameGraphSystem : MonoBehaviour {
                 }
                 break;
             case 2:
-                value = Mathf.InverseLerp(min[2],max[2],val);
+                value = inverse_lerp(min[2],max[2],val);
                 y0 = (int)(value * graphHeight);
                 if (y0 > ymax) y0 = ymax;
                 if (y0 < 0) y0 = 0;
                 currentColors[y0] = ecgColor;
                 colorsECG[currentIndex2][y0] = ecgColor;
-                if (Mathf.Abs(lastECG - y0) > 2) {
+                if (vabs(lastECG - y0) > 2) {
                     dist = lastECG;
                     if (lastECG > y0) {
                         dist = lastECG - 1;
@@ -365,7 +365,7 @@ public class NewGameGraphSystem : MonoBehaviour {
                 int half = (int)((max[2] - min[2]) / 2f);
 
                 // Increase thickness to 3 pixels
-                if (y0 > 0 && y0 < ymax && (Mathf.Abs(y0 - half) > 2)) {
+                if (y0 > 0 && y0 < ymax && (vabs(y0 - half) > 2)) {
                     currentColors[y0 - 1] = ecgColor;
                     currentColors[y0 + 1] = ecgColor;
                     colorsECG[currentIndex2][y0 - 1] = ecgColor;

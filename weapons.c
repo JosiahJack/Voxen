@@ -144,7 +144,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         if (index < 0) return;
 // 		if (WeaponCurrent.a.weaponCurrent < 0) return;
 // 
-//         if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+//         if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 // 			// Alternate (2)
 //             damageData.damage = Const.a.damagePerHitForWeapon2[index];
 //             damageData.delayBetweenShots = 
@@ -167,7 +167,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         damageData.energyDrainHi = Const.a.energyDrainHiForWeapon[index];
 //         damageData.energyDrainOver = Const.a.energyDrainOverloadForWeapon[index];
 //         damageData.attackType = Const.a.attackTypeForWeapon[index];
-//         damageData.berserkActive = (Utils.CheckFlags(PlayerPatch.a.patchActive,PlayerPatch.PATCH_BERSERK));
+//         damageData.berserkActive = (Utils.CheckFlags(instances[PLAYER1].patchActive,PlayerPatch.PATCH_BERSERK));
 //     }
 // 
 //     public static int Get16WeaponIndexFromConstIndex(int index) {
@@ -202,13 +202,13 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 //     bool WeaponsHaveAnyHeat() {
 // 		if (WeaponCurrent.a.redbull) return false;
-// 		if (Inventory.a.currentEnergyWeaponHeat[0] > 0f) return true;
-// 		if (Inventory.a.currentEnergyWeaponHeat[1] > 0f) return true;
-// 		if (Inventory.a.currentEnergyWeaponHeat[2] > 0f) return true;
-// 		if (Inventory.a.currentEnergyWeaponHeat[3] > 0f) return true;
-// 		if (Inventory.a.currentEnergyWeaponHeat[4] > 0f) return true;
-// 		if (Inventory.a.currentEnergyWeaponHeat[5] > 0f) return true;
-// 		if (Inventory.a.currentEnergyWeaponHeat[6] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[0] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[1] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[2] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[3] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[4] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[5] > 0f) return true;
+// 		if (inventoryPlayer1.currentEnergyWeaponHeat[6] > 0f) return true;
 //         return false;
 //     }
 // 
@@ -217,14 +217,14 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			fogFac--;
 // 			if (fogFac < 0) fogFac = 0;
 // 			if (WeaponsHaveAnyHeat() || CurrentWeaponUsesEnergy()) {
-// 				Inventory.a.currentEnergyWeaponHeat[0] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[0] <= 0f) Inventory.a.currentEnergyWeaponHeat[0] = 0f;
-// 				Inventory.a.currentEnergyWeaponHeat[1] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[1] <= 0f) Inventory.a.currentEnergyWeaponHeat[1] = 0f;
-// 				Inventory.a.currentEnergyWeaponHeat[2] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[2] <= 0f) Inventory.a.currentEnergyWeaponHeat[2] = 0f;
-// 				Inventory.a.currentEnergyWeaponHeat[3] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[3] <= 0f) Inventory.a.currentEnergyWeaponHeat[3] = 0f;
-// 				Inventory.a.currentEnergyWeaponHeat[4] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[4] <= 0f) Inventory.a.currentEnergyWeaponHeat[4] = 0f;
-// 				Inventory.a.currentEnergyWeaponHeat[5] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[5] <= 0f) Inventory.a.currentEnergyWeaponHeat[5] = 0f;
-// 				Inventory.a.currentEnergyWeaponHeat[6] -= 10f; if (Inventory.a.currentEnergyWeaponHeat[6] <= 0f) Inventory.a.currentEnergyWeaponHeat[6] = 0f;
-// 				if (CurrentWeaponUsesEnergy()) energheatMgr.HeatBleed(Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent]); // update hud heat ticks if current weapon uses energy
+// 				inventoryPlayer1.currentEnergyWeaponHeat[0] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[0] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[0] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[1] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[1] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[1] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[2] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[2] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[2] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[3] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[3] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[3] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[4] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[4] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[4] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[5] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[5] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[5] = 0f;
+// 				inventoryPlayer1.currentEnergyWeaponHeat[6] -= 10f; if (inventoryPlayer1.currentEnergyWeaponHeat[6] <= 0f) inventoryPlayer1.currentEnergyWeaponHeat[6] = 0f;
+// 				if (CurrentWeaponUsesEnergy()) energheatMgr.HeatBleed(inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent]); // update hud heat ticks if current weapon uses energy
 // 			}
 // 			
 //             heatTickFinished = Sys_Global.pauseRelativeTime + heatTickTime;
@@ -235,7 +235,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		float strength = Const.a.recoilForWeapon[i];
 // 		//DualLog("Recoil from gun index: "+i.ToString()+" with strength of " +strength.ToString());
 // 		if (strength <= 0f) return;
-// 		if (PlayerMovement.a.fatigue > 80) strength = strength * 2f;
+// 		if (instances[PLAYER1].fatigue > 80.0f) strength = strength * 2f;
 // 		strength = strength * 0.25f;
 // 		Vector3 wepJoltPosition = new Vector3(reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1f,1f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
 // 		if (wepJoltPosition.x > 999f) wepJoltPosition.x = 0;
@@ -264,8 +264,8 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 		float x = reloadContainer.localPosition.x; // side to side
 // 		float z = reloadContainer.localPosition.z; // forward and back
-// 		z = Mathf.Lerp(z,reloadContainerHome.z,Time.deltaTime);
-// 		x = Mathf.Lerp(x,reloadContainerHome.x,Time.deltaTime);
+// 		z = lerp(z,reloadContainerHome.z,Time.deltaTime);
+// 		x = lerp(x,reloadContainerHome.x,Time.deltaTime);
 // 		reloadContainer.localPosition = 
 // 			new Vector3(x,reloadContainer.localPosition.y,z);
 // 	}
@@ -288,7 +288,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				WeaponLerpGetTargetDown();
 // 			}
 // 
-// 			Mathf.Clamp(targetY, -100f, 100f);
+// 			vclamp(targetY, -100f, 100f);
 // 			Vector3 pos = new Vector3(reloadContainer.localPosition.x,
 // 									  targetY,
 // 									  reloadContainer.localPosition.z);
@@ -329,7 +329,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         if (CurrentWeaponUsesEnergy()) {
 // 			// Update hud heat ticks if current weapon uses energy
 // 			int iC = WeaponCurrent.a.weaponCurrent;
-// 			energheatMgr.HeatBleed(Inventory.a.currentEnergyWeaponHeat[iC]);
+// 			energheatMgr.HeatBleed(inventoryPlayer1.currentEnergyWeaponHeat[iC]);
 // 		}
 // 
 // 		// Set current weapon inventory lookup index
@@ -342,7 +342,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		// Update the ammo icons.
 // 		int ind = WeaponCurrent.a.weaponIndex;
 // 		bool alt = false;
-// 		if (ind >= 0 && ind < 16) alt = Inventory.a.wepLoadedWithAlternate[ind];
+// 		if (ind >= 0 && ind < 16) alt = inventoryPlayer1.wepLoadedWithAlternate[ind];
 // 		MFDManager.a.SetAmmoIcons(ind,alt);
 // 		MFDManager.a.SetWepInfo(WeaponCurrent.a.weaponIndex);
 // 		WeaponCurrent.a.UpdateWeaponViewModels();
@@ -371,7 +371,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		// Check for other things that must capture and override clicks
 // 		if (GetInput.a.Attack()) {
 // 			if (MouseLookScript.a.vmailActive) {
-// 				Inventory.a.DeactivateVMail();
+// 				inventoryPlayer1.DeactivateVMail();
 // 				MouseLookScript.a.vmailActive = false;
 // 				waitTilNextFire = Sys_Global.pauseRelativeTime + 0.8f;
 // 				return;
@@ -448,22 +448,22 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				if (PlayerEnergy.a.energy > 0
 // 					|| WeaponCurrent.a.bottomless
 // 					|| WeaponCurrent.a.redbull) {
-// 					if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > overheatedPercent
+// 					if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > overheatedPercent
 // 						&& !WeaponCurrent.a.bottomless
 // 						&& !WeaponCurrent.a.redbull) {
 // 						Utils.PlayUIOneShotSavable(238); // noammo
 // 						waitTilNextFire = Sys_Global.pauseRelativeTime + 0.8f;
-// 						Const.sprint(11);
+// 						CenterStatusPrint(11);
 // 					} else {
 // 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
 // 					}
 // 				} else {
-// 					Const.sprint(207); // Not enough energy to fire weapon.
+// 					CenterStatusPrint(207); // Not enough energy to fire weapon.
 // 				}
 // 				break;
 // 			default:
 // 				// Uses normal ammo, check versus alternate or normal to see if we have ammo then fire
-// 				if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+// 				if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 // 					if (WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent] > 0
 // 						|| WeaponCurrent.a.bottomless) {
 // 						FireWeapon(wepdex, false); // weapon index, isSilent == false so play normal SFX
@@ -500,16 +500,16 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(WeaponCurrent.a.weaponIndex);
 // 		if (wep16index < 0) return;
 // 
-// 		if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+// 		if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 // 			if (WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent] <= 0
-// 				|| Inventory.a.wepAmmoSecondary[wep16index] <= 0) { // True for no wepAmmoSecondary causes Reload to run and display no ammo message.
+// 				|| inventoryPlayer1.wepAmmoSecondary[wep16index] <= 0) { // True for no wepAmmoSecondary causes Reload to run and display no ammo message.
 // 				WeaponCurrent.a.Reload();
 // 			} else {
 // 				WeaponCurrent.a.Unload(false);
 // 			}
 // 		} else {
 // 			if (WeaponCurrent.a.currentMagazineAmount[WeaponCurrent.a.weaponCurrent] <= 0
-// 				|| Inventory.a.wepAmmo[wep16index] <= 0) { // True for no wepAmmo causes Reload to run and display no ammo message.
+// 				|| inventoryPlayer1.wepAmmo[wep16index] <= 0) { // True for no wepAmmo causes Reload to run and display no ammo message.
 // 				WeaponCurrent.a.Reload();
 // 			} else {
 // 				WeaponCurrent.a.Unload(false);
@@ -526,19 +526,19 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 	public void FireCyberWeapon() {
 // 		if (cyberWeaponAttackFinished < Sys_Global.pauseRelativeTime) {
-// 			if (Inventory.a.isPulserNotDrill) {
-// 				if (Inventory.a.hasSoft[1]) {
+// 			if (inventoryPlayer1.isPulserNotDrill) {
+// 				if (inventoryPlayer1.hasSoft[1]) {
 // 					// Fire pulser
 // 					Const.a.shotsFired++;
-// 					if (Inventory.a.hasSoft[1]) FireCyberBeachball(true,railgunShotForce,492);
+// 					if (inventoryPlayer1.hasSoft[1]) FireCyberBeachball(true,railgunShotForce,492);
 // 					Utils.PlayUIOneShotSavable(258); // wpulser
 // 					cyberWeaponAttackFinished = Sys_Global.pauseRelativeTime + 0.08f;
 // 				}
 // 			} else {
-// 				if (Inventory.a.hasSoft[0]) {
+// 				if (inventoryPlayer1.hasSoft[0]) {
 // 					// Fire I.C.E. drill
 // 					Const.a.shotsFired++;
-// 					if (Inventory.a.hasSoft[0]) FireCyberBeachball(false,plasmaShotForce,495);
+// 					if (inventoryPlayer1.hasSoft[0]) FireCyberBeachball(false,plasmaShotForce,495);
 // 					Utils.PlayUIOneShotSavable(241); // wdrill baby drill
 // 					cyberWeaponAttackFinished = Sys_Global.pauseRelativeTime + 0.5f;
 // 				}
@@ -551,10 +551,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         // like a beachball for collisions with enemies, but act like a baseball for walls/floor to prevent hitting corners
 //         GameObject beachball = ConsoleEmulator.SpawnDynamicObject(prefabID,-1);
 //         if (beachball != null) {
-// 			damageData.damage = 10f * Inventory.a.softVersions[0];
+// 			damageData.damage = 10f * inventoryPlayer1.softVersions[0];
 // 			if (isPulser) {
 // 				// Cyberspace enemies don't have much health.
-// 				damageData.damage = 1f + (0.25f * Inventory.a.softVersions[1]);
+// 				damageData.damage = 1f + (0.25f * inventoryPlayer1.softVersions[1]);
 // 			}
 // 
 //             damageData.owner = playerCapsule;
@@ -562,9 +562,9 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			if (!isPulser) damageData.attackType = AttackType.Drill;
 //             beachball.GetComponent<ProjectileEffectImpact>().dd = damageData;
 //             beachball.GetComponent<ProjectileEffectImpact>().host = playerCapsule;
-//             beachball.transform.position = playerCamera.transform.position;
+//             beachball.instances[i].position = playerCamera.instances[i].position;
 // 			MouseLookScript.a.SetCameraFocusPoint();
-//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.transform.position;
+//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.instances[i].position;
 //             beachball.transform.forward = tempVec.normalized;
 //             beachball.SetActive(true);
 //             Vector3 shove = beachball.transform.forward * shoveForce;
@@ -584,7 +584,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(251); // wmarksman
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashMK3.SetActive(true);
-// 				smoke = Instantiate(muzSmokeMK3,muzFlashMK3.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeMK3,muzFlashMK3.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 2;
@@ -597,10 +597,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashBlaster.SetActive(true);
 //                 if (overloadEnabled) {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
 //                 } else {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += blasterSetting;
-// 					if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += blasterSetting;
+// 					if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 38:
@@ -614,7 +614,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(243); // wflechette
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashFlechette.SetActive(true);
-// 				smoke = Instantiate(muzSmokeFlechette,muzFlashFlechette.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeFlechette,muzFlashFlechette.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 1;
@@ -627,10 +627,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashIonBeam.SetActive(true);
 //                 if (overloadEnabled) {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
 //                 } else {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += ionSetting;
-// 					if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += ionSetting;
+// 					if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 41:
@@ -646,7 +646,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(249); // wmagnum
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashMagnum.SetActive(true);
-// 				smoke = Instantiate(muzSmokeMagnum,muzFlashMagnum.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeMagnum,muzFlashMagnum.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 3;
@@ -662,7 +662,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(255); // wpistol
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashPistol.SetActive(true);
-// 				smoke = Instantiate(muzSmokePistol,muzFlashPistol.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokePistol,muzFlashPistol.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 1;
@@ -675,10 +675,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 FirePlasma(index);
 // 				muzFlashPlasma.SetActive(true);
 //                 if (overloadEnabled) {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
 //                 } else {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += plasmaSetting;
-// 					if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += plasmaSetting;
+// 					if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 47:
@@ -686,7 +686,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(259); // wrailgun
 //                 FireRailgun(index);
 // 				muzFlashRailgun.SetActive(true);
-// 				smoke = Instantiate(muzSmokeRailgun,muzFlashRailgun.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeRailgun,muzFlashRailgun.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 2;
@@ -696,7 +696,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(262); // wriotgun
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashRiotgun.SetActive(true);
-// 				smoke = Instantiate(muzSmokeRiotgun,muzFlashRiotgun.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeRiotgun,muzFlashRiotgun.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 4;
@@ -706,7 +706,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (!isSilent) Utils.PlayUIOneShotSavable(263); // wskorpion
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashSkorpion.SetActive(true);
-// 				smoke = Instantiate(muzSmokeSkorpion,muzFlashSkorpion.transform.position,Const.a.quaternionIdentity) as GameObject;
+// 				smoke = Instantiate(muzSmokeSkorpion,muzFlashSkorpion.instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 				smoke.transform.parent = reloadContainer;
 // 				smoke.SetActive(true);
 // 				fogFac += 2;
@@ -718,10 +718,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (DidRayHit(index)) HitScanFire(index);
 // 				muzFlashSparq.SetActive(true);
 //                 if (overloadEnabled) {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
 //                 } else {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += sparqSetting;
-// 					if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += sparqSetting;
+// 					if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //             case 51:
@@ -731,10 +731,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 FireStungun(index);
 // 				muzFlashStungun.SetActive(true);
 //                 if (overloadEnabled) {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f;
 //                 } else {
-//                     Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += stungunSetting;
-// 					if (Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) Inventory.a.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
+//                     inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] += stungunSetting;
+// 					if (inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] > 100f) inventoryPlayer1.currentEnergyWeaponHeat[WeaponCurrent.a.weaponCurrent] = 100f; // cap it
 //                 }
 //                 break;
 //         }
@@ -754,7 +754,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                     if (!WeaponCurrent.a.bottomless && !WeaponCurrent.a.redbull) {
 // 						PlayerEnergy.a.TakeEnergy(Const.a.energyDrainOverloadForWeapon[index]); //take large amount
 // 						if (BiomonitorGraphSystem.a != null) {
-// 							BiomonitorGraphSystem.a.EnergyPulse(Const.a.energyDrainOverloadForWeapon[index]);
+// 							BiomonitorEnergyPulse(Const.a.energyDrainOverloadForWeapon[index]);
 // 						}
 // 					}
 //                 } else {
@@ -762,12 +762,12 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                     if (!WeaponCurrent.a.bottomless && !WeaponCurrent.a.redbull) {
 // 						PlayerEnergy.a.TakeEnergy(takeEnerg);
 // 						if (BiomonitorGraphSystem.a != null) {
-// 							BiomonitorGraphSystem.a.EnergyPulse(takeEnerg);
+// 							BiomonitorEnergyPulse(takeEnerg);
 // 						}
 // 					}
 //                 }
 //             } else {
-//                 if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+//                 if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 //                     if (!WeaponCurrent.a.bottomless) WeaponCurrent.a.currentMagazineAmount2[WeaponCurrent.a.weaponCurrent]--; // Take ammo away
 //                 } else {
 //                     if (!WeaponCurrent.a.bottomless) WeaponCurrent.a.currentMagazineAmount[WeaponCurrent.a.weaponCurrent]--; // Take ammo away
@@ -778,7 +778,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         }
 // 
 // 		Recoil(index);
-//         if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]
+//         if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]
 // 			|| overloadEnabled) {
 // 
 //             overloadEnabled = false;
@@ -789,7 +789,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 							  + Const.a.delayBetweenShotsForWeapon[index];
 //         }
 // 
-// 		Inventory.a.UpdateAmmoText();
+// 		inventoryPlayer1.UpdateAmmoText();
 //     }
 // 
 //     bool DidRayHit(int wep16Index) {
@@ -851,9 +851,9 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			Quaternion.LookRotation(tempHit.normal*-1,Vector3.up),
 // 			hitGO.transform);
 // 
-// 		Quaternion roll = impactMark.transform.localRotation;
+// 		Quaternion roll = impactMark.instances[i].rotation;
 // 		roll *= Quaternion.Euler(0f,0f,random_range(0,3) * 90f);
-// 		impactMark.transform.localRotation = roll;
+// 		impactMark.instances[i].rotation = roll;
 // 		GameObject dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
 // 		impactMark.transform.parent = dynamicObjectsContainer.transform;
 // 	}
@@ -897,12 +897,12 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         else  if (wep16index == 4) laserIndex = 407; // Yellow laser for ion
 // 
 // 		GameObject dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
-// 		GameObject lasertracer = Instantiate(Const.a.GetPrefab(laserIndex),transform.position,Const.a.quaternionIdentity) as GameObject;
+// 		GameObject lasertracer = Instantiate(Const.a.GetPrefab(laserIndex),instances[i].position,Const.a.quaternionIdentity) as GameObject;
 // 
 // 		// Temporary object only, no need to save or mark as instantiated.
 // 		if (lasertracer != null) {
 // 			lasertracer.transform.SetParent(dynamicObjectsContainer.transform,true);
-// 			tempVec = transform.position;
+// 			tempVec = instances[i].position;
 // 			tempVec.y += verticalOffset;
 // 			lasertracer.GetComponent<LaserDrawing>().startPoint = tempVec;
 // 			lasertracer.GetComponent<LaserDrawing>().endPoint = tempHit.point;
@@ -935,16 +935,16 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 	// TargetID Instance
 // 	void CreateTargetIDInstance(float dmgFinal, HealthManager hm, float tranq) {
 // 		 if (hm == null || !hm.isNPC || hm.health <= 0f) return;
-// 		if (!Inventory.a.hasHardware[4] && tranq <= 0f && dmgFinal > 0f) return;
+// 		if (!inventoryPlayer1.hasHardware[4] && tranq <= 0f && dmgFinal > 0f) return;
 // 		if (hm.linkedTargetID != null) return; // Let SendDamageReceive handle updates
 // 
 // 		float linkDistForTargID = TargetID.GetTargetIDTetherRange();
-// 		bool showHealth = Inventory.a.hasHardware[4] && Inventory.a.hardwareVersion[4] > 2;
-// 		bool showRange = Inventory.a.hasHardware[4];
-// 		bool showAttitude = Inventory.a.hasHardware[4] && Inventory.a.hardwareVersion[4] > 1;
-// 		bool showName = Inventory.a.hasHardware[4] && Inventory.a.hardwareVersion[4] > 1;
+// 		bool showHealth = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 2;
+// 		bool showRange = inventoryPlayer1.hasHardware[4];
+// 		bool showAttitude = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1;
+// 		bool showName = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1;
 // 
-// 		GameObject idFrame = Instantiate(Const.a.GetPrefab(736), hm.transform.position, Const.a.quaternionIdentity) as GameObject;
+// 		GameObject idFrame = Instantiate(Const.a.GetPrefab(736), hm.instances[i].position, Const.a.quaternionIdentity) as GameObject;
 // 		if (idFrame == null) return;
 // 
 // 		TargetID tid = idFrame.GetComponent<TargetID>();
@@ -954,10 +954,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		tid.linkedHM = hm;
 // 		hm.linkedTargetID = tid;
 // 
-// 		if (!Inventory.a.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
-// 			tid.currentText = tranq > 0f ? Const.a.stringTable[536] : (dmgFinal == 0f ? Const.a.stringTable[511] : "");
+// 		if (!inventoryPlayer1.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
+// 			tid.currentText = tranq > 0f ? Sys_Text.stringTable[536] : (dmgFinal == 0f ? Sys_Text.stringTable[511] : "");
 // 			tid.lifetime += tranq;
-// 			tid.damageTimeFinished = Mathf.Max(Sys_Global.pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
+// 			tid.damageTimeFinished = vmax(Sys_Global.pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
 // 			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
 // 		} else {
 // 			tid.currentText = ""; // Set by SendDamageReceive
@@ -1006,7 +1006,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		float textdmg_Ofs = textname_Ofs - 0.18f; // def: 1.1f, e.g. MINOR
 // 		float textnum_Ofs = textname_Ofs - 0.09f; // def: 1.19f, e.g. 3.8M Idle
 // 
-// 		idFrame.transform.position = hm.transform.position;
+// 		idFrame.instances[i].position = hm.instances[i].position;
 // 		idFrame.SetActive(true);
 // 		tid.linkedHM = hm;
 // 		hm.linkedTargetID = tid;
@@ -1061,7 +1061,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //             CreateStandardImpactEffects(); // standard blood spurts/robot sparks
 // 
 // 			// the only exception
-// 			if (wep16Index == 2 && Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+// 			if (wep16Index == 2 && inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 // 				damageData.attackType = AttackType.Tranq; // tranquilize the untranquil....yes
 // 			}
 //         }
@@ -1088,7 +1088,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //         damageData.hit = tempHit;
 // 		damageData.attacknormal = MouseCursor.a.GetCursorScreenPointForRay();
 //         damageData.attacknormal = playerCamera.ScreenPointToRay(damageData.attacknormal).direction;
-//         if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+//         if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 //             damageData.damage = Const.a.damagePerHitForWeapon2[wep16Index];
 // 			damageData.offense = Const.a.offenseForWeapon2[wep16Index];
 // 			damageData.penetration = Const.a.penetrationForWeapon2[wep16Index];
@@ -1198,10 +1198,10 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				if (prefID != null && !isRapier) {
 // 					FootStepType fstep = PlayerMovement.a.GetFootstepTypeForPrefab(prefID.constIndex);
 // 					AudioClip stcp = PlayerMovement.a.JumpLandSound(fstep);
-// 					Utils.PlayTempAudio(transform.position,stcp,1f);
-// 					Utils.PlayTempAudio(transform.position,hit,0.65f);	
+// 					play_wav(instances[i].position,stcp,1f);
+// 					play_wav(instances[i].position,hit,0.65f);	
 // 				} else {
-// 					Utils.PlayTempAudio(transform.position,hit,1f);	
+// 					play_wav(instances[i].position,hit,1f);	
 // 				}
 // 
 // 				PlayerHealth.a.makingNoise = true;
@@ -1239,7 +1239,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		if (isRapier) {
 // 			PlayerEnergy.a.TakeEnergy(3.666f); // 3 hits per tick.
 // 			if (BiomonitorGraphSystem.a != null) {
-// 				BiomonitorGraphSystem.a.EnergyPulse(3.666f);
+// 				BiomonitorEnergyPulse(3.666f);
 // 			}
 // 		}
 // 	}
@@ -1291,8 +1291,8 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			if (hm == null) continue;
 // 			if (!hm.gameObject.activeInHierarchy) continue;
 // 
-// 			if (distance_vector3(hm.transform.position,
-// 								 playerCapsule.transform.position)
+// 			if (distance_vector3(hm.instances[i].position,
+// 								 playerCapsule.instances[i].position)
 // 				>= meleescanDistance) {
 // 
 // 				continue;
@@ -1300,11 +1300,11 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 			MouseLookScript.a.SetCameraFocusPoint();
 // 			tempVec = MouseLookScript.a.cameraFocusPoint
-// 						- playerCamera.transform.position;
+// 						- playerCamera.instances[i].position;
 // 
 // 			tempVec = tempVec.normalized;
-// 			Vector3 ang = hm.transform.position
-// 							- playerCamera.transform.position;
+// 			Vector3 ang = hm.instances[i].position
+// 							- playerCamera.instances[i].position;
 // 
 // 			ang = ang.normalized;
 // 			float dot = Vector3.Dot(tempVec,ang);
@@ -1355,9 +1355,9 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			damageData.penetration = Const.a.penetrationForWeapon[index16];
 //             beachball.GetComponent<ProjectileEffectImpact>().dd = damageData;
 //             beachball.GetComponent<ProjectileEffectImpact>().host = playerCapsule;
-//             beachball.transform.position = playerCamera.transform.position;
+//             beachball.instances[i].position = playerCamera.instances[i].position;
 // 			MouseLookScript.a.SetCameraFocusPoint();
-//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.transform.position;
+//             tempVec = MouseLookScript.a.cameraFocusPoint - playerCamera.instances[i].position;
 //             beachball.transform.forward = tempVec.normalized;
 //             beachball.SetActive(true);
 //             Vector3 shove = beachball.transform.forward * shoveForce;
@@ -1428,7 +1428,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				return;
 // 		}
 // 
-// 		if (Inventory.a.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
+// 		if (inventoryPlayer1.wepLoadedWithAlternate[WeaponCurrent.a.weaponCurrent]) {
 // 			UpdateDigits(WeaponCurrent.a.currentMagazineAmount2[index]);
 // 		} else {
 // 			UpdateDigits(WeaponCurrent.a.currentMagazineAmount[index]);
@@ -1539,14 +1539,14 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		int nextIndex = initialIndex - 1; // add 1 to get slot above this
 // 		if (nextIndex < 0) nextIndex = 6; // wraparound to top
 // 		int countCheck = 0;
-// 		bool buttonNotValid = (Inventory.a.weaponInventoryIndices[nextIndex] == -1);
+// 		bool buttonNotValid = (inventoryPlayer1.weaponInventoryIndices[nextIndex] == -1);
 // 		while (buttonNotValid) {
 // 			countCheck++;
 // 			if (countCheck > 13) return; // no weapons!  don't runaway loop
 // 
 // 			nextIndex--;
 // 			if (nextIndex < 0) nextIndex = 6;
-// 			buttonNotValid = (Inventory.a.weaponInventoryIndices[nextIndex] == -1);
+// 			buttonNotValid = (inventoryPlayer1.weaponInventoryIndices[nextIndex] == -1);
 // 		}
 // 
 // 		wepbut = wepbutMan.wepButtonsScripts[nextIndex];
@@ -1695,7 +1695,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
 // 		if (wep16index < 0) return;
 // 		if (wep16index == 5 || wep16index == 6) {
-// 			Const.sprint(315);
+// 			CenterStatusPrint(315);
 // 			return; // Do nothing for pipe or rapier.
 // 		}
 // 
@@ -1708,24 +1708,24 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				MFDManager.a.overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 		} else {
-// 			if (Inventory.a.wepLoadedWithAlternate[weaponCurrent]) {
-// 				if (Inventory.a.wepAmmo[wep16index] > 0) {
-// 				Inventory.a.wepLoadedWithAlternate[weaponCurrent] = false;
+// 			if (inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) {
+// 				if (inventoryPlayer1.wepAmmo[wep16index] > 0) {
+// 				inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent] = false;
 // 				// Take bullets out of the clip, put them back into the ammo stockpile, then zero out the clip amount, did I say clip?  I mean magazine but whatever
-// 				Inventory.a.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
+// 				inventoryPlayer1.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
 // 				currentMagazineAmount2[weaponCurrent] = 0;
 // 				LoadPrimaryAmmoType(false);
 // 				} else {
-// 					Const.sprint(535); //No more of ammo type to load.
+// 					CenterStatusPrint(535); //No more of ammo type to load.
 // 				}
 // 			} else {
-// 				if (Inventory.a.wepAmmoSecondary[wep16index] > 0) {
-// 					Inventory.a.wepLoadedWithAlternate[weaponCurrent] = true;
-// 					Inventory.a.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
+// 				if (inventoryPlayer1.wepAmmoSecondary[wep16index] > 0) {
+// 					inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent] = true;
+// 					inventoryPlayer1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
 // 					currentMagazineAmount[weaponCurrent] = 0;
 // 					LoadSecondaryAmmoType(false);
 // 				} else {
-// 					Const.sprint(535); //No more of ammo type to load.
+// 					CenterStatusPrint(535); //No more of ammo type to load.
 // 				}
 // 			}
 // 		}
@@ -1733,30 +1733,30 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 	public void LoadPrimaryAmmoType(bool isSilent) {
 // 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
-// 		if (!Inventory.a.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with normal.
+// 		if (!inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with normal.
 // 			if (currentMagazineAmount[weaponCurrent] == Const.a.magazinePitchCountForWeapon[wep16index]) {
-// 				Const.sprint(191); //Current weapon magazine already full.
+// 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 			
-// 			if (currentMagazineAmount[weaponCurrent] == Inventory.a.wepAmmo[wep16index]) {
-// 				Const.sprint(535); // No more of ammo type to load
+// 			if (currentMagazineAmount[weaponCurrent] == inventoryPlayer1.wepAmmo[wep16index]) {
+// 				CenterStatusPrint(535); // No more of ammo type to load
 // 				return;
 // 			}
 // 		}
 // 
 // 		Unload(true);
-// 		Inventory.a.wepLoadedWithAlternate[weaponCurrent] = false;
+// 		inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent] = false;
 // 
 // 		// Put bullets into the magazine
-// 		if (Inventory.a.wepAmmo[wep16index] >= Const.a.magazinePitchCountForWeapon[wep16index]) {
+// 		if (inventoryPlayer1.wepAmmo[wep16index] >= Const.a.magazinePitchCountForWeapon[wep16index]) {
 // 			currentMagazineAmount[weaponCurrent] = Const.a.magazinePitchCountForWeapon[wep16index];
 // 		} else {
-// 			currentMagazineAmount[weaponCurrent] = Inventory.a.wepAmmo[wep16index];
+// 			currentMagazineAmount[weaponCurrent] = inventoryPlayer1.wepAmmo[wep16index];
 // 		}
 // 
 // 		// Take bullets out of the ammo stockpile
-// 		Inventory.a.wepAmmo[wep16index] -= currentMagazineAmount[weaponCurrent];
+// 		inventoryPlayer1.wepAmmo[wep16index] -= currentMagazineAmount[weaponCurrent];
 // 
 // 		if (!isSilent) {
 // 			if (wep16index == 0 || wep16index == 3) {
@@ -1777,30 +1777,30 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 	public void LoadSecondaryAmmoType(bool isSilent) {
 // 		int wep16index = WeaponFire.Get16WeaponIndexFromConstIndex(weaponIndex);
-// 		if (Inventory.a.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with alternate
+// 		if (inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) { // Already loaded with alternate
 // 			if (currentMagazineAmount2[weaponCurrent] == Const.a.magazinePitchCountForWeapon2[wep16index]) {
-// 				Const.sprint(191); //Current weapon magazine already full.
+// 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 			
-// 			if (currentMagazineAmount2[weaponCurrent] == Inventory.a.wepAmmoSecondary[wep16index]) {
-// 				Const.sprint(535); // No more of ammo type to load
+// 			if (currentMagazineAmount2[weaponCurrent] == inventoryPlayer1.wepAmmoSecondary[wep16index]) {
+// 				CenterStatusPrint(535); // No more of ammo type to load
 // 				return;
 // 			}
 // 		}
 // 
 // 		Unload(true);
-// 		Inventory.a.wepLoadedWithAlternate[weaponCurrent] = true;
+// 		inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent] = true;
 // 
 // 		// Put bullets into the magazine
-// 		if (Inventory.a.wepAmmoSecondary[wep16index] >= Const.a.magazinePitchCountForWeapon2[wep16index]) {
+// 		if (inventoryPlayer1.wepAmmoSecondary[wep16index] >= Const.a.magazinePitchCountForWeapon2[wep16index]) {
 // 			currentMagazineAmount2[weaponCurrent] = Const.a.magazinePitchCountForWeapon2[wep16index];
 // 		} else {
-// 			currentMagazineAmount2[weaponCurrent] = Inventory.a.wepAmmoSecondary[wep16index];
+// 			currentMagazineAmount2[weaponCurrent] = inventoryPlayer1.wepAmmoSecondary[wep16index];
 // 		}
 // 
 // 		// Take bullets out of the ammo stockpile
-// 		Inventory.a.wepAmmoSecondary[wep16index] -= currentMagazineAmount2[weaponCurrent];
+// 		inventoryPlayer1.wepAmmoSecondary[wep16index] -= currentMagazineAmount2[weaponCurrent];
 // 
 // 		if (!isSilent) {
 // 			if (wep16index == 0 || wep16index == 3) {
@@ -1829,14 +1829,14 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		if (wep16index == -1) return; // we don't have a weapon at all right now :)
 // 
 // 		// Take bullets out of the clip, put them back into the ammo stockpile, then zero out the clip amount, did I say clip?  I mean magazine but whatever
-// 		if (Inventory.a.wepLoadedWithAlternate[weaponCurrent]) {
-// 			Inventory.a.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
+// 		if (inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) {
+// 			inventoryPlayer1.wepAmmoSecondary[wep16index] += currentMagazineAmount2[weaponCurrent];
 // 			currentMagazineAmount2[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
 // 			MFDManager.a.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		} else {
-// 			Inventory.a.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
+// 			inventoryPlayer1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
 // 			currentMagazineAmount[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
@@ -1850,29 +1850,29 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		if (wep16index < 0) return;
 // 
 // 		if (wep16index == 5 || wep16index == 6) {
-// 			Const.sprint(315); // Weapon does not use ammo.
+// 			CenterStatusPrint(315); // Weapon does not use ammo.
 // 			return; // do nothing for pipe or rapier
 // 		}
 // 
 // 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) {
-// 			Const.sprint(538); // Weapon does not need reloaded.
+// 			CenterStatusPrint(538); // Weapon does not need reloaded.
 // 			return; // do nothing for energy weapons
 // 		}
 // 
 // 		if (weaponCurrent < 0) return;
 // 
-// 		if (Inventory.a.wepLoadedWithAlternate[weaponCurrent]) {
+// 		if (inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) {
 // 			if (currentMagazineAmount2[weaponCurrent] == Const.a.magazinePitchCountForWeapon2[wep16index]) {
-// 				Const.sprint(191); //Current weapon magazine already full.
+// 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 
-// 			if (Inventory.a.wepAmmoSecondary[wep16index] <= 0) {
-// 				if (Inventory.a.wepAmmo[wep16index] <= 0) {
-// 					Const.sprint(305); //No more of any ammo type to load.
+// 			if (inventoryPlayer1.wepAmmoSecondary[wep16index] <= 0) {
+// 				if (inventoryPlayer1.wepAmmo[wep16index] <= 0) {
+// 					CenterStatusPrint(305); //No more of any ammo type to load.
 // 					return;
 // 				} else {
-// 					Const.sprint(192); //No more of current ammo type to load, loading with alternate.
+// 					CenterStatusPrint(192); //No more of current ammo type to load, loading with alternate.
 // 					LoadPrimaryAmmoType(isSilent);
 // 					return;
 // 				}
@@ -1880,16 +1880,16 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			LoadSecondaryAmmoType(isSilent);
 // 		} else {
 // 			if (currentMagazineAmount[weaponCurrent] == Const.a.magazinePitchCountForWeapon[wep16index]) {
-// 				Const.sprint(191); //Current weapon magazine already full.
+// 				CenterStatusPrint(191); //Current weapon magazine already full.
 // 				return;
 // 			}
 // 
-// 			if (Inventory.a.wepAmmo[wep16index] <= 0) {
-// 				if (Inventory.a.wepAmmoSecondary[wep16index] <= 0) {
-// 					Const.sprint(305); //No more of any ammo type to load.
+// 			if (inventoryPlayer1.wepAmmo[wep16index] <= 0) {
+// 				if (inventoryPlayer1.wepAmmoSecondary[wep16index] <= 0) {
+// 					CenterStatusPrint(305); //No more of any ammo type to load.
 // 					return;
 // 				} else {
-// 					Const.sprint(192); //No more of current ammo type to load, loading with alternate.
+// 					CenterStatusPrint(192); //No more of current ammo type to load, loading with alternate.
 // 					LoadSecondaryAmmoType(isSilent);
 // 					return;
 // 				}
@@ -1903,77 +1903,86 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 	}
 // }
 
-// public class WeaponButtonsManager : MonoBehaviour {
-// 	public WeaponButton[] wepButtonsScripts;
-// 	public GameObject[] wepCountsText;
-// 
-// 	public void WeaponCycleUp() {
-// 		if (WeaponFire.a.reloadFinished > Sys_Global.pauseRelativeTime) return;
-// 
-// 		int initialIndex = WeaponCurrent.a.weaponCurrent;
-// 		if (initialIndex < 0) initialIndex = 0;
-// 		if (initialIndex > 6) initialIndex = 0;
-// 		int nextIndex = initialIndex + 1; // add 1 to get slot above this
-// 		if (nextIndex > 6) nextIndex = 0; // wraparound to bottom
-// 		int countCheck = 0;
-// 		bool buttonNotValid = (Inventory.a.weaponInventoryIndices[nextIndex] == -1);
-// 		while (buttonNotValid) {
-// 			countCheck++;
-// 			if (countCheck > 13) {
-// 				return; // no weapons!  don't runaway loop
-// 			}
-// 			nextIndex++;
-// 			if (nextIndex > 6) nextIndex = 0;
-// 			buttonNotValid = (Inventory.a.weaponInventoryIndices[nextIndex] == -1);
-// 		}
-// 
-// 		if (wepButtonsScripts[nextIndex].gameObject.activeSelf
-// 			&& nextIndex != initialIndex) {
-// 			WeaponCurrent.a.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,
-// 										 wepButtonsScripts[nextIndex].WepButtonIndex);
-// 		}
-// 	}
-// 
-// 	public void WeaponCycleDown() {
-// 		if (WeaponFire.a.reloadFinished > Sys_Global.pauseRelativeTime) return;
-// 
-// 		int initialIndex = WeaponCurrent.a.weaponCurrent;
-// 		if (initialIndex < 0) initialIndex = 0;
-// 		if (initialIndex > 6) initialIndex = 0;
-// 		int nextIndex = initialIndex - 1; // add 1 to get slot above this
-// 		if (nextIndex < 0) nextIndex = 6; // wraparound to top
-// 		int countCheck = 0;
-// 		bool buttonNotValid = (Inventory.a.weaponInventoryIndices[nextIndex] == -1);
-// 		while (buttonNotValid) {
-// 			countCheck++;
-// 			if (countCheck > 13) {
-// 				return; // no weapons!  don't runaway loop
-// 			}
-// 			nextIndex--;
-// 			if (nextIndex < 0) nextIndex = 6;
-// 			buttonNotValid = (Inventory.a.weaponInventoryIndices[nextIndex] == -1);
-// 		}
-// 
-// 		if (wepButtonsScripts[nextIndex].gameObject.activeSelf
-// 			&& nextIndex != initialIndex) {
-// 			WeaponCurrent.a.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,
-// 										 wepButtonsScripts[nextIndex].WepButtonIndex);
-// 		}
-// 	}
-// }
+void WeaponCycleUp() {
+    if (MouseLookScript.a.inCyberSpace) {
+        inventoryPlayer1.isPulserNotDrill = !inventoryPlayer1.isPulserNotDrill; // There's only two cyberspace weapons, up is down.
+        Utils.PlayUIOneShotSavable(80); // changeweapon
+        if (inventoryPlayer1.isPulserNotDrill) {
+            inventoryPlayer1.pulserButtonText.Select(true);
+            inventoryPlayer1.drillButtonText.Select(false);
+        } else {
+            inventoryPlayer1.pulserButtonText.Select(false);
+            inventoryPlayer1.drillButtonText.Select(true);
+        }
+    } else {
+        if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleDown();
+        else {
+            if (WeaponFire.a.reloadFinished > Sys_Global.pauseRelativeTime) return;
 
-// Handles weapon inventory buttons so when player clicks on the weapon name
-// text it selects that weapon, also changing to it to have as current.
-// public class WeaponButton : MonoBehaviour {
-//     public int useableItemIndex;
-// 	public int WepButtonIndex;
-// 
-// void WeaponInvClick () {
-//     MFDManager.a.mouseClickHeldOverGUI = true;
-//     WeaponCurrent.a.WeaponChange(useableItemIndex, WepButtonIndex);
-// }
-// 
-// 	void Start() {
-// 		GetComponent<Button>().onClick.AddListener(() => { WeaponInvClick(); });
-// 	}
-// }
+            int initialIndex = WeaponCurrent.a.weaponCurrent;
+            if (initialIndex < 0) initialIndex = 0;
+            if (initialIndex > 6) initialIndex = 0;
+            int nextIndex = initialIndex + 1; // add 1 to get slot above this
+            if (nextIndex > 6) nextIndex = 0; // wraparound to bottom
+            int countCheck = 0;
+            bool buttonNotValid = (inventoryPlayer1.weaponInventoryIndices[nextIndex] == -1);
+            while (buttonNotValid) {
+                countCheck++;
+                if (countCheck > 13) {
+                    return; // no weapons!  don't runaway loop
+                }
+                nextIndex++;
+                if (nextIndex > 6) nextIndex = 0;
+                buttonNotValid = (inventoryPlayer1.weaponInventoryIndices[nextIndex] == -1);
+            }
+
+            if (wepButtonsScripts[nextIndex].gameObject.activeSelf
+                && nextIndex != initialIndex) {
+                WeaponCurrent.a.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex, wepButtonsScripts[nextIndex].WepButtonIndex);
+            }
+        }
+    }
+}
+
+void WeaponCycleDown() {
+    if (MouseLookScript.a.inCyberSpace) {
+        // There's only two cyberspace weapons, up is down.
+        inventoryPlayer1.isPulserNotDrill = !inventoryPlayer1.isPulserNotDrill;
+        Utils.PlayUIOneShotSavable(80); // changeweapon
+        if (inventoryPlayer1.isPulserNotDrill) {
+            inventoryPlayer1.pulserButtonText.Select(true);
+            inventoryPlayer1.drillButtonText.Select(false);
+        } else {
+            inventoryPlayer1.pulserButtonText.Select(false);
+            inventoryPlayer1.drillButtonText.Select(true);
+        }
+    } else {
+        if (Const.a.InputInvertInventoryCycling) wepbutMan.WeaponCycleUp();
+        else {
+            if (WeaponFire.a.reloadFinished > Sys_Global.pauseRelativeTime) return;
+
+            int initialIndex = WeaponCurrent.a.weaponCurrent;
+            if (initialIndex < 0) initialIndex = 0;
+            if (initialIndex > 6) initialIndex = 0;
+            int nextIndex = initialIndex - 1; // add 1 to get slot above this
+            if (nextIndex < 0) nextIndex = 6; // wraparound to top
+            int countCheck = 0;
+            bool buttonNotValid = (inventoryPlayer1.weaponInventoryIndices[nextIndex] == -1);
+            while (buttonNotValid) {
+                countCheck++;
+                if (countCheck > 13) {
+                    return; // no weapons!  don't runaway loop
+                }
+                nextIndex--;
+                if (nextIndex < 0) nextIndex = 6;
+                buttonNotValid = (inventoryPlayer1.weaponInventoryIndices[nextIndex] == -1);
+            }
+
+            if (wepButtonsScripts[nextIndex].gameObject.activeSelf
+                && nextIndex != initialIndex) {
+                WeaponCurrent.a.WeaponChange(wepButtonsScripts[nextIndex].useableItemIndex,
+                                                wepButtonsScripts[nextIndex].WepButtonIndex);
+            }
+        }
+    }
+}

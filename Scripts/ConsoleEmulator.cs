@@ -129,7 +129,7 @@ public static class ConsoleEmulator {
 		Utils.DisableCapsuleCollider(PlayerMovement.a.capsuleCollider);
 		Utils.DisableCapsuleCollider(PlayerMovement.a.leanCapsuleCollider);
 		Utils.DisableSphereCollider(PlayerMovement.a.cyberCollider);
-		Const.sprint("noclip " + Const.a.stringTable[1000]); // "ACTIVATED"
+		CenterStatusPrint("noclip " + Sys_Text.stringTable[1000]); // "ACTIVATED"
 	}
 
 	static void ExitNoclip() {
@@ -141,7 +141,7 @@ public static class ConsoleEmulator {
 			Utils.EnableCapsuleCollider(PlayerMovement.a.capsuleCollider);
 			Utils.EnableCapsuleCollider(PlayerMovement.a.leanCapsuleCollider);
 		}
-		Const.sprint("noclip " + Const.a.stringTable[717]); // "DISABLED"
+		CenterStatusPrint("noclip " + Sys_Text.stringTable[717]); // "DISABLED"
 	}
 
     private static void ConsoleEntry(string entry) {
@@ -160,13 +160,13 @@ public static class ConsoleEmulator {
 			 || ts.Contains("editor")) {
 			Const.a.editMode = !Const.a.editMode;
 			if (Const.a.editMode) {
-				Const.sprint(Const.a.stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
+				CenterStatusPrint("%s", Sys_Text.stringTable[998]); // "Edit Mode activated! The current level can be shaped to your heart's content!"
 				EnterNoclip();
 				PlayerMovement.a.Notarget = true;
 			}
 
 			if (!Const.a.editMode) {
-				Const.sprint(Const.a.stringTable[999]); // "Edit Mode deactivated, normal play"
+				CenterStatusPrint("%s", Sys_Text.stringTable[999]); // "Edit Mode deactivated, normal play"
 				LevelEditor.a.EditorExit();
 				ExitNoclip();
 				PlayerMovement.a.Notarget = false;
@@ -174,20 +174,20 @@ public static class ConsoleEmulator {
         } else if (ts.Contains("notarget") || ts.Contains("no target")) {
 			if (PlayerMovement.a.Notarget) {
 				PlayerMovement.a.Notarget = false;
-				Const.sprint("notarget " + Const.a.stringTable[717]); // "DISABLED"
+				CenterStatusPrint("notarget " + Sys_Text.stringTable[717]); // "DISABLED"
 			} else {
 				PlayerMovement.a.Notarget = true;
-				Const.sprint("notarget " + Const.a.stringTable[1000]); // "ACTIVATED"
+				CenterStatusPrint("notarget " + Sys_Text.stringTable[1000]); // "ACTIVATED"
 			}
         } else if (ts.Contains("god")
                    || (ts.Contains("power") && ts.Contains("overwhelming"))
                    || ts.Contains("whosyourdaddy")
                    || ts.Contains("iddqd")) {
 			if (PlayerMovement.a.hm.god) {
-				Const.sprint("god mode " + Const.a.stringTable[717]); // "DISABLED"
+				CenterStatusPrint("god mode " + Sys_Text.stringTable[717]); // "DISABLED"
 				PlayerMovement.a.hm.god = false;
 			} else {
-				Const.sprint("god mode " + Const.a.stringTable[1000]); // "ACTIVATED"
+				CenterStatusPrint("god mode " + Sys_Text.stringTable[1000]); // "ACTIVATED"
 				PlayerMovement.a.hm.god = true;
 			}
         } else if (ts.Contains("load") && (tn.Contains("0") || ts.Contains("loadr") || ts.Contains("load r")) && !ts.Contains("10") && !ts.Contains("arsenal")) CheatLoadLevel(0);
@@ -207,7 +207,7 @@ public static class ConsoleEmulator {
         else if (ts.Contains("load") && ts.Contains("11") && !ts.Contains("arsenal")) CheatLoadLevel(11);
         else if (ts.Contains("load") && ts.Contains("12") && !ts.Contains("arsenal")) CheatLoadLevel(12);
 		else if (ts.Contains("load") && ts.Contains("g3") && !ts.Contains("arsenal")) {
-			Const.sprint(Const.a.stringTable[1001]); // "Gamma grove already jettisoned!  Those poor arrogant people."
+			CenterStatusPrint("%s", Sys_Text.stringTable[1001]); // "Gamma grove already jettisoned!  Those poor arrogant people."
 		} else if (ts.Contains("load") && ts.Contains("arsenal")) {
             if (ts.Contains("arsenalr") || ts.Contains("arsenal r") || ts.Contains("0"))
                                         PlayerMovement.a.EnableCheatArsenal(0);
@@ -224,21 +224,21 @@ public static class ConsoleEmulator {
             else if (ts.Contains("g2")) PlayerMovement.a.EnableCheatArsenal(11);
             else if (ts.Contains("g4")) PlayerMovement.a.EnableCheatArsenal(12);
             else if (ts.Contains("g3")) {
-                Const.sprint(Const.a.stringTable[1001]); // "Gamma grove already jettisoned!  Those poor arrogant people."
+                CenterStatusPrint("%s", Sys_Text.stringTable[1001]); // "Gamma grove already jettisoned!  Those poor arrogant people."
             }
         } else if (ts.Contains("bottomless") && ts.Contains("clip")) { // bottomlessclip
 			if (WeaponCurrent.a.bottomless) {
-				Const.sprint(Const.a.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
+				CenterStatusPrint("%s", Sys_Text.stringTable[1003]); // "Hose disconnected from interdimensional wormhole. Normal ammo operation restored."
 				WeaponCurrent.a.bottomless = false;
 			} else {
-				Const.sprint("bottomlessclip!  " + Const.a.stringTable[1002]); // "Bring it!"
+				CenterStatusPrint("bottomlessclip!  " + Sys_Text.stringTable[1002]); // "Bring it!"
 				WeaponCurrent.a.bottomless = true;
 			}
         }  else if (ts.Contains("nohud")) { // No HUD
 			if (Const.a.noHUD) {
 				// Normal
 				Const.a.noHUD = false;
-				Const.sprint("HUD " + Const.a.stringTable[1000]); // "ACTIVATED"
+				CenterStatusPrint("HUD " + Sys_Text.stringTable[1000]); // "ACTIVATED"
 				if (MouseLookScript.a.inventoryMode) {
 					MouseLookScript.a.shootModeButton.SetActive(true);
 				}
@@ -268,13 +268,13 @@ public static class ConsoleEmulator {
 				MFDManager.a.TabReset(false);
 				MFDManager.a.ReturnToLastTab(true);
 				MFDManager.a.ReturnToLastTab(false);
-				if (Inventory.a.hasHardware[1]) {
+				if (inventoryPlayer1.hasHardware[1]) {
 					MouseLookScript.a.compassContainer.SetActive(true);
 				}
 			} else {
 				// HUDless Screenshot mode!
 				Const.a.noHUD = true;
-				Const.sprint(Const.a.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
+				CenterStatusPrint("%s", Sys_Text.stringTable[1004]); // "No HUD! Enjoy the cinematic screenshot experience!"
 				MouseLookScript.a.shootModeButton.SetActive(false);
 				MFDManager.a.overallLeftMFD.SetActive(false);
 				MFDManager.a.overallRightMFD.SetActive(false);
@@ -298,25 +298,25 @@ public static class ConsoleEmulator {
                    || (ts.Contains("i") && ts.Contains("feel")
                        && ts.Contains("the") && ts.Contains("power"))) {
 			if (WeaponCurrent.a.redbull) {
-				Const.sprint(Const.a.stringTable[1005]); // Energy usage normal
+				CenterStatusPrint("%s", Sys_Text.stringTable[1005]); // Energy usage normal
 				WeaponCurrent.a.redbull = false;
 			} else {
-				Const.sprint(Const.a.stringTable[1006]); // "I feel the power! 0 energy consumption!"
+				CenterStatusPrint("%s", Sys_Text.stringTable[1006]); // "I feel the power! 0 energy consumption!"
 				WeaponCurrent.a.redbull = true; // Might not be wings, but hey.
 			}
         } else if (ts.Contains("show") && ts.Contains("fps")) { // showfps
-			Const.sprint(Const.a.stringTable[1007]); // "Toggling FPS counter for framerate (bottom right corner)..."
+			CenterStatusPrint("%s", Sys_Text.stringTable[1007]); // "Toggling FPS counter for framerate (bottom right corner)..."
 			PlayerMovement.a.fpsCounter.SetActive(!PlayerMovement.a.fpsCounter.activeInHierarchy);
-			Inventory.a.hardwareButtonManager.bioMonitorContainer.SetActive(true);
+			inventoryPlayer1.hardwareButtonManager.bioMonitorContainer.SetActive(true);
         } else if (ts.Contains("show") && ts.Contains("location")) { // showlocation
-			Const.sprint(Const.a.stringTable[1008]); // "Toggling locationIndicator (bottom left corner)..."
+			CenterStatusPrint("%s", Sys_Text.stringTable[1008]); // "Toggling locationIndicator (bottom left corner)..."
 			PlayerMovement.a.locationIndicator.SetActive(!PlayerMovement.a.locationIndicator.activeInHierarchy);
 		} else if (ts.Contains("i") && ts.Contains("am") && ts.Contains("shodan")) { // iamshodan
 			if (LevelManager.a.superoverride) {
-				Const.sprint(Const.a.stringTable[1009]); // "SHODAN has regained control of security from you"
+				CenterStatusPrint("%s", Sys_Text.stringTable[1009]); // "SHODAN has regained control of security from you"
 				LevelManager.a.superoverride = false;
 			} else {
-				Const.sprint(Const.a.stringTable[1010]); // "Full security override enabled!"
+				CenterStatusPrint("%s", Sys_Text.stringTable[1010]); // "Full security override enabled!"
 				LevelManager.a.superoverride = true;
 			}
 		} else if (entry == "dizzy") {
@@ -326,68 +326,68 @@ public static class ConsoleEmulator {
 			else if (LevelManager.a.skyRotate.rotateSpeed < 9.9f) LevelManager.a.skyRotate.rotateSpeed = 10f;
 			else LevelManager.a.skyRotate.rotateSpeed = LevelManager.a.skyRotate.defaultSpeed;
 		} else if (entry == "Mr. Bean") {
-			Const.sprint("Nice try, there are no go carts to slow down here");
+			CenterStatusPrint("Nice try, there are no go carts to slow down here");
 		} else if (entry == "Simon Foster") {
-			Const.sprint("Nice try, nothing to paint here");
+			CenterStatusPrint("Nice try, nothing to paint here");
 		} else if (entry == "Motherlode" || entry == "Rosebud" || entry == "Kaching" || entry == "money") {
-			Const.sprint("Nice try, there's no money here.");
+			CenterStatusPrint("Nice try, there's no money here.");
 		} else if (entry == "Richard Branson") {
-			Const.sprint("Nice try, there's no money here.  You do realize this isn't Rollercoaster Tycoon right?");
+			CenterStatusPrint("Nice try, there's no money here.  You do realize this isn't Rollercoaster Tycoon right?");
 		} else if (entry == "John Wardley") {
-			Const.sprint("WOW!");
+			CenterStatusPrint("WOW!");
 		} else if (entry == "John Mace") {
-			Const.sprint("Nice try, there's nothing to pay double for here");
+			CenterStatusPrint("Nice try, there's nothing to pay double for here");
 		} else if (entry == "Melanie Warn") {
-				Const.sprint("I feel happy!!!");
+				CenterStatusPrint("I feel happy!!!");
 		} else if (entry == "Damon Hill") {
-				Const.sprint("Nice try, there are no go carts to speed up here");
+				CenterStatusPrint("Nice try, there are no go carts to speed up here");
 		} else if (entry == "Michael Schumacher") {
-				Const.sprint("Nice try, there are no go carts to give ludicrous speed here");
+				CenterStatusPrint("Nice try, there are no go carts to give ludicrous speed here");
 		} else if (entry == "Tony Day") {
-				Const.sprint("Ok, now I want a hamburger");
+				CenterStatusPrint("Ok, now I want a hamburger");
 		} else if (entry == "Katie Brayshaw") {
-				Const.sprint("Hi there! Hello! Hey! Howdy!");
+				CenterStatusPrint("Hi there! Hello! Hey! Howdy!");
 		} else if (ts.Contains("sudo") || ts.Contains("admin")) {
-				Const.sprint("Super user access granted...ERROR: access restricted by SHODAN");
+				CenterStatusPrint("Super user access granted...ERROR: access restricted by SHODAN");
 		} else if (ts.Contains("git")) {
-				if (ts.Contains("pull") || ts.Contains("fetch")) Const.sprint("remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.");
-				else if (ts.Contains("status")) Const.sprint("Your branch is up to date with origin/triop. Working directory clean.");
-				else if (ts.Contains("log")) Const.sprint("<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...");
-				else if (ts.Contains("reflog")) Const.sprint("dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`");
-				else if (ts.Contains("merge")) Const.sprint("Failed, could not connect with origin/triop");
-				else if (ts.Contains("push")) Const.sprint("Could not find Username for 'triopttp://192.168.1.451'");
-				else if (ts.Contains("clone")) Const.sprint("Failed, connection blocked by SHODAN. Employee ID invalid.");
-				else if (ts.Contains("branch") || ts.Contains("-b")) Const.sprint("Created new branch " + ts.Split(' ').Last());
-				else if (ts.Contains("checkout")) Const.sprint("Branch name not recognized.  Contact your TriopBucket representative.");
-				else Const.sprint("Branch name not recognized.  Contact your TriopBucket representative.");
+				if (ts.Contains("pull") || ts.Contains("fetch")) CenterStatusPrint("remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.");
+				else if (ts.Contains("status")) CenterStatusPrint("Your branch is up to date with origin/triop. Working directory clean.");
+				else if (ts.Contains("log")) CenterStatusPrint("<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...");
+				else if (ts.Contains("reflog")) CenterStatusPrint("dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`");
+				else if (ts.Contains("merge")) CenterStatusPrint("Failed, could not connect with origin/triop");
+				else if (ts.Contains("push")) CenterStatusPrint("Could not find Username for 'triopttp://192.168.1.451'");
+				else if (ts.Contains("clone")) CenterStatusPrint("Failed, connection blocked by SHODAN. Employee ID invalid.");
+				else if (ts.Contains("branch") || ts.Contains("-b")) CenterStatusPrint("Created new branch " + ts.Split(' ').Last());
+				else if (ts.Contains("checkout")) CenterStatusPrint("Branch name not recognized.  Contact your TriopBucket representative.");
+				else CenterStatusPrint("Branch name not recognized.  Contact your TriopBucket representative.");
 		} else if (ts.Contains("restart")) {
-				Const.sprint("Yeah...better not");
+				CenterStatusPrint("Yeah...better not");
 		} else if (ts.Contains("quit") || ts.Contains("exit")) {
-				Const.sprint("Use the Pause Menu by hitting Escape and using the QUIT option via mouse or arrow keys + ENTER");
+				CenterStatusPrint("Use the Pause Menu by hitting Escape and using the QUIT option via mouse or arrow keys + ENTER");
 		} else if (ts.Contains("cd") || ts.Contains("./")) {
-				Const.sprint("Attempting to access directory... already at root");
+				CenterStatusPrint("Attempting to access directory... already at root");
 		} else if (ts.Contains("kill") || ts.Contains("kick") || ts.Contains("ban") || ts.Contains("destroy") || ts.Contains("attack") || ts.Contains("suicide") || ts.Contains("die")) {
-				Const.sprint(Const.a.stringTable[1011]); // "Player decides to become a cyborg."
+				CenterStatusPrint("%s", Sys_Text.stringTable[1011]); // "Player decides to become a cyborg."
 				DamageData dd = new DamageData();
 				dd.damage = PlayerMovement.a.hm.health + 1.0f;
 				dd.other = PlayerMovement.a.gameObject; // Player capsule
 				PlayerMovement.a.hm.TakeDamage(dd);
 		} else if (ts.Contains("justinbailey")) {
-				Const.sprint("Well, you don't have a suit already so...");
+				CenterStatusPrint("Well, you don't have a suit already so...");
 		} else if (ts.Contains("woodstock")) {
-				Const.sprint("How much wood could a woodchuck chuck...there's no wood in SPACE!");
+				CenterStatusPrint("How much wood could a woodchuck chuck...there's no wood in SPACE!");
 		} else if (ts.Contains("quarry")) {
-				Const.sprint("There's obsidian on levels 6 and 8 if you want to feel decadant, otherwise we are lacking in the stone department.");
+				CenterStatusPrint("There's obsidian on levels 6 and 8 if you want to feel decadant, otherwise we are lacking in the stone department.");
 		} else if (ts.Contains("help")) {
-				Const.sprint("There's no one to save you now Hacker!");
+				CenterStatusPrint("There's no one to save you now Hacker!");
 		} else if (ts.Contains("zelda")) {
-				Const.sprint("Too late, already been to level 1");
+				CenterStatusPrint("Too late, already been to level 1");
 		} else if (ts.Contains("allyourbasearebelongtous") || (ts.Contains("all") && ts.Contains("your") && ts.Contains("base"))) {
-				Const.sprint("ERROR: SHODAN has overriden your command, remove SHODAN first."); // This is not an easter egg if you run this after removing SHODAN!!
+				CenterStatusPrint("ERROR: SHODAN has overriden your command, remove SHODAN first."); // This is not an easter egg if you run this after removing SHODAN!!
 		} else if (ts.Contains("i") && ts.Contains("am") && ((ts.Contains("iron") && ts.Contains("man")) || ts.Contains("amazing") || ts.Contains("cool") || ts.Contains("best"))) {
-				Const.sprint("That's nice dear.");
+				CenterStatusPrint("That's nice dear.");
 		} else if ((ts.Contains("impulse") && tn.Contains("9")) || ts.Contains("idkfa")) {
-				Const.sprint("I can only hold 7 weapons!! Nice try dearies!");
+				CenterStatusPrint("I can only hold 7 weapons!! Nice try dearies!");
 		} else if (ts.Contains("summon_obj")) {
 			int val = Utils.GetIntFromStringAudLogText(ts.Split(' ').Last()); // That's a slow line to compute!
 			if (val < 438 && val >= 0) {
@@ -395,7 +395,7 @@ public static class ConsoleEmulator {
 			}
         } else if (ts.Contains("undo")) {
 			if (lastSpawnedGO != null && Const.a.editMode) Utils.SafeDestroy(lastSpawnedGO);
-			if (!Const.a.editMode) Const.sprint("Cannot undo when not in Edit Mode");
+			if (!Const.a.editMode) CenterStatusPrint("Cannot undo when not in Edit Mode");
         } else if (ts.Contains("settargetfps") || ts.Contains("setfps")) {
 			int val = Utils.GetIntFromStringAudLogText(ts.Split(' ').Last()); // That's a slow line to compute!
 			if (val <= 200 && val > 10) {
@@ -403,19 +403,19 @@ public static class ConsoleEmulator {
 				Config.SetVSync();
 			}
 			
-			Const.sprint("FPS] -> " + val.ToString());
+			CenterStatusPrint("FPS] -> " + val.ToString());
         } else if (ts.Contains("shake")) {
 			Const.a.Shake(true,-1,-1);
         } else if (ts.Contains("tired") || ts.Contains("staminup")) {
             if (PlayerMovement.a.FatigueCheat) {
-                Const.sprint(Const.a.stringTable[1012]); // "Fatigue returned to normal"
+                CenterStatusPrint("%s", Sys_Text.stringTable[1012]); // "Fatigue returned to normal"
                 PlayerMovement.a.FatigueCheat = false;
             } else {
-                Const.sprint("Stamin-Up! " + Const.a.stringTable[1013]); // "Fatigue no longer affects you!"
+                CenterStatusPrint("Stamin-Up! " + Sys_Text.stringTable[1013]); // "Fatigue no longer affects you!"
                 PlayerMovement.a.FatigueCheat = true;
             }
         } else {
-            Const.sprint(Const.a.stringTable[1014] + entry); // "Uknown command or function: "
+            CenterStatusPrint("%s", Sys_Text.stringTable[1014] + entry); // "Uknown command or function: "
         }
 
         PlayerMovement.a.consoleinpFd.text = ""; // Reset console and hide it, command was entered.
@@ -424,7 +424,7 @@ public static class ConsoleEmulator {
 
     public static void CheatLoadLevel(int lev) {
 		if (Sys_Global.menuActive) {
-			Const.sprint(Const.a.stringTable[1015]); // "Cannot load levels via cheat while on the menu!"
+			CenterStatusPrint("%s", Sys_Text.stringTable[1015]); // "Cannot load levels via cheat while on the menu!"
 			return;
 		}
 
@@ -1399,14 +1399,14 @@ Generic Materials (Const.a.genericMaterials[])
 
 		if (lev < 0 || lev > 13) lev = 1; // Fallback to Medical.
 		Vector3 spawnPos = Vector3.zero;
-		if (cheat) spawnPos = PlayerMovement.a.transform.position;
+		if (cheat) spawnPos = PlayerMovement.a.instances[i].position;
 		GameObject go = null;
 		if (ConstIndexIsGeometry(val)) {
 			if (Const.a.editMode || !cheat) {
 				go = MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos,
 									Const.a.quaternionIdentity) as GameObject;
 			} else {
-				Const.sprint("Indices 0 through 306 (level geometry chunks) "
+				CenterStatusPrint("Indices 0 through 306 (level geometry chunks) "
 							 + "not possible when not on edit mode!");
 			}
 		} else {
@@ -1434,9 +1434,9 @@ Generic Materials (Const.a.genericMaterials[])
 			
 			if (cheat && ConstIndexIsHardware(val)) { // Hardware
 				UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
-				int dex14 = Inventory.a.hardware14fromConstdex(uo.useableItemIndex);
-				if (Inventory.a.hasHardware[dex14]) {
-					uo.customIndex = (Inventory.a.hardwareVersion[dex14] + 1);
+				int dex14 = inventoryPlayer1.hardware14fromConstdex(uo.useableItemIndex);
+				if (inventoryPlayer1.hasHardware[dex14]) {
+					uo.customIndex = (inventoryPlayer1.hardwareVersion[dex14] + 1);
 				}
 			}
 		} else {

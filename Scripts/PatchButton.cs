@@ -23,11 +23,11 @@ public class PatchButton: MonoBehaviour {
 
 	public void PatchSelect(bool useSound) {
 		MFDManager.a.SendInfoToItemTab(useableItemIndex);
-		Inventory.a.patchCurrent = PatchButtonIndex; // Set current.
+		inventoryPlayer1.patchCurrent = PatchButtonIndex; // Set current.
 		for (int i = 0; i < 7; i++) {
-			Inventory.a.patchCountTextObjects [i].color = Const.a.ssGreenText;
+			inventoryPlayer1.patchCountTextObjects [i].color = Const.a.ssGreenText;
 		}
-		Inventory.a.patchCountTextObjects[PatchButtonIndex].color = Const.a.ssYellowText;
+		inventoryPlayer1.patchCountTextObjects[PatchButtonIndex].color = Const.a.ssYellowText;
 		if (useSound) Utils.PlayUIOneShotSavable(80); //changeweapon
 	}
 

@@ -16,13 +16,9 @@ public class PlaySoundTriggered : MonoBehaviour {
 	private bool justPaused;
 	private ParticleSystem psys;
 
-
     void Start() {
-		if (SFX == null) SFX = GetComponent<AudioSource>();
-		SFX.playOnAwake = false;
-		SFX.loop = false;
 		if (SFXClip > 0) SFX.clip = Const.a.sounds[SFXClip];
-		else DualLog("Unassigned clip index on PlaySoundTriggered at " + transform.position.ToString() + " for " + gameObject.name);
+		else DualLog("Unassigned clip index on PlaySoundTriggered at " + instances[i].position.ToString() + " for " + gameObject.name);
 		if (playEverywhere) {
 			SFX.spatialBlend = 0.0f;
 		} else {

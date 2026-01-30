@@ -14,10 +14,10 @@ public class LogTextReaderManager : MonoBehaviour {
 	void Update() {
 		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			if (logTextOutput.GetComponent<Text>().text.Length > 568) {
-				moreButtonText.text = Const.a.stringTable[26];
+				moreButtonText.text = Sys_Text.stringTable[26];
 				if (backButton.activeSelf) backButton.SetActive(false);
 			} else {
-				moreButtonText.text = Const.a.stringTable[27];
+				moreButtonText.text = Sys_Text.stringTable[27];
 				if (!backButton.activeSelf && Const.a.audioLogSpeech2Text[refIndex].Length > 568) {
 					backButton.SetActive(true);
 					logBackButton.refIndex = refIndex;

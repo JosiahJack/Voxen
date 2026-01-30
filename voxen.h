@@ -6,8 +6,6 @@
 #include "External/stb_truetype.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "./External/glad/gl.h"
-#include "./External/glfw3.h"
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 
 typedef uint64_t size_t;
@@ -18,6 +16,7 @@ typedef struct { float x,y,z,w; } Quaternion;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
 typedef uint8_t DoorState;
+typedef uint16_t Text;
 
 typedef struct {
     GLFWwindow* window;
@@ -25,6 +24,7 @@ typedef struct {
 	double last_time;
 	double last_topframe_time;
 	double last_physics_time;
+    double deltaTime;
 	double current_time;
 	double timeSinceLastPhysicsTick;
 	double screenshotTimeout;
@@ -119,6 +119,8 @@ typedef struct {
 typedef struct {
 	uint32_t globalFrameNum;
 	double cpuTime;
+    double thisFrameTime;
+    double cpuFrameTime;
 	double lastFrameSecCountTime;
 	uint32_t lastFrameSecCount;
 	uint32_t framesPerLastSecond;
@@ -208,6 +210,138 @@ typedef struct {
     uint16_t hitInstanceIndex;
     bool hit;
 } RaycastHit;
+
+#define PATCH_BERSERK   1
+#define PATCH_DETOX     2
+#define PATCH_GENIUS    4
+#define PATCH_MEDI      8
+#define PATCH_REFLEX   16
+#define PATCH_SIGHT    32
+#define PATCH_STAMINUP 64
+#define BERSERK_TIME  20.0f
+#define DETOX_TIME    60.0f
+#define GENIUS_TIME  180.0f
+#define MEDI_TIME     35.0f
+#define REFLEX_TIME  155.0f
+#define SIGHT_TIME    40.0f
+#define STAMINUP_TIME 60.0f
+#define SIGHT_SIDE_EFFECT_TIME 17.0f
+#define REFLEX_TIME_SCALE 0.25f
+#define DEFAULT_TIME_SCALE 1.0f
+#define BERSERK_DAMAGE_MULTIPLIER 4.0f // Quad Damage!
+#define NITRO_MIN_TIME     1.0f
+#define NITRO_MAX_TIME    60.0f
+#define NITRO_DEFAULT_TIME 7.0f
+#define EARTH_SHAKER_MIN_TIME      4.0f
+#define EARTH_SHAKER_MAX_TIME     60.0f
+#define EARTH_SHAKER_DEFAULT_TIME 10.0f
+#define GLOBAL_SHAKE_DISTANCE 0.3f
+#define GLOBAL_SHAKE_FORCE    1.0f
+#define HW_COUNT 14
+#define HW_SYS  0 // System Analyzer
+#define HW_NAV  1 // Navigation Unit
+#define HW_ERD  2 // Datareader/EReader
+#define HW_SNS  3 // Sensaround
+#define HW_TID  4 // Target Identifier
+#define HW_SHD  5 // Energy Shield
+#define HW_BIO  6 // Biomonitor
+#define HW_LAN  7 // Head Mounted Lantern
+#define HW_ENV  8 // Envirosuit
+#define HW_BST  9 // Turbo Motion Booster
+#define HW_JET 10 // Jump Jet Boots
+#define HW_INF 11 // Infrared Night Sight Enhancement
+#define HW_TRC 12 // Tractor Beam
+#define HW_SAL 13 // Fry Salter
+
+#define MINIGAME_PING        1
+#define MINIGAME_15          2
+#define MINIGAME_WING0       4
+#define MINIGAME_BOTBOUNCE   8
+#define MINIGAME_EEL_ZAPPER 16
+#define MINIGAME_ROAD       32
+#define MINIGAME_TRIOPTOE   64
+
+// Hw referenceIndex, ref14Index
+// Sys 21,0
+// Nav 22,1
+// Ere 23,2
+// Sen 24,3
+// Trg 25,4
+// Shi 26,5
+// Bio 27,6
+// Lan 28,7
+// Env 29,8
+// Boo 30,9
+// Jum 31,10
+// Nig 32,11
+typedef struct {
+    uint32_t accessCardOwned;
+    uint16_t hasHardware;
+    bool hasLog[134];
+    bool readLog[134];
+    uint16_t numLogsFromLevel[10];
+    uint8_t hasMinigame;
+    uint16_t hardwareIsActive;
+    uint8_t hardwareVersion[HW_COUNT];
+    uint8_t hardwareVersionSetting[HW_COUNT];
+    uint16_t hardwareInvReferenceIndex[HW_COUNT];
+} InventorySystem;
+extern InventorySystem inventoryPlayer1;
+extern InventorySystem inventoryPlayer2;
+
+#define BIOM_ERG 0
+#define BIOM_CHI 1
+#define BIOM_ECG 2
+#define BIOM_GRAPH_W 620
+#define BIOM_GRAPH_H  36
+typedef struct {
+	float heartRate;
+	Text patchEffects;
+	Text heartRateText;
+	Text header;
+	Text bpmText;
+	Text fatigueDetailText;
+	Text fatigue;
+	double beatFinished; // Visual only, Time.time controlled
+	float widthPerc;
+    float heightPerc;
+    float max[3]; // Value at the top of the graph
+    float min[3]; // Value at the bottom of the graph
+    Color currentColors[BIOM_GRAPH_H];
+    Color colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    Color colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    Color colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    int lastERG;
+    int lastCHI;
+    int lastECG;
+    Color backgroundColor;
+    Color ergColor;
+    Color chiColor;
+    Color ecgColor;
+    Color col;
+    int ymax;
+	float ecgValue;
+	float ergValue;
+	float chiValue;
+	float beatShift;
+    double tick0Finished;
+    double tick1Finished;
+    double tick2Finished;
+    double tickFinished; // Overall marching.
+    double tick0;
+    double tick1;
+    double tick2;
+    double tick;
+    int currentIndex0;
+    int currentIndex1;
+    int currentIndex2;
+    Color col0;
+    Color col1;
+    Color col2;
+} BioMonitorSystem;
+extern BioMonitorSystem bioMonitor;
+void BioMonitorClearGraphs(void);
+void BioMonitorUpdate(void);
 
 // BodyState
 typedef uint8_t BodyState;
@@ -654,8 +788,10 @@ typedef struct {
 	int projectile3Prefab;
 } NPCTable;
 extern NPCTable npcTable[NUM_AI_TYPES];
-#define ENTITY_IDX selfIdx
+
+extern uint16_t selfIdx;
 #define NPCID (instances[selfIdx].index - 419)
+#define SELF instances[selfIdx]
 
 typedef struct {
 	uint16_t owner; // pass main GameObject that contains the script PlayerReferenceManager
@@ -768,6 +904,7 @@ typedef struct {
 #define ENTFLAG_SHOT_FIRED           (1ull << 35)
 #define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 36)
 #define ENTFLAG_HOP_DONE             (1ull << 37)
+#define ENTFLAG_LOCKED               (1ull << 38)
 
 #define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1u <<  0)
 #define QUESTBIT_ISOTOPE_INSTALLED            (1u <<  1)
@@ -811,11 +948,27 @@ typedef /*FAT*/ struct {
 	int lev4SecCode;
 	int lev5SecCode;
 	int lev6SecCode;
-    void (*think)(void);
-    void (*use)(void);
     UseData ud;
     float health;
     float cyberHealth;
+    uint16_t lockedMessageLingdex;
+    double delayFinished;
+    double tickFinished;
+    double tickTime;
+    
+    // Player
+    uint16_t patchActive;
+    uint16_t drainJPM;
+    double berserkFinishedTime;
+	double berserkIncrementFinishedTime;
+	double detoxFinishedTime;
+	double geniusFinishedTime;
+	double mediFinishedTime;
+	double reflexFinishedTime;
+	double sightFinishedTime;
+	double sightSideEffectFinishedTime;
+	double staminupFinishedTime;
+	int berserkIncrement;
 
 	// Rendering
 	uint16_t modelIndex;
@@ -838,6 +991,9 @@ typedef /*FAT*/ struct {
     double currentFrameFinished;
     double currentFrameStartTime;
     double animSwapFinished;
+    bool alternateOn;
+    uint16_t mainSwitchMaterial;
+	uint16_t alternateSwitchMaterial;
 
 	// Physics
 	Vector3 position;
@@ -859,6 +1015,7 @@ typedef /*FAT*/ struct {
     float linearDrag;
     float angularDrag;
     float inertia;
+    float fatigue;
     Vector3 accumulatedForce;
     Vector3 accumulatedTorque;
     float dynamicFriction;
@@ -944,9 +1101,10 @@ typedef struct {
 #define PI 3.14159265f
 #define TAU 6.2831853f
 static inline float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
-static inline float vceil(float x) { int i = (int)x; return (float)(i < x ? i + 1 : i); }
+static inline float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
 static inline float vclamp(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
 static inline float vsqrtf(float x) { union { float f; unsigned int i; } u = { x }; u.i = 0x1fbd1df5 + (u.i >> 1); return 0.5f * (u.f + x / u.f); }
+static inline float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
 static inline float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 static inline float vcosf(float x) { return vsinf(x + 1.57079632f); }
 static inline float vacosf(float x) {
@@ -1020,7 +1178,7 @@ extern SettingsSystem Sys_Settings;
 extern VoxenShadowSystem voxen_Shadow_System;
 extern DiagnosticsSystem Sys_Dx;
 extern CheatsSystem Sys_Cheats;
-extern Voxen_Text voxen_Text;
+extern Voxen_Text Sys_Text;
 
 extern const char* sounds[670];
 extern const char* audioLogs[134];
@@ -1394,6 +1552,8 @@ void AddInstance(uint16_t entIdx, uint16_t instanceIdx);
 uint32_t xs32(uint32_t *s);
 uint8_t random_range_u8(uint8_t a, uint8_t b);
 uint8_t random_range(float a, float b);
+float lerp(float min, float max, float val);
+float inverse_lerp(float min, float max, float val);
 char* data_parser_trim(char* s);
 int32_t StringToInt(const char *str);
 size_t GetStringLength(const char *s);
@@ -1421,6 +1581,7 @@ bool ConstIndexIsStaticObjectSaveable(int constdex);
 bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
+bool ConstIndexIsButtonSwitch(int constdex);
 bool CursorVisible(void);
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum);
 const char* GetPrefabNameFromIndex(int constIndex);
@@ -1429,18 +1590,7 @@ static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* 
     *pos_z = worldMin_z + (z * WORLDCELL_WIDTH_F);
 }
 
-static inline int32_t clamp(int32_t val, int32_t min, int32_t max) {
-    if (val > max) return max;
-    if (val < min) return min;
-    return val;
-}
-
-static inline float clampf(float val, float min, float max) {
-    if (val > max) return max;
-    if (val < min) return min;
-    return val;
-}
-
+static inline int32_t clamp(int32_t val, int32_t min, int32_t max) { return (val > max) ? max : ((val < min) ? min : val); }
 static inline int32_t PosGetCellCoordX(float pos_x) { return (uint16_t)clamp((int32_t)vfloor((pos_x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline int32_t PosGetCellCoordZ(float pos_z) { return (uint16_t)clamp((int32_t)vfloor((pos_z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED); }
 static inline int32_t PosGetCellCoords(float pos_x, float pos_z) { return (PosGetCellCoordZ(pos_z) * WORLDX) + PosGetCellCoordX(pos_x); } // Clamped just above.
