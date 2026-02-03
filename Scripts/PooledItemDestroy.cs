@@ -17,7 +17,7 @@ public class PooledItemDestroy : MonoBehaviour {
 		if (timerFinished < Sys_Global.pauseRelativeTime) {
 			timerFinished = 9999999f;
 			if (onlyOnce) doneYet = true;
-			gameObject.SetActive(false);
+			flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 }

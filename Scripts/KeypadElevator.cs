@@ -31,12 +31,12 @@ public class KeypadElevator : MonoBehaviour {
 	}
 
 	public void Use (UseData ud) {
-		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(instances[i].position);
+		if (GetCurrentLevelSecurity() > securityThreshhold) {
+			Sys_UI.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
-		if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
+		if (LevelManager.a.superoverride || Sys_Global.difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -45,13 +45,13 @@ public class KeypadElevator : MonoBehaviour {
 			// Target something because we are locked like an info_message to say
 			// hey we are locked, e.g. vox: "Non emergency life pods disabled."
 			CenterStatusPrint(lockedMessageIndex);
-			Const.a.UseTargets(gameObject,ud,lockedTarget);
+			UseTargets(gameObject,ud,lockedTarget);
 			return;
 		}
 
 		padInUse = true;
 		Utils.PlayUIOneShotSavable(91);
-		MFDManager.a.SendElevatorKeypadToDataTab(this,buttonsEnabled,
+		Sys_UI.SendElevatorKeypadToDataTab(this,buttonsEnabled,
 												 buttonsDarkened,buttonText,
 												 targetDestination,
 												 instances[i].position,linkedDoor,

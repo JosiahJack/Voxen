@@ -49,12 +49,12 @@ public class KeycodeButton : MonoBehaviour {
 	public void PtrExit () {
 		if (!pointerEntered) return;
 
-		GUIState.a.ClearOverButton();
+		
 		pointerEntered = false;
 	}
 
 	public void KeycodeButtonClick () {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		KeycodeButtonUse();
 	}
 

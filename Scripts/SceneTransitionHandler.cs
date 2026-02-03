@@ -23,9 +23,9 @@ public class SceneTransitionHandler : MonoBehaviour {
             DualLog("Reinit FULL const tables");
             Const.a.Awake();
             Sys_Global.difficultyCombat = diffCombatCarryover;
-            SSys_Global.difficultyMission = diffMissionCarryover;
-            SSys_Global.difficultyPuzzle = diffPuzzleCarryover;
-            SSys_Global.difficultyCyber = diffCyberCarryover;
+            Sys_Global.difficultyMission = diffMissionCarryover;
+            Sys_Global.difficultyPuzzle = diffPuzzleCarryover;
+            Sys_Global.difficultyCyber = diffCyberCarryover;
             DualLog("Sys_Global.difficultyCombat " + Sys_Global.difficultyCombat.ToString());
             // Must delay by 1 frame.
             Scene loadScene = SceneManager.GetSceneByName("LoadScene");

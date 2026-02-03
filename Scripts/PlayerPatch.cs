@@ -32,103 +32,6 @@
 		a.BerserkDisable();
 	}
 
-	public void ActivatePatch(int index) { // Expects the usableItems index
-		bool depleted = false;
-		switch (index) {
-		case 14:
-			// Berserk Patch
-			inventoryPlayer1.patchCounts[2]--;
-			if (inventoryPlayer1.patchCounts[2] <= 0) { depleted = true; }
-			if (!(instances[PLAYER1].patchActive & PATCH_BERSERK)) instances[PLAYER1].patchActive |= PATCH_BERSERK;
-			berserkFinishedTime = Sys_Global.pauseRelativeTime + Const.berserkTime;
-			float berserkIncrementTime = Const.berserkTime/5f;
-			if (berserkIncrementFinishedTime > Sys_Global.pauseRelativeTime) berserkIncrementFinishedTime += berserkIncrementTime; // berserk effect stacks
-			else                                                           berserkIncrementFinishedTime = Sys_Global.pauseRelativeTime + berserkIncrementTime;
-			break;
-		case 15:
-			// Detox Patch
-			inventoryPlayer1.patchCounts[6]--;
-			if (inventoryPlayer1.patchCounts[6] <= 0) { depleted = true; }
-			DisableAllPatches(); // remove all other effects, even medipatch
-			instances[PLAYER1].patchActive = PATCH_DETOX; // overwrite all other active patches
-			detoxFinishedTime = Sys_Global.pauseRelativeTime + Const.detoxTime; // detox doesn't stack, it cancels itself lol
-			break;
-		case 16:
-			// Genius Patch
-			inventoryPlayer1.patchCounts[5]--;
-			if (inventoryPlayer1.patchCounts[5] <= 0) { depleted = true; }
-			if (!(instances[PLAYER1].patchActive & PATCH_GENIUS)) instances[PLAYER1].patchActive |= PATCH_GENIUS;
-			if (geniusFinishedTime > Sys_Global.pauseRelativeTime) {
-				geniusFinishedTime += Const.geniusTime; // genius effect stacks
-			} else {
-				geniusFinishedTime = Sys_Global.pauseRelativeTime + Const.geniusTime;
-			}
-			break;
-		case 17:
-			// Medi Patch
-			if (hm.health >=255) {
-				CenterStatusPrint("%s", Sys_Text.stringTable[304],MouseLookScript.a.player);
-				return;
-			}
-			inventoryPlayer1.patchCounts[3]--;
-			if (inventoryPlayer1.patchCounts[3] <= 0) { depleted = true; }
-			if (!(instances[PLAYER1].patchActive & PATCH_MEDI)) instances[PLAYER1].patchActive |= PATCH_MEDI;
-			PlayerHealth.a.mediPatchPulseCount = 0;
-			if (mediFinishedTime > Sys_Global.pauseRelativeTime) {
-				mediFinishedTime += Const.mediTime; // medipatch effect stacks
-			} else {
-				mediFinishedTime = Sys_Global.pauseRelativeTime + Const.mediTime;
-			}
-			break;
-		case 18:
-			// Reflex Patch
-			inventoryPlayer1.patchCounts[4]--;
-			if (inventoryPlayer1.patchCounts[4] <= 0) { depleted = true; }
-			Time.timeScale = Const.reflexTimeScale;
-			if (!(instances[PLAYER1].patchActive & PATCH_REFLEX)) instances[PLAYER1].patchActive |= PATCH_REFLEX;
-			if (reflexFinishedTime > Time.realtimeSinceStartup ) {
-				reflexFinishedTime += Const.reflexTime; // reflex effect stacks
-			} else {
-				reflexFinishedTime = Time.realtimeSinceStartup + Const.reflexTime;
-			}
-			break;
-		case 19:
-			// Sight Patch
-			inventoryPlayer1.patchCounts[1]--;
-			if (inventoryPlayer1.patchCounts[1] <= 0) { depleted = true; }
-			sightLight.enabled = true; // enable vision enhancement
-			sightSideEffectFinishedTime = -1f;  // reset side effect timer from previous patch
-			sightDimming.enabled = false; // deactivate side effect from previous patch
-			if (!(instances[PLAYER1].patchActive & PATCH_SIGHT)) instances[PLAYER1].patchActive |= PATCH_SIGHT;
-			if (sightFinishedTime > Sys_Global.pauseRelativeTime) sightFinishedTime += Const.sightTime; // sight effect stacks
-			else                                                  sightFinishedTime = Sys_Global.pauseRelativeTime + Const.sightTime;
-			break;
-		case 20:
-			// Staminup Patch
-			inventoryPlayer1.patchCounts[0]--;
-			if (inventoryPlayer1.patchCounts[0] <= 0) depleted = true;
-			PlayerMovement.a.staminupActive = true;
-			if (!(instances[PLAYER1].patchActive & PATCH_STAMINUP)) instances[PLAYER1].patchActive |= PATCH_STAMINUP;
-			if (staminupFinishedTime > Sys_Global.pauseRelativeTime) {
-				staminupFinishedTime += Const.staminupTime; // staminup effect stacks
-			} else {
-				staminupFinishedTime = Sys_Global.pauseRelativeTime + Const.staminupTime;
-			}
-
-			break;
-		}
-
-		if (depleted) {
-			inventoryPlayer1.PatchCycleDown(false);
-			CenterStatusPrint((Sys_Text.stringTable[590] + Sys_Text.stringTable[index + 326] + Sys_Text.stringTable[589]),MouseLookScript.a.player);
-		} else {
-			CenterStatusPrint((Sys_Text.stringTable[index + 326] + Sys_Text.stringTable[589]),MouseLookScript.a.player);
-		}
-
-		Utils.PlayUIOneShotSavable(89);
-		GUIState.a.ClearOverButton();
-	}
-
 	void Update() {
 		if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
 			// ================================== DETOX PATCH =========================
@@ -233,13 +136,13 @@
 			if (instances[PLAYER1].patchActive & PATCH_STAMINUP) {
 				// ---Disable Patch---
 				if (staminupFinishedTime < Sys_Global.pauseRelativeTime) {
-					PlayerMovement.a.staminupActive = false;
+					instances[PLAYER1].staminupActive = false;
 					instances[PLAYER1].fatigue = 100f;  // side effect
 					instances[PLAYER1].patchActive -= PATCH_STAMINUP;
 				} else {
 					// ***Patch Effect***
 					instances[PLAYER1].fatigue = 0f;
-					PlayerMovement.a.staminupActive = true;
+					instances[PLAYER1].staminupActive = true;
 				}
 			}
 		}
@@ -280,7 +183,7 @@
 		sightDimming.enabled = false;
 		sightLight.enabled = false;
 		staminupFinishedTime =  -1f;
-		PlayerMovement.a.staminupActive = false;
+		instances[PLAYER1].staminupActive = false;
 		instances[PLAYER1].patchActive = 0;
 	}
 }

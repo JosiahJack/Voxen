@@ -38,14 +38,14 @@ public class CyberSwitch : MonoBehaviour {
 		if (active) return;
 
 		if (other.gameObject.CompareTag("Player")) {
-			MFDManager.a.CyberSprint(Sys_Text.stringTable[textIndex]);
+			Sys_UI.CyberSprint(Sys_Text.stringTable[textIndex]);
 			active = true;
 			deactiveCenter.SetActive(false);
 			activeCenter.SetActive(true);
 
 			UseData ud = new UseData();
 			ud.owner = other.gameObject;
-			Const.a.UseTargets(gameObject,ud,target);
+			UseTargets(gameObject,ud,target);
 		}
 	}
 }

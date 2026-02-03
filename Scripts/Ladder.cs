@@ -4,15 +4,15 @@ using System.Collections;
 public class Ladder : MonoBehaviour {	
 	void  OnTriggerEnter (Collider other){
 		if (other.CompareTag("Player")) {
-			PlayerMovement.a.ladderState++;
-			if (PlayerMovement.a.ladderState < 1) PlayerMovement.a.ladderState = 1;
+			instances[PLAYER1].ladderState++;
+			if (instances[PLAYER1].ladderState < 1) instances[PLAYER1].ladderState = 1;
 		}
 	}
 	
 	void  OnTriggerExit (Collider other){
 		if (other.CompareTag("Player")) {
-			PlayerMovement.a.ladderState--;
-			if (PlayerMovement.a.ladderState < 0) PlayerMovement.a.ladderState = 0;
+			instances[PLAYER1].ladderState--;
+			if (instances[PLAYER1].ladderState < 0) instances[PLAYER1].ladderState = 0;
 		}
 	}
 }

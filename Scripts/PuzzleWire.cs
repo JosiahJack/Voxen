@@ -100,7 +100,7 @@ public class PuzzleWire : MonoBehaviour {
 		ChangeAppearance();
 		DisableAllSelectedIndicators();
 		DisableGeniusHints();
-		gameObject.SetActive(false);
+		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 	}
 
 	Color GetColor(HUDColor index) {
@@ -150,7 +150,7 @@ public class PuzzleWire : MonoBehaviour {
 						numberOfWires++;
 				}
 
-				if (SSys_Global.difficultyPuzzle == 3) {
+				if (Sys_Global.difficultyPuzzle == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = rememberColors[0];
 					wireColors[1] = rememberColors[1];
@@ -191,7 +191,7 @@ public class PuzzleWire : MonoBehaviour {
 				}
 			} else {
 				DisableGeniusHints();
-				if (SSys_Global.difficultyPuzzle == 3) {
+				if (Sys_Global.difficultyPuzzle == 3) {
 					// Set all wire colors to the same on hard
 					wireColors[0] = HUDColor.Yellow;
 					wireColors[1] = HUDColor.Yellow;
@@ -317,7 +317,7 @@ public class PuzzleWire : MonoBehaviour {
 		theme = sentTheme;
 		wireColors = sentHUDColors;
 		rememberColors = sentHUDColors;
-		if (SSys_Global.difficultyPuzzle == 3) {
+		if (Sys_Global.difficultyPuzzle == 3) {
 			// Set all wire colors to the same on hard
 			wireColors[0] = HUDColor.Yellow;
 			wireColors[1] = HUDColor.Yellow;
@@ -335,18 +335,18 @@ public class PuzzleWire : MonoBehaviour {
 		EvaluatePuzzle();
 		ChangeAppearance();
 
-		if (udSent.mainIndex == 54 || SSys_Global.difficultyPuzzle == 0) PuzzleSolved(true);
+		if (udSent.mainIndex == 54 || Sys_Global.difficultyPuzzle == 0) PuzzleSolved(true);
 	}
 
 	private Vector3 GetPositionOfLHNode(int index) {
-		tempVec = Const.a.vectorZero;
+		tempVec = (Vector3){0.0f,0.0f,0.0f};
 		tempVec.x = 0;
 		tempVec.y = nodeYOffset * -1 * index;
 		return tempVec;
 	}
 
 	private Vector3 GetPositionOfRHNode(int index) {
-		tempVec = Const.a.vectorZero;
+		tempVec = (Vector3){0.0f,0.0f,0.0f};
 		tempVec.x = nodeXOffset;
 		tempVec.y = nodeYOffset * -1 * index;
 		return tempVec;
@@ -391,7 +391,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	public void ClickLHNode(int spot) {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (Solved) return;
 
 		if (selectedWireLH) {
@@ -407,7 +407,7 @@ public class PuzzleWire : MonoBehaviour {
 	}
 
 	public void ClickRHNode(int spot) {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (Solved) return;
 
 		if (!selectedWireLH) {
@@ -637,7 +637,7 @@ public class PuzzleWire : MonoBehaviour {
 		if (wire5RHPosition == wire5RHTarget && wireIsActive[4]) tempF += 0.19f;
 		if (wire6RHPosition == wire6RHTarget && wireIsActive[5]) tempF += 0.19f;
 		if (wire7RHPosition == wire7RHTarget && wireIsActive[6]) tempF += 0.19f;
-		if (SSys_Global.difficultyPuzzle == 1) tempF += 0.19f;
+		if (Sys_Global.difficultyPuzzle == 1) tempF += 0.19f;
 		actualValue = tempF;
 		if (tempF > 0.92f || AllWiresCorrect()) PuzzleSolved(false);
 	}

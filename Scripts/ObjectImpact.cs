@@ -28,7 +28,7 @@ public class ObjectImpact : MonoBehaviour {
 			if (SFXSource != null) {
 				SFXSource.pitch = (random_range(0.8f,1.2f));
 				float vol = (collision.relativeVelocity.magnitude/maxVolumeSpeed) * 0.3f;
-				Utils.PlayOneShotSavable(SFXSource,Const.a.sounds[impactSFXIndex],vol); // Play sound when object changes velocity significantly enough that it must have hit something
+				Utils.PlayOneShotSavable(SFXSource,sounds[impactSFXIndex],vol); // Play sound when object changes velocity significantly enough that it must have hit something
 			}
 		}
 	}

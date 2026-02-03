@@ -28,10 +28,10 @@ public class SystemAnalyzer : MonoBehaviour {
 	public Text delta;
 
 	public void Close() {
-		MFDManager.a.sysAnalyzerLH.SetActive(false);
-		MFDManager.a.sysAnalyzerRH.SetActive(false);
-		MFDManager.a.mouseClickHeldOverGUI = true;
-		GUIState.a.ClearOverButton();
+		Sys_UI.sysAnalyzerLH.SetActive(false);
+		Sys_UI.sysAnalyzerRH.SetActive(false);
+		Sys_UI.mouseClickHeldOverGUI = true;
+		
 	}
     // Start is called before the first frame update
     void Update() {

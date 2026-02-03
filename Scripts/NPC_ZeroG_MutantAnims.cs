@@ -15,7 +15,7 @@ public class NPC_ZeroG_MutantAnims : MonoBehaviour {
 		tickFinished = Sys_Global.pauseRelativeTime;
 		ResetFrames(); // turn off all frames just in case I left one on in the editor
 		if (endOnLastFrame && startFrame == (frames.Length-1)) {
-			if (frames[startFrame] == null) { DualLog("BUG: frames[startFrame] is null. startFrame is " + startFrame.ToString()); gameObject.SetActive(false); return;}
+			if (frames[startFrame] == null) { DualLog("BUG: frames[startFrame] is null. startFrame is " + startFrame.ToString()); flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); return;}
 			frames[startFrame].SetActive(true);
 		}
 		currentFrame = startFrame;

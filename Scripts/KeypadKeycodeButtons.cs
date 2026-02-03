@@ -28,7 +28,7 @@ public class KeypadKeycodeButtons : MonoBehaviour {
 	}
 	
 	public void Keypress (int button) {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		KeypressAction(button);
 	}
 

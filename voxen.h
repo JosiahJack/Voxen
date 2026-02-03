@@ -18,6 +18,8 @@ typedef uint8_t ColliderType;
 typedef uint8_t DoorState;
 typedef uint16_t Text;
 
+#define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
+#define CREDITS_PAGES 22
 typedef struct {
     GLFWwindow* window;
 	bool inventoryMode;
@@ -31,9 +33,14 @@ typedef struct {
 	double pauseRelativeTime;
 	double absoluteTime;
 	double statusTextDecayFinished;
+    double justSavedTimeStamp;
 	bool levelCurrentlyLoading;
+    double shakeFinished;
 	char global_modname[256];
 	bool global_modIsCitadel;
+    bool startingNewGame;
+    bool introNotPlayed;
+    uint8_t levelSecurity[14];
 	uint8_t startLevel;
 	uint8_t numLevels; // Can be set by gamedata.txt
 	uint8_t currentLevel;
@@ -56,7 +63,6 @@ typedef struct {
 	uint8_t creditsPageIndex;
 	bool creditsActive;
     bool decoyActive;
-	uint8_t creditsLength;
 	char playerName[32];
 } GlobalContext;
 
@@ -166,6 +172,7 @@ typedef struct {
 	uint8_t dizzyLevel;
 } CheatsSystem;
 
+#define SOUNDS_COUNT 670
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
 #define TEXT_STRING_COUNT 1100
 #define TEXT_LOCALIZATION_MAX_LENGTH 1207
@@ -210,138 +217,6 @@ typedef struct {
     uint16_t hitInstanceIndex;
     bool hit;
 } RaycastHit;
-
-#define PATCH_BERSERK   1
-#define PATCH_DETOX     2
-#define PATCH_GENIUS    4
-#define PATCH_MEDI      8
-#define PATCH_REFLEX   16
-#define PATCH_SIGHT    32
-#define PATCH_STAMINUP 64
-#define BERSERK_TIME  20.0f
-#define DETOX_TIME    60.0f
-#define GENIUS_TIME  180.0f
-#define MEDI_TIME     35.0f
-#define REFLEX_TIME  155.0f
-#define SIGHT_TIME    40.0f
-#define STAMINUP_TIME 60.0f
-#define SIGHT_SIDE_EFFECT_TIME 17.0f
-#define REFLEX_TIME_SCALE 0.25f
-#define DEFAULT_TIME_SCALE 1.0f
-#define BERSERK_DAMAGE_MULTIPLIER 4.0f // Quad Damage!
-#define NITRO_MIN_TIME     1.0f
-#define NITRO_MAX_TIME    60.0f
-#define NITRO_DEFAULT_TIME 7.0f
-#define EARTH_SHAKER_MIN_TIME      4.0f
-#define EARTH_SHAKER_MAX_TIME     60.0f
-#define EARTH_SHAKER_DEFAULT_TIME 10.0f
-#define GLOBAL_SHAKE_DISTANCE 0.3f
-#define GLOBAL_SHAKE_FORCE    1.0f
-#define HW_COUNT 14
-#define HW_SYS  0 // System Analyzer
-#define HW_NAV  1 // Navigation Unit
-#define HW_ERD  2 // Datareader/EReader
-#define HW_SNS  3 // Sensaround
-#define HW_TID  4 // Target Identifier
-#define HW_SHD  5 // Energy Shield
-#define HW_BIO  6 // Biomonitor
-#define HW_LAN  7 // Head Mounted Lantern
-#define HW_ENV  8 // Envirosuit
-#define HW_BST  9 // Turbo Motion Booster
-#define HW_JET 10 // Jump Jet Boots
-#define HW_INF 11 // Infrared Night Sight Enhancement
-#define HW_TRC 12 // Tractor Beam
-#define HW_SAL 13 // Fry Salter
-
-#define MINIGAME_PING        1
-#define MINIGAME_15          2
-#define MINIGAME_WING0       4
-#define MINIGAME_BOTBOUNCE   8
-#define MINIGAME_EEL_ZAPPER 16
-#define MINIGAME_ROAD       32
-#define MINIGAME_TRIOPTOE   64
-
-// Hw referenceIndex, ref14Index
-// Sys 21,0
-// Nav 22,1
-// Ere 23,2
-// Sen 24,3
-// Trg 25,4
-// Shi 26,5
-// Bio 27,6
-// Lan 28,7
-// Env 29,8
-// Boo 30,9
-// Jum 31,10
-// Nig 32,11
-typedef struct {
-    uint32_t accessCardOwned;
-    uint16_t hasHardware;
-    bool hasLog[134];
-    bool readLog[134];
-    uint16_t numLogsFromLevel[10];
-    uint8_t hasMinigame;
-    uint16_t hardwareIsActive;
-    uint8_t hardwareVersion[HW_COUNT];
-    uint8_t hardwareVersionSetting[HW_COUNT];
-    uint16_t hardwareInvReferenceIndex[HW_COUNT];
-} InventorySystem;
-extern InventorySystem inventoryPlayer1;
-extern InventorySystem inventoryPlayer2;
-
-#define BIOM_ERG 0
-#define BIOM_CHI 1
-#define BIOM_ECG 2
-#define BIOM_GRAPH_W 620
-#define BIOM_GRAPH_H  36
-typedef struct {
-	float heartRate;
-	Text patchEffects;
-	Text heartRateText;
-	Text header;
-	Text bpmText;
-	Text fatigueDetailText;
-	Text fatigue;
-	double beatFinished; // Visual only, Time.time controlled
-	float widthPerc;
-    float heightPerc;
-    float max[3]; // Value at the top of the graph
-    float min[3]; // Value at the bottom of the graph
-    Color currentColors[BIOM_GRAPH_H];
-    Color colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H];
-    Color colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H];
-    Color colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H];
-    int lastERG;
-    int lastCHI;
-    int lastECG;
-    Color backgroundColor;
-    Color ergColor;
-    Color chiColor;
-    Color ecgColor;
-    Color col;
-    int ymax;
-	float ecgValue;
-	float ergValue;
-	float chiValue;
-	float beatShift;
-    double tick0Finished;
-    double tick1Finished;
-    double tick2Finished;
-    double tickFinished; // Overall marching.
-    double tick0;
-    double tick1;
-    double tick2;
-    double tick;
-    int currentIndex0;
-    int currentIndex1;
-    int currentIndex2;
-    Color col0;
-    Color col1;
-    Color col2;
-} BioMonitorSystem;
-extern BioMonitorSystem bioMonitor;
-void BioMonitorClearGraphs(void);
-void BioMonitorUpdate(void);
 
 // BodyState
 typedef uint8_t BodyState;
@@ -664,6 +539,243 @@ static const uint8_t PhysicsLayer_CorpseSearchable = 29;
 //static const uint8_t PhysicsLayer_               = 30;
 static const uint8_t PhysicsLayer_NULL             = 31;
 
+#define MAX_SAVENAME_LENGTH 24
+#define MENU_ITEMS_MAX 52 // Input page has 40 for the input codes, plus back button plus 10 other widgets
+typedef uint8_t MenuPages;
+static const uint8_t MenuPages_fp = 0;
+static const uint8_t MenuPages_sp = 1;
+static const uint8_t MenuPages_mp = 2;
+static const uint8_t MenuPages_np = 3;
+static const uint8_t MenuPages_lp = 4;
+static const uint8_t MenuPages_op = 5;
+static const uint8_t MenuPages_sv = 6;
+static const uint8_t MenuPages_cd = 7;
+typedef struct {
+    int8_t currentIndex;
+    int8_t currentSaveSlot;
+    bool inCutscene;
+    bool returnToPause;
+    MenuPages currentPage;
+    bool typingSaveGame;
+//     char tempSaveNameHolder[MAX_SAVENAME_LENGTH]; TODO
+    int presetQuestionValue;
+//     uint8_t currentMenuItemsLength; TODO
+    double vidFinished;
+    double vidStartTime;
+    bool axisUp;
+    bool axisDn;
+} MainMenu;
+extern MainMenu Sys_Menu;
+
+#define PATCH_BERSERK   1
+#define PATCH_DETOX     2
+#define PATCH_GENIUS    4
+#define PATCH_MEDI      8
+#define PATCH_REFLEX   16
+#define PATCH_SIGHT    32
+#define PATCH_STAMINUP 64
+#define BERSERK_TIME  20.0
+#define DETOX_TIME    60.0
+#define GENIUS_TIME  180.0
+#define MEDI_TIME     35.0
+#define REFLEX_TIME  155.0
+#define SIGHT_TIME    40.0
+#define STAMINUP_TIME 60.0
+#define SIGHT_SIDE_EFFECT_TIME 17.0
+#define REFLEX_TIME_SCALE 0.25
+#define DEFAULT_TIME_SCALE 1.0
+#define BERSERK_DAMAGE_MULTIPLIER 4.0f // Quad Damage!
+#define NITRO_MIN_TIME     1.0
+#define NITRO_MAX_TIME    60.0
+#define NITRO_DEFAULT_TIME 7.0
+#define EARTH_SHAKER_MIN_TIME      4.0
+#define EARTH_SHAKER_MAX_TIME     60.0
+#define EARTH_SHAKER_DEFAULT_TIME 10.0
+#define GLOBAL_SHAKE_DISTANCE 0.3f
+#define GLOBAL_SHAKE_FORCE    1.0f
+#define HW_COUNT 14
+#define HW_SYS  0 // System Analyzer
+#define HW_NAV  1 // Navigation Unit
+#define HW_ERD  2 // Datareader/EReader
+#define HW_SNS  3 // Sensaround
+#define HW_TID  4 // Target Identifier
+#define HW_SHD  5 // Energy Shield
+#define HW_BIO  6 // Biomonitor
+#define HW_LAN  7 // Head Mounted Lantern
+#define HW_ENV  8 // Envirosuit
+#define HW_BST  9 // Turbo Motion Booster
+#define HW_JET 10 // Jump Jet Boots
+#define HW_INF 11 // Infrared Night Sight Enhancement
+#define HW_TRC 12 // Tractor Beam
+#define HW_SAL 13 // Fry Salter
+
+#define SW_DRILL  0
+#define SW_PULSER 1
+#define SW_SHIELD 2
+#define SW_TURBO  3
+#define SW_DECOY  4
+#define SW_RECALL 5
+#define SW_GAMES  6
+
+#define MINIGAME_PING        1
+#define MINIGAME_15          2
+#define MINIGAME_WING0       4
+#define MINIGAME_BOTBOUNCE   8
+#define MINIGAME_EEL_ZAPPER 16
+#define MINIGAME_ROAD       32
+#define MINIGAME_TRIOPTOE   64
+
+// Hw referenceIndex, ref14Index
+// Sys 21,0
+// Nav 22,1
+// Ere 23,2
+// Sen 24,3
+// Trg 25,4
+// Shi 26,5
+// Bio 27,6
+// Lan 28,7
+// Env 29,8
+// Boo 30,9
+// Jum 31,10
+// Nig 32,11
+typedef struct {
+    uint32_t accessCardOwned;
+    uint8_t hasSoft;
+    uint8_t softVersions[7];
+    bool hasLog[134];
+    bool readLog[134];
+    uint16_t numLogsFromLevel[10];
+    int lastAddedIndex;
+	bool beepDone;
+	bool logPaused;
+    bool hasNewEmail;
+    bool hasNewNotes;
+	int emailCurrent;
+	int emailIndex;
+    uint8_t hasMinigame;
+    uint16_t hasHardware;
+    uint16_t hardwareIsActive;
+    uint8_t hardwareVersion[HW_COUNT];
+    uint8_t hardwareVersionSetting[HW_COUNT];
+    uint16_t hardwareInvReferenceIndex[HW_COUNT];
+    int hardwareInvCurrent; // Current slot in the general inventory (14 slots).
+	int hardwareInvIndex; // Current index to the item look-up table.
+	int generalInventoryIndexRef[14];
+    double nitroTimeSetting;
+    double earthShakerTimeSetting;
+    bool currentCyberItem;
+    bool isPulserNotDrill;
+    int globalLookupIndex;
+} InventorySystem;
+extern InventorySystem inventoryPlayer1;
+extern InventorySystem inventoryPlayer2;
+
+void PlayerInit(uint16_t i);
+void TakeEnergy(float drain);
+void GiveEnergy(float give, EnergyType type);
+
+#define BIOM_ERG 0
+#define BIOM_CHI 1
+#define BIOM_ECG 2
+#define BIOM_GRAPH_W 620
+#define BIOM_GRAPH_H  36
+typedef struct {
+	float heartRate;
+	Text patchEffects;
+	Text heartRateText;
+	Text header;
+	Text bpmText;
+	Text fatigueDetailText;
+	Text fatigue;
+	double beatFinished; // Visual only, Time.time controlled
+	float widthPerc;
+    float heightPerc;
+    float max[3]; // Value at the top of the graph
+    float min[3]; // Value at the bottom of the graph
+    Color currentColors[BIOM_GRAPH_H];
+    Color colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    Color colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    Color colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    int lastERG;
+    int lastCHI;
+    int lastECG;
+    Color backgroundColor;
+    Color ergColor;
+    Color chiColor;
+    Color ecgColor;
+    Color col;
+    int ymax;
+	float ecgValue;
+	float ergValue;
+	float chiValue;
+	float beatShift;
+    double tick0Finished;
+    double tick1Finished;
+    double tick2Finished;
+    double tickFinished; // Overall marching.
+    double tick0;
+    double tick1;
+    double tick2;
+    double tick;
+    int currentIndex0;
+    int currentIndex1;
+    int currentIndex2;
+    Color col0;
+    Color col1;
+    Color col2;
+} BioMonitorSystem;
+extern BioMonitorSystem bioMonitor;
+void BioMonitorClearGraphs(void);
+void BioMonitorUpdate(void);
+
+#define MULTI_MEDIA_TAB_EMAIL_TABLE 0
+#define MULTI_MEDIA_TAB_LOG_TABLE   1
+#define MULTI_MEDIA_TAB_DATA_TABLE  2
+#define MULTI_MEDIA_TAB_NOTES       3
+typedef struct {
+	int lastMultiMediaTabOpened;
+	bool lastWeaponSideRH;
+	bool lastItemSideRH;
+	bool lastAutomapSideRH;
+	bool lastTargetSideRH;
+	bool lastDataSideRH;
+	bool lastSearchSideRH;
+	bool lastLogSideRH;
+	bool lastLogSecondarySideRH;
+	bool lastMinigameSideRH;
+	double logFinished;
+	bool logActive;
+	AudioLogType logType;
+	uint16_t linkedElevatorDoor;
+	Vector3 objectInUsePos;
+	uint16_t tetheredPGP;
+	uint16_t tetheredPWP;
+	uint16_t tetheredSearchable;
+	uint16_t tetheredKeypadElevator;
+	uint16_t tetheredKeypadKeycode;
+	bool paperLogInUse;
+	bool usingObject;
+	int applyButtonReferenceIndex;
+	int curCenterTab;
+	bool mouseClickHeldOverGUI;
+	bool isRH;
+	int wep16index;
+	int tempSpriteIndex;
+	float lastEnergy;
+	float lastHealth;
+	double tickFinished; // Visual only, Time.time controlled
+	int count;
+	bool centerTabNotified[4];
+	double centerTabsTickFinished; // Visual only, Time.time controlled
+	bool highlightStatus[4];
+	uint8_t highlightTickCount[4];
+	double blinkFinished;
+	double beepFinished;
+	uint8_t beepCount;
+	bool audPaused;
+} SystemUI;
+extern SystemUI Sys_UI;
+
 #define MODEL_IDX_MAX 6805
 typedef struct {
 	GLuint inputImageID;
@@ -790,73 +902,10 @@ typedef struct {
 extern NPCTable npcTable[NUM_AI_TYPES];
 
 extern uint16_t selfIdx;
+extern uint16_t activatorIdx;
 #define NPCID (instances[selfIdx].index - 419)
 #define SELF instances[selfIdx]
-
-typedef struct {
-	uint16_t owner; // pass main GameObject that contains the script PlayerReferenceManager
-	int mainIndex; // master index value for lookup in the Const tables
-	int customIndex;
-	bool bitsSet;
-	uint16_t texture;
-    
-	// Action bits.  What do we want our target to do, e.g. turn on a light or close a door or activate force bridge
-	// Using multiple bools to allow for multiple actions to be attempted on all the targets
-	bool tripTrigger; // force activate a trigger
-	bool doorOpen; // force opens the door
-	bool doorOpenIfUnlocked; // open a door only if it isn't locked
-	bool doorClose; // force closes the door
-	bool doorLock; // locks door, argvalue sets the locked message
-	bool doorUnlock; // unlocks door
-	bool switchTrigger; // force use a switch
-	bool chargeStationRecharge; // force recharge a charging station
-	bool enemyAlert; // alert an enemy and pass owner as the new enemy
-	bool forceBridgeActivate; // activate a force bridge
-	bool forceBridgeDeactivate; // deactivate a force bridge
-	bool forceBridgeToggle; // toggle a force bridge
-	bool gravityLiftToggle; // activate a gravity lift
-	bool textureChangeToggle; // toggle a texture on something
-	bool lightOn; // turn on the light
-	bool lightOff; // turn out that light!
-	bool lightToggle; // flip the switch
-	bool funcwallMove; // target a moving wall
-	bool missionBitOn; // turn a mission quest bit on
-	bool missionBitOff; // turn a mission quest bit off
-	bool missionBitToggle; // toggle mission bit
-	bool transferToLogicRelay; // send on to any relays to allow for special extra bits
-	bool sendEmail; // send all players an email
-	bool switchLockToggle; // toggle locked state of a ButtonSwitch
-	bool lockCodeToScreenMaterialChanger; // set the code on a screen after CPUs are destroyed
-	bool spawnerActivate; // activate a SpawnManager
-	bool spawnerActivateAlerted; // activate a SpawnManager and notify all enemies of the player's location
-	bool cyborgConversionToggle; // toggle cyborg conversion so player can respawn on current level
-	bool GOSetActive; // turn a gameObject on
-	bool GOSetDeactive; // turn a gameObject off
-	bool GOToggleActive; // toggle gameObject on/off
-	bool toggleRadiationTrigger; // toggle radiation on/off for a radiation trigger
-	bool toggleRelayEnabled; // toggle logic relay enabled state
-	bool togglePuzzlePanelLocked; // toggle whether a puzzle panel is locked or not
-	bool testQuestBitIsOn; // run target if a certain quest bit is on
-	bool testQuestBitIsOff; // run target if a certain quest bit is off
-	bool playSoundOnce; // play a sound effect
-	bool stopSound; // play a sound effect
-	bool sendSprintMessage; // sprint to the status bar
-	bool radiationTreatment; // flash radiation treatment static on player's screen who used the treatment
-	bool startFlashingMaterials; // enable flashing of materials blink blink blink blink blink!
-	bool stopFlashingMaterials; // disable flashing
-	bool unlockElevatorPad; // unlock elevator pad
-	bool unlockKeycodePad; // unlock elevator keypad
-	bool unlockPuzzlePad; // unlock puzzle pad, grid or wire
-	bool screenShake; // shake the screen/earthquake
-	bool awakeSleepingEnemy; // awaken a sleeping enemy, e.g. the sec-2 bots that are in repair sleep on level 8
-	bool branchFlip; // flip logic_branchs
-	bool branchFlipOnly; // only flip the branch, not flip and fire
-	bool doorAccessCardOverrideToggle; // set that access card has already been used
-	bool unlockSwitch; // unlock a ButtonSwitch
-	bool lockElevatorPad; // lock elevator pad
-	bool doorToggle; // Actuate door, similar to use to open/close
-} UseData;
-
+#define ACTIVATOR instances[activatorIdx]
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
 #define MAX_WAYPOINTS 32
 #define MAX_CHILD_COUNT 4
@@ -866,7 +915,7 @@ typedef struct {
 #define PLAYER1 1u
 #define PLAYER2 2u
 #define START_INDEX_LEVEL_INSTANCES 3
-#define ENTFLAG_ACTIVE               (1ull <<  0)
+#define ENTFLAG_ACTIVE               (1ull <<  0) // Instance renders and updates
 #define ENTFLAG_CARDCHUNK            (1ull <<  1)
 #define ENTFLAG_GROUNDED             (1ull <<  2)
 #define ENTFLAG_USEGRAVITY           (1ull <<  3)
@@ -905,58 +954,146 @@ typedef struct {
 #define ENTFLAG_DEAD_CHECKS_DONE     (1ull << 36)
 #define ENTFLAG_HOP_DONE             (1ull << 37)
 #define ENTFLAG_LOCKED               (1ull << 38)
-
-#define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1u <<  0)
-#define QUESTBIT_ISOTOPE_INSTALLED            (1u <<  1)
-#define QUESTBIT_SHIELD_ACTIVATED             (1u <<  2)
-#define QUESTBIT_LASER_SAFETY_OVERRIDEN       (1u <<  3)
-#define QUESTBIT_LASER_DESTROYED              (1u <<  4)
-#define QUESTBIT_BETA_GROVE_CYBER_UNLOCKED    (1u <<  5)
-#define QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED (1u <<  6)
-#define QUESTBIT_GROVE_BETA_JETTISON_ENABLED  (1u <<  7)
-#define QUESTBIT_GROVE_DELTA_JETTISON_ENABLED (1u <<  8)
-#define QUESTBIT_MASTER_JETTISON_BROKEN       (1u <<  9)
-#define QUESTBIT_RELAY_428_FIXED              (1u << 10)
-#define QUESTBIT_MASTER_JETTISON_ENABLED      (1u << 11)
-#define QUESTBIT_BETA_GROVE_JETTISONED        (1u << 12)
-#define QUESTBIT_ANTENNA_NORTH_DESTROYED      (1u << 13)
-#define QUESTBIT_ANTENNA_SOUTH_DESTROYED      (1u << 14)
-#define QUESTBIT_ANTENNA_EAST_DESTROYED       (1u << 15)
-#define QUESTBIT_ANTENNA_WEST_DESTROYED       (1u << 16)
-#define QUESTBIT_SELF_DESTRUCT_ACTIVATED      (1u << 17)
-#define QUESTBIT_BRIDGE_SEPARATED             (1u << 18)
-#define QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED  (1u << 19)
-
-static inline void flag_set(uint64_t *flags, uint32_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
+#define ENTFLAG_HAS_CAMERA_VIEW      (1ull << 39)
+#define ENTFLAG_REQUIRE_RESET        (1ull << 40)
+#define ENTFLAG_GRAV_LIFT_STATE      (1ull << 41)
+#define ENTFLAG_STOPSOUND_PLAYED     (1ull << 42)
+#define ENTFLAG_DAMAGE_ON_USE        (1ull << 43)
+#define ENTFLAG_MAKING_NOISE         (1ull << 44)
+#define ENTFLAG_ENABLED              (1ull << 45) // Instance updates
+#define ENTFLAG_ACTIVATED            (1ull << 46) // E.g. forcebridge visible, switch is flipped
+#define ENTFLAG_VISIBLE              (1ull << 47) // Renders
+#define QUESTBIT_ROBOT_SPAWN_DEACTIVATED      (1ull <<  0)
+#define QUESTBIT_ISOTOPE_INSTALLED            (1ull <<  1)
+#define QUESTBIT_SHIELD_ACTIVATED             (1ull <<  2)
+#define QUESTBIT_LASER_SAFETY_OVERRIDEN       (1ull <<  3)
+#define QUESTBIT_LASER_DESTROYED              (1ull <<  4)
+#define QUESTBIT_BETA_GROVE_CYBER_UNLOCKED    (1ull <<  5)
+#define QUESTBIT_GROVE_ALPHA_JETTISON_ENABLED (1ull <<  6)
+#define QUESTBIT_GROVE_BETA_JETTISON_ENABLED  (1ull <<  7)
+#define QUESTBIT_GROVE_DELTA_JETTISON_ENABLED (1ull <<  8)
+#define QUESTBIT_MASTER_JETTISON_BROKEN       (1ull <<  9)
+#define QUESTBIT_RELAY_428_FIXED              (1ull << 10)
+#define QUESTBIT_MASTER_JETTISON_ENABLED      (1ull << 11)
+#define QUESTBIT_BETA_GROVE_JETTISONED        (1ull << 12)
+#define QUESTBIT_ANTENNA_NORTH_DESTROYED      (1ull << 13)
+#define QUESTBIT_ANTENNA_SOUTH_DESTROYED      (1ull << 14)
+#define QUESTBIT_ANTENNA_EAST_DESTROYED       (1ull << 15)
+#define QUESTBIT_ANTENNA_WEST_DESTROYED       (1ull << 16)
+#define QUESTBIT_SELF_DESTRUCT_ACTIVATED      (1ull << 17)
+#define QUESTBIT_BRIDGE_SEPARATED             (1ull << 18)
+#define QUESTBIT_ISOLINEAR_CHIPSET_INSTALLED  (1ull << 19)
+#define QUESTBIT_LEV1_CODE_LOCKED             (1ull << 20)
+#define QUESTBIT_LEV2_CODE_LOCKED             (1ull << 21)
+#define QUESTBIT_LEV3_CODE_LOCKED             (1ull << 22)
+#define QUESTBIT_LEV4_CODE_LOCKED             (1ull << 23)
+#define QUESTBIT_LEV5_CODE_LOCKED             (1ull << 24)
+#define QUESTBIT_LEV6_CODE_LOCKED             (1ull << 25)
+#define TARG_IOFLAGS_TRIPTRIGGER        (1ull << 0) // Action bits.  What do we want our target to do, e.g. turn on a light or close a door or activate force bridge.  Using multiple bools to allow for multiple actions to be attempted on all the targets.
+#define TARG_IOFLAGS_DOOROPEN           (1ull << 1)
+#define TARG_IOFLAGS_DOOROPENIFUNLOCKED (1ull << 2)
+#define TARG_IOFLAGS_DOORCLOSE          (1ull << 3)
+#define TARG_IOFLAGS_DOORLOCK           (1ull << 4)
+#define TARG_IOFLAGS_DOORUNLOCK         (1ull << 5)
+#define TARG_IOFLAGS_SWITCHTRIGGER      (1ull << 6)
+#define TARG_IOFLAGS_CHGSTAT_RECHARGE   (1ull << 7)
+#define TARG_IOFLAGS_ENEMY_ALERT        (1ull << 8)
+#define TARG_IOFLAGS_FBRIDGE_ACTIVATE   (1ull << 9)
+#define TARG_IOFLAGS_FBRIDGE_DEACTIVATE (1ull << 10)
+#define TARG_IOFLAGS_FBRIDGE_TOGGLE     (1ull << 11)
+#define TARG_IOFLAGS_GRAVLIFT_TOGGLE    (1ull << 12)
+#define TARG_IOFLAGS_TEXTURE_CHG_TOGGLE (1ull << 13)
+#define TARG_IOFLAGS_LIGHT_ON           (1ull << 14)
+#define TARG_IOFLAGS_LIGHT_OFF          (1ull << 15)
+#define TARG_IOFLAGS_LIGHT_TOGGLE       (1ull << 16)
+#define TARG_IOFLAGS_FUNCWALL_MOVE      (1ull << 17)
+#define TARG_IOFLAGS_MISSION_BIT_ON     (1ull << 18)
+#define TARG_IOFLAGS_MISSION_BIT_OFF    (1ull << 19)
+#define TARG_IOFLAGS_MISSION_BIT_TOGGLE (1ull << 20)
+#define TARG_IOFLAGS_TXFER2LOGIC_RELAY  (1ull << 21)
+#define TARG_IOFLAGS_SEND_EMAIL         (1ull << 22)
+#define TARG_IOFLAGS_SWITCH_LOCK_TOGGLE (1ull << 23)
+#define TARG_IOFLAGS_LOCK_CODE_SCREEN   (1ull << 24)
+#define TARG_IOFLAGS_SPAWNER_ACTIVATE   (1ull << 25)
+#define TARG_IOFLAGS_SPAWNER_ACTALERTED (1ull << 26)
+#define TARG_IOFLAGS_CYBORG_CONV_TOGGLE (1ull << 27)
+#define TARG_IOFLAGS_INST_ACTIVATE      (1ull << 28)
+#define TARG_IOFLAGS_INST_DEACTIVATE    (1ull << 29)
+#define TARG_IOFLAGS_INST_TOGGLE        (1ull << 30)
+#define TARG_IOFLAGS_TOGGLE_RADIATION   (1ull << 31)
+#define TARG_IOFLAGS_TOGGLE_PUZPNL_LOCK (1ull << 32)
+#define TARG_IOFLAGS_TEST_QUESTBIT_ON   (1ull << 33)
+#define TARG_IOFLAGS_TEST_QUESTBIT_OFF  (1ull << 34)
+#define TARG_IOFLAGS_PLAY_SOUND_ONCE    (1ull << 35)
+#define TARG_IOFLAGS_STOP_SOUND         (1ull << 36)
+#define TARG_IOFLAGS_SEND_CENTERPRINT   (1ull << 37)
+#define TARG_IOFLAGS_RADIATION_TREATMNT (1ull << 38)
+#define TARG_IOFLAGS_START_FLASHING_TEX (1ull << 39)
+#define TARG_IOFLAGS_STOP_FLASHING_TEX  (1ull << 40)
+#define TARG_IOFLAGS_UNLOCK_ELEVATORPAD (1ull << 41)
+#define TARG_IOFLAGS_UNLOCK_KEYPAD      (1ull << 42)
+#define TARG_IOFLAGS_UNLOCK_PUZPAD      (1ull << 43)
+#define TARG_IOFLAGS_SCREENSHAKE        (1ull << 44)
+#define TARG_IOFLAGS_AWAKE_SLEEPING_NPC (1ull << 45)
+#define TARG_IOFLAGS_BRANCH_FLIP        (1ull << 46)
+#define TARG_IOFLAGS_BRANCH_FLIPONLY    (1ull << 47)
+#define TARG_IOFLAGS_TOG_DORACESOVERIDE (1ull << 48)
+#define TARG_IOFLAGS_UNLOCK_SWITCH      (1ull << 49)
+#define TARG_IOFLAGS_LOCK_ELEVATORPAD   (1ull << 50)
+#define TARG_IOFLAGS_DOOR_TOGGLE        (1ull << 51)
+#define TARG_IOFLAGS_ONCE_EVER          (1ull << 52)
+#define TARG_IOFLAGS_ALREADY_DONE       (1ull << 53)
+#define TARG_IOFLAGS_START_ON_SECOND    (1ull << 54)
+#define TARG_IOFLAGS_ON_SECOND          (1ull << 55) // No he's on third
+#define TARG_IOFLAGS_AUTOFLIP_ON_TARGET (1ull << 56)
+#define TARG_IOFLAGS_DISABLE_ON_AWAKE   (1ull << 57)
+#define TARG_IOFLAGS_DISABLD_ONCE_4EVER (1ull << 58)
+#define TARGET_STRING_LENGTH 40
+static inline void flag_set(uint64_t *flags, uint64_t bit, bool state) { *flags = (*flags & ~bit) | (-state & bit); }
 typedef /*FAT*/ struct {
     uint64_t entflags;
+    uint64_t ioflags;
     uint16_t index; // constIndex for entity type, used for indexing into arrays for resourec types when loading resources
     
     // Logic and I/O
-    uint32_t ioflags;
-    char targetname[40];
-    char target[40];
-    char targetIfFalse[40];
+    char targetname[TARGET_STRING_LENGTH];
+    char target[TARGET_STRING_LENGTH];
+    char target2[TARGET_STRING_LENGTH];
+    char currenttarget[TARGET_STRING_LENGTH];
+    char targetIfFalse[TARGET_STRING_LENGTH];
     uint8_t securityThreshold;
     uint16_t messageIndex;
     float delay;
+    
     uint16_t activateSFX;
     uint16_t lockedSFX;
     int lev1SecCode;
-	int lev2SecCode;
-	int lev3SecCode;
-	int lev4SecCode;
-	int lev5SecCode;
-	int lev6SecCode;
-    UseData ud;
+    int lev2SecCode;
+    int lev3SecCode;
+    int lev4SecCode;
+    int lev5SecCode;
+    int lev6SecCode;
     float health;
+    float lastHealth;
     float cyberHealth;
+    float energy;
+    float maxEnergy;
     uint16_t lockedMessageLingdex;
     double delayFinished;
     double tickFinished;
     double tickTime;
+    float amount;
+    float resetTime;
+    float minSecurityLevel;
+    BloodType bloodType;
+    DoorState doorOpen;
+    ForceFieldColor fieldColor;
+    bool lerping;
     
     // Player
+    float radiated;
+    float resetAfterDeathTime;
+    float playerHealthTimer;
     uint16_t patchActive;
     uint16_t drainJPM;
     double berserkFinishedTime;
@@ -969,6 +1106,17 @@ typedef /*FAT*/ struct {
 	double sightSideEffectFinishedTime;
 	double staminupFinishedTime;
 	int berserkIncrement;
+    double turboCyberTime;
+    double turboFinished;
+    double energyDrainTickFinished;
+    double noiseFinished;
+	double painSoundFinished;
+	double radSoundFinished;
+	double radFXFinished;
+	float radAdjust;
+	float initialRadiation;
+    int32_t heldObjectIndex;
+    bool playerDead;
 
 	// Rendering
 	uint16_t modelIndex;
@@ -1011,6 +1159,7 @@ typedef /*FAT*/ struct {
     Vector3 colliderCenter; // Offset relative to .position's global worldspace xyz location
     Vector3 colliderSize; // x,y,z for Box, x for Sphere radius, else x, y, z for Capsule radius, height, and direction (0.0f = X-Axis, 1.0f = Y-Axis, 2.0f = Z-Axis respectively, default 1.0f)
     uint16_t colliderMeshIndex;
+    Vector3 activatedScale;
     float mass;
     float linearDrag;
     float angularDrag;
@@ -1043,8 +1192,8 @@ typedef /*FAT*/ struct {
     uint16_t muzzleBurst;
     uint16_t muzzleBurst2;
     uint16_t enemey;
-	float gracePeriodFinished;
-	float meleeDamageFinished;
+	double gracePeriodFinished;
+	double meleeDamageFinished;
     uint8_t walkWaypointsLength;
     Vector3 walkWaypoints[MAX_WAYPOINTS];
 	uint16_t dyingTexture;
@@ -1057,25 +1206,25 @@ typedef /*FAT*/ struct {
 	float attack1SoundTime;
 	float attack2SoundTime;
 	float attack3SoundTime;
-	float timeTillEnemyChangeFinished;
-	float timeTillDeadFinished;
-	float timeTillPainFinished;
-	float huntFinished;
+	double timeTillEnemyChangeFinished;
+	double timeTillDeadFinished;
+	double timeTillPainFinished;
+	double huntFinished;
 	Vector3 lastKnownEnemyPos;
-	float randomWaitForNextAttack1Finished;
-	float randomWaitForNextAttack2Finished;
-	float randomWaitForNextAttack3Finished;
+	double randomWaitForNextAttack1Finished;
+	double randomWaitForNextAttack2Finished;
+	double randomWaitForNextAttack3Finished;
 	Vector3 idealTransformForward;
 	Vector3 idealPos;
-	float attackFinished;
-	float attack2Finished;
-	float attack3Finished;
+	double attackFinished;
+	double attack2Finished;
+	double attack3Finished;
 	Vector3 targettingPosition;
-	float deathBurstFinished;
-	float tranquilizeFinished;
-	float wanderFinished;
-	float timeSinceMovedEnough;
-	float posCheckFinished;
+	double deathBurstFinished;
+	double tranquilizeFinished;
+	double wanderFinished;
+	double timeSinceMovedEnough;
+	double posCheckFinished;
 	char targetID[TARGET_ID_LENGTH];
 
 	// Misc
@@ -1304,6 +1453,8 @@ extern Portal activePortals[MAX_PORTALS];
 extern uint8_t numActivePortals;
 extern uint32_t precomputedVisibleCellsFromHere[524288];
 extern float worldMin_x, worldMin_z, voxelMinCenterX, voxelMinCenterZ;
+void AddCameraPosition(uint16_t i);
+void RemoveCameraPosition(uint16_t i);
 void CullInit(void);
 bool CullCore(void);
 bool get_cull_bit(const uint32_t* arr, int idx);
@@ -1332,6 +1483,7 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
 #define COLLIDER_CAPSULE_DIRECTION_Y_F 1.0f // Y-Axis
 #define COLLIDER_CAPSULE_DIRECTION_Z_F 2.0f // Z-Axis
 #define FROB_DISTANCE 4.9f
+#define ELEVATOR_PAD_TETHER_DIST 2.0f
 #define PLAYER_CAPSULE_TOTAL_HEIGHT 2.0f
 #define PLAYER_CAPSULE_RADIUS 0.48f
 #define PLAYER_CROUCH_RATIO 0.6f
@@ -1535,9 +1687,6 @@ int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float p
 double get_time(void);
 int32_t EventQueueProcess(void);
 // ----------------------------------------------------------------------------
-// Patches
-#define PATCH_TIME_BERSERK 30.0f
-// ----------------------------------------------------------------------------
 // Logging / Debug Prints
 void OpenConsoleLogFile(void);
 void Screenshot(void);
@@ -1569,7 +1718,6 @@ uint16_t parse_numberu16(const char* str, const char* line, uint32_t lineNum);
 uint8_t parse_numberu8(const char* str, const char* line, uint32_t lineNum);
 bool parse_bool(const char* str, const char* line, uint32_t lineNum);
 float parse_float(const char* str, const char* line, uint32_t lineNum);
-
 bool ConstIndexInBounds(int constdex);
 bool ConstIndexIsGeometry(int constdex);
 bool ConstIndexIsDynamicObject(uint16_t constIndex);
@@ -1584,6 +1732,9 @@ bool ConstIndexIsAmbient(int constdex);
 bool ConstIndexIsButtonSwitch(int constdex);
 bool CursorVisible(void);
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum);
+uint8_t GetCurrentLevelSecurity(void);
+uint16_t GetImpactType(uint16_t instanceIdx);
+int hardware14fromConstdex(int constdex);
 const char* GetPrefabNameFromIndex(int constIndex);
 static inline void CellCoordsToPos(uint16_t x, uint16_t z, float* pos_x, float* pos_z) {
     *pos_x = worldMin_x + (x * WORLDCELL_WIDTH_F);
@@ -1687,3 +1838,8 @@ typedef struct {
 	int missionSplitID;
 } AutoSplitterData;
 extern AutoSplitterData autoSplitter;
+
+void UpdateWhileNotPaused(uint16_t i);
+void ScreenShake (float force, double duration);
+void Shake(float force);
+void InitAfterLoad(void);

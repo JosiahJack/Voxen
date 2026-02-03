@@ -9,9 +9,9 @@ public class CyberItem : MonoBehaviour {
 	private GameObject explosionEffect;
 
 	void Start() {
-		if (SSys_Global.difficultyMission == 0) {
+		if (Sys_Global.difficultyMission == 0) {
 			// Disable data objects when Mission difficulty is 0.
-			if (type == SoftwareType.Data) this.gameObject.SetActive(false);
+			if (type == SoftwareType.Data) this.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 
@@ -32,7 +32,7 @@ public class CyberItem : MonoBehaviour {
 			}
 
 			// We've been picked up, quick hide like you were.
-			this.gameObject.SetActive(false);
+			this.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 		}
 	}
 }

@@ -21,10 +21,10 @@ public class TickIndicatorAnimation : MonoBehaviour {
 
 		if (nextthink < Sys_Global.pauseRelativeTime) {
 			if (healthIndicator) {
-				if (PlayerHealth.a.hm.health > 176) {
+				if (instances[PLAYER1].health > 176) {
 					if (indicator.overrideSprite != indicatorImages[0]) indicator.overrideSprite = indicatorImages[0];
 				} else {
-					if (PlayerHealth.a.hm.health > 88) {
+					if (instances[PLAYER1].health > 88) {
 						if (indicator.overrideSprite != indicatorImages[1]) indicator.overrideSprite = indicatorImages[1];
 					} else {
 						switch (tick) {

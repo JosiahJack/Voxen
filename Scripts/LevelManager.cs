@@ -181,7 +181,7 @@ public class LevelManager : MonoBehaviour {
 		// etc. etc.
 		PlayerReferenceManager.a.playerDeathRessurectEffect.SetActive(true);
 		Music.a.PlayTrack(currentLevel,TrackType.Revive,MusicType.Override);
-		PlayerMovement.a.ressurectingFinished = Sys_Global.pauseRelativeTime + 3f;
+		instances[PLAYER1].ressurectingFinished = Sys_Global.pauseRelativeTime + 3f;
 		return true;
 	}
 
@@ -220,9 +220,9 @@ public class LevelManager : MonoBehaviour {
 		// NOTE: Check this first since the button for the current level has a null destination.  This is fine and expected.
 		if (currentLevel == levnum) { CenterStatusPrint("%s", Sys_Text.stringTable[9]); return; } //Already there
 
-		MFDManager.a.TurnOffElevatorPad();
+		Sys_UI.TurnOffElevatorPad();
 // 		DualLog("Cleared GUI Over Button state from clicking on elevator button in MFD side pane");
-		GUIState.a.ClearOverButton();
+		
 		if (targetPosition.x == 0 && targetPosition.y == 0 && targetPosition.z == 0) {
 			switch(levnum) {
 				case 0:  targetPosition = elevatorTargetDestinations[25].instances[i].position; break;
@@ -286,7 +286,7 @@ public class LevelManager : MonoBehaviour {
 		Music.a.inCombat = false;
 		Music.a.levelEntry = true;
 		PlayerHealth.a.radiationArea = false;
-		PlayerMovement.a.ladderState = 0;
+		instances[PLAYER1].ladderState = 0;
 		LoadLevelData(currentLevel);
 		Automap.a.SetAutomapExploredReference(currentLevel);
 		Automap.a.automapBaseImage.overrideSprite = Automap.a.automapsBaseImages[currentLevel];
@@ -420,13 +420,6 @@ public class LevelManager : MonoBehaviour {
 		if (go.transform.parent == par) return;
 
 		go.transform.SetParent(par);
-	}
-
-	public int GetCurrentLevelSecurity() {
-		if (SSys_Global.difficultyMission < 1) return 0;
-		if (!LevNumInBounds(currentLevel)) return 0;
-		if (superoverride) return 0; // tee hee we are SHODAN, no security blocks in place
-		return levelSecurity[currentLevel];
 	}
 
 	// Typical level
@@ -691,11 +684,11 @@ public class LevelManager : MonoBehaviour {
 
 	public void CheatLoadLevel(int ind) {
 		if (ind == 10) {
-			LoadLevel(10,PlayerMovement.a.cheatG1Spawn.position);
+			LoadLevel(10,instances[PLAYER1].cheatG1Spawn.position);
 		} else if (ind == 11) {
-			LoadLevel(11,PlayerMovement.a.cheatG2Spawn.position);
+			LoadLevel(11,instances[PLAYER1].cheatG2Spawn.position);
 		} else if (ind == 12) {
-			LoadLevel(12,PlayerMovement.a.cheatG4Spawn.position);
+			LoadLevel(12,instances[PLAYER1].cheatG4Spawn.position);
 		} else {
 			LoadLevel(ind,ressurectionLocation[ind].position);
 		}

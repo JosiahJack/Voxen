@@ -17,7 +17,7 @@ public class LevelEditor : MonoBehaviour {
     private void EditorEntry() {
         inEditMode = true;
         PauseScript.a.PauseSystems();
-        PlayerMovement.a.ConsoleDisable();
+        instances[PLAYER1].ConsoleDisable();
     }
 
     public void EditorExit() {

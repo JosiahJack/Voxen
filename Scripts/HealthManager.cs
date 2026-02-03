@@ -1,27 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Text;
-using UnityEngine;
-using UnityEngine.UI;
-
-public class HealthManager : MonoBehaviour {
-	// External references, required
-
-	// External references, optional
-	/*[DTValidator.Optional] */public SearchableItem searchableItem; // Not used universally.  Some objects can be destroyed but not searched, such as barrels.
-	public Image linkedOverlay;
-	public SecurityType securityAffected; // Not a reference, needs no optional flag, if using DTValidator that is.
-	/*[DTValidator.Optional] */public GameObject teleportEffect;
-	/*[DTValidator.Optional] */public GameObject[] gibObjects;
-	/*[DTValidator.Optional] */public GameObject[] disableOnGib;
-
-	/*[DTValidator.Optional] */public GameObject healingFXFlash;
-
-	// Externally set values in inspector per instance
-	public float health = -1f; // save, Current health, set in inspector for a different starting health than default on enemies.
-	public float cyberHealth = -1f; //save
-	public float maxhealth; // maximum health
-	private int index; // NPC Index
+﻿
+	SecurityType securityAffected; // Not a reference, needs no optional flag, if using DTValidator that is.
+	float health = -1f; // save, Current health, set in inspector for a different starting health than default on enemies.
+	float cyberHealth = -1f; //save
+	float maxhealth; // maximum health
+	int index; // NPC Index
 	public bool isPlayer = false;
 	public bool isGrenade = false;
 	public bool gibOnDeath = false; // used for things like crates to "gib" and shatter
@@ -112,7 +94,7 @@ public class HealthManager : MonoBehaviour {
 		if (isPlayer) return; // Player death does nothing.
 
 		UseData ud = new UseData();
-		Const.a.UseTargets(gameObject,ud,targetOnDeath);
+		UseTargets(gameObject,ud,targetOnDeath);
 	}
 
 	void InitializeCorpseOnly() {
@@ -287,7 +269,7 @@ public class HealthManager : MonoBehaviour {
 				if (dd.attackType == AttackType.Magnetic) {
 					take = 0f; // don't get hurt by magnetic interactions
 					empstatic.Flash(2);
-					PlayerEnergy.a.TakeEnergy(11f);
+					TakeEnergy(11f);
 					if (BiomonitorGraphSystem.a != null) {
 						BiomonitorEnergyPulse(11f);
 					}
@@ -339,7 +321,7 @@ public class HealthManager : MonoBehaviour {
 			cyberHealth -= take;
 			if (isPlayer) {
 			    Const.a.damageReceived += take;
-				MFDManager.a.DrawTicks(true);
+				Sys_UI.DrawTicks(true);
 				if (cyberHealth <= 0) {
 					MouseLookScript.a.ExitCyberspace();
 					return 0f;
@@ -371,7 +353,7 @@ public class HealthManager : MonoBehaviour {
 			health -= take;
 			if (isPlayer) {
 			    Const.a.damageReceived += take;
-				MFDManager.a.DrawTicks(true);
+				Sys_UI.DrawTicks(true);
 				Music.a.inCombat = true;
 			}
 			
@@ -587,7 +569,7 @@ public class HealthManager : MonoBehaviour {
 	void DropSearchables() {
 		if (searchableItem == null) return;
 
-		MFDManager.a.NotifySearchThatSearchableWasDestroyed();
+		Sys_UI.NotifySearchThatSearchableWasDestroyed();
 		GameObject levelDynamicContainer = LevelManager.a.GetCurrentDynamicContainer();
 		for (int i=0;i<4;i++) {
 			if (searchableItem.contents[i] < 0) continue;
@@ -670,7 +652,7 @@ public class HealthManager : MonoBehaviour {
 	public void HealingBed(float amount,bool flashBed) {
 		health += amount;
 		if (health > 255) health = 255;
-		if (isPlayer) MFDManager.a.DrawTicks(true);
+		if (isPlayer) Sys_UI.DrawTicks(true);
 		if (flashBed && healingFXFlash != null) healingFXFlash.SetActive(true);
 	}
 

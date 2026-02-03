@@ -61,7 +61,7 @@ public class Door : MonoBehaviour {
 			OpenDoor();
 		} else {
 			if (!ajar) SetCollisionLayer(18); // Door
-			doorOpen = DoorState.Closed;
+			doorOpen = DoorState_Closed;
 			anim.Play(idleClosedClipName,0,0f);
 		}
 
@@ -69,120 +69,41 @@ public class Door : MonoBehaviour {
 		asi = anim.GetCurrentAnimatorStateInfo(0);
 		delayFrame = false;
 	}
-
-	public void Use (UseData ud) {
-		if (ud == null) return;
-		if (ud.owner == null) return;
-		
-		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(instances[i].position);
-			return;
-		}
-
-		// SHODAN can go anywhere!  Full security override!
-		if (LevelManager.a.superoverride || SSys_Global.difficultyMission <= 0) {
-			locked = false;
-			requiredAccessCard = AccessCardType_None;
-			accessCardUsedByPlayer = true;
-		}
-
-		if (SSys_Global.difficultyMission <= 1) {
-			requiredAccessCard = AccessCardType_None;
-			accessCardUsedByPlayer = true;
-		}
-
-		asi = anim.GetCurrentAnimatorStateInfo(0);
-		animatorPlaybackTime = asi.normalizedTime;
-		if (useFinished >= Sys_Global.pauseRelativeTime) return;
-
-		useFinished = Sys_Global.pauseRelativeTime + useTimeDelay;	
-		if (requiredAccessCard == AccessCardType_None
-			|| inventoryPlayer1.HasAccessCard(requiredAccessCard)
-			|| accessCardUsedByPlayer) {
-
-			if (!locked) {
-				if (requiredAccessCard != AccessCardType_None) {
-					// State that we just used a keycard and access was granted
-					CenterStatusPrint(Inventory.AccessCardCodeForType(requiredAccessCard) + Sys_Text.stringTable[4]);
-					accessCardUsedByPlayer = true;
-				}
-
-				if ((onlyTargetOnce && !targetAlreadyDone) || !onlyTargetOnce) {
-					targetAlreadyDone = true;
-					Const.a.UseTargets(gameObject,ud,target);
-				}
-
-				if (ajar) {
-					ajar = false;
-					animatorPlaybackTime = topTime * ajarPercentage;
-				}
-
-				DoorActuate();
-			} else {
-				// Use access card
-				if (requiredAccessCard != AccessCardType_None) {
-					CenterStatusPrint(requiredAccessCard.ToString() + Sys_Text.stringTable[4] + Sys_Text.stringTable[5]);
-					accessCardUsedByPlayer = true;
-				} else {
-					CenterStatusPrint(lockedMessageLingdex); 
-					Utils.PlayOneShotSavable(SFX,Const.a.sounds[467],0.55f);
-					if (QuestLogNotesManager.a != null) {
-						QuestLogNotesManager.a.NotifyLockedDoorAttempt(this);
-					}
-				}
-			}
-		} else {
-			// Tell owner of the Use command that an access card is needed.
-			CenterStatusPrint(requiredAccessCard.ToString() + Sys_Text.stringTable[2]);
-			Utils.PlayOneShotSavable(SFX,Const.a.sounds[466],0.7f);
-		}
-	}
 	
 	public void DoorActuate() {
 		asi = anim.GetCurrentAnimatorStateInfo(0);
 		animatorPlaybackTime = asi.normalizedTime;
-		if (doorOpen == DoorState.Open && animatorPlaybackTime > 0.95f) {
-			doorOpen = DoorState.Closing;
+		if (doorOpen == DoorState_Open && animatorPlaybackTime > 0.95f) {
+			doorOpen = DoorState_Closing;
 			CloseDoor();
 			delayFrame = true;
-		} else if (doorOpen == DoorState.Closed && animatorPlaybackTime > 0.95f){
-			doorOpen = DoorState.Opening;
+		} else if (doorOpen == DoorState_Closed && animatorPlaybackTime > 0.95f){
+			doorOpen = DoorState_Opening;
 			OpenDoor();
 			delayFrame = true;
-		} else if (doorOpen == DoorState.Opening) {
-			doorOpen = DoorState.Closing;
+		} else if (doorOpen == DoorState_Opening) {
+			doorOpen = DoorState_Closing;
 			anim.Play(closeClipName,0,topTime - animatorPlaybackTime);
-			Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXIndex]);
+			Utils.PlayOneShotSavable(SFX,sounds[SFXIndex]);
 			delayFrame = true;
-		} else if (doorOpen == DoorState.Closing) {
-			doorOpen = DoorState.Opening;
+		} else if (doorOpen == DoorState_Closing) {
+			doorOpen = DoorState_Opening;
 			waitBeforeClose = Sys_Global.pauseRelativeTime + delay;
 			anim.Play(openClipName,0,topTime - animatorPlaybackTime);
-			Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXIndex]);
+			Utils.PlayOneShotSavable(SFX,sounds[SFXIndex]);
 			delayFrame = true;
 		}
-	}
-
-	void Targetted (UseData ud) {
-		if (locked) {
-			locked = false;
-			if (QuestLogNotesManager.a != null) {
-				QuestLogNotesManager.a.NotifyDoorUnlock(this);
-			}
-		}
-
-		if (!targettingOnlyUnlocks) Use(ud);
 	}
 
 	public void ForceOpen() {
-		if (doorOpen == DoorState.Open) return;
+		if (doorOpen == DoorState_Open) return;
 
 		OpenDoor();
 		delayFrame = true;
 	}
 
 	public void ForceClose() {
-		if (doorOpen == DoorState.Closed) return;
+		if (doorOpen == DoorState_Closed) return;
 
 		CloseDoor();
 		delayFrame = true;
@@ -216,19 +137,19 @@ public class Door : MonoBehaviour {
 	void OpenDoor() {
 		if (anim == null) anim = GetComponent<Animator>();
 		if (anim != null) anim.speed = defaultSpeed;
-		doorOpen = DoorState.Opening;
+		doorOpen = DoorState_Opening;
 		waitBeforeClose = Sys_Global.pauseRelativeTime + delay;
 		if (anim != null) anim.Play(openClipName,0,0f);
-		Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXIndex]);
+		Utils.PlayOneShotSavable(SFX,sounds[SFXIndex]);
 		SetCollisionLayer(19); // InterDebris
 	}
 
 	void CloseDoor() {
 		if (anim == null) anim = GetComponent<Animator>();
 		if (anim != null) anim.speed = defaultSpeed;
-		doorOpen = DoorState.Closing;
+		doorOpen = DoorState_Closing;
 		if (anim != null) anim.Play(closeClipName,0,0f);
-		Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXIndex]);
+		Utils.PlayOneShotSavable(SFX,sounds[SFXIndex]);
 		dynamicObjectsContainer = LevelManager.a.GetCurrentDynamicContainer();
 
 		// Horrible hack to keep objects that have their physics sleeping from
@@ -253,15 +174,15 @@ public class Door : MonoBehaviour {
 		if (anim != null) anim.Play(loadedClipName,loadedClipIndex,loadedAnimatorPlaybackTime);
 		delayFrame = true;
 		switch(loadedClipName) {
-			case idleOpenClipName: doorOpen = DoorState.Open; break;
-			case idleClosedClipName: doorOpen = DoorState.Closed; break;
-			case openClipName: doorOpen = DoorState.Opening; break;
-			case closeClipName: doorOpen = DoorState.Closing; break;
+			case idleOpenClipName: doorOpen = DoorState_Open; break;
+			case idleClosedClipName: doorOpen = DoorState_Closed; break;
+			case openClipName: doorOpen = DoorState_Opening; break;
+			case closeClipName: doorOpen = DoorState_Closing; break;
 		}
 	}
 
 	void SetAjar() {
-		doorOpen = DoorState.Opening;
+		doorOpen = DoorState_Opening;
 		if (toggleLasers) DeactivateLasers();
 		if (anim == null) anim = GetComponent<Animator>();
 		if (anim != null) anim.Play(openClipName,0,ajarPercentage);
@@ -283,27 +204,27 @@ public class Door : MonoBehaviour {
 		if (blocked) Blocked();
 		else Unblocked();
 
-		if (doorOpen == DoorState.Closing || doorOpen == DoorState.Opening) {
+		if (doorOpen == DoorState_Closing || doorOpen == DoorState_Opening) {
 			AnimatorStateInfo asi = anim.GetCurrentAnimatorStateInfo(0);
 			animatorPlaybackTime = asi.normalizedTime;
-			if (doorOpen == DoorState.Closing && animatorPlaybackTime > 0.95f && !delayFrame) {
-				doorOpen = DoorState.Closed; // Door is closed
+			if (doorOpen == DoorState_Closing && animatorPlaybackTime > 0.95f && !delayFrame) {
+				doorOpen = DoorState_Closed; // Door is closed
 			}
 			
-			if (doorOpen == DoorState.Opening && animatorPlaybackTime > 0.95f && !delayFrame) {
-				doorOpen = DoorState.Open; // Door is open
+			if (doorOpen == DoorState_Opening && animatorPlaybackTime > 0.95f && !delayFrame) {
+				doorOpen = DoorState_Open; // Door is open
 			}
 		}
 
 		if (Sys_Global.pauseRelativeTime > waitBeforeClose) {
-			if ((doorOpen == DoorState.Open) && (!stayOpen) && (!startOpen) && !delayFrame) {
+			if ((doorOpen == DoorState_Open) && (!stayOpen) && (!startOpen) && !delayFrame) {
 				DualLog("Close Door, stayOpen: " + stayOpen.ToString());
 				CloseDoor();
 			}
 		}
 		
 		if (toggleLasers) {
-			if (doorOpen == DoorState.Closed) {
+			if (doorOpen == DoorState_Closed) {
 				ActivateLasers();
 			} else {
 				DeactivateLasers();

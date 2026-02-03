@@ -113,17 +113,17 @@ public class SpawnManager : MonoBehaviour {
 		int randpos;
 		randpos = random_range(0,(spawnLocations.Length-1));
 		Vector3 retval = spawnLocations[randpos].position;
-		if (!AreaClear(retval)) return new Vector3(0,0,0);
-		if (!AreaHidden(retval)) return new Vector3(0,0,0);
+		if (!AreaClear(retval)) return (Vector3){0,0,0);
+		if (!AreaHidden(retval)) return (Vector3){0,0,0);
 		return retval;
 	}
 
 	// CapsuleCast using largest NPC's bounding capsule to check area is clear.
 	bool AreaClear(Vector3 spot) {
 		RaycastHit hit = new RaycastHit();
-		if (Physics.CapsuleCast(spot + new Vector3(0,0.52f,0),
-								spot + new Vector3(0,-0.52f,0),0.48f,
-								Const.a.vectorZero,out hit,0.02f,
+		if (Physics.CapsuleCast(spot + (Vector3){0,0.52f,0),
+								spot + (Vector3){0,-0.52f,0),0.48f,
+								(Vector3){0.0f,0.0f,0.0f},out hit,0.02f,
 								Const.a.layerMaskNPCCollision)) {
 			return false;
 		} else {

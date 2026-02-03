@@ -17,7 +17,7 @@ public class GeneralInvButton : MonoBehaviour {
     }
 
     void GeneralInvClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		GeneralInvUse();
 	}
 
@@ -28,25 +28,25 @@ public class GeneralInvButton : MonoBehaviour {
 
 		// Access Cards
 		if (GeneralInvButtonIndex == 0) {
-			MFDManager.a.SendInfoToItemTab(81);
-			if (MFDManager.a.lastItemSideRH) {
-				MFDManager.a.rightTC.SetCurrentAsLast();
+			Sys_UI.SendInfoToItemTab(81);
+			if (Sys_UI.lastItemSideRH) {
+				Sys_UI.rightTC.SetCurrentAsLast();
 			} else {
-				MFDManager.a.leftTC.SetCurrentAsLast();
+				Sys_UI.leftTC.SetCurrentAsLast();
 			}
 		} else {
-			MFDManager.a.SendInfoToItemTab(useableItemIndex,customIndex);
-			if (MFDManager.a.lastItemSideRH) {
-				MFDManager.a.rightTC.SetCurrentAsLast();
+			Sys_UI.SendInfoToItemTab(useableItemIndex,customIndex);
+			if (Sys_UI.lastItemSideRH) {
+				Sys_UI.rightTC.SetCurrentAsLast();
 			} else {
-				MFDManager.a.leftTC.SetCurrentAsLast();
+				Sys_UI.leftTC.SetCurrentAsLast();
 			}
 		}
     }
 
     public void DoubleClick() {
         inventoryPlayer1.generalInvCurrent = GeneralInvButtonIndex; //Set current
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		GeneralInvApply();
 	}
 
@@ -56,7 +56,7 @@ public class GeneralInvButton : MonoBehaviour {
 			reduce = false;
 		}
 
-		PlayerEnergy.a.GiveEnergy(83f,EnergyType.Battery);
+		GiveEnergy(83f,EnergyType_Battery);
 		reduce = true;
 	}
 
@@ -67,27 +67,27 @@ public class GeneralInvButton : MonoBehaviour {
 			return;
 		}
 
-		PlayerEnergy.a.GiveEnergy(255f,EnergyType.Battery);
+		GiveEnergy(255f,EnergyType_Battery);
 		reduce = true;
 	}
 
 	void ApplyHealthkit() {
-		if (PlayerHealth.a.hm.health >= PlayerHealth.a.hm.maxhealth) {
+		if (instances[PLAYER1].health >= instances[PLAYER1].maxhealth) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[304]);
 			reduce = false;
 			return;
 		}
 
-		PlayerHealth.a.hm.health = PlayerHealth.a.hm.maxhealth;
-		MFDManager.a.DrawTicks(true);
+		instances[PLAYER1].health = instances[PLAYER1].maxhealth;
+		Sys_UI.DrawTicks(true);
 		reduce = true;
 	}
 
 	public void GeneralInvApply() {
 		// Access Cards button
 		if (GeneralInvButtonIndex == 0) {
-			MFDManager.a.SendInfoToItemTab(81);
-			MFDManager.a.OpenTab(1,true,TabMSG.None, useableItemIndex,
+			Sys_UI.SendInfoToItemTab(81);
+			Sys_UI.OpenTab(1,true,TabMSG.None, useableItemIndex,
 								 Handedness.LH);
 			return;
 		}
@@ -100,8 +100,8 @@ public class GeneralInvButton : MonoBehaviour {
 			case 53: ApplyIcadBattery(); break;
 			case 55: ApplyHealthkit(); break;
 			default:
-				MFDManager.a.SendInfoToItemTab(useableItemIndex,customIndex);
-				MFDManager.a.OpenTab(1,true,TabMSG.None, useableItemIndex,
+				Sys_UI.SendInfoToItemTab(useableItemIndex,customIndex);
+				Sys_UI.OpenTab(1,true,TabMSG.None, useableItemIndex,
 									 Handedness.LH);
 
 				// Set current.
@@ -111,7 +111,7 @@ public class GeneralInvButton : MonoBehaviour {
 
 		if (reduce)  {
 			inventoryPlayer1.generalInventoryIndexRef[GeneralInvButtonIndex] = -1;
-			GUIState.a.ClearOverButton();
+			
 		}
 	}
 }

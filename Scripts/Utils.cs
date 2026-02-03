@@ -1,80 +1,3 @@
-using System;
-using System.IO;
-using System.Globalization;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-using UnityEngine;
-using UnityEngine.AI;
-using UnityEngine.Rendering;
-using UnityEngine.UI;
-using UnityEngine.Networking;
-
-#if UNITY_EDITOR
-	using UnityEditor;
-	using UnityEditor.SceneManagement;
-#endif
-
-// Globally accessible utility functions for parsing values, generating save
-// strings, converting enumerated and integer values, and other helpful things.
-//
-// Most of this is for saving.
-// All save strings should follow this rule:
-//
-// Start with data; End with data.
-//
-// E.g. 0|1|1 and NOT these: |0|1|1| or 0|1|1|.
-public class Utils {
-	public static string splitChar = "|"; // Common delimiter, not a comma as
-										  // text could contain commas.  Used
-										  // for all savefile text.
-	public static char splitCharChar = '|';
-	public static CultureInfo en_US_Culture = new CultureInfo("en-US");
-
-	private static bool getValparsed;
-	private static int getValreadInt;
-	private static float getValreadFloat;
-	private static float readFloatx, readFloaty, readFloatz, readFloatw;
-	private static Vector3 tempvec;
-	private static Quaternion tempquat;
-	private static bool testAlreadyRan = false;
-	private static bool testRanSuccessful = false;
-
-	public static object SafeIndex(ref object[] array, int index, int max,
-                                   object failValue) {
-		if (array.Length < 1) {
-            DualLog("SafeIndex: Unexpected situation, array " + nameof(array)
-                      + " was empty!  Using fallback value of "
-                      + failValue.ToString());
-
-            return failValue;
-        }
-
-		if (index < 0 || index > max || index > array.Length) {
-            DualLog("SafeIndex: Unexpected situation, index "
-                      + index.ToString() + " out of bounds [0,"
-                      + array.Length.ToString() + "] or context max of "
-                      + max.ToString() + ".  Set to fallback value of "
-                      + failValue.ToString());
-
-            return failValue;
-        }
-
-		return array[index]; // Safe to pass the index value into the array space.
-	}
-
-	public static float Sign(float value) {
-		if (value < FLT_EPSILON && value > -FLT_EPSILON) return 0f;
-		if (value > 0f) return 1f;
-		return -1f;
-	}
-
-
-	public static void BlankBoolArray(ref bool[] array, bool value) {
-		for (int i=0;i<array.Length;i++) {
-			array[i] = value; // Reset the list
-		}
-	}
 
 	public static void Activate(GameObject go) {
 		if (go == null) return;
@@ -1050,50 +973,50 @@ public class Utils {
 
     public static int FuncStatesToInt(FuncStates funcStates) {
 		switch (funcStates) {
-			case FuncStates.Start:            return 1;
-			case FuncStates.Target:           return 2;
-			case FuncStates.MovingStart:      return 3;
-			case FuncStates.MovingTarget:     return 4;
-			case FuncStates.AjarMovingStart:  return 5;
-			case FuncStates.AjarMovingTarget: return 6;
+			case FuncStates_Start:            return 1;
+			case FuncStates_Target:           return 2;
+			case FuncStates_MovingStart:      return 3;
+			case FuncStates_MovingTarget:     return 4;
+			case FuncStates_AjarMovingStart:  return 5;
+			case FuncStates_AjarMovingTarget: return 6;
 		}
         return 0; // Idle
     }
 
     public static FuncStates GetFuncStatesFromInt(int state_i) {
         switch (state_i) {
-            case 0: return FuncStates.Start;
-            case 1: return FuncStates.Start;
-            case 2: return FuncStates.Target;
-            case 3: return FuncStates.MovingStart;
-            case 4: return FuncStates.MovingTarget;
-            case 5: return FuncStates.AjarMovingStart;
-            case 6: return FuncStates.AjarMovingTarget;
+            case 0: return FuncStates_Start;
+            case 1: return FuncStates_Start;
+            case 2: return FuncStates_Target;
+            case 3: return FuncStates_MovingStart;
+            case 4: return FuncStates_MovingTarget;
+            case 5: return FuncStates_AjarMovingStart;
+            case 6: return FuncStates_AjarMovingTarget;
         }
-        return FuncStates.Start;
+        return FuncStates_Start;
     }
 
 //public enum ForceFieldColor : byte {Red,Green,Blue,Purple,RedFaint};
     public static int ForceFieldColorToInt(ForceFieldColor funcStates) {
 		switch (funcStates) {
-			case ForceFieldColor.Red:      return 1;
-			case ForceFieldColor.Green:    return 2;
-			case ForceFieldColor.Blue:     return 3;
-			case ForceFieldColor.Purple:   return 4;
-			case ForceFieldColor.RedFaint: return 5;
+			case ForceFieldColor_Red:      return 1;
+			case ForceFieldColor_Green:    return 2;
+			case ForceFieldColor_Blue:     return 3;
+			case ForceFieldColor_Purple:   return 4;
+			case ForceFieldColor_RedFaint: return 5;
 		}
         return 1; // Red
     }
 
     public static ForceFieldColor GetForceFieldColorFromInt(int state_i) {
         switch (state_i) {
-            case 1: return ForceFieldColor.Red;
-            case 2: return ForceFieldColor.Green;
-            case 3: return ForceFieldColor.Blue;
-            case 4: return ForceFieldColor.Purple;
-            case 5: return ForceFieldColor.RedFaint;
+            case 1: return ForceFieldColor_Red;
+            case 2: return ForceFieldColor_Green;
+            case 3: return ForceFieldColor_Blue;
+            case 4: return ForceFieldColor_Purple;
+            case 5: return ForceFieldColor_RedFaint;
         }
-        return ForceFieldColor.Red;
+        return ForceFieldColor_Red;
     }
 
     public static SaveableType GetSaveableTypeFromInt(int savtyp) {
@@ -1228,7 +1151,7 @@ public class Utils {
 			readFloatx = GetFloatFromString(entries[index],"anchoredPosition3D.x"); index++;
 			readFloaty = GetFloatFromString(entries[index],"anchoredPosition3D.y"); index++;
 			readFloatz = GetFloatFromString(entries[index],"anchoredPosition3D.z"); index++;
-			rectTr.anchoredPosition3D = new Vector3(readFloatx,readFloaty,readFloatz);
+			rectTr.anchoredPosition3D = (Vector3){readFloatx,readFloaty,readFloatz);
 			
 			readFloatx = GetFloatFromString(entries[index],"anchorMax.x"); index++;
 			readFloaty = GetFloatFromString(entries[index],"anchorMax.y"); index++;
@@ -1264,13 +1187,13 @@ public class Utils {
 			readFloatx = GetFloatFromString(entries[index],"localScale.x"); index++;
 			readFloaty = GetFloatFromString(entries[index],"localScale.y"); index++;
 			readFloatz = GetFloatFromString(entries[index],"localScale.z"); index++;
-			rectTr.localScale = new Vector3(readFloatx,readFloaty,readFloatz);
+			rectTr.localScale = (Vector3){readFloatx,readFloaty,readFloatz);
 		} else {
 			// Get position
 			readFloatx = GetFloatFromString(entries[index],"localPosition.x"); index++;
 			readFloaty = GetFloatFromString(entries[index],"localPosition.y"); index++;
 			readFloatz = GetFloatFromString(entries[index],"localPosition.z"); index++;
-			tr.localPosition = new Vector3(readFloatx,readFloaty,readFloatz);
+			tr.localPosition = (Vector3){readFloatx,readFloaty,readFloatz);
 
 			// Get rotation
 			readFloatx = GetFloatFromString(entries[index],"localRotation.x"); index++;
@@ -1286,7 +1209,7 @@ public class Utils {
 			readFloatx = GetFloatFromString(entries[index],"localScale.x"); index++;
 			readFloaty = GetFloatFromString(entries[index],"localScale.y"); index++;
 			readFloatz = GetFloatFromString(entries[index],"localScale.z"); index++;
-			tr.localScale = new Vector3(readFloatx,readFloaty,readFloatz);
+			tr.localScale = (Vector3){readFloatx,readFloaty,readFloatz);
 		}
 		return index; // Carry on with current index read.
 	}
@@ -1314,11 +1237,11 @@ public class Utils {
 		float readX = Utils.GetFloatFromString(entries[index],"center.x"); index++;
 		float readY = Utils.GetFloatFromString(entries[index],"center.y"); index++;
 		float readZ = Utils.GetFloatFromString(entries[index],"center.z"); index++;
-		bcol.center = new Vector3(readX,readY,readZ);
+		bcol.center = (Vector3){readX,readY,readZ);
 		readX = Utils.GetFloatFromString(entries[index],"size.x"); index++;
 		readY = Utils.GetFloatFromString(entries[index],"size.y"); index++;
 		readZ = Utils.GetFloatFromString(entries[index],"size.z"); index++;
-		bcol.size = new Vector3(readX,readY,readZ);
+		bcol.size = (Vector3){readX,readY,readZ);
 		return index;
 	}
 
@@ -1348,7 +1271,7 @@ public class Utils {
 		readFloatx = GetFloatFromString(entries[index],"velocity.x"); index++;
 		readFloaty = GetFloatFromString(entries[index],"velocity.y"); index++;
 		readFloatz = GetFloatFromString(entries[index],"velocity.z"); index++;
-		tempvec = new Vector3(readFloatx,readFloaty,readFloatz);
+		tempvec = (Vector3){readFloatx,readFloaty,readFloatz);
 		rbody.velocity = tempvec;
 // 		CollisionDetectionMode oldCollision = rbody.collisionDetectionMode;
 		rbody.isKinematic = GetBoolFromString(entries[index],"isKinematic"); index++;
@@ -1459,32 +1382,32 @@ public class Utils {
 
 	public static void PlayOneShotSavable(AudioSource SFX, int fx) {
 		if (fx < 0) return;
-		if (fx >= Const.a.sounds.Length) return;
+		if (fx >= sounds.Length) return;
 
-		PlayOneShotSavable(SFX,Const.a.sounds[fx],0);
+		PlayOneShotSavable(SFX,sounds[fx],0);
 	}
 
 	public static void PlayOneShotSavable(AudioSource SFX, int fx, float vol) {
 		if (fx < 0) return;
-		if (fx >= Const.a.sounds.Length) return;
+		if (fx >= sounds.Length) return;
 
-		PlayOneShotSavable(SFX,Const.a.sounds[fx],vol);
+		PlayOneShotSavable(SFX,sounds[fx],vol);
 	}
 	
 	public static void PlayUIOneShotSavable(int fx, float vol) {
 		if (fx < 0) return;
-		if (fx >= Const.a.sounds.Length) return;
+		if (fx >= sounds.Length) return;
 
 		AudioSource aud = null;
-		for (int i=0;i<MFDManager.a.UIAudSource.Length;i++) { 
-			if (MFDManager.a.UIAudSource[i].isPlaying) continue;
+		for (int i=0;i<Sys_UI.UIAudSource.Length;i++) { 
+			if (Sys_UI.UIAudSource[i].isPlaying) continue;
 			
-			aud = MFDManager.a.UIAudSource[i]; // Free channel.
+			aud = Sys_UI.UIAudSource[i]; // Free channel.
 		}
 		
 		if (aud == null) return; // Couldn't find a free channel.
 		
-		PlayOneShotSavable(aud,Const.a.sounds[fx],vol);
+		PlayOneShotSavable(aud,sounds[fx],vol);
 	}
 	
 	public static void PlayUIOneShotSavable(int fx) {
@@ -1493,10 +1416,10 @@ public class Utils {
 	
 	public static void PlayUIOneShotSavable(AudioClip fxclip) {
 		AudioSource aud = null;
-		for (int i=0;i<MFDManager.a.UIAudSource.Length;i++) { 
-			if (MFDManager.a.UIAudSource[i].isPlaying) continue;
+		for (int i=0;i<Sys_UI.UIAudSource.Length;i++) { 
+			if (Sys_UI.UIAudSource[i].isPlaying) continue;
 			
-			aud = MFDManager.a.UIAudSource[i]; // Free channel.
+			aud = Sys_UI.UIAudSource[i]; // Free channel.
 		}
 		
 		if (aud == null) return; // Couldn't find a free channel.
@@ -1509,7 +1432,7 @@ public class Utils {
 	}
 
 	public static void PlaySavable(AudioSource SFX, int fxclip) {
-		PlayAudioSavable(SFX,Const.a.sounds[fxclip],0,false);
+		PlayAudioSavable(SFX,sounds[fxclip],0,false);
 	}
 
 	private static StringBuilder auds1 = new StringBuilder();
@@ -1645,22 +1568,6 @@ public class Utils {
 		SafeDestroy(go,false);
 	}
 
-	public static void SafeDestroyImmediate(GameObject go) {
-		SafeDestroy(go,true);
-	}
-	
-	public static void SafeDestroyAllChildren(Transform parent) {
-		for (int i=0;i<parent.childCount;i++) {
-			SafeDestroy(parent.GetChild(i).gameObject);
-		}
-	}
-
-	public static void SafeDestroyImmediateAllChildren(Transform parent) {
-		for (int i=0;i<parent.childCount;i++) {
-			SafeDestroyImmediate(parent.GetChild(i).gameObject);
-		}
-	}
-
 	public static void ApplyImpactForce(GameObject go, float impactVelocity,
 										Vector3 attackNormal, Vector3 spot) {
 		Rigidbody rbody = go.GetComponent<Rigidbody>();
@@ -1732,21 +1639,4 @@ public class Utils {
 			i++;
 		}
 	}
-	
-	public static void PlayTempAudio(Vector3 spot,AudioClip clip,float volume) {
-		GameObject tempAud = Const.a.GetObjectFromPool(PoolType.TempAudioSources);
-		if (tempAud != null) {
-			tempAud.instances[i].position = spot; // set temporary audiosource to right here
-			PooledItemDestroy poolDet = tempAud.GetComponent<PooledItemDestroy>();
-			if (poolDet != null) poolDet.itemLifeTime = clip.length;
-			tempAud.SetActive(true);
-			AudioSource aS = tempAud.GetComponent<AudioSource>();
-			PlayOneShotSavable(aS,clip);
-		}
-	}
-
-	public static void PlayTempAudio(Vector3 spot,AudioClip clip) {
-		PlayTempAudio(spot,clip,1f);
-	}
-
 }

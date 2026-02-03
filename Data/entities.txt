@@ -5314,6 +5314,14 @@ texture: 553
 index: 754
 model: 143
 texture: 316
+#camera_view
+index: 755
+#ef_particle_leafburst
+index: 756
+#ef_particle_mutationburst
+index: 757
+#ef_particle_graytationburst
+index: 758
 #player
 index: 767
 

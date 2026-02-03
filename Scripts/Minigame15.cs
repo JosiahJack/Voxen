@@ -50,7 +50,7 @@ public class Minigame15 : MonoBehaviour {
         // TODO: Pick image, set size, hide numbers if using image.
         for (int i=1;i<=16;i++) { curNum[i] = i; sliding[i] = false; }
         int sixteenIndex = 16;
-        int shuffleIter = SSys_Global.difficultyPuzzle * 5;
+        int shuffleIter = Sys_Global.difficultyPuzzle * 5;
         while (shuffleIter > 0) {
             int randIter = 32;
             while (randIter > 0) { // Find cell next to empty slot
@@ -66,28 +66,28 @@ public class Minigame15 : MonoBehaviour {
             shuffleIter--;
         }
 
-        position[1]  = new Vector3(-48f, 48f,-1f);
-        position[2]  = new Vector3(-16f, 48f,-1f);
-        position[3]  = new Vector3( 16f, 48f,-1f);
-        position[4]  = new Vector3( 48f, 48f,-1f);
-        position[5]  = new Vector3(-48f, 16f,-1f);
-        position[6]  = new Vector3(-16f, 16f,-1f);
-        position[7]  = new Vector3( 16f, 16f,-1f);
-        position[8]  = new Vector3( 48f, 16f,-1f);
-        position[9]  = new Vector3(-48f,-16f,-1f);
-        position[10] = new Vector3(-16f,-16f,-1f);
-        position[11] = new Vector3( 16f,-16f,-1f);
-        position[12] = new Vector3( 48f,-16f,-1f);
-        position[13] = new Vector3(-48f,-48f,-1f);
-        position[14] = new Vector3(-16f,-48f,-1f);
-        position[15] = new Vector3( 16f,-48f,-1f);
-        position[16] = new Vector3( 48f,-48f,-1f);
+        position[1]  = (Vector3){-48f, 48f,-1f);
+        position[2]  = (Vector3){-16f, 48f,-1f);
+        position[3]  = (Vector3){ 16f, 48f,-1f);
+        position[4]  = (Vector3){ 48f, 48f,-1f);
+        position[5]  = (Vector3){-48f, 16f,-1f);
+        position[6]  = (Vector3){-16f, 16f,-1f);
+        position[7]  = (Vector3){ 16f, 16f,-1f);
+        position[8]  = (Vector3){ 48f, 16f,-1f);
+        position[9]  = (Vector3){-48f,-16f,-1f);
+        position[10] = (Vector3){-16f,-16f,-1f);
+        position[11] = (Vector3){ 16f,-16f,-1f);
+        position[12] = (Vector3){ 48f,-16f,-1f);
+        position[13] = (Vector3){-48f,-48f,-1f);
+        position[14] = (Vector3){-16f,-48f,-1f);
+        position[15] = (Vector3){ 16f,-48f,-1f);
+        position[16] = (Vector3){ 48f,-48f,-1f);
 
         for (int i=1;i<=16;i++) {
             numText[i].text = curNum[i].ToString();
             if (curNum[i] == 16) numText[i].text = "";
             tileImage[i].rectTransform.localPosition =
-                new Vector3(position[i].x,position[i].y,0f);
+                (Vector3){position[i].x,position[i].y,0f);
         }
 
         slideTickFinished = Sys_Global.pauseRelativeTime;
@@ -174,7 +174,7 @@ public class Minigame15 : MonoBehaviour {
                 if (slidingUp) y = pos.y + shift;
                 else if (slidingDown) y = pos.y - shift;
 
-                sliderButton.localPosition = new Vector3(x,y,-1f);
+                sliderButton.localPosition = (Vector3){x,y,-1f);
                 float curx = sliderButton.localPosition.x;
                 float cury = sliderButton.localPosition.y;
                 if (   (slidingLeft  && curx <= position[i].x)
@@ -182,7 +182,7 @@ public class Minigame15 : MonoBehaviour {
                     || (slidingUp    && cury >= position[i].y)
                     || (slidingDown  && cury <= position[i].y)) {
 
-                    sliderButton.gameObject.SetActive(false);
+                    sliderButton.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
                     sliderButtonText.text = "";
                     tileImage[i].color = plainColor;
                     numText[i].text = curNum[i].ToString();

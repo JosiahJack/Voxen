@@ -54,12 +54,12 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			return;
 		}
 
-		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(instances[i].position);
+		if (GetCurrentLevelSecurity() > securityThreshhold) {
+			Sys_UI.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
-		if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
+		if (LevelManager.a.superoverride || Sys_Global.difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -85,7 +85,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 			alreadyOpen = true;
 		}
 
-		MFDManager.a.SendGridPuzzleToDataTab(grid,cellType,gridType,
+		Sys_UI.SendGridPuzzleToDataTab(grid,cellType,gridType,
 											 sourceIndex,outputIndex,width,
 											 height,theme,target,ud,
 											 instances[i].position,this);
@@ -100,7 +100,7 @@ public class PuzzleGridPuzzle : MonoBehaviour {
 		if (onlyFireOnce) fired = true;
 		UseData ud = new UseData();
 		ud.owner = owner;
-		Const.a.UseTargets(gameObject,ud,target);
+		UseTargets(gameObject,ud,target);
 		CenterStatusPrint(successMessageLingdex);
 	}
 

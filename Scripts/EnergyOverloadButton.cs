@@ -27,7 +27,7 @@ public class EnergyOverloadButton : MonoBehaviour {
     }
 
     public void OverloadEnergyClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
         OverloadButtonAction();
     }
 

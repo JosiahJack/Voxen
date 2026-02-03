@@ -10,6 +10,6 @@ public class SearchFXReset : MonoBehaviour {
 
 	IEnumerator DisableMe () {
 		yield return new WaitForSeconds(itemLifeTime);
-		gameObject.SetActive(false);
+		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 	}
 }

@@ -6,11 +6,11 @@ public class TriggerScuffRustles : MonoBehaviour {
     private float finished;
 
     void OnTriggerEnter (Collider col) {
-        if (clip < 0 || clip >= Const.a.sounds.Length) return;
+        if (clip < 0 || clip >= sounds.Length) return;
         if (!(col.gameObject.CompareTag("Player"))) return;
         if (finished > Time.time) return;
 
 		finished = Time.time + random_range(3f,5f);
-        SFX.PlayOneShot(Const.a.sounds[clip],random_range(0.5f,0.75f));
+        SFX.PlayOneShot(sounds[clip],random_range(0.5f,0.75f));
 	}
 }

@@ -59,6 +59,6 @@ public class FireWorkThang : MonoBehaviour {
             tickFinished = Sys_Global.pauseRelativeTime + waitTimeFull;
         }
 
-        instances[i].scale = new Vector3(curScale,curScale,curScale);
+        instances[i].scale = (Vector3){curScale,curScale,curScale);
     }
 }

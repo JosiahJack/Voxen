@@ -5,33 +5,6 @@
 #include "os.h"
 #include "voxen.h"
 
-void InitializeEntity(Entity* entry) {
-    entry->index = UINT16_MAX; // memset here would be harmful as only a handful of fields are the same.
-    entry->entflags = ENTFLAG_KINEMATIC; // Zeroes the rest out.
-    entry->modelIndex = MODEL_IDX_MAX;
-    entry->layer = PhysicsLayer_Default;
-    flag_set(&entry->entflags, ENTFLAG_ANIMATED, false);
-    entry->texIndex = entry->glowIndex = entry->specIndex = entry->normIndex = MAX_VALID_TEXTURE;
-    entry->lodIndex  = MODEL_IDX_MAX;
-    entry->rotation.x = entry->rotation.y = entry->rotation.z = 0.0f; entry->rotation.w = 1.0f; // Quaternion identity
-    entry->scale.x = entry->scale.y = entry->scale.z = 1.0f;
-    entry->collider = COLLIDER_TYPE_NONE;
-    entry->colliderMeshIndex = MODEL_IDX_MAX;
-    entry->mass = 1.0f;
-    entry->angularDrag = 0.05f;
-    entry->dynamicFriction = entry->staticFriction = 0.6f;
-    entry->frictionCombine = entry->bounceCombine = PHYS_COMBINE_AVG;
-    entry->volume = 1.0f;
-    flag_set(&entry->entflags, ENTFLAG_TEST_PERSISTENT, false);
-    for (int i=0;i<MAX_CHILD_COUNT;++i) {
-        entry->child[i] = UINT16_MAX;
-        entry->child_offset[i].x = entry->child_offset[i].y = entry->child_offset[i].z = 0.0f;
-        entry->child_rotation[i].x = entry->child_rotation[i].y = entry->child_rotation[i].z = 0.0f; entry->child_rotation[i].w = 1.0f;
-        entry->child_scale[i].x = entry->child_scale[i].y = entry->child_scale[i].z = 1.0f;
-    }
-    entry->path[0] = '\0';    
-}
-
 Entity entities[MAX_ENTITIES]; // Global array of entity definitions
 uint16_t entityCount; // Number of entities loaded
 void LoadEntities(void) {
@@ -124,6 +97,8 @@ void AddInstance(uint16_t entIdx, uint16_t i) {
 
 void DeleteInstance(uint16_t i) {
     if (i <= PLAYER2 || i >= loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
+    
+    if (instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
     
     if (i <= startOfDoubleSidedInstances) --startOfDoubleSidedInstances; // Shift render state markers.
     if (i <= startOfTransparentInstances) --startOfTransparentInstances;
@@ -396,9 +371,9 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "lerpOn") == 0)          lightLerpOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "currentStep") == 0)     lightCurrentStep[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "lerpValue") == 0)       lightLerpValue[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "lerpTime") == 0) {      float lt = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum); lightLerpTime[lightsIdx] = lt < 0.1f ? 0.1f : lt; }
-                else if (strcmp(trimmed_key, "stepTime") == 0)        lightLerpStepTime[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "lerpStartTime") == 0)   lightLerpStartTime[lightsIdx] = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum);
+//                 else if (strcmp(trimmed_key, "lerpTime") == 0) {      float lt = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum); lightLerpTime[lightsIdx] = lt < 0.1f ? 0.1f : lt; }
+//                 else if (strcmp(trimmed_key, "stepTime") == 0)        lightLerpStepTime[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+//                 else if (strcmp(trimmed_key, "lerpStartTime") == 0)   lightLerpStartTime[lightsIdx] = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "intervalSteps.Length") == 0) lightIntervalStepsLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "intervalSteps[0]") == 0)     lightIntervalSteps[lightsIdx][0] = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "intervalSteps[1]") == 0)     lightIntervalSteps[lightsIdx][1] = parse_float(trimmed_value, initialLine, lineNum);
@@ -476,6 +451,13 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "localScale.y") == 0)    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localScale.z") == 0)    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "go.activeSelf") == 0)   flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (strcmp(trimmed_key, "requireReset") == 0)    flag_set(&instances[instanceIdx].entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (strcmp(trimmed_key, "amount") == 0)          instances[instanceIdx].amount = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "resetTime") == 0)       instances[instanceIdx].resetTime = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "minSecurityLevel") == 0)instances[instanceIdx].minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
+                else if (strcmp(trimmed_key, "damageOnUse") == 0)     flag_set(&instances[instanceIdx].entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (strcmp(trimmed_key, "target") == 0)          StringCopyInto_A_From_B(instances[instanceIdx].target,trimmed_value,TARGET_STRING_LENGTH);
+                else if (strcmp(trimmed_key, "targetname") == 0)      StringCopyInto_A_From_B(instances[instanceIdx].targetname,trimmed_value,TARGET_STRING_LENGTH);
             }
         }
         
@@ -618,48 +600,10 @@ void LoadLevel(uint8_t curlevel) {
     DebugRAM("end of LoadLevel instances");
     RenderLoadingProgress(110,"Loading models...");
     LoadModels();
-    
-    // Set Physics
-    for (int i=0;i<ARRSIZE;++i) { gridCellFloorHeight[i] = -FLT_MAX; gridCellCeilingHeight[i] = FLT_MAX;}
-    for (int i=PLAYER1;i<loadedInstances;++i) {
-        int32_t cellIdx = PosGetCellCoords(instances[i].position.x, instances[i].position.z);
-        instances[i].cellIndex = cellIdx;
-        if (i == PLAYER1 || i == PLAYER2 || ConstIndexIsDynamicObject(instances[i].index)) instances[i].gravity = 1.0f; // Normal gravity
-        else instances[i].gravity = 0.0f;
-        
-        if (instances[i].index < MAX_ENTITIES) flag_set(&instances[i].entflags, ENTFLAG_ANIMATED, entities[instances[i].index].entflags & ENTFLAG_ANIMATED);        
-        if (instances[i].modelIndex >= loadedModelsMaxIndex) continue;
-        if (instances[i].collider == COLLIDER_TYPE_NONE) continue;
-        if (instances[i].collider == COLLIDER_TYPE_CONVEXMESH && instances[i].colliderMeshIndex >= loadedModelsMaxIndex) continue;
-        
-        if (instances[i].collider == COLLIDER_TYPE_BOX) {
-            Quaternion quat = instances[i].rotation;
-            Quaternion upQuat = {0.0f, 0.0f, 0.0f, 1.0f};
-            float floorangle = quat_angle_deg(quat,upQuat); // Get angle in degrees relative to up vector (floor normal)
-            Quaternion downQuat = {0.0f, 0.0f, 0.0f, -1.0f};
-            float ceilangle = quat_angle_deg(quat,downQuat); // Get angle in degrees relative to down vector (ceiling normal)
-            float floorHeight = (floorangle <= 30.0f) ? instances[i].position.y - 1.28f : -FLT_MAX; // World cells are 2.56x2.56x2.56 with modular chunk origins at center, so offset by half cell size to get actual positions.
-            if (floorHeight > -FLT_MAX && floorHeight > gridCellFloorHeight[cellIdx]) gridCellFloorHeight[cellIdx] = floorHeight; // Raise floor up until highest one is selected.
-            float ceilHeight = (ceilangle <= 30.0f) ? instances[i].position.y + 1.28f : FLT_MAX;
-            if (ceilHeight < FLT_MAX && ceilHeight < gridCellCeilingHeight[cellIdx]) gridCellCeilingHeight[cellIdx] = ceilHeight; // Raise floor up until highest one is selected.
-            continue;
-        }
-    }
-    
-    float levelMinFloor = FLT_MAX;
-    float levelMaxCeil = -FLT_MAX;
-    for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
-        if (gridCellFloorHeight[i] > (-FLT_MAX +  1.0f) && gridCellFloorHeight[i] < levelMinFloor) levelMinFloor = gridCellFloorHeight[i];
-        if (gridCellCeilingHeight[i] < (FLT_MAX - 1.0f) && gridCellCeilingHeight[i] > levelMaxCeil) levelMaxCeil = gridCellCeilingHeight[i];
-    }
-    
-    for (int i=0;i<ARRSIZE;++i) { //         Using 1.0f buffer for floating point innaccuracies
-        if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
-        if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
-    }
-
     RenderLoadingProgress(110,"Loading textures...");
     LoadTextures();
+    RenderLoadingProgress(110,"Initialize entities...");
+    InitAfterLoad();
     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!

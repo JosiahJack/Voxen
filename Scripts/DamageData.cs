@@ -50,7 +50,7 @@ public class DamageData {
 		damageData.other = null;
 		damageData.indexNPC = -1;
 		damageData.hit = new RaycastHit();
-		damageData.attacknormal = Const.a.vectorZero;
+		damageData.attacknormal = (Vector3){0.0f,0.0f,0.0f};
 		damageData.impactVelocity = 0f;
 	}
 
@@ -65,7 +65,7 @@ public class DamageData {
 		}
 
 		if (attackNum < 1 || attackNum > 3) attackNum = 1;
-		DamageData dd = new DamageData(); 
+		DamageData dd; 
 		// Attacker (self [a]) data
 		dd.owner = ownedBy;
 		switch (attackNum) {

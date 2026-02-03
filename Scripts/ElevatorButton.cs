@@ -37,17 +37,17 @@ public class ElevatorButton : MonoBehaviour {
 	}
 
 	public void ElevButtonClick () {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 
-		if (MFDManager.a.linkedElevatorDoor == null) {
+		if (Sys_UI.linkedElevatorDoor == null) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
 			return;
 		}
 
-		bool dC = MFDManager.a.linkedElevatorDoor.doorOpen == DoorState.Closed;
-		Vector3 plyPos = MFDManager.a.playerCapsuleTransform.position;
-		float dist = distance_vector3(MFDManager.a.objectInUsePos,plyPos);
-		if (dist > Const.elevatorPadUseDistance && !dC) {
+		bool dC = Sys_UI.linkedElevatorDoor.doorOpen == DoorState_Closed;
+		Vector3 plyPos = instances[PLAYER1].position;
+		float dist = distance_vector3(Sys_UI.objectInUsePos,plyPos);
+		if (dist > ELEVATOR_PAD_TETHER_DIST && !dC) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[6]); // Too far away from that.
 			return;
 		}

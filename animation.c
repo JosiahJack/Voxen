@@ -132,7 +132,7 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
 	void Awake() {
 		// Get a reference to the Material of the game object this script is attached to.
 		mR = GetComponent<MeshRenderer>();
-		if (mR == null) { this.gameObject.SetActive(false); return; }
+		if (mR == null) { this.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); return; }
 		this.goMaterial = this.GetComponent<Renderer>().material;
 		SFX = GetComponent<AudioSource>();
 		pid = GetComponent<PrefabIdentifier>();
@@ -150,7 +150,7 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
 
 	// called by HealthManager.cs's ScreenDeath
 	public void Destroy() {
-		Utils.PlayOneShotSavable(SFX,Const.a.sounds[69]); // screen_destroy
+		Utils.PlayOneShotSavable(SFX,sounds[69]); // screen_destroy
 		if (lightContainer != null) lightContainer.SetActive(false);
 		screenDestroyed = true; // if not already dead, say so
 	}
@@ -1066,7 +1066,7 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
 // 	void Update() {
 // 		if (!Sys_Global.gamePaused || playOnMenu) {
 // 			if (!Sys_Global.menuActive || playOnMenu) {
-// 				if (deactivateAtEnd && playDone) gameObject.SetActive(false);
+// 				if (deactivateAtEnd && playDone) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 // 				if (stopAtEnd && playDone) return;
 // 
 // 				if (stopAtEnd && !playDone) {

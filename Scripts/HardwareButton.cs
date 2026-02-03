@@ -93,7 +93,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void BioClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		BioAction();
 	}
 
@@ -131,14 +131,14 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void ActivateSensaroundCenter() {
-		MFDManager.a.DisableAllCenterTabs();
+		Sys_UI.DisableAllCenterTabs();
 		Utils.Activate(sensaroundCenterCamera);
 		Utils.Activate(sensaroundCenter);
 	}
 
 	public void ActivateSensaroundSides() {
-		MFDManager.a.TabReset(true); // right
-		MFDManager.a.TabReset(false); // left
+		Sys_UI.TabReset(true); // right
+		Sys_UI.TabReset(false); // left
 		if (sensaroundLHCamera != null) sensaroundLHCamera.SetActive (true);
 		if (sensaroundLH != null) sensaroundLH.SetActive (true);
 		if (sensaroundRHCamera != null) sensaroundRHCamera.SetActive (true);
@@ -167,11 +167,11 @@ public class HardwareButton : MonoBehaviour {
 
 	public void DeactivateSensaroundCameras() {
 		HideSensaround();
-		MFDManager.a.CenterTabButtonClickSilent(MFDManager.a.curCenterTab,true);
-		MFDManager.a.TabReset(true); // right
-		MFDManager.a.TabReset(false); // left
-		MFDManager.a.ReturnToLastTab(true);
-		MFDManager.a.ReturnToLastTab(false);
+		Sys_UI.CenterTabButtonClickSilent(Sys_UI.curCenterTab,true);
+		Sys_UI.TabReset(true); // right
+		Sys_UI.TabReset(false); // left
+		Sys_UI.ReturnToLastTab(true);
+		Sys_UI.ReturnToLastTab(false);
 	}
 
 	public void SensaroundOn() {
@@ -181,7 +181,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void SensaroundClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		SensaroundAction();
 	}
 
@@ -205,7 +205,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void ShieldClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		ShieldAction();
 	}
 	
@@ -241,7 +241,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void LanternClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		LanternAction();
 	}
 
@@ -280,7 +280,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void InfraredClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		InfraredAction();
 	}
 
@@ -320,13 +320,13 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void EReaderClick () {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		EReaderAction();
 	}
 	
 	public void EReaderOn() {
 		inventoryPlayer1.hardwareIsActive[2] = true;
-		MFDManager.a.OpenEReaderInItemsTab();
+		Sys_UI.OpenEReaderInItemsTab();
 	}
 
 	public void EReaderAction() {
@@ -336,7 +336,7 @@ public class HardwareButton : MonoBehaviour {
 
 
 	public void BoosterClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		BoosterAction();
 	}
 
@@ -366,7 +366,7 @@ public class HardwareButton : MonoBehaviour {
 	}
 
 	public void JumpJetsClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		JumpJetsAction();
 	}
 

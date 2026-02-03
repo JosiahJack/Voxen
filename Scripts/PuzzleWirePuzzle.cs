@@ -59,12 +59,12 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 			return;
 		}
 
-		if (LevelManager.a.GetCurrentLevelSecurity() > securityThreshhold) {
-			MFDManager.a.BlockedBySecurity(instances[i].position);
+		if (GetCurrentLevelSecurity() > securityThreshhold) {
+			Sys_UI.BlockedBySecurity(instances[i].position);
 			return;
 		}
 
-		if (LevelManager.a.superoverride || SSys_Global.difficultyMission == 0) {
+		if (LevelManager.a.superoverride || Sys_Global.difficultyMission == 0) {
 			// SHODAN can go anywhere!  Full security override!
 			locked = false;
 		}
@@ -85,7 +85,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 
 		CenterStatusPrint(190); //Puzzle accessed
 		inUse = true;
-		MFDManager.a.SendWirePuzzleToDataTab(wiresOn,rowsActive,
+		Sys_UI.SendWirePuzzleToDataTab(wiresOn,rowsActive,
 											 currentPositionsLeft,
 											 currentPositionsRight,
 											 solutionPositionsLeft,
@@ -97,7 +97,7 @@ public class PuzzleWirePuzzle : MonoBehaviour {
 	public void UseTargets (GameObject owner) {
 		UseData ud = new UseData();
 		ud.owner = owner;
-		Const.a.UseTargets(gameObject,ud,target);
+		UseTargets(gameObject,ud,target);
 		CenterStatusPrint(successMessageLingdex);
 	}
 }

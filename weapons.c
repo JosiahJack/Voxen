@@ -117,7 +117,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //     void Start() {
 //         damageData = new DamageData();
 //         tempHit = new RaycastHit();
-//         tempVec = new Vector3(0f, 0f, 0f);
+//         tempVec = (Vector3){0f, 0f, 0f);
 //         heatTickFinished = Sys_Global.pauseRelativeTime + heatTickTime;
 // 		reloadContainerHome = reloadContainer.localPosition;
 // 
@@ -237,7 +237,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		if (strength <= 0f) return;
 // 		if (instances[PLAYER1].fatigue > 80.0f) strength = strength * 2f;
 // 		strength = strength * 0.25f;
-// 		Vector3 wepJoltPosition = new Vector3(reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1f,1f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
+// 		Vector3 wepJoltPosition = (Vector3){reloadContainer.localPosition.x - (strength * 0.5f * random_range(-1f,1f)), reloadContainer.localPosition.y, (reloadContainerHome.z - strength));
 // 		if (wepJoltPosition.x > 999f) wepJoltPosition.x = 0;
 // 		if (wepJoltPosition.y > 999f) wepJoltPosition.y = 0;
 // 		if (wepJoltPosition.z > 999f) wepJoltPosition.z = 0;
@@ -267,7 +267,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		z = lerp(z,reloadContainerHome.z,Time.deltaTime);
 // 		x = lerp(x,reloadContainerHome.x,Time.deltaTime);
 // 		reloadContainer.localPosition = 
-// 			new Vector3(x,reloadContainer.localPosition.y,z);
+// 			(Vector3){x,reloadContainer.localPosition.y,z);
 // 	}
 // 
 // 	void UpdateWeaponReloadDip() {
@@ -289,14 +289,14 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			}
 // 
 // 			vclamp(targetY, -100f, 100f);
-// 			Vector3 pos = new Vector3(reloadContainer.localPosition.x,
+// 			Vector3 pos = (Vector3){reloadContainer.localPosition.x,
 // 									  targetY,
 // 									  reloadContainer.localPosition.z);
 // 
 // 			reloadContainer.localPosition = pos;
 // 		} else {
 // 			lerpUp = 0;
-// 			Vector3 pos = new Vector3(reloadContainer.localPosition.x,
+// 			Vector3 pos = (Vector3){reloadContainer.localPosition.x,
 // 									  reloadContainerHome.y,
 // 									  reloadContainer.localPosition.z);
 // 
@@ -343,8 +343,8 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		int ind = WeaponCurrent.a.weaponIndex;
 // 		bool alt = false;
 // 		if (ind >= 0 && ind < 16) alt = inventoryPlayer1.wepLoadedWithAlternate[ind];
-// 		MFDManager.a.SetAmmoIcons(ind,alt);
-// 		MFDManager.a.SetWepInfo(WeaponCurrent.a.weaponIndex);
+// 		Sys_UI.SetAmmoIcons(ind,alt);
+// 		Sys_UI.SetWepInfo(WeaponCurrent.a.weaponIndex);
 // 		WeaponCurrent.a.UpdateWeaponViewModels();
 // 	}
 // 
@@ -383,7 +383,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			}
 // 
 // 			if (MouseLookScript.a.holdingObject
-// 				&& !MFDManager.a.mouseClickHeldOverGUI) { // !Just clicked
+// 				&& !Sys_UI.mouseClickHeldOverGUI) { // !Just clicked
 // 				if (!GUIState.a.isBlocking) {
 // 					// Drop it
 // 					MouseLookScript.a.DropHeldItem ();
@@ -400,7 +400,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		if (wepdex == -1) return; // No weapon.
 // 		if (GUIState.a.isBlocking) return;
 // 		if (MouseLookScript.a.holdingObject) return;
-// 		if (MFDManager.a.mouseClickHeldOverGUI) return;
+// 		if (Sys_UI.mouseClickHeldOverGUI) return;
 // 
 // 		StartNormalAttack(wepdex);
 // 	}
@@ -423,7 +423,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 		if (GUIState.a.isBlocking) yield break;
 // 		if (MouseLookScript.a.holdingObject) yield break;
-// 		if (MFDManager.a.mouseClickHeldOverGUI) yield break;
+// 		if (Sys_UI.mouseClickHeldOverGUI) yield break;
 // 		if (reloadFinished >= Sys_Global.pauseRelativeTime) yield break;
 // 		if (waitTilNextFire >= Sys_Global.pauseRelativeTime) yield break;
 // 		if (wepdex < 0 || wepdex > 15) yield break;
@@ -752,7 +752,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 if (overloadEnabled) {
 //                     energoverButton.OverloadFired();
 //                     if (!WeaponCurrent.a.bottomless && !WeaponCurrent.a.redbull) {
-// 						PlayerEnergy.a.TakeEnergy(Const.a.energyDrainOverloadForWeapon[index]); //take large amount
+// 						TakeEnergy(Const.a.energyDrainOverloadForWeapon[index]); //take large amount
 // 						if (BiomonitorGraphSystem.a != null) {
 // 							BiomonitorEnergyPulse(Const.a.energyDrainOverloadForWeapon[index]);
 // 						}
@@ -760,7 +760,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 //                 } else {
 //                     float takeEnerg = (WeaponCurrent.a.weaponEnergySetting[WeaponCurrent.a.weaponCurrent] / 100f) * (Const.a.energyDrainHiForWeapon[index] - Const.a.energyDrainLowForWeapon[index]);
 //                     if (!WeaponCurrent.a.bottomless && !WeaponCurrent.a.redbull) {
-// 						PlayerEnergy.a.TakeEnergy(takeEnerg);
+// 						TakeEnergy(takeEnerg);
 // 						if (BiomonitorGraphSystem.a != null) {
 // 							BiomonitorEnergyPulse(takeEnerg);
 // 						}
@@ -933,113 +933,113 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 	}
 // 
 // 	// TargetID Instance
-// 	void CreateTargetIDInstance(float dmgFinal, HealthManager hm, float tranq) {
-// 		 if (hm == null || !hm.isNPC || hm.health <= 0f) return;
-// 		if (!inventoryPlayer1.hasHardware[4] && tranq <= 0f && dmgFinal > 0f) return;
-// 		if (hm.linkedTargetID != null) return; // Let SendDamageReceive handle updates
-// 
-// 		float linkDistForTargID = TargetID.GetTargetIDTetherRange();
-// 		bool showHealth = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 2;
-// 		bool showRange = inventoryPlayer1.hasHardware[4];
-// 		bool showAttitude = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1;
-// 		bool showName = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1;
-// 
-// 		GameObject idFrame = Instantiate(Const.a.GetPrefab(736), hm.instances[i].position, Const.a.quaternionIdentity) as GameObject;
-// 		if (idFrame == null) return;
-// 
-// 		TargetID tid = idFrame.GetComponent<TargetID>();
-// 		if (tid == null) return;
-// 
-// 		tid.parent = hm.transform;
-// 		tid.linkedHM = hm;
-// 		hm.linkedTargetID = tid;
-// 
-// 		if (!inventoryPlayer1.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
-// 			tid.currentText = tranq > 0f ? Sys_Text.stringTable[536] : (dmgFinal == 0f ? Sys_Text.stringTable[511] : "");
-// 			tid.lifetime += tranq;
-// 			tid.damageTimeFinished = vmax(Sys_Global.pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
-// 			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
-// 		} else {
-// 			tid.currentText = ""; // Set by SendDamageReceive
-// 			tid.lifetime = 9999999f;
-// 			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
-// 			tid.damageTime = 2.5f;
-// 			if (tranq > 2.5f) tid.damageTime = tranq;
-// 			tid.damageTimeFinished = Sys_Global.pauseRelativeTime + tid.damageTime;
-// 		}
-// 
-// 		// Center on what we just shot
-// 		float yOfs = 0f;
-// 		float xSize = 1.2f;
-// 		float ySize = 2f;
-// 		float textname_Ofs = 1.28f; // e.g. HOPPER5
-// 		if (hm.aic != null) {
-// 			switch(hm.aic.index) {
-// 				case 0: yOfs = 0.5f; ySize = 1.0f; break; // Autobomb
-// 				case 1: /* GOOD */ break; // Cyborg Assassin
-// 				case 2: yOfs = -0.1f; ySize = 1.4f; xSize = 1.4f; textname_Ofs = 0.76f; break; // Avian Mutant
-// 				case 3: /* GOOD */ break; // Exec-Bot
-// 				case 4: /* GOOD */ break; // Cyborg Drone
-// 				case 5: yOfs = 0.15f; ySize = 3f; xSize = 2.8f; textname_Ofs = 2.14f; break; // Cortex Reaver
-// 				case 6: /* GOOD */ break; // Cyborg Warrior
-// 				case 7: /* GOOD */ break; // Cyborg Enforcer
-// 				case 8: yOfs = 0.05f; ySize = 2.3f; textname_Ofs = 1.48f;  break; // Cyborg Elite Guard
-// 				case 9: ySize = 2.3f; textname_Ofs = 1.36f; break; // Cyborg of Edward Diego
-// 				case 10: yOfs = -0.1f; ySize = 1.8f; xSize = 1.4f; textname_Ofs = 0.92f; break; // Sec-1 Bot
-// 				case 11: yOfs = 0.04f; ySize = 2.4f; xSize = 2.4f; textname_Ofs = 1.51f; break; // Sec-2 Bot
-// 				case 12: yOfs = -0.2f; ySize = 1.6f; xSize = 1.6f; textname_Ofs = 0.68f; break; // Maintenance Robot
-// 				case 13: yOfs = 0.05f; ySize = 2.5f; xSize = 1.6f; textname_Ofs = 1.58f; break; // Mutant Cyborg
-// 				case 14: yOfs = 0.5f; ySize = 2.3f; textname_Ofs = 2.5f; break; // Hopper
-// 				case 15: /* GOOD */ break; // Humanoid Mutant
-// 				case 16: yOfs = 0.12f; ySize = 0.8f; xSize = 1.8f; textname_Ofs = 0.7f; break; // Invisible Mutant
-// 				case 17: /* GOOD */ break; // Virus Mutant
-// 				case 18: yOfs = -0.22f; ySize = 1.5f; textname_Ofs = 0.63f; break; // Servbot
-// 				case 19: yOfs = 0.2f; ySize = 1f; xSize = 1.55f; textname_Ofs = 0.92f;  break; // Flier Bot
-// 				case 20: ySize = 1.1f;  xSize = 1.1f; textname_Ofs = 0.74f; break; // Zero-G Mutant
-// 				case 21: yOfs = -0.25f; ySize = 1.5f; textname_Ofs = 0.53f; xSize = 2f; break; // Gorilla Tiger Mutant
-// 				case 22: yOfs = -0.7f; ySize = 1f; textname_Ofs = 0f; break; // Repair Bot
-// 				case 23: yOfs = -0.24f; ySize = 1.4f; textname_Ofs = 0.58f; break; // Plant Mutant
-// 			}
-// 		}
-// 
-// 		// Set after setting textname_Ofs so all 3 can adapt to size.
-// 		float textdmg_Ofs = textname_Ofs - 0.18f; // def: 1.1f, e.g. MINOR
-// 		float textnum_Ofs = textname_Ofs - 0.09f; // def: 1.19f, e.g. 3.8M Idle
-// 
-// 		idFrame.instances[i].position = hm.instances[i].position;
-// 		idFrame.SetActive(true);
-// 		tid.linkedHM = hm;
-// 		hm.linkedTargetID = tid;
-// 		tid.partSys.Play();
-// 
-// 		//tid.partSys.
-// 		ParticleSystemRenderer rd =
-// 			tid.partSys.GetComponent<ParticleSystemRenderer>();
-// 
-// 		rd.pivot = new Vector3(0f,yOfs,0f);
-// 
-// 		ParticleSystem.MainModule pm = tid.partSys.main;
-// 		pm.startSizeX = xSize;
-// 		pm.startSizeY = ySize;
-// 		pm.startSizeZ = xSize;
-// 
-// 		RectTransform rt = tid.nameText.GetComponent<RectTransform>();
-// 		rt.anchoredPosition = new Vector2(0f,textname_Ofs);
-// 
-// 		RectTransform rtnums = tid.secondaryText.GetComponent<RectTransform>();
-// 		rtnums.anchoredPosition = new Vector2(0f,textnum_Ofs);
-// 
-// 		RectTransform rtdmg = tid.text.GetComponent<RectTransform>();
-// 		rtdmg.anchoredPosition = new Vector2(0f,textdmg_Ofs);
-// 
-// 		tid.playerCapsuleTransform = playerCapsule.transform;
-// 		tid.playerLinkDistance = linkDistForTargID;
-// 		tid.displayRange = showRange;
-// 		tid.displayHealth = showHealth;
-// 		tid.displayAttitude = showAttitude;
-// 		tid.displayName = showName;
-// 		tid.linkedHM.aic.hasTargetIDAttached = true;
-// 	}
+	void CreateTargetIDInstance(float dmgFinal, uint16_t npcIdx, float tranq) {
+		 if (!ConstIndexIsNPC(instances[npcIdx].index) || instances[npcIdx].health <= 0f) return;
+         if (!(inventoryPlayer1.hasHardware & HW_TID) || tranq > 0.0f) return;
+		if (instances[npcIdx].linkedTargetID) return; // Let SendDamageReceive handle updates
+/*
+		float linkDistForTargID = TargetID.GetTargetIDTetherRange();
+		bool showHealth = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 2;
+		bool showRange = inventoryPlayer1.hasHardware[4];
+		bool showAttitude = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1;
+		bool showName = inventoryPlayer1.hasHardware[4] && inventoryPlayer1.hardwareVersion[4] > 1;
+
+		GameObject idFrame = Instantiate(Const.a.GetPrefab(736), instances[npcIdx].position, Const.a.quaternionIdentity) as GameObject;
+		if (idFrame == null) return;
+
+		TargetID tid = idFrame.GetComponent<TargetID>();
+		if (tid == null) return;
+
+		tid.parent = hm.transform;
+		tid.linkedHM = hm;
+		hm.linkedTargetID = tid;
+
+		if (!inventoryPlayer1.hasHardware[4] || tranq > 0f || dmgFinal == 0f) {
+			tid.currentText = tranq > 0f ? Sys_Text.stringTable[536] : (dmgFinal == 0f ? Sys_Text.stringTable[511] : "");
+			tid.lifetime += tranq;
+			tid.damageTimeFinished = vmax(Sys_Global.pauseRelativeTime + tranq,tid.damageTimeFinished + tranq);
+			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
+		} else {
+			tid.currentText = ""; // Set by SendDamageReceive
+			tid.lifetime = 9999999f;
+			tid.lifetimeFinished = Sys_Global.pauseRelativeTime + tid.lifetime;
+			tid.damageTime = 2.5f;
+			if (tranq > 2.5f) tid.damageTime = tranq;
+			tid.damageTimeFinished = Sys_Global.pauseRelativeTime + tid.damageTime;
+		}
+
+		// Center on what we just shot
+		float yOfs = 0f;
+		float xSize = 1.2f;
+		float ySize = 2f;
+		float textname_Ofs = 1.28f; // e.g. HOPPER5
+		if (hm.aic != null) {
+			switch(hm.aic.index) {
+				case 0: yOfs = 0.5f; ySize = 1.0f; break; // Autobomb
+				case 1: /* GOOD */ break; // Cyborg Assassin
+				case 2: yOfs = -0.1f; ySize = 1.4f; xSize = 1.4f; textname_Ofs = 0.76f; break; // Avian Mutant
+				case 3: /* GOOD */ break; // Exec-Bot
+				case 4: /* GOOD */ break; // Cyborg Drone
+				case 5: yOfs = 0.15f; ySize = 3f; xSize = 2.8f; textname_Ofs = 2.14f; break; // Cortex Reaver
+				case 6: /* GOOD */ break; // Cyborg Warrior
+				case 7: /* GOOD */ break; // Cyborg Enforcer
+				case 8: yOfs = 0.05f; ySize = 2.3f; textname_Ofs = 1.48f;  break; // Cyborg Elite Guard
+				case 9: ySize = 2.3f; textname_Ofs = 1.36f; break; // Cyborg of Edward Diego
+				case 10: yOfs = -0.1f; ySize = 1.8f; xSize = 1.4f; textname_Ofs = 0.92f; break; // Sec-1 Bot
+				case 11: yOfs = 0.04f; ySize = 2.4f; xSize = 2.4f; textname_Ofs = 1.51f; break; // Sec-2 Bot
+				case 12: yOfs = -0.2f; ySize = 1.6f; xSize = 1.6f; textname_Ofs = 0.68f; break; // Maintenance Robot
+				case 13: yOfs = 0.05f; ySize = 2.5f; xSize = 1.6f; textname_Ofs = 1.58f; break; // Mutant Cyborg
+				case 14: yOfs = 0.5f; ySize = 2.3f; textname_Ofs = 2.5f; break; // Hopper
+				case 15: /* GOOD */ break; // Humanoid Mutant
+				case 16: yOfs = 0.12f; ySize = 0.8f; xSize = 1.8f; textname_Ofs = 0.7f; break; // Invisible Mutant
+				case 17: /* GOOD */ break; // Virus Mutant
+				case 18: yOfs = -0.22f; ySize = 1.5f; textname_Ofs = 0.63f; break; // Servbot
+				case 19: yOfs = 0.2f; ySize = 1f; xSize = 1.55f; textname_Ofs = 0.92f;  break; // Flier Bot
+				case 20: ySize = 1.1f;  xSize = 1.1f; textname_Ofs = 0.74f; break; // Zero-G Mutant
+				case 21: yOfs = -0.25f; ySize = 1.5f; textname_Ofs = 0.53f; xSize = 2f; break; // Gorilla Tiger Mutant
+				case 22: yOfs = -0.7f; ySize = 1f; textname_Ofs = 0f; break; // Repair Bot
+				case 23: yOfs = -0.24f; ySize = 1.4f; textname_Ofs = 0.58f; break; // Plant Mutant
+			}
+		}
+
+		// Set after setting textname_Ofs so all 3 can adapt to size.
+		float textdmg_Ofs = textname_Ofs - 0.18f; // def: 1.1f, e.g. MINOR
+		float textnum_Ofs = textname_Ofs - 0.09f; // def: 1.19f, e.g. 3.8M Idle
+
+		idFrame.instances[i].position = hm.instances[i].position;
+		idFrame.SetActive(true);
+		tid.linkedHM = hm;
+		hm.linkedTargetID = tid;
+		tid.partSys.Play();
+
+		//tid.partSys.
+		ParticleSystemRenderer rd =
+			tid.partSys.GetComponent<ParticleSystemRenderer>();
+
+		rd.pivot = (Vector3){0f,yOfs,0f);
+
+		ParticleSystem.MainModule pm = tid.partSys.main;
+		pm.startSizeX = xSize;
+		pm.startSizeY = ySize;
+		pm.startSizeZ = xSize;
+
+		RectTransform rt = tid.nameText.GetComponent<RectTransform>();
+		rt.anchoredPosition = new Vector2(0f,textname_Ofs);
+
+		RectTransform rtnums = tid.secondaryText.GetComponent<RectTransform>();
+		rtnums.anchoredPosition = new Vector2(0f,textnum_Ofs);
+
+		RectTransform rtdmg = tid.text.GetComponent<RectTransform>();
+		rtdmg.anchoredPosition = new Vector2(0f,textdmg_Ofs);
+
+		tid.playerCapsuleTransform = playerCapsule.transform;
+		tid.playerLinkDistance = linkDistForTargID;
+		tid.displayRange = showRange;
+		tid.displayHealth = showHealth;
+		tid.displayAttitude = showAttitude;
+		tid.displayName = showName;
+		tid.linkedHM.aic.hasTargetIDAttached = true;*/
+	}
 // 
 //     // WEAPON FIRING CODE:
 //     // ==============================================================================================================================
@@ -1237,7 +1237,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		}
 // 
 // 		if (isRapier) {
-// 			PlayerEnergy.a.TakeEnergy(3.666f); // 3 hits per tick.
+// 			TakeEnergy(3.666f); // 3 hits per tick.
 // 			if (BiomonitorGraphSystem.a != null) {
 // 				BiomonitorEnergyPulse(3.666f);
 // 			}
@@ -1246,11 +1246,11 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 	// These are a bit silly.
 //     void FireRapier(int i16, bool sil) {
-// 		FireMelee(i16,true,sil,Const.a.sounds[246],Const.a.sounds[247],Const.a.sounds[246],true); // wlaserrapier_hit, wlaserrapier_swing, wlaserrapier_hit
+// 		FireMelee(i16,true,sil,sounds[246],sounds[247],sounds[246],true); // wlaserrapier_hit, wlaserrapier_swing, wlaserrapier_hit
 // 	}
 // 
 //     void FirePipe(int i16, bool sil) {
-// 		FireMelee(i16,false,sil,Const.a.sounds[253],Const.a.sounds[254],Const.a.sounds[252],false); // wpipe_hit, wpipe_swing, wpipe_dmg
+// 		FireMelee(i16,false,sil,sounds[253],sounds[254],sounds[252],false); // wpipe_hit, wpipe_swing, wpipe_dmg
 // 	}
 // 
 // 	void FireMelee(int index16, bool isRapier, bool silent, AudioClip hit,
@@ -1506,23 +1506,23 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		Utils.Deactivate(ViewModelSkorpion);
 // 		Utils.Deactivate(ViewModelSparq);
 // 		Utils.Deactivate(ViewModelStungun);
-// 		Utils.Deactivate(MFDManager.a.energySliderLH);
-// 		Utils.Deactivate(MFDManager.a.energyHeatTicksLH);
-// 		Utils.Deactivate(MFDManager.a.overloadButtonLH);
-// 		Utils.Deactivate(MFDManager.a.unloadButtonLH);
-// 		Utils.Deactivate(MFDManager.a.loadNormalAmmoButtonLH);
-// 		Utils.Deactivate(MFDManager.a.loadAlternateAmmoButtonLH);
+// 		Utils.Deactivate(Sys_UI.energySliderLH);
+// 		Utils.Deactivate(Sys_UI.energyHeatTicksLH);
+// 		Utils.Deactivate(Sys_UI.overloadButtonLH);
+// 		Utils.Deactivate(Sys_UI.unloadButtonLH);
+// 		Utils.Deactivate(Sys_UI.loadNormalAmmoButtonLH);
+// 		Utils.Deactivate(Sys_UI.loadAlternateAmmoButtonLH);
 // 
-// 		Utils.Deactivate(MFDManager.a.energySliderRH);
-// 		Utils.Deactivate(MFDManager.a.energyHeatTicksRH);
-// 		Utils.Deactivate(MFDManager.a.overloadButtonRH);
-// 		Utils.Deactivate(MFDManager.a.unloadButtonRH);
-// 		Utils.Deactivate(MFDManager.a.loadNormalAmmoButtonRH);
-// 		Utils.Deactivate(MFDManager.a.loadAlternateAmmoButtonRH);
+// 		Utils.Deactivate(Sys_UI.energySliderRH);
+// 		Utils.Deactivate(Sys_UI.energyHeatTicksRH);
+// 		Utils.Deactivate(Sys_UI.overloadButtonRH);
+// 		Utils.Deactivate(Sys_UI.unloadButtonRH);
+// 		Utils.Deactivate(Sys_UI.loadNormalAmmoButtonRH);
+// 		Utils.Deactivate(Sys_UI.loadAlternateAmmoButtonRH);
 // 	}
 // 
 // 	public void RemoveWeapon(int weaponButton7Index) {
-// 		WeaponButtonsManager wepbutMan = MFDManager.a.wepbutMan;
+// 		WeaponButtonsManager wepbutMan = Sys_UI.wepbutMan;
 // 		WeaponButton wepbut = wepbutMan.wepButtonsScripts[0];
 // 		if (weaponButton7Index != weaponCurrent) {
 // 			if (weaponButton7Index > weaponCurrent) return; // No list shift.
@@ -1569,15 +1569,15 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		WeaponFire.a.StartWeaponDip(0);
 // 		currentMagazineAmount[weaponButton7Index] = 0; // Zero out ammo
 // 		currentMagazineAmount2[weaponButton7Index] = 0;
-// 		MFDManager.a.UpdateHUDAmmoCountsEither();
-// 		MFDManager.a.SetWepInfo(-1);
-// 		MFDManager.a.OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
+// 		Sys_UI.UpdateHUDAmmoCountsEither();
+// 		Sys_UI.SetWepInfo(-1);
+// 		Sys_UI.OpenTab(0, true, TabMSG.Weapon, 0,Handedness.LH);
 // 	}
 // 
 // 	public void WeaponChange(int useableItemIndex, int buttonIndex) {
 // 		if (WeaponFire.a.reloadFinished > Sys_Global.pauseRelativeTime) return;
 // 		if (useableItemIndex == -1 || buttonIndex > 6 || buttonIndex < 0) {
-// 			MFDManager.a.SetAmmoIcons(-1,false); // Clear the ammo icons.
+// 			Sys_UI.SetAmmoIcons(-1,false); // Clear the ammo icons.
 // 			//DualLog("Early exit on WeaponChange() in WeaponCurrent.cs!");
 // 			return;
 // 		}
@@ -1591,8 +1591,8 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 		weaponCurrentPending = buttonIndex;
 // 		weaponIndexPending = useableItemIndex;
-// 		MFDManager.a.SetWepInfo(-1);
-// 		MFDManager.a.UpdateHUDAmmoCountsEither();
+// 		Sys_UI.SetWepInfo(-1);
+// 		Sys_UI.UpdateHUDAmmoCountsEither();
 // 	}
 // 
 // 	void Update() {
@@ -1601,7 +1601,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 
 // 		if (justChangedWeap) {
 // 			justChangedWeap = false;
-// 			MFDManager.a.SetAmmoIcons(-1,false); // Clear it.
+// 			Sys_UI.SetAmmoIcons(-1,false); // Clear it.
 // 			UpdateWeaponViewModels();
 // 		}
 // 
@@ -1620,27 +1620,27 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			useableIndex = -1;
 // 		}
 // 
-// 		MFDManager.a.HideAmmoAndEnergyItems();
+// 		Sys_UI.HideAmmoAndEnergyItems();
 // 		SetAllViewModelsDeactive();
 // 		switch (setWep) {
 // 			case 36: // "LOAD MAGNESIUM", "LOAD PENETRATOR"
-// 				MFDManager.a.ShowAmmoItems(539,540);
+// 				Sys_UI.ShowAmmoItems(539,540);
 // 				Utils.Activate(ViewModelAssault);
 // 				break;
 // 			case 37:
-// 				MFDManager.a.ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelBlaster);
 // 				break;
 // 			case 38: // "LOAD NEEDLE", "LOAD TRANQ"
-// 				MFDManager.a.ShowAmmoItems(541,542);
+// 				Sys_UI.ShowAmmoItems(541,542);
 // 				Utils.Activate(ViewModelDartgun);
 // 				break;
 // 			case 39: // "LOAD HORNET", "LOAD SPLINTER"
-// 				MFDManager.a.ShowAmmoItems(543,544);
+// 				Sys_UI.ShowAmmoItems(543,544);
 // 				Utils.Activate(ViewModelFlechette);
 // 				break;
 // 			case 40:
-// 				MFDManager.a.ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelIon);
 // 				break;
 // 			case 41:
@@ -1650,42 +1650,42 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 				Utils.Activate(ViewModelPipe);
 // 				break;
 // 			case 43: // "LOAD HOLLOW TIP", "LOAD HEAVY SLUG"
-// 				MFDManager.a.ShowAmmoItems(545,546);
+// 				Sys_UI.ShowAmmoItems(545,546);
 // 				Utils.Activate(ViewModelMagnum);
 // 				break;
 // 			case 44: // "LOAD CARTRIDGE"
-// 				MFDManager.a.ShowAmmoItems(547,-1);
+// 				Sys_UI.ShowAmmoItems(547,-1);
 // 				Utils.Activate(ViewModelMagpulse);
-// 				MFDManager.a.HideAlternateAmmoButton();
+// 				Sys_UI.HideAlternateAmmoButton();
 // 				break;
 // 			case 45: // "LOAD STANDARD", "LOAD TEFLON"
-// 				MFDManager.a.ShowAmmoItems(548,549);
+// 				Sys_UI.ShowAmmoItems(548,549);
 // 				Utils.Activate(ViewModelPistol);
 // 				break;
 // 			case 46:
-// 				MFDManager.a.ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelPlasma);
 // 				break;
 // 			case 47: // "LOAD RAIL CLIP"
-// 				MFDManager.a.ShowAmmoItems(550,-1);
+// 				Sys_UI.ShowAmmoItems(550,-1);
 // 				Utils.Activate(ViewModelRailgun);
-// 				MFDManager.a.HideAlternateAmmoButton();
+// 				Sys_UI.HideAlternateAmmoButton();
 // 				break;
 // 			case 48:  // "LOAD RUBBER SLUG"
-// 				MFDManager.a.ShowAmmoItems(551,-1);
+// 				Sys_UI.ShowAmmoItems(551,-1);
 // 				Utils.Activate(ViewModelRiotgun);
-// 				MFDManager.a.HideAlternateAmmoButton();
+// 				Sys_UI.HideAlternateAmmoButton();
 // 				break;
 // 			case 49: // "LOAD SLAG", "LOAD LARGE SLAG"
-// 				MFDManager.a.ShowAmmoItems(552,553);
+// 				Sys_UI.ShowAmmoItems(552,553);
 // 				Utils.Activate(ViewModelSkorpion);
 // 				break;
 // 			case 50:
-// 				MFDManager.a.ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelSparq);
 // 				break;
 // 			case 51:
-// 				MFDManager.a.ShowEnergyItems();
+// 				Sys_UI.ShowEnergyItems();
 // 				Utils.Activate(ViewModelStungun);
 // 				break;
 // 		}
@@ -1700,12 +1700,12 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		}
 // 
 // 		if (wep16index == 1 || wep16index == 4 || wep16index == 10 || wep16index == 14 || wep16index == 15) {
-// 			if (MFDManager.a.overloadButtonLH.activeInHierarchy) {
-// 				MFDManager.a.overloadButtonLH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
+// 			if (Sys_UI.overloadButtonLH.activeInHierarchy) {
+// 				Sys_UI.overloadButtonLH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 
-// 			if (MFDManager.a.overloadButtonRH.activeInHierarchy) {
-// 				MFDManager.a.overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
+// 			if (Sys_UI.overloadButtonRH.activeInHierarchy) {
+// 				Sys_UI.overloadButtonRH.GetComponent<EnergyOverloadButton>().OverloadButtonAction();
 // 			}
 // 		} else {
 // 			if (inventoryPlayer1.wepLoadedWithAlternate[weaponCurrent]) {
@@ -1767,7 +1767,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		}
 // 
 // 		// Update the counter on the HUD
-// 		MFDManager.a.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
+// 		Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 
 // 		// Pop it back to start to be sure
@@ -1811,7 +1811,7 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 		}
 // 
 // 		// Update the counter on the HUD
-// 		MFDManager.a.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
+// 		Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		WeaponFire.a.StartWeaponDip(Const.a.reloadTime[wep16index]);
 // 
 // 		// Pop it back to start to be sure
@@ -1834,13 +1834,13 @@ float reloadTime[16]={1.0f,0.8f,1.0f,1.2f,0.8f,0.8f,0.8f,1.3f,1.5f,0.8f,0.8f,1.0
 // 			currentMagazineAmount2[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
-// 			MFDManager.a.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
+// 			Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount2[weaponCurrent]);
 // 		} else {
 // 			inventoryPlayer1.wepAmmo[wep16index] += currentMagazineAmount[weaponCurrent];
 // 			currentMagazineAmount[weaponCurrent] = 0;
 // 
 // 			// Update the counter on the HUD
-// 			MFDManager.a.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
+// 			Sys_UI.UpdateHUDAmmoCounts(currentMagazineAmount[weaponCurrent]);
 // 		}
 // 		if (!isSilent) Utils.PlayUIOneShotSavable(260); // wreload
 // 	}

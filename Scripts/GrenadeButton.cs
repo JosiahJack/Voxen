@@ -51,24 +51,24 @@ public class GrenadeButton : MonoBehaviour {
 	public void PtrExit () {
 		if (!pointerEntered) return;
 
-		GUIState.a.ClearOverButton();
+		
 		pointerEntered = false;
     }
 
 	void DoubleClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 
 		// Put grenade in the player's hand (cursor)
 		MouseLookScript.a.UseGrenade(useableItemIndex);
 	}
 
 	public void GrenadeInvClick () {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		GrenadeInvSelect();
 	}
 
 	public void GrenadeInvSelect() {
-		MFDManager.a.SendInfoToItemTab(useableItemIndex);
+		Sys_UI.SendInfoToItemTab(useableItemIndex);
 		inventoryPlayer1.grenadeCurrent = GrenButtonIndex; // Set current
 		Utils.PlayUIOneShotSavable(80); //changeweapon
 	}

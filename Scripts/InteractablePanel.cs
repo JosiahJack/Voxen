@@ -40,12 +40,12 @@ public class InteractablePanel : MonoBehaviour {
 												  && ud.customIndex == 1))) {
 												     // Abe Ghiran's head.
 				if (installed) { 					 // ... is big
-					Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXAlreadyInstalledIndex]);
+					Utils.PlayOneShotSavable(SFX,sounds[SFXAlreadyInstalledIndex]);
 					return; // do nothing already done here
 				}
 				installed = true;
 				if (installationItem != null) installationItem.SetActive(true);
-				Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXInstallationIndex]);
+				Utils.PlayOneShotSavable(SFX,sounds[SFXInstallationIndex]);
 				CenterStatusPrint(installedMessageLingdex);
 				// any extra effect objects?  activate them here...good for sparks or turning on any extra bits and bobs
 				if (effects.Length > 0) {
@@ -64,15 +64,15 @@ public class InteractablePanel : MonoBehaviour {
 				MouseLookScript.a.ResetHeldItem();
 
 				// use the target now that we are active
-				Const.a.UseTargets(gameObject,ud,target);
+				UseTargets(gameObject,ud,target);
 			} else {
-				Utils.PlayOneShotSavable(SFX,Const.a.sounds[43]); // button_deny, aaaahhh!! Try again
+				Utils.PlayOneShotSavable(SFX,sounds[43]); // button_deny, aaaahhh!! Try again
 				CenterStatusPrint(wrongItemMessageLingdex);
 			}
 		} else {
 			open = true;
 			anim.Play("Open");
-			Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXOpenIndex]);
+			Utils.PlayOneShotSavable(SFX,sounds[SFXOpenIndex]);
 			CenterStatusPrint(openMessageLingdex);
 		}
 	}

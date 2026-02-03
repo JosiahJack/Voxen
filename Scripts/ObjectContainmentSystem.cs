@@ -60,7 +60,7 @@ public static class ObjectContainmentSystem {
             if (deltay - distMin < 1.28f) return checkpos;
         }
 
-        return new Vector3(x,heightFallback,y);
+        return (Vector3){x,heightFallback,y);
     }
     
     public static void ClearLists() {

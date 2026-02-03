@@ -17,19 +17,19 @@ public class GravityLift : MonoBehaviour {
 	void Awake() {
 		boxcol = GetComponent<BoxCollider>();
 		if (boxcol == null) return;
-		topPoint = new Vector3(0f,boxcol.bounds.max.y,0f);
+		topPoint = (Vector3){0f,boxcol.bounds.max.y,0f);
 	}
 
 	void OnTriggerExit(Collider other) {
 		if (other.gameObject.GetComponent<PlayerMovement>() != null) {
-			PlayerMovement.a.gravliftState = false;
+			instances[PLAYER1].gravliftState = false;
 		}
 	}
 
 	void OnForce(Collider other, bool initial) {
 		if (other.gameObject.layer == 12) { // Player
 			if (other.gameObject.GetComponent<PlayerMovement>() != null) {
-				PlayerMovement.a.gravliftState = true;
+				instances[PLAYER1].gravliftState = true;
 			}
 		}
 
@@ -39,7 +39,7 @@ public class GravityLift : MonoBehaviour {
 		if (otherRbody.velocity.y < 0f) velY = 0f; // Saturate at bottom end.
 
 		if (dist < distancePaddingToTopPoint) {
-			Vector3 force = new Vector3(0f,9.81f - velY,0f);
+			Vector3 force = (Vector3){0f,9.81f - velY,0f);
 			otherRbody.AddForce(force,ForceMode.Acceleration);
 		} else {
 			if (otherRbody.velocity.y < (strength * otherRbody.mass)) {
@@ -52,7 +52,7 @@ public class GravityLift : MonoBehaviour {
 					yForce *= 2f;
 				}
 
-				otherRbody.AddForce(new Vector3(0f,yForce,0f));
+				otherRbody.AddForce((Vector3){0f,yForce,0f));
 			}
 		}
 	}
@@ -61,7 +61,7 @@ public class GravityLift : MonoBehaviour {
 		// Apply weak force for inactive state - applies some force for gentle
 		// descent, never really off completely.
 		if (other.gameObject.GetComponent<PlayerMovement>() != null) {
-			PlayerMovement.a.gravliftState = true;
+			instances[PLAYER1].gravliftState = true;
 		}
 
 		if (otherRbody.velocity.y < offStrengthFactor) {
@@ -72,7 +72,7 @@ public class GravityLift : MonoBehaviour {
 				yForce *= 2f;
 			}
 
-			otherRbody.AddForce(new Vector3(0f,yForce,0f));
+			otherRbody.AddForce((Vector3){0f,yForce,0f));
 		}
 	}
 
@@ -95,41 +95,5 @@ public class GravityLift : MonoBehaviour {
 
 	public void Toggle() {
 		active = !active;
-	}
-
-	public static string Save(GameObject go) {
-		GravityLift gl = go.GetComponent<GravityLift>(); // Not quite Open, but hey
-		if (gl == null) {
-			DualLog("GravityLift missing on savetype of GravityLift!  GameObject.name: " + go.name);
-			return "1";
-		}
-
-		s1.Clear();
-		s1.Append(Utils.BoolToString(gl.active,"active")); // bool - is this gravlift on?
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(gl.initialBurstFinished,"initialBurstFinished"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		GravityLift gl = go.GetComponent<GravityLift>();
-		if (gl == null) {
-			DualLog("GravityLift.Load failure, gl == null");
-			return index + 1;
-		}
-
-		if (index < 0) {
-			DualLog("GravityLift.Load failure, index < 0");
-			return index + 1;
-		}
-
-		if (entries == null) {
-			DualLog("GravityLift.Load failure, entries == null");
-			return index + 1;
-		}
-
-		gl.active = Utils.GetBoolFromString(entries[index],"active"); index++; // bool - is this gravlift on?
-		gl.initialBurstFinished = Utils.LoadRelativeTimeDifferential(entries[index],"initialBurstFinished"); index++;
-		return index;
 	}
 }

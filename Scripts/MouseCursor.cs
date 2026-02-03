@@ -229,7 +229,7 @@ public class MouseCursor : MonoBehaviour {
 		}
 
 		if (hideCursorForMinigame) {
-			if (cursorUIImage.gameObject.activeSelf) cursorUIImage.gameObject.SetActive(false);
+			if (cursorUIImage.gameObject.activeSelf) cursorUIImage.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
         } else {
 			if (!cursorUIImage.gameObject.activeSelf) cursorUIImage.gameObject.SetActive(true);
 		}
@@ -387,7 +387,7 @@ public class MouseCursor : MonoBehaviour {
 			} else {
 				if (inventoryAddHelper.activeInHierarchy) inventoryAddHelper.SetActive(false);
 				if (justDroppedItemInHelper) {
-					GUIState.a.ClearOverButton();
+					
 					justDroppedItemInHelper = false; // only disable blocking state once, not constantly
 				}
 			}
@@ -395,7 +395,7 @@ public class MouseCursor : MonoBehaviour {
 			if (justDroppedItemInHelper) {
 				justDroppedItemInHelper = false; // only disable blocking state once, not constantly
 				inventoryAddHelper.SetActive(false);
-				GUIState.a.ClearOverButton();
+				
 			}
 		}
 	}

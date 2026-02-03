@@ -17,7 +17,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 	private ParticleSystem psys;
 
     void Start() {
-		if (SFXClip > 0) SFX.clip = Const.a.sounds[SFXClip];
+		if (SFXClip > 0) SFX.clip = sounds[SFXClip];
 		else DualLog("Unassigned clip index on PlaySoundTriggered at " + instances[i].position.ToString() + " for " + gameObject.name);
 		if (playEverywhere) {
 			SFX.spatialBlend = 0.0f;
@@ -44,7 +44,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 		if (SFX == null) SFX = GetComponent<AudioSource>();
 		if (loopingAmbient) {
 			if (SFX != null) SFX.loop = true;
-			if (SFX != null) SFX.clip = Const.a.sounds[SFXClip];
+			if (SFX != null) SFX.clip = sounds[SFXClip];
 			if (SFX != null) SFX.Play();
 		}
 	}
@@ -66,7 +66,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 			if (playSoundOnParticleEmit){
 				int count = psys.particleCount;
 				if (count > numparticles && (count == burstemittcnt1 || count == burstemittcnt2)) {
-					Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXClip]);
+					Utils.PlayOneShotSavable(SFX,sounds[SFXClip]);
 				}
 				numparticles = count;
 			}
@@ -75,7 +75,7 @@ public class PlaySoundTriggered : MonoBehaviour {
 
     public void PlaySoundEffect() {
 		if (SFX != null) SFX.loop = false;
-		Utils.PlayOneShotSavable(SFX,Const.a.sounds[SFXClip]);
+		Utils.PlayOneShotSavable(SFX,sounds[SFXClip]);
 	}
 	
 	public void StopSoundEffect() {

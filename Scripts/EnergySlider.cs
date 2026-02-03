@@ -26,7 +26,7 @@ public class EnergySlider : MonoBehaviour {
 			return;
 		}
 
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (val < 1.0f) val = val * 100f;
 		if (val < 0) val = 0f;
 		if (val >= 98f) val = 100f;

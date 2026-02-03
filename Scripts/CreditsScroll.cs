@@ -1,25 +1,7 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-using UnityEngine.Video;
-
-public class CreditsScroll : MonoBehaviour {
-	public Text creditsText;
-	private bool bottom = false;
-	public int pagenum = 0;
-	public GameObject exitVideo;
-	private float vidFinished;
-	public GameObject endVideoTextGO1;
-	public GameObject endVideoTextGO2;
-	public GameObject endVideoTextGO3;
-	public Text endVideoText1;
-	public Text endVideoText2;
-	public Text endVideoText3;
-	public VideoPlayer outroPlayer;
-
-	private const float vidLength = 37.2f;
-	private float vidStartTime;
+﻿	bool bottom = false;
+	int pagenum = 0;
+	float vidFinished;
+	float vidStartTime;
 
     void OnEnable() {
 		bottom = false;
@@ -33,15 +15,12 @@ public class CreditsScroll : MonoBehaviour {
 		Utils.ConfirmExistsMakeIfNot(basePath,vidFile);
 		outroPlayer.url = urlPath;
 		outroPlayer.Play();
-		if (!MainMenuHandler.a.dataFound) outroPlayer.SetDirectAudioMute(0,true);
-		else outroPlayer.SetDirectAudioMute(0,false);
-
 		endVideoText1.text = Sys_Text.stringTable[610];
 		endVideoText2.text = Sys_Text.stringTable[611];
 		endVideoText3.text = Sys_Text.stringTable[612];
 		Utils.Deactivate(endVideoTextGO2);
 		Utils.Deactivate(endVideoTextGO3);
-		vidFinished = Time.time + vidLength;
+		vidFinished = Time.time + 37.2f;
 		vidStartTime = Time.time;
 		if (Const.a.gameFinished) {
 			// Get player stats for finishing the game!
@@ -98,11 +77,9 @@ public class CreditsScroll : MonoBehaviour {
 					if (pagenum == 1) pagenum++; // Skip stats when playing
 					                             // from main menu.
 				}
-				if (pagenum >= Const.a.creditsLength) {
-					bottom = true;
-				} else {
-					creditsText.text = Const.a.creditsText[pagenum];
-				}
+				
+				if (pagenum >= CREDITS_PAGES) bottom = true;
+				else creditsText.text = Const.a.creditsText[pagenum];
 			} else {
 				MainMenuHandler.a.GoBack();
 			}

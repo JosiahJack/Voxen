@@ -69,7 +69,7 @@ public class TargetID : MonoBehaviour {
 			linkedHM = null;
 		}
 
-		gameObject.SetActive(false); // put back into pool
+		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // put back into pool
 		Destroy(this.gameObject);
 	}
 
@@ -99,7 +99,7 @@ public class TargetID : MonoBehaviour {
 		}
 
 		if ((distance_vector3(instances[i].position,
-							  playerCapsuleTransform.position)
+							  instances[PLAYER1].position)
 			> playerLinkDistance)) {
 			Deactivate();
 			return;
@@ -123,7 +123,7 @@ public class TargetID : MonoBehaviour {
 		}
 
 		if (displayRange && linkedHM != null) {
-			float range = distance_vector3(playerCapsuleTransform.position,
+			float range = distance_vector3(instances[PLAYER1].position,
 										   linkedHM.instances[i].position);
 
 			if (displayHealth) secondaryDisplayString += comma;

@@ -168,7 +168,7 @@ public class MouseLookScript : MonoBehaviour {
 		}
 
 		if (Sys_Global.gamePaused) return;
-		if (PlayerMovement.a.ressurectingFinished > Sys_Global.pauseRelativeTime) return;
+		if (instances[PLAYER1].ressurectingFinished > Sys_Global.pauseRelativeTime) return;
 
 		Utils.EnableCamera(playerCamera);
 
@@ -187,32 +187,21 @@ public class MouseLookScript : MonoBehaviour {
 			Const.a.StartSave(7,qsavename);
 		}
 
-		// Toggle inventory mode<->shoot mode
-		if(GetInput.a.ToggleMode()) ToggleInventoryMode();
-
-		if (Const.a.questData.SelfDestructActivated
-			&& LevelManager.a.currentLevel != 13   // Not Cyberspace
-			&& LevelManager.a.currentLevel != 9) { // Not the bridge, separated
-
+		if(GetInput.a.ToggleMode()) ToggleInventoryMode(); // Toggle inventory mode<->shoot mode
+		if (Const.a.questData.SelfDestructActivated && LevelManager.a.currentLevel != 13 && LevelManager.a.currentLevel != 9) { // Not Cyberspace, Not the bridge, separated
 			if (randomShakeFinished < Sys_Global.pauseRelativeTime) {
-				randomShakeFinished = Sys_Global.pauseRelativeTime
-				                      + random_range(5f,20f);
+				randomShakeFinished = Sys_Global.pauseRelativeTime + random_range(5f,20f);
 				ScreenShake(3f,2f);
 			}
 			
 			if (randomKlaxonFinished < Sys_Global.pauseRelativeTime) {
-				randomKlaxonFinished = Sys_Global.pauseRelativeTime
-				                       + random_range(10f,20f);
-
+				randomKlaxonFinished = Sys_Global.pauseRelativeTime + random_range(10f,20f);
 				Utils.PlayUIOneShotSavable(104); // klaxon
 			}
 		}
 
 		RecoilAndRest(); // Spring Back to Rest from Recoil
 		keyboardTurnSpeed = 15f * Const.a.MouseSensitivity;
-		if (Application.platform == RuntimePlatform.Android) {
-			if (Const.a.MouseSensitivity == 100f) Const.a.MouseSensitivity = 20f;
-		} 
 		KeyboardTurn();
 		KeyboardLookUpDn();
 		TouchLook();
@@ -377,25 +366,25 @@ public class MouseLookScript : MonoBehaviour {
 	public void EnterCyberspace(Vector3 entryPoint) {
 		cyberspaceRecallPoint = entryPoint;
 		playerRadiationTreatmentFlash.SetActive(true);
-		cyberspaceReturnPoint = PlayerMovement.a.instances[i].position;
+		cyberspaceReturnPoint = instances[PLAYER1].instances[i].position;
 		cyberspaceReturnCameraLocalRotation = instances[i].rotation.eulerAngles;
 		cyberspaceReturnPlayerCapsuleLocalRotation = playerCapsuleTransform.localRotation.eulerAngles;
 		cyberspaceReturnLevel = LevelManager.a.currentLevel;
-		MFDManager.a.EnterCyberspace();
+		Sys_UI.EnterCyberspace();
 		LevelManager.a.LoadLevel(13,cyberspaceRecallPoint);
-		PlayerMovement.a.inCyberSpace = true;
-		PlayerMovement.a.leanCapsuleCollider.enabled = false;
+		instances[PLAYER1].inCyberSpace = true;
+		instances[PLAYER1].leanCapsuleCollider.enabled = false;
 		hm.inCyberSpace = true;
 		inCyberSpace = true;
 		playerCamera.useOcclusionCulling = false;
-		MFDManager.a.DrawTicks(true);
+		Sys_UI.DrawTicks(true);
 		SetCameraCullDistances();
 		Utils.PlayUIOneShotSavable(81); // cyber
 	}
 
 	public void ExitCyberspace() {
 		playerRadiationTreatmentFlash.SetActive(true);
-		MFDManager.a.ExitCyberspace();
+		Sys_UI.ExitCyberspace();
 		LevelManager.a.LoadLevel(cyberspaceReturnLevel,cyberspaceReturnPoint);
 
 		// Left/right component applied to capsule.
@@ -412,14 +401,14 @@ public class MouseLookScript : MonoBehaviour {
 
 		returnFromCyberspaceFinished = Time.time + 0.1f; // Prevent mouselook
 														 // messing it up.
-		PlayerMovement.a.inCyberSpace = false;
-		PlayerMovement.a.rbody.velocity = Const.a.vectorZero;
-		PlayerMovement.a.leanCapsuleCollider.enabled = true;
+		instances[PLAYER1].inCyberSpace = false;
+		instances[PLAYER1].rbody.velocity = (Vector3){0.0f,0.0f,0.0f};
+		instances[PLAYER1].leanCapsuleCollider.enabled = true;
 		hm.inCyberSpace = false;
 		inCyberSpace = false;
 		playerCamera.useOcclusionCulling = true;
 		Const.a.decoyActive = false;
-		MFDManager.a.DrawTicks(true);
+		Sys_UI.DrawTicks(true);
 		Utils.PlayUIOneShotSavable(81); // cyber
 		SetCameraCullDistances();
 	}
@@ -825,7 +814,7 @@ public class MouseLookScript : MonoBehaviour {
 		heldObjectAmmo = ammo1;
 		heldObjectAmmo2 = ammo2;
 		heldObjectLoadedAlternate = loadedAlt;
-		if (fromButton) GUIState.a.ClearOverButton();
+		if (fromButton) 
 		ForceInventoryMode();
 	}
 
@@ -843,10 +832,10 @@ public class MouseLookScript : MonoBehaviour {
 		PutObjectInHand(indexPriorToRemoval,-1,am1,am2,loadAlt,true);
 		WeaponCurrent.a.RemoveWeapon(wepbut.WepButtonIndex);
 		inventoryPlayer1.RemoveWeapon(wepbut.WepButtonIndex);
-		MFDManager.a.SetAmmoIcons(-1,false) ; // Clear the ammo icons.
-		MFDManager.a.HideAmmoAndEnergyItems();
+		Sys_UI.SetAmmoIcons(-1,false) ; // Clear the ammo icons.
+		Sys_UI.HideAmmoAndEnergyItems();
 		wepbut.useableItemIndex = -1;
-		wepbut = MFDManager.a.wepbutMan.wepButtonsScripts[0];
+		wepbut = Sys_UI.wepbutMan.wepButtonsScripts[0];
 		WeaponCurrent.a.WeaponChange(wepbut.useableItemIndex,
 									 wepbut.WepButtonIndex);
 	}
@@ -878,7 +867,7 @@ public class MouseLookScript : MonoBehaviour {
 						}
 					}
 
-					MFDManager.a.SendInfoToItemTab(inventoryPlayer1.grenadeCurrent);
+					Sys_UI.SendInfoToItemTab(inventoryPlayer1.grenadeCurrent);
 					if (inventoryPlayer1.grenadeCurrent < 0) {
 						inventoryPlayer1.grenadeCurrent = 0;
 					}
@@ -894,11 +883,11 @@ public class MouseLookScript : MonoBehaviour {
 				if (inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] <= 0) {
 					inventoryPlayer1.patchCounts[patbut.PatchButtonIndex] = 0;
 					inventoryPlayer1.patchCurrent = -1;
-					GUIState.a.ClearOverButton();
+					
 					for (int i = 0; i < 7; i++) {
 						if (inventoryPlayer1.patchCounts[i] > 0) inventoryPlayer1.patchCurrent = i;
 					}
-					MFDManager.a.SendInfoToItemTab(inventoryPlayer1.patchCurrent);
+					Sys_UI.SendInfoToItemTab(inventoryPlayer1.patchCurrent);
 					if (inventoryPlayer1.patchCurrent < 0) {
 						inventoryPlayer1.patchCurrent = 0;
 					}
@@ -911,8 +900,8 @@ public class MouseLookScript : MonoBehaviour {
 
 				// Access Cards button
 				if (genbut.GeneralInvButtonIndex == 0) {
-					MFDManager.a.OpenLastItemSide();
-					MFDManager.a.SendInfoToItemTab(81);
+					Sys_UI.OpenLastItemSide();
+					Sys_UI.SendInfoToItemTab(81);
 					return;
 				}
 
@@ -931,9 +920,9 @@ public class MouseLookScript : MonoBehaviour {
 				}
 
 				if (referenceIndex < 0 || referenceIndex > 110) {
-					MFDManager.a.ResetItemTab();
+					Sys_UI.ResetItemTab();
 				} else {
-					MFDManager.a.SendInfoToItemTab(referenceIndex,genbut.customIndex);
+					Sys_UI.SendInfoToItemTab(referenceIndex,genbut.customIndex);
 				}
 				PutObjectInHand(indexPriorToRemoval,customIndexPrior,0,0,false,true);
 				break;
@@ -963,7 +952,7 @@ public class MouseLookScript : MonoBehaviour {
 				break;
 			case ButtonType.ShootMode:
 				ForceShootMode();
-				GUIState.a.ClearOverButton();
+				
 				break;
 			case ButtonType.GrenadeTimerSlider:
 				Button btn = currentButton.GetComponent<Button>();
@@ -984,9 +973,9 @@ public class MouseLookScript : MonoBehaviour {
 		
 		sebut.contents[index] = -1;
 		sebut.customIndex[index] = -1;
-		MFDManager.a.DisableSearchItemImage(index);
+		Sys_UI.DisableSearchItemImage(index);
 		sebut.CheckForEmpty();
-		GUIState.a.ClearOverButton();
+		
 		if (Const.a.InputQuickItemPickup) {
 			AddItemToInventory(heldObjectIndex,heldObjectCustomIndex);
 			ResetHeldItem();
@@ -997,31 +986,31 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	void RecoilAndRest() {
-		float targetY = Const.a.playerCameraOffsetY * PlayerMovement.a.currentCrouchRatio;
+		float targetY = Const.a.playerCameraOffsetY * instances[PLAYER1].currentCrouchRatio;
 		float targetX = 0f;
-		if (PlayerMovement.a.relSideways > 0) targetX += 0.12f;
-		if (PlayerMovement.a.relSideways < 0) targetX -= 0.12f;
-		if (PlayerMovement.a.relForward != 0) targetY -= 0.08f;
+		if (instances[PLAYER1].relSideways > 0) targetX += 0.12f;
+		if (instances[PLAYER1].relSideways < 0) targetX -= 0.12f;
+		if (instances[PLAYER1].relForward != 0) targetY -= 0.08f;
 		if (shakeFinished > Sys_Global.pauseRelativeTime) {
 			headBobX = instances[PLAYER1].position.x + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
 			headBobY = instances[PLAYER1].position.y + random_range(shakeForce * -0.08f, shakeForce * 0.08f);
 			headBobZ = instances[PLAYER1].position.z + random_range(shakeForce * -0.17f, shakeForce * 0.17f);
 		} else {
 			headBobZ = 0f;
-			Vector3 vel = PlayerMovement.a.rbody.velocity;
+			Vector3 vel = instances[PLAYER1].rbody.velocity;
 			vel.y = 0f;
-			if (PlayerMovement.a.relForward + PlayerMovement.a.relSideways != 0 && Sys_Settings.HeadBob) {
+			if (instances[PLAYER1].relForward + instances[PLAYER1].relSideways != 0 && Sys_Settings.HeadBob) {
 				if (instances[PLAYER1].headBobShiftFinished < Sys_Global.pauseRelativeTime) {
 					instances[PLAYER1].headBobShiftFinished = Sys_Global.pauseRelativeTime + 0.2f;
-					if (!PlayerMovement.a.isSprinting) instances[PLAYER1].headBobShiftFinished += 0.1f;
+					if (!instances[PLAYER1].isSprinting) instances[PLAYER1].headBobShiftFinished += 0.1f;
 					bobTarget = HeadBobAmount * -1f * vsign(bobTarget);
 				}
 
-				if (PlayerMovement.a.rbody.velocity.magnitude > 0.1f) headBobY = smooth_damp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
+				if (instances[PLAYER1].rbody.velocity.magnitude > 0.1f) headBobY = smooth_damp(headBobY,targetY + bobTarget,ref headBobYVel,Const.HeadBobRate);
 				headBobX = smooth_damp(headBobX,targetX,ref headBobXVel,Const.HeadBobRate);
 			} else {
 				headBobX = smooth_damp(headBobX,0f,ref headBobXVel,Const.HeadBobRate);
-				headBobY = smooth_damp(headBobY,Const.a.playerCameraOffsetY * PlayerMovement.a.currentCrouchRatio,ref headBobYVel,Const.HeadBobRate);
+				headBobY = smooth_damp(headBobY,Const.a.playerCameraOffsetY * instances[PLAYER1].currentCrouchRatio,ref headBobYVel,Const.HeadBobRate);
 			}
 		}
 		
@@ -1036,7 +1025,7 @@ public class MouseLookScript : MonoBehaviour {
 	}
 
 	public void AddItemToInventory(int index, int customIndex) {
-		MFDManager.a.mouseClickHeldOverGUI = true; // Prevent gun shooting.
+		Sys_UI.mouseClickHeldOverGUI = true; // Prevent gun shooting.
 		if (index < 0) index = 0; // Good check on paper.
 		if (index > 110) index = 94; // Way to get a head.
 		if ((index >= 0 && index <= 5)
@@ -1119,7 +1108,7 @@ public class MouseLookScript : MonoBehaviour {
 			}
 	    	if (numberFoundContents == 0) {
 				currentSearchItem = null;
-				MFDManager.a.ReturnTabsFromSearch();
+				Sys_UI.ReturnTabsFromSearch();
 			}
 		}
 		firstTimePickup = false;
@@ -1199,7 +1188,7 @@ public class MouseLookScript : MonoBehaviour {
 		} else {
 			// Throw an active grenade
 			grenadeActive = false;
-			MFDManager.a.mouseClickHeldOverGUI = true; // Prevent shooting it.
+			Sys_UI.mouseClickHeldOverGUI = true; // Prevent shooting it.
 			tossObject = Instantiate(heldObject,(instances[i].position + (transform.forward * tossOffset)),Const.a.quaternionIdentity) as GameObject;  //effect
 			if (tossObject == null) {
 				CenterStatusPrint("BUG: Failed to instantiate object being dropped!",player);
@@ -1246,8 +1235,8 @@ public class MouseLookScript : MonoBehaviour {
 	public void ForceShootMode() {
 		if (Const.a.NoShootMode) return; // We are being like the original now!
 
-		GUIState.a.ClearOverButton();
-		MFDManager.a.mouseClickHeldOverGUI = false;
+		
+		Sys_UI.mouseClickHeldOverGUI = false;
 		Automap.a.CloseFullmap();
 		Cursor.lockState = CursorLockMode.Locked;
 		Cursor.visible = false;
@@ -1267,7 +1256,7 @@ public class MouseLookScript : MonoBehaviour {
 	public void ForceInventoryMode() {
 		if (inventoryMode) return;
 
-		GUIState.a.ClearOverButton();
+		
 		if (Sys_Global.menuActive || Sys_Global.gamePaused) {
 			Cursor.lockState = CursorLockMode.None;
 		} else {
@@ -1305,7 +1294,7 @@ public class MouseLookScript : MonoBehaviour {
 					CenterStatusPrint("%s", Sys_Text.stringTable[heldObjectIndex + 326]
 								 + Sys_Text.stringTable[319],player); // picked up
 
-					MFDManager.a.DisableSearchItemImage(i);
+					Sys_UI.DisableSearchItemImage(i);
 					useFX = false;
 					break;
 				}
@@ -1329,9 +1318,9 @@ public class MouseLookScript : MonoBehaviour {
 
 		if (firstTimeSearch) {
 			firstTimeSearch = false;
-			MFDManager.a.OpenTab (4, true, TabMSG.Search, -1,Handedness.LH);
+			Sys_UI.OpenTab (4, true, TabMSG.Search, -1,Handedness.LH);
 		}
-		MFDManager.a.SendSearchToDataTab(curSearchScript.objectName,
+		Sys_UI.SendSearchToDataTab(curSearchScript.objectName,
 										 numberFoundContents,resultContents,
 										 resultCustomIndex,
 										 currentSearchItem.instances[i].position,
@@ -1359,146 +1348,6 @@ public class MouseLookScript : MonoBehaviour {
 			case 12: heldObject = Const.a.GetPrefab(403); inventoryPlayer1.RemoveGrenade(5); break; // Nitropak
 			case 13: heldObject = Const.a.GetPrefab(404); inventoryPlayer1.RemoveGrenade(2); break; // Gas
 		}
-		MFDManager.a.ResetItemTab();
+		Sys_UI.ResetItemTab();
 		PutObjectInHand(index,-1,0,0,false,true);
 	}
-
-	public void ScreenShake (float force, float duration) {
-		shakeFinished = Sys_Global.pauseRelativeTime + duration;
-		if (force < 0.48f) shakeForce = force;
-		else shakeForce = 0.48f;
-	}
-
-	public static string Save(GameObject go) {
-		MouseLookScript ml = go.GetComponent<MouseLookScript>();
-        s1.Clear();
-		s1.Append(Utils.BoolToString(ml.gameObject.activeSelf,"MouseLookScript.gameObject.activeSelf"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.playerCamera.enabled,"playerCamera.enabled"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.inventoryMode,"inventoryMode"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.holdingObject,"holdingObject"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(ml.heldObjectIndex,"heldObjectIndex"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(ml.heldObjectCustomIndex,"heldObjectCustomIndex"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(ml.heldObjectAmmo,"heldObjectAmmo"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(ml.heldObjectAmmo2,"heldObjectAmmo2"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.heldObjectLoadedAlternate,"heldObjectLoadedAlternate"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.firstTimePickup,"firstTimePickup"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.firstTimeSearch,"firstTimeSearch"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.grenadeActive,"grenadeActive"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.inCyberSpace,"inCyberSpace"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.yRotation,"yRotation"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.geniusActive,"geniusActive"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.xRotation,"xRotation"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(ml.vmailActive,"vmailActive"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnPoint.x,"cyberspaceReturnPoint.x"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnPoint.y,"cyberspaceReturnPoint.y"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnPoint.z,"cyberspaceReturnPoint.z"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnCameraLocalRotation.x,"cyberspaceReturnCameraLocalRotation.x"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnCameraLocalRotation.y,"cyberspaceReturnCameraLocalRotation.y"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnCameraLocalRotation.z,"cyberspaceReturnCameraLocalRotation.z"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnPlayerCapsuleLocalRotation.x,"cyberspaceReturnPlayerCapsuleLocalRotation.x"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnPlayerCapsuleLocalRotation.y,"cyberspaceReturnPlayerCapsuleLocalRotation.y"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceReturnPlayerCapsuleLocalRotation.z,"cyberspaceReturnPlayerCapsuleLocalRotation.z"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceRecallPoint.x, "cyberspaceRecallPoint.x"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceRecallPoint.y,"cyberspaceRecallPoint.y"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(ml.cyberspaceRecallPoint.z,"cyberspaceRecallPoint.z"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(ml.cyberspaceReturnLevel,"cyberspaceReturnLevel"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(ml.returnFromCyberspaceFinished,"returnFromCyberspaceFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(ml.randomShakeFinished,"randomShakeFinished"));
-        s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(ml.randomKlaxonFinished,"randomKlaxonFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(ml.shakeFinished,"shakeFinished"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		MouseLookScript ml = go.GetComponent<MouseLookScript>();
-		float readFloatx, readFloaty, readFloatz;
-		ml.gameObject.SetActive(Utils.GetBoolFromString(entries[index],"MouseLookScript.gameObject.activeSelf")); index++;
-		ml.playerCamera.enabled = Utils.GetBoolFromString(entries[index],"playerCamera.enabled"); index++;
-		ml.inventoryMode = !Utils.GetBoolFromString(entries[index],"inventoryMode"); index++; // Take opposite because we are about to opposite again...
-		ml.ToggleInventoryMode(); // ...correctly set cursor lock state, and opposite again, now it is what was saved
-		PauseScript.a.previousInvMode = ml.inventoryMode; // Prevent it changing it inadvertently after load unpauses.
-		ml.holdingObject = Utils.GetBoolFromString(entries[index],"holdingObject"); index++;
-		ml.heldObjectIndex = Utils.GetIntFromString(entries[index],"heldObjectIndex"); index++;
-		ml.heldObjectCustomIndex = Utils.GetIntFromString(entries[index],"heldObjectCustomIndex"); index++;
-		ml.heldObjectAmmo = Utils.GetIntFromString(entries[index],"heldObjectAmmo"); index++;
-		ml.heldObjectAmmo2 = Utils.GetIntFromString(entries[index],"heldObjectAmmo2"); index++;
-		ml.heldObjectLoadedAlternate = Utils.GetBoolFromString(entries[index],"heldObjectLoadedAlternate"); index++;
-		ml.firstTimePickup = Utils.GetBoolFromString(entries[index],"firstTimePickup"); index++;
-		ml.firstTimeSearch = Utils.GetBoolFromString(entries[index],"firstTimeSearch"); index++;
-		ml.grenadeActive = Utils.GetBoolFromString(entries[index],"grenadeActive"); index++;
-		ml.inCyberSpace = Utils.GetBoolFromString(entries[index],"inCyberSpace"); index++;
-		ml.yRotation = Utils.GetFloatFromString(entries[index],"yRotation"); index++;
-		ml.geniusActive = Utils.GetBoolFromString(entries[index],"geniusActive"); index++;
-		ml.xRotation = Utils.GetFloatFromString(entries[index],"xRotation"); index++;
-		ml.vmailActive = Utils.GetBoolFromString(entries[index],"vmailActive"); index++;
-		readFloatx = Utils.GetFloatFromString(entries[index],"cyberspaceReturnPoint.x"); index++;
-		readFloaty = Utils.GetFloatFromString(entries[index],"cyberspaceReturnPoint.y"); index++;
-		readFloatz = Utils.GetFloatFromString(entries[index],"cyberspaceReturnPoint.z"); index++;
-		ml.cyberspaceReturnPoint = new Vector3(readFloatx,readFloaty,readFloatz);
-		readFloatx = Utils.GetFloatFromString(entries[index],"cyberspaceReturnCameraLocalRotation.x"); index++;
-		readFloaty = Utils.GetFloatFromString(entries[index],"cyberspaceReturnCameraLocalRotation.y"); index++;
-		readFloatz = Utils.GetFloatFromString(entries[index],"cyberspaceReturnCameraLocalRotation.z"); index++;
-		ml.cyberspaceReturnCameraLocalRotation = new Vector3(readFloatx,readFloaty,readFloatz);
-
-		 // Euler Angles, only 3
-		readFloatx = Utils.GetFloatFromString(entries[index],"cyberspaceReturnPlayerCapsuleLocalRotation.x"); index++;
-		readFloaty = Utils.GetFloatFromString(entries[index],"cyberspaceReturnPlayerCapsuleLocalRotation.y"); index++;
-		readFloatz = Utils.GetFloatFromString(entries[index],"cyberspaceReturnPlayerCapsuleLocalRotation.z"); index++;
-		ml.cyberspaceReturnPlayerCapsuleLocalRotation = new Vector3(readFloatx,readFloaty,readFloatz);
-		readFloatx = Utils.GetFloatFromString(entries[index],"cyberspaceRecallPoint.x"); index++;
-		readFloaty = Utils.GetFloatFromString(entries[index],"cyberspaceRecallPoint.y"); index++;
-		readFloatz = Utils.GetFloatFromString(entries[index],"cyberspaceRecallPoint.z"); index++;
-		ml.cyberspaceRecallPoint = new Vector3(readFloatx,readFloaty,readFloatz);
-		ml.cyberspaceReturnLevel = Utils.GetIntFromString(entries[index],"cyberspaceReturnLevel"); index++;
-		ml.returnFromCyberspaceFinished = Utils.LoadRelativeTimeDifferential(entries[index],"returnFromCyberspaceFinished"); index++;
-		ml.randomShakeFinished = Utils.LoadRelativeTimeDifferential(entries[index],"randomShakeFinished"); index++;
-		ml.randomKlaxonFinished = Utils.LoadRelativeTimeDifferential(entries[index],"randomKlaxonFinished"); index++;
-		ml.shakeFinished = Utils.LoadRelativeTimeDifferential(entries[index],"shakeFinished"); index++;
-
-		// Prevent picking up first item immediately. Not currently possible to
-		// save references (without a lot of work, aherm).
-		ml.currentSearchItem = null;
-
-		// Left/Right component applied to capsule.
-		Transform capsuleTr = ml.transform.parent.transform.parent.transform;
-		capsuleTr.localRotation = Quaternion.Euler(0f, ml.yRotation, 0f);
-
-		// Up/Down component only applied to camera.
-		Transform cameraTr = ml.transform;
-		cameraTr.localRotation = Quaternion.Euler(ml.xRotation,0f,0f);
-		return index;
-	}
-}

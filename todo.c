@@ -1,5 +1,7 @@
 // todo.c - TODO stuff.  Someday this file will be deleted.  Meanwhile any stubs will go here and anything stupid.
 // TODO: Multiview renders for sensaround
+// TODO: Multiview renders for camera views
+// TODO: Add camera view entities
 // TODO: Proper physics
 // TODO: Particle system
 // TODO: Raycasts
@@ -30,7 +32,7 @@ uint16_t SpawnDynamicObject(int val, bool cheat) {
     uint16_t entityIndexInInstanceTable = NULLENT;//MonoBehaviour.Instantiate(Const.a.GetPrefab(val),spawnPos, Const.a.quaternionIdentity) as Entity;
     if (cheat && ConstIndexIsHardware(val)) { // Hardware
 //         UseableObjectUse uo = go.GetComponent<UseableObjectUse>();
-//         int dex14 = inventoryPlayer1.hardware14fromConstdex(uo.useableItemIndex);
+//         int dex14 = hardware14fromConstdex(uo.useableItemIndex);
 //         if (inventoryPlayer1.hasHardware[dex14]) uo.customIndex = (inventoryPlayer1.hardwareVersion[dex14] + 1);
     }
 
@@ -51,10 +53,19 @@ void cmd_undo(void) {
     }
 }
 
-void cmd_shake(void) {
-    // Const.a.Shake(true, -1, -1);
-    CenterStatusPrint("SHAKE IT!");
+void ScreenShake(float force, double duration) {
+    Sys_Global.shakeFinished = Sys_Global.pauseRelativeTime + duration;
+    float shakeForce = (force < 0.48f) ? force : 0.48f;
+    (void)shakeForce;
+    // TODO actually shake
 }
+
+void Shake(float force) {
+    float forc = (force <= 0.0f) ? 1.0f : force;
+    ScreenShake(forc,1.0); // The whole station is a shakin' and a movin'!
+}
+
+void cmd_shake(void) { Shake(-1); CenterStatusPrint("SHAKIN LIKE A LEAF!"); }
 
 void ApplyCorpseFriction(uint16_t instanceIdx) {
     instances[instanceIdx].dynamicFriction = 10.0f;

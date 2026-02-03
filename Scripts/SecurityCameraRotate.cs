@@ -55,7 +55,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 			return;
 		}
 		
-		transform.Rotate(new Vector3(0,degreesYPerSecond * tickTime,0),
+		transform.Rotate((Vector3){0,degreesYPerSecond * tickTime,0),
 						 Space.World);
 	}
 
@@ -67,7 +67,7 @@ public class SecurityCameraRotate : MonoBehaviour {
 			return;
 		}
 		
-		transform.Rotate(new Vector3(0,degreesYPerSecond * tickTime * -1,0),
+		transform.Rotate((Vector3){0,degreesYPerSecond * tickTime * -1,0),
 						 Space.World);
 	}
 

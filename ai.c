@@ -3,7 +3,7 @@
 const float stopDistance = 1.28f; // Constant
 const float positionCheckDelay = 2.0f;
 const float searchTime = 5.0f;
-Vector3 targetOffset = new Vector3(0.0f, 0.24f, 0.0f);
+Vector3 targetOffset = (Vector3){0.0f, 0.24f, 0.0f);
 uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
 
 float Tranquilize(float amount, bool energy) {
@@ -250,7 +250,7 @@ void InitializeAIAfterLoad() {
 
 		float distUp = 0;
 		float distDn = 0;
-		Vector3 floorPoint = new Vector3();
+		Vector3 floorPoint = (Vector3){);
 		floorPoint = Const.a.vectorZero;
 		if (enemy != null) {
 		    idealPos = instances[i].position; // Where it's at
@@ -265,7 +265,7 @@ void InitializeAIAfterLoad() {
 			float distT = (distUp + distDn);
 			float yHeight = Const.a.flightHeight[index];
 			if (Const.a.flightHeightIsPercentage[index]) yHeight *= distT;
-			idealPos = floorPoint + new Vector3(0,yHeight, 0);
+			idealPos = floorPoint + (Vector3){0,yHeight, 0);
 		}
 
 		float dist = vabs(idealPos.y - instances[i].position.y);
@@ -359,7 +359,7 @@ void InitializeAIAfterLoad() {
 		float newZ = instances[i].position.z + random_range(-79f,79f);
 		float newY = 0f;
 		if (IsCyberNPC()) newY = instances[i].position.y + random_range(-79f,79f);
-		return new Vector3(newX,newY,newZ);
+		return (Vector3){newX,newY,newZ);
 	}
 
 	void Walk() {
@@ -564,10 +564,10 @@ void InitializeAIAfterLoad() {
 		bool clearSouth = false;
 		bool clearEast = false;
 		bool clearWest = false;
-		Vector3 northPoint = instances[i].position + new Vector3(0f,0f,2.56f);
-		Vector3 southPoint = instances[i].position + new Vector3(0f,0f,-2.56f);
-		Vector3 eastPoint = instances[i].position + new Vector3(2.56f,0f,0f);
-		Vector3 westPoint = instances[i].position + new Vector3(-2.56f,0f,0f);
+		Vector3 northPoint = instances[i].position + (Vector3){0f,0f,2.56f);
+		Vector3 southPoint = instances[i].position + (Vector3){0f,0f,-2.56f);
+		Vector3 eastPoint = instances[i].position + (Vector3){2.56f,0f,0f);
+		Vector3 westPoint = instances[i].position + (Vector3){-2.56f,0f,0f);
 		List<Vector3> availablePositions = new List<Vector3>();
 		if (DynamicCulling.a.XYPairInBounds(currentCell.x,currentCell.y + 1)) {
 			clearNorth = (DynamicCulling.a.gridCells[currentCell.x,currentCell.y + 1].open && !DynamicCulling.a.gridCells[currentCell.x,currentCell.y].closedNorth);
@@ -1208,7 +1208,7 @@ void InitializeAIAfterLoad() {
 		gameObject.layer = 13; // Change to Corpse layer
 
 		// Bump it up a hair to prevent corpse falling through the floor
-		//instances[i].position = new Vector3(instances[i].position.x,
+		//instances[i].position = (Vector3){instances[i].position.x,
 		//								 instances[i].position.y + 0.04f,
 		//								 instances[i].position.z);
 
@@ -1223,7 +1223,7 @@ void InitializeAIAfterLoad() {
 		}
 
 		if (index == 9 || index == 20) {
-			rbody.velocity = new Vector3(0f,rbody.velocity.z,0f);
+			rbody.velocity = (Vector3){0f,rbody.velocity.z,0f);
 		}
 
 		dyingSetup = true;
@@ -1365,7 +1365,7 @@ void InitializeAIAfterLoad() {
 					}
 
 					if (dr != null) {
-						if ((dr.doorOpen == DoorState.Closed || (dr.doorOpen == DoorState.Closing && Sys_Global.difficultyCombat > 2))
+						if ((dr.doorOpen == DoorState_Closed || (dr.doorOpen == DoorState_Closing && Sys_Global.difficultyCombat > 2))
 							&& !dr.locked && (LevelManager.a.GetCurrentLevelSecurity() <= dr.securityThreshhold)
 							&& (dr.requiredAccessCard == AccessCardType_None || dr.accessCardUsedByPlayer || inventoryPlayer1.HasAccessCard(dr.requiredAccessCard))) {
 						

@@ -16,13 +16,13 @@ public class SearchButton : MonoBehaviour {
 
 	public void CheckForEmpty () {
 		if (contents[0] == -1 && contents[1] == -1 && contents[2] == -1 && contents[3] == -1) {
-			MFDManager.a.ReturnToLastTab(isRH);
+			Sys_UI.ReturnToLastTab(isRH);
 		}
 	}
 
 	public void SearchButtonClick (int buttonIndex) {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		MouseLookScript.a.SearchButtonClick(buttonIndex,this);
-		GUIState.a.ClearOverButton();
+		
 	}
 }

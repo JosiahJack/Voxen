@@ -41,7 +41,7 @@ public class ImageSequenceTextureArrayUI : MonoBehaviour {
 	void Update() {
 		if (!Sys_Global.gamePaused || playOnMenu) {
 			if (!Sys_Global.menuActive || playOnMenu) {
-				if (deactivateAtEnd && playDone) gameObject.SetActive(false);
+				if (deactivateAtEnd && playDone) flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 				if (stopAtEnd && playDone) return;
 
 				if (stopAtEnd && !playDone) {

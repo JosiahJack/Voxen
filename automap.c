@@ -239,7 +239,7 @@ static const float camMaxAmount = 0.2548032f
 // 			if (inFullMap) {
 // 				Utils.EnableImage(automapFullPlayerIcon);
 // 				SetLinkedOverlayPos(automapFullPlayerIcon,1f,PlayerMovement.a.gameObject);
-// 				automapFullPlayerIcon.rectTransform.anchoredPosition = new Vector3(1024f - automapFullPlayerIcon.rectTransform.anchoredPosition.x + 512f - 2048f + 57f - 10.0839f,
+// 				automapFullPlayerIcon.rectTransform.anchoredPosition = (Vector3){1024f - automapFullPlayerIcon.rectTransform.anchoredPosition.x + 512f - 2048f + 57f - 10.0839f,
 // 																				   1024f - automapFullPlayerIcon.rectTransform.anchoredPosition.y - 512f - 168.8f + 68.404f,
 // 																				   -0.03544822f);
 // 				// Move the map to center.
@@ -467,7 +467,7 @@ static const float camMaxAmount = 0.2548032f
 // 			default: zoom = automapZoom0; break;
 // 		}
 // 
-// 		Vector3 scaleVec = new Vector3(zoom,zoom,zoom);
+// 		Vector3 scaleVec = (Vector3){zoom,zoom,zoom);
 // 		automapContainerLH.instances[i].scale = scaleVec;
 // 		automapContainerRH.instances[i].scale = scaleVec;
 // 	}
@@ -481,10 +481,10 @@ static const float camMaxAmount = 0.2548032f
 // 	public void AutomapGoSide() {
 // 		automapSideButtonTextLH.text = Sys_Text.stringTable[887];
 // 		automapSideButtonTextRH.text = Sys_Text.stringTable[887];
-// 		automapInnerCircleLH.gameObject.SetActive(false);
-// 		automapInnerCircleRH.gameObject.SetActive(false);
-// 		automapOuterCircleLH.gameObject.SetActive(false);
-// 		automapOuterCircleRH.gameObject.SetActive(false);
+// 		automapInnerCircleLH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+// 		automapInnerCircleRH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+// 		automapOuterCircleLH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
+// 		automapOuterCircleRH.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 // 		automapTopLH.SetActive(false);
 // 		automapTopRH.SetActive(false);
 // 		automapNormalPlayerIconGOLH.SetActive(false);
@@ -517,11 +517,11 @@ static const float camMaxAmount = 0.2548032f
 // 		}
 // 		Utils.Activate(automapFull);
 // 		inFullMap = true;
-// 		MFDManager.a.AutomapGoFull();
+// 		Sys_UI.AutomapGoFull();
 // 	}
 // 
 // 	public void CloseFullmap() {
-// 		if (automapFull.activeInHierarchy) MFDManager.a.CloseFullmap();
+// 		if (automapFull.activeInHierarchy) Sys_UI.CloseFullmap();
 // 		Utils.Deactivate(automapFull);
 // 		inFullMap = false;
 // 		if (inSideView) AutomapGoSide();
@@ -543,7 +543,7 @@ static const float camMaxAmount = 0.2548032f
 // 		// 34.16488, -45.08, 0.4855735
 // 		// x = ((0.6384575295) * 1008f) + 8;
 // 		// x = 651
-// 		Vector3 retval = new Vector3(0f,0f,0f);
+// 		Vector3 retval = (Vector3){0f,0f,0f);
 // 		retval.y = ((ewOffset/mapWidth) * 1008f) + Const.mapTileMinX;
 // 		retval.x = ((nsOffset/mapHeight) * 1008f) + Const.mapTileMinY;
 // 		retval.z = -0.03f; // Always moved to be behind the fog of war tiles.

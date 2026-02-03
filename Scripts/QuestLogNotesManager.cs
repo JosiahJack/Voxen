@@ -33,8 +33,8 @@
 			a.notes[i].SetActive(false);
 		}
 
-		if (SSys_Global.difficultyMission == 0) {
-			gameObject.SetActive(false);
+		if (Sys_Global.difficultyMission == 0) {
+			flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 			return;
 		}
 		a.labels[6].text = Sys_Text.stringTable[554]; // Set:Escape neurosurgery suite.
@@ -42,14 +42,14 @@
 		if (Inventory.a != null) inventoryPlayer1.hasNewNotes = true;
 	}
 
-	public void NotifyDoorUnlock(Door d) {
+	void NotifyDoorUnlock(Door d) {
 		if (d == neuroSurgeryDoor) {
 			checkBoxes[6].isOn = true; // Escape neurosurgery suite.
 			if (Inventory.a != null) inventoryPlayer1.hasNewNotes = true;
 		}
 	}
 
-	public void NotifyLockedDoorAttempt(Door d) {
+	void NotifyLockedDoorAttempt(Door d) {
 		if (d == level6elevatorDoorTo7) {
 			notes[12].SetActive(true); // Jettison Beta Grove.
 			labels[12].text = Sys_Text.stringTable[565];
@@ -95,7 +95,7 @@
 	}
 
 	public void LogAdded(int logCustomIndex) {
-		if (SSys_Global.difficultyMission == 0) return;
+		if (Sys_Global.difficultyMission == 0) return;
 		// Not checking for eReader present here...best to assume so we don't
 		// have to do all this later and remember it and save it in save file.
 
@@ -186,7 +186,7 @@
 	}
 
 	public void NodesDestroyed(int levelIndex) {
-		if (SSys_Global.difficultyMission == 0) return;
+		if (Sys_Global.difficultyMission == 0) return;
 
 		switch (levelIndex) {
 			case 1: // Level 1

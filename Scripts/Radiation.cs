@@ -15,7 +15,7 @@ public class Radiation : MonoBehaviour {
 
 	void OnTriggerEnter (Collider col) {
 		if (col.gameObject.CompareTag("Player")) {
-			if (PlayerHealth.a.hm.health > 0f) {
+			if (instances[PLAYER1].health > 0f) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
 				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
@@ -25,7 +25,7 @@ public class Radiation : MonoBehaviour {
 
 	void  OnTriggerStay (Collider col) {
 		if (col.gameObject.CompareTag("Player")) {
-			if (PlayerHealth.a.hm.health > 0f && (radFinished < Sys_Global.pauseRelativeTime)) {
+			if (instances[PLAYER1].health > 0f && (radFinished < Sys_Global.pauseRelativeTime)) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(radiationAmount);
 				radFinished = Sys_Global.pauseRelativeTime + (intervalTime*random_range(1f,1.5f));
@@ -35,7 +35,7 @@ public class Radiation : MonoBehaviour {
 
 	void OnTriggerExit (Collider col) {
 		if (col.gameObject.CompareTag("Player")) { 
-			if (PlayerHealth.a.hm.health > 0f) {
+			if (instances[PLAYER1].health > 0f) {
 				PlayerHealth.a.radiationArea = false;
 				radFinished = Sys_Global.pauseRelativeTime;  // reset so re-triggering is instant
 			}

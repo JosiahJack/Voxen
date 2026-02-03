@@ -10,7 +10,7 @@ public class LogMoreButton : MonoBehaviour {
 	private string remainder = System.String.Empty;
 
 	void LogMoreButtonClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		remainder = logTextOutput.GetComponent<Text>().text;
 		if (remainder.Length>568) {
 			// MORE BUTTON
@@ -18,12 +18,12 @@ public class LogMoreButton : MonoBehaviour {
 			logTextOutput.GetComponent<Text>().text = remainder;
 		} else {
 			// CLOSE BUTTON
-			MFDManager.a.ResetMultiMediaTabs();
-			MFDManager.a.ClearDataTab(true);
-			MFDManager.a.ClearDataTab(false);
-			MFDManager.a.leftTC.ReturnToLastTab();
-			MFDManager.a.rightTC.ReturnToLastTab();
-			MFDManager.a.CenterTabButtonClickSilent(0,true);
+			Sys_UI.ResetMultiMediaTabs();
+			Sys_UI.ClearDataTab(true);
+			Sys_UI.ClearDataTab(false);
+			Sys_UI.leftTC.ReturnToLastTab();
+			Sys_UI.rightTC.ReturnToLastTab();
+			Sys_UI.CenterTabButtonClickSilent(0,true);
 			GetComponent<UIButtonMask>().PtrExit(); // Force mouse cursor out of UI.
 		}
 	}

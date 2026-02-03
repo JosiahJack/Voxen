@@ -96,7 +96,7 @@
 			}
 
 			if (destroyInsteadOfDeactivate) Utils.SafeDestroy(gameObject);
-			else gameObject.SetActive(false); // disable the projectile
+			else flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false); // disable the projectile
 		}
 	}
 }

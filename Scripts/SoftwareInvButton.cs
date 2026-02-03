@@ -6,12 +6,12 @@ public class SoftwareInvButton : MonoBehaviour {
 	public int index = 0;
 
 	public void DoubleClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		SoftInvClick();
 	}
 
     public void SoftInvClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		switch(index) {
 			case 0:
 					// Drill
@@ -39,7 +39,7 @@ public class SoftwareInvButton : MonoBehaviour {
 					// Turbo
 					if (MouseLookScript.a.inCyberSpace) {
 						inventoryPlayer1.UseTurbo();
-						GUIState.a.ClearOverButton();
+						
 					} else {
 						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
 					}
@@ -48,7 +48,7 @@ public class SoftwareInvButton : MonoBehaviour {
 					// Decoy
 					if (MouseLookScript.a.inCyberSpace) {
 						inventoryPlayer1.UseDecoy();
-						GUIState.a.ClearOverButton();
+						
 					} else {
 						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
 					}
@@ -57,7 +57,7 @@ public class SoftwareInvButton : MonoBehaviour {
 					// Recall
 					if (MouseLookScript.a.inCyberSpace) {
 						inventoryPlayer1.UseRecall();
-						GUIState.a.ClearOverButton();
+						
 					} else {
 						CenterStatusPrint("%s", Sys_Text.stringTable[460],Const.a.player1);
 					}
@@ -67,7 +67,7 @@ public class SoftwareInvButton : MonoBehaviour {
 					if (MouseLookScript.a.inCyberSpace) {
 						CenterStatusPrint("%s", Sys_Text.stringTable[443],Const.a.player1);
 					} else {
-						MFDManager.a.OpenMinigames();
+						Sys_UI.OpenMinigames();
 						CenterStatusPrint("%s", Sys_Text.stringTable[309],Const.a.player1); // Trioptimum Funpack Module, don't play on company time!
 					}
 					break;

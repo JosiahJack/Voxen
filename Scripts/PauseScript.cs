@@ -223,20 +223,20 @@ public class PauseScript : MonoBehaviour {
 		}
 
 		UnpauseAmbients();
-		PlayerMovement.a.ConsoleDisable();
+		instances[PLAYER1].ConsoleDisable();
 	}
 
 	public void OpenSaveDialog() {
 		if (onSaveDialog) return;
 
-		if (PlayerMovement.a.inCyberSpace) {
+		if (instances[PLAYER1].inCyberSpace) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 			OpenSaveDialogHard();
 			return;
 		}
 
 		DisablePauseUI();
-		if (Const.a.justSavedTimeStamp < Time.time) {
+		if (Sys_Global.justSavedTimeStamp < Time.time) {
 			onSaveDialog = true;
 			saveDialog.SetActive(true);
 		}
@@ -246,7 +246,7 @@ public class PauseScript : MonoBehaviour {
 		if (onSaveDialog) return;
 
 		DisablePauseUI();
-		if (Const.a.justSavedTimeStamp < Time.time) {
+		if (Sys_Global.justSavedTimeStamp < Time.time) {
 			onSaveDialog = true;
 			hardSaveDialog.SetActive(true);
 		}
@@ -260,7 +260,7 @@ public class PauseScript : MonoBehaviour {
 	}
 
 	public void SavePause() {
-		if (PlayerMovement.a.inCyberSpace) {
+		if (instances[PLAYER1].inCyberSpace) {
 			CenterStatusPrint("%s", Sys_Text.stringTable[602]); // Cannot save in cyberspace
 			return;
 		}
@@ -321,7 +321,7 @@ public class PauseScript : MonoBehaviour {
 
 			if (smbh != null) {
 				smbh.DeHighlight(); // Prevent persisted states.
-				if (i == 3 && PlayerMovement.a.inCyberSpace) { // Save button
+				if (i == 3 && instances[PLAYER1].inCyberSpace) { // Save button
 					smbh.enabled = false;
 				} else {
 					smbh.enabled = true;

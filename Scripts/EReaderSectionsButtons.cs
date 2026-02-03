@@ -9,7 +9,7 @@ public class EReaderSectionsButtons : MonoBehaviour {
 	public EReaderSectionsButtonHighlight ersbh3;
 
 	void OnEnable() {
-		if (SSys_Global.difficultyMission == 0) ersbh3.gameObject.SetActive(false);
+		if (Sys_Global.difficultyMission == 0) ersbh3.flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 		else ersbh3.gameObject.SetActive(true);
 
 		HighlightOthers();
@@ -24,14 +24,14 @@ public class EReaderSectionsButtons : MonoBehaviour {
 	}
 
 	public void OnClick(int index) {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 
 		SetEReaderSectionsButtonsHighlights(index);
 		switch (index) {
-			case 0: MFDManager.a.OpenEmailTableContents(); break;
-			case 1: MFDManager.a.OpenLogTableContents(); break;
-			case 2: MFDManager.a.OpenDataTableContents(); break;
-			case 3: MFDManager.a.OpenNotesTableContents(); break;
+			case 0: Sys_UI.OpenEmailTableContents(); break;
+			case 1: Sys_UI.OpenLogTableContents(); break;
+			case 2: Sys_UI.OpenDataTableContents(); break;
+			case 3: Sys_UI.OpenNotesTableContents(); break;
 		}
 	}
 

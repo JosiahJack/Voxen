@@ -43,8 +43,8 @@ public class MinigameCnc : MonoBehaviour {/*
     }
 
     private void ResetBall() {
-        ball.localPosition = new Vector3(0f,0f,0f);
-        computerPaddle.localPosition = new Vector3(0f,100f,0f);
+        ball.localPosition = (Vector3){0f,0f,0f);
+        computerPaddle.localPosition = (Vector3){0f,100f,0f);
         ballDir = GetNewBallDirection();
         ballResetFinished = Sys_Global.pauseRelativeTime + 2.5f;
     }
@@ -66,7 +66,7 @@ public class MinigameCnc : MonoBehaviour {/*
         y = ball.localPosition.y;
         x += ballDir.x * ballSpeed;
         y += ballDir.y * ballSpeed;
-        ball.localPosition = new Vector3(x,y,0f);
+        ball.localPosition = (Vector3){x,y,0f);
         if (ball.localPosition.y < -160f) { // More than 133 gives delay.
             computerScore++;
             servecount++;
@@ -111,11 +111,11 @@ public class MinigameCnc : MonoBehaviour {/*
         if (ball.localPosition.x < -122f) {
             ballDir.x *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = new Vector3(-121.9f,ball.localPosition.y,0f);
+            ball.localPosition = (Vector3){-121.9f,ball.localPosition.y,0f);
         } else if (ball.localPosition.x > 122f) {
             ballDir.x *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = new Vector3(121.9f,ball.localPosition.y,0f);
+            ball.localPosition = (Vector3){121.9f,ball.localPosition.y,0f);
         }
 
         // Hit paddles
@@ -148,7 +148,7 @@ public class MinigameCnc : MonoBehaviour {/*
                     if (ballDir.x > 1f) ballDir.x = 1f;
                     else if (ballDir.x < -1f) ballDir.x = -1f;
 
-                    ball.localPosition = new Vector3(
+                    ball.localPosition = (Vector3){
                         ball.localPosition.x,
                         playerPaddle.localPosition.y + paddleHeightH + ballSideH + 0.05f,
                         0f
@@ -191,7 +191,7 @@ public class MinigameCnc : MonoBehaviour {/*
                     if (ballDir.x > 1f) ballDir.x = 1f;
                     else if (ballDir.x < -1f) ballDir.x = -1f;
 
-                    ball.localPosition = new Vector3(
+                    ball.localPosition = (Vector3){
                         ball.localPosition.x,
                         computerPaddle.localPosition.y - paddleHeightH - ballSideH - 0.05f,
                         0f
@@ -216,7 +216,7 @@ public class MinigameCnc : MonoBehaviour {/*
             x = 128f - paddleWidthH;
             playerVel = 0f;
         }
-        playerPaddle.localPosition = new Vector3(x,-100f,0f);
+        playerPaddle.localPosition = (Vector3){x,-100f,0f);
     }
 
     private void ComputerPaddleUpdate() {
@@ -232,7 +232,7 @@ public class MinigameCnc : MonoBehaviour {/*
             x = 128f - paddleWidthH;
             computerVel = 0f;
         }
-        computerPaddle.localPosition = new Vector3(x,100f,0f);
+        computerPaddle.localPosition = (Vector3){x,100f,0f);
     }
 
     private void GameOver() {

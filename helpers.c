@@ -283,3 +283,38 @@ void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat re
 // finished) somewhere instead of (finished < time) which is my usual Quake
 // derived timer pattern.
 float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum) { return parse_float(trimmed_value, initialLine, lineNum) + (float)Sys_Global.pauseRelativeTime; }
+uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
+
+uint16_t GetImpactType(uint16_t instanceIdx) {
+    switch (instances[instanceIdx].bloodType) {
+        case BloodType_None:         return 729; // SparksSmall
+        case BloodType_Red:          return 724; // BloodSpurtSmall
+        case BloodType_Yellow:       return 723; // BloodSpurtSmallYellow
+        case BloodType_Green:        return 722; // BloodSpurtSmallGreen
+        case BloodType_Robot:        return 730; // SparksSmallBlue
+        case BloodType_Leaf:         return 756; // LeafBurst
+        case BloodType_Mutation:     return 757; // MutationBurst
+        case BloodType_GrayMutation: return 758; // GraytationBurst
+    }
+
+    return 729; // SparksSmall
+}
+
+int hardware14fromConstdex(int constdex) {
+    switch (constdex) {
+        case 21: return 0;
+        case 22: return 1;
+        case 23: return 2;
+        case 24: return 3;
+        case 25: return 4;
+        case 26: return 5;
+        case 27: return 6;
+        case 28: return 7;
+        case 29: return 8;
+        case 30: return 9;
+        case 31: return 10;
+        case 32: return 11;
+    }
+    
+    return 0; // Using zero in case I pass this straight into the ever dangerous [ ]
+}

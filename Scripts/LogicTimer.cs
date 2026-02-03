@@ -35,6 +35,6 @@ public class LogicTimer : MonoBehaviour {
 
 	public void UseTargets () {
 		UseData ud = new UseData();
-		Const.a.UseTargets(gameObject,ud,target);
+		UseTargets(gameObject,ud,target);
 	}
 }

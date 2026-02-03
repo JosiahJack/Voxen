@@ -25,7 +25,7 @@ public class TextureStaticNoise : MonoBehaviour {
 		if (texture.width != resolution) texture.Resize(resolution, resolution);
 		for (int y=0; y<resolution; y++) {
 			for (int x=0; x<resolution; x++) {
-				texture.SetPixel(x, y, Color.white * Random.value);
+				texture.SetPixel(x, y, Color.white * random_range(0.0f,1.0f));
 			}
 		}
 		texture.filterMode = FilterMode.Point;
@@ -39,9 +39,5 @@ public class TextureStaticNoise : MonoBehaviour {
 				FillTexture();
 			}
 		}
-	}
-	
-	void OnDestroy() {
-		Destroy(texture);
 	}
 }

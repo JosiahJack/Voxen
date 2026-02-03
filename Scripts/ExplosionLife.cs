@@ -29,7 +29,7 @@ public class ExplosionLife : MonoBehaviour {
 	IEnumerator DelayedDestroy () {
 		yield return new WaitForSeconds (delayBeforeDestroy);
 		if (dontDestroy) {
-			gameObject.SetActive(false);
+			flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 		} else {
 			Utils.SafeDestroy(this.gameObject);
 		}

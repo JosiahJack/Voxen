@@ -39,7 +39,7 @@ public class MinigameBotBounce : MonoBehaviour {
         playerScore = 3;
         numAlive = 24;
         UpdateScoreText();
-        playerPaddle.localPosition = new Vector3(0f,-100f,0f);
+        playerPaddle.localPosition = (Vector3){0f,-100f,0f);
         gameOver.SetActive(false);
         winPizzazz.SetActive(false);
         ResetBall();
@@ -56,7 +56,7 @@ public class MinigameBotBounce : MonoBehaviour {
     }
 
     private void ResetBall() {
-        ball.localPosition = new Vector3(0f,-100f,0f);
+        ball.localPosition = (Vector3){0f,-100f,0f);
         ballDir = GetNewBallDirection();
         ballResetFinished = Sys_Global.pauseRelativeTime + 2.5f;
     }
@@ -85,7 +85,7 @@ public class MinigameBotBounce : MonoBehaviour {
         y = ball.localPosition.y;
         x += ballDir.x * ballSpeed;
         y += ballDir.y * ballSpeed;
-        ball.localPosition = new Vector3(x,y,0f);
+        ball.localPosition = (Vector3){x,y,0f);
         if (ball.localPosition.y < -160f) { // More than 133 gives delay.
             playerPaddleImg.color = Const.a.ssRedText;
             playerScore--;
@@ -103,15 +103,15 @@ public class MinigameBotBounce : MonoBehaviour {
         if (ball.localPosition.y > 133f) { // More than 133 gives delay.
             ballDir.y *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = new Vector3(ball.localPosition.x,132f,0f);
+            ball.localPosition = (Vector3){ball.localPosition.x,132f,0f);
         } else if (ball.localPosition.x < -122f) { // Hit sides
             ballDir.x *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = new Vector3(-121.9f,ball.localPosition.y,0f);
+            ball.localPosition = (Vector3){-121.9f,ball.localPosition.y,0f);
         } else if (ball.localPosition.x > 122f) {
             ballDir.x *= -1f;
             ballImg.color = ballHitColor;
-            ball.localPosition = new Vector3(121.9f,ball.localPosition.y,0f);
+            ball.localPosition = (Vector3){121.9f,ball.localPosition.y,0f);
         }
 
         // Hit paddles
@@ -144,7 +144,7 @@ public class MinigameBotBounce : MonoBehaviour {
                     if (ballDir.x > 1f) ballDir.x = 1f;
                     else if (ballDir.x < -1f) ballDir.x = -1f;
 
-                    ball.localPosition = new Vector3(
+                    ball.localPosition = (Vector3){
                         ball.localPosition.x,
                         playerPaddle.localPosition.y + paddleHeightH + ballSideH + 0.05f,
                         0f
@@ -169,7 +169,7 @@ public class MinigameBotBounce : MonoBehaviour {
             x = 128f - paddleWidthH;
             playerVel = 0f;
         }
-        playerPaddle.localPosition = new Vector3(x,-100f,0f);
+        playerPaddle.localPosition = (Vector3){x,-100f,0f);
     }
 
     private void GameOver() {

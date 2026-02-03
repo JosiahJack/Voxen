@@ -38,7 +38,7 @@ public class MissionTimer : MonoBehaviour {
 		
 		QuestLogNotesManager.a.UpdateToNextMission(nextMissionIndex);
 
-		if (SSys_Global.difficultyMission < 3) return; // Don't update timer on lower skill settings.
+		if (Sys_Global.difficultyMission < 3) return; // Don't update timer on lower skill settings.
 		t = newTimerAmount;
 		currentMissionIndex = nextMissionIndex;
 		currentMission = Sys_Text.stringTable[misTextIndex];
@@ -46,13 +46,13 @@ public class MissionTimer : MonoBehaviour {
     }
 
     void Update() {
-		if (SSys_Global.difficultyMission < 3) return;
+		if (Sys_Global.difficultyMission < 3) return;
 		if (Sys_Global.gamePaused) return;
 		if (Sys_Global.menuActive) return;
 		if (MouseLookScript.a.inCyberSpace) return; // timer doesn't count down in cyberspace, yay!
 
 		if (timesUP) {
-			if (PlayerHealth.a.hm.health > 0f) {
+			if (instances[PLAYER1].health > 0f) {
 				PlayerHealth.a.radiationArea = true;
 				PlayerHealth.a.GiveRadiation(0.1f); // Every frame! Muahaha!!!
 				return;

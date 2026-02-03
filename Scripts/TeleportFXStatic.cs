@@ -24,26 +24,26 @@ public class TeleportFXStatic : MonoBehaviour {
 	void FlipX () {
 		if (xFlipped) {
 			xFlipped = false;
-			rect.localScale = new Vector3(1f, 1f, 1f);
+			rect.localScale = (Vector3){1f, 1f, 1f);
 		} else {
 			xFlipped = true;
-			rect.localScale = new Vector3(-1f, 1f, 1f);
+			rect.localScale = (Vector3){-1f, 1f, 1f);
 		}
 	}
 
 	void FlipY () {
 		if (yFlipped) {
 			yFlipped = false;
-			rect.localScale = new Vector3(1f, 1f, 1f);
+			rect.localScale = (Vector3){1f, 1f, 1f);
 		} else {
 			yFlipped = true;
-			rect.localScale = new Vector3(1f, -1f, 1f);
+			rect.localScale = (Vector3){1f, -1f, 1f);
 		}
 	}
 
 	void Deactivate () {
 		MouseCursor.a.cursorImage = cursorTexture; //return to previous cursor
-		gameObject.SetActive(false);
+		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 	}
 
 	void Update() {

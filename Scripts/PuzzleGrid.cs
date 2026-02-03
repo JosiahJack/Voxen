@@ -69,7 +69,7 @@ public class PuzzleGrid : MonoBehaviour {
 		// No longer in use, reset reset!
 		puzzleSolved = false;
 		progressBar.value = 0;
-		gameObject.SetActive(false);
+		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 	}
 
 	public void SendGrid(bool[] states, PuzzleCellType[] types,
@@ -96,7 +96,7 @@ public class PuzzleGrid : MonoBehaviour {
 		EvaluatePuzzle();
 		UpdateCellImages();
 
-		if (udSender.mainIndex == 54 || SSys_Global.difficultyPuzzle == 0) {
+		if (udSender.mainIndex == 54 || Sys_Global.difficultyPuzzle == 0) {
 			PuzzleSolved(true);
 		}
 	}
@@ -106,11 +106,11 @@ public class PuzzleGrid : MonoBehaviour {
 	}
 
 	public void OnGridCellClick (int index) {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (puzzleSolved) return;
 
 		if (cellType[index] == PuzzleCellType.Standard) {
-			if (SSys_Global.difficultyPuzzle == 1) {
+			if (Sys_Global.difficultyPuzzle == 1) {
 				King(index); // Easy puzzle difficulty.  Chose King instead of Pawn to help speed up the puzzle by the antenna trap on Level 7
 			} else {
 				switch (gridType) {
@@ -134,7 +134,7 @@ public class PuzzleGrid : MonoBehaviour {
 			if (puzzleSolved) return;
 
 			if (cellType[index] == PuzzleCellType.Standard) {
-				if (SSys_Global.difficultyPuzzle == 1) {
+				if (Sys_Global.difficultyPuzzle == 1) {
 					HoverKing(index); // Easy puzzle difficulty.  Chose King instead of Pawn to help speed up the puzzle by the antenna trap on Level 7
 				} else {
 					switch (gridType) {
@@ -439,7 +439,7 @@ public class PuzzleGrid : MonoBehaviour {
 			MouseLookScript.a.ResetHeldItem();
 		}
 		
-		Const.a.UseTargets(null,udSender,target);
+		UseTargets(null,udSender,target);
 	}
 
 	int ReturnCellAbove(int index) {

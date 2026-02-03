@@ -175,15 +175,15 @@ public class SearchableItem : MonoBehaviour {
 				if (se.contents[i] > -1) numberFoundContents++;
 			}
 
-			if (MFDManager.a.tetheredSearchable != se) {
-				if (MFDManager.a.tetheredSearchable != null) {
-					MFDManager.a.tetheredSearchable.ResetSearchable(false);
-					MFDManager.a.tetheredSearchable = null;
+			if (Sys_UI.tetheredSearchable != se) {
+				if (Sys_UI.tetheredSearchable != null) {
+					Sys_UI.tetheredSearchable.ResetSearchable(false);
+					Sys_UI.tetheredSearchable = null;
 				}
 			}
-			MFDManager.a.tetheredSearchable = se;
-			MFDManager.a.objectInUsePos = se.gameObject.instances[i].position;
-			MFDManager.a.usingObject = true;
+			Sys_UI.tetheredSearchable = se;
+			Sys_UI.objectInUsePos = se.gameObject.instances[i].position;
+			Sys_UI.usingObject = true;
 		}
 		return index;
 	}

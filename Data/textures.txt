@@ -471,7 +471,8 @@ index: 195
 index: 196
 #Textures/door_bulk1_glow.png
 index: 197
-
+#Textures/col3_forcefield_faint.png
+index: 198
 #Textures/door_bulk3_glow.png
 index: 199
 #Textures/door_bulk3.png

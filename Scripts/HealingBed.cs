@@ -14,18 +14,18 @@ public class HealingBed : MonoBehaviour {
 	}
 
 	public void Use (UseData ud) {
-		if (LevelManager.a.GetCurrentLevelSecurity() <= minSecurityLevel) {
+		if (GetCurrentLevelSecurity() <= minSecurityLevel) {
 			if (!broken) {
 				PlayerReferenceManager.a.playerCapsule.GetComponent<HealthManager>().HealingBed(amount,true);
 				PlayerHealth.a.radiationArea = false;
 				PlayerHealth.a.radiated = 0f;
 				CenterStatusPrint("%s", Sys_Text.stringTable[23],ud.owner);
-				Utils.PlayOneShotSavable(SFXSource,Const.a.sounds[103]);
+				Utils.PlayOneShotSavable(SFXSource,sounds[103]);
 			} else {
 				CenterStatusPrint("%s", Sys_Text.stringTable[24],ud.owner);
 			}
 		} else {
-			MFDManager.a.BlockedBySecurity(instances[i].position);
+			Sys_UI.BlockedBySecurity(instances[i].position);
 		}
 	}
 }

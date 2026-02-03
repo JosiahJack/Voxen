@@ -58,12 +58,12 @@ public class VaporizeButton : MonoBehaviour {
 	public void PtrExit () {
 		if (!pointerEntered) return;
 
-		GUIState.a.ClearOverButton();
+		
 		pointerEntered = false;
 	}
 
 	public void OnVaporizeClick() {
-		MFDManager.a.mouseClickHeldOverGUI = true;
+		Sys_UI.mouseClickHeldOverGUI = true;
 		if (Inventory.a == null) return;
 		if (inventoryPlayer1.generalInvCurrent == 0) return; // Access Cards index.
 
@@ -89,15 +89,15 @@ public class VaporizeButton : MonoBehaviour {
 		int indexRef = inventoryPlayer1.generalInventoryIndexRef[cur];
 		if (inventoryPlayer1.generalInvCurrent == 0) {
 			if (inventoryPlayer1.HasAnyAccessCards()) {
-				MFDManager.a.SendInfoToItemTab(indexRef);
+				Sys_UI.SendInfoToItemTab(indexRef);
 			} else {
 				// If no access cards, reset item tab to show nothing.
-				MFDManager.a.SendInfoToItemTab(-1);
+				Sys_UI.SendInfoToItemTab(-1);
 				PtrExit();
 			}
 		} else {
 			GeneralInvButton genbut = inventoryPlayer1.genButtons[cur].GetComponent<GeneralInvButton>();
-			MFDManager.a.SendInfoToItemTab(indexRef,genbut.customIndex);
+			Sys_UI.SendInfoToItemTab(indexRef,genbut.customIndex);
 		}
 	}
 }

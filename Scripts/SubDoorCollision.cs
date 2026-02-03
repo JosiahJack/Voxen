@@ -11,7 +11,7 @@ public class SubDoorCollision : MonoBehaviour {
 	}
 
 	void OnCollisionEnter () {
-		if (parentDoorScript.doorOpen == DoorState.Closing)
+		if (parentDoorScript.doorOpen == DoorState_Closing)
 			parentDoorScript.blocked = true; //only block the door while closing
 	}
 

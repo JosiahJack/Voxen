@@ -91,7 +91,7 @@ public class GrenadeActivate : MonoBehaviour {
 	public void Explode() {
 		DualLog("Grenade exploded");
 		Utils.DisableCollision(gameObject);
-		DamageData dd = new DamageData();
+		DamageData dd;
 		dd.damage = damage;
 		dd.attackType = attackType;
 		dd.penetration = penetration;
@@ -122,7 +122,7 @@ public class GrenadeActivate : MonoBehaviour {
 			play_wav(sounds[soundIndex],1.0f,instances[i].position,true);
 		}
 
-		Const.a.Shake(true,-1,-1);
-		gameObject.SetActive(false);
+		Shake(-1,-1);
+		flag_set(&SELF.entflags, ENTFLAG_ACTIVE, false);
 	}
 }

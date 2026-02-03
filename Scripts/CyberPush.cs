@@ -9,7 +9,7 @@ public class CyberPush : MonoBehaviour {
 	private Vector3 tempVec;
 
 	void OnTriggerStay(Collider col) {
-		if (SSys_Global.difficultyCyber < 1) return;
+		if (Sys_Global.difficultyCyber < 1) return;
 
 		if (col.gameObject.CompareTag("Player")) {
 			PlayerMovement pm = col.gameObject.GetComponent<PlayerMovement>();

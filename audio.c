@@ -187,7 +187,7 @@ void ResetLevelAudio(void) {
     }
 }
 
-const char* sounds[] = {
+const char* sounds[SOUNDS_COUNT] = {
     "./Audio/misc/null.wav",
     "./Audio/ambient/ambient_frogs.wav",
     "./Audio/ambient/clicker.wav",
@@ -860,7 +860,7 @@ const char* sounds[] = {
     "./Audio/physics/footsteps/Wood/woodcrate_jump3.wav",
 };
 
-const char* audioLogs[] = {
+const char* audioLogs[TEXT_LOGS_COUNT] = {
     "./Audio/logs/ghiran-2.wav",
     "./Audio/logs/steinberg-1.wav",
     "./Audio/logs/raines-1.wav",
