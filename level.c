@@ -99,11 +99,6 @@ void DeleteInstance(uint16_t i) {
     if (i <= PLAYER2 || i >= loadedInstances) return; // Don't delete null ent, player 1, nor player 2 or already empty slots.
     
     if (instances[i].entflags & ENTFLAG_HAS_CAMERA_VIEW) RemoveCameraPosition(i);
-    
-    if (i <= startOfDoubleSidedInstances) --startOfDoubleSidedInstances; // Shift render state markers.
-    if (i <= startOfTransparentInstances) --startOfTransparentInstances;
-    if (i <= endOfModels)                 --endOfModels;
-    if (InstanceIsNonRenderable(i))      --invalidModelIndexCount;
     uint16_t endInstance = vmax(vmin(INSTANCE_COUNT - 1, loadedInstances - 1),START_INDEX_LEVEL_INSTANCES);
     for (;i<endInstance;++i) instances[i] = instances[i + 1]; // Shift the entire list down, overwriting the entity we're deleting at starting i
     --loadedInstances; // Shift final marker.  It's history!
@@ -165,79 +160,10 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
     }
 }
 
-bool InstanceIsNonRenderable(uint16_t i) { return (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].modelIndex == UINT16_MAX); }
-
-uint16_t invalidModelIndexCount;
-uint16_t endOfModels;
-uint16_t startOfDoubleSidedInstances, startOfTransparentInstances;
-uint16_t loadedInstances;
-void SortInstances(void) { // Reorder instances such that each type is grouped opaque->doublesided->transparent in that order in instances[].
-    double start_time = get_time();
-    DualLog("Sorting entity instances... ");
-    uint16_t* modelTypeCountsOpaque = calloc(MODEL_IDX_MAX,sizeof(uint16_t));
-    uint16_t* modelTypeCountsDoubleSided = calloc(MODEL_IDX_MAX,sizeof(uint16_t));
-    uint16_t* modelTypeCountsTransparent = calloc(MODEL_IDX_MAX,sizeof(uint16_t));
-    uint16_t* opaqueInstances      = calloc(INSTANCE_COUNT,sizeof(uint16_t));
-    uint16_t* doubleSidedInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
-    uint16_t* transparentInstances = calloc(INSTANCE_COUNT,sizeof(uint16_t));
-    uint16_t opaqueInstancesHead = 0, doubleSidedInstancesHead = 0, transparentInstancesHead = 0; invalidModelIndexCount = 0; startOfDoubleSidedInstances = startOfTransparentInstances = INSTANCE_COUNT;
-    for (uint32_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; i++) { // Skip player instances and NULLENT by starting at 3.
-        if (instances[i].texIndex >= MAX_VALID_TEXTURE && instances[i].texIndex != MAX_VALID_TEXTURE) { DualLogError("Invalid texIndex %u for instance %u\n", instances[i].texIndex, i); invalidModelIndexCount++; continue; }
-        if (InstanceIsNonRenderable(i)) { invalidModelIndexCount++; continue; }
-        if (instances[i].index >= MAX_ENTITIES) { DualLogError("Invalid entity index %u for instance %u\n", instances[i].index, i); invalidModelIndexCount++; continue; }
-
-        bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
-        if (isTransparent(instances[i].texIndex)) {
-            if (transparentInstancesHead >= INSTANCE_COUNT) { DualLogError("Transparent instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
-
-            transparentInstances[transparentInstancesHead++] = i;
-            modelTypeCountsTransparent[instances[i].modelIndex]++;
-        } else if (is_double_sided) {
-            if (doubleSidedInstancesHead >= INSTANCE_COUNT) { DualLogError("Double-sided instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
-
-            doubleSidedInstances[doubleSidedInstancesHead++] = i;
-            modelTypeCountsDoubleSided[instances[i].modelIndex]++;
-        } else {
-            if (opaqueInstancesHead >= INSTANCE_COUNT) { DualLogError("Opaque instances overflow at index %u\n", i); invalidModelIndexCount++; continue; }
-
-            opaqueInstances[opaqueInstancesHead++] = i;
-            modelTypeCountsOpaque[instances[i].modelIndex]++;
-        }
-    }
-    
-    endOfModels = loadedInstances - invalidModelIndexCount;
-    uint16_t currentOffset = START_INDEX_LEVEL_INSTANCES; // Compute offsets
-    uint16_t i = 0;
-    for (; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsOpaque[i]; }
-    startOfDoubleSidedInstances = currentOffset;
-    for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsDoubleSided[i]; }
-    startOfTransparentInstances = currentOffset;
-    for (i = 0; i < MODEL_IDX_MAX; i++) { currentOffset += modelTypeCountsTransparent[i]; }
-    if ((startOfTransparentInstances + transparentInstancesHead) > endOfModels) { DualLogError("Transparent range overflow: start %u, head %u, limit %u\n", startOfTransparentInstances, transparentInstancesHead, endOfModels); OS_Exit(1); }
-
-    Entity* tempInstances = calloc(INSTANCE_COUNT,sizeof(Entity));
-    memcpy(tempInstances, instances, loadedInstances * sizeof(Entity));
-    uint16_t targetIdx = START_INDEX_LEVEL_INSTANCES;
-    CopyInstanceRegion(opaqueInstancesHead,           opaqueInstances, tempInstances, &targetIdx, startOfDoubleSidedInstances); // Copy opaque instances
-    CopyInstanceRegion(doubleSidedInstancesHead, doubleSidedInstances, tempInstances, &targetIdx, startOfTransparentInstances); // Copy doublesided instances
-    CopyInstanceRegion(transparentInstancesHead, transparentInstances, tempInstances, &targetIdx,             loadedInstances); // Copy transparent instances
-    for (i = 0; i < loadedInstances; ++i) { // Put all the invisible entities at the end of the list now
-        if (tempInstances[i].modelIndex > MODEL_IDX_MAX) { instances[targetIdx] = tempInstances[i]; targetIdx++; }
-    }
-
-    free(transparentInstances); free(doubleSidedInstances); free(opaqueInstances); free(tempInstances);
-    free(modelTypeCountsOpaque); free(modelTypeCountsDoubleSided); free(modelTypeCountsTransparent);
-    #if defined(LINUX) || defined(ANDROID)
-        malloc_trim(0);
-    #endif
-    DualLog("opaque: %u, double-sided: %u, transparent: %u, invisible: %u...", opaqueInstancesHead, doubleSidedInstancesHead, transparentInstancesHead, invalidModelIndexCount);
-    DualLog(" took %f secs\n", get_time() - start_time);
-    ResetLevelAudio();
-}
-
 #define LINE_LEN_MAX 81920
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
+uint16_t loadedInstances;
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");
@@ -322,7 +248,7 @@ void LoadLevel(uint8_t curlevel) {
         int32_t litIdx = lightsIdx * LIGHT_DATA_SIZE;
         uint8_t lightType = 0u; // Point
         bool lightOnRead = false;
-        bool overridePos = false;
+        bool activeStateRead = false;
         while(line[0] != '\0') { // Guaranteed no leading whitespaces,k comments, or blank lines, so don't bother
             char* pipe = strchr(line,'|');
             char* kvString = line; // key:value pair before the pipe as a string
@@ -450,7 +376,7 @@ void LoadLevel(uint8_t curlevel) {
                 else if (strcmp(trimmed_key, "localScale.x") == 0)    instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localScale.y") == 0)    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "localScale.z") == 0)    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "go.activeSelf") == 0)   flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (strcmp(trimmed_key, "go.activeSelf") == 0) { activeStateRead = true ; flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
                 else if (strcmp(trimmed_key, "requireReset") == 0)    flag_set(&instances[instanceIdx].entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
                 else if (strcmp(trimmed_key, "amount") == 0)          instances[instanceIdx].amount = parse_float(trimmed_value, initialLine, lineNum);
                 else if (strcmp(trimmed_key, "resetTime") == 0)       instances[instanceIdx].resetTime = parse_float(trimmed_value, initialLine, lineNum);
@@ -486,20 +412,8 @@ void LoadLevel(uint8_t curlevel) {
         } else {
             uint16_t parent = instanceIdx; // Needed as adding children moves the instanceIdx.
             uint16_t entIdx = instances[parent].index;
-            float posBeforeX, posBeforeY, posBeforeZ;
-            if (overridePos) {
-                posBeforeX = instances[parent].position.x;
-                posBeforeY = instances[parent].position.y;
-                posBeforeZ = instances[parent].position.z;
-                flag_set(&instances[parent].entflags,ENTFLAG_TEST_OVERRIDE_TEST,true);
-            }
             AddInstance(entIdx, parent);
-            if (overridePos) {
-                    instances[parent].position.x = posBeforeX;
-                    instances[parent].position.y = posBeforeY;
-                    instances[parent].position.z = posBeforeZ;
-            }
-            
+            if (!activeStateRead) flag_set(&instances[parent].entflags, ENTFLAG_ACTIVE, true);
             if (EntityIndexIsPortalBlockingDoor(entIdx)) {
                 float nudgeAmount = entIdx == 499 || entIdx == 509 ? 3.84f : 0.32f; // Bulkhead and giant elevator door need to nudge further to be sure.
                 instances[parent].portalIndex = numActivePortals;
@@ -604,7 +518,7 @@ void LoadLevel(uint8_t curlevel) {
     LoadTextures();
     RenderLoadingProgress(110,"Initialize entities...");
     InitAfterLoad();
-    SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
+//     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");

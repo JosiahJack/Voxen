@@ -612,7 +612,10 @@ void AddDebugLine(Vector3 start, Vector3 end) {
 void PortalCulling(void);
 void UpdateAnims(void) {
     bool portalsNeedUpdated = false;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < endOfModels; ++i) {
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
+        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
+        
         uint16_t animNum = instances[i].animationNum;
         if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
         if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
@@ -765,10 +768,10 @@ void RenderShadowmaps(void) {
         uint32_t shadowmapOffsetHead = 0U;
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
-        for (int i=START_INDEX_LEVEL_INSTANCES;i<endOfModels;++i) {
+        for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
             uint16_t mdx = instances[i].modelIndex;
-            if (modelVertexCounts[mdx] < 3) continue;
-            if (mdx >= loadedModelsMaxIndex) continue;
+            if (mdx >= MODEL_IDX_MAX) continue;
+            if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
             if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
 
             shadowCasterIndices[numShadowCasters] = i;
@@ -1016,6 +1019,10 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
     for (uint16_t i = instancesStartIdx; i < instancesEndIdx; ++i) {
         if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
+        if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
+        if (instances[i].index >= MAX_ENTITIES) continue;
+        if (isTransparent(instances[i].texIndex) && !transparents) continue;
+        else if (!isTransparent(instances[i].texIndex) && transparents) continue;
         
         Vector3 objPos = instances[i].position;
         uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
@@ -1023,7 +1030,7 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
         float distSqrd = delta.x*delta.x + delta.y*delta.y + delta.z*delta.z;
         if (distSqrd >= FAR_PLANE_SQUARED && (instances[i].index != 754 || !skyVisible)) continue;
 
-        if (EntityIndexIsPortalBlockingDoor(instances[i].index) && !transparents) { // Extra checks only needed for opaque portal blocking doors.
+        if (EntityIndexIsPortalBlockingDoor(instances[i].index)) { // Extra checks only needed for opaque portal blocking doors.
             bool inPVS = (gridCellStates[instCellIdx] & CELL_VISIBLE);
             if (!inPVS) {
                 uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((objPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
@@ -1062,6 +1069,14 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), transparents ? compareDepthSort : compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
+        bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
+        if (isTransparent(instances[i].texIndex) && transparents) {
+            glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
+        } else if (is_double_sided) {
+            glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
+        } else { // Opaque
+            glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND);
+        }
         glUniform1ui(0, i);    glUniform1ui(17, instances[i].texIndex == 316 ? 1u : 0u);
         if (currentNormIndex != (uint32_t)instances[i].normIndex || instances[i].normIndex == 0) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
@@ -1089,14 +1104,8 @@ static inline void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. R
     glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
     glUniform1ui(3, 0u); /* isUI false */
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, startOfDoubleSidedInstances, playerPos, false);
-    
-    glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
-    RenderInstancesBetween(startOfDoubleSidedInstances, startOfTransparentInstances, playerPos, false);
-    
-    glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
-    RenderInstancesBetween(startOfTransparentInstances, endOfModels, playerPos, true);
-    
+    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, false);
+    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, true);
     if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
