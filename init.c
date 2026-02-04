@@ -119,6 +119,8 @@ void InitAfterLoad(void) { // Init entities after level load and after already h
         if (gridCellFloorHeight[i] <= (-FLT_MAX +  1.0f)) gridCellFloorHeight[i] = levelMinFloor;
         if (gridCellCeilingHeight[i] >= (FLT_MAX - 1.0f)) gridCellCeilingHeight[i] = levelMaxCeil;
     }
+    
+    ResetLevelAudio();
 }
 
 void MFDInit(void) {

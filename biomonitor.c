@@ -1,5 +1,56 @@
 // biomonotor.c - Biomonitor Graph and Text displays.
 #include "voxen.h"
+#define BIOM_ERG 0
+#define BIOM_CHI 1
+#define BIOM_ECG 2
+#define BIOM_GRAPH_W 620
+#define BIOM_GRAPH_H  36
+typedef struct {
+	float heartRate;
+	Text patchEffects;
+	Text heartRateText;
+	Text header;
+	Text bpmText;
+	Text fatigueDetailText;
+	Text fatigue;
+	double beatFinished; // Visual only, Time.time controlled
+	float widthPerc;
+    float heightPerc;
+    float max[3]; // Value at the top of the graph
+    float min[3]; // Value at the bottom of the graph
+    Color currentColors[BIOM_GRAPH_H];
+    Color colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    Color colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    Color colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H];
+    int lastERG;
+    int lastCHI;
+    int lastECG;
+    Color backgroundColor;
+    Color ergColor;
+    Color chiColor;
+    Color ecgColor;
+    Color col;
+    int ymax;
+	float ecgValue;
+	float ergValue;
+	float chiValue;
+	float beatShift;
+    double tick0Finished;
+    double tick1Finished;
+    double tick2Finished;
+    double tickFinished; // Overall marching.
+    double tick0;
+    double tick1;
+    double tick2;
+    double tick;
+    int currentIndex0;
+    int currentIndex1;
+    int currentIndex2;
+    Color col0;
+    Color col1;
+    Color col2;
+} BioMonitorSystem;
+BioMonitorSystem bioMonitor;
 
 void BioMonitorClearGraphs(void) {
 //     for (int x=0;x<BIOM_GRAPH_W;x++) {
@@ -24,6 +75,18 @@ void BioMonitorClearGraphs(void) {
             bioMonitor.colorsECG[x][y] = bioMonitor.backgroundColor;
         }
     }
+}
+
+void BioMonitorInit(void) {
+    bioMonitor.beatFinished = get_time() + 0.5; // Half second beat tick
+    bioMonitor.widthPerc = 0.4f; bioMonitor.heightPerc = 0.1f;
+    bioMonitor.backgroundColor = (Color){0.2f,0.2f,1.0f,0.01f};
+    bioMonitor.ergColor = (Color){0.0f,0.5f,1.0f,1.0f}; bioMonitor.chiColor = (Color){0.7f,0.0f,1.0f,1.0f}; bioMonitor.ecgColor = (Color){1.0f,0.0f,0.0f,1.0f};
+    bioMonitor.ymax = 36;
+    bioMonitor.tick = 0.02; bioMonitor.tick0 = 0.0211; bioMonitor.tick1 = 0.050; bioMonitor.tick2 = 0.0104;
+    bioMonitor.min[BIOM_ERG] =  0.0f; bioMonitor.min[BIOM_CHI] = -2.0f; bioMonitor.min[BIOM_ECG] = -1.0f;
+    bioMonitor.max[BIOM_ERG] =  1.0f; bioMonitor.max[BIOM_CHI] =  2.0f; bioMonitor.max[BIOM_ECG] =  1.0f;
+    BioMonitorClearGraphs();
 }
 
 static void IncrementERG(void) {

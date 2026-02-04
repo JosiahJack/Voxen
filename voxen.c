@@ -16,7 +16,6 @@ CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, 
 RenderSystem Sys_Render;
 SystemUI Sys_UI;
 FILE* console_log_file = NULL;
-BioMonitorSystem bioMonitor;
 InventorySystem inventoryPlayer1;
 InventorySystem inventoryPlayer2;
 AutoSplitterData autoSplitter = { 0x1337133713371337, 0, false, 0 }; // Fore use with LiveSplit or other future speedrunner utilities for doing speedruns
@@ -595,16 +594,7 @@ void InitializeEnvironment(void) {
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     
     // Menu Active Items, System Wide Game Logic Starts:
-    bioMonitor.beatFinished = get_time() + 0.5; // Half second beat tick
-    bioMonitor.widthPerc = 0.4f; bioMonitor.heightPerc = 0.1f;
-    bioMonitor.backgroundColor = (Color){0.2f,0.2f,1.0f,0.01f};
-    bioMonitor.ergColor = (Color){0.0f,0.5f,1.0f,1.0f}; bioMonitor.chiColor = (Color){0.7f,0.0f,1.0f,1.0f}; bioMonitor.ecgColor = (Color){1.0f,0.0f,0.0f,1.0f};
-    bioMonitor.ymax = 36;
-    bioMonitor.tick = 0.02; bioMonitor.tick0 = 0.0211; bioMonitor.tick1 = 0.050; bioMonitor.tick2 = 0.0104;
-    bioMonitor.min[BIOM_ERG] =  0.0f; bioMonitor.min[BIOM_CHI] = -2.0f; bioMonitor.min[BIOM_ECG] = -1.0f;
-    bioMonitor.max[BIOM_ERG] =  1.0f; bioMonitor.max[BIOM_CHI] =  2.0f; bioMonitor.max[BIOM_ECG] =  1.0f;
-    BioMonitorClearGraphs();
-    
+    BioMonitorInit();
     if (Sys_Global.introNotPlayed) {
         // TODO: Play intro
     } else {
@@ -634,50 +624,6 @@ void AddDebugLine(Vector3 start, Vector3 end) {
     debugLineBuffer[i++] = start.x; debugLineBuffer[i++] = start.y; debugLineBuffer[i++] = start.z;
     debugLineBuffer[i++] =   end.x; debugLineBuffer[i++] =   end.y; debugLineBuffer[i++] =   end.z;
     Sys_Dx.debugLineVertCount = i;
-}
-
-void PortalCulling(void);
-void UpdateAnims(void) {
-    bool portalsNeedUpdated = false;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
-        if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
-        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
-        
-        uint16_t animNum = instances[i].animationNum;
-        if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
-        if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
-        if (instances[i].numclips == 0) continue; // Invalid animation clip index
-        if (!(instances[i].entflags & ENTFLAG_ANIMATED)) continue;
-        
-        AnimationClip currentClip = modelAnimationClips[animNum][instances[i].clip];
-        if (instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
-        
-        instances[i].currentFrameFinished = Sys_Global.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
-        instances[i].frame++;
-        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
-        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
-
-        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
-        dirtyInstances[i] = true;
-        if (!EntityIndexIsPortalBlockingDoor(instances[i].index)) continue;
-        
-        uint8_t portalIdx = instances[i].portalIndex;
-        if (portalIdx >= MAX_PORTALS) continue;
-        
-        uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
-        bool currentState = activePortals[portalIdx].open;
-        if (instances[i].modelIndex == closedModelIndex && currentState) {
-            activePortals[portalIdx].open = false;
-            activePortals[portalIdx].dirty = true;
-            portalsNeedUpdated = true;
-        } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
-            activePortals[portalIdx].open = true;
-            activePortals[portalIdx].dirty = true;
-            portalsNeedUpdated = true;
-        }
-    }
-    
-    if (portalsNeedUpdated) PortalCulling();
 }
 
 #define FROB_DISTANCE 4.9f
@@ -1263,6 +1209,8 @@ static void UpdateVoxelsAndInstances(void) {
     }
     if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
+
+void UpdateAnims(void);
 
 #define ARG_IS(s, l) (argc >= 2 && (strcmp(argv[1], s) == 0 || strcmp(argv[1], l) == 0))
 int32_t main(int32_t argc, char* argv[]) {

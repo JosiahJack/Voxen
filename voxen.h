@@ -65,6 +65,7 @@ typedef struct {
     bool decoyActive;
 	char playerName[32];
 } GlobalContext;
+extern GlobalContext Sys_Global;
 
 typedef struct {
 	int32_t InputCodeSettings[42];
@@ -101,6 +102,7 @@ typedef struct {
 	uint8_t HeadBob;
 	uint8_t SSR_RES;
 } SettingsSystem;
+extern SettingsSystem Sys_Settings;
 
 typedef struct { bool down; bool pressed; bool released; } KeyState;
 
@@ -144,6 +146,7 @@ typedef struct {
 	uint32_t drawCallsNormal;
 	uint32_t debugLineVertCount;
 } DiagnosticsSystem;
+extern DiagnosticsSystem Sys_Dx;
 
 #define LIGHT_COUNT 1600 // MAX CITADEL LIGHT COUNT is 1561 for Level 7, leaves room for dynamic lights from projectiles
 #define MAX_SHADOWMAPS 48u
@@ -157,6 +160,7 @@ typedef struct {
     uint32_t shadowmapIndirectionList[LIGHT_COUNT];
     float shadDotThresh;
 } VoxenShadowSystem;
+extern VoxenShadowSystem voxen_Shadow_System;
 
 typedef struct {
 	bool god;
@@ -173,6 +177,7 @@ typedef struct {
 	bool editMode;
 	uint8_t dizzyLevel;
 } CheatsSystem;
+extern CheatsSystem Sys_Cheats;
 
 #define SOUNDS_COUNT 670
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
@@ -187,6 +192,7 @@ typedef struct {
 	uint8_t audioLogType[TEXT_LOGS_COUNT];
 	uint8_t audioLogLevelFound[TEXT_LOGS_COUNT];
 } Voxen_Text;
+extern Voxen_Text Sys_Text;
 
 typedef struct {
     double timestamp;
@@ -675,59 +681,7 @@ extern InventorySystem inventoryPlayer2;
 void PlayerInit(uint16_t i);
 void TakeEnergy(float drain);
 void GiveEnergy(float give, EnergyType type);
-
-#define BIOM_ERG 0
-#define BIOM_CHI 1
-#define BIOM_ECG 2
-#define BIOM_GRAPH_W 620
-#define BIOM_GRAPH_H  36
-typedef struct {
-	float heartRate;
-	Text patchEffects;
-	Text heartRateText;
-	Text header;
-	Text bpmText;
-	Text fatigueDetailText;
-	Text fatigue;
-	double beatFinished; // Visual only, Time.time controlled
-	float widthPerc;
-    float heightPerc;
-    float max[3]; // Value at the top of the graph
-    float min[3]; // Value at the bottom of the graph
-    Color currentColors[BIOM_GRAPH_H];
-    Color colorsERG[BIOM_GRAPH_W][BIOM_GRAPH_H];
-    Color colorsCHI[BIOM_GRAPH_W][BIOM_GRAPH_H];
-    Color colorsECG[BIOM_GRAPH_W][BIOM_GRAPH_H];
-    int lastERG;
-    int lastCHI;
-    int lastECG;
-    Color backgroundColor;
-    Color ergColor;
-    Color chiColor;
-    Color ecgColor;
-    Color col;
-    int ymax;
-	float ecgValue;
-	float ergValue;
-	float chiValue;
-	float beatShift;
-    double tick0Finished;
-    double tick1Finished;
-    double tick2Finished;
-    double tickFinished; // Overall marching.
-    double tick0;
-    double tick1;
-    double tick2;
-    double tick;
-    int currentIndex0;
-    int currentIndex1;
-    int currentIndex2;
-    Color col0;
-    Color col1;
-    Color col2;
-} BioMonitorSystem;
-extern BioMonitorSystem bioMonitor;
-void BioMonitorClearGraphs(void);
+void BioMonitorInit(void);
 void BioMonitorUpdate(void);
 
 #define MULTI_MEDIA_TAB_EMAIL_TABLE 0
@@ -1299,37 +1253,6 @@ static inline float vpow(float a, float b) { return vexp(b * vlog(a)); }
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
-
-#define ANIM_LOOP_ALL 0
-#define ANIM_IDLE_CLOSED 0
-#define ANIM_OPENING     1
-#define ANIM_IDLE_OPEN   2
-#define ANIM_CLOSING     3
-#define ANIM_INSTALL     4
-#define ANIM_INSTALLED   5
-#define ANIM_INACTIVE   0
-#define ANIM_ACTIVATE   1
-#define ANIM_ACTIVATED  2
-#define ANIM_DEACTIVATE 3
-#define ANIM_IDLE    0
-#define ANIM_WALK    1
-#define ANIM_RUN     2
-#define ANIM_ATTACK1 3
-#define ANIM_ATTACK2 4
-#define ANIM_ATTACK3 5
-#define ANIM_PAIN    6
-#define ANIM_PAIN2   7
-#define ANIM_PAIN3   8
-#define ANIM_DYING   9
-#define ANIM_ATTACK_MISS 1
-#define ANIM_ATTACK_HIT  2
-
-extern GlobalContext Sys_Global;
-extern SettingsSystem Sys_Settings;
-extern VoxenShadowSystem voxen_Shadow_System;
-extern DiagnosticsSystem Sys_Dx;
-extern CheatsSystem Sys_Cheats;
-extern Voxen_Text Sys_Text;
 
 extern const char* sounds[670];
 extern const char* audioLogs[134];

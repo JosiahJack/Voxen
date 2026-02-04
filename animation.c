@@ -1,5 +1,28 @@
 ﻿// animation.c - Animation System for both models and textures (in world and UI)
 #include "voxen.h"
+#define ANIM_LOOP_ALL 0
+#define ANIM_IDLE_CLOSED 0
+#define ANIM_OPENING     1
+#define ANIM_IDLE_OPEN   2
+#define ANIM_CLOSING     3
+#define ANIM_INSTALL     4
+#define ANIM_INSTALLED   5
+#define ANIM_INACTIVE   0
+#define ANIM_ACTIVATE   1
+#define ANIM_ACTIVATED  2
+#define ANIM_DEACTIVATE 3
+#define ANIM_IDLE    0
+#define ANIM_WALK    1
+#define ANIM_RUN     2
+#define ANIM_ATTACK1 3
+#define ANIM_ATTACK2 4
+#define ANIM_ATTACK3 5
+#define ANIM_PAIN    6
+#define ANIM_PAIN2   7
+#define ANIM_PAIN3   8
+#define ANIM_DYING   9
+#define ANIM_ATTACK_MISS 1
+#define ANIM_ATTACK_HIT  2
 
 // static const float textureSequenceFrameDelay = 0.35f;
 // static const float textureSequenceFrameDelayVmail = 0.09f;
@@ -57,6 +80,50 @@ const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS
     [50]={[ANIM_IDLE]={1.0f,1,1,5748,24},[ANIM_ATTACK_MISS]={0.5f,4,22,5749,24},[ANIM_ATTACK_HIT]={1.0f,4,22,5749,24}}, // v_rapier
     [51]={[ANIM_IDLE]={1.0f,1,65,5768,24},[ANIM_WALK]={1.0f,75,98,5833,24},[ANIM_RUN]={1.0f,75,98,5833,24},[ANIM_ATTACK2]={1.0f,109,126,5857,24},[ANIM_ATTACK1]={1.0f,128,142,5875,24},[ANIM_PAIN]={1.0f,144,159,5890,24},[ANIM_PAIN2]={1.0f,161,174,5906,24},[ANIM_DYING]={1.0f,176,243,5920,24}}, // npc_mutant_cyborg
 };
+
+void PortalCulling(void);
+void UpdateAnims(void) {
+    bool portalsNeedUpdated = false;
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
+        if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
+        if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
+        
+        uint16_t animNum = instances[i].animationNum;
+        if (animNum >= MAX_ANIMATED_MODELS) continue; // Invalid animated model index
+        if (instances[i].numclips >= MAX_ANIMATION_CLIPS_PER_MODEL) continue; // Invalid animation clip index
+        if (instances[i].numclips == 0) continue; // Invalid animation clip index
+        if (!(instances[i].entflags & ENTFLAG_ANIMATED)) continue;
+        
+        AnimationClip currentClip = modelAnimationClips[animNum][instances[i].clip];
+        if (instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
+        
+        instances[i].currentFrameFinished = Sys_Global.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+        instances[i].frame++;
+        if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
+        else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;
+
+        instances[i].modelIndex = (currentClip.frameStartModelIndex + (instances[i].frame - currentClip.frameStart));
+        dirtyInstances[i] = true;
+        if (!EntityIndexIsPortalBlockingDoor(instances[i].index)) continue;
+        
+        uint8_t portalIdx = instances[i].portalIndex;
+        if (portalIdx >= MAX_PORTALS) continue;
+        
+        uint16_t closedModelIndex = modelAnimationClips[animNum][ANIM_IDLE_CLOSED].frameStartModelIndex;                    
+        bool currentState = activePortals[portalIdx].open;
+        if (instances[i].modelIndex == closedModelIndex && currentState) {
+            activePortals[portalIdx].open = false;
+            activePortals[portalIdx].dirty = true;
+            portalsNeedUpdated = true;
+        } else if (instances[i].modelIndex != closedModelIndex && !currentState) {
+            activePortals[portalIdx].open = true;
+            activePortals[portalIdx].dirty = true;
+            portalsNeedUpdated = true;
+        }
+    }
+    
+    if (portalsNeedUpdated) PortalCulling();
+}
 
 // uint16_t sequenceTextures[302]={};
 /*scr_exp 01 - 06
