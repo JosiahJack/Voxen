@@ -10,7 +10,7 @@
 #include "data_textures.c"
 #include "audio.c"
 const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
-GlobalContext Sys_Global = { .menuActive = false, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
+GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
@@ -310,7 +310,7 @@ Color textColors[9] = {
 };
 
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char * restrict format, ...) {
+void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...) {
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
@@ -326,11 +326,11 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
     size_t vertexCount = 0;
     const char* p = uiTextBuffer;
     float xpos = x, ypos = y + GetScreenRelativeY(0.0211f);
-    float lineSpacing = GetScreenRelativeY(0.03f); // Match RenderUI
+    float lineSpacing = GetScreenRelativeY(0.03f);
     stbtt_aligned_quad q;
     int characterCount = 0;
     float paddingUV = 12.0f / (float)FONT_ATLAS_SIZE; // This is for the black outline around all text for readability.
-    float borderWidthPixels = 2.0f;
+    float borderWidthPixels = 2.0f * scale;
     while (*p) {
         // Decode UTF8
         const unsigned char *s = (const unsigned char *)p;
@@ -369,14 +369,14 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
 
         if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
-        float vx0 = q.x0 - borderWidthPixels;
-        float vy0 = q.y0 - borderWidthPixels;
-        float vx1 = q.x1 + borderWidthPixels;
-        float vy1 = q.y1 + borderWidthPixels;
-        float s0 = q.s0 - paddingUV;
-        float t0 = q.t0 - paddingUV;
-        float s1 = q.s1 + paddingUV;
-        float t1 = q.t1 + paddingUV;
+        float vx0 = (q.x0 * scale) - (borderWidthPixels * scale);
+        float vy0 = (q.y0 * scale) - (borderWidthPixels * scale);
+        float vx1 = (q.x1 * scale) + (borderWidthPixels * scale);
+        float vy1 = (q.y1 * scale) + (borderWidthPixels * scale);
+        float s0 = (q.s0) - (paddingUV);
+        float t0 = (q.t0) - (paddingUV);
+        float s1 = (q.s1) + (paddingUV);
+        float t1 = (q.t1) + (paddingUV);
         float z = 0.0f;
         float textVertices[30] = { vx0, vy0, z, s0, t0, vx1, vy1, z, s1, t1, vx1, vy0, z, s1, t0, vx0, vy0, z, s0, t0, vx0, vy1, z, s0, t1, vx1, vy1, z, s1, t1 };
         memcpy(textVertexData + vertexCount * 30, textVertices, sizeof(textVertices));
@@ -398,7 +398,7 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const
 
 void RenderLoadingProgress(int32_t offset, const char * restrict text) { // Only adds 0.01secs to game startup time.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL, text);
+    RenderFormattedText(Sys_Settings.ScreenWidth / 2 - offset, Sys_Settings.ScreenHeight / 2 - 5, TEXT_WHITE, FONT_NORMAL,1.0f,text);
     glfwSwapBuffers(Sys_Global.window);
 }
 
@@ -900,64 +900,81 @@ void RenderCredits(void) {
 
     if (Sys_Global.creditsPageIndex == 1) {
         CreditsStats();
-        RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL, (const char*)&creditStats);
-    } else RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL, creditPages[Sys_Global.creditsPageIndex]);
+        RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL,1.0f, (const char*)&creditStats);
+    } else RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL,1.0f, creditPages[Sys_Global.creditsPageIndex]);
+}
+
+#define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
+#define BASE_RES_Y 768.0f
+float UIX(int16_t x) { return (float)x / BASE_RES_X; }
+float RelX(int16_t x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; }
+float UIY(int16_t y) { return (float)y / BASE_RES_Y; }
+float RelY(int16_t y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
+
+#define ALIGN_CENTER 0
+#define ALIGN_LEFTER 1
+bool UI_Button(char* text, int16_t x, int16_t y, float w, float h, uint8_t color, uint8_t alignment, float scale, bool* cursorOver) {
+    float width = RelX(w);
+    float height = RelY(h);
+    float xpos = alignment == ALIGN_CENTER ? RelX(x) - (width * 0.5f) : RelX(x);
+    float ypos = RelY(y) - height;
+    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos - height);
+    if (cursorIsOver && color == TEXT_STOPD_RED) color = TEXT_STOPD_RED_HIGHLIGHT;
+    if (cursorOver) *cursorOver = cursorIsOver;
+    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed && cursorIsOver) return true;
+    RenderFormattedText(xpos,ypos,color,FONT_STOPD,scale,text); return false;
 }
 
 static inline void RenderMenu(void) {
-    
+    RenderUIImage(RelX(-417), RelY(-384), RelX(2200), RelY(1536), 1026); // Menu background
+    RenderUIImage(RelX(282), RelY(46), RelX(800), RelY(128), 1031); // Menu background
+    bool overS = false, overM = false, overO = false, overQ = false;
+    if (UI_Button("SINGLEPLAYER", 560, 316, 250, 22, TEXT_STOPD_RED,ALIGN_LEFTER,1.0f,&overS)) Sys_Global.menuActive = false;
+    RenderUIImage(RelX(510), RelY(278), RelX(32), RelY(32), overS ? 1029 : 1028); // Menu pad
+    if (UI_Button("MULTIPLAYER",  560, 436, 244, 22, TEXT_STOPD_RED,ALIGN_LEFTER,1.0f,&overM)) CenterStatusPrint("Cannot access multiplayer at this time");
+    RenderUIImage(RelX(510), RelY(398), RelX(32), RelY(32), overM ? 1029 : 1028); // Menu pad
+    if (UI_Button("OPTIONS",      560, 560, 180, 22, TEXT_STOPD_RED,ALIGN_LEFTER,1.0f,&overO)) CenterStatusPrint("Cannot access options at this time");
+    RenderUIImage(RelX(510), RelY(522), RelX(32), RelY(32), overO ? 1029 : 1028); // Menu pad
+    if (UI_Button("QUIT",         560, 680, 96, 22, TEXT_STOPD_RED,ALIGN_LEFTER,1.0f,&overQ)) OS_Exit(0);
+    RenderUIImage(RelX(510), RelY(640), RelX(32), RelY(32), overQ ? 1029 : 1028); // Menu pad
 }
 
 static inline void RenderPausedUI(void) {
-    float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
-    float pauseBGX = Sys_Settings.ScreenCenterX - (pauseBGWidth * 0.5f);
-    float pauseBGY = Sys_Settings.ScreenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
-    RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background
-    RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background
-    float quitGame_Height = GetScreenRelativeY(0.05f);
-    RenderUIImage(pauseBGX, Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.40f) - (quitGame_Height * 0.5f), pauseBGWidth, quitGame_Height, 950); // Pause Quit Game background
-    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.3f), TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
-    char* pauseButton_ResumeText = "RESUME";
-    float pauseButton_ResumeWidth = (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
-    float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
-    float pauseButton_ResumeX = Sys_Settings.ScreenCenterX - pauseButton_ResumeWidth;
-    float pauseButton_ResumeY = Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.08f);
-    bool pauseButton_CursorIsAbove = CursorIsOverBounds(pauseButton_ResumeX, pauseButton_ResumeX + (pauseButton_ResumeWidth * 2.0f), pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.451f), pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.451f));
-    uint8_t pauseButton_ResumeColor = pauseButton_CursorIsAbove ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED;
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed && pauseButton_CursorIsAbove) { Sys_Global.gamePaused = false; return; }
-    
-    RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
-    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.00f), TEXT_STOPD_RED, FONT_STOPD, "LOAD");
-    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.08f), TEXT_STOPD_RED, FONT_STOPD, "SAVE");
-    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.5f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.16f), TEXT_STOPD_RED, FONT_STOPD, "OPTIONS");
-    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 6.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.24f), TEXT_STOPD_RED, FONT_STOPD, "QUIT TO MENU");
-    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 4.5f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.40f), TEXT_STOPD_RED, FONT_STOPD, "QUIT GAME");
+    RenderUIImage(RelX(519), RelY(276), RelX(328), RelY(300), 1025); // Pause Menu background
+    RenderUIImage(RelX(519), RelY(276), RelX(328), RelY(300), 1080); // Pause Menu background outline
+    RenderFormattedText(RelX(610),RelY(210),TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,"PAUSED");
+    if (UI_Button(  "RESUME",     683, 330, 157, 22, TEXT_STOPD_RED,ALIGN_CENTER,1.0f,NULL)) Sys_Global.gamePaused = false;
+    if (UI_Button(   "LOAD",      683, 388, 112, 22, TEXT_STOPD_RED,ALIGN_CENTER,1.0f,NULL)) CenterStatusPrint("Cannot load at this time");
+    if (UI_Button(   "SAVE",      683, 446, 104, 22, TEXT_STOPD_RED,ALIGN_CENTER,1.0f,NULL)) CenterStatusPrint("Cannot save at this time");
+    if (UI_Button(  "OPTIONS",    683, 504, 174, 22, TEXT_STOPD_RED,ALIGN_CENTER,1.0f,NULL)) CenterStatusPrint("Cannot access options at this time");
+    if (UI_Button("QUIT TO MENU", 683, 562, 284, 22, TEXT_STOPD_RED,ALIGN_CENTER,1.0f,NULL)) Sys_Global.menuActive = true;
+    RenderUIImage(RelX(519),RelY(672),RelX(328),RelY(42),1252); // Pause Quit Game background
+    if (UI_Button( "QUIT GAME",   683, 714, 216, 22, TEXT_STOPD_RED,ALIGN_CENTER,1.0f,NULL)) OS_Exit(0);
 }
 
 static inline double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     Sys_Dx.drawCallsNormal = Sys_Dx.drawCallsRenderedThisFrame;
-    if (Sys_Global.menuActive) { RenderMenu(); return get_time(); }
-    if (Sys_Global.gamePaused) { RenderPausedUI(); return get_time(); }
     if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
+    if (Sys_Global.menuActive) RenderMenu();
+    else if (Sys_Global.gamePaused) RenderPausedUI();
     if (Sys_Cheats.noHUD) return get_time(); // NO HUD BARRIER =====================
     
     // Diagnostics / Debugging
     float debugTextStartY = GetScreenRelativeY(0.075f);
-    float leftPad = GetScreenRelativeX(0.0125f);
-    if (Sys_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
+    float leftPad = RelX(16);
+    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
     float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL, "Cursor: %d, %d", cursorPosition_x, cursorPosition_y);
-    if (Sys_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d", cursorPosition_x, cursorPosition_y);
+    if (Sys_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
+    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL,1.0f, "%s",statusText);
     float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
     float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
     float shootModePos_y = 0.0f;
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, FONT_NORMAL, "Shootmode button pos: %f %f -- %f %f", (double)shootModePos_x, (double)shootModePos_y, (double)shootModePos_x + (double)shootModeWidth, (double)shootModePos_y + (double)shootModeHeight);
     if (!Sys_Global.gamePaused) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
     bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
     if (mouseReleased) DualLog("Mouse pressed %u\n", Sys_Dx.globalFrameNum);
@@ -979,8 +996,8 @@ static inline double RenderUI(void) {
         if (vabs(Sys_Dx.thisFrameTime - Sys_Dx.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
         if (Sys_Dx.thisFrameTime > 6.944444) timingColor = TEXT_RED;
         Sys_Dx.drawCallsRenderedThisFrame += 2; Sys_Dx.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
-        RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
+        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
+        RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
     }
     
     return time_now;

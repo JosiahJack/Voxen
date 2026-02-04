@@ -2083,6 +2083,9 @@ persistent: 1
 #Textures/UI/menu_config.png
 index: 1030
 persistent: 1
+#Textures/UI/title.png
+index: 1031
+persistent: 1
 
 #Textures/UI/menu_load.png
 index: 1037
@@ -2512,6 +2515,9 @@ index: 1249
 index: 1250
 #Textures/deb_warecasing.png
 index: 1251
+#Textures/UI/quitbutton.png
+index: 1252
+persistent: 1
 
 #Textures/med2_1_spec.png
 index: 1254

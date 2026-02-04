@@ -1266,7 +1266,7 @@ void UpdateAmbientSounds(void);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 24595200u
+#define MAX_TOTAL_PIXELS 25600000u
 #define MAX_UNIQUE_COLORS 76800u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
@@ -1388,7 +1388,7 @@ static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (en
 extern char creditStats[4096];
 void CreditsStats(void);
 void CreditsScroll(void);
-void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, const char * restrict format, ...);
+void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 512

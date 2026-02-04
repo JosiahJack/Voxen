@@ -225,7 +225,7 @@ void PlayerEnergyUpdate() {
     }
 
     drainJPM = 50;
-    if (drainJPM) RenderFormattedText(GetScreenRelativeX(0.88f),GetScreenRelativeY(0.18f), TEXT_WHITE, FONT_NORMAL, "%u J/min", drainJPM);
+    if (drainJPM) RenderFormattedText(GetScreenRelativeX(0.88f),GetScreenRelativeY(0.18f), TEXT_WHITE, FONT_NORMAL,1.0f, "%u J/min", drainJPM);
 }
 
 void HardwareButtonsUpdate() { // TODO

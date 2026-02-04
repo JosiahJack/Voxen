@@ -409,7 +409,7 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
         cursorPosition_y = newY;
     }
     
-    if (Sys_Global.gamePaused || Sys_Global.inventoryMode) return 0;
+    if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Global.inventoryMode) return 0;
     
     float sensitivity = vclamp((float)Sys_Settings.MouseSensitivity / 100.0f, 0.01f, 1.0f) * 0.2f;
     cam_yaw += (float)xrel * sensitivity;
