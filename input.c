@@ -166,7 +166,6 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     UpdateProjectionMatrices();
-    Sys_Settings.SSR_RES = 8u;
     glUseProgram(Sys_Render.imageBlitShaderProgram);
     glUniform1ui(2, Sys_Settings.ScreenWidth);
     glUniform1ui(3, Sys_Settings.ScreenHeight);

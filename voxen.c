@@ -924,6 +924,8 @@ static inline void RenderPausedUI(void) {
     float pauseButton_ResumeY = Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.08f);
     bool pauseButton_CursorIsAbove = CursorIsOverBounds(pauseButton_ResumeX, pauseButton_ResumeX + (pauseButton_ResumeWidth * 2.0f), pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.451f), pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.451f));
     uint8_t pauseButton_ResumeColor = pauseButton_CursorIsAbove ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED;
+    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed && pauseButton_CursorIsAbove) { Sys_Global.gamePaused = false; return; }
+    
     RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
     RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.00f), TEXT_STOPD_RED, FONT_STOPD, "LOAD");
     RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.08f), TEXT_STOPD_RED, FONT_STOPD, "SAVE");
