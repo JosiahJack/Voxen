@@ -224,7 +224,7 @@ void LoadModels(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glFlush(); glFinish();
     OS_DeallocateRAM(model_parser.entries,model_parser.count * sizeof(Entity));
-    cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
+//     cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
     DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
     DebugRAM("After Load Models");
 }

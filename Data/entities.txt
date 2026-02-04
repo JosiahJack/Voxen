@@ -736,7 +736,6 @@ texture: 455
 #chunk_maint2_1b
 index: 127
 model: 228
-cardchunk: 1
 texture: 451
 #chunk_maint2_1d
 index: 128

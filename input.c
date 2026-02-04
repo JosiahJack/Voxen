@@ -73,7 +73,7 @@ const Setting configTable[] = {
 const int configTableSize = sizeof(configTable) / sizeof(Setting);
 
 static inline int32_t GetGLFWIndirectionIndexForAnInput(const char* val) {
-    for (int i=0;i<149;++i) { if (!strcmp(val, inputElements[i].name)) return i; }
+    for (int i=0;i<149;++i) { if (StringsAreEqual(val,inputElements[i].name)) return i; }
     return 148;
 }
 
@@ -93,7 +93,7 @@ void LoadConfig(void) {
         char* key = data_parser_trim(s);
         char* val = data_parser_trim(eq + 1);
         for (int i = 0; i < configTableSize; i++) {
-            if (!strcmp(key, configTable[i].name)) {
+            if (StringsAreEqual(key,configTable[i].name)) {
                 if (configTable[i].type == SETTING_U8)         *( uint8_t*)configTable[i].ptr = (uint8_t)StringToInt(val);
                 else if (configTable[i].type == SETTING_U16)   *(uint16_t*)configTable[i].ptr = (uint16_t)StringToInt(val);
                 else if (configTable[i].type == SETTING_INPUT) *(uint16_t*)configTable[i].ptr = GetGLFWIndirectionIndexForAnInput(val);
@@ -162,6 +162,7 @@ void GenerateAndBindTexture(GLuint *id, GLint internalFormat, int32_t width, int
 void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     (void)window;
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
+    Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
     DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     UpdateProjectionMatrices();
@@ -243,19 +244,17 @@ void ApplySettings(void) {
     // TODO: Render config view on the menu
 }
 
+bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
+
 // GLFW Callbacks
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
-    if (key == GLFW_KEY_F10 && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-        if (log_playback) { log_playback = false; DualLog("Exited log playback manually.  Control returned\n"); return; }
-        else OS_Exit(0);
-    } else {
-        if (!log_playback) {
-            if (action == GLFW_PRESS || action == GLFW_REPEAT) EnqueueEvent(EV_KEYDOWN, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-            else if (action == GLFW_RELEASE) EnqueueEvent(EV_KEYUP, key, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
-        }
-    }
+//     DualLog("Keyboard button callback entry with key %d, scancode %d, action %d, mods %d\n",key,scancode,action,mods);
+    if (key == GLFW_KEY_F10 && action) OS_Exit(0);
+
+    if (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key))) Input_KeyDown(key);
+    else if (action == GLFW_RELEASE)                                                Input_KeyUp(key);
 }
 
 void Input_PollJoysticks(void) {
@@ -306,14 +305,14 @@ static void joystick_callback(int32_t jid, int32_t event) {
 }
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (!log_playback && Sys_Input.window_has_focus) {
+    if (Sys_Input.window_has_focus) {
         int32_t dx = (int32_t)(xpos - Sys_Input.last_mouse_x);
         int32_t dy = (int32_t)(ypos - Sys_Input.last_mouse_y);
         Sys_Input.last_mouse_x = xpos;
         Sys_Input.last_mouse_y = ypos;
         if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
         
-        if (Sys_Dx.globalFrameNum > 1) EnqueueEvent(EV_MOUSEMOVE, dx, dy, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
+        if (Sys_Dx.globalFrameNum > 1) Input_MouseMove(dx,dy);
     }
 }
 
@@ -324,15 +323,13 @@ static void window_focus_callback(GLFWwindow* window, int32_t focused) {
 }
 
 static void mouse_button_callback(GLFWwindow* window, int32_t button, int32_t action, int32_t mods) {
-    if (button < 0 || button >= MAX_MOUSE_BUTTONS) return;
+//     DualLog("Mouse button callback entry with button %d, action %d, mods %d\n",button,action,mods);
     if (action == GLFW_PRESS) {
         Sys_Input.mouseButtons[button].down = true;
         Sys_Input.mouseButtons[button].pressed = true;
-        EnqueueEvent(EV_KEYDOWN, button + 1000, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED); // offset mouse events if needed
     } else if (action == GLFW_RELEASE) {
         Sys_Input.mouseButtons[button].down = false;
         Sys_Input.mouseButtons[button].released = true;
-        EnqueueEvent(EV_KEYUP, button + 1000, EV_INT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED, EV_FLOAT_FIELD_UNUSED);
     }
 }
 
@@ -510,7 +507,7 @@ void ProcessInput(void) {
     }
     
     if (Menu()) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
-    if (!Sys_Input.window_has_focus || log_playback) return;
+    if (!Sys_Input.window_has_focus) return;
     if (Sys_Global.gamePaused || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
 //     if (Sys_Global.menuActive) { MenuInput(); return; } TODO
     

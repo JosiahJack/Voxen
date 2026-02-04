@@ -59,49 +59,25 @@ bool ConstIndexIsHardware(int constdex) { return (constdex >= 328) && (constdex 
 bool ConstIndexIsAmbient(int constdex) { return (constdex >= 621 && constdex <= 655); }
 bool ConstIndexIsButtonSwitch(int constdex) { return ((constdex >= 688 && constdex <= 692) || constdex == 694 || constdex == 695); }
 bool ConstIndexIsDynamicObject(uint16_t constIndex) {
-    return     (constIndex >= 307 && constIndex <= 404)
-            ||  constIndex == 417
-            || (constIndex >= 419 && constIndex <= 428)
-            || (constIndex >= 430 && constIndex <= 437)
-            || (constIndex >= 440 && constIndex <= 442)
-            || (constIndex >= 458 && constIndex <= 463)
-            || (constIndex >= 465 && constIndex <= 476);
+    return     (constIndex >= 307 && constIndex <= 404) ||  constIndex == 417 || (constIndex >= 419 && constIndex <= 428)
+            || (constIndex >= 430 && constIndex <= 437) || (constIndex >= 440 && constIndex <= 442)
+            || (constIndex >= 458 && constIndex <= 463) || (constIndex >= 465 && constIndex <= 476);
 }
 
 bool ConstIndexIsStaticObjectSaveable(int constdex) {
-	return (   constdex == 112 || constdex == 279
-            || (constdex >= 448 && constdex < 458)
-			|| constdex == 480 || constdex == 516
-			|| (constdex >= 518 && constdex <= 526)
-			|| constdex == 530 || constdex == 531 || constdex == 546
-			|| constdex == 555 || constdex == 594 || constdex == 596
-			|| constdex == 598
-			|| (constdex >= 600 && constdex < 603)
-			|| (constdex >= 604 && constdex < 616)
-			|| (constdex >= 688 && constdex < 693)
-			|| constdex == 694 || constdex == 695
-			|| (constdex >= 699 && constdex < 704)
-			|| (constdex >= 741 && constdex < 746));
+	return (constdex == 112 || constdex == 279 || (constdex >= 448 && constdex < 458) || constdex == 480 || constdex == 516
+			|| (constdex >= 518 && constdex <= 526) || constdex == 530 || constdex == 531 || constdex == 546
+			|| constdex == 555 || constdex == 594 || constdex == 596 || constdex == 598 || (constdex >= 600 && constdex < 603)
+			|| (constdex >= 604 && constdex < 616) || (constdex >= 688 && constdex < 693) || constdex == 694 || constdex == 695
+			|| (constdex >= 699 && constdex < 704) || (constdex >= 741 && constdex < 746));
 }
 
 bool ConstIndexIsStaticObjectImmutable(int constdex) {
-	return ((constdex >= 527 && constdex < 530)
-			|| (constdex >= 532 && constdex < 546)
-			|| (constdex >= 547 && constdex < 553)
-			|| constdex == 554
-			|| (constdex >= 556 && constdex < 594)
-			|| constdex == 595 || constdex == 597 || constdex == 599
-			|| constdex == 601 || constdex == 603
-			|| (constdex >= 616 && constdex < 688)
-			|| constdex == 693 || constdex == 696 || constdex == 697
-			|| constdex == 698
-			|| (constdex >= 704 && constdex < 717)
-			|| constdex == 720
-			|| (constdex >= 733 && constdex < 736)
-			|| (constdex >= 737 && constdex < 739)
-			|| constdex == 746
-			|| constdex == 747
-			|| (constdex >= 750 && constdex <= 759 && constdex != 755));
+	return ((constdex >= 527 && constdex < 530) || (constdex >= 532 && constdex < 546) || (constdex >= 547 && constdex < 553)
+			|| constdex == 554 || (constdex >= 556 && constdex < 594) || constdex == 595 || constdex == 597 || constdex == 599
+			|| constdex == 601 || constdex == 603 || (constdex >= 616 && constdex < 688) || constdex == 693 || constdex == 696 || constdex == 697
+			|| constdex == 698 || (constdex >= 704 && constdex < 717) || constdex == 720 || (constdex >= 733 && constdex < 736)
+			|| (constdex >= 737 && constdex < 739) || constdex == 746 || constdex == 747 || (constdex >= 750 && constdex <= 759 && constdex != 755));
 }
 
 void Screenshot(void) {
@@ -300,21 +276,4 @@ uint16_t GetImpactType(uint16_t instanceIdx) {
     return 729; // SparksSmall
 }
 
-int hardware14fromConstdex(int constdex) {
-    switch (constdex) {
-        case 21: return 0;
-        case 22: return 1;
-        case 23: return 2;
-        case 24: return 3;
-        case 25: return 4;
-        case 26: return 5;
-        case 27: return 6;
-        case 28: return 7;
-        case 29: return 8;
-        case 30: return 9;
-        case 31: return 10;
-        case 32: return 11;
-    }
-    
-    return 0; // Using zero in case I pass this straight into the ever dangerous [ ]
-}
+int hardware14fromConstdex(int constdex) { return clamp(constdex - 21,0,14); }

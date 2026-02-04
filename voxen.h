@@ -70,6 +70,8 @@ typedef struct {
 	int32_t InputCodeSettings[42];
 	uint16_t ScreenWidth;
 	uint16_t ScreenHeight;
+    float ScreenCenterX;
+    float ScreenCenterY;
 	bool Fullscreen;
 	uint8_t FOV;
 	uint8_t Brightness;
@@ -1657,44 +1659,12 @@ void InitFontAtlasses(void);
 float GetScreenRelativeX(float percentage);
 float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------
-// Event System
-#define EV_NULL 0u
-#define EV_INIT 1u
-#define EV_KEYDOWN 10u
-#define EV_KEYUP 11u
-#define EV_MOUSEMOVE 12u
-#define EV_MOUSEDOWN 13u
-#define EV_MOUSEUP 14u
-#define EV_MOUSEWARP 15u
-#define EV_PLAYAUDIO_CLIP 40u
-#define EV_PLAYAUDIO_STREAM 41u
-#define EV_PHYSICS_TICK 50u
-#define EV_PARTICLE_TICK 60u
-#define EV_INT_FIELD_UNUSED 0
-#define EV_FLOAT_FIELD_UNUSED 0.0f
-#define EVENT_JOURNAL_BUFFER_SIZE 1000
-#define MAX_EVENTS_PER_FRAME 100
+// Helper Functions
 #define DOUBLE_CLICK_TIME 0.5f
-extern Event eventQueue[MAX_EVENTS_PER_FRAME];
-extern int32_t eventJournalIndex;
-extern bool journalFirstWrite;
-extern Event eventJournal[EVENT_JOURNAL_BUFFER_SIZE]; // Journal buffer for event history to write into the log/demo file
-extern int32_t eventIndex; // Event that made it to the counter.  Indices below this were already executed and walked away from the counter.
-extern bool log_playback;
-int32_t ReadActiveLog(void);
-void EventSystemInit(int32_t argc, char* command, char* command_input1);
-int32_t EnqueueEvent(uint8_t type, int32_t payload1i, int32_t payload2i, float payload1f, float payload2f);
 double get_time(void);
-int32_t EventQueueProcess(void);
-// ----------------------------------------------------------------------------
-// Logging / Debug Prints
-void OpenConsoleLogFile(void);
 void Screenshot(void);
 void CenterStatusPrint(const char* fmt, ...);
-void JournalDump(const char* dem_file);
 void DebugRAM(const char *context);
-// ----------------------------------------------------------------------------
-// Helper Functions
 extern uint32_t random_range_rng;
 double get_time(void);
 void AddInstance(uint16_t entIdx, uint16_t instanceIdx);

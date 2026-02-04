@@ -15,6 +15,7 @@ DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
 CheatsSystem Sys_Cheats = { .god = false, .noclip = true, .showLocation = true, .showFPS = true, .editMode = true };
 RenderSystem Sys_Render;
 SystemUI Sys_UI;
+FILE* console_log_file = NULL;
 BioMonitorSystem bioMonitor;
 InventorySystem inventoryPlayer1;
 InventorySystem inventoryPlayer2;
@@ -57,6 +58,33 @@ bool lightCastsShadows[LIGHT_COUNT];
 uint16_t useableItemsFrobIcons[94];
 bool boosterActive;
 uint16_t selfIdx;
+
+// Logs both to log file and console, usage same as printf
+void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
+    va_list copy; va_copy(copy, args);
+    #ifdef WINDOWS
+        if (prefix) fprintf(stream, "%s", prefix);
+        vfprintf(stream, fmt, args);
+        fflush(stream);
+    #else
+        if (prefix) fprintf(stream, "%s\033[0m", prefix);
+        vfprintf(stream, fmt, args);
+        fprintf(stream, "\033[0m"); fflush(stream);        
+    #endif
+    if (prefix) fprintf(console_log_file, "%s ", prefix);
+    vfprintf(console_log_file, fmt, copy); fflush(console_log_file);
+    va_end(copy);
+}
+
+#ifdef WINDOWS
+    void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+    void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "WARN:", fmt, args); va_end(args); }
+    void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "ERROR:", fmt, args); va_end(args); }
+#else
+    void DualLog(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, NULL, fmt, args); va_end(args); }
+    void DualLogWarn(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stdout, "\033[1;38;5;208mWARN:", fmt, args); va_end(args); }
+    void DualLogError(const char* fmt, ...) { va_list args; va_start(args, fmt); DualLogMain(stderr, "\033[1;31mERROR:", fmt, args); va_end(args); }
+#endif
 
 static inline void LogShaderError(GLuint s, const char* name) { char er[512]; glGetShaderInfoLog(s, 512, NULL, er); DualLogError("%s Compilation Failed: %s\n", name, er); OS_Exit(1); }
 static inline GLuint CompileShader(GLenum type, const char* source, const char* name) { GLuint s = glCreateShader(type); glShaderSource(s, 1, &source, NULL); glCompileShader(s); GLint ok; glGetShaderiv(s, GL_COMPILE_STATUS, &ok); if (!ok) LogShaderError(s, name); return s; }
@@ -449,12 +477,11 @@ void LoadGameModDefinition(void) { // Unique set separate from savedata path and
     DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
 }
 
-void InitializeEnvironment(int32_t argc, char* command, char* command_input1) {
+void InitializeEnvironment(void) {
     double init_start_time = get_time();
     Sys_Dx.globalFrameNum = 0;
     DebugRAM("prior to event system init");
     DualLog("%s by W. Josiah Jack, MIT-0 licensed\n", EngineName);
-    EventSystemInit(argc,command,command_input1);
     if (!glfwInit()) { DualLogError("GLFW initialization failed\n"); OS_Exit(1); }
     
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
@@ -917,7 +944,7 @@ void CreditsStats(void) {
     off += snprintf(creditStats + off, sizeof(creditStats), "Damage Dealt: %f\nDamage Received: %f\nSaves Scummed: %u\n\nClick to continue...\n", (double)Sys_Global.damageDealt, (double)Sys_Global.damageReceived, Sys_Global.savesScummed);
 }
 
-void CreditsScroll(void) {
+void RenderCredits(void) {
     if (!Sys_Global.creditsActive) return;
 
     if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_1].pressed) {
@@ -931,57 +958,64 @@ void CreditsScroll(void) {
     } else RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL, creditPages[Sys_Global.creditsPageIndex]);
 }
 
+static inline void RenderMenu(void) {
+    
+}
+
+static inline void RenderPausedUI(void) {
+    float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
+    float pauseBGX = Sys_Settings.ScreenCenterX - (pauseBGWidth * 0.5f);
+    float pauseBGY = Sys_Settings.ScreenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
+    RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background
+    RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background
+    float quitGame_Height = GetScreenRelativeY(0.05f);
+    RenderUIImage(pauseBGX, Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.40f) - (quitGame_Height * 0.5f), pauseBGWidth, quitGame_Height, 950); // Pause Quit Game background
+    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.3f), TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
+    char* pauseButton_ResumeText = "RESUME";
+    float pauseButton_ResumeWidth = (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
+    float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
+    float pauseButton_ResumeX = Sys_Settings.ScreenCenterX - pauseButton_ResumeWidth;
+    float pauseButton_ResumeY = Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.08f);
+    bool pauseButton_CursorIsAbove = CursorIsOverBounds(pauseButton_ResumeX, pauseButton_ResumeX + (pauseButton_ResumeWidth * 2.0f), pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.451f), pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.451f));
+    uint8_t pauseButton_ResumeColor = pauseButton_CursorIsAbove ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED;
+    RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
+    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.00f), TEXT_STOPD_RED, FONT_STOPD, "LOAD");
+    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.08f), TEXT_STOPD_RED, FONT_STOPD, "SAVE");
+    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.5f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.16f), TEXT_STOPD_RED, FONT_STOPD, "OPTIONS");
+    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 6.0f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.24f), TEXT_STOPD_RED, FONT_STOPD, "QUIT TO MENU");
+    RenderFormattedText(Sys_Settings.ScreenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 4.5f), Sys_Settings.ScreenCenterY + GetScreenRelativeY(0.40f), TEXT_STOPD_RED, FONT_STOPD, "QUIT GAME");
+}
+
 static inline double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     Sys_Dx.drawCallsNormal = Sys_Dx.drawCallsRenderedThisFrame;
-    float screenCenterX = (float)Sys_Settings.ScreenWidth / 2;
-    float screenCenterY = (float)Sys_Settings.ScreenHeight / 2;
-    float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
-    if (Sys_Global.gamePaused) {
-        float pauseBGWidth = GetScreenRelativeX(0.24f), pauseBGHeight = GetScreenRelativeY(0.39f);
-        float pauseBGX = screenCenterX - (pauseBGWidth * 0.5f);
-        float pauseBGY = screenCenterY - (pauseBGHeight * 0.5f) + GetScreenRelativeY(0.08f);
-        RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1025); // Pause Menu background
-        RenderUIImage(pauseBGX, pauseBGY, pauseBGWidth, pauseBGHeight, 1080); // Pause Menu background
-        float quitGame_Height = GetScreenRelativeY(0.05f);
-        RenderUIImage(pauseBGX, screenCenterY + GetScreenRelativeY(0.40f) - (quitGame_Height * 0.5f), pauseBGWidth, quitGame_Height, 950); // Pause Quit Game background
-        RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.0f), screenCenterY - GetScreenRelativeY(0.3f), TEXT_STOPD_RED_PAUSETITLE, FONT_STOPD, "PAUSED");
-        char* pauseButton_ResumeText = "RESUME";
-        float pauseButton_ResumeWidth = (TextWidth(pauseButton_ResumeText,FONT_STOPD) * 0.5f);
-        float pauseButton_ResumeHeight = GetScreenRelativeY(genericTextHeightFacStopD);
-        float pauseButton_ResumeX = screenCenterX - pauseButton_ResumeWidth;
-        float pauseButton_ResumeY = screenCenterY - GetScreenRelativeY(0.08f);
-        uint8_t pauseButton_ResumeColor = TEXT_STOPD_RED;
-        bool pauseButton_CursorIsAbove = CursorIsOverBounds(pauseButton_ResumeX - GetScreenRelativeX(genericTextWidthFacStopD), pauseButton_ResumeX + pauseButton_ResumeWidth, pauseButton_ResumeY + (pauseButton_ResumeHeight * 0.5f), pauseButton_ResumeY - (pauseButton_ResumeHeight * 0.5f));
-        if (pauseButton_CursorIsAbove) pauseButton_ResumeColor = TEXT_STOPD_RED_HIGHLIGHT;
-        RenderFormattedText(pauseButton_ResumeX, pauseButton_ResumeY, pauseButton_ResumeColor, FONT_STOPD, "RESUME");
-        RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.00f), TEXT_STOPD_RED, FONT_STOPD, "LOAD");
-        RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 2.0f), screenCenterY + GetScreenRelativeY(0.08f), TEXT_STOPD_RED, FONT_STOPD, "SAVE");
-        RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 3.5f), screenCenterY + GetScreenRelativeY(0.16f), TEXT_STOPD_RED, FONT_STOPD, "OPTIONS");
-        RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 6.0f), screenCenterY + GetScreenRelativeY(0.24f), TEXT_STOPD_RED, FONT_STOPD, "QUIT TO MENU");
-        RenderFormattedText(screenCenterX - GetScreenRelativeX(genericTextWidthFacStopD * 4.5f), screenCenterY + GetScreenRelativeY(0.40f), TEXT_STOPD_RED, FONT_STOPD, "QUIT GAME");
-    }
-    
-    CreditsScroll();
+    if (Sys_Global.menuActive) { RenderMenu(); return get_time(); }
+    if (Sys_Global.gamePaused) { RenderPausedUI(); return get_time(); }
+    if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
     if (Sys_Cheats.noHUD) return get_time(); // NO HUD BARRIER =====================
     
     // Diagnostics / Debugging
     float debugTextStartY = GetScreenRelativeY(0.075f);
     float leftPad = GetScreenRelativeX(0.0125f);
     if (Sys_Cheats.showLocation) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
+    float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL, "Player velocity: %.2f, %.2f, %.2f, accumulated force: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z, (double)instances[PLAYER1].accumulatedForce.x, (double)instances[PLAYER1].accumulatedForce.y, (double)instances[PLAYER1].accumulatedForce.z);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
     RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL, "Cursor: %d, %d", cursorPosition_x, cursorPosition_y);
     if (Sys_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL, "] %s",consoleEntryText);
-    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, screenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
+    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL, "%s",statusText);
     float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
     float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
     float shootModePos_y = 0.0f;
+    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 6), TEXT_WHITE, FONT_NORMAL, "Shootmode button pos: %f %f -- %f %f", (double)shootModePos_x, (double)shootModePos_y, (double)shootModePos_x + (double)shootModeWidth, (double)shootModePos_y + (double)shootModeHeight);
     if (!Sys_Global.gamePaused) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+    bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
+    if (mouseReleased) DualLog("Mouse pressed %u\n", Sys_Dx.globalFrameNum);
     if (Sys_Global.inventoryMode) {
         if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
-            if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].released) {
+            if (mouseReleased) {
                 Sys_Global.inventoryMode = false;
                 cursorPosition_x = Sys_Settings.ScreenWidth / 2;
                 cursorPosition_y = Sys_Settings.ScreenHeight / 2;
@@ -1000,14 +1034,6 @@ static inline double RenderUI(void) {
         RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
         RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
     }
-    
-    // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
-    bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
-    uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
-    float cursorSize = (float)Sys_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE * (menuOrInventoryCursorStyle ? 3.0f : 1.0f);
-    float cursorHalfSize = cursorSize * 0.5f;
-    if (CursorVisible()) RenderUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
-    else RenderUIImage(screenCenterX - cursorHalfSize, screenCenterY - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
     
     return time_now;
 }
@@ -1187,6 +1213,15 @@ void Render(void) {
     Sys_Dx.drawCallsRenderedThisFrame++;
     Sys_Dx.verticesRenderedThisFrame += 4;
     Sys_Global.last_time = RenderUI();
+    
+    // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
+    bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
+    uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
+    float cursorSize = (float)Sys_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE * (menuOrInventoryCursorStyle ? 3.0f : 1.0f);
+    float cursorHalfSize = cursorSize * 0.5f;
+    if (CursorVisible()) RenderUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
+    else RenderUIImage(Sys_Settings.ScreenCenterX - cursorHalfSize, Sys_Settings.ScreenCenterY - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
+    
     if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
         Sys_Dx.framesPerLastSecond = Sys_Dx.globalFrameNum - Sys_Dx.lastFrameSecCount;
@@ -1233,21 +1268,18 @@ static void UpdateVoxelsAndInstances(void) {
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();
     random_range_rng = (uint32_t)game_start_time; // Seed global rand uniquely with time since system boot.
-    OpenConsoleLogFile();
+    console_log_file = fopen("voxen.log", "w"); // Initialize log system for all prints to go to both stdout and voxen.log file
+    if (!console_log_file) DualLogError("Failed to open log file voxen.log\n");
     DebugRAM("program start");
     #ifdef WINDOWS
         SetDllDirectory("External\\Windows");
     #endif
     if (ARG_IS("-v", "--version")) { DualLog("-----------------------------------------------------------\n%s\nby W. Josiah Jack\nMIT-0 licensed\n", EngineName); OS_Exit(0); }
     if (ARG_IS("-h", "--help")) { DualLog("%s\n-------------------------------------------------------------\n   This is a game engine designed for optimized focused usage\n   of OpenGL, making heavy use of GPU Driven rendering\n"
-                                          "   techniques, a unified event system for debugging and log\n   playback, full mod support loading all data from external\n   files and using definition files for what to do with the\n   data.\n\n"
+                                          "   techniques with full mod support loading all data from external\n   files and using definition files for what to do with the\n   data.\n\n"
                                           "   This project aims to have minimal overhead, profiling,\n   traceability, robustness, and low level control.\n\n\nValid arguments:\n < none >\n    Runs the engine as normal, loading data from \n"
-                                          "    neighbor directories (./Textures, ./Models, etc.)\n\n-v, --version\n    Prints version information\n\nplay <file>\n    Plays back recorded log from current directory\n\nrecord <file>\n"
-                                          "    Records all engine events to designated log\n    as a .dem file\n\ndump <file.dem>\n    Dumps the specified log into ./log_dump.txt\n    as human readable text.  You must provide full\n"
-                                          "    file name with extension\n\n-h, --help\n    Provides this help text.  Neat!\n-----------------------------------------------------------\n", EngineName); OS_Exit(0); }
-    if (argc == 3 && strcmp(argv[1], "dump") == 0) { DualLog("Converting log to plaintext: %s ...", argv[2]); JournalDump(argv[2]); DualLog("DONE!\n"); OS_Exit(0); }
-
-    InitializeEnvironment(argc,argv[1],argv[2]);
+                                          "    neighbor directories (./Textures, ./Models, etc.)\n\n-v, --version\n    Prints version information\n\n-h, --help\n    Provides this help text.  Neat!\n-----------------------------------------------------------\n", EngineName); OS_Exit(0); }
+    InitializeEnvironment();
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
     Sys_Global.absoluteTime = Sys_Global.pauseRelativeTime = get_time();
@@ -1266,37 +1298,23 @@ int32_t main(int32_t argc, char* argv[]) {
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
-        InputClearRisingAndFallingEdges();        
-        Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
-        if (!log_playback && !Sys_Global.gamePaused && !Sys_Global.menuActive && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
-            Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
-            EnqueueEvent(EV_PHYSICS_TICK,EV_INT_FIELD_UNUSED,EV_INT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED,EV_FLOAT_FIELD_UNUSED);
-        }
-
-        if (log_playback) { // Enqueue all logged events for the current frame.
-            int32_t read_status = ReadActiveLog();
-            if (read_status == 2) { // EOF reached, no more events
-                DualLog("Log playback completed.  Control returned.\n");
-            } else if (read_status == -1) { DualLogError("Error reading log file, exiting playback\n"); OS_Exit(1); }
-        }
-
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) { // Update Gameplay
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_2].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
-
-            // TODO
-//             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) { // Do everything... TODO: Put into event??  eventssss??
-//                 UpdateWhileNotPaused(i); // Get new states prior to updating animations, physics event, or rendering
-//             }
-            
+//             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
             UpdateAmbientSounds();
             UpdateAnims();
         }
         
-        if (EventQueueProcess()) OS_Exit(1); // Do everything
+        Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
+            Sys_Global.last_physics_time = Sys_Global.pauseRelativeTime;
+            Physics();
+        }
         
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateVoxelsAndInstances();
         Render();
+        InputClearRisingAndFallingEdges();
         Sys_Dx.globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT
             if (Sys_Dx.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }

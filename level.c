@@ -1,7 +1,3 @@
-#include <stdio.h>
-#include <malloc.h>
-#include <string.h>
-#include <float.h>
 #include "os.h"
 #include "voxen.h"
 
@@ -236,7 +232,7 @@ void LoadLevel(uint8_t curlevel) {
         memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
         bool isLight = true;
-        if (strcmp(firstKeyCheck, "constIndex") == 0) isLight = false;  // constIndex specified indicating this is a real entity?
+        if (StringsAreEqual(firstKeyCheck, "constIndex")) isLight = false;  // constIndex specified indicating this is a real entity?
         if (isLight) {
             lightsIdx++;
             if (lightsIdx >= LIGHT_COUNT) { DualLogError("Too many lights %u in level%d.txt!\n",lightsIdx,curlevel); OS_Exit(1); }
@@ -276,114 +272,111 @@ void LoadLevel(uint8_t curlevel) {
             trimmed_key[sizeof(trimmed_key) - 1] = '\0';
             trimmed_value[sizeof(trimmed_value) - 1] = '\0';
             if (isLight) {
-                     if (strcmp(trimmed_key, "localPosition.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localPosition.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localPosition.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.x") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.y") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.z") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.w") == 0) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intensity") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = parse_float(trimmed_value, initialLine, lineNum) * 0.35f;
-                else if (strcmp(trimmed_key, "range") == 0)           lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "spotAngle") == 0)       lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "type") == 0) {
-                    if ((strcmp(trimmed_value, "Spot") == 0)) lightType = 1u;
-                    else if ((strcmp(trimmed_value, "Directional") == 0)) lightType = 2u;
+                     if (StringsAreEqual(trimmed_key,"localPosition.x")) lights[litIdx + LIGHT_DATA_OFFSET_POSX] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.y")) lights[litIdx + LIGHT_DATA_OFFSET_POSY] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.z")) lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.x")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRX] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.y")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRY] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.z")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRZ] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.w")) lights[litIdx + LIGHT_DATA_OFFSET_SPOTDIRW] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intensity"))       lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = parse_float(trimmed_value, initialLine, lineNum) * 0.35f;
+                else if (StringsAreEqual(trimmed_key,"range"))           lights[litIdx + LIGHT_DATA_OFFSET_RANGE] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"spotAngle"))       lights[litIdx + LIGHT_DATA_OFFSET_SPOTANG] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"type")) {
+                         if (StringsAreEqual(trimmed_value,"Spot"))        lightType = 1u;
+                    else if (StringsAreEqual(trimmed_value,"Directional")) lightType = 2u;
                 }
-                else if (strcmp(trimmed_key, "color.r") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_R] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "color.g") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_G] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "color.b") == 0)         lights[litIdx + LIGHT_DATA_OFFSET_B] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "lightOn") == 0 && !lightOnRead) {       lightOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum); lightOnRead = true; } // Check lightOnRead in if here since TargetIO also has same value lightOn, whoops!  But guaranteed to be 2nd so get the real one here
-                else if (strcmp(trimmed_key, "lerpOn") == 0)          lightLerpOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "currentStep") == 0)     lightCurrentStep[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "lerpValue") == 0)       lightLerpValue[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-//                 else if (strcmp(trimmed_key, "lerpTime") == 0) {      float lt = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum); lightLerpTime[lightsIdx] = lt < 0.1f ? 0.1f : lt; }
-//                 else if (strcmp(trimmed_key, "stepTime") == 0)        lightLerpStepTime[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-//                 else if (strcmp(trimmed_key, "lerpStartTime") == 0)   lightLerpStartTime[lightsIdx] = LoadRelativeTimeDifferential(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps.Length") == 0) lightIntervalStepsLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[0]") == 0)     lightIntervalSteps[lightsIdx][0] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[1]") == 0)     lightIntervalSteps[lightsIdx][1] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[2]") == 0)     lightIntervalSteps[lightsIdx][2] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[3]") == 0)     lightIntervalSteps[lightsIdx][3] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[4]") == 0)     lightIntervalSteps[lightsIdx][4] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[5]") == 0)     lightIntervalSteps[lightsIdx][5] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[6]") == 0)     lightIntervalSteps[lightsIdx][6] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[7]") == 0)     lightIntervalSteps[lightsIdx][7] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[8]") == 0)     lightIntervalSteps[lightsIdx][8] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[9]") == 0)     lightIntervalSteps[lightsIdx][9] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[10]") == 0)    lightIntervalSteps[lightsIdx][10] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[11]") == 0)    lightIntervalSteps[lightsIdx][11] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[12]") == 0)    lightIntervalSteps[lightsIdx][12] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[13]") == 0)    lightIntervalSteps[lightsIdx][13] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[14]") == 0)    lightIntervalSteps[lightsIdx][14] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[15]") == 0)    lightIntervalSteps[lightsIdx][15] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[16]") == 0)    lightIntervalSteps[lightsIdx][16] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[17]") == 0)    lightIntervalSteps[lightsIdx][17] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[18]") == 0)    lightIntervalSteps[lightsIdx][18] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[19]") == 0)    lightIntervalSteps[lightsIdx][19] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[20]") == 0)    lightIntervalSteps[lightsIdx][20]= parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[21]") == 0)    lightIntervalSteps[lightsIdx][21] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[22]") == 0)    lightIntervalSteps[lightsIdx][22] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[23]") == 0)    lightIntervalSteps[lightsIdx][23] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[24]") == 0)    lightIntervalSteps[lightsIdx][24] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[25]") == 0)    lightIntervalSteps[lightsIdx][25] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[26]") == 0)    lightIntervalSteps[lightsIdx][26] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[27]") == 0)    lightIntervalSteps[lightsIdx][27] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[28]") == 0)    lightIntervalSteps[lightsIdx][28] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalSteps[29]") == 0)    lightIntervalSteps[lightsIdx][29] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping.Length") == 0) lightIntervalStepIsLerpingLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[0]") == 0)     intervalStepisLerping[lightsIdx][0] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[1]") == 0)     intervalStepisLerping[lightsIdx][1] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[2]") == 0)     intervalStepisLerping[lightsIdx][2] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[3]") == 0)     intervalStepisLerping[lightsIdx][3] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[4]") == 0)     intervalStepisLerping[lightsIdx][4] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[5]") == 0)     intervalStepisLerping[lightsIdx][5] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[6]") == 0)     intervalStepisLerping[lightsIdx][6] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[7]") == 0)     intervalStepisLerping[lightsIdx][7] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[8]") == 0)     intervalStepisLerping[lightsIdx][8] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[9]") == 0)     intervalStepisLerping[lightsIdx][9] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[10]") == 0)    intervalStepisLerping[lightsIdx][10] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[11]") == 0)    intervalStepisLerping[lightsIdx][11] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[12]") == 0)    intervalStepisLerping[lightsIdx][12] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[13]") == 0)    intervalStepisLerping[lightsIdx][13] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[14]") == 0)    intervalStepisLerping[lightsIdx][14] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[15]") == 0)    intervalStepisLerping[lightsIdx][15] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[16]") == 0)    intervalStepisLerping[lightsIdx][16] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[17]") == 0)    intervalStepisLerping[lightsIdx][17] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[18]") == 0)    intervalStepisLerping[lightsIdx][18] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[19]") == 0)    intervalStepisLerping[lightsIdx][19] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[20]") == 0)    intervalStepisLerping[lightsIdx][20] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[21]") == 0)    intervalStepisLerping[lightsIdx][21] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[22]") == 0)    intervalStepisLerping[lightsIdx][22] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[23]") == 0)    intervalStepisLerping[lightsIdx][23] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[24]") == 0)    intervalStepisLerping[lightsIdx][24] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[25]") == 0)    intervalStepisLerping[lightsIdx][25] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[26]") == 0)    intervalStepisLerping[lightsIdx][26] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[27]") == 0)    intervalStepisLerping[lightsIdx][27] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[28]") == 0)    intervalStepisLerping[lightsIdx][28] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "intervalStepisLerping[29]") == 0)    intervalStepisLerping[lightsIdx][29] = parse_bool(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "minIntensity") == 0)    lightMinIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "maxIntensity") == 0)    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"color.r"))         lights[litIdx + LIGHT_DATA_OFFSET_R] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"color.g"))         lights[litIdx + LIGHT_DATA_OFFSET_G] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"color.b"))         lights[litIdx + LIGHT_DATA_OFFSET_B] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"lightOn") && !lightOnRead) { lightOn[lightsIdx] = parse_bool(trimmed_value,initialLine,lineNum); lightOnRead = true; } // Check lightOnRead in if here since TargetIO also has same value lightOn, whoops!  But guaranteed to be 2nd so get the real one here
+                else if (StringsAreEqual(trimmed_key,"lerpOn"))          lightLerpOn[lightsIdx] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"currentStep"))     lightCurrentStep[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"lerpValue"))       lightLerpValue[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps.Length")) lightIntervalStepsLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[0]"))     lightIntervalSteps[lightsIdx][0] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[1]"))     lightIntervalSteps[lightsIdx][1] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[2]"))     lightIntervalSteps[lightsIdx][2] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[3]"))     lightIntervalSteps[lightsIdx][3] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[4]"))     lightIntervalSteps[lightsIdx][4] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[5]"))     lightIntervalSteps[lightsIdx][5] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[6]"))     lightIntervalSteps[lightsIdx][6] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[7]"))     lightIntervalSteps[lightsIdx][7] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[8]"))     lightIntervalSteps[lightsIdx][8] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[9]"))     lightIntervalSteps[lightsIdx][9] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[10]"))    lightIntervalSteps[lightsIdx][10] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[11]"))    lightIntervalSteps[lightsIdx][11] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[12]"))    lightIntervalSteps[lightsIdx][12] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[13]"))    lightIntervalSteps[lightsIdx][13] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[14]"))    lightIntervalSteps[lightsIdx][14] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[15]"))    lightIntervalSteps[lightsIdx][15] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[16]"))    lightIntervalSteps[lightsIdx][16] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[17]"))    lightIntervalSteps[lightsIdx][17] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[18]"))    lightIntervalSteps[lightsIdx][18] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[19]"))    lightIntervalSteps[lightsIdx][19] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[20]"))    lightIntervalSteps[lightsIdx][20]= parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[21]"))    lightIntervalSteps[lightsIdx][21] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[22]"))    lightIntervalSteps[lightsIdx][22] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[23]"))    lightIntervalSteps[lightsIdx][23] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[24]"))    lightIntervalSteps[lightsIdx][24] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[25]"))    lightIntervalSteps[lightsIdx][25] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[26]"))    lightIntervalSteps[lightsIdx][26] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[27]"))    lightIntervalSteps[lightsIdx][27] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[28]"))    lightIntervalSteps[lightsIdx][28] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalSteps[29]"))    lightIntervalSteps[lightsIdx][29] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping.Length")) lightIntervalStepIsLerpingLength[lightsIdx] = parse_numberu8(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[0]"))     intervalStepisLerping[lightsIdx][0] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[1]"))     intervalStepisLerping[lightsIdx][1] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[2]"))     intervalStepisLerping[lightsIdx][2] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[3]"))     intervalStepisLerping[lightsIdx][3] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[4]"))     intervalStepisLerping[lightsIdx][4] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[5]"))     intervalStepisLerping[lightsIdx][5] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[6]"))     intervalStepisLerping[lightsIdx][6] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[7]"))     intervalStepisLerping[lightsIdx][7] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[8]"))     intervalStepisLerping[lightsIdx][8] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[9]"))     intervalStepisLerping[lightsIdx][9] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[10]"))    intervalStepisLerping[lightsIdx][10] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[11]"))    intervalStepisLerping[lightsIdx][11] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[12]"))    intervalStepisLerping[lightsIdx][12] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[13]"))    intervalStepisLerping[lightsIdx][13] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[14]"))    intervalStepisLerping[lightsIdx][14] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[15]"))    intervalStepisLerping[lightsIdx][15] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[16]"))    intervalStepisLerping[lightsIdx][16] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[17]"))    intervalStepisLerping[lightsIdx][17] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[18]"))    intervalStepisLerping[lightsIdx][18] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[19]"))    intervalStepisLerping[lightsIdx][19] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[20]"))    intervalStepisLerping[lightsIdx][20] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[21]"))    intervalStepisLerping[lightsIdx][21] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[22]"))    intervalStepisLerping[lightsIdx][22] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[23]"))    intervalStepisLerping[lightsIdx][23] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[24]"))    intervalStepisLerping[lightsIdx][24] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[25]"))    intervalStepisLerping[lightsIdx][25] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[26]"))    intervalStepisLerping[lightsIdx][26] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[27]"))    intervalStepisLerping[lightsIdx][27] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[28]"))    intervalStepisLerping[lightsIdx][28] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"intervalStepisLerping[29]"))    intervalStepisLerping[lightsIdx][29] = parse_bool(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"minIntensity"))    lightMinIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"maxIntensity"))    lightMaxIntensity[lightsIdx] = parse_float(trimmed_value, initialLine, lineNum);
             } else {
-                     if (strcmp(trimmed_key, "constIndex") == 0)      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localPosition.x") == 0) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localPosition.y") == 0) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localPosition.z") == 0) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.x") == 0) instances[instanceIdx].rotation.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.y") == 0) instances[instanceIdx].rotation.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.z") == 0) instances[instanceIdx].rotation.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localRotation.w") == 0) instances[instanceIdx].rotation.w = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localScale.x") == 0)    instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localScale.y") == 0)    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "localScale.z") == 0)    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "go.activeSelf") == 0) { activeStateRead = true ; flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
-                else if (strcmp(trimmed_key, "requireReset") == 0)    flag_set(&instances[instanceIdx].entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (strcmp(trimmed_key, "amount") == 0)          instances[instanceIdx].amount = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "resetTime") == 0)       instances[instanceIdx].resetTime = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "minSecurityLevel") == 0)instances[instanceIdx].minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
-                else if (strcmp(trimmed_key, "damageOnUse") == 0)     flag_set(&instances[instanceIdx].entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
-                else if (strcmp(trimmed_key, "target") == 0)          StringCopyInto_A_From_B(instances[instanceIdx].target,trimmed_value,TARGET_STRING_LENGTH);
-                else if (strcmp(trimmed_key, "targetname") == 0)      StringCopyInto_A_From_B(instances[instanceIdx].targetname,trimmed_value,TARGET_STRING_LENGTH);
+                     if (StringsAreEqual(trimmed_key,"constIndex"))      instances[instanceIdx].index = parse_numberu16(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.x")) instances[instanceIdx].position.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.y")) instances[instanceIdx].position.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localPosition.z")) instances[instanceIdx].position.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.x")) instances[instanceIdx].rotation.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.y")) instances[instanceIdx].rotation.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.z")) instances[instanceIdx].rotation.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localRotation.w")) instances[instanceIdx].rotation.w = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localScale.x"))    instances[instanceIdx].scale.x = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localScale.y"))    instances[instanceIdx].scale.y = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"localScale.z"))    instances[instanceIdx].scale.z = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"go.activeSelf")) { activeStateRead = true ; flag_set(&instances[instanceIdx].entflags, ENTFLAG_ACTIVE, parse_bool(trimmed_value, initialLine, lineNum)); }
+                else if (StringsAreEqual(trimmed_key,"requireReset"))    flag_set(&instances[instanceIdx].entflags, ENTFLAG_REQUIRE_RESET, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"amount"))          instances[instanceIdx].amount = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"resetTime"))       instances[instanceIdx].resetTime = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"minSecurityLevel"))instances[instanceIdx].minSecurityLevel = parse_float(trimmed_value, initialLine, lineNum);
+                else if (StringsAreEqual(trimmed_key,"damageOnUse"))     flag_set(&instances[instanceIdx].entflags, ENTFLAG_DAMAGE_ON_USE, parse_bool(trimmed_value, initialLine, lineNum));
+                else if (StringsAreEqual(trimmed_key,"target"))          StringCopyInto_A_From_B(instances[instanceIdx].target,trimmed_value,TARGET_STRING_LENGTH);
+                else if (StringsAreEqual(trimmed_key,"targetname"))      StringCopyInto_A_From_B(instances[instanceIdx].targetname,trimmed_value,TARGET_STRING_LENGTH);
             }
         }
         
