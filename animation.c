@@ -97,7 +97,7 @@ void UpdateAnims(void) {
         AnimationClip currentClip = modelAnimationClips[animNum][instances[i].clip];
         if (instances[i].currentFrameFinished >= Sys_Global.current_time) continue;
         
-        instances[i].currentFrameFinished = Sys_Global.current_time + ((double)currentClip.speed * (1.0 / (double)currentClip.framerate));
+        instances[i].currentFrameFinished = Sys_Global.current_time + ((1.0/(double)currentClip.speed) * (1.0 / (double)currentClip.framerate));
         instances[i].frame++;
         if (instances[i].frame > currentClip.frameEnd) instances[i].frame = currentClip.frameStart;
         else if (instances[i].frame < currentClip.frameStart) instances[i].frame = currentClip.frameEnd;

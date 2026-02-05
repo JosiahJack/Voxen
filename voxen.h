@@ -550,30 +550,16 @@ static const uint8_t PhysicsLayer_NULL             = 31;
 #define MAX_SAVENAME_LENGTH 24
 #define MENU_ITEMS_MAX 52 // Input page has 40 for the input codes, plus back button plus 10 other widgets
 typedef uint8_t MenuPages;
-static const uint8_t MenuPages_fp = 0;
-static const uint8_t MenuPages_sp = 1;
-static const uint8_t MenuPages_mp = 2;
-static const uint8_t MenuPages_np = 3;
-static const uint8_t MenuPages_lp = 4;
-static const uint8_t MenuPages_op = 5;
-static const uint8_t MenuPages_sv = 6;
-static const uint8_t MenuPages_cd = 7;
-typedef struct {
-    int8_t currentIndex;
-    int8_t currentSaveSlot;
-    bool inCutscene;
-    bool returnToPause;
-    MenuPages currentPage;
-    bool typingSaveGame;
-//     char tempSaveNameHolder[MAX_SAVENAME_LENGTH]; TODO
-    int presetQuestionValue;
-//     uint8_t currentMenuItemsLength; TODO
-    double vidFinished;
-    double vidStartTime;
-    bool axisUp;
-    bool axisDn;
-} MainMenu;
-extern MainMenu Sys_Menu;
+static const uint8_t MenuPages_FrontPage = 0;
+static const uint8_t MenuPages_Singleplayer = 1;
+static const uint8_t MenuPages_Multiplayer = 2;
+static const uint8_t MenuPages_NewGame = 3;
+static const uint8_t MenuPages_Load = 4;
+static const uint8_t MenuPages_Options = 5;
+static const uint8_t MenuPages_Save = 6;
+static const uint8_t MenuPages_IntroVideo = 7;
+static const uint8_t MenuPages_CreditsVideo = 8;
+void MenuGoBack(void);
 
 #define PATCH_BERSERK   1
 #define PATCH_DETOX     2
@@ -1560,6 +1546,12 @@ void SetSkyRotateSpeed(void);
 #define TEXT_STOPD_RED 6
 #define TEXT_STOPD_RED_HIGHLIGHT 7
 #define TEXT_STOPD_RED_PAUSETITLE 8
+#define TEXT_GREEN_MENU 9
+#define TEXT_GREEN_MENU_SHADOW 10
+#define TEXT_GREEN_MENU_GLOW 11
+extern uint8_t currentMenuPage;
+extern bool typingSaveGame;
+extern bool returnToPause;
 extern char** audiologNames;
 extern char** audiologSubjects;
 extern char** audiologSenders;

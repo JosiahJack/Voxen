@@ -252,6 +252,10 @@ bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == 
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
 //     DualLog("Keyboard button callback entry with key %d, scancode %d, action %d, mods %d\n",key,scancode,action,mods);
     if (key == GLFW_KEY_F10 && action) OS_Exit(0);
+    if (Sys_Global.menuActive && !returnToPause) {
+        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down) Sys_Global.menuActive = Sys_Global.gamePaused = false;
+        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) Sys_Global.menuActive = Sys_Global.gamePaused = false;
+    }
 
     if (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key))) Input_KeyDown(key);
     else if (action == GLFW_RELEASE)                                                Input_KeyUp(key);
@@ -422,19 +426,19 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
     return 0;
 }
 
-KeyState GetCodeMapping(int settingIndex) {
+KeyState* GetCodeMapping(int settingIndex) {
     int32_t i = Sys_Settings.InputCodeSettings[settingIndex]; // Get table index into all recognized inputs
-    if (i == 148) return (KeyState){ .down = false, .pressed = false, .released = false }; // UNUSED NULL (e.g. setting unbound)
+    if (i == 148 || i >= MAX_KEYS) return &Sys_Input.keyStates[MAX_KEYS - 1]; // UNUSED NULL (e.g. setting unbound)
     
     if (i >= 53 && i <= 61) { // Pick subtable of GLFW values that were set by GLFW callbacks
-        return Sys_Input.mouseButtons[inputElements[i].value];
+        return &Sys_Input.mouseButtons[inputElements[i].value];
     } else if (i >= 62 && i <= 77) {
-        return Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];        
+        return &Sys_Input.joystickButtons[GLFW_JOYSTICK_1][inputElements[i].value];        
     } else if ((i >= 78 && i <= 79) || (i >= 132 && i <= 133)) {
-        return Sys_Input.joystickHats[inputElements[i].value];        
+        return &Sys_Input.joystickHats[inputElements[i].value];        
     }
     
-    return Sys_Input.keyStates[inputElements[i].value];
+    return &Sys_Input.keyStates[inputElements[i].value];
 }
 
 bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
@@ -442,8 +446,9 @@ bool GetKeyRiseEdgeOrHeld(int settingIndex, bool risingEdge) {
          if (i == 129) return Sys_Input.scrollDelta > 0.0; // Mousewheel +
     else if (i == 130) return Sys_Input.scrollDelta < 0.0; // Mousewheel -
     
-    KeyState keyOfConcern = GetCodeMapping(settingIndex);
-    return risingEdge ? keyOfConcern.pressed : keyOfConcern.down;
+    KeyState* keyOfConcern = GetCodeMapping(settingIndex);
+    bool retval = risingEdge ? keyOfConcern->pressed : keyOfConcern->down;
+    return retval;
 }
 
 bool GetKey(int settingIndex) { return GetKeyRiseEdgeOrHeld(settingIndex,false); }  // True while held down.
@@ -497,6 +502,8 @@ bool TakeScreenshot(void) {  return GetKeyPressed(41); }
 void ProcessInput(void) {
     Input_PollJoysticks();
     Input_PollGamepad();
+    if (!Sys_Input.window_has_focus) return;
+    
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
     if (Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down && Sys_Input.keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(Sys_Global.window); // TODO: Remove?  Kinda handy.
     if (Console()) ToggleConsole();
@@ -506,8 +513,8 @@ void ProcessInput(void) {
         Sys_Global.screenshotTimeout = Sys_Global.current_time + 1.0; // Prevent saving more than 1 per second for sanity purposes.
     }
     
-    if (Menu()) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
-    if (!Sys_Input.window_has_focus) return;
+    if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
+    if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
     if (Sys_Global.gamePaused || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
 //     if (Sys_Global.menuActive) { MenuInput(); return; } TODO
     

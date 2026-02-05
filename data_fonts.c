@@ -214,7 +214,7 @@ void InitFontAtlasses(void) {
     unsigned char *bmp = OS_AllocateRAM(NULL, FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, OS_INVALID_HANDLE);
     stbtt_pack_context pc;
     stbtt_PackBegin(&pc, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
-    pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
+    pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8 for chunky 2pixel black outline support for readability and to follow System Shock.
     pc.v_oversample = 8;
     numPackedGlyphs = 0;
     float h = GetScreenRelativeY(genericTextHeightFac);
