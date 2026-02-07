@@ -163,7 +163,7 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     (void)window;
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
-    DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
+//     DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     UpdateProjectionMatrices();
     glUseProgram(Sys_Render.imageBlitShaderProgram);
@@ -240,7 +240,7 @@ void ApplySettings(void) {
     glUniform1ui(22, Sys_Settings.Shadows);
     glUseProgram(Sys_Render.chunkShaderProgram);
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
-    DualLog("Applied configuration settings\n");
+//     DualLog("Applied configuration settings\n");
     // TODO: Render config view on the menu
 }
 

@@ -103,5 +103,5 @@ void CycleToNextMonitor(GLFWwindow* window) {
     int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
     glfwSetWindowPos(window, xpos, ypos);
     Sys_Input.ignore_next_mouse_delta = true;
-    DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
+//     DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
 }

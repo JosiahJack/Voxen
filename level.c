@@ -511,7 +511,6 @@ void LoadLevel(uint8_t curlevel) {
     LoadTextures();
     RenderLoadingProgress(110,"Initialize entities...");
     InitAfterLoad();
-//     SortInstances(); // All instances loaded, sort them for render order: opaques, doublesideds, transparents.  REORDERS instances[] INDICES!!  CAREFUL!!
     RenderLoadingProgress(110,"Loading cull system...");
     CullInit(); // Must be after level! MUST BE AFTER SortInstances!!
     RenderLoadingProgress(120,"Loading voxel lighting data...");
@@ -523,6 +522,5 @@ void LoadLevel(uint8_t curlevel) {
     }
     memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
-    DualLog("LoadLevel completed!\n");
 }
 #pragma GCC diagnostic pop

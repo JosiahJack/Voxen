@@ -102,12 +102,12 @@ float TextWidth(const char *utf8, int fontID) {
                 int kern = stbtt_GetGlyphKernAdvance(&fontInfo[0], prevGlyph, stbtt_FindGlyphIndex(&fontInfo[0], cp));
                 
                 int fheight = ttSHORT(fontInfo[0].data + fontInfo[0].hhea + 4) - ttSHORT(fontInfo[0].data + fontInfo[0].hhea + 6);
-                float kernScaleForPixelHeight = (float)GetScreenRelativeY(genericTextHeightFac) / (float)fheight;
+                float kernScaleForPixelHeight = (genericTextHeightFac * (float)Sys_Settings.ScreenHeight) / (float)fheight;
                 width += (float)kern * kernScaleForPixelHeight;
             } else if (fontID == FONT_STOPD && packedIdx >= 0) {
                 int kern = stbtt_GetGlyphKernAdvance(&fontInfo[1], prevGlyph, stbtt_FindGlyphIndex(&fontInfo[1], cp));
                 int fheight = ttSHORT(fontInfo[1].data + fontInfo[1].hhea + 4) - ttSHORT(fontInfo[1].data + fontInfo[1].hhea + 6);
-                float kernScaleForPixelHeight = (float)GetScreenRelativeY(genericTextHeightFacStopD) / (float)fheight;
+                float kernScaleForPixelHeight = (genericTextHeightFacStopD * (float)Sys_Settings.ScreenHeight) / (float)fheight;
                 width += (float)kern * kernScaleForPixelHeight;
             }
         }
@@ -217,7 +217,7 @@ void InitFontAtlasses(void) {
     pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8 for chunky 2pixel black outline support for readability and to follow System Shock.
     pc.v_oversample = 8;
     numPackedGlyphs = 0;
-    float h = GetScreenRelativeY(genericTextHeightFac);
+    float h = (genericTextHeightFac * (float)Sys_Settings.ScreenHeight);
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
@@ -253,7 +253,7 @@ void InitFontAtlasses(void) {
     pc2.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
     pc2.v_oversample = 8;
     numPackedGlyphsStopD = 0;
-    float h2 = GetScreenRelativeY(genericTextHeightFacStopD);
+    float h2 = (genericTextHeightFacStopD * (float)Sys_Settings.ScreenHeight);
     for (int r = 0; r < numFontRanges; r++) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {

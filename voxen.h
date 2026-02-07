@@ -1374,7 +1374,7 @@ static inline bool EntityIndexIsPortalBlockingDoor(uint16_t entIdx) { return (en
 extern char creditStats[4096];
 void CreditsStats(void);
 void CreditsScroll(void);
-void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
+void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...);
 // ----------------------------------------------------------------------------
 // Physics
 #define MAX_DYNAMIC_ENTITIES 512
@@ -1571,8 +1571,6 @@ void LoadLogTextForLanguage(uint8_t lang);
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
 float TextWidth(const char *utf8, int32_t fontID);
 void InitFontAtlasses(void);
-float GetScreenRelativeX(float percentage);
-float GetScreenRelativeY(float percentage);
 // ----------------------------------------------------------------------------
 // Helper Functions
 #define DOUBLE_CLICK_TIME 0.5f

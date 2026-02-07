@@ -29,8 +29,7 @@ void main() {
     float verticalComponent = gradNorm.y; // +1 = pointing up (bottom edge), -1 = pointing down (top edge)
     vec2 screenTexSize = fwidth(TexCoord);
     float screenPxRange = max(0.5 * length(screenTexSize) * 2.0, 0.0001);
-    float softness     = screenPxRange * 5.0;
-
+    float softness = screenPxRange * 5.0;
     float opacity = smoothstep(0.5 - softness, 0.5 + softness, sdf);
     if (fontType == 1) { // StopD: directional colored borders + softened edges
         float sdfRight = texture(textTexture, TexCoord + vec2(texelSize.x, 0.0)).r;

@@ -264,33 +264,38 @@ __attribute__((pure)) int32_t compareDepthSortInverted(const void* a, const void
 
 // ============================================================================
 // UI Rendering and Text
-float GetScreenRelativeX(float percentage) { return (float)Sys_Settings.ScreenWidth * percentage; }
-float GetScreenRelativeY(float percentage) { return (float)Sys_Settings.ScreenHeight * percentage; }
+#define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
+#define BASE_RES_Y 768.0f
+float UIX(int16_t x) { return (float)x / BASE_RES_X; } // Pos or value as percent of 1366x768 resolution
+float RelX(int16_t x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; } // Pos or value in current resolution
+float UIY(int16_t y) { return (float)y / BASE_RES_Y; }
+float RelY(int16_t y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
 
-void RenderUIImage(float x, float y, float width, float height, uint32_t texIndex) {
+void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t texIndex) {
+    float xpos = RelX(x); float ypos = RelY(y);
     glEnable(GL_BLEND);
     glClear(GL_DEPTH_BUFFER_BIT); // Clear main FBO.  glClearBufferfv was actually SLOWER!  2nd Clear needed or UI dissappears/flickers!!
     glDisable(GL_CULL_FACE);
     glUseProgram(Sys_Render.chunkShaderProgram);
     glBindVertexArray(Sys_Render.textVAO);
-    glUniform1ui(1, 0);
-    glUniform1ui(3, 1u);  // isUI true
-    glUniform1ui(17, 1u); // unlit is true
-    glUniform1ui(19, 0);
-    glUniform1ui(20, 0);
-    glUniformMatrix4fv(2, 1, GL_FALSE, uiOrthoProjection);
-    glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.textVBO);
-    float x1 = x + width;
-    float y1 = y + height;
+    glUniform1ui(1,0);
+    glUniform1ui(3,1u);  // isUI true
+    glUniform1ui(17,1u); // unlit is true
+    glUniform1ui(19,0);
+    glUniform1ui(20,0);
+    glUniformMatrix4fv(2,1,GL_FALSE,uiOrthoProjection);
+    glBindBuffer(GL_ARRAY_BUFFER,Sys_Render.textVBO);
+    float x1 = xpos + RelX(width);
+    float y1 = ypos + RelY(height);
     float z = 0.0f;
-    float vertices[30] = { x, y1, z, 0.0f, 0.0f, x1,  y, z, 1.0f, 1.0f, x1, y1, z, 1.0f, 0.0f, x, y1, z, 0.0f, 0.0f, x,  y, z, 0.0f, 1.0f, x1,  y, z, 1.0f, 1.0f };
-    glUniform1ui(18, texIndex);
-    glBufferData(GL_ARRAY_BUFFER, 30 * sizeof(float), vertices, GL_DYNAMIC_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    float vertices[30] = {xpos,y1,z,0.0f,0.0f,x1,ypos,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,xpos,y1,z,0.0f,0.0f,xpos,ypos,z,0.0f,1.0f,x1,ypos,z,1.0f,1.0f};
+    glUniform1ui(18,texIndex);
+    glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES,0,6);
     Sys_Dx.drawCallsRenderedThisFrame++;
     Sys_Dx.uiImageDrawCallsRenderedThisFrame++;
     Sys_Dx.verticesRenderedThisFrame += 6;    
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
 __attribute__((pure)) bool CursorIsOverBounds(float startX, float endX, float startY, float endY) {
@@ -313,7 +318,7 @@ Color textColors[] = {
 };
 
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...) {
+void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...) {
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
@@ -328,8 +333,8 @@ void RenderFormattedText(float x, float y, uint32_t color, uint8_t fontID, float
     glBindVertexArray(Sys_Render.textVAO);
     size_t vertexCount = 0;
     const char* p = uiTextBuffer;
-    float xpos = x, ypos = y + GetScreenRelativeY(0.0211f * scale);
-    float lineSpacing = GetScreenRelativeY(0.03f * scale);
+    float xpos = RelX(x), ypos = RelX((int16_t)(((float)y) + (16.0f * scale)));
+    float lineSpacing = RelY((int16_t)(23.0f * scale));
     stbtt_aligned_quad q;
     int characterCount = 0;
     float paddingUV = (12.0f / (float)FONT_ATLAS_SIZE); // This is for the black outline around all text for readability.
@@ -903,29 +908,17 @@ void RenderCredits(void) {
 
     if (Sys_Global.creditsPageIndex == 1) {
         CreditsStats();
-        RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL,1.0f, (const char*)&creditStats);
-    } else RenderFormattedText(GetScreenRelativeX(0.219f), GetScreenRelativeY(0.0125f), TEXT_WHITE, FONT_NORMAL,1.0f, creditPages[Sys_Global.creditsPageIndex]);
+        RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,(const char*)&creditStats);
+    } else RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
 }
 
-#define BASE_RES_X 1366.0f // Positions done in fixed int positions off base resolution, scaled against current resolution.
-#define BASE_RES_Y 768.0f
-float UIX(int16_t x) { return (float)x / BASE_RES_X; }
-float RelX(int16_t x) { return UIX(x) * (float)Sys_Settings.ScreenWidth; }
-float UIY(int16_t y) { return (float)y / BASE_RES_Y; }
-float RelY(int16_t y) { return UIY(y) * (float)Sys_Settings.ScreenHeight; }
-
-#define ALIGN_CENTER 0
-#define ALIGN_LEFTER 1
-bool UI_Button(char* text, int16_t x, int16_t y, float w, float h, uint8_t color, uint8_t fontID, uint8_t alignment, float scale, bool* cursorOver) {
-    float width = RelX(w);
-    float height = RelY(h);
-    float xpos = alignment == ALIGN_CENTER ? RelX(x) - (width * 0.5f) : RelX(x);
-    float ypos = RelY(y) - height;
-    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos - height);
-    if (cursorIsOver && color == TEXT_STOPD_RED) color = TEXT_STOPD_RED_HIGHLIGHT;
-    if (cursorOver) *cursorOver = cursorIsOver;
+bool UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver) {
+    float width = RelX(w); float height = RelY(h);
+    float xpos = RelX(x); float ypos = RelY(y) - height;
+    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
+    if (cursorOver != NULL) *cursorOver = cursorIsOver;
     if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed && cursorIsOver) return true;
-    RenderFormattedText(xpos,ypos,color,fontID,scale,text); return false;
+    return false;
 }
 
 MenuPages currentMenuPage = MenuPages_FrontPage;
@@ -937,51 +930,98 @@ void MenuGoBack(void) {
 }
 
 static inline void RenderMenu(void) {
-    if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo) RenderUIImage(RelX(-417), RelY(-384), RelX(2200), RelY(1536), 1026); // Menu background
+    if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
     if (currentMenuPage == MenuPages_FrontPage) {
-        RenderUIImage(RelX(282), RelY(46), RelX(800), RelY(128), 1031); // Title CITADEL with strikethrough effect
+        RenderUIImage(282,46, 800,128, 1031); // Title CITADEL with strikethrough effect
         bool overS = false, overM = false, overO = false, overQ = false;
-        if (UI_Button("SINGLEPLAYER", 560, 316, 276, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overS)) currentMenuPage = MenuPages_Singleplayer;
-        RenderUIImage(RelX(510), RelY(278), RelX(32), RelY(32), overS ? 1029 : 1028); // Menu pad
-        if (UI_Button("MULTIPLAYER",  560, 436, 260, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overM)) currentMenuPage = MenuPages_Multiplayer;
-        RenderUIImage(RelX(510), RelY(398), RelX(32), RelY(32), overM ? 1029 : 1028); // Menu pad
-        if (UI_Button("OPTIONS",      560, 560, 180, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overO)) currentMenuPage = MenuPages_Options;
-        RenderUIImage(RelX(510), RelY(522), RelX(32), RelY(32), overO ? 1029 : 1028); // Menu pad
-        if (UI_Button("QUIT",         560, 680, 96, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overQ)) OS_Exit(0);
-        RenderUIImage(RelX(510), RelY(640), RelX(32), RelY(32), overQ ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,340, 574,84, &overS)) currentMenuPage = MenuPages_Singleplayer;
+        RenderFormattedText(560,292, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"SINGLEPLAYER");
+        RenderUIImage(510,278, 32,32, overS ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,458, 574,84, &overM)) currentMenuPage = MenuPages_Multiplayer;
+        RenderFormattedText(560,412, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"MULTIPLAYER");
+        RenderUIImage(510,398, 32,32, overM ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,582, 574,84, &overO)) currentMenuPage = MenuPages_Options;
+        RenderFormattedText(560,536, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"OPTIONS");
+        RenderUIImage(510,522, 32,32, overO ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,702, 574,84, &overQ)) OS_Exit(0);
+        RenderFormattedText(560,656, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT");
+        RenderUIImage(510,640, 32,32, overQ ? 1029 : 1028); // Menu pad
     } else if (currentMenuPage == MenuPages_Singleplayer) {
-        RenderFormattedText(RelX(250),RelY(50),TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
-        RenderFormattedText(RelX(250),RelY(46),TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
-        RenderFormattedText(RelX(250),RelY(48),TEXT_GREEN_MENU,FONT_STOPD,1.75f,"SINGLEPLAYER");
-        bool overS = false, overM = false, overO = false, overQ = false;
-        if (UI_Button("CONTINUE", 560, 316, 200, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overS)) currentMenuPage = MenuPages_Load;
-        RenderUIImage(RelX(510), RelY(278), RelX(32), RelY(32), overS ? 1029 : 1028); // Menu pad
-        if (UI_Button("NEW GAME",  560, 436, 210, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overM)) currentMenuPage = MenuPages_NewGame;
-        RenderUIImage(RelX(510), RelY(398), RelX(32), RelY(32), overM ? 1029 : 1028); // Menu pad
-        if (UI_Button("PLAY INTRO",      560, 560, 224, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overO)) currentMenuPage = MenuPages_IntroVideo;
-        RenderUIImage(RelX(510), RelY(522), RelX(32), RelY(32), overO ? 1029 : 1028); // Menu pad
-        if (UI_Button("PLAY CREDITS",         560, 680, 244, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_LEFTER,1.0f,&overQ)) currentMenuPage = MenuPages_CreditsVideo;
-        RenderUIImage(RelX(510), RelY(640), RelX(32), RelY(32), overQ ? 1029 : 1028); // Menu pad
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
+        RenderFormattedText(250,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
+        RenderFormattedText(250,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
+        RenderFormattedText(250,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"SINGLEPLAYER");
+        bool overS = false, overM = false, overO = false, overQ = false, overBack = false;
+        if (UI_Button(408,340, 574,84, &overS)) currentMenuPage = MenuPages_Load;
+        RenderFormattedText(560,292, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"CONTINUE");
+        RenderUIImage(510,278,  32,32, overS ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,458, 574,84, &overM)) currentMenuPage = MenuPages_NewGame;
+        RenderFormattedText(560,412, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"NEW GAME");
+        RenderUIImage(510,398,  32,32, overM ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,582, 574,84, &overO)) currentMenuPage = MenuPages_IntroVideo;
+        RenderFormattedText(560,536, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"PLAY INTRO");
+        RenderUIImage(510,522,  32,32, overO ? 1029 : 1028); // Menu pad
+        if (UI_Button(408,702, 574,84, &overQ)) currentMenuPage = MenuPages_CreditsVideo;
+        RenderFormattedText(560,656, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"PLAY CREDITS");
+        RenderUIImage( 510,640, 32,32, overQ ? 1029 : 1028); // Menu pad
+        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
+        if (UI_Button(1060,758, 84,32, &overBack)) MenuGoBack();
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_Multiplayer) {
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
+        bool overBack = false;
+        RenderFormattedText(266,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"MULTIPLAYER");
+        RenderFormattedText(266,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"MULTIPLAYER");
+        RenderFormattedText(266,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"MULTIPLAYER");
+        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
+        if (UI_Button(1060,758, 84,32, &overBack)) MenuGoBack();
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_Options) {
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
+        bool overBack = false;
+        RenderFormattedText(238,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"CONFIGURATION");
+        RenderFormattedText(238,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"CONFIGURATION");
+        RenderFormattedText(238,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"CONFIGURATION");
+        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
+        if (UI_Button(1060,758, 84,32, &overBack)) MenuGoBack();
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_Load) {
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
-    } else if (currentMenuPage == MenuPages_Load) {
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
+        bool overBack = false;
+        RenderFormattedText(280,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"LOAD GAME");
+        RenderFormattedText(280,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"LOAD GAME");
+        RenderFormattedText(280,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"LOAD GAME");
+        RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
+        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
+        if (UI_Button(1060,758, 84,32, &overBack)) MenuGoBack();
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_Save) {
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
+        bool overBack = false;
+        RenderFormattedText(284,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"SAVE GAME");
+        RenderFormattedText(284,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"SAVE GAME");
+        RenderFormattedText(284,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"SAVE GAME");
+        RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
+        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
+        if (UI_Button(1060,758, 84,32, &overBack)) MenuGoBack();
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_NewGame) {
-        RenderUIImage(RelX(1060), RelY(724), RelX(84), RelY(36), 1252); // Back Button background
-        if (UI_Button("BACK", 1076, 756, 80, 24, TEXT_STOPD_RED,FONT_NORMAL,ALIGN_LEFTER,1.0f,NULL)) MenuGoBack();
+        bool overBack = false, overStart = false;
+        RenderFormattedText(290,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"NEW GAME");
+        RenderFormattedText(290,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"NEW GAME");
+        RenderFormattedText(290,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"NEW GAME");
+        RenderUIImage(136,196,1088,558,1048); // Newgame inset
+        RenderUIImage(136,196,1088,558,1049); // Newgame background
+        RenderUIImage(1060,724,84,36,1252); // Back Button background
+        RenderFormattedText(220,146,TEXT_STOPD_RED,FONT_STOPD,1.5f,"NAME");
+        RenderUIImage(297,217,32,32, 1028); // Menu pad
+        RenderFormattedText(145,202,TEXT_STOPD_RED,FONT_STOPD,1.5f,"COMBAT");
+        RenderUIImage(185,301,32,32,1028); // Menu pad
+        RenderFormattedText(145,330,TEXT_STOPD_RED,FONT_STOPD,1.5f,"PUZZLE");
+        RenderUIImage(185,493,32,32, 1028); // Menu pad
+        RenderFormattedText(505,202,TEXT_STOPD_RED,FONT_STOPD,1.5f,"MISSION");
+        RenderUIImage(725,301,32,32, 1028); // Menu pad
+        RenderFormattedText(505,330,TEXT_STOPD_RED,FONT_STOPD,1.5f,"CYBERSPACE");
+        RenderUIImage(725,493,32,32,1028); // Menu pad
+        if (UI_Button(1060,758, 84,32, &overBack)) MenuGoBack();
+        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
+        if (UI_Button(544,747, 282,68, &overStart)) Sys_Global.menuActive = false;
+        RenderFormattedText(400,464,overStart ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"START");
     } else if (currentMenuPage == MenuPages_IntroVideo) {
 
     } else if (currentMenuPage == MenuPages_CreditsVideo) {
@@ -990,16 +1030,23 @@ static inline void RenderMenu(void) {
 }
 
 static inline void RenderPausedUI(void) {
-    RenderUIImage(RelX(519), RelY(276), RelX(328), RelY(300), 1025); // Pause Menu background
-    RenderUIImage(RelX(519), RelY(276), RelX(328), RelY(300), 1080); // Pause Menu background outline
-    RenderFormattedText(RelX(610),RelY(210),TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,"PAUSED");
-    if (UI_Button(  "RESUME",     683, 330, 157, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_CENTER,1.0f,NULL)) Sys_Global.gamePaused = false;
-    if (UI_Button(   "LOAD",      683, 388, 112, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_CENTER,1.0f,NULL)) { currentMenuPage = MenuPages_Load; Sys_Global.menuActive = true; returnToPause = true; }
-    if (UI_Button(   "SAVE",      683, 446, 104, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_CENTER,1.0f,NULL)) currentMenuPage = MenuPages_Save;
-    if (UI_Button(  "OPTIONS",    683, 504, 174, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_CENTER,1.0f,NULL)) { currentMenuPage = MenuPages_Options; Sys_Global.menuActive = true; returnToPause = true; }
-    if (UI_Button("QUIT TO MENU", 683, 562, 284, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_CENTER,1.0f,NULL)) { Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
-    RenderUIImage(RelX(519),RelY(672),RelX(328),RelY(42),1252); // Pause Quit Game background
-    if (UI_Button( "QUIT GAME",   683, 714, 216, 22, TEXT_STOPD_RED,FONT_STOPD,ALIGN_CENTER,1.0f,NULL)) OS_Exit(0);
+    bool overResume = false, overLoad /* ;) */ = false, overSave = false, overOptions = false, overQuitMenu = false, overQuit = false;
+    RenderUIImage(519,276,328,300,1025); // Pause Menu background
+    RenderUIImage(519,276,328,300,1080); // Pause Menu background outline
+    RenderFormattedText(610,210,TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,"PAUSED");
+    if (UI_Button(683,330, 157,22, &overResume)) Sys_Global.gamePaused = false;
+    RenderFormattedText(610,306,overResume ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"RESUME");
+    if (UI_Button(683,388, 112,22, &overLoad)) { currentMenuPage = MenuPages_Load; Sys_Global.menuActive = true; returnToPause = true; }
+    RenderFormattedText(610,364, overLoad ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"LOAD");
+    if (UI_Button(683,446, 104,22, &overSave)) { currentMenuPage = MenuPages_Save; Sys_Global.menuActive = true; returnToPause = true; }
+    RenderFormattedText(610,422,overSave ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"SAVE");
+    if (UI_Button(683,504, 174,22, &overOptions)) { currentMenuPage = MenuPages_Options; Sys_Global.menuActive = true; returnToPause = true; }
+    RenderFormattedText(610,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"OPTIONS");
+    if (UI_Button(683,562, 284,22, &overQuitMenu)) { Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
+    RenderFormattedText(610,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT TO MENU");
+    RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
+    if (UI_Button(683,714, 216,22, &overQuit)) OS_Exit(0);
+    RenderFormattedText(610,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT GAME");
 }
 
 static inline double RenderUI(void) {
@@ -1011,25 +1058,21 @@ static inline double RenderUI(void) {
     if (Sys_Cheats.noHUD) return get_time(); // NO HUD BARRIER =====================
     
     // Diagnostics / Debugging
-    float debugTextStartY = GetScreenRelativeY(0.075f);
-    float leftPad = RelX(16);
-    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
-    float lineSpacing = GetScreenRelativeY(genericTextHeightFac);
-    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
-    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive) RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
-    RenderFormattedText(leftPad, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d", cursorPosition_x, cursorPosition_y);
-    if (Sys_Cheats.consoleActive) RenderFormattedText(leftPad, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
-    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(leftPad + (Sys_Settings.ScreenWidth / 2) - 220, Sys_Settings.ScreenCenterY - GetScreenRelativeY(0.30f + (genericTextHeightFac * 2.0f)), TEXT_WHITE, FONT_NORMAL,1.0f, "%s",statusText);
+    int16_t debugTextStartY = 58;
+    if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
+    int16_t lineSpacing = 18;
+    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d", cursorPosition_x, cursorPosition_y);
+    if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
+    if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
-    float shootModeWidth = GetScreenRelativeX(0.01639f), shootModeHeight = GetScreenRelativeX(0.01639f);
-    float shootModePos_x = GetScreenRelativeX(0.5f) - (shootModeWidth * 0.5f);
-    float shootModePos_y = 0.0f;
-    if (!Sys_Global.gamePaused) RenderUIImage(shootModePos_x, shootModePos_y, shootModeWidth, shootModeHeight, 1020); // Shoot mode button
+    if (!Sys_Global.gamePaused) RenderUIImage(672,0,22,22,1020); // Shoot mode button
         bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
         if (Sys_Global.inventoryMode) {
-            if (CursorIsOverBounds(shootModePos_x, shootModePos_x + shootModeWidth, shootModePos_y + shootModeHeight, shootModePos_y)) {
+            if (CursorIsOverBounds(672,694,22,0)) {
                 if (mouseReleased) {
                     Sys_Global.inventoryMode = false;
                     cursorPosition_x = Sys_Settings.ScreenWidth / 2;
@@ -1047,8 +1090,8 @@ static inline double RenderUI(void) {
         if (vabs(Sys_Dx.thisFrameTime - Sys_Dx.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
         if (Sys_Dx.thisFrameTime > 6.944444) timingColor = TEXT_RED;
         Sys_Dx.drawCallsRenderedThisFrame += 2; Sys_Dx.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
-        RenderFormattedText(leftPad, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
-        RenderFormattedText(leftPad + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
+        RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
     }
     
     return time_now;
@@ -1233,10 +1276,8 @@ void Render(void) {
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
     bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
     uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
-    float cursorSize = (float)Sys_Settings.ScreenWidth * CURSOR_SCREEN_PERCENTAGE * (menuOrInventoryCursorStyle ? 3.0f : 1.0f);
-    float cursorHalfSize = cursorSize * 0.5f;
-    if (CursorVisible()) RenderUIImage(cursorPosition_x - cursorHalfSize, cursorPosition_y - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
-    else RenderUIImage(Sys_Settings.ScreenCenterX - cursorHalfSize, Sys_Settings.ScreenCenterY - cursorHalfSize, cursorSize, cursorSize, cursorTexture);
+    if (CursorVisible()) RenderUIImage((int16_t)(cursorPosition_x) - 20, (int16_t)(cursorPosition_y) - 20, 40,40, cursorTexture);
+    else RenderUIImage(683-20,371, 40,40, cursorTexture);
     
     if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
         Sys_Dx.lastFrameSecCountTime = Sys_Global.last_time;
