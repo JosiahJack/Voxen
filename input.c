@@ -3,6 +3,7 @@
 InputSystem Sys_Input;
 extern uint16_t editModeTestEntityDefinition;
 extern uint16_t editModeSelection;
+bool mouseMovementThisFrame;
 
 SettingsSystem Sys_Settings = { // Potato defaults so initial state is good on first run for potatoes (e.g. won't crash for out of VRAM, or won't take 5min to init).
     .InputCodeSettings = {
@@ -406,10 +407,12 @@ int32_t Input_MouseMove(int32_t xrel, int32_t yrel) {
         int32_t newX = cursorPosition_x + xrel;
         if (newX > Sys_Settings.ScreenWidth) newX = Sys_Settings.ScreenWidth;
         if (newX < 0) newX = 0;
+        if (newX != cursorPosition_x) mouseMovementThisFrame = true;
         cursorPosition_x = newX;
         int32_t newY = cursorPosition_y + yrel;
         if (newY > Sys_Settings.ScreenHeight) newY = Sys_Settings.ScreenHeight;
         if (newY < 0) newY = 0;
+        if (newY != cursorPosition_y) mouseMovementThisFrame = true;
         cursorPosition_y = newY;
     }
     

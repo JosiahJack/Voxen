@@ -4,23 +4,23 @@
 	float cyberHealth = -1f; //save
 	float maxhealth; // maximum health
 	int index; // NPC Index
-	public bool isPlayer = false;
-	public bool isGrenade = false;
-	public bool gibOnDeath = false; // used for things like crates to "gib" and shatter
-	public bool dropItemsOnGib = false;
-    public bool vaporizeCorpse = true;
-	public bool isNPC = false;
-	public bool isObject = false;
-	public bool isIce = false;
-	public bool isSecCamera = false;
-	public bool teleportOnDeath = false;
-	public bool actAsCorpseOnly = false;
-	public bool gibsGetVelocity = false;
-	public Vector3 gibVelocityBoost;
-	public PoolType deathFX;
-	public BloodType bloodType;
-	public string targetOnDeath;
-	public bool inCyberSpace = false; // Externally modifiable
+	bool isPlayer = false;
+	bool isGrenade = false;
+	bool gibOnDeath = false; // used for things like crates to "gib" and shatter
+	bool dropItemsOnGib = false;
+    bool vaporizeCorpse = true;
+	bool isNPC = false;
+	bool isObject = false;
+	bool isIce = false;
+	bool isSecCamera = false;
+	bool teleportOnDeath = false;
+	bool actAsCorpseOnly = false;
+	bool gibsGetVelocity = false;
+	Vector3 gibVelocityBoost;
+	PoolType deathFX;
+	BloodType bloodType;
+	string targetOnDeath;
+	bool inCyberSpace = false; // Externally modifiable
 
 	// Internal references
 	GameObject attacker;
@@ -35,14 +35,10 @@
 	TargetID linkedTargetID;
 	bool awakeInitialized = false;
 	bool startInitialized = false;
-	private bool isScreen = false;
 
 	public void Awake () {
 		if (awakeInitialized) return;
 
-		prefID = GetComponent<PrefabIdentifier>();
-		if (prefID == null) prefID = transform.parent.gameObject.GetComponent<PrefabIdentifier>();
-		isScreen = (prefID.constIndex == 279);
         attacker = null;
 		take = 0;
 		if (isPlayer) {
@@ -226,10 +222,8 @@
 		return take;
 	}
 
-	public float TakeDamage(DamageData dd) {
-		if (dd == null) return 0;
-		if (dd.damage <= 0) return 0; // Ah!! scaryy!! cannot divide by 0, let's get out of here!
-		if (god) return 0; // untouchable!
+	float TakeDamage(uint16_t this, DamageData dd) {
+		if (this.god) return 0; // untouchable!
 
         tempFloat = health;
 		if (IsCyberEntity()) {
@@ -240,7 +234,7 @@
 
 		// Object is dead exceptions.
 		if (tempFloat <= 0) {
-			if (gibOnDeath || isIce || isPlayer || isGrenade || isScreen || isSecCamera || teleportOnDeath) return 0;
+			if (gibOnDeath || isIce || isPlayer || isGrenade || instances[selfIdx].index == 279 || isSecCamera || teleportOnDeath) return 0;
 		}
 
 		take = dd.damage;
@@ -400,7 +394,7 @@
 			if (isIce) Utils.DisableCollision(gameObject);
 			if (vaporizeCorpse && !isSecCamera && !isGrenade) VaporizeCorpse(energyVaporized);
 			else if (isObject) ObjectDeath();
-			else if (isScreen) ScreenDeath();
+			else if (instances[selfIdx].index == 279) ScreenDeath();
 			else if (teleportOnDeath) TeleportAway();
 			else if (isGrenade) GrenadeDeath();
 
@@ -553,7 +547,7 @@
 		}
 
 		DropSearchables();
-		if (!isScreen) Utils.DisableCollision(gameObject);
+		if (instances[selfIdx].index != 279) Utils.DisableCollision(gameObject);
 		AIController aic = GetComponent<AIController>();
 		if (aic != null) {
 			if (aic.healthManager.gibOnDeath) { // We are a corpse here.
@@ -631,7 +625,7 @@
 	}
 
 	void HideSelf() {
-		if (isScreen) return;
+		if (instances[selfIdx].index == 279) return;
 
 		if (isSecCamera) {
 			PrefabIdentifier pid = transform.parent.gameObject.GetComponent<PrefabIdentifier>();
@@ -709,7 +703,7 @@
 		}
 
 		// Handle screens
-		if (isScreen) {
+		if (instances[selfIdx].index == 279) {
 			if (health > 0) {
 				ImageSequenceTextureArray ista = GetComponent<ImageSequenceTextureArray>();
 				if (ista != null) {

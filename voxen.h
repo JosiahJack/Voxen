@@ -1549,8 +1549,6 @@ void SetSkyRotateSpeed(void);
 #define TEXT_GREEN_MENU 9
 #define TEXT_GREEN_MENU_SHADOW 10
 #define TEXT_GREEN_MENU_GLOW 11
-extern uint8_t currentMenuPage;
-extern bool typingSaveGame;
 extern bool returnToPause;
 extern char** audiologNames;
 extern char** audiologSubjects;
@@ -1563,6 +1561,7 @@ extern float fixedNumberAdvanceWidthStopD;
 extern float genericTextHeightFacStopD;
 extern float genericTextWidthFacStopD;
 extern float genericTextHeightFac;
+extern bool mouseMovementThisFrame;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
 extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];

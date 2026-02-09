@@ -54,8 +54,7 @@ public class DamageData {
 		damageData.impactVelocity = 0f;
 	}
 
-	public static DamageData SetNPCData (int NPCindex, int attackNum,
-											   GameObject ownedBy) {
+	DamageData SetNPCData (int NPCindex, int attackNum, uint16_t ownedBy) {
 		if (NPCindex < 0 || NPCindex > 28) {
 			NPCindex = 0;
 			DualLog("BUG: NPCindex incorrect on NPC.  Not 0 to 28 on NPC at: "
