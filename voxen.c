@@ -1004,18 +1004,36 @@ static inline void RenderMenu(void) {
         RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_Options) {
         menuTabCount = 3;
-             if (currentMenuTab == 0) menuItemCount = 12; // Graphics 
-        else if (currentMenuTab == 1) menuItemCount = 49; // Input
-        else                          menuItemCount = 10; // Audio / Lang
-
         bool overBack = false;
         RenderFormattedText(238,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"CONFIGURATION");
         RenderFormattedText(238,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"CONFIGURATION");
         RenderFormattedText(238,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"CONFIGURATION");
-        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
-        if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
+        RenderUIImage(179,220, 1001,552, 1030); // Config background
+        RenderUIImage(520,196, 160,30, currentMenuTab == 2 ? 920 : 921); // Config tab unhighlighted
+        RenderFormattedText(530,202,currentMenuTab == 2 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"AUDIO / LANG");
+        RenderUIImage(354,196, 160,30, currentMenuTab == 1 ? 920 : 921); // Config tab unhighlighted
+        RenderFormattedText(366,202,currentMenuTab == 1 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"INPUT");
+        RenderUIImage(190,196, 160,30, currentMenuTab == 0 ? 920 : 921); // Config tab highlighted
+        RenderFormattedText(200,202,currentMenuTab == 0 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"GRAPHICS");
+        if (currentMenuTab == 0) {
+            bool overDetails = false;
+            menuItemCount = 12; // Graphics
+            RenderUIImage(200,500, 16,16, 910); // Checkbox background
+            if (UI_Button(200,516, 16,16, &overDetails, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Settings.ModelDetail = Sys_Settings.ModelDetail == 1u ? 0u : 1u;
+            overDetails = overDetails || currentMenuItem == 0;
+            if (Sys_Settings.ModelDetail) RenderUIImage(202,502, 12,12, 912); // Checkbox check
+            RenderFormattedText(220,500,overDetails ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"DETAILED MODELS");
+        } else if (currentMenuTab == 1) {
+            menuItemCount = 49; // Input
+        } else {
+            menuItemCount = 10; // Audio / Lang
+        }
+        
+        RenderUIImage(1087,723, 84,36, 1252); // Back Button background
+        int8_t lastItem = menuItemCount - 1;
+        if (UI_Button(1087,757, 84,32, &overBack, lastItem) || (MenuEnter() && currentMenuItem == lastItem)) MenuGoBack();
+        overBack = overBack || currentMenuItem == lastItem;
+        RenderFormattedText(1103,731,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
     } else if (currentMenuPage == MenuPages_Load) {
         menuItemCount = 9; menuTabCount = 1;
         bool overBack = false;
