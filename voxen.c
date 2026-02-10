@@ -289,13 +289,7 @@ void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t
     float y1 = ypos + RelY(height);
     float z = 0.0f;
     float vertices[30] = {xpos,y1,z,0.0f,0.0f,x1,ypos,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,xpos,y1,z,0.0f,0.0f,xpos,ypos,z,0.0f,1.0f,x1,ypos,z,1.0f,1.0f};
-    glUniform1ui(18,texIndex);
-    if (texIndex >= MAX_VALID_TEXTURE) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
-        glUniform1i(21, 4); // outputImage texture sampler2D
-    }
-    
+    glUniform1ui(18,texIndex);    
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES,0,6);
     Sys_Dx.drawCallsRenderedThisFrame++;
@@ -966,6 +960,7 @@ static inline void RenderMenu(void) {
     if (Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_B].pressed && currentMenuPage != MenuPages_FrontPage) { MenuGoBack(); return; } // TODO Android Back button
     
     if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
+    if (currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
     if (currentMenuPage == MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1032); // Menu background
     if (currentMenuPage == MenuPages_FrontPage) {
         menuItemCount = 4; menuTabCount = 1;
@@ -973,20 +968,20 @@ static inline void RenderMenu(void) {
         bool overS = false, overM = false, overO = false, overQ = false;
         if (UI_Button(408,340, 574,84, &overS, 0) || (MenuEnter() && currentMenuItem == 0)) ChangeMenuPage(MenuPages_Singleplayer);
         overS = overS || currentMenuItem == 0;
-        RenderFormattedText(560,292, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"SINGLEPLAYER");
-        RenderUIImage(510,278, 32,32, overS ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,188, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"SINGLEPLAYER");
+        RenderUIImage(430,278, 32,32, overS ? 1029 : 1028); // Menu pad
         if (UI_Button(408,458, 574,84, &overM, 1) || (MenuEnter() && currentMenuItem == 1)) ChangeMenuPage(MenuPages_Multiplayer);
         overM = overM || currentMenuItem == 1;
-        RenderFormattedText(560,412, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"MULTIPLAYER");
-        RenderUIImage(510,398, 32,32, overM ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,268, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"MULTIPLAYER");
+        RenderUIImage(430,398, 32,32, overM ? 1029 : 1028); // Menu pad
         if (UI_Button(408,582, 574,84, &overO, 2) || (MenuEnter() && currentMenuItem == 2)) ChangeMenuPage(MenuPages_Options);
         overO = overO || currentMenuItem == 2;
-        RenderFormattedText(560,536, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"OPTIONS");
-        RenderUIImage(510,522, 32,32, overO ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,350, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"OPTIONS");
+        RenderUIImage(430,522, 32,32, overO ? 1029 : 1028); // Menu pad
         if (UI_Button(408,702, 574,84, &overQ, 3) || (MenuEnter() && currentMenuItem == 3)) OS_Exit(0);
         overQ = overQ || currentMenuItem == 3;
-        RenderFormattedText(560,656, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT");
-        RenderUIImage(510,640, 32,32, overQ ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,430, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"QUIT");
+        RenderUIImage(430,640, 32,32, overQ ? 1029 : 1028); // Menu pad
     } else if (currentMenuPage == MenuPages_Singleplayer) {
         menuItemCount = 5; menuTabCount = 1;
         RenderFormattedText(250,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
@@ -995,20 +990,20 @@ static inline void RenderMenu(void) {
         bool overS = false, overM = false, overO = false, overQ = false, overBack = false;
         if (UI_Button(408,340, 574,84, &overS, 0) || (MenuEnter() && currentMenuItem == 0)) ChangeMenuPage(MenuPages_Load);
         overS = overS || currentMenuItem == 0;
-        RenderFormattedText(560,292, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"CONTINUE");
-        RenderUIImage(510,278,  32,32, overS ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,188, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"CONTINUE");
+        RenderUIImage(430,278,  32,32, overS ? 1029 : 1028); // Menu pad
         if (UI_Button(408,458, 574,84, &overM, 1) || (MenuEnter() && currentMenuItem == 1)) ChangeMenuPage(MenuPages_NewGame);
         overM = overM || currentMenuItem == 1;
-        RenderFormattedText(560,412, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"NEW GAME");
-        RenderUIImage(510,398,  32,32, overM ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,268, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"NEW GAME");
+        RenderUIImage(430,398,  32,32, overM ? 1029 : 1028); // Menu pad
         if (UI_Button(408,582, 574,84, &overO, 2) || (MenuEnter() && currentMenuItem == 2)) ChangeMenuPage(MenuPages_IntroVideo);
         overO = overO || currentMenuItem == 2;
-        RenderFormattedText(560,536, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"PLAY INTRO");
-        RenderUIImage(510,522,  32,32, overO ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,350, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"PLAY INTRO");
+        RenderUIImage(430,522,  32,32, overO ? 1029 : 1028); // Menu pad
         if (UI_Button(408,702, 574,84, &overQ, 3) || (MenuEnter() && currentMenuItem == 3)) ChangeMenuPage(MenuPages_CreditsVideo);
         overQ = overQ || currentMenuItem == 3;
-        RenderFormattedText(560,656, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"PLAY CREDITS");
-        RenderUIImage( 510,640, 32,32, overQ ? 1029 : 1028); // Menu pad
+        RenderFormattedText(320,430, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"PLAY CREDITS");
+        RenderUIImage(430,640, 32,32, overQ ? 1029 : 1028); // Menu pad
         RenderUIImage(1060,724, 84,36, 1252); // Back Button background
         if (UI_Button(1060,758, 84,32, &overBack, 4) || (MenuEnter() && currentMenuItem == 4)) MenuGoBack();
         overBack = overBack || currentMenuItem == 4;
@@ -1039,9 +1034,7 @@ static inline void RenderMenu(void) {
         RenderFormattedText(200,202,currentMenuTab == 0 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"GRAPHICS");
         if (currentMenuTab == 0) {
             bool overDetails = false, overAA = false, overShadows = false, overSSR = false, overVsync = false, overFOV = false;
-            menuItemCount = 12; // Graphics
-            RenderUIImage(424,226, 750,422, 2048); // Config rendered view
-            
+            menuItemCount = 12; // Graphics            
             RenderUIImage(200,500, 16,16, 910); // Checkbox background
             if (UI_Button(200,516, 210,16, &overDetails, 0) || (MenuEnter() && currentMenuItem == 0)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail == 1u ? 0u : 1u; SaveConfig(); }
             overDetails = overDetails || currentMenuItem == 0;
@@ -1503,13 +1496,13 @@ int32_t main(int32_t argc, char* argv[]) {
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
-        if (!Sys_Global.gamePaused || Sys_Global.menuActive) { // Update Gameplay
+        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) { // Update Gameplay
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
             UpdateAmbientSounds();
             UpdateAnims();
-        }
+        } else if (Sys_Global.menuActive) UpdateAnims();
         
         Sys_Global.timeSinceLastPhysicsTick = Sys_Global.pauseRelativeTime - Sys_Global.last_physics_time;
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive && Sys_Global.timeSinceLastPhysicsTick > (1.0 / 144.0)) {
@@ -1517,7 +1510,7 @@ int32_t main(int32_t argc, char* argv[]) {
             Physics();
         }
         
-        /*if (!Sys_Global.gamePaused && !Sys_Global.menuActive) */UpdateVoxelsAndInstances();
+        if (!Sys_Global.gamePaused || Sys_Global.menuActive) UpdateVoxelsAndInstances();
         Render();
         InputClearRisingAndFallingEdges();
         Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;

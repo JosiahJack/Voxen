@@ -107,7 +107,7 @@ void InitAfterLoad(void) { // Init entities after level load and after already h
             else { StringCopyInto_A_From_B(SELF.currenttarget,SELF.target2,TARGET_STRING_LENGTH); flag_set(&SELF.ioflags,TARG_IOFLAGS_ON_SECOND,true); }
         }
     }
-    
+
     float levelMinFloor = FLT_MAX;
     float levelMaxCeil = -FLT_MAX;
     for (int i=0;i<ARRSIZE;++i) { //        Using 1.0f buffer for floating point innaccuracies
