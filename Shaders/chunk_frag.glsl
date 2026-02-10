@@ -25,6 +25,7 @@ layout(location = 17) uniform uint unlit;
 layout(location = 18) uniform uint texIndex;
 layout(location = 19) uniform uint glowIndex;
 layout(location = 20) uniform uint specIndex;
+layout(location = 21) uniform sampler2D outputImage;
 
 layout(location = 0) out vec4 outAlbedo;   // GL_COLOR_ATTACHMENT0
 layout(location = 1) out vec4 outWorldPos; // GL_COLOR_ATTACHMENT1
@@ -123,16 +124,23 @@ vec2 EncodeOctahedral(vec3 n) {
     return n.z >= 0.0 ? p : (1.0 - abs(p.yx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.y >= 0.0 ? 1.0 : -1.0);
 }
 
+const int MAX_VALID_TEXTURE = 2048;
+
 void main() {
     vec3 worldPos = FragPos.xyz;
     vec3 viewDir = (camPos - worldPos);
     float distToPixel = length(viewDir);
     viewDir = normalize(viewDir);
-    ivec2 texSize = textureSizes[texIndex];
+    ivec2 texSize = texIndex >= MAX_VALID_TEXTURE ? ivec2(int(screenWidth), int(screenHeight)) : textureSizes[texIndex];
     vec2 uv = (vec2(TexCoord.x, 1.0 - TexCoord.y)); // Invert V (aka Y), OpenGL convention vs import
     ivec2 texUV = ivec2(int(floor(uv.x * float(texSize.x))), int(floor(uv.y * float(texSize.y))));
     texUV.x = texUV.x % texSize.x;
     texUV.y = texUV.y % texSize.y;
+    if (texIndex >= MAX_VALID_TEXTURE) { // Config render view
+        outAlbedo.rgb = vec3(0.0,0.0,0.0);//texture(outputImage, texUV).rgb;
+        return;
+    }
+
     vec4 albedoColor = getTextureColor(texIndex,texUV);
     if (albedoColor.a < 0.05) discard; // Alpha cutout threshold
 
@@ -173,7 +181,7 @@ void main() {
     texUVSpec.x = texUVSpec.x % texSizeSpec.x;
     texUVSpec.y = texUVSpec.y % texSizeSpec.y;
     specColor = getTextureColor(specIndex,texUVSpec);
-    if (reflectionsEnabled > 0) {
+    if (reflectionsEnabled > 0 && isUI == 0) {
         outSpecular = specColor;
         vec4 worldPosPack = vec4(FragPos.xyz, 0.0);
         outWorldPos = worldPosPack;

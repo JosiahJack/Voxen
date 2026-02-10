@@ -233,14 +233,6 @@ void ApplySettings(void) {
     SetGI();
     SetSpeakerMode();
     SetLanguage();
-    glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glUniform1ui(5, Sys_Settings.Reflections);
-    glUniform1ui(6, Sys_Settings.AntiAliasing);
-    glUniform1f(14, Sys_Settings.FOV);
-    glUniform1f(16, (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
-    glUniform1ui(22, Sys_Settings.Shadows);
-    glUseProgram(Sys_Render.chunkShaderProgram);
-    glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
 //     DualLog("Applied configuration settings\n");
     // TODO: Render config view on the menu
 }
@@ -311,13 +303,13 @@ static void joystick_callback(int32_t jid, int32_t event) {
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     if (Sys_Input.window_has_focus) {
-        int32_t dx = (int32_t)(xpos - Sys_Input.last_mouse_x);
-        int32_t dy = (int32_t)(ypos - Sys_Input.last_mouse_y);
+        Sys_Input.currentMouse_dx = (int32_t)(xpos - Sys_Input.last_mouse_x);
+        Sys_Input.currentMouse_dy = (int32_t)(ypos - Sys_Input.last_mouse_y);
         Sys_Input.last_mouse_x = xpos;
         Sys_Input.last_mouse_y = ypos;
         if (Sys_Input.ignore_next_mouse_delta) { Sys_Input.ignore_next_mouse_delta = false; return; }
         
-        if (Sys_Dx.globalFrameNum > 1) Input_MouseMove(dx,dy);
+        if (Sys_Dx.globalFrameNum > 1) Input_MouseMove(Sys_Input.currentMouse_dx,Sys_Input.currentMouse_dy);
     }
 }
 

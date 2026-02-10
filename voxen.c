@@ -161,8 +161,6 @@ Quaternion cubemapOrientationQuaternion[6] = {
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 bool UpdateLights(bool* voxelsNeedUpdated) {
-    if (Sys_Global.gamePaused || Sys_Global.menuActive) return false;
-    
     for (uint16_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {        
         if (lightDirty[lightIdx]) { // Marked all as true at level load.
             *voxelsNeedUpdated = true;
@@ -202,29 +200,31 @@ bool UpdateLights(bool* voxelsNeedUpdated) {
             }
         }
     }
-        
-    for (int i=0;i<loadedLights;++i) { // Just lerps/flickers in intensity
-        if (lightIntervalStepsLength[i] < 1) continue;
-        
-        int litIdx = i * LIGHT_DATA_SIZE;
-        if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
+    
+    if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+        for (int i=0;i<loadedLights;++i) { // Just lerps/flickers in intensity
+            if (lightIntervalStepsLength[i] < 1) continue;
+            
+            int litIdx = i * LIGHT_DATA_SIZE;
+            if (!lightOn[i]) { lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightMinIntensity[i]; continue; }
 
-        float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
-        if (lightLerpTime[i] < (float)Sys_Global.pauseRelativeTime) {
-            lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
-            lightLerpUp[i] = !lightLerpUp[i];
-            lightCurrentStep[i]++;
-            if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0; // Wrap and start over continuous looping
-            lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
-            lightLerpTime[i] = (float)Sys_Global.pauseRelativeTime + lightLerpStepTime[i];
-            lightLerpStartTime[i] = (float)Sys_Global.pauseRelativeTime;
-        } else if (lightLerpOn[i]) {
-            if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
-                if (intervalStepisLerping[i][lightCurrentStep[i]]) {
-                    lightLerpValue[i] = ((float)Sys_Global.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
-                    float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
-                    lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * lerpVal);
-                    lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+            float differenceInIntensity = (lightMaxIntensity[i] - lightMinIntensity[i]);
+            if (lightLerpTime[i] < (float)Sys_Global.pauseRelativeTime) {
+                lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpUp[i] ? lightMaxIntensity[i] : lightMinIntensity[i]; // Pick target to lerp towards
+                lightLerpUp[i] = !lightLerpUp[i];
+                lightCurrentStep[i]++;
+                if (lightCurrentStep[i] >= lightIntervalStepsLength[i]) lightCurrentStep[i] = 0; // Wrap and start over continuous looping
+                lightLerpStepTime[i] = lightIntervalSteps[i][lightCurrentStep[i]];
+                lightLerpTime[i] = (float)Sys_Global.pauseRelativeTime + lightLerpStepTime[i];
+                lightLerpStartTime[i] = (float)Sys_Global.pauseRelativeTime;
+            } else if (lightLerpOn[i]) {
+                if (lightCurrentStep[i] < lightIntervalStepIsLerpingLength[i]) {
+                    if (intervalStepisLerping[i][lightCurrentStep[i]]) {
+                        lightLerpValue[i] = ((float)Sys_Global.pauseRelativeTime - lightLerpStartTime[i])/(lightLerpTime[i] - lightLerpStartTime[i]); // percent towards goal time
+                        float lerpVal = lightLerpUp[i] ? (lightLerpValue[i]) : (1.0f - lightLerpValue[i]);
+                        lightLerpValue[i] = lightMinIntensity[i] + (differenceInIntensity * lerpVal);
+                        lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY] = lightLerpValue[i];
+                    }
                 }
             }
         }
@@ -290,6 +290,12 @@ void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t
     float z = 0.0f;
     float vertices[30] = {xpos,y1,z,0.0f,0.0f,x1,ypos,z,1.0f,1.0f,x1,y1,z,1.0f,0.0f,xpos,y1,z,0.0f,0.0f,xpos,ypos,z,0.0f,1.0f,x1,ypos,z,1.0f,1.0f};
     glUniform1ui(18,texIndex);
+    if (texIndex >= MAX_VALID_TEXTURE) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
+        glUniform1i(21, 4); // outputImage texture sampler2D
+    }
+    
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES,0,6);
     Sys_Dx.drawCallsRenderedThisFrame++;
@@ -932,6 +938,20 @@ uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8
     return 0u;
 }
 
+uint8_t UI_Slider(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
+    float width = RelX(w); float height = RelY(h);
+    float xpos = RelX(x); float ypos = RelY(y) - height;
+    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
+    if (cursorIsOver && mouseMovementThisFrame) {
+        currentMenuItem = this;
+        if (cursorOver != NULL) *cursorOver = cursorIsOver;
+    }
+    
+    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].down && cursorIsOver) return 1u;
+    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down && cursorIsOver) return 2u;
+    return 0u;
+}
+
 void MenuGoBack(void) {
     if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; }
     if (currentMenuPage == MenuPages_Singleplayer || currentMenuPage == MenuPages_Multiplayer || currentMenuPage == MenuPages_Options) currentMenuPage = MenuPages_FrontPage;//News
@@ -941,11 +961,12 @@ void MenuGoBack(void) {
 bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
 void ChangeMenuPage(MenuPages pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
 
+bool fovSliderActive = false;
 static inline void RenderMenu(void) {
-    if (mouseMovementThisFrame) DualLog("Mouse movement detected %u\n", Sys_Dx.globalFrameNum);
     if (Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_B].pressed && currentMenuPage != MenuPages_FrontPage) { MenuGoBack(); return; } // TODO Android Back button
     
-    if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
+    if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
+    if (currentMenuPage == MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1032); // Menu background
     if (currentMenuPage == MenuPages_FrontPage) {
         menuItemCount = 4; menuTabCount = 1;
         RenderUIImage(282,46, 800,128, 1031); // Title CITADEL with strikethrough effect
@@ -1008,7 +1029,8 @@ static inline void RenderMenu(void) {
         RenderFormattedText(238,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"CONFIGURATION");
         RenderFormattedText(238,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"CONFIGURATION");
         RenderFormattedText(238,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"CONFIGURATION");
-        RenderUIImage(179,220, 1001,552, 1030); // Config background
+        if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030); // Config background
+        if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033); // Config background graphics (empty alpha center)
         RenderUIImage(520,196, 160,30, currentMenuTab == 2 ? 920 : 921); // Config tab unhighlighted
         RenderFormattedText(530,202,currentMenuTab == 2 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"AUDIO / LANG");
         RenderUIImage(354,196, 160,30, currentMenuTab == 1 ? 920 : 921); // Config tab unhighlighted
@@ -1016,13 +1038,55 @@ static inline void RenderMenu(void) {
         RenderUIImage(190,196, 160,30, currentMenuTab == 0 ? 920 : 921); // Config tab highlighted
         RenderFormattedText(200,202,currentMenuTab == 0 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"GRAPHICS");
         if (currentMenuTab == 0) {
-            bool overDetails = false;
+            bool overDetails = false, overAA = false, overShadows = false, overSSR = false, overVsync = false, overFOV = false;
             menuItemCount = 12; // Graphics
+            RenderUIImage(424,226, 750,422, 2048); // Config rendered view
+            
             RenderUIImage(200,500, 16,16, 910); // Checkbox background
-            if (UI_Button(200,516, 16,16, &overDetails, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Settings.ModelDetail = Sys_Settings.ModelDetail == 1u ? 0u : 1u;
+            if (UI_Button(200,516, 210,16, &overDetails, 0) || (MenuEnter() && currentMenuItem == 0)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail == 1u ? 0u : 1u; SaveConfig(); }
             overDetails = overDetails || currentMenuItem == 0;
             if (Sys_Settings.ModelDetail) RenderUIImage(202,502, 12,12, 912); // Checkbox check
             RenderFormattedText(220,500,overDetails ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"DETAILED MODELS");
+            
+            RenderUIImage(200,530, 16,16, 910); // Checkbox background
+            if (UI_Button(200,546, 210,16, &overAA, 1) || (MenuEnter() && currentMenuItem == 1)) { Sys_Settings.AntiAliasing = Sys_Settings.AntiAliasing == 1u ? 0u : 1u; SaveConfig(); }
+            overAA = overAA || currentMenuItem == 1;
+            if (Sys_Settings.AntiAliasing) RenderUIImage(202,532, 12,12, 912); // Checkbox check
+            RenderFormattedText(220,530,overAA ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"ANTIALIASING");
+            
+            RenderUIImage(200,560, 16,16, 910); // Checkbox background
+            if (UI_Button(200,576, 210,16, &overShadows, 2) || (MenuEnter() && currentMenuItem == 2)) { Sys_Settings.Shadows = Sys_Settings.Shadows == 1u ? 0u : 1u; SaveConfig(); }
+            overShadows = overShadows || currentMenuItem == 2;
+            if (Sys_Settings.Shadows) RenderUIImage(202,562, 12,12, 912); // Checkbox check
+            RenderFormattedText(220,560,overShadows ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"SHADOWS");
+            
+            RenderUIImage(200,590, 16,16, 910); // Checkbox background
+            if (UI_Button(200,606, 210,16, &overSSR, 3) || (MenuEnter() && currentMenuItem == 3)) { Sys_Settings.Reflections = Sys_Settings.Reflections == 1u ? 0u : 1u; SaveConfig(); }
+            overSSR = overSSR || currentMenuItem == 3;
+            if (Sys_Settings.Reflections) RenderUIImage(202,592, 12,12, 912); // Checkbox check
+            RenderFormattedText(220,590,overSSR ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"REFLECTIONS");
+            
+            RenderUIImage(200,620, 16,16, 910); // Checkbox background
+            if (UI_Button(200,636, 210,16, &overVsync, 4) || (MenuEnter() && currentMenuItem == 4)) { Sys_Settings.Vsync = Sys_Settings.Vsync == 1u ? 0u : 1u; SetVSync(); SaveConfig(); }
+            overVsync = overVsync || currentMenuItem == 4;
+            if (Sys_Settings.Vsync) RenderUIImage(202,622, 12,12, 912); // Checkbox check
+            RenderFormattedText(220,620,overVsync ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"VSYNC (FPS: %d)", Sys_Dx.framesPerLastSecond);
+            
+            float fovMin = 45.0f; float fovMax = 150.0f;
+            RenderUIImage(400,650, 128,16, 1079); // Slider background
+            RenderUIImage(400 + (((Sys_Settings.FOV - fovMin) / fovMax) * 112),650, 16,16, 1078); // Slider handle
+            if (UI_Slider(200,666, 328,16, &overFOV, 5)) fovSliderActive = true;
+            if (fovSliderActive && Sys_Input.currentMouse_dx != 0) {
+                int32_t new = (int32_t)Sys_Settings.FOV + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.FOV = (uint8_t)vmin(vmax(new,45),150); UpdateProjectionMatrices();
+            }
+            if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) fovSliderActive = false;
+            
+            bool shiftHeld = Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down;
+            if (MenuEnter() && currentMenuItem == 5) { Sys_Settings.FOV = (Sys_Settings.FOV == 150) ? 45 : Sys_Settings.FOV + (shiftHeld ? -5 : 5); UpdateProjectionMatrices(); }
+            overFOV = overFOV || currentMenuItem == 5;
+            RenderFormattedText(200,650,overFOV ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"FIELD OF VIEW %u", Sys_Settings.FOV);
+
+//             float gammaMin = 0.0f; float gammaMax = 100.0f;
         } else if (currentMenuTab == 1) {
             menuItemCount = 49; // Input
         } else {
@@ -1144,7 +1208,7 @@ static inline double RenderUI(void) {
     if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
     if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
     if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
-    RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d", cursorPosition_x, cursorPosition_y);
+    RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d   dx: %d dy: %d", cursorPosition_x, cursorPosition_y, Sys_Input.currentMouse_dx, Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
@@ -1260,29 +1324,6 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
     }
 }
 
-static inline void RenderInstances(float* viewProj, Vector3 playerPos) { // 4. Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-    glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
-    glUseProgram(Sys_Render.chunkShaderProgram);
-    glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
-    glUniform1ui(3, 0u); /* isUI false */
-    glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, false);
-    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, true);
-    if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-static inline void RenderSSR(float* viewProj, Vector3 playerPos) {
-    glUseProgram(Sys_Render.ssrShaderProgram);
-    glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-    glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
-    GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
-    GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
-    glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-}
-
 void Render(void) {
     Sys_Dx.drawCallsRenderedThisFrame = Sys_Dx.textDrawCallsRenderedThisFrame = Sys_Dx.uiImageDrawCallsRenderedThisFrame = Sys_Dx.shadowDrawCallsRenderedThisFrame = Sys_Dx.verticesRenderedThisFrame = 0; // Reset per frame
     
@@ -1308,48 +1349,74 @@ void Render(void) {
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
     float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
-    if (!Sys_Global.gamePaused && !Sys_Global.menuActive) {
+//     if (!Sys_Global.menuActive &&!Sys_Global.gamePaused) { // Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
         glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
         if (Sys_Settings.Shadows > 0u) RenderShadowmaps();
         memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
         memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-        RenderInstances(viewProj, playerPos);
-        if (Sys_Settings.Reflections > 0u) RenderSSR(viewProj, playerPos); // Screen Space Reflections
-    }
-
-    glUseProgram(Sys_Render.imageBlitShaderProgram);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
-    glUniform1i(4, 4); // outputImage texture sampler2D
-    double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
-    if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
-    glUniform1f(9, (float)berserkTimeRemainingNormalized);
-    glUniform1f(10, berserkSeedTime);
-    glUniform1ui(11, Sys_Settings.Brightness);
-    glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-    glUniform3f(13, px, py, pz);
-    glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
-    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
-    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
-    glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
-    uint32_t shieldOnType = 0u; // No shield green tint.
-    if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
-        if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-        else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
-    }
+        glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+        glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
+        glUseProgram(Sys_Render.chunkShaderProgram);
+        glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
+        glUniform1ui(3, 0u); /* isUI false */
+        glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
+        glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
+        RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, false);
+        RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, true);
+        if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        if (Sys_Settings.Reflections > 0u) { // Screen Space Reflections
+            glUseProgram(Sys_Render.ssrShaderProgram);
+            glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
+            glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
+            GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
+            GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
+            glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+        }
+//     }
     
-    glUniform1ui(20, shieldOnType);
-    Color painStaticColor = GetPainStaticColor();
-    glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
-    glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
-    glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
-    glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
-    glUniform1f(28, GetPainStatic());
-    glBindVertexArray(Sys_Render.quadVAO);
-    glDisable(GL_DEPTH_TEST);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    Sys_Dx.drawCallsRenderedThisFrame++;
-    Sys_Dx.verticesRenderedThisFrame += 4;
+//     if (!Sys_Global.menuActive) {
+        glUseProgram(Sys_Render.imageBlitShaderProgram);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
+        glUniform1i(4, 4); // outputImage texture sampler2D
+        double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
+        if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
+        glUniform1ui(5, Sys_Settings.Reflections);
+        glUniform1ui(6, Sys_Settings.AntiAliasing);
+        glUniform1f(14, Sys_Settings.FOV);
+        glUniform1f(16, (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
+        glUniform1ui(22, Sys_Settings.Shadows);
+        glUniform1f(9, (float)berserkTimeRemainingNormalized);
+        glUniform1f(10, berserkSeedTime);
+        glUniform1ui(11, Sys_Settings.Brightness);
+        glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+        glUniform3f(13, px, py, pz);
+        glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
+        glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
+        glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
+        glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+        uint32_t shieldOnType = 0u; // No shield green tint.
+        if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+            if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+            else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+        }
+        
+        glUniform1ui(20, shieldOnType);
+        Color painStaticColor = GetPainStaticColor();
+        glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
+        glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
+        glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
+        glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
+        glUniform1f(28, GetPainStatic());
+        glBindVertexArray(Sys_Render.quadVAO);
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        Sys_Dx.drawCallsRenderedThisFrame++;
+        Sys_Dx.verticesRenderedThisFrame += 4;
+//     }
+    
     Sys_Global.last_time = RenderUI();
     
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
@@ -1401,7 +1468,6 @@ static void UpdateVoxelsAndInstances(void) {
 }
 
 void UpdateAnims(void);
-
 #define ARG_IS(s, l) (argc >= 2 && (strcmp(argv[1], s) == 0 || strcmp(argv[1], l) == 0))
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();
@@ -1437,7 +1503,7 @@ int32_t main(int32_t argc, char* argv[]) {
         glfwPollEvents();
         ProcessInput(); // Calls ApplyPlayerMovements(), needs called without checking paused state for menus handling.
         if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdatePlayerFacingAngles();
-        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) { // Update Gameplay
+        if (!Sys_Global.gamePaused || Sys_Global.menuActive) { // Update Gameplay
             if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].released) Frob(instances[PLAYER1].position, instances[PLAYER1].forward, instances[PLAYER1].right);
             if (Sys_Global.current_time < Sys_Dx.debugLineFinished && (Sys_Dx.debugLineVertCount + 6) < (MAX_DEBUG_LINE_VERTS * 3)) AddDebugLine(Sys_Dx.debugLine_start, Sys_Dx.debugLine_end);
 //             for (uint16_t i=START_INDEX_LEVEL_INSTANCES;i<loadedInstances;++i) UpdateWhileNotPaused(i); // TODO Get new states prior to updating animations, physics event, or rendering
@@ -1451,9 +1517,10 @@ int32_t main(int32_t argc, char* argv[]) {
             Physics();
         }
         
-        if (!Sys_Global.gamePaused && !Sys_Global.menuActive) UpdateVoxelsAndInstances();
+        /*if (!Sys_Global.gamePaused && !Sys_Global.menuActive) */UpdateVoxelsAndInstances();
         Render();
         InputClearRisingAndFallingEdges();
+        Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
         Sys_Dx.globalFrameNum++;
         #ifdef DEBUG_RAM_OUTPUT
             if (Sys_Dx.globalFrameNum == 4) { DebugRAM("after 4 frames of running"); }

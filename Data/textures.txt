@@ -2086,6 +2086,12 @@ persistent: 1
 #Textures/UI/title.png
 index: 1031
 persistent: 1
+#Textures/UI/menu_background_config.png
+index: 1032
+persistent: 1
+#Textures/UI/menu_config_graphics.png
+index: 1033
+persistent: 1
 
 #Textures/UI/menu_load.png
 index: 1037

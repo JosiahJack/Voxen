@@ -120,11 +120,13 @@ typedef struct {
 	KeyState joystickHats[MAX_JOYSTICK_HATS]; // What can I say, I'm a man of many hats. ^^D
 	bool window_has_focus;
 	double last_mouse_x, last_mouse_y;
+    int32_t currentMouse_dx, currentMouse_dy;
 	double scrollDelta;
 	bool ignore_next_mouse_delta;
 	bool lastUse;
 	bool isCapsLockOn;
 } InputSystem;
+extern InputSystem Sys_Input;
 
 typedef struct {
 	uint32_t globalFrameNum;
@@ -1252,7 +1254,7 @@ void UpdateAmbientSounds(void);
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
-#define MAX_TOTAL_PIXELS 25600000u
+#define MAX_TOTAL_PIXELS 26400000u
 #define MAX_UNIQUE_COLORS 76800u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
@@ -1440,7 +1442,6 @@ RaycastHit CapsuleCast(Vector3 start, Vector3 end, float capsuleRadius, float ca
 void ApplyPlayerMovements(void);
 // ----------------------------------------------------------------------------
 // Input
-extern InputSystem Sys_Input;
 void CycleToNextMonitor(GLFWwindow* window);
 void Input_Init(GLFWwindow* window);
 void Input_MouselookApply(void);
@@ -1725,3 +1726,5 @@ void UpdateWhileNotPaused(uint16_t i);
 void ScreenShake (float force, double duration);
 void Shake(float force);
 void InitAfterLoad(void);
+void SetVSync(void);
+void UpdateProjectionMatrices(void);
