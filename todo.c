@@ -82,26 +82,3 @@ float GetPainStatic(void) { // TODO: Hook into pain/health management and shield
 Color GetPainStaticColor(void) { // TODO: Hook staticColor up to red or blue for pain or shield impact.
     return (Color){1.0f,0.0f,0.0f,1.0f};
 }
-
-double monitorSwitchTime;
-int currentMonitorIndex = 1; // Start on primary after first cycle, puts it a 0.
-void CycleToNextMonitor(GLFWwindow* window) {
-    if (get_time() < monitorSwitchTime) return;
-    
-    monitorSwitchTime = get_time() + 1.5; // Dumb hack to prevent toggling every frame from keypress illogic
-    int monitorCount;
-    GLFWmonitor** monitors = glfwGetMonitors(&monitorCount);
-    if (!monitors || monitorCount < 2) return;
-
-    currentMonitorIndex = (currentMonitorIndex + 1) % monitorCount;
-    GLFWmonitor* next = monitors[currentMonitorIndex];
-
-    int mx, my;
-    glfwGetMonitorPos(next, &mx, &my);
-    const GLFWvidmode* mode = glfwGetVideoMode(next);
-    int xpos = mx + (mode->width - Sys_Settings.ScreenWidth) / 2;
-    int ypos = my + (mode->height - Sys_Settings.ScreenHeight) / 2;
-    glfwSetWindowPos(window, xpos, ypos);
-    Sys_Input.ignore_next_mouse_delta = true;
-//     DualLog("Window moved to monitor %d: %s at x: %d, y: %d\n", currentMonitorIndex, glfwGetMonitorName(next), xpos, ypos);
-}

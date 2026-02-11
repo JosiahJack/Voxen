@@ -1712,6 +1712,7 @@ void cmd_undo(void);
 void cmd_shake(void);
 float GetPainStatic(void);
 Color GetPainStaticColor(void);
+extern int currentMonitorIndex;
 void CycleToNextMonitor(GLFWwindow* window);
 
 typedef struct {

@@ -117,6 +117,7 @@ void SaveConfig(void) {
     }
 
     fclose(f);
+    DualLog("Saved settings to ./Data/Config.ini!\n");
 }
 
 void SetSkyRotateSpeed(void) {
@@ -164,7 +165,7 @@ void UpdateScreenSize(GLFWwindow* window, int32_t width, int32_t height) {
     (void)window;
     Sys_Settings.ScreenWidth = vmax(vmin((uint16_t)width, 7680), 320u); Sys_Settings.ScreenHeight = vmax(vmin((uint16_t)height, 4320), 200u); // Cap at minimum Quake 1 resolution and maximum 8k.
     Sys_Settings.ScreenCenterX = (float)Sys_Settings.ScreenWidth * 0.5f; Sys_Settings.ScreenCenterY = (float)Sys_Settings.ScreenHeight * 0.5f;
-//     DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
+    DualLog("Screen size updated to %u x %u from input values %d x %d\n", Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, width, height);
     glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
     UpdateProjectionMatrices();
     glUseProgram(Sys_Render.imageBlitShaderProgram);
@@ -500,7 +501,6 @@ void ProcessInput(void) {
     if (!Sys_Input.window_has_focus) return;
     
     if (Sys_Input.keyStates[GLFW_KEY_CAPS_LOCK].pressed) Sys_Input.isCapsLockOn = !Sys_Input.isCapsLockOn; // Change capslock state to match keyboard having toggled.  Must always happen regardless of paused/menu.
-    if (Sys_Input.keyStates[GLFW_KEY_LEFT_CONTROL].down && Sys_Input.keyStates[GLFW_KEY_B].pressed) CycleToNextMonitor(Sys_Global.window); // TODO: Remove?  Kinda handy.
     if (Console()) ToggleConsole();
     
     if (TakeScreenshot() && Sys_Global.current_time > Sys_Global.screenshotTimeout) {

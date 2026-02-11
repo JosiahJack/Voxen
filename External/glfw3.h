@@ -516,6 +516,8 @@ GLFWAPI int glfwUpdateGamepadMappings(const char* string);
 GLFWAPI const char* glfwGetGamepadName(int jid);
 GLFWAPI int glfwGetGamepadState(int jid, GLFWgamepadstate* state);
 
+void glfwGetMonitorWorkarea(GLFWmonitor * monitor, int* xpos, int* ypos, int* width, int* height);
+
 // Used by Voxen:
 #define GLFW_SRGB_CAPABLE           0x0002100E
 #define GLFW_CONTEXT_VERSION_MAJOR  0x00022002

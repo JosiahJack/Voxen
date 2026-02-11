@@ -318,7 +318,8 @@ Color textColors[] = {
 };
 
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
-void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scale, const char * restrict format, ...) {
+void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scaleInput, const char * restrict format, ...) {
+    float scale = scaleInput * UIY(Sys_Settings.ScreenHeight);
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
@@ -333,12 +334,12 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
     glBindVertexArray(Sys_Render.textVAO);
     size_t vertexCount = 0;
     const char* p = uiTextBuffer;
-    float xpos = RelX(x), ypos = RelX((int16_t)(((float)y) + (16.0f * scale)));
-    float lineSpacing = RelY((int16_t)(23.0f * scale));
+    float xpos = RelX(x), ypos = RelY(y) + (RelY(16) * scale);
+    float lineSpacing = RelY(22) * scale;
     stbtt_aligned_quad q;
     int characterCount = 0;
     float paddingUV = (12.0f / (float)FONT_ATLAS_SIZE); // This is for the black outline around all text for readability.
-    float borderWidthPixels = 2.0f * scale;
+    float borderWidthPixels = 2.0f;
     while (*p) {
         // Decode UTF8
         const unsigned char *s = (const unsigned char *)p;
@@ -377,10 +378,10 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
 
         if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
-        float vx0 = (q.x0 * scale) - (borderWidthPixels * scale);
-        float vy0 = (q.y0 * scale) - (borderWidthPixels * scale);
-        float vx1 = (q.x1 * scale) + (borderWidthPixels * scale);
-        float vy1 = (q.y1 * scale) + (borderWidthPixels * scale);
+        float vx0 = (q.x0 * scale) - (borderWidthPixels);
+        float vy0 = (q.y0 * scale) - (borderWidthPixels);
+        float vx1 = (q.x1 * scale) + (borderWidthPixels);
+        float vy1 = (q.y1 * scale) + (borderWidthPixels);
         float s0 = (q.s0) - (paddingUV);
         float t0 = (q.t0) - (paddingUV);
         float s1 = (q.s1) + (paddingUV);
@@ -912,279 +913,8 @@ void RenderCredits(void) {
     } else RenderFormattedText(300,10,TEXT_WHITE,FONT_NORMAL,1.0f,creditPages[Sys_Global.creditsPageIndex]);
 }
 
-MenuPages currentMenuPage = MenuPages_FrontPage;
-bool returnToPause;
-int8_t currentMenuItem = 0;
-int8_t currentMenuTab = 0;
-int8_t menuItemCount = 4;
-int8_t menuTabCount = 1;
-uint8_t UI_Button(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
-    float width = RelX(w); float height = RelY(h);
-    float xpos = RelX(x); float ypos = RelY(y) - height;
-    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
-    if (cursorIsOver && mouseMovementThisFrame) {
-        currentMenuItem = this;
-        if (cursorOver != NULL) *cursorOver = cursorIsOver;
-    }
-    
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].pressed && cursorIsOver) return 1u;
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].pressed && cursorIsOver) return 2u;
-    return 0u;
-}
-
-uint8_t UI_Slider(int16_t x, int16_t y, float w, float h, bool* cursorOver, int8_t this) {
-    float width = RelX(w); float height = RelY(h);
-    float xpos = RelX(x); float ypos = RelY(y) - height;
-    bool cursorIsOver = CursorIsOverBounds(xpos, xpos + width, ypos + height, ypos);
-    if (cursorIsOver && mouseMovementThisFrame) {
-        currentMenuItem = this;
-        if (cursorOver != NULL) *cursorOver = cursorIsOver;
-    }
-    
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT ].down && cursorIsOver) return 1u;
-    if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down && cursorIsOver) return 2u;
-    return 0u;
-}
-
-void MenuGoBack(void) {
-    if (returnToPause) { returnToPause = false; Sys_Global.gamePaused = true; Sys_Global.menuActive = false; }
-    if (currentMenuPage == MenuPages_Singleplayer || currentMenuPage == MenuPages_Multiplayer || currentMenuPage == MenuPages_Options) currentMenuPage = MenuPages_FrontPage;//News
-    else if (currentMenuPage == MenuPages_Load || currentMenuPage == MenuPages_NewGame || currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) currentMenuPage = MenuPages_Singleplayer;
-}
-
-bool MenuEnter(void) { return (Sys_Input.keyStates[GLFW_KEY_KP_ENTER].pressed || Sys_Input.keyStates[GLFW_KEY_ENTER].pressed || Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_A].pressed); }
-void ChangeMenuPage(MenuPages pg) { currentMenuPage = pg; currentMenuItem = currentMenuTab = 0; }
-
-bool fovSliderActive = false;
-static inline void RenderMenu(void) {
-    if (Sys_Input.gamepadButtons[GLFW_GAMEPAD_BUTTON_B].pressed && currentMenuPage != MenuPages_FrontPage) { MenuGoBack(); return; } // TODO Android Back button
-    
-    if (currentMenuPage != MenuPages_IntroVideo && currentMenuPage != MenuPages_CreditsVideo && currentMenuPage != MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1026); // Menu background
-    if (currentMenuPage == MenuPages_IntroVideo || currentMenuPage == MenuPages_CreditsVideo) RenderUIImage(-417,-384, 2200,1536, 0); // Video blackground
-    if (currentMenuPage == MenuPages_Options) RenderUIImage(-417,-384, 2200,1536, 1032); // Menu background
-    if (currentMenuPage == MenuPages_FrontPage) {
-        menuItemCount = 4; menuTabCount = 1;
-        RenderUIImage(282,46, 800,128, 1031); // Title CITADEL with strikethrough effect
-        bool overS = false, overM = false, overO = false, overQ = false;
-        if (UI_Button(408,340, 574,84, &overS, 0) || (MenuEnter() && currentMenuItem == 0)) ChangeMenuPage(MenuPages_Singleplayer);
-        overS = overS || currentMenuItem == 0;
-        RenderFormattedText(320,188, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"SINGLEPLAYER");
-        RenderUIImage(430,278, 32,32, overS ? 1029 : 1028); // Menu pad
-        if (UI_Button(408,458, 574,84, &overM, 1) || (MenuEnter() && currentMenuItem == 1)) ChangeMenuPage(MenuPages_Multiplayer);
-        overM = overM || currentMenuItem == 1;
-        RenderFormattedText(320,268, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"MULTIPLAYER");
-        RenderUIImage(430,398, 32,32, overM ? 1029 : 1028); // Menu pad
-        if (UI_Button(408,582, 574,84, &overO, 2) || (MenuEnter() && currentMenuItem == 2)) ChangeMenuPage(MenuPages_Options);
-        overO = overO || currentMenuItem == 2;
-        RenderFormattedText(320,350, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"OPTIONS");
-        RenderUIImage(430,522, 32,32, overO ? 1029 : 1028); // Menu pad
-        if (UI_Button(408,702, 574,84, &overQ, 3) || (MenuEnter() && currentMenuItem == 3)) OS_Exit(0);
-        overQ = overQ || currentMenuItem == 3;
-        RenderFormattedText(320,430, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"QUIT");
-        RenderUIImage(430,640, 32,32, overQ ? 1029 : 1028); // Menu pad
-    } else if (currentMenuPage == MenuPages_Singleplayer) {
-        menuItemCount = 5; menuTabCount = 1;
-        RenderFormattedText(250,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
-        RenderFormattedText(250,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"SINGLEPLAYER");
-        RenderFormattedText(250,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"SINGLEPLAYER");
-        bool overS = false, overM = false, overO = false, overQ = false, overBack = false;
-        if (UI_Button(408,340, 574,84, &overS, 0) || (MenuEnter() && currentMenuItem == 0)) ChangeMenuPage(MenuPages_Load);
-        overS = overS || currentMenuItem == 0;
-        RenderFormattedText(320,188, overS ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"CONTINUE");
-        RenderUIImage(430,278,  32,32, overS ? 1029 : 1028); // Menu pad
-        if (UI_Button(408,458, 574,84, &overM, 1) || (MenuEnter() && currentMenuItem == 1)) ChangeMenuPage(MenuPages_NewGame);
-        overM = overM || currentMenuItem == 1;
-        RenderFormattedText(320,268, overM ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"NEW GAME");
-        RenderUIImage(430,398,  32,32, overM ? 1029 : 1028); // Menu pad
-        if (UI_Button(408,582, 574,84, &overO, 2) || (MenuEnter() && currentMenuItem == 2)) ChangeMenuPage(MenuPages_IntroVideo);
-        overO = overO || currentMenuItem == 2;
-        RenderFormattedText(320,350, overO ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"PLAY INTRO");
-        RenderUIImage(430,522,  32,32, overO ? 1029 : 1028); // Menu pad
-        if (UI_Button(408,702, 574,84, &overQ, 3) || (MenuEnter() && currentMenuItem == 3)) ChangeMenuPage(MenuPages_CreditsVideo);
-        overQ = overQ || currentMenuItem == 3;
-        RenderFormattedText(320,430, overQ ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"PLAY CREDITS");
-        RenderUIImage(430,640, 32,32, overQ ? 1029 : 1028); // Menu pad
-        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
-        if (UI_Button(1060,758, 84,32, &overBack, 4) || (MenuEnter() && currentMenuItem == 4)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 4;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
-    } else if (currentMenuPage == MenuPages_Multiplayer) {
-        menuItemCount = 1; menuTabCount = 1;
-        bool overBack = false;
-        RenderFormattedText(266,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"MULTIPLAYER");
-        RenderFormattedText(266,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"MULTIPLAYER");
-        RenderFormattedText(266,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"MULTIPLAYER");
-        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
-        if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
-    } else if (currentMenuPage == MenuPages_Options) {
-        menuTabCount = 3;
-        bool overBack = false;
-        RenderFormattedText(238,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"CONFIGURATION");
-        RenderFormattedText(238,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"CONFIGURATION");
-        RenderFormattedText(238,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"CONFIGURATION");
-        if (currentMenuTab != 0) RenderUIImage(179,220, 1001,548, 1030); // Config background
-        if (currentMenuTab == 0) RenderUIImage(179,220, 1001,548, 1033); // Config background graphics (empty alpha center)
-        RenderUIImage(520,196, 160,30, currentMenuTab == 2 ? 920 : 921); // Config tab unhighlighted
-        RenderFormattedText(530,202,currentMenuTab == 2 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"AUDIO / LANG");
-        RenderUIImage(354,196, 160,30, currentMenuTab == 1 ? 920 : 921); // Config tab unhighlighted
-        RenderFormattedText(366,202,currentMenuTab == 1 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"INPUT");
-        RenderUIImage(190,196, 160,30, currentMenuTab == 0 ? 920 : 921); // Config tab highlighted
-        RenderFormattedText(200,202,currentMenuTab == 0 ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"GRAPHICS");
-        if (currentMenuTab == 0) {
-            bool overDetails = false, overAA = false, overShadows = false, overSSR = false, overVsync = false, overFOV = false;
-            menuItemCount = 12; // Graphics            
-            RenderUIImage(200,500, 16,16, 910); // Checkbox background
-            if (UI_Button(200,516, 210,16, &overDetails, 0) || (MenuEnter() && currentMenuItem == 0)) { Sys_Settings.ModelDetail = Sys_Settings.ModelDetail == 1u ? 0u : 1u; SaveConfig(); }
-            overDetails = overDetails || currentMenuItem == 0;
-            if (Sys_Settings.ModelDetail) RenderUIImage(202,502, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,500,overDetails ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"DETAILED MODELS");
-            
-            RenderUIImage(200,530, 16,16, 910); // Checkbox background
-            if (UI_Button(200,546, 210,16, &overAA, 1) || (MenuEnter() && currentMenuItem == 1)) { Sys_Settings.AntiAliasing = Sys_Settings.AntiAliasing == 1u ? 0u : 1u; SaveConfig(); }
-            overAA = overAA || currentMenuItem == 1;
-            if (Sys_Settings.AntiAliasing) RenderUIImage(202,532, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,530,overAA ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"ANTIALIASING");
-            
-            RenderUIImage(200,560, 16,16, 910); // Checkbox background
-            if (UI_Button(200,576, 210,16, &overShadows, 2) || (MenuEnter() && currentMenuItem == 2)) { Sys_Settings.Shadows = Sys_Settings.Shadows == 1u ? 0u : 1u; SaveConfig(); }
-            overShadows = overShadows || currentMenuItem == 2;
-            if (Sys_Settings.Shadows) RenderUIImage(202,562, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,560,overShadows ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"SHADOWS");
-            
-            RenderUIImage(200,590, 16,16, 910); // Checkbox background
-            if (UI_Button(200,606, 210,16, &overSSR, 3) || (MenuEnter() && currentMenuItem == 3)) { Sys_Settings.Reflections = Sys_Settings.Reflections == 1u ? 0u : 1u; SaveConfig(); }
-            overSSR = overSSR || currentMenuItem == 3;
-            if (Sys_Settings.Reflections) RenderUIImage(202,592, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,590,overSSR ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"REFLECTIONS");
-            
-            RenderUIImage(200,620, 16,16, 910); // Checkbox background
-            if (UI_Button(200,636, 210,16, &overVsync, 4) || (MenuEnter() && currentMenuItem == 4)) { Sys_Settings.Vsync = Sys_Settings.Vsync == 1u ? 0u : 1u; SetVSync(); SaveConfig(); }
-            overVsync = overVsync || currentMenuItem == 4;
-            if (Sys_Settings.Vsync) RenderUIImage(202,622, 12,12, 912); // Checkbox check
-            RenderFormattedText(220,620,overVsync ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"VSYNC (FPS: %d)", Sys_Dx.framesPerLastSecond);
-            
-            float fovMin = 45.0f; float fovMax = 150.0f;
-            RenderUIImage(400,650, 128,16, 1079); // Slider background
-            RenderUIImage(400 + (((Sys_Settings.FOV - fovMin) / fovMax) * 112),650, 16,16, 1078); // Slider handle
-            if (UI_Slider(200,666, 328,16, &overFOV, 5)) fovSliderActive = true;
-            if (fovSliderActive && Sys_Input.currentMouse_dx != 0) {
-                int32_t new = (int32_t)Sys_Settings.FOV + vmin(vmax(Sys_Input.currentMouse_dx,-1),1); Sys_Settings.FOV = (uint8_t)vmin(vmax(new,45),150); UpdateProjectionMatrices();
-            }
-            if (!Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].down && !Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_RIGHT].down) fovSliderActive = false;
-            
-            bool shiftHeld = Sys_Input.keyStates[GLFW_KEY_LEFT_SHIFT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_SHIFT].down;
-            if (MenuEnter() && currentMenuItem == 5) { Sys_Settings.FOV = (Sys_Settings.FOV == 150) ? 45 : Sys_Settings.FOV + (shiftHeld ? -5 : 5); UpdateProjectionMatrices(); }
-            overFOV = overFOV || currentMenuItem == 5;
-            RenderFormattedText(200,650,overFOV ? TEXT_YELLOW : TEXT_GREEN,FONT_NORMAL,1.0f,"FIELD OF VIEW %u", Sys_Settings.FOV);
-
-//             float gammaMin = 0.0f; float gammaMax = 100.0f;
-        } else if (currentMenuTab == 1) {
-            menuItemCount = 49; // Input
-        } else {
-            menuItemCount = 10; // Audio / Lang
-        }
-        
-        RenderUIImage(1087,723, 84,36, 1252); // Back Button background
-        int8_t lastItem = menuItemCount - 1;
-        if (UI_Button(1087,757, 84,32, &overBack, lastItem) || (MenuEnter() && currentMenuItem == lastItem)) MenuGoBack();
-        overBack = overBack || currentMenuItem == lastItem;
-        RenderFormattedText(1103,731,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
-    } else if (currentMenuPage == MenuPages_Load) {
-        menuItemCount = 9; menuTabCount = 1;
-        bool overBack = false;
-        RenderFormattedText(280,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"LOAD GAME");
-        RenderFormattedText(280,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"LOAD GAME");
-        RenderFormattedText(280,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"LOAD GAME");
-        RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
-        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
-        if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
-    } else if (currentMenuPage == MenuPages_Save) {
-        menuItemCount = 9; menuTabCount = 1;
-        bool overBack = false;
-        RenderFormattedText(284,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"SAVE GAME");
-        RenderFormattedText(284,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"SAVE GAME");
-        RenderFormattedText(284,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"SAVE GAME");
-        RenderUIImage(400,214, 586,500, 1037); // Load/Save table background
-        RenderUIImage(1060,724, 84,36, 1252); // Back Button background
-        if (UI_Button(1060,758, 84,32, &overBack, 0) || (MenuEnter() && currentMenuItem == 0)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 0;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
-    } else if (currentMenuPage == MenuPages_NewGame) {
-        menuItemCount = 19;
-        menuTabCount = (currentMenuItem > 0 && currentMenuItem <= 16) ? 2 : 1;
-        
-        bool overBack = false, overStart = false;
-        RenderFormattedText(290,50,TEXT_GREEN_MENU_SHADOW,FONT_STOPD,1.75f,"NEW GAME");
-        RenderFormattedText(290,46,TEXT_GREEN_MENU_GLOW,FONT_STOPD,1.75f,"NEW GAME");
-        RenderFormattedText(290,48,TEXT_GREEN_MENU,FONT_STOPD,1.75f,"NEW GAME");
-        RenderUIImage(136,196,1088,558,1048); // Newgame inset
-        RenderUIImage(136,196,1088,558,1049); // Newgame background
-        RenderUIImage(1060,724,84,36,1252); // Back Button background
-        RenderFormattedText(220,146,TEXT_STOPD_RED,FONT_STOPD,1.5f,"NAME");
-        RenderUIImage(297,217,32,32, 1028); // Menu pad
-        RenderFormattedText(145,202,TEXT_STOPD_RED,FONT_STOPD,1.5f,"COMBAT");
-        RenderUIImage(185,301,32,32,1028); // Menu pad
-        RenderFormattedText(145,330,TEXT_STOPD_RED,FONT_STOPD,1.5f,"PUZZLE");
-        RenderUIImage(185,493,32,32, 1028); // Menu pad
-        RenderFormattedText(505,202,TEXT_STOPD_RED,FONT_STOPD,1.5f,"MISSION");
-        RenderUIImage(725,301,32,32, 1028); // Menu pad
-        RenderFormattedText(505,330,TEXT_STOPD_RED,FONT_STOPD,1.5f,"CYBERSPACE");
-        RenderUIImage(725,493,32,32,1028); // Menu pad
-        if (UI_Button(1060,758, 84,32, &overBack, 1) || (MenuEnter() && currentMenuItem == 1)) MenuGoBack();
-        overBack = overBack || currentMenuItem == 1;
-        RenderFormattedText(1076,732,overBack ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_NORMAL,1.0f,"BACK");
-        if (UI_Button(544,747, 282,68, &overStart, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Global.menuActive = Sys_Global.gamePaused = false; // TODO reload game.
-        overStart = overStart || currentMenuItem == 0;
-        RenderFormattedText(400,464,overStart ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.5f,"START");
-    } else if (currentMenuPage == MenuPages_IntroVideo) {
-        menuItemCount = 1; menuTabCount = 1;
-        if (MenuEnter()) MenuGoBack();
-    } else if (currentMenuPage == MenuPages_CreditsVideo) {
-        menuItemCount = 1; menuTabCount = 1;
-        if (MenuEnter()) MenuGoBack();
-    }
-    
-    if (menuTabCount <= currentMenuTab) currentMenuTab = 0;
-    if (menuItemCount <= currentMenuItem) currentMenuItem = 0;
-    if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
-    if (Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
-    if (Sys_Input.keyStates[GLFW_KEY_RIGHT].pressed) currentMenuTab = (currentMenuTab + 1) >= menuTabCount ? 0 : (currentMenuTab + 1);
-    if (Sys_Input.keyStates[GLFW_KEY_LEFT].pressed) currentMenuTab =  (currentMenuTab - 1) < 0 ? (menuTabCount - 1) : (currentMenuTab - 1);
-}
-
-static inline void RenderPausedUI(void) {
-    menuItemCount = 6; menuTabCount = 1;
-    bool overResume = false, overLoad /* ;) */ = false, overSave = false, overOptions = false, overQuitMenu = false, overQuit = false;
-    RenderUIImage(519,276,328,300,1025); // Pause Menu background
-    RenderUIImage(519,276,328,300,1080); // Pause Menu background outline
-    RenderFormattedText(610,210,TEXT_STOPD_RED_PAUSETITLE,FONT_STOPD,1.0f,"PAUSED");
-    if (UI_Button(522,330, 322,52, &overResume, 0) || (MenuEnter() && currentMenuItem == 0)) Sys_Global.gamePaused = false;
-    overResume = overResume || currentMenuItem == 0;
-    RenderFormattedText(610,306,overResume ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"RESUME");
-    if (UI_Button(522,390, 322,52, &overLoad, 1) || (MenuEnter() && currentMenuItem == 1)) { currentMenuPage = MenuPages_Load; Sys_Global.menuActive = true; returnToPause = true; }
-    overLoad = overLoad || currentMenuItem == 1;
-    RenderFormattedText(630,364, overLoad ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"LOAD");
-    if (UI_Button(522,450, 322,60, &overSave, 2) || (MenuEnter() && currentMenuItem == 2)) { currentMenuPage = MenuPages_Save; Sys_Global.menuActive = true; returnToPause = true; }
-    overSave = overSave || currentMenuItem == 2;
-    RenderFormattedText(635,422,overSave ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"SAVE");
-    if (UI_Button(522,510, 322,60, &overOptions, 3) || (MenuEnter() && currentMenuItem == 3)) { currentMenuPage = MenuPages_Options; Sys_Global.menuActive = true; returnToPause = true; }
-    overOptions = overOptions || currentMenuItem == 3;
-    RenderFormattedText(599,480,overOptions ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"OPTIONS");
-    if (UI_Button(522,570, 322,60, &overQuitMenu, 4) || (MenuEnter() && currentMenuItem == 4)) { Sys_Global.menuActive = true; currentMenuPage = MenuPages_FrontPage; }
-    overQuitMenu = overQuitMenu || currentMenuItem == 4;
-    RenderFormattedText(546,538,overQuitMenu ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT TO MENU");
-    RenderUIImage(519,672,328,42,1252); // Pause Quit Game background
-    if (UI_Button(522,672, 322,42, &overQuit, 5) || (MenuEnter() && currentMenuItem == 5)) OS_Exit(0);
-    overQuit = overQuit || currentMenuItem == 5;
-    RenderFormattedText(572,690,overQuit ? TEXT_STOPD_RED_HIGHLIGHT : TEXT_STOPD_RED,FONT_STOPD,1.0f,"QUIT GAME");
-    if (Sys_Input.keyStates[GLFW_KEY_DOWN].pressed) currentMenuItem = (currentMenuItem + 1) >= menuItemCount ? 0 : (currentMenuItem + 1);
-    if (Sys_Input.keyStates[GLFW_KEY_UP].pressed) currentMenuItem = (currentMenuItem - 1) < 0 ? (menuItemCount - 1) : (currentMenuItem - 1);
-}
-
+void RenderMenu(void);
+void RenderPausedUI(void);
 static inline double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     Sys_Dx.drawCallsNormal = Sys_Dx.drawCallsRenderedThisFrame;
@@ -1342,74 +1072,69 @@ void Render(void) {
     mul_mat4(viewProj, rasterPerspectiveProjection, view);
     float invViewRot[9] = { view[0], view[4], view[8],    view[1], view[5], view[9],    view[2], view[6], view[10] };
     ExtractFrustumPlanes(viewProj, playerFrustumPlanes);
-//     if (!Sys_Global.menuActive &&!Sys_Global.gamePaused) { // Raterized Geometry, Standard vertex + fragment rendering, but with special packing to minimize transfer data amounts
-        glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
-        if (Sys_Settings.Shadows > 0u) RenderShadowmaps();
-        memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-        memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
-        glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
-        glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
-        glUseProgram(Sys_Render.chunkShaderProgram);
-        glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
-        glUniform1ui(3, 0u); /* isUI false */
-        glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
-        glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-        RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, false);
-        RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, true);
-        if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        if (Sys_Settings.Reflections > 0u) { // Screen Space Reflections
-            glUseProgram(Sys_Render.ssrShaderProgram);
-            glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
-            glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
-            GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
-            GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
-            glDispatchCompute(groupX_ssr, groupY_ssr, 1);
-        }
-//     }
+    glBindVertexArray(Sys_Render.vao_chunk); // Common vao for RenderShadowmaps and Rasterized Geometry
+    if (Sys_Settings.Shadows > 0u) RenderShadowmaps();
+    memset(    lightDirty,0    ,LIGHT_COUNT * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    memset(dirtyInstances,0,loadedInstances * sizeof(bool)); // Clear dirty after shadowmaps for minimal shadowmap updating.
+    glBindFramebuffer(GL_FRAMEBUFFER, Sys_Render.gBufferFBO);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the corner where last shadowmap wrote into
+    glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); // Opaques
+    glUseProgram(Sys_Render.chunkShaderProgram);
+    glUniformMatrix4fv(2, 1, GL_FALSE, viewProj);
+    glUniform1ui(3, 0u); // isUI false
+    glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
+    glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
+    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, false);
+    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, true);
+    if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (Sys_Settings.Reflections > 0u) { // Screen Space Reflections
+        glUseProgram(Sys_Render.ssrShaderProgram);
+        glUniformMatrix4fv(4, 1, GL_FALSE, viewProj);
+        glUniform3f(3, playerPos.x, playerPos.y, playerPos.z);
+        GLuint groupX_ssr = ((Sys_Settings.ScreenWidth  / Sys_Settings.SSR_RES) + 31) / 32;
+        GLuint groupY_ssr = ((Sys_Settings.ScreenHeight / Sys_Settings.SSR_RES) + 31) / 32;
+        glDispatchCompute(groupX_ssr, groupY_ssr, 1);
+    }
+
+    glUseProgram(Sys_Render.imageBlitShaderProgram);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
+    glUniform1i(4, 4); // outputImage texture sampler2D
+    double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
+    if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
+    glUniform1ui(5, Sys_Settings.Reflections);
+    glUniform1ui(6, Sys_Settings.AntiAliasing);
+    glUniform1f(14, Sys_Settings.FOV);
+    glUniform1f(16, (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
+    glUniform1ui(22, Sys_Settings.Shadows);
+    glUniform1f(9, (float)berserkTimeRemainingNormalized);
+    glUniform1f(10, berserkSeedTime);
+    glUniform1ui(11, Sys_Settings.Brightness);
+    glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
+    glUniform3f(13, px, py, pz);
+    glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
+    glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
+    glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
+    glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
+    uint32_t shieldOnType = 0u; // No shield green tint.
+    if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
+        if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
+        else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
+    }
     
-//     if (!Sys_Global.menuActive) {
-        glUseProgram(Sys_Render.imageBlitShaderProgram);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, Sys_Render.inputImageID);
-        glUniform1i(4, 4); // outputImage texture sampler2D
-        double berserkTimeRemainingNormalized = berserkFinished > 0.0001 ? (berserkFinished - Sys_Global.pauseRelativeTime) / BERSERK_TIME : 0.0;
-        if (berserkFinished < Sys_Global.pauseRelativeTime && berserkFinished > 0.0001) berserkFinished = berserkTimeRemainingNormalized = 0.0;
-        glUniform1ui(5, Sys_Settings.Reflections);
-        glUniform1ui(6, Sys_Settings.AntiAliasing);
-        glUniform1f(14, Sys_Settings.FOV);
-        glUniform1f(16, (float)Sys_Settings.ScreenWidth / (float)Sys_Settings.ScreenHeight);
-        glUniform1ui(22, Sys_Settings.Shadows);
-        glUniform1f(9, (float)berserkTimeRemainingNormalized);
-        glUniform1f(10, berserkSeedTime);
-        glUniform1ui(11, Sys_Settings.Brightness);
-        glUniform3f(12, deg2rad(cam_yaw), deg2rad(cam_pitch), deg2rad(cam_roll));
-        glUniform3f(13, px, py, pz);
-        glUniform1f(15, (float)Sys_Global.pauseRelativeTime * 0.1f);
-        glUniform1ui(17, (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX) || Sys_Global.currentLevel == LEVEL_CYBERSPACE);
-        glUniform1ui(18, (gridCellStates[playerCellIdx] & CELL_SEES_SUN) && Sys_Global.currentLevel != LEVEL_CYBERSPACE);
-        glUniform1ui(19, ((Sys_Global.currentLevel >= 10 && Sys_Global.currentLevel < LEVEL_CYBERSPACE) ? 1u : 0u) && (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX));
-        uint32_t shieldOnType = 0u; // No shield green tint.
-        if (instances[WORLD].ioflags & QUESTBIT_SHIELD_ACTIVATED) {
-            if (Sys_Global.currentLevel == 6 || Sys_Global.currentLevel == 7) shieldOnType = 2u; // Shielding only below player for lower levels.
-            else if (Sys_Global.currentLevel <= 5) shieldOnType = 1u; // Shielding everywhere as levels fully within shield.
-        }
-        
-        glUniform1ui(20, shieldOnType);
-        Color painStaticColor = GetPainStaticColor();
-        glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
-        glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
-        glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
-        glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
-        glUniform1f(28, GetPainStatic());
-        glBindVertexArray(Sys_Render.quadVAO);
-        glDisable(GL_DEPTH_TEST);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-        Sys_Dx.drawCallsRenderedThisFrame++;
-        Sys_Dx.verticesRenderedThisFrame += 4;
-//     }
-    
+    glUniform1ui(20, shieldOnType);
+    Color painStaticColor = GetPainStaticColor();
+    glUniform3f(23, painStaticColor.r, painStaticColor.g, painStaticColor.b);
+    glUniformMatrix4fv(24, 1, GL_FALSE, viewProj);
+    glUniformMatrix3fv(25, 1, GL_FALSE, invViewRot);
+    glUniform1i(27, 0); // Texture 0 for the rendered geometry color buffer
+    glUniform1f(28, GetPainStatic());
+    glBindVertexArray(Sys_Render.quadVAO);
+    glDisable(GL_DEPTH_TEST);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    Sys_Dx.drawCallsRenderedThisFrame++;
+    Sys_Dx.verticesRenderedThisFrame += 4;
     Sys_Global.last_time = RenderUI();
     
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
