@@ -95,7 +95,7 @@ void Screenshot(void) {
 }
 
 __attribute__((pure)) bool CursorVisible(void) {
-    return (Sys_Global.inventoryMode || Sys_Global.menuActive || Sys_Global.gamePaused);
+    return ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused);
 }
 
 uint32_t random_range_rng = 0x12345678u; // Global seed

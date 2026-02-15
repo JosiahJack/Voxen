@@ -314,12 +314,13 @@ Color textColors[] = {
     { 0.909803922f, 0.203921569f,  0.219607843f, 1.0f}, // 8 StopD Red Pause Title       TEXT_STOPD_RED_PAUSETITLE
     { 0.470588235f, 0.721568627f,  0.172549020f, 1.0f}, // 9 Green Menu Title            TEXT_GREEN_MENU
     { 0.137254902f, 0.356862745f,  0.109803922f, 1.0f}, // 10 Green Menu Title Shadow    TEXT_GREEN_MENU_SHADOW
-    { 0.239215686f, 0.466666667f,  0.129411765f, 1.0f}  // 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW
+    { 0.239215686f, 0.466666667f,  0.129411765f, 1.0f}, // 11 Green Menu Title Glow      TEXT_GREEN_MENU_GLOW
+    { 0.392156863f, 0.031372549f,  0.039215686f, 1.0f}  // 12 Red Menu Text Dark         TEXT_RED_MENU
 };
 
 float textVertexData[8192]; // Reusable buffer for text vertices.  Most text only needs ~3000
 void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, float scaleInput, const char * restrict format, ...) {
-    float scale = scaleInput * UIY(Sys_Settings.ScreenHeight);
+    float scale = scaleInput;// * UIY(Sys_Settings.ScreenHeight);
     va_list args;
     va_start(args, format); vsnprintf(uiTextBuffer, TEXT_BUFFER_SIZE, format, args); va_end(args);
     glUseProgram(Sys_Render.textShaderProgram);
@@ -421,9 +422,8 @@ void CenterStatusPrint(const char * restrict fmt, ...) {
     Sys_Global.statusTextDecayFinished = get_time() + 2.5; // 2.5 second decay time before text dissappears.
 }
 
-void NewGame(void) {
+void NewGame(void) { // Reset World States
     RenderLoadingProgress(100,"Loading new game...");
-    // Set World States
     instances[WORLD].ioflags = 0u;
     instances[WORLD].lev1SecCode = random_range_u8(0u,9u); // Must do rand's repeatedly to prevent
     instances[WORLD].lev2SecCode = random_range_u8(0u,9u); // these all being the same number.
@@ -433,13 +433,24 @@ void NewGame(void) {
     instances[WORLD].lev6SecCode = random_range_u8(0u,9u);
     memset(instances,0,INSTANCE_COUNT * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     PlayerInit(PLAYER1); PlayerInit(PLAYER2);
+    cam_yaw = 90.0f; cam_pitch = 0.0f; cam_roll = 0.0f;
     Sys_Global.inventoryMode = Sys_Settings.NoShootMode;
-//     WriteDatForIntroPlayed(); // TODO
     LoadLevel(Sys_Global.startLevel); // Must be after entities!
-    Sys_Global.pauseRelativeTime = 0.0;
-    Sys_Global.last_physics_time = get_time();
+    Sys_Global.pauseRelativeTime =  Sys_Global.last_physics_time = 0.0;
     Sys_Global.last_topframe_time = Sys_Global.last_physics_time - 0.05;
+    Sys_Global.timeSinceLastPhysicsTick = 0.0166666666f;
+    Sys_Global.gameFinished = Sys_Global.creditsActive = Sys_Global.decoyActive = false;
+	Sys_Global.ressurections = Sys_Global.deaths = Sys_Global.kills = Sys_Global.cyberkills = 0u;
+	Sys_Global.shotsFired = Sys_Global.grenadesThrown = Sys_Global.savesScummed = 0U;
+    Sys_Global.damageDealt = Sys_Global.damageReceived = 0.0f;
+	Sys_Global.creditsPageIndex = 0u;
     for (int i=0;i<14;++i) Sys_Global.levelSecurity[i] = 100u;
+    InputClearRisingAndFallingEdges();
+    Sys_Input.currentMouse_dx = Sys_Input.currentMouse_dy = 0;
+    Sys_Input.last_mouse_x = Sys_Input.last_mouse_y = 0;
+    Sys_Input.ignore_next_mouse_delta = true;
+    Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS state.
+    Sys_Input.lastUse = false;
 }
 
 void LoadGameModDefinition(void) { // Unique set separate from savedata path and resource data to keep it focussed
@@ -832,7 +843,8 @@ void RenderShadowmaps(void) {
             numShadowingLightsHandled++;
         }
 
-        glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+//         glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
+        glViewport(0, 0, 1366, 768);
         glNamedBufferData(Sys_Render.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     }
     
@@ -900,8 +912,6 @@ void CreditsStats(void) {
 }
 
 void RenderCredits(void) {
-    if (!Sys_Global.creditsActive) return;
-
     if (Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed) {
         ++Sys_Global.creditsPageIndex;
         if (Sys_Global.creditsPageIndex > CREDITS_PAGES) {Sys_Global.creditsActive = false; return; }
@@ -921,21 +931,20 @@ static inline double RenderUI(void) {
     if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
     if (Sys_Global.menuActive) RenderMenu();
     else if (Sys_Global.gamePaused) RenderPausedUI();
-    if (Sys_Cheats.noHUD) return get_time(); // NO HUD BARRIER =====================
     
     // Diagnostics / Debugging
     int16_t debugTextStartY = 58;
     if (Sys_Cheats.showLocation && !Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY, TEXT_WHITE, FONT_NORMAL,1.0f, "x: %.4f, y: %.4f, z: %.4f, rx: %.4f, ry: %.4f, rz: %.4f, rw: %.4f", (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, (double)instances[PLAYER1].rotation.x, (double)instances[PLAYER1].rotation.y, (double)instances[PLAYER1].rotation.z, (double)instances[PLAYER1].rotation.w);
     int16_t lineSpacing = 18;
-    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
-    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
-    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
-    if (!Sys_Global.menuActive) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 1), TEXT_WHITE, FONT_NORMAL,1.0f, "timeSinceLastPhysicsTick: %.6f, numShadowsCouldRender: %u, playerCellIdx: %u, numCellsVisible: %u", Sys_Global.timeSinceLastPhysicsTick, voxen_Shadow_System.numShadowsCouldRender, playerCellIdx, numCellsVisible);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 2), TEXT_WHITE, FONT_NORMAL,1.0f, "Player velocity: %.2f, %.2f, %.2f", (double)instances[PLAYER1].velocity.x, (double)instances[PLAYER1].velocity.y, (double)instances[PLAYER1].velocity.z);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 3), TEXT_WHITE, FONT_NORMAL,1.0f, "Test Entity %s Index: %u, Shadow cpu ms: %.3f", entities[instances[editModeSelection].index].path, editModeTestEntityDefinition, voxen_Shadow_System.shadowTime * 1000);
+    if (!Sys_Global.menuActive && !Sys_Cheats.noHUD) RenderFormattedText(16, debugTextStartY + (lineSpacing * 4), TEXT_WHITE, FONT_NORMAL,1.0f, "Player cell: %u, floor: %.3f, ceil: %.3f", instances[PLAYER1].cellIndex, (double)gridCellFloorHeight[instances[PLAYER1].cellIndex], (double)gridCellCeilingHeight[instances[PLAYER1].cellIndex]);
     RenderFormattedText(16, debugTextStartY + (lineSpacing * 5), TEXT_WHITE, FONT_NORMAL,1.0f, "Cursor: %d, %d   dx: %d dy: %d", cursorPosition_x, cursorPosition_y, Sys_Input.currentMouse_dx, Sys_Input.currentMouse_dy);
     if (Sys_Cheats.consoleActive) RenderFormattedText(16, 0, TEXT_WHITE, FONT_NORMAL,1.0f, "] %s",consoleEntryText);
     if (Sys_Global.statusTextDecayFinished > Sys_Global.current_time) RenderFormattedText(479,114,TEXT_WHITE,FONT_NORMAL,1.0f, "%s",statusText);
     if (!Sys_Global.menuActive && !Sys_Global.gamePaused) {
-    if (!Sys_Global.gamePaused) RenderUIImage(672,0,22,22,1020); // Shoot mode button
+        if (!Sys_Global.gamePaused && !Sys_Cheats.noHUD) RenderUIImage(672,0,22,22,1020); // Shoot mode button
         bool mouseReleased = Sys_Input.mouseButtons[GLFW_MOUSE_BUTTON_LEFT].pressed;
         if (Sys_Global.inventoryMode) {
             if (CursorIsOverBounds(672,694,22,0)) {
@@ -957,7 +966,7 @@ static inline double RenderUI(void) {
         if (Sys_Dx.thisFrameTime > 6.944444) timingColor = TEXT_RED;
         Sys_Dx.drawCallsRenderedThisFrame += 2; Sys_Dx.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d Edit:%u", Sys_Dx.framesPerLastSecond, Sys_Dx.worstFPS, Sys_Dx.drawCallsRenderedThisFrame, Sys_Dx.drawCallsNormal, Sys_Dx.uiImageDrawCallsRenderedThisFrame, Sys_Dx.textDrawCallsRenderedThisFrame, Sys_Dx.shadowDrawCallsRenderedThisFrame, Sys_Dx.verticesRenderedThisFrame, Sys_Cheats.editMode);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Dx.framesPerLastSecond,Sys_Dx.worstFPS,Sys_Dx.drawCallsRenderedThisFrame,Sys_Dx.drawCallsNormal,Sys_Dx.uiImageDrawCallsRenderedThisFrame,Sys_Dx.textDrawCallsRenderedThisFrame,Sys_Dx.shadowDrawCallsRenderedThisFrame,Sys_Dx.verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
     }
     
     return time_now;
@@ -1204,7 +1213,8 @@ int32_t main(int32_t argc, char* argv[]) {
     InitializeEnvironment();
     DebugRAM("prior to game loop");
     DualLog("Game Initialized in %f secs\n",get_time() - game_start_time);
-    Sys_Global.absoluteTime = Sys_Global.pauseRelativeTime = get_time();
+    Sys_Global.absoluteTime = Sys_Global.last_topframe_time = Sys_Global.current_time = get_time();
+    Sys_Global.pauseRelativeTime = Sys_Global.last_physics_time = 0.0;
     while(1) { // Main Loop
         if (glfwWindowShouldClose(Sys_Global.window)) OS_Exit(0);
         if (queuedLevelToLoad != 255u) { LoadLevel(queuedLevelToLoad); queuedLevelToLoad = 255u; continue; }

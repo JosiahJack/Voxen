@@ -31,7 +31,6 @@ void Load(uint8_t slot) {
 // 		ShowLoading();
 // 		GameObject freshGame = GameObject.Find("GameNotYetStarted");
 // 		if (freshGame != null) Utils.SafeDestroy(freshGame);
-// 		startingNewGame = false;
 // 		introNotPlayed = false;
 // 		WriteDatForIntroPlayed(introNotPlayed); // reset
 // 		StartCoroutine(Const.a.LoadRoutine(saveFileIndex,false));

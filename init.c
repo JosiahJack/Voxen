@@ -164,31 +164,31 @@ void InventoryInit(void) {
 }
 
 void PlayerInit(uint16_t i) {
-    selfIdx = i;
-    SELF.index = 767;
-    SELF.layer = 12; // PhysicsLayer_Player
-    SELF.position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
-    SELF.scale = (Vector3) { 1.0f, 1.0f, 1.0f };
-    SELF.rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
-    SELF.entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
-    SELF.collider = COLLIDER_TYPE_CAPSULE;
-    SELF.colliderCenter.y = 0.84f;
-    SELF.colliderSize = (Vector3) { .x = 0.48f, .y = 2.0f, .z = 1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
-    SELF.mass = 1.0f;
-    SELF.linearDrag = 8.0f;
-    SELF.dynamicFriction = 0.6f;
-    SELF.staticFriction = 0.8f;
-    SELF.frictionCombine = PHYS_COMBINE_MUL;
-    SELF.health = 200.0f;
-    SELF.lastHealth = SELF.health;
-    SELF.energyDrainTickFinished = Sys_Global.pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
-    SELF.energy = 54.0f;
-    SELF.maxEnergy = 255.0f;
-    SELF.resetAfterDeathTime = 0.5;
-    SELF.painSoundFinished = Sys_Global.pauseRelativeTime;
-    SELF.radSoundFinished = Sys_Global.pauseRelativeTime;
-    SELF.radFXFinished = Sys_Global.pauseRelativeTime;
-    SELF.noiseFinished = Sys_Global.pauseRelativeTime;
+    instances[i].index = 767;
+    instances[i].layer = 12; // PhysicsLayer_Player
+    instances[i].position = (Vector3) { .x = 10.52f, .y = -43.792f + 0.84f, .z = 20.2908f}; // Start Actual: Puts player on Medical Level in actual game start position.  Added 0.84f y for cam offset from center
+    instances[i].scale = (Vector3) { 1.0f, 1.0f, 1.0f };
+    instances[i].rotation = (Quaternion){ .x = 0.0f, .y = 0.7071f, .z = 0.0f, .w = 0.7071f }; // 90deg rotation CW about Y axis as viewed from the top looking down onto player
+    instances[i].entflags = ENTFLAG_ACTIVE | ENTFLAG_USEGRAVITY | ENTFLAG_RIGIDBODY;
+    instances[i].collider = COLLIDER_TYPE_CAPSULE;
+    instances[i].colliderCenter.y = 0.84f;
+    instances[i].colliderSize = (Vector3){.x = 0.48f, .y = 2.0f, .z = 1.0f}; // Radius, Overall height including end radii (Unity convention, blech), Direction, 1.0 == Y-Axis
+    instances[i].mass = 1.0f;
+    instances[i].linearDrag = 8.0f;
+    instances[i].velocity = (Vector3){0.0f,0.0f,0.0f};
+    instances[i].dynamicFriction = 0.6f;
+    instances[i].staticFriction = 0.8f;
+    instances[i].frictionCombine = PHYS_COMBINE_MUL;
+    instances[i].health = 200.0f;
+    instances[i].lastHealth = instances[i].health;
+    instances[i].energyDrainTickFinished = Sys_Global.pauseRelativeTime + 0.1 + (double)random_range(0.5f, 1.0f);
+    instances[i].energy = 54.0f;
+    instances[i].maxEnergy = 255.0f;
+    instances[i].resetAfterDeathTime = 0.5;
+    instances[i].painSoundFinished = Sys_Global.pauseRelativeTime;
+    instances[i].radSoundFinished = Sys_Global.pauseRelativeTime;
+    instances[i].radFXFinished = Sys_Global.pauseRelativeTime;
+    instances[i].noiseFinished = Sys_Global.pauseRelativeTime;
     if (i == PLAYER1) MFDInit(); // TODO Make this check if i == current player on this PC
     if (i == PLAYER1) InventoryInit(); // TODO Make this check if i == current player
 }

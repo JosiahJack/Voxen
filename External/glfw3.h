@@ -549,6 +549,8 @@ GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun ca
 GLFWAPI void glfwMakeContextCurrent(GLFWwindow* window);
 GLFWAPI void glfwSwapBuffers(GLFWwindow* window);
 GLFWAPI void glfwSwapInterval(int interval);
+GLFWAPI void glfwGetWindowPos(GLFWwindow* window, int* xpos, int* ypos);
+GLFWAPI void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
 
 #ifdef GLFW_WINGDIAPI_DEFINED
  #undef WINGDIAPI

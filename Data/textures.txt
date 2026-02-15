@@ -2184,7 +2184,9 @@ persistent: 1
 #Textures/UI/shieldwave.png
 index: 1076
 persistent: 1
-
+#Textures/UI/dropdown_caret.png
+index: 1077
+persistent: 1
 #Textures/UI/sliderhandle.png
 index: 1078
 persistent: 1
@@ -2262,6 +2264,12 @@ index: 1116
 index: 1117
 #Textures/sequences/broken_clock02.png
 index: 1118
+#Textures/UI/dropdown_caret_hilite.png
+index: 1119
+persistent: 1
+#Textures/UI/input_button_filled.png
+index: 1120
+persistent: 1
 
 #Textures/sequences/engscreen1_04.png
 index: 1123

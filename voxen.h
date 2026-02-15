@@ -38,7 +38,6 @@ typedef struct {
     double shakeFinished;
 	char global_modname[256];
 	bool global_modIsCitadel;
-    bool startingNewGame;
     bool introNotPlayed;
     uint8_t levelSecurity[14];
 	uint8_t startLevel;
@@ -57,13 +56,13 @@ typedef struct {
 	uint16_t cyberkills;
 	uint32_t shotsFired;
 	uint32_t grenadesThrown;
-	uint32_t damageDealt;
-	uint32_t damageReceived;
+	float damageDealt;
+	float damageReceived;
 	uint32_t savesScummed;
 	uint8_t creditsPageIndex;
 	bool creditsActive;
     bool decoyActive;
-	char playerName[32];
+	char playerName[27];
 } GlobalContext;
 extern GlobalContext Sys_Global;
 
@@ -1526,6 +1525,7 @@ extern float aspect3D;
 extern float rasterPerspectiveProjection[16];
 extern float shadowmapsPerspectiveProjection[16];
 extern float uiOrthoProjection[16];
+extern bool enteringPlayerName;
 void Screenshot(void);
 void ToggleConsole(void);
 void ConsoleEmulator(int32_t keycode);
@@ -1537,19 +1537,20 @@ void SetSkyRotateSpeed(void);
 #define FONT_ATLAS_SIZE 3072
 #define MAX_GLYPHS 639
 #define FONT_NORMAL 0
-#define FONT_STOPD 1
-#define TEXT_WHITE 0
-#define TEXT_YELLOW 1
-#define TEXT_DARK_YELLOW 2
-#define TEXT_GREEN 3
-#define TEXT_RED 4
-#define TEXT_ORANGE 5
-#define TEXT_STOPD_RED 6
-#define TEXT_STOPD_RED_HIGHLIGHT 7
+#define FONT_STOPD  1
+#define TEXT_WHITE                0
+#define TEXT_YELLOW               1
+#define TEXT_DARK_YELLOW          2
+#define TEXT_GREEN                3
+#define TEXT_RED                  4
+#define TEXT_ORANGE               5
+#define TEXT_STOPD_RED            6
+#define TEXT_STOPD_RED_HIGHLIGHT  7
 #define TEXT_STOPD_RED_PAUSETITLE 8
-#define TEXT_GREEN_MENU 9
-#define TEXT_GREEN_MENU_SHADOW 10
-#define TEXT_GREEN_MENU_GLOW 11
+#define TEXT_GREEN_MENU           9
+#define TEXT_GREEN_MENU_SHADOW   10
+#define TEXT_GREEN_MENU_GLOW     11
+#define TEXT_RED_MENU            12
 extern bool returnToPause;
 extern char** audiologNames;
 extern char** audiologSubjects;
@@ -1729,3 +1730,6 @@ void Shake(float force);
 void InitAfterLoad(void);
 void SetVSync(void);
 void UpdateProjectionMatrices(void);
+void TextEntry(int32_t keycode);
+void GoIntoGame(void);
+void NewGame(void);

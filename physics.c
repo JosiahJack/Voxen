@@ -103,6 +103,9 @@ void ApplyPlayerMovements(void) {
     Vector3 currentVel = instances[PLAYER1].velocity;
     float accel = boosterActive ? 1.0f : 3.0f;
     Vector3 deltaVel = Vector3_A_minus_B(wishVel, currentVel);
+    deltaVel.x = vmax(vmin(deltaVel.x,10.0f),-10.0f);
+    deltaVel.y = vmax(vmin(deltaVel.y,10.0f),-10.0f);
+    deltaVel.z = vmax(vmin(deltaVel.z,10.0f),-10.0f);
     Vector3 appliedVel = Vector3_A_plus_B(currentVel, scale_vector3(deltaVel, (accel * (float)Sys_Global.timeSinceLastPhysicsTick)));
     instances[PLAYER1].velocity = appliedVel; // Gravity applied elsewhere same as everything else.
 }

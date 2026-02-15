@@ -234,8 +234,6 @@ void ApplySettings(void) {
     SetGI();
     SetSpeakerMode();
     SetLanguage();
-//     DualLog("Applied configuration settings\n");
-    // TODO: Render config view on the menu
 }
 
 bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == GLFW_KEY_ENTER || key == GLFW_KEY_TAB || key == GLFW_KEY_ESCAPE; }
@@ -244,11 +242,10 @@ bool IsNonRepeatingKey(int32_t key) { return key == GLFW_KEY_KP_ENTER || key == 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 static void key_callback(GLFWwindow* window, int32_t key, int32_t scancode, int32_t action, int32_t mods) {
-//     DualLog("Keyboard button callback entry with key %d, scancode %d, action %d, mods %d\n",key,scancode,action,mods);
     if (key == GLFW_KEY_F10 && action) OS_Exit(0);
     if (Sys_Global.menuActive && !returnToPause) {
-        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down) Sys_Global.menuActive = Sys_Global.gamePaused = false;
-        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) Sys_Global.menuActive = Sys_Global.gamePaused = false;
+        if ((key == GLFW_KEY_RIGHT_ALT || key == GLFW_KEY_LEFT_ALT) && action && Sys_Input.keyStates[GLFW_KEY_ENTER].down)                    GoIntoGame();
+        if (key == GLFW_KEY_ENTER && action && (Sys_Input.keyStates[GLFW_KEY_LEFT_ALT].down || Sys_Input.keyStates[GLFW_KEY_RIGHT_ALT].down)) GoIntoGame();
     }
 
     if (action == GLFW_PRESS || (action == GLFW_REPEAT && !IsNonRepeatingKey(key))) Input_KeyDown(key);
@@ -341,13 +338,12 @@ void Input_Init(GLFWwindow* window) {
     glfwSetWindowFocusCallback(window, window_focus_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    Sys_Input.isCapsLockOn = false; // As far as we're concerned, don't worry about OS state.
-    Sys_Input.lastUse = false;
 }
 
 int32_t Input_KeyDown(int32_t keycode) {
     if (keycode >= 0 && keycode < MAX_KEYS) Sys_Input.keyStates[keycode].pressed = Sys_Input.keyStates[keycode].down = true;
     if (Sys_Cheats.consoleActive) { ConsoleEmulator(keycode); return 0; }
+    if (enteringPlayerName && Sys_Global.menuActive) { TextEntry(keycode); return 0; }
     return 0;
 }
 
@@ -510,26 +506,7 @@ void ProcessInput(void) {
     
     if (Menu() && !Sys_Global.menuActive) { Sys_Global.gamePaused = !Sys_Global.gamePaused; return; }
     if (Menu() && Sys_Global.menuActive) { MenuGoBack(); return; }
-    if (Sys_Global.gamePaused || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
-//     if (Sys_Global.menuActive) { MenuInput(); return; } TODO
-    
-    // Debug test light TODO: Remove later once player lantern is working
-//     uint16_t testLight = 741;
-//     uint16_t testLightIdx = (testLight * LIGHT_DATA_SIZE);
-//     Vector3 testLightPos = (Vector3){ lights[testLightIdx + LIGHT_DATA_OFFSET_POSX], lights[testLightIdx + LIGHT_DATA_OFFSET_POSY], lights[testLightIdx + LIGHT_DATA_OFFSET_POSZ] };
-//     float mx = 0.0f, my = 0.0f, mz = 0.0f;
-//     bool moveTestLight =    Sys_Input.keyStates[GLFW_KEY_1].down || Sys_Input.keyStates[GLFW_KEY_2].down
-//                          || Sys_Input.keyStates[GLFW_KEY_3].down || Sys_Input.keyStates[GLFW_KEY_4].down
-//                          || Sys_Input.keyStates[GLFW_KEY_5].down || Sys_Input.keyStates[GLFW_KEY_6].down;
-//     if (moveTestLight) {
-//         if (Sys_Input.keyStates[GLFW_KEY_1].down) mx =  0.01f;
-//         if (Sys_Input.keyStates[GLFW_KEY_2].down) mx = -0.01f;
-//         if (Sys_Input.keyStates[GLFW_KEY_3].down) my =  0.01f;
-//         if (Sys_Input.keyStates[GLFW_KEY_4].down) my = -0.01f;
-//         if (Sys_Input.keyStates[GLFW_KEY_5].down) mz =  0.01f;
-//         if (Sys_Input.keyStates[GLFW_KEY_6].down) mz = -0.01f;
-//         lightDirty[testLight] = true; lightsNewPosition[testLight] = Vector3_A_plus_B(testLightPos, (Vector3){ mx, my, mz });
-//     }
+    if (Sys_Global.gamePaused || Sys_Global.menuActive || Sys_Cheats.consoleActive) return; // =========== PAUSE BARRIER ==================
     
     // Debug test entity for confirming model+texture setup + collisions TODO: Remove after combing through entity types.
     if (Sys_Input.keyStates[GLFW_KEY_I].pressed) {
