@@ -160,40 +160,37 @@ Quaternion cubemapOrientationQuaternion[6] = {
 bool lightInPVS[LIGHT_COUNT];
 Vector3 lightsNewPosition[LIGHT_COUNT];
 bool UpdateLights(bool* voxelsNeedUpdated) {
-    for (uint16_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {        
+    for (uint16_t lightIdx = 0; lightIdx < loadedLights; ++lightIdx) { 
+        uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lightsNewPosition[lightIdx].y;
+        lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lightsNewPosition[lightIdx].z;
+        Vector3 lightPos = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
         if (lightDirty[lightIdx]) { // Marked all as true at level load.
             *voxelsNeedUpdated = true;
-            uint32_t litIdx = lightIdx * LIGHT_DATA_SIZE;
-
-            // Update to new position
-            lights[litIdx + LIGHT_DATA_OFFSET_POSX] = lightsNewPosition[lightIdx].x;
-            lights[litIdx + LIGHT_DATA_OFFSET_POSY] = lightsNewPosition[lightIdx].y;
-            lights[litIdx + LIGHT_DATA_OFFSET_POSZ] = lightsNewPosition[lightIdx].z;
-            Vector3 lightPos = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-
             #pragma GCC unroll 6
-            for (int j=0;j<6;++j) {
+            for (int j=0;j<6;++j) { // Update to new position
                 mat4_lookat_from((float*)lightView[lightIdx][j], &cubemapOrientationQuaternion[j], lightPos);
                 mul_mat4((float*)lightViewProj[lightIdx][j], shadowmapsPerspectiveProjection, (float*)lightView[lightIdx][j]);
                 ExtractFrustumPlanes((float*)lightViewProj[lightIdx][j], lightFrustumPlanes[lightIdx][j]);
             }
-            
-            uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-            uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
-            int lightCellIdx = (cellZ * WORLDX) + cellX;
-            float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
-            int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
-            lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
-            if (!lightInPVS[lightIdx]) {
-                for (int ix = cellX - r; ix <= (int)cellX + r; ++ix) {
-                    for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
-                        if (!XZPairInBounds(ix, iz)) continue;
-                        
-                        int subIdx = iz * WORLDX + ix;
-                        if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
-                            lightInPVS[lightIdx] = true;
-                            break;
-                        }
+        }
+        
+        uint16_t cellX = (uint16_t)clamp((int32_t)vfloor((lightPos.x - worldMin_x + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        uint16_t cellZ = (uint16_t)clamp((int32_t)vfloor((lightPos.z - worldMin_z + CELLXHALF) / WORLDCELL_WIDTH_F), 0, WORLDX_0BASED);
+        int lightCellIdx = (cellZ * WORLDX) + cellX;
+        float range = lights[litIdx + LIGHT_DATA_OFFSET_RANGE];
+        int r = vceil(range * (1.0f / WORLDCELL_WIDTH_F));
+        lightInPVS[lightIdx] = (gridCellStates[lightCellIdx] & CELL_VISIBLE);
+        if (!lightInPVS[lightIdx]) {
+            for (int ix = cellX - r; ix <= (int)cellX + r; ++ix) {
+                for (int iz = cellZ - r; iz <= (int)cellZ + r; ++iz) {
+                    if (!XZPairInBounds(ix, iz)) continue;
+                    
+                    int subIdx = iz * WORLDX + ix;
+                    if (get_cull_bit(precomputedVisibleCellsFromHere, lightCellIdx * ARRSIZE + subIdx) && (gridCellStates[subIdx] & CELL_VISIBLE)) {
+                        lightInPVS[lightIdx] = true;
+                        break;
                     }
                 }
             }
@@ -675,7 +672,6 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
 }
 
 #define SHADOW_NEARMESH_MAX 384 // 350 was too low for light 712 on security atrium
-#define SHADOW_LIGHT_THRESH 0.015f
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
 bool UpdatedPlayerCell(void);
@@ -716,7 +712,7 @@ void RenderShadowmaps(void) {
         
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
         float luminosity = (intensity / (range * range));
-        if (luminosity < SHADOW_LIGHT_THRESH) continue;
+        if (luminosity < 0.015f && (range < 8.0f || intensity < 0.5f)) continue;
         if (!lightInPVS[i]) continue;
         
         float dx = lightPos.x - playerPos.x;    float dy = lightPos.y - playerPos.y;    float dz = lightPos.z - playerPos.z;
@@ -725,9 +721,6 @@ void RenderShadowmaps(void) {
         if (dotResult < 0.0f && distSqrdToPlayer > (range * range)) continue;
         
         float score = distSqrdToPlayer / vmax(intensity, 0.01f);
-        if (dotResult > 0.5f || distSqrdToPlayer < 26.2144f) score *= 0.125f; // Favor lights in player's view cone or within 5.12 (2 world cells)
-        else if (dotResult > 0.0f) score *= 0.25f; // Favor lights in player's view cone
-
         if (numberFoundLightCandidatesForShadows < MAX_SHADOWMAPS) {
             candidates[numberFoundLightCandidatesForShadows] = (LightCandidate){ i, distSqrdToPlayer, score, range, lightPos };
             bestScores[numberFoundLightCandidatesForShadows] = score;
