@@ -16,6 +16,8 @@ void GoIntoGame(void) {
     currentMenuItem = currentMenuTab = 0; currentMenuPage = MenuPages_FrontPage;
     Sys_Global.inventoryMode = false;
     NewGame();
+    mp3_clear();
+    play_mp3("./Audio/music/THM1-19_medicalstart.mp3",100);
     DualLog("%s started the game!\n", Sys_Global.playerName);
 }
 

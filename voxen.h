@@ -1243,7 +1243,7 @@ void DualLogError(const char* fmt, ...);
 
 extern const char* sounds[670];
 extern const char* audioLogs[134];
-void play_mp3(const char* path, float volume, int32_t fade_in_ms);
+void play_mp3(const char* path, int32_t fade_in_ms);
 void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 void InitializeAudio(void);
 void InitializeAIAfterLoad(uint16_t i);
@@ -1733,3 +1733,9 @@ void UpdateProjectionMatrices(void);
 void TextEntry(int32_t keycode);
 void GoIntoGame(void);
 void NewGame(void);
+void mp3_clear(void);
+void play_message(const char* path);
+void set_music_volume(void);
+void set_sfx_volume(void);
+void set_message_volume(void);
+void set_master_volume(void);

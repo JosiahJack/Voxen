@@ -8,7 +8,6 @@
 #include "Shaders/shaders.h"
 #include "credits.h"
 #include "data_textures.c"
-#include "audio.c"
 const char* EngineName = "Voxen, the Voxel Lit Open Source Game Engine";
 GlobalContext Sys_Global = { .menuActive = true, .screenshotTimeout = 1.0, .creditsPageIndex = 1, .difficultyCombat = 2, .difficultyCyber = 2, .difficultyPuzzle = 2, .difficultyMission = 2, .deaths = 0 };
 DiagnosticsSystem Sys_Dx = { .worstFPS = UINT32_MAX };
@@ -621,6 +620,9 @@ void InitializeEnvironment(void) {
         // Testing:
         NewGame(); // TODO: Do this from menu not immediately lol
     }
+    
+    mp3_clear();
+    play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     DebugRAM("InitializeEnvironment end");
 }
 

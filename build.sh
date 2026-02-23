@@ -168,7 +168,7 @@ fi
 cp $GLAD_OBJ "$TEMP_DIR/glad.o"
 export CC=$CC
 export CFLAGS=$CFLAGS
-SOURCES="voxen.c physics.c helpers.c init.c menu.c animation.c console.c biomonitor.c level.c data_parser.c data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c"
+SOURCES="voxen.c physics.c helpers.c init.c menu.c audio.c animation.c console.c biomonitor.c level.c data_parser.c data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
 

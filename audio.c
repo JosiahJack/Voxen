@@ -1,17 +1,19 @@
 // audio.c
 #include <string.h>
-#include <stdio.h>
+#include "os.h"
+#include "voxen.h"
 #include "./External/miniaudio.h"
 
 #define MAX_CHANNELS 16
 #define MAX_AMBIENT_NOISES 128
 ma_engine audio_engine;
 ma_sound mp3_sounds[2]; // For crossfading
+int32_t mp3_slot = 0;
 ma_sound wav_sounds[MAX_CHANNELS];
+float wav_volumes[MAX_CHANNELS]; // Setting independent base sfx volume (e.g. dropped physics object hard or lightly volume, independent of position).
 int32_t wav_count = 0;
-// Usage: play_mp3("./Audio/music/looped/track1.mp3",0.08f,0);  WORKED! play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
-//        play_mp3("./Audio/music/TITLOOP-00_menu.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f + 0.09f,1500);
-//        play_mp3("./Audio/music/THM1-19_medicalstart.mp3",((float)Sys_Settings.VolumeMusic/100.0f) * 0.4f,100);
+ma_sound log_sound;
+// Usage: play_wav("./Audio/cyborgs/yourlevelsareterrible.wav",0.1f); WORKED!
 
 void InitializeAudio(void) {
     ma_result result;
@@ -21,43 +23,67 @@ void InitializeAudio(void) {
     if (result != MA_SUCCESS) { DualLog("ERROR: Failed to initialize miniaudio engine: %d\n", result); return; }
 }
 
-void play_mp3(const char* path, float volume, int32_t fade_in_ms) {
-    static int32_t slot = 0;
-    ma_sound_uninit(&mp3_sounds[slot]);
-    ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &mp3_sounds[slot]);
+void mp3_clear(void) {
+    ma_sound_stop(&mp3_sounds[0]);
+    ma_sound_stop(&mp3_sounds[1]);
+    mp3_slot = 0;
+}
+
+float GetSFXVolume(float volume) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeEffects/100.0f) * volume; }
+float GetMusicVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMusic/100.0f); }
+float GetMessageVolume(void) { return ((float)Sys_Settings.VolumeMaster/100.0f) * ((float)Sys_Settings.VolumeMessage/100.0f); }
+void set_music_volume(void) { for (int i=0;i<2;++i) { ma_sound_set_volume(&mp3_sounds[i], GetMusicVolume()); } }
+void set_sfx_volume(void) { for (int i=0;i<MAX_CHANNELS;++i) { ma_sound_set_volume(&wav_sounds[i], GetSFXVolume(wav_volumes[i])); } }
+void set_message_volume(void) { ma_sound_set_volume(&log_sound, GetMessageVolume()); }
+void set_master_volume(void) { set_sfx_volume(); set_music_volume(); set_message_volume(); }
+
+void play_mp3(const char* path, int32_t fade_in_ms) {
+    ma_sound_uninit(&mp3_sounds[mp3_slot]);
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, MA_SOUND_FLAG_STREAM, NULL, NULL, &mp3_sounds[mp3_slot]);
     if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load MP3 %s: %d\n", path, result);  return; }
     
-    ma_sound_set_fade_in_milliseconds(&mp3_sounds[slot], 0.0f, volume, fade_in_ms);
-    ma_sound_start(&mp3_sounds[slot]);
-    slot = 1 - slot; // Toggle for crossfade
+    float vol = GetMusicVolume();
+    ma_sound_set_fade_in_milliseconds(&mp3_sounds[mp3_slot], 0.0f, vol, fade_in_ms);
+    ma_sound_start(&mp3_sounds[mp3_slot]);
+    ma_sound_set_volume(&mp3_sounds[mp3_slot], vol);
+    mp3_slot = mp3_slot ? 0 : 1; // Toggle for crossfade
 }
 
 void play_wav(const char* path, float volume, Vector3 pos, bool positional) {
-    // Try to find a free slot (either unused or finished)
     int32_t slot = -1;
-    for (int32_t i = 0; i < wav_count; i++) {
+    for (int32_t i = 0; i < wav_count; i++) { // Try to find a free slot (either unused or finished)
         if (!ma_sound_is_playing(&wav_sounds[i]) && ma_sound_at_end(&wav_sounds[i])) {
             ma_sound_uninit(&wav_sounds[i]);
             slot = i;
             break;
         }
     }
-    
-    // If no free slot, use a new one if available
-    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++;
-    if (slot == -1) { DualLog("WARNING: Max WAV channels (%d) reached\n", MAX_CHANNELS); return; }
+
+    if (slot == -1 && wav_count < MAX_CHANNELS) slot = wav_count++; // If no free slot, use a new one if available
+    if (slot == -1) { DualLog("WARNING: Max effect WAV channels (%d) reached\n", MAX_CHANNELS); return; }
 
     ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &wav_sounds[slot]);
     if (result != MA_SUCCESS) {
-        DualLog("ERROR: Failed to load WAV %s: %d\n", path, result);
+        DualLog("ERROR: Failed to load effect WAV %s: %d\n", path, result);
         if (slot == wav_count - 1) wav_count--; // Revert count if init fails
         return;
     }
     
     if (positional) ma_sound_set_position(&wav_sounds[slot], pos.x, pos.y, pos.z);
     ma_sound_set_spatialization_enabled(&wav_sounds[slot], (ma_bool32)positional);
-    ma_sound_set_volume(&wav_sounds[slot], volume);
+    wav_volumes[slot] = volume;
+    ma_sound_set_volume(&wav_sounds[slot], GetSFXVolume(wav_volumes[slot]));
     ma_sound_start(&wav_sounds[slot]);
+}
+
+void play_message(const char* path) {
+    if (ma_sound_is_playing(&log_sound)) { ma_sound_stop(&log_sound); ma_sound_uninit(&log_sound); }
+    ma_result result = ma_sound_init_from_file(&audio_engine, path, 0, NULL, NULL, &log_sound);
+    if (result != MA_SUCCESS) { DualLog("ERROR: Failed to load message WAV %s: %d\n", path, result); return; }
+    
+    ma_sound_set_spatialization_enabled(&log_sound, false);
+    ma_sound_set_volume(&log_sound, GetMessageVolume());
+    ma_sound_start(&log_sound);
 }
 
 // ============================================================================
