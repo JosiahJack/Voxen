@@ -139,12 +139,6 @@ typedef struct {
 	Vector3 debugLine_start;
 	Vector3 debugLine_end;
 	double debugLineFinished;
-	uint32_t drawCallsRenderedThisFrame;
-	uint32_t textDrawCallsRenderedThisFrame;
-	uint32_t uiImageDrawCallsRenderedThisFrame;
-	uint32_t shadowDrawCallsRenderedThisFrame;
-	uint32_t verticesRenderedThisFrame;
-	uint32_t drawCallsNormal;
 	uint32_t debugLineVertCount;
 } DiagnosticsSystem;
 extern DiagnosticsSystem Sys_Dx;
@@ -1236,20 +1230,13 @@ static inline float vexp2f(float x) {
 
 static inline float vexp(float x) { return vexp2f(x * 1.4426950409f); } // 1/ln(2)
 static inline float vpow(float a, float b) { return vexp(b * vlog(a)); }
-
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
-
 extern const char* sounds[670];
 extern const char* audioLogs[134];
 void play_mp3(const char* path, int32_t fade_in_ms);
 void play_wav(const char* path, float volume, Vector3 pos, bool positional);
-void InitializeAudio(void);
-void InitializeAIAfterLoad(uint16_t i);
-void ResetLevelAudio(void);
-void UpdateAmbientSounds(void);
-
 #define MAX_VALID_TEXTURE 2048
 #define MAX_TEXTURE_DIMENSION 2048
 #define MAX_PALETTE_SIZE 256
@@ -1257,10 +1244,6 @@ void UpdateAmbientSounds(void);
 #define MAX_UNIQUE_COLORS 76800u
 extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
 extern bool transparentTexture[MAX_VALID_TEXTURE];
-bool isDoubleSided(uint32_t texIndexToCheck);
-bool isTransparent(uint32_t texIndexToCheck);
-void LoadTextures(void);
-
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
@@ -1284,8 +1267,6 @@ extern bool modelHasAnimation[MODEL_IDX_MAX];
 #define MAX_ANIMATED_MODELS 64
 #define MAX_ANIMATION_CLIPS_PER_MODEL 32
 extern const AnimationClip modelAnimationClips[MAX_ANIMATED_MODELS][MAX_ANIMATION_CLIPS_PER_MODEL];
-void LoadModels(void);
-bool InstanceIsNonRenderable(uint16_t i);
 
 // Lights
                            //    0     1     2          3       4        5         6         7         8         9 10 11 12
@@ -1529,7 +1510,6 @@ extern bool enteringPlayerName;
 void Screenshot(void);
 void ToggleConsole(void);
 void ConsoleEmulator(int32_t keycode);
-bool CursorVisible(void);
 void SetSkyRotateSpeed(void);
 // ----------------------------------------------------------------------------
 // UI
@@ -1560,9 +1540,6 @@ extern GLuint fontAtlasTex;
 extern GLuint fontAtlasTexStopD;
 extern float fixedNumberAdvanceWidth;
 extern float fixedNumberAdvanceWidthStopD;
-extern float genericTextHeightFacStopD;
-extern float genericTextWidthFacStopD;
-extern float genericTextHeightFac;
 extern bool mouseMovementThisFrame;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
 extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
@@ -1570,7 +1547,6 @@ extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 void LoadTextForLanguage(uint8_t lang);
 void LoadLogTextForLanguage(uint8_t lang);
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
-float TextWidth(const char *utf8, int32_t fontID);
 void InitFontAtlasses(void);
 // ----------------------------------------------------------------------------
 // Helper Functions
@@ -1614,8 +1590,6 @@ bool ConstIndexIsNPC(int constdex);
 bool ConstIndexIsHardware(int constdex);
 bool ConstIndexIsAmbient(int constdex);
 bool ConstIndexIsButtonSwitch(int constdex);
-bool CursorVisible(void);
-float LoadRelativeTimeDifferential(char* trimmed_value, char* initialLine, uint32_t lineNum);
 uint8_t GetCurrentLevelSecurity(void);
 uint16_t GetImpactType(uint16_t instanceIdx);
 int hardware14fromConstdex(int constdex);

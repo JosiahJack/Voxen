@@ -38,27 +38,4 @@ public class TeleportTouch : MonoBehaviour {
 			}
 		}
 	}
-
-	public static string Save(GameObject go) {
-		TeleportTouch tt = go.GetComponent<TeleportTouch>();
-		s1.Clear();
-		s1.Append(Utils.SaveRelativeTimeDifferential(tt.justUsed,"justUsed"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(tt.touchEnabled,"touchEnabled"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(tt.teleportID,"teleportID"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.UintToString(tt.targetDestinationID,"targetDestinationID"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		TeleportTouch tt = go.GetComponent<TeleportTouch>();
-		tt.justUsed = Utils.LoadRelativeTimeDifferential(entries[index],"justUsed"); index++;
-		tt.touchEnabled = Utils.GetBoolFromString(entries[index],"touchEnabled"); index++;
-		tt.teleportID = Utils.GetIntFromString(entries[index],"teleportID"); index++;
-		tt.targetDestinationID = Utils.GetIntFromString(entries[index],"targetDestinationID"); index++;
-		tt.Awake();
-		return index;
-	}
 }

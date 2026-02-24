@@ -144,29 +144,4 @@ public class SpawnManager : MonoBehaviour {
 		}
 		return true;
 	}
-
-	public static string Save(GameObject go) {
-		SpawnManager sm = go.GetComponent<SpawnManager>();
-		s1.Clear();
-		s1.Append(Utils.BoolToString(sm.active,"SpawnManager.active"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.IntToString(sm.numberActive,"numberActive"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.SaveRelativeTimeDifferential(sm.delayFinished,"delayFinished"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		SpawnManager sm = go.GetComponent<SpawnManager>();
-		// Spawn martin.  Ok dang, this is such a vague reference it makes
-		// vague references look specific.  See source code for a Quake mod
-		// called vigil (the source code, not referenced as Martin in the mod
-		// though that's what your friend's name is, requires decompiling to
-		// see that it's called spawnmartin() as it isn't available separately,
-		// goodness gracious!)
-		sm.active = Utils.GetBoolFromString(entries[index],"SpawnManager.active"); index++;
-		sm.numberActive = Utils.GetIntFromString(entries[index],"numberActive"); index++;
-		sm.delayFinished = Utils.LoadRelativeTimeDifferential(entries[index],"delayFinished"); index++;
-		return index;
-	}
 }

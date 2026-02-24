@@ -70,29 +70,4 @@ public class SecurityCameraRotate : MonoBehaviour {
 		transform.Rotate((Vector3){0,degreesYPerSecond * tickTime * -1,0),
 						 Space.World);
 	}
-
-	public static string Save(GameObject go) {
-		SecurityCameraRotate scr = go.GetComponent<SecurityCameraRotate>();
-		s1.Clear();
-		s1.Append(Utils.SaveRelativeTimeDifferential(scr.waitingFinished,"waitingFinished"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.BoolToString(scr.enabled,"enabled"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(scr.startYAngle,"startYAngle"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(scr.endYAngle,"endYAngle"));
-		s1.Append(Utils.splitChar);
-		s1.Append(Utils.FloatToString(scr.waitTime,"waitTime"));
-		return s1.ToString();
-	}
-
-	public static int Load(GameObject go, ref string[] entries, int index) {
-		SecurityCameraRotate scr = go.GetComponent<SecurityCameraRotate>();
-		scr.waitingFinished = Utils.LoadRelativeTimeDifferential(entries[index],"waitingFinished"); index++;
-		scr.enabled = Utils.GetBoolFromString(entries[index],"enabled"); index++;
-		scr.startYAngle = Utils.GetFloatFromString(entries[index],"startYAngle"); index++;
-		scr.endYAngle = Utils.GetFloatFromString(entries[index],"endYAngle"); index++;
-		scr.waitTime = Utils.GetFloatFromString(entries[index],"waitTime"); index++;
-		return index;
-	}
 }

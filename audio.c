@@ -143,7 +143,7 @@ static const AmbientDef* ambient_def_by_index(uint16_t idx) {
     return NULL;
 }
 
-inline void UpdateAmbientSounds(void) {
+void UpdateAmbientSounds(void) {
     const Vector3* player = &instances[PLAYER1].position;
     const float max_range = 7.68f;
     const float max_range_sq = max_range * max_range;

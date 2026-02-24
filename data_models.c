@@ -1,5 +1,4 @@
 // data_models.c - Load 3D Models from .vmdl caches or .fbx via Assimp if cache invalid
-#include <malloc.h>
 #include "./External/assimp/cimport.h"
 #include "./External/assimp/scene.h"
 #include "os.h" // Operating System calls shim layer.
@@ -67,7 +66,7 @@ void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmd
     const struct aiScene* scene = NULL;
     if (!fromCache) {
         DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
-        scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_Triangulate*/ 0x8 | /*aiProcess_GenNormals*/ 0x20 | 0x800/*aiProcess_ImproveCacheLocality*/ | /*aiProcess_JoinIdenticalVertices*/ 0x2, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
+        scene = aiImportFileExWithProperties(fbx_path, /*aiProcess_Triangulate*/ 0x8 | 0x800/*aiProcess_ImproveCacheLocality*/ | /*aiProcess_JoinIdenticalVertices*/ 0x2, NULL, props); // aiProcess vars from https://github.com/assimp/assimp/blob/672594c230832252f94bc90c19ca9ee9917be563/include/assimp/postprocess.h#L170
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) { DualLogError("Assimp failed %s: %s\n", fbx_path, aiGetErrorString()); return; }
     } // else use existing .vmdl binary RAM blob (aka a cache hit was successful)
 

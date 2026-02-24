@@ -56,6 +56,12 @@ bool lightCastsShadows[LIGHT_COUNT];
 uint16_t useableItemsFrobIcons[94];
 bool boosterActive;
 uint16_t selfIdx;
+uint32_t drawCallsRenderedThisFrame;
+uint32_t textDrawCallsRenderedThisFrame;
+uint32_t uiImageDrawCallsRenderedThisFrame;
+uint32_t shadowDrawCallsRenderedThisFrame;
+uint32_t verticesRenderedThisFrame;
+uint32_t drawCallsNormal;
 
 // Logs both to log file and console, usage same as printf
 void DualLogMain(FILE *stream, const char *prefix, const char *fmt, va_list args) {
@@ -101,11 +107,9 @@ void CompileShaders(void) {
 }
 
 GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage) {
-    glGenBuffers(1, id);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER, *id);
+    glGenBuffers(1, id); glBindBuffer(GL_SHADER_STORAGE_BUFFER, *id);
     glBufferData(GL_SHADER_STORAGE_BUFFER, size, data, usage);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, *id);
-    return *id;
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, bindingIndex, *id); return *id;
 }
 
 // Generates View Matrix4x4 for Geometry Rasterizer Pass from camera world position + orientation
@@ -117,19 +121,14 @@ void mat4_lookat_from(float* m, Quaternion* camRotation, Vector3 eye) { // Kept 
     Vector3 right   = { 1.0f - 2.0f * (y2 + z2),        2.0f * (xy + wz),        2.0f * (xz - wy) };  // X+ (right)
     Vector3 up      = {        2.0f * (xy - wz), 1.0f - 2.0f * (x2 + z2),        2.0f * (yz + wx) };  // Y+ (up)
     Vector3 forward = {        2.0f * (xz + wy),        2.0f * (yz - wx), 1.0f - 2.0f * (x2 + y2) };  // Z+ (forward)
-    m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x; m[3]  = 0.0f;
-    m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y; m[7]  = 0.0f;
-    m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z; m[11] = 0.0f;
+    m[0]  = right.x;   m[1]  = up.x;   m[2]  = -forward.x;// m[3]  = 0.0f;
+    m[4]  = right.y;   m[5]  = up.y;   m[6]  = -forward.y;// m[7]  = 0.0f;
+    m[8]  = right.z;   m[9]  = up.z;   m[10] = -forward.z;// m[11] = 0.0f;
     m[12] = -dot_vector3(right, eye); m[13] = -dot_vector3(up, eye); m[14] = dot_vector3(forward, eye); m[15] = 1.0f;
 }
 
 __attribute__((pure)) bool SphereInFrustum(FrustumPlane* planes, Vector3 c, float radius) {
-    if ((planes[0].normal.x * c.x + planes[0].normal.y * c.y + planes[0].normal.z * c.z + planes[0].d) < -radius) return false;
-    if ((planes[1].normal.x * c.x + planes[1].normal.y * c.y + planes[1].normal.z * c.z + planes[1].d) < -radius) return false;
-    if ((planes[2].normal.x * c.x + planes[2].normal.y * c.y + planes[2].normal.z * c.z + planes[2].d) < -radius) return false;
-    if ((planes[3].normal.x * c.x + planes[3].normal.y * c.y + planes[3].normal.z * c.z + planes[3].d) < -radius) return false;
-    if ((planes[4].normal.x * c.x + planes[4].normal.y * c.y + planes[4].normal.z * c.z + planes[4].d) < -radius) return false;
-    if ((planes[5].normal.x * c.x + planes[5].normal.y * c.y + planes[5].normal.z * c.z + planes[5].d) < -radius) return false;
+    for (int i=0;i<6;++i) { if ((planes[i].normal.x * c.x + planes[i].normal.y * c.y + planes[i].normal.z * c.z + planes[i].d) < -radius) return false; }
     return true;
 }
 
@@ -288,9 +287,7 @@ void RenderUIImage(int16_t x, int16_t y, int16_t width, int16_t height, uint32_t
     glUniform1ui(18,texIndex);    
     glBufferData(GL_ARRAY_BUFFER,30 * sizeof(float),vertices,GL_DYNAMIC_DRAW);
     glDrawArrays(GL_TRIANGLES,0,6);
-    Sys_Dx.drawCallsRenderedThisFrame++;
-    Sys_Dx.uiImageDrawCallsRenderedThisFrame++;
-    Sys_Dx.verticesRenderedThisFrame += 6;    
+    drawCallsRenderedThisFrame++; uiImageDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += 6;    
     glBindBuffer(GL_ARRAY_BUFFER,0);
 }
 
@@ -371,8 +368,6 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
         }
 
         int idx = CodepointToPackedIndex(codepoint, fontID);
-        if (idx < 0) continue;
-
         if (fontID == FONT_STOPD) stbtt_GetPackedQuad(fontPackedCharStopD, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         else stbtt_GetPackedQuad(fontPackedChar, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, idx, &xpos, &ypos, &q, 1);
         float vx0 = (q.x0 * scale) - (borderWidthPixels);
@@ -396,9 +391,7 @@ void RenderFormattedText(int16_t x, int16_t y, uint32_t color, uint8_t fontID, f
     if (vertexCount > 0) {
         glNamedBufferData(Sys_Render.textVBO, vertexCount * 30 * sizeof(float), textVertexData, GL_DYNAMIC_DRAW);
         glDrawArrays(GL_TRIANGLES, 0, vertexCount * 6);
-        Sys_Dx.drawCallsRenderedThisFrame++;
-        Sys_Dx.textDrawCallsRenderedThisFrame++;
-        Sys_Dx.verticesRenderedThisFrame += vertexCount * 6;
+        drawCallsRenderedThisFrame++; textDrawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertexCount * 6;
     }
 }
 
@@ -492,6 +485,7 @@ void LoadGameModDefinition(void) { // Unique set separate from savedata path and
     DualLog(" %s:: num levels: %d, start level: %d... took %f secs\n",Sys_Global.global_modname, Sys_Global.numLevels, Sys_Global.startLevel, get_time() - start_time);
 }
 
+void InitializeAudio(void);
 void InitializeEnvironment(void) {
     double init_start_time = get_time();
     Sys_Dx.globalFrameNum = 0;
@@ -508,7 +502,7 @@ void InitializeEnvironment(void) {
     Sys_Global.window = glfwCreateWindow(Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, "Voxen", NULL, NULL);
     glfwSetFramebufferSizeCallback(Sys_Global.window, UpdateScreenSize);
     if (!Sys_Global.window) { DualLogError("glfwCreateWindow failed\n"); OS_Exit(1); }
-        
+
     glfwMakeContextCurrent(Sys_Global.window);
     if (!gladLoadGL((GLADloadfunc)glfwGetProcAddress)) { DualLogError("Failed to initialize GLAD\n"); OS_Exit(1); }
     
@@ -608,16 +602,9 @@ void InitializeEnvironment(void) {
     Sys_Render.texturePaletteOffsetsID = SetupSSBO(&Sys_Render.texturePaletteOffsetsID, 17, MAX_VALID_TEXTURE * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
     Sys_Render.lightsID                = SetupSSBO(&Sys_Render.lightsID,                19, LIGHT_COUNT * LIGHT_DATA_SIZE * sizeof(float), NULL, GL_STATIC_DRAW);
     Sys_Render.uniqueLightListsID      = SetupSSBO(&Sys_Render.uniqueLightListsID,       27,  VOXEL_COUNT * MAX_LIGHTS_PER_VOXEL * sizeof(uint32_t), NULL, GL_STATIC_DRAW);
-    
-    // Menu Active Items, System Wide Game Logic Starts:
     BioMonitorInit();
-    if (Sys_Global.introNotPlayed) {
-        // TODO: Play intro
-    } else {
-        // Testing:
-        NewGame(); // TODO: Do this from menu not immediately lol
-    }
-    
+    if (Sys_Global.introNotPlayed) { /* TODO: Play intro */ }
+    NewGame();
     mp3_clear();
     play_mp3("./Audio/music/TITLOOP-00_menu.mp3",1500);
     DebugRAM("InitializeEnvironment end");
@@ -633,8 +620,7 @@ void DrawDebugLines(float* viewProj) {
     glBindVertexArray(Sys_Render.debugLinesVAO);
     glDrawArrays(GL_LINES, 0, Sys_Dx.debugLineVertCount / 3);
     glEnable(GL_DEPTH_TEST);
-    Sys_Dx.drawCallsRenderedThisFrame++;
-    Sys_Dx.verticesRenderedThisFrame += Sys_Dx.debugLineVertCount / 3;
+    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += Sys_Dx.debugLineVertCount / 3;
     Sys_Dx.debugLineVertCount = 0;
 }
 
@@ -674,9 +660,6 @@ void Frob(Vector3 pos, Vector3 forward, Vector3 right) {
 #define SHADOW_NEARMESH_MAX 384 // 350 was too low for light 712 on security atrium
 DepthSort shadows_nearMeshes[SHADOW_NEARMESH_MAX]; // Found that this is typically around 172
 float shadows_nearMeshRadii[SHADOW_NEARMESH_MAX];
-bool UpdatedPlayerCell(void);
-
-static inline bool CellNotVisible(uint16_t index) { return ((gridCellStates[index] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN); } // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
 
 typedef struct {
     uint16_t index; // Original index in lights array
@@ -694,20 +677,13 @@ void RenderShadowmaps(void) {
     float bestScores[MAX_SHADOWMAPS];
     voxen_Shadow_System.numShadowsCouldRender = 0;
     Vector3 playerPos = instances[PLAYER1].position;
-    Vector3 playerFwd = instances[PLAYER1].forward;
-    static const Vector3 cornerShiftSigns[24] = { {1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, -1.0f},   {1.0f, -1.0f, 1.0f},   {1.0f, -1.0f, -1.0f},
-                                                {-1.0f, 1.0f, 1.0f},  {-1.0f, 1.0f, -1.0f},  {-1.0f, -1.0f, 1.0f},  {-1.0f, -1.0f, -1.0f},
-                                                {1.0f, 1.0f, 1.0f},   {1.0f, 1.0f, -1.0f},   {-1.0f, 1.0f, 1.0f},   {-1.0f, 1.0f, -1.0f},
-                                                {1.0f, -1.0f, 1.0f},  {1.0f, -1.0f, -1.0f},  {-1.0f, -1.0f, 1.0f},  {-1.0f, -1.0f, -1.0f},
-                                                {1.0f, 1.0f, 1.0f},   {1.0f, -1.0f, 1.0f},   {-1.0f, 1.0f, 1.0f},   {-1.0f, -1.0f, -1.0f},
-                                                {1.0f, 1.0f, -1.0f},  {1.0f, -1.0f, -1.0f},  {-1.0f, 1.0f, -1.0f},  {-1.0f, -1.0f, -1.0f} };
     float pfx = instances[PLAYER1].forward.x;    float pfy = instances[PLAYER1].forward.y;    float pfz = instances[PLAYER1].forward.z;
     for (uint16_t i = 0; i < loadedLights; ++i) { // Collect candidates: only lights that are enabled, within FAR_PLANE, and in PVS
         if (!lightCastsShadows[i]) continue;
 
         uint32_t litIdx = i * LIGHT_DATA_SIZE;
         Vector3 lightPos = (Vector3){ lights[litIdx], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
-        float intensity = lightMaxIntensity[i];//lights[litIdx + LIGHT_DATA_OFFSET_INTENSITY];
+        float intensity = lightMaxIntensity[i];
         if (intensity < 0.1f) continue;
         
         float range =  lights[litIdx + LIGHT_DATA_OFFSET_RANGE] * 0.99f; // Discard 1% more lights/meshes for performance.
@@ -749,7 +725,7 @@ void RenderShadowmaps(void) {
             glDispatchCompute(groupX_shadClear,6,1);
         }
 
-        Sys_Dx.shadowDrawCallsRenderedThisFrame = 0;
+        shadowDrawCallsRenderedThisFrame = 0;
         memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
         glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         glUseProgram(Sys_Render.shadowmapsShaderProgram);
@@ -757,8 +733,7 @@ void RenderShadowmaps(void) {
         uint16_t shadowCasterIndices[SHADOW_NEARMESH_MAX * MAX_SHADOWMAPS];
         uint16_t numShadowCasters = 0;
         for (int i=START_INDEX_LEVEL_INSTANCES;i<INSTANCE_COUNT;++i) {
-            uint16_t mdx = instances[i].modelIndex;
-            if (mdx >= MODEL_IDX_MAX) continue;
+            if (instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) continue;
             if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
             if (instances[i].entflags & ENTFLAG_NO_SHADOWS) continue;
 
@@ -792,26 +767,13 @@ void RenderShadowmaps(void) {
 
             glUniform3f(3, lightPos.x, lightPos.y, lightPos.z);
             voxen_Shadow_System.shadowmapIndirectionList[lightIdx] = numShadowingLightsHandled;
-            bool lightPositionInPlayerFrustum = SphereInFrustum(playerFrustumPlanes, lightPos, 0.64f); // Use some radius for floating point errors
             uint8_t numFacesRendered = 0;
             #pragma GCC unroll 6
-            for (uint8_t face = 0; face < 6; face++) {                            
-                if (!lightPositionInPlayerFrustum) { // Check if at least one of the four points of this cubemap face's frustum are within the player's frustum
-                    bool faceOverlapsPlayerView = false;
-                    Vector3 shiftBasis = (Vector3){ effectiveRadius, effectiveRadius, effectiveRadius };
-                    int start = face * 4; int end = start + 4;
-                    for (int i = start; i < end; ++i) {
-                        Vector3 corner = (Vector3){ shiftBasis.x * cornerShiftSigns[i].x, shiftBasis.y * cornerShiftSigns[i].y, shiftBasis.z * cornerShiftSigns[i].z };
-                        if (dot_vector3(Vector3_A_minus_B(Vector3_A_plus_B(lightPos, corner), playerPos), playerFwd) > voxen_Shadow_System.shadDotThresh) { faceOverlapsPlayerView = true; break; }
-                    }
-
-                    if (!faceOverlapsPlayerView && !SphereInFrustum(lightFrustumPlanes[lightIdx][face], playerPos, 0.48f)) continue;
-                }
-                
+            for (uint8_t face = 0; face < 6; face++) {                                            
                 glUniform1ui(2, face);
                 glUniformMatrix4fv(1, 1, GL_FALSE, (float*)lightViewProj[lightIdx][face]);
                 glUniform1ui(7, shadowmapOffsetHead + (face * 36864));
-                Sys_Dx.shadowDrawCallsRenderedThisFrame++;
+                shadowDrawCallsRenderedThisFrame++;
                 for (uint16_t j = 0; j < nearbyMeshCount; ++j) {
                     int i = shadows_nearMeshes[j].index;            
                     if (!SphereInFrustum(lightFrustumPlanes[lightIdx][face], instances[i].position, shadows_nearMeshRadii[j] * 1.41f)) continue;
@@ -825,10 +787,9 @@ void RenderShadowmaps(void) {
                     
                     glUniform1ui(0, i);
                     if (currentTexIndex != instances[i].texIndex) { currentTexIndex = instances[i].texIndex; glUniform1ui(6, instances[i].texIndex); }
-                    if (currentIsTransparent != isTransparent(instances[i].texIndex)) { currentIsTransparent = isTransparent(instances[i].texIndex); glUniform1ui(8, isTransparent(instances[i].texIndex)); }
+                    if (currentIsTransparent != transparentTexture[instances[i].texIndex]) { currentIsTransparent = transparentTexture[instances[i].texIndex]; glUniform1ui(8, transparentTexture[instances[i].texIndex] ? 1u : 0u); }
                     glDrawElements(GL_TRIANGLES, modelTriangleCounts[currentModelType] * 3, GL_UNSIGNED_INT, 0);
-                    Sys_Dx.drawCallsRenderedThisFrame++;
-                    Sys_Dx.verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
+                    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += modelTriangleCounts[currentModelType] * 3;
                 }
                 
                 numFacesRendered++;
@@ -838,8 +799,7 @@ void RenderShadowmaps(void) {
             numShadowingLightsHandled++;
         }
 
-//         glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
-        glViewport(0, 0, 1366, 768);
+        glViewport(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight);
         glNamedBufferData(Sys_Render.shadowMapsIndirectionID, loadedLights * sizeof(uint32_t), voxen_Shadow_System.shadowmapIndirectionList, GL_DYNAMIC_DRAW);
     }
     
@@ -922,7 +882,7 @@ void RenderMenu(void);
 void RenderPausedUI(void);
 static inline double RenderUI(void) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    Sys_Dx.drawCallsNormal = Sys_Dx.drawCallsRenderedThisFrame;
+    drawCallsNormal = drawCallsRenderedThisFrame;
     if (Sys_Global.creditsActive) { RenderCredits(); return get_time(); }
     if (Sys_Global.menuActive) RenderMenu();
     else if (Sys_Global.gamePaused) RenderPausedUI();
@@ -959,25 +919,22 @@ static inline double RenderUI(void) {
         uint8_t timingColor = TEXT_WHITE;
         if (vabs(Sys_Dx.thisFrameTime - Sys_Dx.cpuFrameTime) < 0.451) timingColor = TEXT_GREEN;
         if (Sys_Dx.thisFrameTime > 6.944444) timingColor = TEXT_RED;
-        Sys_Dx.drawCallsRenderedThisFrame += 2; Sys_Dx.textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
+        drawCallsRenderedThisFrame += 2; textDrawCallsRenderedThisFrame += 2; // Add two more for this text render ;)
         RenderFormattedText(16, debugTextStartY - lineSpacing, timingColor, FONT_NORMAL,1.0f, "ms: %.2f, CPU %.2f", Sys_Dx.thisFrameTime,Sys_Dx.cpuFrameTime);
-        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Dx.framesPerLastSecond,Sys_Dx.worstFPS,Sys_Dx.drawCallsRenderedThisFrame,Sys_Dx.drawCallsNormal,Sys_Dx.uiImageDrawCallsRenderedThisFrame,Sys_Dx.textDrawCallsRenderedThisFrame,Sys_Dx.shadowDrawCallsRenderedThisFrame,Sys_Dx.verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
+        RenderFormattedText(16 + 230.0f, debugTextStartY - lineSpacing, TEXT_WHITE, FONT_NORMAL,1.0f, "(FPS: %d, Worst: %d), Drwclls: %d [G %d UI %d Txt %d Shd %d] Vrts: %d E:%u|M:%u|P:%u|T:%.5f",Sys_Dx.framesPerLastSecond,Sys_Dx.worstFPS,drawCallsRenderedThisFrame,drawCallsNormal,uiImageDrawCallsRenderedThisFrame,textDrawCallsRenderedThisFrame,shadowDrawCallsRenderedThisFrame,verticesRenderedThisFrame,Sys_Cheats.editMode,Sys_Global.menuActive,Sys_Global.gamePaused,Sys_Global.pauseRelativeTime);
     }
     
     return time_now;
 }
 
 DepthSort visibleInstances[INSTANCE_COUNT];
-
-static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t instancesEndIdx, Vector3 playerPos, bool transparents) {
+static inline void RenderInstances(Vector3 playerPos, bool transparents) {
     uint16_t visibleCount = 0, currentTexIndex = 0, currentNormIndex = 0, currentGlowIndex = 0, currentSpecIndex = 0, currentModelType = 0;
     bool skyVisible = (gridCellStates[playerCellIdx] & CELL_SEES_SKYBOX);
-    for (uint16_t i = instancesStartIdx; i < instancesEndIdx; ++i) {
+    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < INSTANCE_COUNT; ++i) {
         if (!(instances[i].entflags & ENTFLAG_ACTIVE)) continue;
-        if (instances[i].modelIndex >= MODEL_IDX_MAX) continue;
-        if (instances[i].index >= MAX_ENTITIES) continue;
-        if (isTransparent(instances[i].texIndex) && !transparents) continue;
-        else if (!isTransparent(instances[i].texIndex) && transparents) continue;
+        if (instances[i].index >= MAX_ENTITIES || instances[i].modelIndex >= MODEL_IDX_MAX || instances[i].texIndex >= MAX_VALID_TEXTURE) continue;
+        if (transparentTexture[instances[i].texIndex] ^ transparents) continue; // must be transparent && transparents or neither
         
         Vector3 objPos = instances[i].position;
         uint16_t instCellIdx = PosGetCellCoords(objPos.x, objPos.z);
@@ -1006,7 +963,7 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
             if (!inPVS) continue;
         } else {
             if (!(Sys_Global.currentLevel == 1 && (instances[i].index == 309 ||  instances[i].index == 532))) { // Hack for beaker and beaker holder on level 1 shelf getting culled from door portals.
-                if (CellNotVisible(instCellIdx) && (instances[i].index != 754 || !skyVisible)) continue;
+                if (((gridCellStates[instCellIdx] & (CELL_VISIBLE | CELL_OPEN)) == CELL_OPEN) && (instances[i].index != 754 || !skyVisible)) continue; // For some shelves that are inset away from cells, need to still draw their items by checking && CELL_OPEN here, unfortunately this means they don't ever get culled :(
             }
             
             if (!(gridCellStates[instCellIdx] & CELL_OPEN) && distSqrd >= 943.7184f && (instances[i].index != 754 || !skyVisible)) continue; // 30.72 * 30.72, 12 cells
@@ -1024,14 +981,10 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
     if (visibleCount > 1) qsort(visibleInstances, visibleCount, sizeof(DepthSort), transparents ? compareDepthSort : compareDepthSortInverted); // Sort by depth (ascending for front-to-back)
     for (uint16_t visibleIndex = 0; visibleIndex < visibleCount; ++visibleIndex) {
         uint16_t i = visibleInstances[visibleIndex].index;
-        bool is_double_sided = isDoubleSided(instances[i].texIndex) || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f;
-        if (isTransparent(instances[i].texIndex) && transparents) {
-            glEnable(GL_CULL_FACE); glEnable(GL_BLEND); // Transparents (with sort)
-        } else if (is_double_sided) {
-            glDisable(GL_CULL_FACE); glEnable(GL_BLEND); // Doublesided
-        } else { // Opaque
-            glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND);
-        }
+        if (transparentTexture[instances[i].texIndex] && transparents) { glEnable(GL_CULL_FACE); glEnable(GL_BLEND); } // Transparents (with sort)
+        else if (doubleSidedTexture[instances[i].texIndex] || instances[i].scale.x < 0.0f || instances[i].scale.y < 0.0f || instances[i].scale.z < 0.0f) { glDisable(GL_CULL_FACE); glEnable(GL_BLEND); } // Doublesided
+        else { glEnable(GL_CULL_FACE); glEnable(GL_DEPTH_TEST); glDisable(GL_BLEND); } // Opaque
+
         glUniform1ui(0, i);    glUniform1ui(17, instances[i].texIndex == 316 ? 1u : 0u);
         if (currentNormIndex != (uint32_t)instances[i].normIndex || instances[i].normIndex == 0) { currentNormIndex = (uint32_t)instances[i].normIndex; glUniform1ui(1, currentNormIndex); }
         if (currentTexIndex  != (uint32_t)instances[i].texIndex)  { currentTexIndex  =  (uint32_t)instances[i].texIndex; glUniform1ui(18, currentTexIndex); }
@@ -1046,13 +999,12 @@ static inline void RenderInstancesBetween(uint16_t instancesStartIdx, uint16_t i
         
         uint32_t vertCount = modelTriangleCounts[currentModelType] * 3;
         glDrawElements(GL_TRIANGLES, vertCount, GL_UNSIGNED_INT, 0);
-        Sys_Dx.drawCallsRenderedThisFrame++;
-        Sys_Dx.verticesRenderedThisFrame += vertCount;
+        drawCallsRenderedThisFrame++; verticesRenderedThisFrame += vertCount;
     }
 }
 
 void Render(void) {
-    Sys_Dx.drawCallsRenderedThisFrame = Sys_Dx.textDrawCallsRenderedThisFrame = Sys_Dx.uiImageDrawCallsRenderedThisFrame = Sys_Dx.shadowDrawCallsRenderedThisFrame = Sys_Dx.verticesRenderedThisFrame = 0; // Reset per frame
+    drawCallsRenderedThisFrame = textDrawCallsRenderedThisFrame = uiImageDrawCallsRenderedThisFrame = shadowDrawCallsRenderedThisFrame = verticesRenderedThisFrame = 0; // Reset per frame
     
     // Frame prep, View Matrix, and Projection Matrix
     float view[16]; // Also known as view matrix
@@ -1088,9 +1040,8 @@ void Render(void) {
     glUniform1ui(3, 0u); // isUI false
     glUniform1ui(14, Sys_Settings.Reflections);   glUniform1ui(15, Sys_Settings.Shadows);
     glUniform1f(8, worldMin_x);   glUniform1f(9, worldMin_z);    glUniform3f(10, playerPos.x, playerPos.y, playerPos.z);
-    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, false);
-    RenderInstancesBetween(START_INDEX_LEVEL_INSTANCES, INSTANCE_COUNT, playerPos, true);
-    if (Sys_Dx.debugLineVertCount > 0) DrawDebugLines(viewProj);
+    RenderInstances(playerPos, false); RenderInstances(playerPos, true); // opaque, then transparents
+    if (Sys_Dx.debugLineVertCount > 1) DrawDebugLines(viewProj);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     if (Sys_Settings.Reflections > 0u) { // Screen Space Reflections
         glUseProgram(Sys_Render.ssrShaderProgram);
@@ -1137,14 +1088,13 @@ void Render(void) {
     glBindVertexArray(Sys_Render.quadVAO);
     glDisable(GL_DEPTH_TEST);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    Sys_Dx.drawCallsRenderedThisFrame++;
-    Sys_Dx.verticesRenderedThisFrame += 4;
+    drawCallsRenderedThisFrame++; verticesRenderedThisFrame += 4;
     Sys_Global.last_time = RenderUI();
     
     // Cursor [ /// VERY LAST DRAWN OVER EVERYTHING ELSE! /// ]
     bool menuOrInventoryCursorStyle = (Sys_Global.gamePaused || Sys_Global.menuActive);
     uint16_t cursorTexture = menuOrInventoryCursorStyle ? 1261 : 1260;
-    if (CursorVisible()) RenderUIImage((int16_t)(cursorPosition_x) - 20, (int16_t)(cursorPosition_y) - 20, 40,40, cursorTexture);
+    if ((Sys_Global.inventoryMode && !Sys_Cheats.noHUD) || Sys_Global.menuActive || Sys_Global.gamePaused) RenderUIImage((int16_t)(cursorPosition_x) - 20, (int16_t)(cursorPosition_y) - 20, 40,40, cursorTexture);
     else RenderUIImage(683-20,371, 40,40, cursorTexture);
     
     if ((Sys_Global.last_time - Sys_Dx.lastFrameSecCountTime) >= 1.00) { // Update Diagnostic Poll
@@ -1159,6 +1109,7 @@ void Render(void) {
     CHECK_GL_ERROR();
 }
 
+bool UpdatedPlayerCell(void);
 static void UpdateVoxelsAndInstances(void) {
     Sys_Render.shadowmapsNeedUpdated = UpdatedPlayerCell();
     Sys_Render.shadowmapsNeedUpdated = UpdateLights(&Sys_Render.shadowmapsNeedUpdated);
@@ -1189,7 +1140,7 @@ static void UpdateVoxelsAndInstances(void) {
     if (uploadInstances) glNamedBufferData(Sys_Render.matricesBufferID, loadedInstances * 16 * sizeof(float), modelMatrices, GL_DYNAMIC_DRAW);
 }
 
-void UpdateAnims(void);
+void UpdateAnims(void); void UpdateAmbientSounds(void);
 #define ARG_IS(s, l) (argc >= 2 && (strcmp(argv[1], s) == 0 || strcmp(argv[1], l) == 0))
 int32_t main(int32_t argc, char* argv[]) {
     double game_start_time = get_time();

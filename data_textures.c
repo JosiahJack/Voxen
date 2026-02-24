@@ -1,5 +1,4 @@
 // data_textures.c - Load textures from raw .png files on disk
-#include <malloc.h>
 uint32_t totalPixels;
 uint32_t totalPaletteColors;
 uint16_t loadedTexturesMaxIndex;

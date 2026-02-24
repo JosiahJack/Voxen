@@ -9,10 +9,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "External/stb_truetype.h"
 
-float genericTextHeightFac = 0.025f;
-float genericTextWidthFac = 0.0125f;
-float genericTextHeightFacStopD = 0.07f;
-float genericTextWidthFacStopD = 0.0182f;
 int numPackedGlyphs = 0;
 int numPackedGlyphsStopD = 0;
 GLuint fontAtlasTex;
@@ -66,57 +62,8 @@ __attribute__((pure)) int32_t CodepointToPackedIndex(int32_t codepoint, int font
             if (idx < total_packed) return idx;
         }
     }
-    return -1;
-}
-
-static int Utf8ToCodepoint(const char **p) {
-    const unsigned char *s = (const unsigned char*)*p;
-    int cp = 0;
-    if (s[0] < 0x80) { cp = s[0]; ++*p; }
-    else if ((s[0] & 0xE0) == 0xC0) { cp = ((s[0]&0x1F)<<6)|(s[1]&0x3F); *p += 2; }
-    else if ((s[0] & 0xF0) == 0xE0) { cp = ((s[0]&0x0F)<<12)|((s[1]&0x3F)<<6)|(s[2]&0x3F); *p += 3; }
-    else if ((s[0] & 0xF8) == 0xF0) { cp = ((s[0]&0x07)<<18)|((s[1]&0x3F)<<12)|((s[2]&0x3F)<<6)|(s[3]&0x3F); *p += 4; }
-    else { ++*p; } // invalid
-    return cp;
-}
-
-// Returns the *pixel* width of the string in the current font scale.
-float TextWidth(const char *utf8, int fontID) {
-    if (!utf8) return 0.0f;
-
-    float width = 0.0f;
-    const char *p = utf8;
-    int prevGlyph = -1;
-    while (*p) {
-        int cp = Utf8ToCodepoint(&p);
-        int packedIdx = CodepointToPackedIndex(cp,fontID);
-        float advance = 0.0f;
-        if (fontID == FONT_STOPD) {
-            if (packedIdx >= 0 && packedIdx < numPackedGlyphsStopD) advance = fontPackedCharStopD[packedIdx].xadvance;
-        } else {
-            if (packedIdx >= 0 && packedIdx < numPackedGlyphs) advance = fontPackedChar[packedIdx].xadvance;
-        }
-
-        if (prevGlyph != -1 && advance > 0.0f) { // Kerning
-            if (fontID == FONT_NORMAL && packedIdx >= 0) {
-                int kern = stbtt_GetGlyphKernAdvance(&fontInfo[0], prevGlyph, stbtt_FindGlyphIndex(&fontInfo[0], cp));
-                
-                int fheight = ttSHORT(fontInfo[0].data + fontInfo[0].hhea + 4) - ttSHORT(fontInfo[0].data + fontInfo[0].hhea + 6);
-                float kernScaleForPixelHeight = (genericTextHeightFac * (float)Sys_Settings.ScreenHeight) / (float)fheight;
-                width += (float)kern * kernScaleForPixelHeight;
-            } else if (fontID == FONT_STOPD && packedIdx >= 0) {
-                int kern = stbtt_GetGlyphKernAdvance(&fontInfo[1], prevGlyph, stbtt_FindGlyphIndex(&fontInfo[1], cp));
-                int fheight = ttSHORT(fontInfo[1].data + fontInfo[1].hhea + 4) - ttSHORT(fontInfo[1].data + fontInfo[1].hhea + 6);
-                float kernScaleForPixelHeight = (genericTextHeightFacStopD * (float)Sys_Settings.ScreenHeight) / (float)fheight;
-                width += (float)kern * kernScaleForPixelHeight;
-            }
-        }
-
-        width += advance;
-        prevGlyph = (packedIdx >= 0) ? stbtt_FindGlyphIndex((fontID == FONT_STOPD ? &fontInfo[1] : &fontInfo[0]), cp) : -1;
-    }
-    
-    return width;
+    DualLogError("Could not find codepoint for codepoint %d for fontID: %d\n",codepoint,fontID);
+    OS_Exit(1);
 }
 
 static LoadedFont LoadFallbackFont(const char *path, int fontInfoIdx) {
@@ -217,7 +164,7 @@ void InitFontAtlasses(void) {
     pc.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8 for chunky 2pixel black outline support for readability and to follow System Shock.
     pc.v_oversample = 8;
     numPackedGlyphs = 0;
-    float h = (genericTextHeightFac * (float)Sys_Settings.ScreenHeight);
+    float h = (0.025f * (float)Sys_Settings.ScreenHeight);
     for (int r = 0; r < numFontRanges; r++) {
         fontRanges[r].startIndex = numPackedGlyphs;
         for (int i = 0; i < fontRanges[r].count; i++) {
@@ -253,7 +200,7 @@ void InitFontAtlasses(void) {
     pc2.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8
     pc2.v_oversample = 8;
     numPackedGlyphsStopD = 0;
-    float h2 = (genericTextHeightFacStopD * (float)Sys_Settings.ScreenHeight);
+    float h2 = (0.07f * (float)Sys_Settings.ScreenHeight);
     for (int r = 0; r < numFontRanges; r++) {
         fontRangesStopD[r].startIndex = numPackedGlyphsStopD;
         for (int i = 0; i < fontRangesStopD[r].count; i++) {

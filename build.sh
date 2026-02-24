@@ -122,7 +122,7 @@ MAC_CC="gcc"
 COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
                -Wdouble-promotion -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
-               -Werror=implicit-function-declaration -Og -D_GNU_SOURCE"
+               -Werror=implicit-function-declaration -Og -D_GNU_SOURCE -fopenmp"
 
 if [ "$PLATFORM" = "windows" ]; then
     CC=$WINDOWS_CC
@@ -136,7 +136,7 @@ elif [ "$PLATFORM" = "mac" ]; then
     CC=$LINUX_CC
     LINKER=$LINUX_CC
     CFLAGS="-D__APPLE__ $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-L./External/ -L./External/Mac -lassimp -lm -l:libglfw3.a -l:libminiaudio.0.11.22.a -lGL -fopenmp"
     OBJ_DIR="./External/Mac"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen_mac"
@@ -144,7 +144,7 @@ elif [ "$PLATFORM" = "android" ]; then
     CC=$ANDROID_CC
     LINKER=$CC
     CFLAGS="-D__ANDROID__ -fPIC $COMMON_CFLAGS"
-    LDFLAGS="-L./External/ -L./External/Android -landroid -llog -lGLESv3 -lEGL -lm"
+    LDFLAGS="-L./External/ -L./External/Android -landroid -llog -lGLESv3 -lEGL -lm -fopenmp"
     OBJ_DIR="./External/Android"
     GLAD_OBJ="${OBJ_DIR}/glad.o"
     BINARY_NAME="voxen_android"
@@ -152,7 +152,7 @@ else
     CC=$LINUX_CC
     LINKER="mold -run gcc"
     CFLAGS="-march=haswell -mtune=haswell $COMMON_CFLAGS"
-    LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL"
+    LDFLAGS="-flto -Wl,--gc-sections -L./External/Linux -lassimp -lm -l:libglfw3.5.a -l:libminiaudio.0.11.22.a -lGL -fopenmp"
     OBJ_DIR="./External/Linux"
     GLAD_OBJ="${OBJ_DIR}/glad/glad.o"
     BINARY_NAME="voxen"

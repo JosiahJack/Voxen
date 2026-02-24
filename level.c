@@ -40,16 +40,7 @@ void LoadEntities(void) {
     DebugRAM("after loading all entities");
 }
 
-__attribute__((pure)) bool isDoubleSided(uint32_t texIndexToCheck) {
-    if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
-    return doubleSidedTexture[texIndexToCheck] > 0 ? 1 : 0;
-}
-
-__attribute__((pure)) bool isTransparent(uint32_t texIndexToCheck) {
-    if (texIndexToCheck >= MAX_VALID_TEXTURE) return false;
-    return transparentTexture[texIndexToCheck] > 0 ? 1 : 0;    
-}
-
+void InitializeAIAfterLoad(uint16_t i);
 void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
         
@@ -160,6 +151,7 @@ void CopyInstanceRegion(uint16_t head, uint16_t* instanceTypeArray, Entity* temp
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 uint16_t loadedInstances;
+void LoadTextures(void); void LoadModels(void);
 void LoadLevel(uint8_t curlevel) {
     double start_time = get_time();
     DebugRAM("start of LoadLevel");

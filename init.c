@@ -74,6 +74,7 @@ void InitializeEntity(Entity* entry) { // Blank entity, no index yet, for initia
     entry->path[0] = '\0';    
 }
 
+void ResetLevelAudio(void);
 void InitAfterLoad(void) { // Init entities after level load and after already having generic entity type fields set.
     for (int i=0;i<ARRSIZE;++i) { gridCellFloorHeight[i] = -FLT_MAX; gridCellCeilingHeight[i] = FLT_MAX;}
     for (int i=PLAYER1;i<loadedInstances;++i) {
