@@ -6,18 +6,18 @@ const float searchTime = 5.0f;
 Vector3 targetOffset = (Vector3){0.0f, 0.24f, 0.0f);
 uint16_t npcCountInWorldPerType[NUM_AI_TYPES];
 
-float Tranquilize(float amount, bool energy) {
+float Tranquilize(uint16_t i, float amount, bool energy) {
     if (npcTable[NPCID].type == NPCType_Robot && !energy) return 0.0f;
 
     float tranqSecs = (amount < 3.0f) ? npcTable[NPCID].timeForTranquilization : amount; // If we're going to tranq, at least do it for 3 secs.
-    SELF.tranquilizeFinished = vmax(Sys_Global.pauseRelativeTime + tranqSecs, SELF.tranquilizeFinished + tranqSecs);
+    instances[i].tranquilizeFinished = vmax(Sys_Global.pauseRelativeTime + tranqSecs, SELF.tranquilizeFinished + tranqSecs);
     return tranqSecs;
 }
 
 static inline bool IsCyberNPC() { return npcTable[NPCID].type == NPCType_Cyber; }
 
 void SetHuntFinished() {
-    SELF.huntFinished = Sys_Global.pauseRelativeTime;
+    instances[i].huntFinished = Sys_Global.pauseRelativeTime;
     int diff = Sys_Global.difficultyCombat;
     if (npcTable[NPCID].type == NPCType_Cyber) diff = SSys_Global.difficultyCyber;
     if (diff <= 1) { // More forgetful on easy.
@@ -29,62 +29,64 @@ void SetHuntFinished() {
     }
 }
 
-void InitializeAIAfterLoad() {
-    SELF.layer = PhysicsLayer_NPC;
-    SELF.idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[NPCID].timeIdleSFXMin, npcTable[NPCID].timeIdleSFXMax);
-    SELF.attack1SoundTime = SELF.attack2SoundTime = SELF.attack3SoundTime = Sys_Global.pauseRelativeTime;
-    SELF.timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
+void InitializeAIAfterLoad(uint16_t i) {
+    instances[i].layer = PhysicsLayer_NPC;
+    uint16_t npcID = instances[i].index - 419;
+    instances[i].idleTime = Sys_Global.pauseRelativeTime + random_range(npcTable[npcID].timeIdleSFXMin, npcTable[npcID].timeIdleSFXMax);
+    instances[i].attack1SoundTime = instances[i].attack2SoundTime = instances[i].attack3SoundTime = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillEnemyChangeFinished = Sys_Global.pauseRelativeTime;
     SetHuntFinished();
-    SELF.attackFinished = Sys_Global.pauseRelativeTime;
-    SELF.attack2Finished = Sys_Global.pauseRelativeTime;
-    SELF.attack3Finished = Sys_Global.pauseRelativeTime;
-    SELF.timeTillPainFinished = Sys_Global.pauseRelativeTime;
-    SELF.timeTillDeadFinished = Sys_Global.pauseRelativeTime;
-    SELF.meleeDamageFinished = Sys_Global.pauseRelativeTime;
-    SELF.gracePeriodFinished = Sys_Global.pauseRelativeTime;
-    SELF.randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
-    SELF.randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
-    SELF.randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
-    SELF.tranquilizeFinished = Sys_Global.pauseRelativeTime;
-    SELF.deathBurstFinished = Sys_Global.pauseRelativeTime;
-    SELF.wanderFinished = Sys_Global.pauseRelativeTime;
-    SELF.posCheckFinished = Sys_Global.pauseRelativeTime;
-    SELF.lastPosition = SELF.position;
-    SELF.timeSinceMovedEnough = 0.0f;
-    if (SELF.walkWaypointsLength > 0 && SELF.walkPathOnStart && !SELF.asleep) {
-        SELF.currentDestination = SELF.walkWaypoints[SELF.currentWaypoint];
-        SELF.currentState = AIState_Walk; // If waypoints are set, start walking
+    instances[i].attackFinished = Sys_Global.pauseRelativeTime;
+    instances[i].attack2Finished = Sys_Global.pauseRelativeTime;
+    instances[i].attack3Finished = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillPainFinished = Sys_Global.pauseRelativeTime;
+    instances[i].timeTillDeadFinished = Sys_Global.pauseRelativeTime;
+    instances[i].meleeDamageFinished = Sys_Global.pauseRelativeTime;
+    instances[i].gracePeriodFinished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack1Finished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack2Finished = Sys_Global.pauseRelativeTime;
+    instances[i].randomWaitForNextAttack3Finished = Sys_Global.pauseRelativeTime;
+    instances[i].tranquilizeFinished = Sys_Global.pauseRelativeTime;
+    instances[i].deathBurstFinished = Sys_Global.pauseRelativeTime;
+    instances[i].wanderFinished = Sys_Global.pauseRelativeTime;
+    instances[i].posCheckFinished = Sys_Global.pauseRelativeTime;
+    instances[i].lastPosition = instances[i].position;
+    instances[i].timeSinceMovedEnough = 0.0f;
+    if (instances[i].walkWaypointsLength > 0 && instances[i].walkPathOnStart && !instances[i].asleep) {
+        instances[i].currentDestination = instances[i].walkWaypoints[instances[i].currentWaypoint];
+        instances[i].currentState = AIState_Walk; // If waypoints are set, start walking
     } else {
-        SELF.currentState = AIState_Idle; // No waypoints, stay put
+        instances[i].currentState = AIState_Idle; // No waypoints, stay put
     }
 
-    if (SELF.wandering && (random_range(0.0f,1.0f) < 0.5f)) currentState = AIState_Walk;
-    else SELF.wandering = false;
+    if (instances[i].wandering && (random_range(0.0f,1.0f) < 0.5f)) currentState = AIState_Walk;
+    else instances[i].wandering = false;
 
-    if (SELF.entflags & ENTFLAG_ASLEEP) {
-        SELF.currentState = AIState_Idle;
-        flag_set(instances[SELF.sleepingCables].entflags, ENTFLAG_ACTIVE, true);
+    if (instances[i].entflags & ENTFLAG_ASLEEP) {
+        instances[i].currentState = AIState_Idle;
+        flag_set(instances[instances[i].sleepingCables].entflags, ENTFLAG_ACTIVE, true);
     }
 
-    SELF.attackFinished = Sys_Global.pauseRelativeTime + 1.0f;
-    SELF.idealTransformForward = SELF.forward;
-    SELF.targetID = snprintf(SELF.targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[NPCID].name,npcCountInWorldPerType[index]++);
+    instances[i].attackFinished = Sys_Global.pauseRelativeTime + 1.0f;
+    instances[i].idealTransformForward = instances[i].forward;
+    instances[i].targetID = snprintf(instances[i].targetID, TARGET_ID_LENGTH * sizeof(char), "%s %05u", npcTable[npcID].name,npcCountInWorldPerType[index]++);
     if (asleep) Utils.Activate(sleepingCables);
     startInitialized = true;
 }
 
-	void AI_Face(Vector3 goalLocation) {
-		if (SELF.asleep) return;
+	void AI_Face(uint16_t i, Vector3 goalLocation) {
+		if (instances[i].asleep) return;
 
+        uint16_t npcID = instances[i].index - 419;
 		faceVec = goalLocation - instances[i].position;
-		if (!npcTable[NPCID].type == NPCType_Cyber) faceVec.y = 0.0f;
-		if (Vector3.Dot(faceVec,Vector3.up) > 0.99f && !npcTable[NPCID].type == NPCType_Cyber) return; // Up results in no Y rotation.
+		if (!npcTable[npcID].type == NPCType_Cyber) faceVec.y = 0.0f;
+		if (Vector3.Dot(faceVec,Vector3.up) > 0.99f && !npcTable[npcID].type == NPCType_Cyber) return; // Up results in no Y rotation.
 
 		// Rotate as fast as we can towards facing the goal location.
 		Vector3 up = Vector3.up;
-		if (npcTable[NPCID].type == NPCType_Cyber && enemy != null) {
+		if (npcTable[npcID].type == NPCType_Cyber && enemy != null) {
 			up = enemy.transform.up;
-			SELF.rotation = enemy.rotation;
+			instances[i].rotation = enemy.rotation;
 			return;
 		}
 		
@@ -95,7 +97,6 @@ void InitializeAIAfterLoad() {
 		
 		lookRot = Quaternion.LookRotation(faceVec,up);
 		instances[i].rotation = Quaternion.Slerp(instances[i].rotation,lookRot,Const.aiTickTime * npcTable[index].yawSpeed * Time.deltaTime);
-        #undef SELF
 	}
 
 	bool HasHealth(uint16_t i) {

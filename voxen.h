@@ -1,11 +1,15 @@
 #pragma once
 // #define DEBUG_RAM_OUTPUT // Debug and Compile Flags
-#include <stdarg.h>
 #include "./External/glad/gl.h"
 #include "./External/glfw3.h"
-#include "External/stb_truetype.h"
-#include <stdint.h>
-#include <stdbool.h>
+typedef __INT16_TYPE__ int16_t;
+typedef __INT32_TYPE__ int32_t;
+typedef __UINT8_TYPE__ uint8_t;
+typedef __UINT16_TYPE__ uint16_t;
+typedef __UINT32_TYPE__ uint32_t;
+#define bool _Bool
+#define true 1
+#define false 0
 #define INSTANCE_COUNT 10240 // Max 5454 for Citadel level 7 geometry, Max 295 for Citadel level 1 dynamic objects, 1561 lights, extras for dynamically spawned objects/lights
 
 typedef uint64_t size_t;
@@ -15,7 +19,6 @@ typedef struct { float x,y,z; } Vector3;
 typedef struct { float x,y,z,w; } Quaternion;
 typedef uint8_t PhysCombineType;
 typedef uint8_t ColliderType;
-typedef uint8_t DoorState;
 typedef uint16_t Text;
 
 #define SAVE_REMINDER_TIME 7.0f // 7secs ~is human short-term memory length
@@ -840,7 +843,6 @@ extern NPCTable npcTable[NUM_AI_TYPES];
 
 extern uint16_t selfIdx;
 extern uint16_t activatorIdx;
-#define NPCID (instances[selfIdx].index - 419)
 #define SELF instances[selfIdx]
 #define ACTIVATOR instances[activatorIdx]
 #define TARGET_ID_LENGTH 32 // Max needed 22 + 5 for ID + 1 for space between them = 28
@@ -1542,8 +1544,6 @@ extern float fixedNumberAdvanceWidth;
 extern float fixedNumberAdvanceWidthStopD;
 extern bool mouseMovementThisFrame;
 extern char consoleEntryText[TEXT_BUFFER_SIZE];
-extern stbtt_packedchar fontPackedChar[MAX_GLYPHS];
-extern stbtt_packedchar fontPackedCharStopD[MAX_GLYPHS];
 void LoadTextForLanguage(uint8_t lang);
 void LoadLogTextForLanguage(uint8_t lang);
 int32_t CodepointToPackedIndex(int32_t codepoint, int32_t fontID);
@@ -1713,3 +1713,9 @@ void set_music_volume(void);
 void set_sfx_volume(void);
 void set_message_volume(void);
 void set_master_volume(void);
+char CharToLower(const char c);
+char* StringFindSubstring(const char* haystack, const char* needle);
+const char* StringFindLastChar(const char* str, const char c);
+char* StringFindFirstCharWithin(const char *s, char c);
+char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr);
+int StringCompareUpToLength(const char* s1, const char* s2, size_t n);

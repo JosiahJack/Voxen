@@ -1,45 +1,6 @@
 #include "os.h"
 #include "voxen.h"
 
-Entity entities[MAX_ENTITIES]; // Global array of entity definitions
-uint16_t entityCount; // Number of entities loaded
-void LoadEntities(void) {
-    double start_time = get_time();
-    entityCount = 0;
-    DataParser entity_parser;
-    if (!parse_data_file(&entity_parser, MAX_ENTITIES, "./Data/entities.txt")) { DualLogError("Could not parse ./Data/entities.txt!\n"); OS_Exit(1); }
-    
-    entityCount = (uint16_t)entity_parser.count;
-    DualLog("Loading  %d entities...", entityCount);
-    if (entityCount > MAX_ENTITIES) { DualLogError("Too many entities in parser count %d, greater than %d!\n", entityCount, MAX_ENTITIES); OS_Exit(1); }
-    if (entityCount == 0) { DualLogError("No entities found in entities.txt\n"); OS_Exit(1); }
-
-    memset(entities,0,MAX_ENTITIES * sizeof(Entity));
-    for (int32_t i = 0; i < entityCount; i++) {
-        if (entity_parser.entries[i].index == UINT16_MAX) continue;
-
-        entities[i] = entity_parser.entries[i];
-        flag_set(&entities[i].entflags, ENTFLAG_ACTIVE, true);
-        flag_set(&entities[i].entflags, ENTFLAG_GROUNDED, false);
-        flag_set(&entities[i].entflags, ENTFLAG_RIGIDBODY, ConstIndexIsDynamicObject(entities[i].index));
-        if (entity_parser.entries[i].entflags & ENTFLAG_CARDCHUNK) {
-            entities[i].lodIndex = GEOMETRY_LOD_CARD_MODEL_IDX; // Generic LOD card
-            entities[i].collider = COLLIDER_TYPE_BOX;
-            entities[i].colliderCenter = (Vector3){ .x = 0.0f, .y = 1.44f, .z = 0.0f };
-            entities[i].colliderSize = (Vector3){ .x = 2.56f, .y = 0.32f, .z = 2.56f };
-        }
-        
-        if (ConstIndexIsButtonSwitch(entities[i].index)) {
-            entities[i].lockedMessageLingdex = 193; // ButtonSwitch
-            entities[i].tickTime = 1.5;
-        }
-    }
-
-    OS_DeallocateRAM(entity_parser.entries,entity_parser.count * sizeof(Entity));
-    DualLog(" took %f secs\n", get_time() - start_time);
-    DebugRAM("after loading all entities");
-}
-
 void InitializeAIAfterLoad(uint16_t i);
 void AddInstance(uint16_t entIdx, uint16_t i) {
     if (entIdx >= entityCount) { DualLogError("\nEntity index when loading non-light entity was %d, exceeds max defined entity count of %d\n",entIdx,entityCount); OS_Exit(1); }
@@ -158,7 +119,7 @@ void LoadLevel(uint8_t curlevel) {
     Sys_Global.levelCurrentlyLoading = true;
     queuedLevelToLoad = 255u; // Reset any loading state that got us here.
     RenderLoadingProgress(100,"Loading level...");
-    if (!Sys_Global.levelCurrentlyLoading) memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
+    if (!Sys_Global.levelCurrentlyLoading) __builtin_memset(instances + 3,0,(INSTANCE_COUNT - 3) * sizeof(Entity)); // Initialize instances, the global entity array for the currently loaded level.
     Sys_Global.levelCurrentlyLoading = true;
     Sys_Global.currentLevel = curlevel;
     loadedInstances = 3; // 0 == NULL, 1 == Player1, 2 == Player2
@@ -184,25 +145,25 @@ void LoadLevel(uint8_t curlevel) {
     worldMin_z -= CELL_SIZE;
     voxelMinCenterX = worldMin_x + VOXEL_HALF;
     voxelMinCenterZ = worldMin_z + VOXEL_HALF;
-    memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
-    memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
-    memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
-    memset(lightCastsShadows,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
-    memset(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
-    memset(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
-    memset(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
-    memset(lightLerpValue,0,LIGHT_COUNT * sizeof(float));
-    memset(lightLerpTime,0,LIGHT_COUNT * sizeof(float));
-    memset(lightLerpStepTime,0,LIGHT_COUNT * sizeof(float));
-    memset(lightLerpStartTime,0,LIGHT_COUNT * sizeof(float));
-    memset(lightIntervalStepsLength,0,LIGHT_COUNT * sizeof(uint8_t));
-    memset(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
-    memset(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
-    memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
+    __builtin_memset(lightMinIntensity,0,LIGHT_COUNT * sizeof(float));
+    __builtin_memset(lightMaxIntensity,0,LIGHT_COUNT * sizeof(float));
+    __builtin_memset(lightOn,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
+    __builtin_memset(lightCastsShadows,1,LIGHT_COUNT * sizeof(bool)); // Default all on, only off if level data specifies
+    __builtin_memset(lightLerpOn,0,LIGHT_COUNT * sizeof(bool));
+    __builtin_memset(lightLerpUp,0,LIGHT_COUNT * sizeof(bool));
+    __builtin_memset(lightCurrentStep,0,LIGHT_COUNT * sizeof(uint8_t));
+    __builtin_memset(lightLerpValue,0,LIGHT_COUNT * sizeof(float));
+    __builtin_memset(lightLerpTime,0,LIGHT_COUNT * sizeof(float));
+    __builtin_memset(lightLerpStepTime,0,LIGHT_COUNT * sizeof(float));
+    __builtin_memset(lightLerpStartTime,0,LIGHT_COUNT * sizeof(float));
+    __builtin_memset(lightIntervalStepsLength,0,LIGHT_COUNT * sizeof(uint8_t));
+    __builtin_memset(lightIntervalSteps,0,LIGHT_COUNT * 30 * sizeof(float));
+    __builtin_memset(lightIntervalStepIsLerpingLength,0,LIGHT_COUNT * sizeof(uint8_t));
+    __builtin_memset(intervalStepisLerping,0,LIGHT_COUNT * 30 * sizeof(float));
     if (curlevel >= Sys_Global.numLevels) { DualLogError("Cannot load world geometry, level number %d out of bounds 0 to %d\n", curlevel, Sys_Global.numLevels - 1); OS_Exit(1); }
     
     for (uint16_t idx = START_INDEX_LEVEL_INSTANCES;idx<INSTANCE_COUNT;idx++) { InitializeEntity(&instances[idx]); dirtyInstances[idx] = true; } // Start AFTER player indices and NULLENT
-    memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
+    __builtin_memset(modelMatrices, 0, INSTANCE_COUNT * 16 * sizeof(float)); // Matrix4x4 = 16
     char filename[20]; // Minimum size for 0 through 13.
     snprintf(filename, sizeof(filename), "./Data/level%d.txt", curlevel);
     FILE *file = fopen(filename, "r");
@@ -221,7 +182,7 @@ void LoadLevel(uint8_t curlevel) {
         lineSpace[--len] = '\0';
         line = lineSpace;
         snprintf(initialLine, sizeof(initialLine), "%s", line);
-        memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
+        __builtin_memcpy(firstKeyCheck,line,10); firstKeyCheck[10] = '\0';
         lineNum++;
         bool isLight = true;
         if (StringsAreEqual(firstKeyCheck, "constIndex")) isLight = false;  // constIndex specified indicating this is a real entity?
@@ -238,7 +199,7 @@ void LoadLevel(uint8_t curlevel) {
         bool lightOnRead = false;
         bool activeStateRead = false;
         while(line[0] != '\0') { // Guaranteed no leading whitespaces,k comments, or blank lines, so don't bother
-            char* pipe = strchr(line,'|');
+            char* pipe = StringFindFirstCharWithin(line,'|');
             char* kvString = line; // key:value pair before the pipe as a string
             if (pipe) {
                 *pipe = '\0';          // Split string at the pipe
@@ -247,9 +208,9 @@ void LoadLevel(uint8_t curlevel) {
                 line += GetStringLength(line);
             }
            
-            if (kvString[0] == '\0' || strchr(kvString, ':') == NULL) continue;
+            if (kvString[0] == '\0' || StringFindFirstCharWithin(kvString, ':') == NULL) continue;
             
-            char *colon = strchr(kvString, ':');
+            char *colon = StringFindFirstCharWithin(kvString, ':');
             if (colon[1] == '\0') continue; // Don't care about the name.  Need to skip this in the middle, but this also handles the very end
             
             *colon = '\0';           // Split string at the colon
@@ -512,7 +473,7 @@ void LoadLevel(uint8_t curlevel) {
         lightsNewPosition[i] = (Vector3){ lights[litIdx + LIGHT_DATA_OFFSET_POSX], lights[litIdx + LIGHT_DATA_OFFSET_POSY], lights[litIdx + LIGHT_DATA_OFFSET_POSZ] };
         lightInPVS[i] = false;
     }
-    memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
+    __builtin_memset(voxen_Shadow_System.shadowmapIndirectionList, MAX_SHADOWMAPS + 1, loadedLights * sizeof(uint32_t)); // Set to invalid values for all
     Sys_Global.levelCurrentlyLoading = false;
 }
 #pragma GCC diagnostic pop

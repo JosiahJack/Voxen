@@ -1,12 +1,9 @@
 // helpers.c - Helper Functions for various things
-#include <time.h>
-#include <malloc.h>
 #include "os.h"
 #include "voxen.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_STATIC
 #include "External/stb_image_write.h"
-
 double get_time(void) {
     #ifdef WINDOWS
         static LARGE_INTEGER frequency;
@@ -16,8 +13,10 @@ double get_time(void) {
         QueryPerformanceCounter(&counter);
         return (double)counter.QuadPart / frequency.QuadPart;
     #else
-        struct timespec ts;
-        if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) { DualLogError("clock_gettime failed\n"); return 0.0; }
+        struct { long tv_sec; long tv_nsec; } ts;
+        long ret;
+        __asm__ __volatile__("syscall" : "=a" (ret) : "a" (228), "D" (1), "S" (&ts) : "rcx", "r11", "memory"); // 1 == MONOTONIC
+        if (ret != 0) { DualLogError("get_time failed\n"); return 0.0; }
         return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9; // Full time in seconds
     #endif
 }
@@ -84,12 +83,8 @@ void Screenshot(void) {
     OS_MakeFolder("Screenshots");
     unsigned char* pixels = OS_AllocateRAM(NULL, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);//malloc(Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
     glReadPixels(0, 0, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    char timestamp[32];
     char filename[96];
-    time_t now = time(NULL);
-    struct tm *utc_time = localtime(&now);    
-    if (utc_time) strftime(timestamp, sizeof(timestamp), "%d%b%Y_%H_%M_%S", utc_time);
-    snprintf(filename, sizeof(filename), "Screenshots/%s_x%.2f_y%.2f_z%.2f__time_%.1f.bmp", timestamp, (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z, get_time());
+    snprintf(filename, sizeof(filename), "Screenshots/%f_x%.2f_y%.2f_z%.2f.bmp", get_time(), (double)instances[PLAYER1].position.x, (double)instances[PLAYER1].position.y, (double)instances[PLAYER1].position.z);
     if (!stbi_write_bmp(filename, Sys_Settings.ScreenWidth, Sys_Settings.ScreenHeight, 4, pixels)) DualLogError("Failed to save screenshot\n"); else DualLog("Saved screenshot %s\n", filename);
     OS_DeallocateRAM(pixels, Sys_Settings.ScreenWidth * Sys_Settings.ScreenHeight * 4 * sizeof(char));
 }
@@ -195,7 +190,9 @@ bool StringsAreEqual(const char* a, const char* b) { // !strcmp replacement (hat
     return true;
 }
 
-bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit) { // !strcmp replacement (hated its inverted logic)
+bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit) {
+    if (limit == 0) return false;
+    
     size_t size  = GetStringLength(a);
     size_t size2 = GetStringLength(b);
     if (size != size2) return false;
@@ -206,6 +203,24 @@ bool StringsAreEqualLimitedBy(const char* a, const char* b, size_t limit) { // !
     }
     
     return true;
+}
+
+int StringCompareUpToLength(const char* s1, const char* s2, size_t n) { // !strncmp replacement
+    if (n == 0) return 0;
+
+    const unsigned char* p1 = (const unsigned char*)s1;
+    const unsigned char* p2 = (const unsigned char*)s2;
+    while (n-- > 0) {
+        if (*p1 != *p2) {
+            return (*p1 < *p2) ? -1 : 1;
+        }
+        if (*p1 == '\0') {
+            break;
+        }
+        p1++;
+        p2++;
+    }
+    return 0;
 }
 
 void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // strcpy replacement
@@ -232,6 +247,66 @@ void StringConcatenate(char* a, const char* b, size_t bufferSize) { // strcat re
     for (size_t i=0;i<size2; ++i) dest[i] = b[i];
     dest[size2] = '\0';
 }
+
+char CharToLower(const char c) { return c + ((c >= 'A' && c <= 'Z') ? 32 : 0); } // If uppercase 'A'-'Z' (65-90), +32 into 'a'-'z' (97-122)
+
+char* StringFindSubstring(const char* haystack, const char* needle) { // strstr replacement
+    if (needle[0] == '\0') return (char*)haystack;
+
+    for (size_t i = 0; haystack[i] != '\0'; ++i) {
+        if (haystack[i] == needle[0]) { // If the first character matches, check the rest of the needle
+            size_t h_idx = i;
+            size_t n_idx = 0;
+            while (haystack[h_idx] != '\0' && needle[n_idx] != '\0' && haystack[h_idx] == needle[n_idx]) {
+                h_idx++;
+                n_idx++;
+            }
+
+            if (needle[n_idx] == '\0') return (char*)&haystack[i];
+        }
+    }
+
+    return NULL; // No match found
+}
+
+const char* StringFindLastChar(const char* str, const char c) { // strrchr replacement
+    const char* lastSeen = NULL;
+    do {
+        if (*str == c) lastSeen = str;
+    } while (*str++);
+    return lastSeen;
+}
+
+char* StringFindFirstCharWithin(const char *s, char c) { // strchr replacement
+    char* stringwalker = (char*)s;
+    while (*stringwalker != c) {
+        if (!*stringwalker) return NULL;
+        stringwalker++;
+    }
+    return stringwalker;
+}
+
+char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr) { // strtok_r replacement
+    char* token;
+    if (str) *saveptr = str;
+    token = *saveptr;
+    if (!token || *token == '\0') return NULL;
+
+    // Find the delimiter or end of string
+    while (**saveptr != '\0') {
+        if (**saveptr == delim) {
+            **saveptr = '\0'; // Terminate the token
+            (*saveptr)++;     // Move saveptr to start of next token
+            return token;
+        }
+        (*saveptr)++;
+    }
+
+    // If we reached the end of the string, the next call should return NULL
+    *saveptr = NULL;
+    return token;
+}
+
 
 uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
 

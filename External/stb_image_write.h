@@ -1,7 +1,6 @@
 #ifndef INCLUDE_STB_IMAGE_WRITE_H
 #define INCLUDE_STB_IMAGE_WRITE_H
 
-#include <stdint.h>
 #include <stdlib.h>
 
 // if STB_IMAGE_WRITE_STATIC causes problems, try defining STBIWDEF to 'inline' or 'static inline'
@@ -18,16 +17,10 @@
 #endif
 
 STBIWDEF int stbi_write_bmp(char const *filename, int w, int h, int comp, const void  *data);
-
-
 #endif//INCLUDE_STB_IMAGE_WRITE_H
 
 #ifdef STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stdio.h>
 #include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
 #define STBIW_UCHAR(x) (unsigned char)((x) & 0xff)
 
 typedef void stbi_write_func(void *context, void *data, int size);

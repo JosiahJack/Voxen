@@ -1,13 +1,24 @@
 // os.h - starts most translation units and defines the shim layer between Voxen and the OS as well as defining project wide OS defines.
 #pragma once
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#define bool _Bool
+#define true 1
+#define false 0
+typedef __INT16_TYPE__ int16_t;
+typedef __INT32_TYPE__ int32_t;
+typedef __UINT8_TYPE__ uint8_t;
+typedef __UINT16_TYPE__ uint16_t;
+typedef __UINT32_TYPE__ uint32_t;
+typedef __INT64_TYPE__ int64_t;
+typedef __UINT64_TYPE__ uint64_t;
+#define likely(x)   __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 #include <stdio.h>
 #include <fcntl.h>
 void DualLog(const char* fmt, ...);
 void DualLogWarn(const char* fmt, ...);
 void DualLogError(const char* fmt, ...);
+char* StringFindSubstring(const char* haystack, const char* needle);
+char* StringFindFirstCharWithin(const char *s, char c);
 typedef struct {
     uint64_t mtime_ns;
     uint64_t size;
@@ -67,10 +78,7 @@ typedef struct {
     #include <sys/stat.h>
     #include <sys/mman.h>
     #include <fcntl.h>
-    #include <unistd.h>
-    #include <errno.h>
-    #include <string.h>
-    
+    #include <unistd.h>    
     #define OS_MakeFolder(path) mkdir(path, 0755)
     static inline void OS_Close(OsFileHandle fileDescriptor) { close(fileDescriptor); }
 
@@ -112,7 +120,7 @@ static inline OsFileHandle OS_OpenReadonly(const char* filePath) {
         if (fp == OS_INVALID_HANDLE) { DualLog("Could not open file %s\n", filePath); return OS_INVALID_HANDLE; }
     #else // Linux, Mac, Android
         OsFileHandle fp = open(filePath, O_RDONLY);
-        if (fp < 0) { DualLog("Could not open file %s: %s\n", filePath, strerror(errno)); return OS_INVALID_HANDLE; }
+        if (fp < 0) { DualLog("Could not open file %s\n", filePath); return OS_INVALID_HANDLE; }
     #endif
     return fp;
 }
@@ -123,7 +131,7 @@ static inline OsFileHandle OS_OpenWriteonly(const char* filePath) {
         return (h == OS_INVALID_HANDLE) ? (DualLogError("Failed to open %s\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #else // Linux, Mac, Android
         OsFileHandle h = open(filePath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        return (h < 0) ? (DualLogError("Failed to open %s: %s\n", filePath, strerror(errno)), OS_Exit(1), OS_INVALID_HANDLE) : h;
+        return (h < 0) ? (DualLogError("Failed to open %s\n", filePath), OS_Exit(1), OS_INVALID_HANDLE) : h;
     #endif
 }
 
@@ -153,7 +161,7 @@ static inline void* OS_AllocateFileBackedRAMReadonly(size_t size, OsFileHandle f
         if (ramSpacePointer == NULL) { DualLogError("Failed to allocate %s (err %lu)\n", filePath, GetLastError()); return NULL; }
     #else // Linux, Mac, Android
         void* ramSpacePointer = OS_AllocateRAM(NULL, size, PROT_READ, MAP_PRIVATE, fileDescriptor);
-        if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s: %s\n", filePath, strerror(errno)); return NULL; }
+        if (ramSpacePointer == MAP_FAILED) { DualLogError("Failed to allocate %s\n", filePath); return NULL; }
     #endif
     return ramSpacePointer;
 }
@@ -179,7 +187,7 @@ static inline void OS_DeallocateRAM(void* ramSpacePointer, size_t size) {
     #else // Linux, Mac, Android
         if (!ramSpacePointer || ramSpacePointer == MAP_FAILED) { DualLogError("Attempting to double free!\n"); OS_Exit(1); }
         
-        if ((void *)(int64_t)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogError("munmap failed: %s\n", strerror(errno));
+        if ((void *)(int64_t)munmap(ramSpacePointer, size) == MAP_FAILED) DualLogError("munmap failed\n");
     #endif
 }
 
@@ -208,8 +216,8 @@ static inline void OS_CPUInfo(void) {
             OS_Close(fd);
             if (n > 0) {
                 buf[n] = 0;
-                char* f = strstr(buf, "model name");
-                if (f && (f = strchr(f, ':'))) {
+                char* f = StringFindSubstring(buf, "model name");
+                if (f && (f = StringFindFirstCharWithin(f, ':'))) {
                     f += 2; // Skip ": "
                     int i = 0;
                     while (f[i] && f[i] != '\n' && i < 255) { brand[i] = f[i]; i++; }
@@ -246,7 +254,7 @@ static inline bool OS_GetFileFingerprint(const char *path, FileFingerprint *fp) 
         CloseHandle(hFile);
     #else // Linux, Mac, Android
         struct stat st;
-        if (stat(path, &st) != 0) return false;
+        if (stat(path, &st) != 0) { DualLogError("Failed to stat \"%s\"\n", path); return false; }
 
         fp->size  = (uint64_t)st.st_size;
     #endif

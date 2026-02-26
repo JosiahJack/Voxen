@@ -62,11 +62,7 @@ void main() {
     vec3 toCam = voxelPos - cam;
     float distToVox = length(toCam);
     if (distToVox > 71.68) return;
-    if (dot(toCam,camForward) < 0.0 && distToVox > 20.48) return;
-    
-//     uint cellIdx = PosGetCellCoords(voxelPos);
-//     if ((gridCellStates[cellIdx] & CELL_VISIBLE) == 0u && ((gridCellStates[cellIdx] & CELL_OPEN) >= 1u)) return;
-    
+
     for (uint lightIdx = 0; lightIdx < loadedLights; ++lightIdx) {
         uint litIdx = lightIdx * LIGHT_DATA_SIZE;
         vec3 lightPos = vec3(lights[litIdx], 0.0, lights[litIdx + LIGHT_DATA_OFFSET_POSZ]);

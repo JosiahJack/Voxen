@@ -87,7 +87,7 @@ void LoadConfig(void) {
         char* s = data_parser_trim(line);
         if (*s == 0 || (s[0] == '/' && s[1] == '/')) continue;
 
-        char* eq = strchr(s, '=');
+        char* eq = StringFindFirstCharWithin(s, '=');
         if (!eq) continue;
         *eq = 0;
 
@@ -291,11 +291,11 @@ static void joystick_callback(int32_t jid, int32_t event) {
     if (jid > GLFW_JOYSTICK_LAST) return;
     
     if (event == GLFW_CONNECTED) {
-        memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
+        __builtin_memset(&Sys_Input.joystickPresent[jid], 1, sizeof(bool));
     } else if (event == GLFW_DISCONNECTED) {
-        memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
-        memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
-        memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
+        __builtin_memset(&Sys_Input.joystickPresent[jid], 0, sizeof(bool));
+        __builtin_memset(Sys_Input.joystickButtons, 0, sizeof(Sys_Input.joystickButtons));
+        __builtin_memset(Sys_Input.joystickHats, 0, sizeof(Sys_Input.joystickHats));
     }
 }
 

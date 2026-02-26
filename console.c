@@ -1,9 +1,6 @@
 // console.c - Console Emulator
-#include <ctype.h> // For tolower
-#include <string.h>
-#include <stdio.h> // For snprintf
 #include "voxen.h"
-
+#define NULL 0
 #define MAX_HISTORY 7
 static int32_t currentEntryLength = 0;
 char consoleEntryText[TEXT_BUFFER_SIZE] = "Enter a command...";
@@ -74,14 +71,14 @@ typedef struct {
 
 __attribute__((pure)) static int CommandMatch(const char* input, const char* cmd) {
     while (*cmd && *input) {
-        char c1 = tolower((unsigned char)*input++);
-        char c2 = tolower((unsigned char)*cmd++);
+        char c1 = CharToLower((unsigned char)*input++);
+        char c2 = CharToLower((unsigned char)*cmd++);
         if (c1 == ' ' || c1 == '_') c1 = ' ';
         if (c2 == ' ' || c2 == '_') c2 = ' ';
         if (c1 != c2) return 0;
     }
 
-    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((unsigned char)*input) || *input == '_' || *input == '\0');
+    return *cmd == '\0' && (*input == '\0' || CharacterIsEmpty((unsigned char)*input) || *input == '_');
 }
 
 static void cmd_noclip(void) {
@@ -105,59 +102,23 @@ static void cmd_edit(void) {
     }
 }
 
-static void cmd_savegeometry(void) {
-    if (!Sys_Cheats.editMode) { CenterStatusPrint("savegeometry only works in edit mode!"); return; }
-
-    char filename[64];
-    snprintf(filename, sizeof(filename), "./Data/level%u.txt", Sys_Global.currentLevel);
-    FILE* f = fopen(filename, "w");
-    if (!f) { CenterStatusPrint("Failed to open %s for writing!", filename); return; }
-
-    DualLog("Saving current level geometry to %s...", filename);
-    // We'll save only geometry chunks for now (constIndex 0–306 except 112, and 760)
-    int saved = 0;
-    for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i < loadedInstances; ++i) {
-        Entity* ent = &instances[i];
-        uint16_t idx = ent->index;
-        if (!ConstIndexIsGeometry(idx)) continue;
-
-        fprintf(f, "constIndex:%u|geometry instance (%u)|", idx, i - START_INDEX_LEVEL_INSTANCES + 1);
-        fprintf(f, "localPosition.x:%08.5f|", (double)ent->position.x);
-        fprintf(f, "localPosition.y:%08.5f|", (double)ent->position.y);
-        fprintf(f, "localPosition.z:%08.5f|", (double)ent->position.z);
-        fprintf(f, "localRotation.x:%08.5f|", (double)ent->rotation.x);
-        fprintf(f, "localRotation.y:%08.5f|", (double)ent->rotation.y);
-        fprintf(f, "localRotation.z:%08.5f|", (double)ent->rotation.z);
-        fprintf(f, "localRotation.w:%08.5f|", (double)ent->rotation.w);
-        fprintf(f, "localScale.x:%08.5f|",    (double)ent->scale.x);
-        fprintf(f, "localScale.y:%08.5f|",    (double)ent->scale.y);
-        fprintf(f, "localScale.z:%08.5f|",    (double)ent->scale.z);
-        fprintf(f, "go.activeSelf:%s|\n", (ent->entflags & ENTFLAG_ACTIVE) ? "True" : "False");
-        saved++;
-    }
-
-    fclose(f);
-    CenterStatusPrint("Saved %d geometry objects to %s", saved, filename);
-    DualLog("Saved %d geometry objects.", saved);
-}
-
 static int ParseLevelArg(const char* arg) {
     if (!arg || !*arg) return -1;
 
     char clean[64] = {0};
     int j = 0;
     for (int i = 0; arg[i] && j < 60; i++) {
-        if (arg[i] != ' ' && arg[i] != '_') clean[j++] = tolower((unsigned char)arg[i]);
+        if (arg[i] != ' ' && arg[i] != '_') clean[j++] = CharToLower((unsigned char)arg[i]);
     }
     
     clean[j] = '\0';
 
     // Special cases
-    if (StringsAreEqual(clean, "r") || strstr(clean, "reactor")) return 0;
-    if (strstr(clean, "g1") || strstr(clean, "10")) return 10;
-    if (strstr(clean, "g2") || strstr(clean, "11")) return 11;
-    if (strstr(clean, "g4") || strstr(clean, "12")) return 12;
-    if (strstr(clean, "g3")) {
+    if (StringsAreEqual(clean, "r")      || StringFindSubstring(clean, "reactor")) return 0;
+    if (StringFindSubstring(clean, "g1") || StringFindSubstring(clean, "10")) return 10;
+    if (StringFindSubstring(clean, "g2") || StringFindSubstring(clean, "11")) return 11;
+    if (StringFindSubstring(clean, "g4") || StringFindSubstring(clean, "12")) return 12;
+    if (StringFindSubstring(clean, "g3")) {
         CenterStatusPrint("%s", Sys_Text.stringTable[1001]); // "Gamma grove already jettisoned! Those poor arrogant people."
         return -2; // Special code: do not load
     }
@@ -274,25 +235,25 @@ static void cmd_sudo(void)           { CenterStatusPrint("Super user access gran
 
 static void cmd_git(const char* arg) {
     if (!arg) arg = "";
-    if (strstr(arg, "pull") || strstr(arg, "fetch")) {
+    if (StringFindSubstring(arg, "pull") || StringFindSubstring(arg, "fetch")) {
         CenterStatusPrint("remote: Enumerating objects: 24601, done. Failed, could not connect with origin/triop.");
-    } else if (strstr(arg, "status")) {
+    } else if (StringFindSubstring(arg, "status")) {
         CenterStatusPrint("Your branch is up to date with origin/triop. Working directory clean.");
-    } else if (strstr(arg, "log")) {
+    } else if (StringFindSubstring(arg, "log")) {
         CenterStatusPrint("<Merge pull request #451 from SHODAN/NeuralLinkBugfix> 6 months ago...");
-    } else if (strstr(arg, "reflog")) {
+    } else if (StringFindSubstring(arg, "reflog")) {
         CenterStatusPrint("dc51440 HEAD0 -> master: commit: Establish neural connection ... ERROR: invalid ID `2-4601`");
-    } else if (strstr(arg, "merge")) {
+    } else if (StringFindSubstring(arg, "merge")) {
         CenterStatusPrint("Failed, could not connect with origin/triop");
-    } else if (strstr(arg, "push")) {
+    } else if (StringFindSubstring(arg, "push")) {
         CenterStatusPrint("Could not find Username for 'triopttp://192.168.1.451'");
-    } else if (strstr(arg, "clone")) {
+    } else if (StringFindSubstring(arg, "clone")) {
         CenterStatusPrint("Failed, connection blocked by SHODAN. Employee ID invalid.");
-    } else if (strstr(arg, "branch") || strstr(arg, "-b")) {
-        const char* last = strrchr(arg, ' ');
+    } else if (StringFindSubstring(arg, "branch") || StringFindSubstring(arg, "-b")) {
+        const char* last = StringFindLastChar(arg, ' ');
         const char* name = last ? last + 1 : "unknown";
         CenterStatusPrint("Created new branch %s", name);
-    } else if (strstr(arg, "checkout")) {
+    } else if (StringFindSubstring(arg, "checkout")) {
         CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
     } else {
         CenterStatusPrint("Branch name not recognized. Contact your TriopBucket representative.");
@@ -405,7 +366,6 @@ static const ConsoleCommand g_ConsoleCommands[] = {
     { "claude",          {.noArg = cmd_ai},               CMD_NOARG },
     { "gemini",          {.noArg = cmd_ai},               CMD_NOARG },
     { "shodan",          {.noArg = cmd_aireal},           CMD_NOARG },
-    { "savegeometry",    {.noArg = cmd_savegeometry},     CMD_NOARG },
     { NULL, {.raw = NULL}, CMD_NOARG } // sizeof helper
 };
 

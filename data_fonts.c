@@ -105,7 +105,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (file_expected != expected_glyphs) { DualLogWarn("range mismatch %s (file:%u exp:%u)\n", path, file_expected, expected_glyphs); OS_DeallocateRAM(map, fontFileSize); return false; }
 
     uint64_t file_stamp_on_disk;
-    memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
+    __builtin_memcpy(&file_stamp_on_disk, p, sizeof(uint64_t));
     p += sizeof(uint64_t);
     if (file_stamp_on_disk != file_stamp) { OS_DeallocateRAM(map, fontFileSize); DualLogWarn("Filestamp mismatch %s\n", path); return false; }
 
@@ -113,7 +113,7 @@ static bool load_font_cache(const char *path, int32_t expected_glyphs, const uin
     if (actual_packed > MAX_GLYPHS) { OS_DeallocateRAM(map, fontFileSize); return false; }
 
     float fixed_advance = *(float*)p;       p += 4;
-    memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
+    __builtin_memcpy(out_packed, p, sizeof(stbtt_packedchar) * actual_packed);
     *out_num = (int32_t)actual_packed;
     *out_fixed_advance = fixed_advance;
     p += sizeof(stbtt_packedchar) * actual_packed;
@@ -134,7 +134,6 @@ void InitFontAtlasses(void) {
     DualLog("Loaded    5 fonts...");
     OsFileHandle fd1; int sz1; fontData[0] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[0], &fd1, &sz1);
     OsFileHandle fd2; int sz2; fontData[1] = OS_OpenAndAllocateFileBufferReadonly(fontPaths[1], &fd2, &sz2);
-    if (fd1 == OS_INVALID_HANDLE || fd2 == OS_INVALID_HANDLE || sz1 <= 0 || sz2 <= 0 || fontData[0] == NULL || fontData[1] == NULL) { DualLogError("Could not open fonts\n"); OS_Exit(1); }
     if (!stbtt_InitFont_internal(&fontInfo[0], fontData[0], 0)) { DualLogError("%s font init failed\n", fontPaths[0]); OS_Exit(1); }
     if (!stbtt_InitFont_internal(&fontInfo[1], fontData[1], 0)) { DualLogError("%s font init failed\n", fontPaths[1]); OS_Exit(1); }
 
@@ -194,7 +193,7 @@ void InitFontAtlasses(void) {
     write_font_cache(pri_cache, pri_expected, fbx_stamp1, fontPackedChar, numPackedGlyphs,fixedNumberAdvanceWidth, bmp);
 
     // Secondary
-    memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
+    __builtin_memset(bmp,0,FONT_ATLAS_SIZE * FONT_ATLAS_SIZE * sizeof(unsigned char));
     stbtt_pack_context pc2;
     stbtt_PackBegin(&pc2, bmp, FONT_ATLAS_SIZE, FONT_ATLAS_SIZE, 0, 16, NULL);
     pc2.h_oversample = 8; // STBTT_MAX_OVERSAMPLE = 8

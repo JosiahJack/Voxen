@@ -34,9 +34,6 @@ typedef struct {
    uint8_t *img_buffer, *img_buffer_end;
 } stbi__context;
 
-void *memcpy(void *s1, const void *s2, size_t n); // #include <string.h>
-void *memset(void *s, int c, size_t n);
-
 typedef struct {
    stbi__context *s;
    uint8_t *idata, *expanded, *out;
@@ -87,8 +84,8 @@ inline static int32_t stbi__bit_reverse(int32_t n, int32_t bits) {
 static int32_t stbi__zbuild_huffman(stbi__zhuffman *z, const uint8_t* sizelist, int32_t num) {
    int32_t i,k=0;
    int32_t next_code[16], sizes[17];
-   memset(sizes, 0, sizeof(sizes));
-   memset(z->fast, 0, sizeof(z->fast));
+   __builtin_memset(sizes, 0, sizeof(sizes));
+   __builtin_memset(z->fast, 0, sizeof(z->fast));
    if (num != 32) {
       for (i=0; i < num; ++i) ++sizes[sizelist[i]];      
    }
@@ -215,7 +212,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
    uint32_t hdist = stbi__zreceive(a,5) + 1;
    uint32_t hclen = stbi__zreceive(a,4) + 4;
    uint32_t ntot  = hlit + hdist;
-   memset(codelength_sizes, 0, sizeof(codelength_sizes));
+   __builtin_memset(codelength_sizes, 0, sizeof(codelength_sizes));
    for (uint32_t i=0; i < hclen; ++i) {
       uint32_t s = stbi__zreceive(a,3);
       codelength_sizes[length_dezigzag[i]] = (uint8_t)s;
@@ -238,7 +235,7 @@ static int stbi__compute_huffman_codes(stbi__zbuf *a) {
             c = stbi__zreceive(a,7)+11;
          } else return 0;
          
-         memset(lencodes+n, fill, c);
+         __builtin_memset(lencodes+n, fill, c);
          n += c;
       }
    }
@@ -264,7 +261,7 @@ static int stbi__parse_uncompressed_block(stbi__zbuf *a) {
    if (k <= 2) header[2] = *a->zbuffer++;
    if (k <= 3) header[3] = *a->zbuffer++;
    int32_t len = header[1] * 256 + header[0];
-   memcpy(a->zout, a->zbuffer, len);
+   __builtin_memcpy(a->zout, a->zbuffer, len);
    a->zbuffer += len;
    a->zout += len;
    return 1;
@@ -421,7 +418,7 @@ extern uint8_t* stbi_load_from_memory(const uint8_t* buffer, int len, int *x, in
                ioff = 0;
             }
             
-            memcpy(z.idata + ioff, s.img_buffer, length);
+            __builtin_memcpy(z.idata + ioff, s.img_buffer, length);
             s.img_buffer += length;
             ioff += length;
             break;

@@ -14,12 +14,12 @@ uint16_t loadedModelsMaxIndex = 0;
 GLuint SetupSSBO(GLuint* id, GLuint bindingIndex, GLsizeiptr size, const void* data, GLenum usage);
 struct aiPropertyStore* props;
 
-static bool LoadVMDL(const char *vmdl_path, uint64_t fbx_stamp, float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount, void** out_map, size_t* out_mapsz) {
+static bool LoadVMDL(const char *vmdl_path, uint64_t fbx_stamp, float **out_verts, uint32_t *out_vcount, uint32_t **out_idx, uint32_t *out_icount) {
     OsFileHandle fd; int st_size; uint8_t* map = OS_OpenAndAllocateFileBufferReadonly(vmdl_path, &fd, &st_size);
     if ((size_t)st_size < sizeof(uint64_t) + 4 + 4) return false;
     
     uint64_t file_stamp_on_disk;
-    memcpy(&file_stamp_on_disk, map, sizeof(uint64_t));
+    __builtin_memcpy(&file_stamp_on_disk, map, sizeof(uint64_t));
     if (file_stamp_on_disk != fbx_stamp) { OS_DeallocateRAM(map, (size_t)st_size); return false; }
 
     const uint8_t *p = map + sizeof(uint64_t);
@@ -34,35 +34,10 @@ static bool LoadVMDL(const char *vmdl_path, uint64_t fbx_stamp, float **out_vert
     *out_verts  = (float*)p;
     p += vert_bytes;
     *out_idx    = (uint32_t*)p;
-    *out_map = map;
-    *out_mapsz = (size_t)st_size;
     return true;
 }
 
-static void WriteVMDL(const char *vmdl_path, const uint64_t fbx_stamp, const float *verts, uint32_t vcnt, const uint32_t *triangleIndices, uint32_t triCount) {
-    OsFileHandle fd = OS_OpenWriteonly(vmdl_path);
-    size_t total = sizeof(uint64_t) + 4 + vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
-    uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
-    if (!buf) { OS_Close(fd); return; }
-
-    uint8_t *p = buf;
-    *(uint64_t *)p = fbx_stamp;
-    p += sizeof(uint64_t);
-    *(uint32_t*)p = vcnt; p += 4;
-    *(uint32_t*)p = triCount; p += 4;
-    memcpy(p, verts, vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vcnt*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
-    memcpy(p, triangleIndices, triCount*3*sizeof(uint32_t));
-    OS_Write(fd, buf, total, vmdl_path);
-    OS_DeallocateRAM(buf,total);
-    OS_Close(fd);
-}
-
-typedef struct { void* ptr; size_t size; } MMapEntry;
-MMapEntry mmap_cleanup[MODEL_IDX_MAX];
-int mmap_cleanup_count = 0;
-void cleanup_all_mmaps(void) { for (int i = 0; i < mmap_cleanup_count; i++) OS_DeallocateRAM(mmap_cleanup[i].ptr, mmap_cleanup[i].size); }
-
-void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmdl_path, uint64_t fbx_stamp, float* cached_verts, uint32_t cached_vcnt, uint32_t* cached_idx, uint32_t cached_icnt, void* mmap_map, size_t mmap_size) {
+void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmdl_path, uint64_t fbx_stamp, float* cached_verts, uint32_t cached_vcnt, uint32_t* cached_idx, uint32_t cached_icnt) {
     const struct aiScene* scene = NULL;
     if (!fromCache) {
         DualLog("No vmdl found or .fbx model was updated so needs refresh from .fbx source, loading %s with Assimp...\n", fbx_path);
@@ -125,10 +100,23 @@ void LoadModel(bool fromCache, uint16_t i, const char* fbx_path, const char* vmd
     r = vmax(r, vabs(minx)); r = vmax(r, vabs(miny)); r = vmax(r, vabs(minz));
     r = vmax(r, maxx);       r = vmax(r, maxy);       r = vmax(r, maxz);
     modelBounds[base + BOUNDS_DATA_OFFSET_RADIUS] = r;
-    if (fromCache) { mmap_cleanup[mmap_cleanup_count].ptr = mmap_map; mmap_cleanup[mmap_cleanup_count].size = mmap_size; mmap_cleanup_count++;
-    } else {
-        WriteVMDL(vmdl_path, fbx_stamp, modelVertices[i], vertexCount, modelTriangles[i], triCount);
+    if (!fromCache) {
         aiReleaseImport(scene);
+        OsFileHandle fd = OS_OpenWriteonly(vmdl_path);
+        size_t total = sizeof(uint64_t) + 4 + vertexCount*VERTEX_ATTRIBUTES_COUNT*sizeof(float) + 4 + triCount*3*sizeof(uint32_t);
+        uint8_t *buf = OS_AllocateRAM(NULL, total, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE | MAP_POPULATE, OS_INVALID_HANDLE);
+        if (!buf) { OS_Close(fd); return; }
+
+        uint8_t *p = buf;
+        *(uint64_t *)p = fbx_stamp;
+        p += sizeof(uint64_t);
+        *(uint32_t*)p = vertexCount; p += 4;
+        *(uint32_t*)p = triCount; p += 4;
+        __builtin_memcpy(p, modelVertices[i], vertexCount*VERTEX_ATTRIBUTES_COUNT*sizeof(float)); p += vertexCount*VERTEX_ATTRIBUTES_COUNT*sizeof(float);
+        __builtin_memcpy(p, modelTriangles[i], triCount*3*sizeof(uint32_t));
+        OS_Write(fd, buf, total, vmdl_path);
+        OS_DeallocateRAM(buf,total);
+        OS_Close(fd);
     }
 }
 
@@ -157,25 +145,19 @@ void LoadModels(void) {
     }
     
     props = aiCreatePropertyStore();
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_ANIMATIONS, 1); aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_MATERIALS, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_TEXTURES, 0);   aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_LIGHTS, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_READ_CAMERAS, 0);    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_FBX_OPTIMIZE_EMPTY_ANIMATION_CURVES, 1);
+    aiSetImportPropertyInteger(props, AI_CONFIG_IMPORT_NO_SKELETON_MESHES, 0);  aiSetImportPropertyInteger(props, AI_CONFIG_PP_RVC_FLAGS, aiComponent_ANIMATIONS | aiComponent_BONEWEIGHTS);
     aiSetImportPropertyInteger(props, AI_CONFIG_PP_SBP_REMOVE, aiPrimitiveType_LINE | aiPrimitiveType_POINT);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 16);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);
-    aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_ICL_PTCACHE_SIZE, 16);       aiSetImportPropertyInteger(props, AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4);
+    aiSetImportPropertyInteger(props, AI_CONFIG_PP_FD_REMOVE, 1);               aiSetImportPropertyInteger(props, AI_CONFIG_PP_PTV_KEEP_HIERARCHY, 0);
     DebugRAM("prior to model load loop");
     for (uint32_t i = 0; i < loadedModelsMaxIndex; ++i) {
         int32_t parserIdx = indexToParser[i];
         modelHasAnimation[i] = (model_parser.entries[parserIdx].entflags & ENTFLAG_ANIMATED);
         const char *fbx_path = model_parser.entries[parserIdx].path;
-        if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); OS_Exit(1); }
+        if (!fbx_path || !fbx_path[0]) { DualLogError("No fbx path for model index %u\n", i); continue; }
 
         char vmdl_path[256];
         size_t fbx_path_sz = GetStringLength(fbx_path);
@@ -184,12 +166,12 @@ void LoadModels(void) {
         
         StringConcatenate(vmdl_path, "vmdl", 256); // Extension . separator was preserved above, so just add the letters part.
         FileFingerprint fp;
-        if (!OS_GetFileFingerprint(fbx_path, &fp)) { DualLogError("File change detection failed for %s\n", fbx_path); continue; }
+        if (!OS_GetFileFingerprint(fbx_path, &fp)) { DualLogError("File change detection failed for %s (%s)\n", fbx_path, vmdl_path); continue; }
         
         uint64_t fbx_stamp = OS_GetFilestamp(&fp);
-        float  *cached_verts = NULL; uint32_t cached_vcnt = 0; uint32_t *cached_idx  = NULL; uint32_t cached_icnt = 0; void* mmap_map = NULL; size_t mmap_size = 0;
-        bool cache_hit = LoadVMDL(vmdl_path, fbx_stamp, &cached_verts, &cached_vcnt, &cached_idx,  &cached_icnt, &mmap_map, &mmap_size);
-        LoadModel(cache_hit, i, fbx_path, vmdl_path, fbx_stamp, cached_verts, cached_vcnt, cached_idx, cached_icnt, mmap_map, mmap_size);        
+        float *cached_verts = NULL; uint32_t cached_vcnt = 0, cached_icnt = 0; uint32_t *cached_idx = NULL; 
+        bool cache_hit = LoadVMDL(vmdl_path, fbx_stamp, &cached_verts, &cached_vcnt, &cached_idx, &cached_icnt);
+        LoadModel(cache_hit, i, fbx_path, vmdl_path, fbx_stamp, cached_verts, cached_vcnt, cached_idx, cached_icnt);        
     }
 
     DebugRAM("after model load loop");
@@ -208,12 +190,12 @@ void LoadModels(void) {
         glBindBuffer(GL_ARRAY_BUFFER, Sys_Render.vbos[i]);
         glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)vertSize, NULL, GL_STATIC_DRAW);
         void* ptr = glMapBufferRange(GL_ARRAY_BUFFER, 0, (GLsizeiptr)vertSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        memcpy(ptr, modelVertices[i], vertSize);
+        __builtin_memcpy(ptr, modelVertices[i], vertSize);
         glUnmapBuffer(GL_ARRAY_BUFFER);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Sys_Render.tbos[i]);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)triSize, NULL, GL_STATIC_DRAW);
         ptr = glMapBufferRange(GL_ELEMENT_ARRAY_BUFFER, 0, (GLsizeiptr)triSize, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-        memcpy(ptr, modelTriangles[i], triSize);
+        __builtin_memcpy(ptr, modelTriangles[i], triSize);
         glUnmapBuffer(GL_ELEMENT_ARRAY_BUFFER);
         glFlush(); glFinish(); // Surprisingly also causes the LoadTextures OpenGL driver in Linux to drop its CPU side RAM duplicates earlier
     }
@@ -223,7 +205,6 @@ void LoadModels(void) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glFlush(); glFinish();
     OS_DeallocateRAM(model_parser.entries,model_parser.count * sizeof(Entity));
-//     cleanup_all_mmaps(); // Uggggh, can't without losing mesh collision support at the moment.
     DualLog(" total vertices: %u, total tris: %u, took %f secs\n", totalVertices, totalTris, get_time() - start_time);
     DebugRAM("After Load Models");
 }

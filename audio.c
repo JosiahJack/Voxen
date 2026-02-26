@@ -1,5 +1,4 @@
 // audio.c
-#include <string.h>
 #include "os.h"
 #include "voxen.h"
 #include "./External/miniaudio.h"
@@ -200,7 +199,7 @@ void UpdateAmbientSounds(void) {
 
 void ResetLevelAudio(void) {
     loadedAmbients = 0;
-    memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
+    __builtin_memset(ambientRegistry, 0, loadedAmbients * sizeof(uint16_t));
     for (uint16_t i = START_INDEX_LEVEL_INSTANCES; i<loadedInstances;++i) {
         uint16_t entIdx = instances[i].index;
         if (ConstIndexIsAmbient(entIdx)) {

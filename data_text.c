@@ -1,10 +1,6 @@
 #include "os.h"
 #include "voxen.h"
 #include <malloc.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 Voxen_Text Sys_Text;
 char** audiologNames = NULL;
@@ -93,7 +89,7 @@ void LoadTextForLanguage(uint8_t lang) {
                 continue;
             }
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
-            memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
+            __builtin_memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
         } else if (is_utf16le) {                               // ----- UTF-16-LE path -----
             while (data_pos + 1 < (size_t)file_size) {
@@ -126,7 +122,7 @@ void LoadTextForLanguage(uint8_t lang) {
         }
 
         if (lineNum < TEXT_STRING_COUNT) {
-            memcpy(Sys_Text.stringTable[lineNum], utf8_line, len);
+            __builtin_memcpy(Sys_Text.stringTable[lineNum], utf8_line, len);
             Sys_Text.stringTable[lineNum][len] = '\0';
             ++lineNum;
         }
@@ -148,13 +144,10 @@ void LoadLogTextForLanguage(uint8_t lang) {
     FREE_ARRAY(audiologSenders,     TEXT_LOGS_COUNT);
     FREE_ARRAY(audiologSubjects,    TEXT_LOGS_COUNT);
     FREE_ARRAY(audioLogSpeech2Text, TEXT_LOGS_COUNT);
-    #if defined(LINUX) || defined(ANDROID)
-        malloc_trim(0);
-    #endif
-    memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
-    memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
-    memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
-    memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesLH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
+    __builtin_memset(Sys_Text.audioLogImagesRefIndicesRH,0,TEXT_LOGS_COUNT * sizeof(uint16_t));
+    __builtin_memset(Sys_Text.audioLogType,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
+    __builtin_memset(Sys_Text.audioLogLevelFound,0,TEXT_LOGS_COUNT * sizeof(uint8_t));
     audiologNames       = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audiologSenders     = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audiologSubjects    = calloc(TEXT_LOGS_COUNT, sizeof(char*));
@@ -207,7 +200,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
             size_t len = data_pos - line_start;
             if (len == 0) continue;
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
-            memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
+            __builtin_memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
         } else if (is_utf16le) {
             while (data_pos + 1 < (size_t)file_size) {
@@ -233,23 +226,20 @@ void LoadLogTextForLanguage(uint8_t lang) {
         if (len == 0) { ++lineNum; continue; }   /* blank line -> skip */
 
         char logline[TEXT_LOCALIZATION_MAX_LENGTH];
-        memcpy(logline, utf8_line, sizeof(logline) - 1);
+        __builtin_memcpy(logline, utf8_line, sizeof(logline) - 1);
         logline[sizeof(logline) - 1] = '\0';
-        
         char fields[32][TEXT_LOCALIZATION_MAX_LENGTH];
         int  num_fields = 0;
         char *saveptr = NULL;
-        char *token = strtok_r(logline, ",", &saveptr);
-
+        char *token = StringReturnUpToDelimiterAndLopOffAndShiftOriginal(logline, ',', &saveptr);
         while (token && num_fields < 32) {
             if (token[0] == '"') ++token;
             size_t tlen = GetStringLength(token);
             if (tlen && token[tlen - 1] == '"') token[--tlen] = '\0';
-            memcpy(fields[num_fields], token, sizeof(fields[0]) - 1);
+            __builtin_memcpy(fields[num_fields], token, sizeof(fields[0]) - 1);
             fields[num_fields][sizeof(fields[0]) - 1] = '\0';
-            
             ++num_fields;
-            token = strtok_r(NULL, ",", &saveptr);
+            token = StringReturnUpToDelimiterAndLopOffAndShiftOriginal(NULL, ',', &saveptr);
         }
 
         int  readIndexOfLog      = (num_fields > 0) ? StringToInt(fields[0]) : -1;
@@ -261,9 +251,9 @@ void LoadLogTextForLanguage(uint8_t lang) {
         char readLogText[TEXT_LOCALIZATION_MAX_LENGTH * 4] = {0};
         int  readLogType         = (num_fields > 6) ? StringToInt(fields[6]) : 0;
         int  readLogLevelFound   = (num_fields > 7) ? StringToInt(fields[7]) : 0;
-        if (num_fields > 3) memcpy(readLogName,    fields[3], sizeof(readLogName) - 1);
-        if (num_fields > 4) memcpy(readLogSender,  fields[4], sizeof(readLogSender) - 1);
-        if (num_fields > 5) memcpy(readLogSubject, fields[5], sizeof(readLogSubject) - 1);
+        if (num_fields > 3) __builtin_memcpy(readLogName,    fields[3], sizeof(readLogName) - 1);
+        if (num_fields > 4) __builtin_memcpy(readLogSender,  fields[4], sizeof(readLogSender) - 1);
+        if (num_fields > 5) __builtin_memcpy(readLogSubject, fields[5], sizeof(readLogSubject) - 1);
         for (int f = 8; f < num_fields; ++f) {
             if (f > 8) StringConcatenate(readLogText, ",", TEXT_LOCALIZATION_MAX_LENGTH * 4);
             StringConcatenate(readLogText, fields[f], TEXT_LOCALIZATION_MAX_LENGTH * 4);

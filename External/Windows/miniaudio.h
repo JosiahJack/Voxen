@@ -3770,7 +3770,7 @@ extern "C" {
     #define MA_SIZEOF_PTR   4
 #endif
 
-#include <stddef.h> /* For size_t. */
+typedef uint64_t size_t;
 
 /* Sized types. */
 #if defined(MA_USE_STDINT)
