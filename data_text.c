@@ -152,7 +152,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
     audiologSenders     = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audiologSubjects    = calloc(TEXT_LOGS_COUNT, sizeof(char*));
     audioLogSpeech2Text = calloc(TEXT_LOGS_COUNT, sizeof(char*));
-    char textFile[256];
+    char textFile[256] = {0};
     switch (lang) {
         case 1:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_espanol.txt", 256); break;
         case 2:  StringCopyInto_A_From_B(textFile, "./Data/logs_text_deutsch.txt", 256); break;
@@ -186,7 +186,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
     }
 
     int lineNum = 0, totalLines = 0;
-    char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH]; // 1207
+    char utf8_line[TEXT_LOCALIZATION_MAX_LENGTH];
     while (data_pos < (size_t)file_size) {
         ++totalLines;
         size_t line_start = data_pos;
@@ -199,6 +199,7 @@ void LoadLogTextForLanguage(uint8_t lang) {
             }
             size_t len = data_pos - line_start;
             if (len == 0) continue;
+            
             if (len >= sizeof(utf8_line)) len = sizeof(utf8_line) - 1;
             __builtin_memcpy(utf8_line, &Sys_Text.file_data[line_start], len);
             utf8_line[len] = '\0';
@@ -226,8 +227,8 @@ void LoadLogTextForLanguage(uint8_t lang) {
         if (len == 0) { ++lineNum; continue; }   /* blank line -> skip */
 
         char logline[TEXT_LOCALIZATION_MAX_LENGTH];
-        __builtin_memcpy(logline, utf8_line, sizeof(logline) - 1);
-        logline[sizeof(logline) - 1] = '\0';
+        __builtin_memcpy(logline, utf8_line, len - 1);
+        logline[len] = '\0';
         char fields[32][TEXT_LOCALIZATION_MAX_LENGTH];
         int  num_fields = 0;
         char *saveptr = NULL;

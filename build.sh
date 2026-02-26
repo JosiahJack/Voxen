@@ -119,7 +119,7 @@ LINUX_CC="gcc"
 WINDOWS_CC="x86_64-w64-mingw32-gcc"
 ANDROID_CC="aarch64-linux-android24-clang"
 MAC_CC="gcc"
-COMMON_CFLAGS=" -I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -g1 -std=c11 -Wall -Wextra \
+COMMON_CFLAGS="-I./External/ -pipe -fno-ident -fdata-sections -ffunction-sections -ffast-math -g1 -std=c11 -Wall -Wextra \
                -fno-omit-frame-pointer -fstrict-aliasing -fno-common -Walloca -Wstack-usage=262144 \
                -Wdouble-promotion -Wformat=2 -Wnull-dereference -Wstrict-prototypes -Wno-overlength-strings \
                -Werror=implicit-function-declaration -Og -D_GNU_SOURCE"
@@ -170,10 +170,10 @@ cp $GLAD_OBJ "$TEMP_DIR/glad.o"
 export CC=$CC
 export CFLAGS=$CFLAGS
 SOURCES="voxen.c physics.c helpers.c init.c menu.c audio.c animation.c console.c biomonitor.c level.c data_parser.c \
-         data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c"
+         data_text.c data_fonts.c data_models.c dynamic_culling.c todo.c input.c data_textures.c"
 export TEMP_DIR=temp_build
 printf "%s\n" $SOURCES | xargs -P12 -I{} $CC -c {} $CFLAGS -o "$TEMP_DIR"/{}.o
-
+# $CC -c data_textures.c $CFLAGS -fsanitize=address -o "$TEMP_DIR"/data_textures.o
 $LINKER "$TEMP_DIR"/*.o $LDFLAGS -o $BINARY_NAME $LDFLAGS
 link_status=$?
 if [ $link_status -ne 0 ]; then

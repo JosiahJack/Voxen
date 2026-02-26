@@ -232,7 +232,7 @@ void StringCopyInto_A_From_B(char* a, const char* b, size_t bufferSize) { // str
 }
 
 void StringCopyInto_A_SubstringFrom_B(char* a, size_t substringSize, const char* b, size_t bufferSize) { // strcpy replacement (hopefully my mnemonic "SubstringFrom_B" will help me remember substringSize comes before be in the args passed)
-    if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer!\n");  OS_Exit(1); }
+    if (substringSize >= bufferSize) { DualLogError("Substring too large for buffer! %u >= %u\n", substringSize, bufferSize);  OS_Exit(1); }
     
     for (size_t i=0;i<substringSize;++i) a[i] = b[i];
     a[substringSize] = '\0';
@@ -287,26 +287,29 @@ char* StringFindFirstCharWithin(const char *s, char c) { // strchr replacement
 }
 
 char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr) { // strtok_r replacement
-    char* token;
     if (str) *saveptr = str;
-    token = *saveptr;
-    if (!token || *token == '\0') return NULL;
 
-    // Find the delimiter or end of string
-    while (**saveptr != '\0') {
-        if (**saveptr == delim) {
-            **saveptr = '\0'; // Terminate the token
-            (*saveptr)++;     // Move saveptr to start of next token
-            return token;
-        }
-        (*saveptr)++;
+    char* token = *saveptr;
+    if (!token || *token == '\0') {
+        *saveptr = NULL;
+        return NULL;
     }
 
-    // If we reached the end of the string, the next call should return NULL
-    *saveptr = NULL;
+    char* p = token;
+    while (*p != '\0' && *p != delim) {
+        p++;
+    }
+
+    if (*p == delim) {
+        *p = '\0';
+        *saveptr = p + 1;
+    } else {
+        // End of string reached — no more tokens after this
+        *saveptr = NULL;
+    }
+
     return token;
 }
-
 
 uint8_t GetCurrentLevelSecurity() { return (Sys_Global.difficultyMission < 1 || Sys_Cheats.superoverride) ? 0u : Sys_Global.levelSecurity[Sys_Global.currentLevel]; }
 

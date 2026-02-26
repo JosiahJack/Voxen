@@ -180,7 +180,7 @@ extern CheatsSystem Sys_Cheats;
 #define SOUNDS_COUNT 670
 #define TEXT_DATA_FILEBUFFER_SIZE 65536 // 16 pages
 #define TEXT_STRING_COUNT 1100
-#define TEXT_LOCALIZATION_MAX_LENGTH 1207
+#define TEXT_LOCALIZATION_MAX_LENGTH 1280
 #define TEXT_LOGS_COUNT 134
 typedef struct {	
 	uint8_t file_data[TEXT_DATA_FILEBUFFER_SIZE]; // Found that only 59430 were needed at one point, padded for safety and typo fixes
@@ -1190,8 +1190,10 @@ typedef struct {
 #define TAU 6.2831853f
 static inline float vfloor(float x) { int i = (int)x; return (float)(i > x ? i - 1 : i); }
 static inline float vceil(float x) { int i = (int)x; return (float)(x > 0 && x > (float)i ? i + 1 : i); }
-static inline float vclamp(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
-static inline float vsqrtf(float x) { union { float f; unsigned int i; } u = { x }; u.i = 0x1fbd1df5 + (u.i >> 1); return 0.5f * (u.f + x / u.f); }
+// static inline float vclamp(float x, float a, float b) { return x < a ? a : (x > b ? b : x); }
+#define vclamp(x,a,b) __builtin_fminf(__builtin_fmaxf(x, a), b)
+// static inline float vsqrtf(float x) { union { float f; unsigned int i; } u = { x }; u.i = 0x1fbd1df5 + (u.i >> 1); return 0.5f * (u.f + x / u.f); }
+#define vsqrtf(x) __builtin_sqrtf(x)
 static inline float vsign(float x) { return x < 0.0f ? -1.0f : 1.0f; } // Follow Unity Sign convention where 0 = 1.0f sign.
 static inline float vsinf(float x) { x -= TAU * vfloor(x / TAU); if (x > PI) { x -= TAU; } float s = (4/PI)*x - (4/(PI*PI))*x*vabs(x); return 0.225f*(s*vabs(s) - s) + s; }
 static inline float vcosf(float x) { return vsinf(x + 1.57079632f); }
@@ -1244,8 +1246,6 @@ void play_wav(const char* path, float volume, Vector3 pos, bool positional);
 #define MAX_PALETTE_SIZE 256
 #define MAX_TOTAL_PIXELS 26400000u
 #define MAX_UNIQUE_COLORS 76800u
-extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
-extern bool transparentTexture[MAX_VALID_TEXTURE];
 #define VERTEX_ATTRIBUTES_COUNT 8 // x,y,z,nx,ny,nz,u,v
 #define BOUNDS_ATTRIBUTES_COUNT 7
 #define BOUNDS_DATA_OFFSET_MINX 0
@@ -1719,3 +1719,9 @@ const char* StringFindLastChar(const char* str, const char c);
 char* StringFindFirstCharWithin(const char *s, char c);
 char* StringReturnUpToDelimiterAndLopOffAndShiftOriginal(char* str, const char delim, char** saveptr);
 int StringCompareUpToLength(const char* s1, const char* s2, size_t n);
+
+extern uint32_t totalPixels;
+extern uint32_t totalPaletteColors;
+extern uint16_t loadedTexturesMaxIndex;
+extern bool doubleSidedTexture[MAX_VALID_TEXTURE];
+extern bool transparentTexture[MAX_VALID_TEXTURE];

@@ -128,11 +128,12 @@ bool parse_data_file(DataParser *parser, uint16_t maxSize, const char *filename)
         if (*start == '#') {
             if (entry.path[0] && entry.index != UINT16_MAX && entry.index < parser->capacity) parser->entries[entry.index] = entry;
             InitializeEntity(&entry);
-            size_t pathLen = (lineend >= (start + 1)) ? lineLen : 0;
-            size_t limit = (pathLen < sizeof(entry.path) - 1) ? pathLen - 1 : sizeof(entry.path) - 1;
-            StringCopyInto_A_SubstringFrom_B(entry.path, limit, start + 1, 128);
-            
-            entry.path[limit] = '\0';
+            if (lineend > start) {
+                size_t actualLen = lineend - (start + 1) + 1;
+                if (actualLen >= sizeof(entry.path)) actualLen = sizeof(entry.path) - 1;
+                __builtin_memcpy(entry.path, start + 1, actualLen);
+                entry.path[actualLen] = '\0';
+            }
             continue;
         }
 
